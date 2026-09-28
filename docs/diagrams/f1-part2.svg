@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1711.4" viewBox="0 0 1120 1711.4">
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#5B6B80"/>
+  </marker>
+</defs>
+<rect width="1120" height="1711.4" fill="#FFFFFF"/>
+<text x="560" y="32.0" font-family="Helvetica, Arial, sans-serif" font-size="27.55" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">Flow 1 — Transport Request Creation &amp; Approval (Part 2 of 2)</text><text x="560" y="69.2" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">From quotation to approval, job creation and hand-off into Flow 2 and Flow 3</text>
+<rect x="35" y="141.4" width="350" height="1528" fill="#FFFFFF" stroke="#C7D3E2" stroke-width="1"/><rect x="35" y="92" width="350" height="49.4" fill="#1F3A5F"/><text x="210" y="116.7" font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="central">Customer (Club / Horse Owner)</text><rect x="385" y="141.4" width="350" height="1528" fill="#F4F7FB" stroke="#C7D3E2" stroke-width="1"/><rect x="385" y="92" width="350" height="49.4" fill="#1F3A5F"/><text x="560" y="116.7" font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="central">System (CBRTS)</text><rect x="735" y="141.4" width="350" height="1528" fill="#FFFFFF" stroke="#C7D3E2" stroke-width="1"/><rect x="735" y="92" width="350" height="49.4" fill="#1F3A5F"/><text x="910" y="116.7" font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#FFFFFF" font-weight="bold" text-anchor="middle" dominant-baseline="central">Logistics Manager</text>
+<rect x="770" y="167.4" width="280" height="106" rx="8" ry="8" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.6"/>
+
+<text x="910" y="209.8" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">From Part 1 — request</text>
+<text x="910" y="231.0" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">accepted for quotation</text>
+<rect x="770" y="319.4" width="280" height="106" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+
+<text x="910" y="340.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Build the quotation: legs,</text>
+<text x="910" y="361.8" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">stalls, quarantine,</text>
+<text x="910" y="383.0" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">documentation, escort,</text>
+<text x="910" y="404.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">insurance, contingency</text>
+<rect x="420" y="471.4" width="280" height="106" rx="8" ry="8" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.6"/>
+<text x="560" y="484.4" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#2E6DA4" font-weight="bold" text-anchor="middle" dominant-baseline="central">STATUS → QUOTED</text>
+<text x="560" y="520.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Issue the quote (valid 7 days)</text>
+<text x="560" y="541.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">and notify the customer</text>
+<polygon points="210,617.04 338.8,676.4 210,735.76 81.19999999999999,676.4" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+<text x="210" y="657.0" font-family="Helvetica, Arial, sans-serif" font-size="15.5" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Customer accepts</text>
+<text x="210" y="676.4" font-family="Helvetica, Arial, sans-serif" font-size="15.5" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">within the validity</text>
+<text x="210" y="695.8" font-family="Helvetica, Arial, sans-serif" font-size="15.5" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">period?</text>
+<rect x="81.19999999999999" y="793.42" width="257.6" height="69.96000000000001" rx="34.980000000000004" ry="34.980000000000004" fill="#FBE7E4" stroke="#B23A2C" stroke-width="1.6"/>
+<text x="210" y="806.4" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#B23A2C" font-weight="bold" text-anchor="middle" dominant-baseline="central">STATUS → EXPIRED / DECLINED</text>
+<text x="210" y="813.6" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">Request closed — the</text>
+<text x="210" y="834.9" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">customer may ask for a</text>
+<text x="210" y="856.1" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">re-quote</text>
+<rect x="70" y="927.4" width="280" height="106" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="210" y="940.4" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">STATUS → CUSTOMER_ACCEPTED</text>
+<text x="210" y="976.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Accept the quote and confirm</text>
+<text x="210" y="997.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">the deposit</text>
+<rect x="770" y="1079.4" width="280" height="106" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="910" y="1092.4" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">STATUS → APPROVED</text>
+<text x="910" y="1128.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Final approval and sign-off —</text>
+<text x="910" y="1149.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">pricing is locked</text>
+<rect x="420" y="1231.4" width="280" height="106" rx="8" ry="8" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.6"/>
+
+<text x="560" y="1252.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Create Transport Job</text>
+<text x="560" y="1273.8" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">CBRT-YYYY-NNN and assign</text>
+<text x="560" y="1295.0" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Transport Specialist +</text>
+<text x="560" y="1316.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Coordinator</text>
+<rect x="420" y="1383.4" width="280" height="106" rx="8" ry="8" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.6"/>
+
+<text x="560" y="1404.5" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">Generate the per-horse</text>
+<text x="560" y="1425.8" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">document checklist → Flow 2</text>
+<text x="560" y="1447.0" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">· Push the job to the planning</text>
+<text x="560" y="1468.3" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">backlog → Flow 3</text>
+<rect x="81.19999999999999" y="1553.42" width="257.6" height="69.96000000000001" rx="34.980000000000004" ry="34.980000000000004" fill="#FBE7E4" stroke="#B23A2C" stroke-width="1.6"/>
+
+<text x="210" y="1567.2" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">Customer notified: request</text>
+<text x="210" y="1588.4" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">approved and job code</text>
+<text x="210" y="1609.7" font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">issued</text>
+<polyline points="910,273.4 910,319.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="910,425.4 910,448.4 560,448.4 560,471.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="560,577.4 560,597.22 210,597.22 210,617.04" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="224.0" y="753.8" width="103.2" height="21.5" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="275.5899" y="764.6" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">No / no reply</text>
+<polyline points="210,735.76 210,793.42" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="338.8,676.4 378,676.4 378,980.4 350,980.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="386.0" y="817.6" width="37.2" height="21.5" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="404.60519999999997" y="828.4" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Yes</text>
+<polyline points="210,1033.4 210,1056.4 910,1056.4 910,1079.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="910,1185.4 910,1208.4 560,1208.4 560,1231.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="560,1337.4 560,1383.4" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="560,1489.4 560,1521.41 210,1521.41 210,1553.42" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="39" y="1681.4" width="24" height="20" rx="5" fill="#E3F3E8" stroke="#2E7D4F" stroke-width="1.4"/><text x="67" y="1691.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Start / End</text><rect x="170.74380000000002" y="1681.4" width="24" height="20" rx="5" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.4"/><text x="198.74380000000002" y="1691.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Manual step</text><rect x="307.04150000000004" y="1681.4" width="24" height="20" rx="5" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.4"/><text x="335.04150000000004" y="1691.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">System step</text><polygon points="458.5993,1681.4 469.5993,1691.4 458.5993,1701.4 447.5993,1691.4" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.4"/><text x="475.5993" y="1691.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Decision</text><rect x="564.2124" y="1681.4" width="24" height="20" rx="5" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.4"/><text x="592.2124" y="1691.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Hand-off</text>
+</svg>

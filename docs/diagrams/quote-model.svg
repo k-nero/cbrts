@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="910" viewBox="0 0 1340 910">
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#5B6B80"/>
+  </marker>
+</defs>
+<rect width="1340" height="910" fill="#FFFFFF"/>
+<text x="670" y="32.0" font-family="Helvetica, Arial, sans-serif" font-size="25" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">Quotation build-up — cost lines and calculation order</text><text x="670" y="65.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Derived from how specialist equine shippers actually price a movement; the numbers live in rate catalogs, the structure lives in the system</text>
+<rect x="40" y="168" width="640" height="645" rx="12" fill="#FBFCFE" stroke="#C7D3E2" stroke-width="1.4"/><rect x="40" y="168" width="640" height="34" rx="12" fill="#1F3A5F"/><rect x="40" y="188" width="640" height="14" fill="#1F3A5F"/><text x="56" y="185.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="start" dominant-baseline="central">Cost line groups — everything a complete quote must contain</text>
+<rect x="64" y="217" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="230.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">A · GROUND, ORIGIN</text>
+<text x="360" y="246.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">per km loaded + empty positioning km · minimum charge per movement · waiting</text>
+<text x="360" y="262.6" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">time per hour</text>
+<rect x="64" y="290" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="303.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">B · PRE-EXPORT</text>
+<text x="360" y="327.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">isolation: per horse per day · blood tests: per horse per test · official vet fee</text>
+<rect x="64" y="363" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="376.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">C · AIR</text>
+<text x="360" y="392.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">stall positions = total horse width ÷ 96 in, priced by service class · airport handling ·</text>
+<text x="360" y="408.6" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">air waybill</text>
+<rect x="64" y="436" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="449.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">D · ESCORT</text>
+<text x="360" y="473.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">grooms = number of horses ÷ 3, rounded up · flight vet from 8 horses or on high value</text>
+<rect x="64" y="509" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="522.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">E · DOCUMENTATION</text>
+<text x="360" y="546.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">permits and health certificate: per horse · customs handling: per border crossing</text>
+<rect x="64" y="582" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="595.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">F · POST-ARRIVAL</text>
+<text x="360" y="619.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">quarantine: per horse per day, rate depends on the horse's sex · customs clearance</text>
+<rect x="64" y="655" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="668.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">G · GROUND, DESTINATION</text>
+<text x="360" y="692.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">per km from the quarantine facility to the delivery address</text>
+<rect x="64" y="728" width="592" height="62" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="360" y="741.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">H · SURCHARGES</text>
+<text x="360" y="765.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">stall upgrade · layover beyond 72 h · difficult access · hard loader · re-route</text>
+<rect x="710" y="168" width="590" height="645" rx="12" fill="#FBFCFE" stroke="#C7D3E2" stroke-width="1.4"/><rect x="710" y="168" width="590" height="34" rx="12" fill="#1F3A5F"/><rect x="710" y="188" width="590" height="14" fill="#1F3A5F"/><text x="726" y="185.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="start" dominant-baseline="central">Calculation order — the system computes, nobody types the total</text>
+<rect x="734" y="204" width="542" height="56" rx="8" ry="8" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.6"/>
+<text x="1005" y="217.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#2E6DA4" font-weight="bold" text-anchor="middle" dominant-baseline="central">SUM</text>
+<text x="1005" y="238.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Direct cost subtotal — groups A to H</text>
+<rect x="734" y="276" width="542" height="56" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="1005" y="289.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">% OF THE AIR LINES ONLY</text>
+<text x="1005" y="310.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">+ Fuel surcharge</text>
+<rect x="734" y="348" width="542" height="56" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="1005" y="361.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">% OF THE DECLARED HORSE VALUE</text>
+<text x="1005" y="382.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">+ Transit insurance</text>
+<rect x="734" y="420" width="542" height="56" rx="8" ry="8" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.6"/>
+<text x="1005" y="433.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#2E6DA4" font-weight="bold" text-anchor="middle" dominant-baseline="central">=</text>
+<text x="1005" y="454.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Cost base</text>
+<rect x="734" y="492" width="542" height="56" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="1005" y="505.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">% OF THE COST BASE</text>
+<text x="1005" y="526.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">+ Contingency allowance</text>
+<rect x="734" y="564" width="542" height="56" rx="8" ry="8" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.6"/>
+<text x="1005" y="577.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">% OF THE COST BASE</text>
+<text x="1005" y="598.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#16202E" font-weight="normal" text-anchor="middle" dominant-baseline="central">+ Commercial margin</text>
+<rect x="734" y="632" width="542" height="64" rx="8" ry="8" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.6"/>
+<text x="1005" y="645.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#7A4BA8" font-weight="bold" text-anchor="middle" dominant-baseline="central">=</text>
+<text x="1005" y="670.5" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">QUOTE TOTAL — one currency, FX rate pinned at issue</text>
+<polyline points="1005,262 1005,274" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="1005,334 1005,346" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="1005,406 1005,418" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="1005,478 1005,490" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="1005,550 1005,562" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="1005,622 1005,630" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="734" y="712" width="542" height="88" rx="8" ry="8" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+<text x="1005" y="725.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#B9852A" font-weight="bold" text-anchor="middle" dominant-baseline="central">WATCH THE STEP FUNCTIONS</text>
+<text x="1005" y="738.1" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Air space steps on total width, not headcount — an air stall is 96 in wide and a</text>
+<text x="1005" y="754.4" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">standard horse takes 32 in, so three fit, but two warmbloods can fill the same</text>
+<text x="1005" y="770.6" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">stall. Grooms step on headcount: the fourth horse adds a whole groom.</text>
+<text x="1005" y="786.9" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Quarantine steps on each horse's sex.</text>
+<rect x="40" y="836" width="1260" height="56" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+
+<text x="670" y="856.5" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Every line is tagged FIXED or ESTIMATED. Estimated lines — waiting time, layover, difficult access, hard loader — may differ on the final invoice, and the customer sees which is which before</text>
+<text x="670" y="871.5" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">accepting. Every rate and percentage is a catalog value per corridor and per service class, never a constant in the code.</text>
+</svg>

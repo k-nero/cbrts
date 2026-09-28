@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="1180" viewBox="0 0 1260 1180">
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#5B6B80"/>
+  </marker>
+</defs>
+<rect width="1260" height="1180" fill="#FFFFFF"/>
+<text x="630" y="32.0" font-family="Helvetica, Arial, sans-serif" font-size="25" fill="#1F3A5F" font-weight="bold" text-anchor="middle" dominant-baseline="central">Flow 2 — Automatic document validity check</text><text x="630" y="65.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Run by the system on every upload and re-run on every schedule change, before a human ever looks at the file</text>
+<rect x="310" y="211" width="320" height="78" rx="39" ry="39" fill="#E3F3E8" stroke="#2E7D4F" stroke-width="1.6"/>
+
+<text x="470" y="241.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#1B4D31" font-weight="normal" text-anchor="middle" dominant-baseline="central">A document is uploaded — or the planned</text>
+<text x="470" y="258.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#1B4D31" font-weight="normal" text-anchor="middle" dominant-baseline="central">departure date changes</text>
+<rect x="310" y="336" width="320" height="92" rx="8" ry="8" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.6"/>
+
+<text x="470" y="364.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">Resolve the rule for (document type ×</text>
+<text x="470" y="382.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">destination country) from the catalog</text>
+<text x="470" y="399.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#123A5E" font-weight="normal" text-anchor="middle" dominant-baseline="central">version pinned to the job</text>
+<rect x="310" y="479" width="320" height="86" rx="8" ry="8" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+
+<text x="470" y="513.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Issue / expiry dates present and the file</text>
+<text x="470" y="530.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">readable?</text>
+<rect x="310" y="629" width="320" height="86" rx="8" ry="8" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+
+<text x="470" y="663.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Rule satisfied on the planned departure</text>
+<text x="470" y="680.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">date?</text>
+<rect x="310" y="779" width="320" height="86" rx="8" ry="8" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+
+<text x="470" y="813.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">Still satisfied on the arrival date plus the</text>
+<text x="470" y="830.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">buffer?</text>
+<rect x="310" y="919" width="320" height="78" rx="8" ry="8" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.6"/>
+
+<text x="470" y="949.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">GREEN — accepted, queued for the</text>
+<text x="470" y="966.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#43246B" font-weight="normal" text-anchor="middle" dominant-baseline="central">Transport Specialist</text>
+<rect x="40" y="483" width="250" height="78" rx="39" ry="39" fill="#FBE7E4" stroke="#B23A2C" stroke-width="1.6"/>
+
+<text x="165" y="513.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">RED — upload refused on the</text>
+<text x="165" y="530.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">spot, reason shown</text>
+<rect x="40" y="633" width="250" height="78" rx="39" ry="39" fill="#FBE7E4" stroke="#B23A2C" stroke-width="1.6"/>
+
+<text x="165" y="663.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">RED — item flagged, a new</text>
+<text x="165" y="680.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#79231A" font-weight="normal" text-anchor="middle" dominant-baseline="central">certificate must be issued</text>
+<rect x="40" y="776" width="250" height="92" rx="8" ry="8" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.6"/>
+
+<text x="165" y="804.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">AMBER — accepted, but must be</text>
+<text x="165" y="822.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">renewed by the date the system</text>
+<text x="165" y="839.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#5C4210" font-weight="normal" text-anchor="middle" dominant-baseline="central">computes</text>
+<polyline points="470,291 470,334" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="470,430 470,477" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<polyline points="470,567 470,627" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="492.9" y="587.2" width="34.3" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="510" y="597.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Yes</text>
+<polyline points="470,717 470,777" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="492.9" y="737.2" width="34.3" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="510" y="747.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Yes</text>
+<polyline points="470,867 470,917" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="492.9" y="882.2" width="34.3" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="510" y="892.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">Yes</text>
+<polyline points="308,522 292,522" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="286.6" y="490.2" width="26.8" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="300" y="500.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">No</text>
+<polyline points="308,672 292,672" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="286.6" y="640.2" width="26.8" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="300" y="650.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">No</text>
+<polyline points="308,822 292,822" fill="none" stroke="#5B6B80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#ah)"/>
+<rect x="286.6" y="790.2" width="26.8" height="19.6" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="300" y="800.0" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">No</text>
+<rect x="660" y="196" width="560" height="596" rx="12" fill="#FBFCFE" stroke="#C7D3E2" stroke-width="1.4"/><rect x="660" y="196" width="560" height="34" rx="12" fill="#1F3A5F"/><rect x="660" y="216" width="560" height="14" fill="#1F3A5F"/><text x="676" y="213.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="start" dominant-baseline="central">Rule shapes stored in the Country Regulation Catalog</text>
+<rect x="690" y="250" width="500" height="92" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+<text x="940" y="263.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#6B7A8C" font-weight="bold" text-anchor="middle" dominant-baseline="central">WINDOW BEFORE DEPARTURE</text>
+<text x="940" y="293.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Issued at most N days before departure.</text>
+<text x="940" y="311.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Example: EIA / Coggins test, export health certificate.</text>
+<rect x="690" y="368" width="500" height="92" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+<text x="940" y="381.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#6B7A8C" font-weight="bold" text-anchor="middle" dominant-baseline="central">VALID-UNTIL DATE</text>
+<text x="940" y="403.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Carries an expiry date and must still be valid at arrival plus a</text>
+<text x="940" y="420.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">buffer.</text>
+<text x="940" y="438.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Example: equine passport, insurance policy.</text>
+<rect x="690" y="486" width="500" height="92" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+<text x="940" y="499.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#6B7A8C" font-weight="bold" text-anchor="middle" dominant-baseline="central">BOOSTER WINDOW</text>
+<text x="940" y="529.8" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Administered at least X and at most Y days before departure.</text>
+<text x="940" y="547.3" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Example: equine influenza booster.</text>
+<rect x="690" y="604" width="500" height="92" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+<text x="940" y="617.0" font-family="Helvetica, Arial, sans-serif" font-size="9.5" fill="#6B7A8C" font-weight="bold" text-anchor="middle" dominant-baseline="central">PRESENCE ONLY</text>
+<text x="940" y="639.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">No date rule — must exist, be legible and match the horse's</text>
+<text x="940" y="656.5" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">microchip.</text>
+<text x="940" y="674.0" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">Example: proof of ownership.</text>
+<rect x="722.1" y="718.4" width="435.7" height="35.3" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="940" y="728.2" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">N, X, Y and the buffer are catalog values per country and per border</text>
+<text x="940" y="743.8" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#4A5A70" font-weight="normal" text-anchor="middle" dominant-baseline="central">crossing — never constants in the code.</text>
+<rect x="40" y="1046" width="1180" height="56" rx="8" ry="8" fill="#EFF1F4" stroke="#6B7A8C" stroke-width="1.6"/>
+
+<text x="630" y="1066.2" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">The check re-runs whenever the planned departure date moves, whenever a new catalog version is published, and on a nightly sweep. A document that was GREEN can therefore turn</text>
+<text x="630" y="1081.8" font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#33404F" font-weight="normal" text-anchor="middle" dominant-baseline="central">AMBER or RED without anyone touching it — which is the point.</text><rect x="44" y="1146" width="24" height="20" rx="5" fill="#E3F3E8" stroke="#2E7D4F" stroke-width="1.4"/><text x="72" y="1156.0" font-family="Helvetica, Arial, sans-serif" font-size="11.5" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Trigger</text><rect x="144.49365" y="1146" width="24" height="20" rx="5" fill="#E8F1FB" stroke="#2E6DA4" stroke-width="1.4"/><text x="172.49365" y="1156.0" font-family="Helvetica, Arial, sans-serif" font-size="11.5" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">System step</text><polygon points="286.52555,1146 297.52555,1156 286.52555,1166 275.52555,1156" fill="#FFF6E0" stroke="#B9852A" stroke-width="1.4"/><text x="303.52555" y="1156.0" font-family="Helvetica, Arial, sans-serif" font-size="11.5" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Decision / warning</text><rect x="446.58205" y="1146" width="24" height="20" rx="5" fill="#F3E9FA" stroke="#7A4BA8" stroke-width="1.4"/><text x="474.58205" y="1156.0" font-family="Helvetica, Arial, sans-serif" font-size="11.5" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Pass</text><rect x="533.8208" y="1146" width="24" height="20" rx="5" fill="#FBE7E4" stroke="#B23A2C" stroke-width="1.4"/><text x="561.8208" y="1156.0" font-family="Helvetica, Arial, sans-serif" font-size="11.5" fill="#4A5A70" font-weight="normal" text-anchor="start" dominant-baseline="central">Reject</text>
+</svg>
