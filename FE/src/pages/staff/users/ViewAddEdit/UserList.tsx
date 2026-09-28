@@ -77,13 +77,16 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       rowKey="id"
       columns={columns}
       dataSource={listQuery.data?.content ?? []}
-      loading={listQuery.isFetching}
+      // Spinner until the first page arrives, and while a new page or sort loads.
+      loading={listQuery.isPending || listQuery.isFetching}
       ignoreKeys={['actions']}
       pagination={{
         current: pageState.number + 1,
         pageSize: pageState.size,
         total: listQuery.data?.totalElements ?? 0,
+        showTotal: (total, [from, to]) => `${from}–${to} of ${total} accounts`,
       }}
+      locale={{ emptyText: 'No accounts match. Clear the search or the role filter.' }}
       onChange={(pagination, _filters, sorter) => {
         const s = Array.isArray(sorter) ? sorter[0] : sorter;
         setPageState({

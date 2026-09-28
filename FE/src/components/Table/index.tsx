@@ -274,7 +274,7 @@ const Table = <T extends object = object>({
         onChange={onChange}
         pagination={pagination}
         locale={{
-          emptyText: <Empty description={'No data'} />,
+          emptyText: <Empty description="No data" />,
           ...rest.locale,
         }}
       />

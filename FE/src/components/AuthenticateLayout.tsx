@@ -1,11 +1,13 @@
 import { FC } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LogoutOutlined } from '@ant-design/icons';
+import { DownOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Dropdown, Flex, Layout } from 'antd';
+import dayjs from 'dayjs';
 
 import Brand from './Brand';
 import Breadcrumb from './Breadscrumb';
 import ErrorBoundaryHandling from './ErrorBoundaryHandling';
+import Footer from './Footer';
 import Header from './Header';
 
 import { COLOR_BG_CANVAS, COLOR_BG_SUNKEN, COLOR_BORDER, ZINDEX_MENU } from '@/constant/color';
@@ -53,6 +55,7 @@ const SideUser: FC = () => {
         <span className="flex-1 truncate text-[13px] font-medium text-ink">
           {me ? `${me.lastName} ${me.firstName}` : 'Loading…'}
         </span>
+        <DownOutlined style={{ fontSize: 10, color: 'var(--color-ink-3)' }} />
       </button>
     </Dropdown>
   );
@@ -64,25 +67,35 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
   const roles = useAuthStore((state) => state.roles);
   const role = primaryRole(roles);
 
-  const body = (
-    <Layout style={{ background: COLOR_BG_CANVAS }}>
-      <ErrorBoundaryHandling key={pathname}>
-        <Breadcrumb />
-        <Content style={{ padding: menu ? '28px 40px 96px' : '32px 120px 96px' }}>
-          {children}
-        </Content>
-      </ErrorBoundaryHandling>
-    </Layout>
-  );
-
   if (!menu) {
+    // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout).
     return (
       <Layout style={{ minHeight: '100vh', background: COLOR_BG_CANVAS }}>
         <Header />
-        {body}
+        <ErrorBoundaryHandling key={pathname}>
+          <Content style={{ padding: '32px 120px 96px' }}>{children}</Content>
+        </ErrorBoundaryHandling>
+        <Footer />
       </Layout>
     );
   }
+
+  // Staff shell: a top bar with the breadcrumb and today's date, then content at 40 px gutters.
+  const body = (
+    <Layout style={{ background: COLOR_BG_CANVAS }}>
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{ padding: '18px 40px', borderBottom: `1px solid ${COLOR_BORDER}` }}
+      >
+        <Breadcrumb />
+        <span className="font-mono text-[12px] text-ink-3">{dayjs().format('ddd D MMM YYYY')}</span>
+      </Flex>
+      <ErrorBoundaryHandling key={pathname}>
+        <Content style={{ padding: '28px 40px 96px' }}>{children}</Content>
+      </ErrorBoundaryHandling>
+    </Layout>
+  );
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

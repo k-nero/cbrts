@@ -114,7 +114,7 @@ const SelectField = <
             theme={themeSelect}
             isDisabled={disabled}
             classNamePrefix="react-select"
-            placeholder={'Select'}
+            placeholder="Select"
             {...props}
             styles={{ ...props.styles, ...getSelectOptionStyles() }}
           />

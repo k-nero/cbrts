@@ -47,13 +47,10 @@ const FileField = <TFieldValues extends FieldValues = FieldValues>({
 
   const onUploadChange = (info: UploadChangeParam<UploadFile<unknown>>) => {
     const { status } = info.file;
-    if (status !== 'uploading') {
-      //   console.log(info.file, info.fileList);
-    }
     if (status === 'done') {
-      message.success(`${info.file.name} ${'uploaded.'}`);
+      message.success(`${info.file.name} uploaded.`);
     } else if (status === 'error') {
-      message.error(`${info.file.name} ${'upload failed.'}`);
+      message.error(`${info.file.name} upload failed.`);
     }
 
     customChange?.(info);
@@ -220,7 +217,7 @@ const FileField = <TFieldValues extends FieldValues = FieldValues>({
                   return false;
                 } catch (error) {
                   onUploading?.('error');
-                  message.error(`${file.name} ${'upload failed.'}`);
+                  message.error(`${file.name} upload failed.`);
                   console.error(error);
                   return false;
                 }
@@ -244,7 +241,7 @@ const FileField = <TFieldValues extends FieldValues = FieldValues>({
                   )}
                   <Text>{'or'}</Text>
                   <Text underline style={{ color: COLOR_INFO }}>
-                    {'Browse file'}
+                    Browse file
                   </Text>
                 </Flex>
               </Spin>

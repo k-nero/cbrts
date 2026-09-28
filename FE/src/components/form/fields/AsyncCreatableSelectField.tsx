@@ -101,7 +101,7 @@ const AsyncCreatableSelectField = <
             isDisabled={disabled}
             theme={themeSelect}
             classNamePrefix="react-select"
-            placeholder={'Select'}
+            placeholder="Select"
             {...props}
           />
         );

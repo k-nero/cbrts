@@ -65,7 +65,7 @@ const SectionWrapper: FC<Props> = ({
           )}
           <Flex gap={8}>
             {mode === 'view' && onDelete && (
-              <Tooltip title={'Delete'}>
+              <Tooltip title="Delete">
                 <span style={{ display: 'inline-flex' }}>
                   <DeleteButton
                     disabled={deleteDisabled}
@@ -75,7 +75,7 @@ const SectionWrapper: FC<Props> = ({
               </Tooltip>
             )}
             {mode === 'view' && onEdit && (
-              <Tooltip title={'Edit'}>
+              <Tooltip title="Edit">
                 <EditOutlined style={{ cursor: 'pointer', fontSize: 30 }} onClick={onEdit} />
               </Tooltip>
             )}
@@ -86,10 +86,10 @@ const SectionWrapper: FC<Props> = ({
         {mode === 'edit' && onClose && onSubmit && (
           <Flex gap={8}>
             <Button className="cancel-button" htmlType="button" onClick={onClose}>
-              {'Cancel'}
+              Cancel
             </Button>
             <Button type="primary" htmlType="button" onClick={onSubmit}>
-              {'Save'}
+              Save
             </Button>
           </Flex>
         )}

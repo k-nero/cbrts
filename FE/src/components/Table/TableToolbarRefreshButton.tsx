@@ -10,7 +10,7 @@ type Props = {
 
 const TableToolbarRefreshButton = ({ onClick, spin }: Props) => {
   return (
-    <Tooltip title={'Refresh'}>
+    <Tooltip title="Refresh">
       <Button
         type="text"
         className={`${TABLE_CSS_PREFIX}-toolbar-refresh`}

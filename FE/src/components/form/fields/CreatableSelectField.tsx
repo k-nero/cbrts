@@ -101,7 +101,7 @@ const CreatableSelectField = <
             isDisabled={disabled}
             classNamePrefix="react-select"
             theme={themeSelect}
-            placeholder={'Select'}
+            placeholder="Select"
             {...props}
             ref={selectRef}
             styles={{ ...props.styles, ...getSelectOptionStyles() }}

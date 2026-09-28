@@ -1,39 +1,39 @@
 import { useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
-import { LogoutOutlined } from '@ant-design/icons';
-import { Avatar, Dropdown, Flex, Layout, Menu } from 'antd';
+import { NavLink } from 'react-router-dom';
+import { DownOutlined, LogoutOutlined } from '@ant-design/icons';
+import { Dropdown, Flex, Layout } from 'antd';
 import type { ItemType } from 'antd/es/menu/interface';
 
 import Brand from './Brand';
 
-import { COLOR_BG_CANVAS, COLOR_BG_MUTED, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
+import { COLOR_BG_CANVAS, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
 import { type RouteName, useCustomRouter } from '@/router/route.hook';
 
 const { Header: HeaderLayout } = Layout;
 
-const NAV: [RouteName, string][] = [
-  ['customer-home', 'Home'],
-  ['my-horses', 'My horses'],
-  ['my-requests', 'My requests'],
+const NAV: [RouteName, string, boolean][] = [
+  ['customer-home', 'Home', true],
+  ['my-horses', 'My horses', false],
+  ['my-requests', 'My requests', false],
 ];
 
-/** The owner portal header: the customer's own items only; staff work in the sidebar shell. */
+const NAV_ITEM = 'rounded-lg px-3 py-2 text-[13px] font-medium no-underline transition-colors';
+const AVATAR =
+  'grid size-7 place-items-center rounded-full bg-muted font-mono text-[11px] text-ink-2';
+const ACCOUNT_CHIP = [
+  'flex cursor-pointer items-center gap-2.5 rounded-full border border-line',
+  'bg-transparent py-1 pr-3.5 pl-1 text-[13px] text-ink-2 hover:border-line-strong',
+].join(' ');
+
+/**
+ * The owner portal header (DESIGN.md, App header): the customer's own items only, the active one
+ * a Muted Navy pill with a Gold Ink label. Staff work in the sidebar shell instead.
+ */
 const Header: React.FC = () => {
   const router = useCustomRouter();
-  const { pathname } = useLocation();
   const { logout } = useAuth();
   const me = useMe().data;
-
-  const navItems = useMemo<ItemType[]>(
-    () =>
-      NAV.map(([name, label]) => ({
-        key: router.paths.get(name),
-        label,
-        onClick: () => router.push(router.paths.get(name)),
-      })),
-    [router],
-  );
 
   const userItems = useMemo<ItemType[]>(
     () => [{ key: 'logout', label: 'Sign out', icon: <LogoutOutlined />, onClick: logout }],
@@ -51,21 +51,28 @@ const Header: React.FC = () => {
     >
       <Flex align="center" justify="space-between" style={{ height: '100%' }}>
         <Brand onClick={() => router.push(router.paths.get('customer-home'))} />
-        <Menu
-          mode="horizontal"
-          items={navItems}
-          selectedKeys={[pathname]}
-          style={{ background: 'transparent', borderBottom: 0, minWidth: 320 }}
-        />
-        <Dropdown menu={{ items: userItems }} placement="bottomRight">
-          <Flex align="center" gap={10} style={{ cursor: 'pointer' }}>
-            <Avatar style={{ backgroundColor: COLOR_BG_MUTED }}>
-              {me?.firstName.at(0) ?? '?'}
-            </Avatar>
-            <span className="text-[13px] text-ink-2">
-              {me ? `${me.firstName} ${me.lastName}` : ''}
+        <nav className="flex items-center gap-1" aria-label="Main">
+          {NAV.map(([name, label, end]) => (
+            <NavLink
+              key={name}
+              to={router.paths.get(name)}
+              end={end}
+              className={({ isActive }) =>
+                `${NAV_ITEM} ${isActive ? 'bg-muted text-gold-ink' : 'text-ink-2 hover:text-ink'}`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <Dropdown menu={{ items: userItems }} placement="bottomRight" trigger={['click']}>
+          <button type="button" className={ACCOUNT_CHIP}>
+            <span className={AVATAR}>
+              {me ? `${me.firstName.at(0) ?? ''}${me.lastName.at(0) ?? ''}`.toUpperCase() : '?'}
             </span>
-          </Flex>
+            {me ? `${me.firstName} ${me.lastName}` : 'Loading…'}
+            <DownOutlined style={{ fontSize: 10 }} />
+          </button>
         </Dropdown>
       </Flex>
     </HeaderLayout>

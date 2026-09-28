@@ -2,7 +2,7 @@ import { FC, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumb as BreadcrumbAnt } from 'antd';
 
-import { COLOR_BG_CANVAS, COLOR_BORDER, COLOR_TEXT_TERTIARY } from '@/constant/color';
+import { COLOR_TEXT_TERTIARY } from '@/constant/color';
 import { useCustomRouter } from '@/router/route.hook';
 import { useLayoutStore } from '@/stores/layout';
 
@@ -35,17 +35,11 @@ const Breadcrumb: FC = () => {
   }, [breadcrumbOverride, router.configsMatchPath, router.paths]);
 
   return (
-    <div
-      style={{
-        borderBottom: `1px solid ${COLOR_BORDER}`,
-        background: COLOR_BG_CANVAS,
-        padding: '18px 40px',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 12,
-      }}
-    >
-      <BreadcrumbAnt separator="/" items={items} />
-    </div>
+    <BreadcrumbAnt
+      separator="/"
+      items={items}
+      style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+    />
   );
 };
 

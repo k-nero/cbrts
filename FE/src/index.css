@@ -60,3 +60,33 @@ body {
 * {
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
+
+/* Browser surfaces on the palette (DESIGN.md, Focus/Ring: 1.5 px gold plus a 3 px halo). */
+::selection {
+  background: rgba(201, 170, 90, 0.35);
+  color: var(--color-ink);
+}
+
+input,
+textarea {
+  caret-color: var(--color-gold);
+}
+
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+.ant-btn:focus-visible,
+.ant-menu-item:focus-visible {
+  outline: 1.5px solid var(--color-gold);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(201, 170, 90, 0.45);
+}
+
+/* Table headers speak in Mono Label (DESIGN.md): 11 px, uppercase, tracked, Slate. */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
