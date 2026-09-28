@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+/*
+ * EquiFreight tokens (DESIGN.md): navy control surface, gold for the one forward action,
+ * status in tone plus word. Fraunces for titles, Outfit for everything else, DM Mono for data only.
+ */
+@theme {
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    --color-canvas: #0c1520;
+    --color-sunken: #09111a;
+    --color-card: #111b2c;
+    --color-raised: #15223a;
+    --color-muted: #182538;
+    --color-line: #1c2e44;
+    --color-line-strong: #2a4266;
+    --color-ink: #ede9e1;
+    --color-ink-2: #b3bfcc;
+    --color-ink-3: #7a8fa3;
+    --color-gold: #c9aa5a;
+    --color-gold-ink: #d9bd72;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * AntD v6 injects each component's font-family at runtime with the same specificity as a
+ * Tailwind utility and a later source order, so it overrides font-mono on antd elements.
+ * The doubled selector wins without !important.
+ */
+.font-mono.font-mono {
+    font-family: var(--font-mono);
+}
