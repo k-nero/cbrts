@@ -1,0 +1,195 @@
+.wt-table-resize-handle-line,
+.wt-table-resize-guide,
+.wt-table-column-settings-trigger,
+.wt-table-toolbar-refresh {
+  --wt-accent: #b3bfcc;
+  --wt-accent-rgb: 179, 191, 204;
+  --wt-accent-soft: #182538;
+  --wt-accent-active: rgba(179, 191, 204, 0.55);
+}
+
+.wt-table-columns-resizable .ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
+.wt-table-columns-resizable .ant-table-header table,
+.wt-table-columns-resizable .ant-table-body table,
+.wt-table-columns-resizable .ant-table-content table,
+.wt-table-resizing .ant-table-header table,
+.wt-table-resizing .ant-table-body table,
+.wt-table-resizing .ant-table-content table {
+  table-layout: fixed !important;
+}
+
+.wt-table-resize-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.wt-table-resize-handle {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  margin-left: -3px;
+  padding: 0;
+  border: none;
+  appearance: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: col-resize;
+  pointer-events: auto;
+  z-index: 1;
+  touch-action: none;
+}
+
+.wt-table-resize-handle-line {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+  margin-left: -0.5px;
+  border-radius: 1px;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    width 120ms ease,
+    margin-left 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.wt-table-resize-handle:hover .wt-table-resize-handle-line,
+.wt-table-resize-handle:focus-visible .wt-table-resize-handle-line {
+  width: 2px;
+  margin-left: -1px;
+  overflow: visible;
+  opacity: 1;
+  background: var(--wt-accent-active);
+  box-shadow:
+    -8px 0 14px rgba(var(--wt-accent-rgb), 0.38),
+    8px 0 14px rgba(var(--wt-accent-rgb), 0.38);
+}
+
+.wt-table-resize-guide {
+  position: fixed;
+  top: 0;
+  width: 2px;
+  margin-left: -1px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10000;
+  background: var(--wt-accent-active);
+  box-shadow:
+    -8px 0 14px rgba(var(--wt-accent-rgb), 0.38),
+    8px 0 14px rgba(var(--wt-accent-rgb), 0.38);
+}
+
+.wt-table-resizing .ant-table,
+.wt-table-resizing .ant-table-container {
+  user-select: none;
+}
+
+.wt-table-resizing .ant-table-thead > tr > th {
+  cursor: col-resize;
+}
+
+.wt-table-column-settings-trigger.ant-btn,
+.wt-table-toolbar-refresh.ant-btn {
+  border: none !important;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.15);
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wt-accent) !important;
+  background: transparent !important;
+  font-size: 16px;
+}
+
+.wt-table-column-settings-trigger.ant-btn:hover,
+.wt-table-column-settings-trigger.ant-btn:focus-visible,
+.wt-table-toolbar-refresh.ant-btn:hover,
+.wt-table-toolbar-refresh.ant-btn:focus-visible {
+  background-color: var(--wt-accent-soft) !important;
+}
+
+/* Popover portals outside .wt-table — needs its own accent tokens. */
+.wt-table-column-settings-popover {
+  --wt-accent: #b3bfcc;
+  --wt-accent-rgb: 179, 191, 204;
+  --wt-accent-soft: #182538;
+  --wt-accent-active: rgba(179, 191, 204, 0.55);
+}
+
+.wt-table-column-settings-popover .ant-btn-link {
+  color: var(--wt-accent) !important;
+}
+
+.wt-table-column-settings-popover .ant-btn-link:hover {
+  color: var(--wt-accent) !important;
+  opacity: 0.85;
+}
+
+.wt-table-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wt-table-toolbar-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.wt-table .ant-table-body,
+.wt-table .ant-table-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.wt-table .ant-table-body::-webkit-scrollbar,
+.wt-table .ant-table-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.wt-table .ant-table-body::-webkit-scrollbar-track,
+.wt-table .ant-table-content::-webkit-scrollbar-track,
+.wt-table .ant-table-body::-webkit-scrollbar-corner,
+.wt-table .ant-table-content::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+  border-radius: 4px;
+}
+
+.wt-table .ant-table-body::-webkit-scrollbar-thumb,
+.wt-table .ant-table-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.wt-table .ant-table-body::-webkit-scrollbar-thumb:hover,
+.wt-table .ant-table-content::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.wt-table .ant-table-body::-webkit-scrollbar-thumb:active,
+.wt-table .ant-table-content::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+}

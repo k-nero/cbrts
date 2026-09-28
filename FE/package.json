@@ -8,8 +8,8 @@
         "build": "rsbuild build",
         "preview": "rsbuild preview",
         "typecheck": "tsc --noEmit",
-        "lint": "eslint .",
-        "format": "prettier --write .",
+        "lint": "eslint ./src",
+        "format": "prettier --write ./src",
         "format:check": "prettier --check .",
         "lint:fix": "eslint --fix ."
     },
@@ -34,9 +34,12 @@
         "qs": "^6.15.3",
         "react": "^19.2.7",
         "react-dom": "^19.2.7",
+        "react-error-boundary": "^6.1.6",
         "react-hook-form": "^7.81.0",
         "react-router-dom": "^7.18.1",
+        "react-select": "^5.10.2",
         "tailwindcss": "^4.3.2",
+        "usehooks-ts": "^3.1.1",
         "zod": "^4.4.3",
         "zustand": "^5.0.14"
     },

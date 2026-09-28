@@ -1,21 +1,12 @@
-import { Card, Typography } from 'antd';
+import { FC } from 'react';
+import { Empty, Flex } from 'antd';
 
-const { Title, Paragraph } = Typography;
+/** A page that is designed in Figma but not built yet. */
+const PlaceholderPage: FC<{ title: string }> = ({ title }) => (
+  <Flex vertical gap={28}>
+    <h1 className="m-0 font-display text-[44px] leading-[50px] font-normal text-ink">{title}</h1>
+    <Empty description="Designed in Figma; not built yet." />
+  </Flex>
+);
 
-export interface PlaceholderPageProps {
-    title: string;
-    description?: string;
-}
-
-export default function PlaceholderPage({ title, description }: PlaceholderPageProps) {
-    return (
-        <div className="p-6">
-            <Card>
-                <Title level={4}>{title}</Title>
-                {description !== undefined ? (
-                    <Paragraph type="secondary">{description}</Paragraph>
-                ) : null}
-            </Card>
-        </div>
-    );
-}
+export default PlaceholderPage;

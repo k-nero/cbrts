@@ -1,0 +1,13 @@
+export const DATE_FORMAT = 'MM/DD/YYYY';
+export const DATE_FORMAT_2 = 'DD/MM/YYYY';
+export const DATE_FORMAT_3 = 'YYYY/MM/DD';
+export const DATETIME_FORMAT = 'MM/DD/YYYY HH:mm';
+export const DATETIME_FORMAT_2 = 'DD/MM/YYYY HH:mm';
+export const DATETIME_FORMAT_3 = 'YYYY/MM/DD HH:mm';
+export const DATETIME_FORMAT_4 = 'YYYY/MM/DD HH:mm UTC';
+export const SERVER_DATE_FORMAT = 'YYYY-MM-DD';
+export const SERVER_DATETIME_FORMAT = 'YYYY-MM-DD HH:mm';
+export const DATE_MONTH_DAY_YEAR_FORMAT = 'MMM DD, YYYY';
+export const DATE_MONTH_DATETIME_YEAR_FORMAT = 'MMM DD, YYYY, HH:mm';
+export const DATETIME_FILE_NAME_FORMAT = 'YYYY-MM-DD_HH_mm';
+export const DATETIME_FILE_NAME_EXPORT = 'DD_MM_YYYY_HH';

@@ -26,6 +26,11 @@ export default defineConfig({
     html: {
         template: './index.html',
     },
+    resolve: {
+        alias: {
+            '@': './src',
+        },
+    },
     source: {
         entry: {
             index: './src/main.tsx',

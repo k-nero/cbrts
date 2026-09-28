@@ -5,37 +5,37 @@
  * status in tone plus word. Fraunces for titles, Outfit for everything else, DM Mono for data only.
  */
 @theme {
-    --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: 'Fraunces', Georgia, serif;
-    --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    --color-canvas: #0c1520;
-    --color-sunken: #09111a;
-    --color-card: #111b2c;
-    --color-raised: #15223a;
-    --color-muted: #182538;
-    --color-line: #1c2e44;
-    --color-line-strong: #2a4266;
-    --color-ink: #ede9e1;
-    --color-ink-2: #b3bfcc;
-    --color-ink-3: #7a8fa3;
-    --color-gold: #c9aa5a;
-    --color-gold-ink: #d9bd72;
+  --color-canvas: #0c1520;
+  --color-sunken: #09111a;
+  --color-card: #111b2c;
+  --color-raised: #15223a;
+  --color-muted: #182538;
+  --color-line: #1c2e44;
+  --color-line-strong: #2a4266;
+  --color-ink: #ede9e1;
+  --color-ink-2: #b3bfcc;
+  --color-ink-3: #7a8fa3;
+  --color-gold: #c9aa5a;
+  --color-gold-ink: #d9bd72;
 }
 
 html,
 body,
 #root {
-    height: 100%;
-    margin: 0;
+  height: 100%;
+  margin: 0;
 }
 
 body {
-    font-family: var(--font-sans);
-    background: var(--color-canvas);
-    color: var(--color-ink);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /*
@@ -44,5 +44,19 @@ body {
  * The doubled selector wins without !important.
  */
 .font-mono.font-mono {
-    font-family: var(--font-mono);
+  font-family: var(--font-mono);
+}
+
+/* Used by the shared form and table components. */
+:root {
+  --shadow-box-1: 0 1px 0 #1c2e44;
+  --neutral-500: #7a8fa3;
+  --scrollbar-track: #09111a;
+  --scrollbar-thumb: #2a4266;
+  --scrollbar-thumb-hover: #3a5680;
+  --scrollbar-thumb-active: #4a6a99;
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }

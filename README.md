@@ -9,7 +9,7 @@ The earlier coursework (`prj301/`, and the SWP391 parking management system in `
 | Folder | What it is |
 |---|---|
 | `BE/` | Spring Boot 4 REST API (Java 25, Gradle, PostgreSQL, Flyway, Spring Security with JWT, SpringDoc) |
-| `FE/` | React 19 single-page app (Rsbuild, Ant Design 6, Tailwind 4, React Router 7, TanStack Query, React Hook Form with Zod) |
+| `FE/` | React 19 single-page app (Rsbuild, Ant Design 6, Tailwind 4, React Router 7, TanStack Query, React Hook Form with Zod). Layout: `apis/` + `hooks/` per domain, `router/route.config.ts` for pages and roles, `components/form` and `components/Table` as the base kits |
 | `docs/` | The core-flows spec and quotation builder (`.docx`), the diagrams, and the Figma design generator (`docs/figma-plugin/`) |
 | `requirement.txt` | The course requirement (Vietnamese) |
 
