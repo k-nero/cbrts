@@ -2461,6 +2461,61 @@ function pageNum(st) {
   if (st === 'Focus') { strokeOf(c, 'accent/default', 1.5); effect(c, 'Focus/Ring'); }
   return c;
 }
+/* ---------- table states ----------
+   What stands in for a list table's rows when there are none to show. Never an empty grid that looks
+   like "no results" while the list is still loading or the server is down (FE polish, 28 Sep).
+   noun: what the table lists ("accounts"). */
+function skeletonRow(widths) {
+  var r = H({ name: 'Row', gap: 16, pad: [16, 16, 16, 16], cross: 'CENTER' });
+  borderSide(r, 'border/default', 'top');
+  widths.forEach(function (w, i) { add(r, rect(w, 12, 'surface/muted', 'Bar ' + (i + 1), 4)); });
+  return r;
+}
+function tableHeaderOnly(cols) {
+  var hr = H({ name: 'Header', gap: 16, pad: [10, 16, 10, 16], fill: 'bg/sunken', cross: 'CENTER' });
+  cols.forEach(function (c) { add(hr, Tx(c, 'Mono/Eyebrow', 'text/tertiary', { w: 160 })); });
+  return hr;
+}
+function tableState(kind, noun, o) {
+  o = o || {};
+  var cols = o.cols || ['Name', 'Role', 'Created'];
+  if (kind === 'loading') {
+    var p = panel('Table · Loading', { gap: 0, pad: 0, clip: true });
+    add(p, fillW(tableHeaderOnly(cols)));
+    [[220, 140, 90], [180, 120, 90], [240, 140, 90]].forEach(function (w) { add(p, fillW(skeletonRow(w))); });
+    return p;
+  }
+  if (kind === 'offline') {
+    return callout('Warn', 'You’re offline.', 'The ' + noun + ' load as soon as the connection is back.');
+  }
+  if (kind === 'error') {
+    var e = VV({ name: 'Table · Error', gap: 12 });
+    addAll(e, [callout('Bad', 'Couldn’t load the ' + noun + '.', 'The server didn’t answer. Check your connection, then try again.'), btn('Secondary', 'SM', 'Try again')]);
+    return e;
+  }
+  var t = panel('Table · No results', { gap: 0, pad: 0, clip: true });
+  add(t, fillW(tableHeaderOnly(cols)));
+  var body = VV({ name: 'Empty', gap: 8, pad: [40, 24, 44, 24], cross: 'CENTER' });
+  borderSide(body, 'border/default', 'top');
+  addAll(body, [Tx('No ' + noun + ' match these filters', 'Heading/H4', 'text/primary', { align: 'CENTER' }),
+    Tx(o.hint || 'Clear the search or the filters to see every one.', 'Body/S', 'text/secondary', { align: 'CENTER' }),
+    VV({ name: 'Action', pad: [8, 0, 0, 0] }, [btn('Secondary', 'SM', 'Clear filters')])]);
+  add(t, fillW(body));
+  return t;
+}
+/* the four states side by side, for the Table controls doc block */
+function tableStatesRow() {
+  var row = VV({ name: 'Table states', gap: 16 });
+  add(row, Tx('Table states: while the first page loads, offline, when the server errors, and when filters match nothing. The count line still shows; the foot does not.', 'Body/M', 'text/secondary', { w: 900 }));
+  var grid = H({ name: 'States', gap: 24, wrap: true, rowGap: 24 });
+  [['Loading', tableState('loading', 'accounts')], ['Offline', tableState('offline', 'accounts')], ['Error', tableState('error', 'accounts')], ['No results', tableState('empty', 'accounts')]].forEach(function (s) {
+    var cell = VV({ name: s[0], gap: 10, w: 690 });
+    addAll(cell, [Tx(s[0], 'Label/S', 'text/secondary'), fillW(s[1])]);
+    add(grid, cell);
+  });
+  add(row, fillW(grid));
+  return row;
+}
 function buildTableComponents(board) {
   var b = docBlock(board, 'Table controls', 'For list tables only (Jobs, Requests, Users & roles, Audit log). A column header sorts only when its order is the user\'s to choose; the active column takes Parchment and an arrow, and sets aria-sort. A list whose default order is not a column (blocked first, what needs you first) says so in the count line, and a column sort replaces that note with what it sorted by and a Reset order button. Pages hold ' + PAGE_SIZE + ' rows; the foot always shows the range, and Previous or Next is disabled at either end. Quotations, catalogs and document tables keep a fixed order and have none of this.');
   var heads = [];
@@ -2468,6 +2523,7 @@ function buildTableComponents(board) {
   C.colHead = combine(heads, b, 'Column header', 'Sortable column header. Unsorted shows a faint up-down mark; Ascending and Descending turn the label Parchment with the arrow. Focus: gold border outside the label and the ring. Set aria-sort on the active column.');
   wireText(C.colHead, ['Label']);
   C.pageNum = combine(['Default', 'Current', 'Focus'].map(pageNum), b, 'Page number', 'One page in the pager. Current carries aria-current="page".');
+  add(b, fillW(tableStatesRow()));
   wireText(C.pageNum, ['Page']);
 }
 function tabRow(tabs) {
@@ -2811,7 +2867,9 @@ function person(name, id, initials) {
   addAll(h, [av, stack(name, id)]);
   return h;
 }
-function scrUsers() {
+function scrUsersError() { return scrUsers('error'); }
+function scrUsers(state) {
+  state = state === 'error' ? 'error' : null;
   var role = function (r) { return chip('Neutral', r, { noDot: true }); };
   var status = function (s) { return chip(s === 'Active' ? 'Ok' : 'Warn', s); };
   var staff = tbl('Staff', [['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Jobs', 64, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Last active', 112, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Status', 84]], [
@@ -2842,12 +2900,14 @@ function scrUsers() {
   });
   add(perm, VV({ name: 'Note', pad: [12, 0, 0, 0] }, [Tx('CUST customer · LM logistics manager · TS transport specialist · FRC fleet & route coordinator · DRV driver / escort. Only the Logistics Manager approves requests (BR-F1-04); only the Transport Specialist approves documents (BR-F2-04).', 'Body/S', 'text/tertiary', { w: 352 })]));
   tableFoot(staff, 7, 7, 'staff');
+  if (state === 'error') staff.remove();
   var list = tableBlock({ tabs: [['Staff · 7', 'Active'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Default']],
     filters: [filterField('Search', 'Search', 'Name or email', { placeholder: true }), filterField('Select', 'Role', 'All roles')],
-    count: '7 staff', order: 'Order: by role', table: staff });
+    count: state === 'error' ? 'Staff' : '7 staff', order: state === 'error' ? null : 'Order: by role',
+    table: state === 'error' ? tableState('error', 'accounts') : staff });
   var body = H({ name: 'Body', gap: 24 });
   addAll(body, [fillW(list), perm]);
-  return adminScreen('Logistics manager · Users & roles', 'Users & roles', ['Users & roles'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
+  return adminScreen('Logistics manager · Users & roles' + (state ? ' · Error' : ''), 'Users & roles', ['Users & roles'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
     headAdmin('Users & roles', 'Staff accounts and what each role can do. Customers manage their own accounts from the owner portal.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' })),
     body
   ]);
@@ -2945,7 +3005,7 @@ async function eTableComponents() {
   return report({ columnHeader: C.colHead.id, pageNumber: C.pageNum.id });
 }
 async function eAdminCatalogs() { return adminScreensCall([scrRegulations, scrRates]); }
-async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers]); }
+async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers, scrUsersError]); }
 
 /* ---------- MCP: rebuild the sidebar in place and move every staff screen onto it ---------- */
 /* frame → [staff key, active item, breadcrumb, [[old, new] for the back link or page title]] */
@@ -2956,6 +3016,7 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Users & roles': ['yen', 'Users & roles', ['Users & roles'], [['Users and roles', 'Users & roles']]],
   'Logistics manager · Jobs': ['yen', 'Jobs', ['Jobs']],
   'Logistics manager · Jobs · Sorted': ['yen', 'Jobs', ['Jobs']],
+  'Logistics manager · Users & roles · Error': ['yen', 'Users & roles', ['Users & roles']],
   'Transport specialist · Clearance checklist': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Clearance']],
   'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Load plan']],
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Route']],
@@ -5677,7 +5738,7 @@ async function main() {
   place(light.concat([mob, mobL]), 0, y3, 120);
   await flush();
 
-  var admin = [scrRegulations(), scrRates(), scrDashboard(), scrUsers(), scrJobs(), scrJobsSorted(), scrReview(), scrReviewOverride(), scrBuilder(), scrBuilderBlocked(), scrDocReview(), scrDocReject(), scrIncidentHeld(), scrIncidentReport(), scrStaffNotes()];
+  var admin = [scrRegulations(), scrRates(), scrDashboard(), scrUsers(), scrUsersError(), scrJobs(), scrJobsSorted(), scrReview(), scrReviewOverride(), scrBuilder(), scrBuilderBlocked(), scrDocReview(), scrDocReject(), scrIncidentHeld(), scrIncidentReport(), scrStaffNotes()];
   await flush();
   var lblA = Tx('Staff workspace · Dark', 'Display/M');
   screens.appendChild(lblA);
@@ -5714,7 +5775,7 @@ async function main() {
   await flush();
   figma.viewport.scrollAndZoomIntoView(cover.children);
 
-  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants, 66 screens.';
+  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants, 67 screens.';
   if (FALLBACKS.length) msg += ' Font fallbacks: ' + FALLBACKS.join('; ');
   figma.closePlugin(msg);
 }

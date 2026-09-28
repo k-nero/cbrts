@@ -59,7 +59,7 @@ async function main() {
   place(light.concat([mob, mobL]), 0, y3, 120);
   await flush();
 
-  var admin = [scrRegulations(), scrRates(), scrDashboard(), scrUsers(), scrJobs(), scrJobsSorted(), scrReview(), scrReviewOverride(), scrBuilder(), scrBuilderBlocked(), scrDocReview(), scrDocReject(), scrIncidentHeld(), scrIncidentReport(), scrStaffNotes()];
+  var admin = [scrRegulations(), scrRates(), scrDashboard(), scrUsers(), scrUsersError(), scrJobs(), scrJobsSorted(), scrReview(), scrReviewOverride(), scrBuilder(), scrBuilderBlocked(), scrDocReview(), scrDocReject(), scrIncidentHeld(), scrIncidentReport(), scrStaffNotes()];
   await flush();
   var lblA = Tx('Staff workspace · Dark', 'Display/M');
   screens.appendChild(lblA);
@@ -96,7 +96,7 @@ async function main() {
   await flush();
   figma.viewport.scrollAndZoomIntoView(cover.children);
 
-  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants, 66 screens.';
+  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants, 67 screens.';
   if (FALLBACKS.length) msg += ' Font fallbacks: ' + FALLBACKS.join('; ');
   figma.closePlugin(msg);
 }
