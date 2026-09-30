@@ -296,5 +296,86 @@ function scrTripHeld() {
     cabStrip([['Done', 'Phnom Penh', 'Pickup', INC40.loaded, 'Departed'], ['Held', 'Bavet – Mộc Bài', 'Border', INC40.held, 'Held since'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '—', 'Waits on the decision'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '—', 'Waits on the decision']]),
     task, right, cabDock('Waiting for Yến’s decision', 'Nothing to record until she decides; any water or checks you log go on the trip record.', null));
 }
-async function eTripA() { return insertChainCall([scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
+/* ---------- The office side of the same trip: Khôi at 08:41 on 18 Oct ----------
+   The coordinator watches what the cab records against the route he planned. Positions come
+   only from recorded checkpoints, as on the customer's page, so nothing here is a guess.
+   There is no gold: while the trip runs to plan the office has nothing to move forward. */
+var NOW041 = '08:41';
+/* [stop, kind, planned, recorded, what was recorded, chip tone, chip word] */
+var TRIP_PLAN = [
+  ['Phú Thọ training centre', 'Pickup · Ho Chi Minh City', '06:00', '06:05', 'Departed · Minh, driver', 'Ok', 'Departed'],
+  ['Mộc Bài – Bavet', 'Border · Vietnam exit, Cambodia entry', '08:30', '08:34', 'Arrived 07:58, cleared both sides · Minh, driver', 'Ok', 'Cleared'],
+  ['Svay Rieng welfare stop', 'Welfare stop · 45 min rest', '09:30', null, 'Expected in ' + durText(toMin('09:30') - toMin(NOW041)), 'Info', 'Next'],
+  ['Phnom Penh Equestrian Centre', 'Delivery · handover to the receiving groom', '12:30', null, 'Not reached', 'Neutral', 'Upcoming']
+];
+function againstPlan(planned, recorded) {
+  if (!recorded) return '—';
+  var d = toMin(recorded) - toMin(planned);
+  return d === 0 ? 'On time' : (d > 0 ? '+' : '−') + durText(Math.abs(d));
+}
+function scrTripCoordinator() {
+  var last = TRIP_PLAN.filter(function (r) { return r[3]; }).pop();
+  var log = tripLogUntil(NOW041);
+  var tiles = H({ name: 'Tiles', gap: 16 });
+  addAll(tiles, [
+    fillW(stat('Neutral', againstPlan(last[2], last[3]), 'Against plan at ' + last[0])),
+    fillW(stat('Neutral', durText(toMin(NOW041) - toMin(TRIP_LOG[0][0])), 'On the trailer since loading at ' + TRIP_LOG[0][0])),
+    fillW(stat('Info', TRIP_PLAN[2][2], 'Next checkpoint · Svay Rieng')),
+    fillW(stat('Ok', '4 of 4', 'Horses sound at the last check, ' + log[log.length - 1][0]))
+  ]);
+
+  var stops = tbl('Checkpoints', [['Checkpoint', null], ['Planned', 90, null, 'Mono/Data'], ['Recorded', 280], ['Against plan', 110, 'RIGHT', 'Mono/Data'], ['Status', 110, 'RIGHT']], TRIP_PLAN.map(function (r) {
+    var name = VV({ name: r[0], gap: 2 });
+    addAll(name, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/tertiary', { fill: true })]);
+    var rec = VV({ name: 'Recorded', gap: 2 });
+    if (r[3]) add(rec, Tx(r[3], 'Mono/Data', 'text/primary'));
+    add(rec, Tx(r[4], 'Body/S', r[3] ? 'text/tertiary' : (r[5] === 'Info' ? 'status/info/fg' : 'text/tertiary'), { fill: true }));
+    return { cells: [fillW(name), r[2], fillW(rec), againstPlan(r[2], r[3]), chip(r[5], r[6], r[5] === 'Neutral' ? { noDot: true } : null)], hl: r[6] === 'Next' };
+  }));
+
+  var lp = panel('Escort’s log', { gap: 0, pad: [20, 24, 12, 24] });
+  var lh = VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] });
+  addAll(lh, [Tx('Escort’s log', 'Heading/H4'), Tx(tripLogSummary(NOW041) + '. Every record also reaches the customer’s page.', 'Body/S', 'text/tertiary')]);
+  add(lp, fillW(lh));
+  log.slice().reverse().forEach(function (r) {
+    var row = H({ name: r[0], gap: 20, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(row, 'border/default', 'top');
+    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/tertiary', { w: 56 }), Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary', { w: 120, align: 'RIGHT' })]);
+    add(lp, fillW(row));
+  });
+  var plan = titled('Checkpoints, planned against recorded', 'From the route plan you confirmed on 16 Oct; recorded times come from the cab.', stops, Tx('Updated ' + NOW041, 'Mono/Caption', 'text/tertiary'));
+
+  /* each horse's word from the last condition check, the same Sound / Watch / Concern the groom picks */
+  var board = panel('On board', { gap: 0, pad: [20, 24, 12, 24] });
+  var bh = VV({ name: 'Title', gap: 2, pad: [0, 0, 10, 0] });
+  addAll(bh, [Tx('On board', 'Heading/H4'), Tx('Last condition check ' + log[log.length - 1][0] + ' by ' + log[log.length - 1][2] + '. Next at the welfare stop.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(board, fillW(bh));
+  var notes = { Nightfall: 'Sweated at loading; calm since the border.' };
+  TRIP_LOAD.forEach(function (h) {
+    var r = H({ name: h[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var t = VV({ name: 'Text', gap: 2 });
+    add(t, Tx(h[0], 'Label/M'));
+    add(t, Tx(notes[h[0]] ? h[1] + ' · ' + notes[h[0]] : h[1], 'Body/S', 'text/tertiary', { fill: true }));
+    addAll(r, [fillW(t), chip('Ok', 'Sound')]);
+    add(board, fillW(r));
+  });
+  var crew = panel('Crew and vehicle', { gap: 12 });
+  add(crew, Tx('Crew and vehicle', 'Heading/H4'));
+  [['Vehicle', 'Trailer TX-447', true], ['Driver', STAFF.minh[0]], ['Grooms', 'Lê Thị Hoa, Phạm Quốc Tuấn'], ['Records', 'All sent · last ' + log[log.length - 1][0]]].forEach(function (f) { add(crew, factRow(f)); });
+  add(crew, btn('Secondary', 'MD', 'Call the cab', { fill: true }));
+  var stop = panel('If the trip stops', { gap: 10 });
+  addAll(stop, [Tx('If the trip stops', 'Heading/H4'),
+    Tx('A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the customer. Raise one yourself for anything the cab can’t record.', 'Body/S', 'text/secondary', { fill: true }),
+    btn('Secondary', 'MD', 'Raise an incident', { lead: 'alert' })]);
+  /* the table takes the full width; below it, what was recorded and what the customer reads, beside the horses and the crew */
+  var left = column([lp, customerSees('Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop, expected 09:30.')]);
+  var right = column([board, crew, stop]);
+
+  return jobScreen('Fleet & route coordinator · Trip', 'Trip', STAFF.khoi, [tiles, plan, split(left, right, SIDE.narrow)], {
+    stage: 'Trip', gateState: 'Clear', today: 'Sun 18 Oct 2026',
+    gate: 'Cleared 17 Oct, 16:20 by Lan, transport specialist. Departure recorded 06:05 by Minh, driver.'
+  });
+}
+async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
 async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld], 'Escort · Welfare stop'); }

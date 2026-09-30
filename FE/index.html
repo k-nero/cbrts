@@ -5,11 +5,16 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>EquiFreight</title>
+        <!-- paste this BEFORE any scripts -->
+        <script
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        ></script>
         <script>
             // Pick the theme before first paint so a light-mode browser never flashes navy.
             // stores/themeStore.ts owns it from here; keep the key ('ef.theme') in step.
             (function () {
-                var mode;
+                let mode;
                 try {
                     mode = localStorage.getItem('ef.theme');
                 } catch (e) {}
