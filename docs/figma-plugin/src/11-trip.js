@@ -45,7 +45,7 @@ function cabBar(o) {
   var bar = H({ name: 'Cab bar', gap: 20, pad: [14, 32, 14, 32], cross: 'CENTER', fill: 'surface/card' });
   borderSide(bar, 'border/default', 'bottom');
   var job = H({ name: 'Job', gap: 12, cross: 'CENTER' });
-  addAll(job, [Tx(o.code, 'Mono/Data', 'text/secondary'), Tx(o.route, 'Heading/H4'), stageChip('Trip'), chip(o.pillTone, o.pill)]);
+  addAll(job, [Tx(o.code, 'Mono/Data', 'text/secondary'), Tx(o.route, 'Heading/H4'), stageMark('Trip'), chip(o.pillTone, o.pill)]);
   var sync = H({ name: 'Sync', gap: 8, cross: 'CENTER' });
   addAll(sync, [Ic(o.synced ? 'check' : 'clock', 18, o.synced ? 'status/ok/fg' : 'status/warn/fg'), Tx(o.sync, 'Label/S', o.synced ? 'text/secondary' : 'status/warn/fg')]);
   var who = H({ name: 'Who', gap: 10, cross: 'CENTER' });
@@ -134,14 +134,15 @@ function customerSees(text) {
   addAll(p, [Tx('What the customer sees', 'Heading/H4'), Tx(text, 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
-/* Sound / Watch / Concern at touch size; the chosen one takes its status tone */
+/* Sound / Watch / Concern at touch size. The chosen one is said three ways so it survives glare in a sunlit cab:
+   a check before the word, a 1.5px border in the full status colour, and its tone fill */
 function conditionControl(pick) {
   var tones = { Sound: 'Ok', Watch: 'Warn', Concern: 'Bad' };
   var s = H({ name: 'Condition', gap: 0, radius: 8, stroke: 'border/strong', clip: true });
   ['Sound', 'Watch', 'Concern'].forEach(function (w, i) {
     var on = w === pick, tn = TONE[tones[w]];
-    var c = H({ name: w, w: 112, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
-    if (on) { c.strokes = [P(tn.border)]; c.strokeWeight = 1.5; c.strokeAlign = 'INSIDE'; }
+    var c = H({ name: w, gap: 6, w: 112, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
+    if (on) { c.strokes = [P(tn.fg)]; c.strokeWeight = 1.5; c.strokeAlign = 'INSIDE'; add(c, Ic('check', 16, tn.fg)); }
     else if (i) { c.strokes = [P('border/strong')]; c.strokeAlign = 'INSIDE'; c.strokeTopWeight = 0; c.strokeBottomWeight = 0; c.strokeRightWeight = 0; c.strokeLeftWeight = 1; }
     add(c, Tx(w, 'Label/M', on ? tn.fg : 'text/secondary'));
     add(s, c);

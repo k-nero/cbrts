@@ -37,7 +37,7 @@ function scrTrackClosed() {
   var stagesP = stagePanel([['Done', 'Submitted 2 Sep.', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', 'Closed after you confirmed the handover.', 'Done', '19 Oct']]);
   var route = routePanel('Route as recorded', 'Every checkpoint was recorded by the escort.', stopsWith(['Done', 'Done', 'Done', 'Done'], ['06:05', '08:34', '09:36', '12:41']), 'Clear', [['Vehicle', 'Trailer TX-447', true], ['Escort', 'Minh, driver · Hoa and Tuấn'], ['Distance', '240 km · 6 h 36 min', true]]);
   var hist = historyPanel([['19 Oct · 09:14', 'Handover confirmed; the job is closed.', 'You'], ['18 Oct · 12:48', 'Handed over to Sophea, receiving groom; arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver']], 'Show all 38 events');
-  return trackScreen('Tracking · Closed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageChip('Handover'), chip('Ok', 'Closed')], true),
+  return trackScreen('Tracking · Closed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover'), chip('Ok', 'Closed')], true),
     [closedLead(), sum, split(column([arr, docs, stagesP]), route, SIDE.wide), hist], '19 Oct 2026, 09:20');
 }
 async function eHandover() { return insertChainCall([scrTrackClosed], 'Tracking · Delivered'); }

@@ -8,7 +8,7 @@ var CNAMES = {
   button: 'Button', chip: 'Chip', input: 'Input field', checkbox: 'Checkbox', option: 'Option card', nav: 'Nav item',
   tab: 'Tab', step: 'Step', stat: 'Stat tile', progress: 'Progress', callout: 'Callout', toast: 'Toast',
   nameplate: 'Nameplate', horse: 'Horse card', loadItem: 'Load item', stall: 'Stall tile', docRow: 'Document row',
-  gate: 'Clearance gate', quoteLine: 'Quote line', estimate: 'Estimate card', service: 'Service card', stop: 'Timeline stop',
+  gate: 'Clearance gate', quoteLine: 'Quote line', estimate: 'Estimate card', stop: 'Timeline stop',
   header: 'App header / Desktop', headerM: 'App header / Mobile', footer: 'Footer',
   sideNav: 'Side nav item', adminSide: 'Staff sidebar',
   owed: 'Owed item', stageRow: 'Stage row', stop2: 'Route stop', colHead: 'Column header', pageNum: 'Page number'
@@ -106,7 +106,6 @@ async function eComponentsB() {
   buildGate(board);
   buildQuoteLine(board);
   buildEstimate(board);
-  buildServiceCard(board);
   buildTimeline(board);
   buildChrome(board);
   var toastRow = docBlock(board, 'In use', 'Toasts confirm what just happened in words that match the button that caused it.');
@@ -199,15 +198,30 @@ async function eFooter() {
 }
 async function eAccess() { return newScreensCall(ACCESS_SCREENS); }
 async function eAudit() { return newScreensCall(AUDIT_SCREENS); }
-async function eScreensOwnerA() { return screensCall([scrHome, scrHorses]); }
+async function eScreensOwnerA() { return screensCall([scrLanding, scrHorses]); }
+/* the signed-in Home needs the owed item and route stop, built by eTrackComponents, so it comes after them;
+   it makes its own Light clones because eArrange has already run */
+async function eHomeScreens() {
+  var out = await screensCall([scrHome, scrHomeClear, scrHomeRoad]);
+  var page = pageNamed(PAGE_NAMES[3]);
+  if (COLL.light) ['Home', 'Home · Nothing owed', 'Home · On the road'].forEach(function (nm) {
+    var src = page.children.filter(function (n) { return n.name === nm; })[0];
+    if (!src) return;
+    page.children.filter(function (n) { return n.name === nm + ' · Light'; }).forEach(function (n) { n.remove(); });
+    var c = src.clone(); c.name = nm + ' · Light';
+    c.setExplicitVariableModeForCollection(COLL.color, COLL.light);
+  });
+  await flush();
+  return out;
+}
 async function eScreensOwnerB() { return screensCall([scrRequest1, scrRequest3, scrRequest4]); }
 /* The quotation (tracking page model) and the staff job tabs need components
    built later in the sequence, so they come after them: eQuoteScreen, eStaffScreens*. */
 
 var ROWS = [
-  ['Owner portal · Dark', ['Home', 'My horses', 'Request · 1 Horses', 'Request · 3 Route & dates (error)', 'Request · 4 Review']],
+  ['Owner portal · Dark', ['Landing · Signed out', 'Home', 'My horses', 'Request · 1 Horses', 'Request · 3 Route & dates (error)', 'Request · 4 Review']],
   ['Operations · Dark', ['Quotation', 'Fleet & route coordinator · Load plan', 'Transport specialist · Clearance checklist', 'Fleet & route coordinator · Route plan']],
-  ['Light mode & mobile', ['Home · Light', 'Transport specialist · Clearance checklist · Light', 'Quotation · Light', 'My horses · Mobile', 'My horses · Mobile · Light']]
+  ['Light mode & mobile', ['Landing · Signed out · Light', 'Home · Light', 'Transport specialist · Clearance checklist · Light', 'Quotation · Light', 'My horses · Mobile', 'My horses · Mobile · Light']]
 ];
 async function eArrange() {
   var page = await rehydrate(PAGE_NAMES[3]);
@@ -215,7 +229,7 @@ async function eArrange() {
   var byName = {};
   page.children.forEach(function (n) { byName[n.name] = n; });
   if (COLL.light) {
-    ['Home', 'Transport specialist · Clearance checklist', 'Quotation'].forEach(function (nm) {
+    ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'Transport specialist · Clearance checklist', 'Quotation'].forEach(function (nm) {
       if (!byName[nm]) return;
       var c = byName[nm].clone(); c.name = nm + ' · Light';
       c.setExplicitVariableModeForCollection(COLL.color, COLL.light);
@@ -291,13 +305,13 @@ var STAFF_ROWS = ['Logistics manager · Vũ Hải Yến', 'Transport specialist 
 /* [label text, existing label names it may carry, frames in reading order] */
 var CANVAS = [
   ['Access · Dark', ['Row label · Access · Dark'], ['Access · Sign in', 'Access · Sign in · Wrong password', 'Access · Sign in · Locked', 'Access · Create account', 'Access · Create account · Check your email', 'Access · Staff invite', 'Access · Staff invite · Expired', 'Access · Reset password', 'Access · Reset password · Link sent', 'Access · Reset password · New password', 'Access · Reset password · Link expired']],
-  ['Owner portal · Dark', ['Row label · Owner portal · Dark'], ['Home', 'My horses', 'My horses · Nightfall', 'My horses · Nightfall · Edit', 'Request · 1 Horses', 'Request · 2 Service', 'Request · 3 Route & dates (error)', 'Request · 4 Review', 'First run · My requests', 'First run · Add a horse']],
+  ['Owner portal · Dark', ['Row label · Owner portal · Dark'], ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'My horses', 'My horses · Nightfall', 'My horses · Nightfall · Edit', 'Request · 1 Horses', 'Request · 2 Service', 'Request · 3 Route & dates (error)', 'Request · 4 Review', 'First run · My requests', 'First run · Add a horse']],
   ['Owner · Request tracking', ['Row label · Owner · Request tracking'], ['Tracking · My requests', 'Tracking · In review', 'Tracking · Info required', 'Quotation', 'Tracking · Documents needed', 'Tracking · All documents', 'Tracking · Ask a question', 'Tracking · Document upload · Refused', 'Tracking · Document upload', 'Tracking · In transit', 'Tracking · Delivered', 'Tracking · Closed', 'Tracking · Report a problem']],
-  [STAFF_ROWS[0], ['Row label · ' + STAFF_ROWS[0], 'Row label · Staff workspace · Dark'], ['Logistics manager · Overview', 'Logistics manager · Jobs', 'Logistics manager · Jobs · Sorted', 'Logistics manager · Request review', 'Logistics manager · Request review · Override', 'Logistics manager · Quotation builder', 'Logistics manager · Quotation builder · Blocked', 'Logistics manager · Incident · Held', 'Logistics manager · Incident · Customer report', 'Logistics manager · Users & roles', 'Logistics manager · Users & roles · Error', 'Logistics manager · Audit log', 'Logistics manager · Audit log · Entry', 'Logistics manager · Audit log · No results']],
-  [STAFF_ROWS[1], ['Row label · ' + STAFF_ROWS[1]], ['Transport specialist · Clearance checklist', 'Transport specialist · Authorities', 'Transport specialist · Authorities · Overdue', 'Transport specialist · Document review', 'Transport specialist · Document review · Reject', 'Transport specialist · Customer notes', 'Transport specialist · Regulation catalog', 'Transport specialist · Rate catalog', 'Transport specialist · Audit log · Not allowed']],
+  [STAFF_ROWS[0], ['Row label · ' + STAFF_ROWS[0], 'Row label · Staff workspace · Dark'], ['Logistics manager · Overview', 'Logistics manager · Jobs', 'Logistics manager · Jobs · Sorted', 'Logistics manager · Request review', 'Logistics manager · Request review · Override', 'Logistics manager · Quotation builder', 'Logistics manager · Quotation builder · Blocked', 'Logistics manager · Incident · Held', 'Logistics manager · Incident · Customer report', 'Logistics manager · Users & roles', 'Logistics manager · Users & roles · Error', 'Logistics manager · Users & roles · Pending invites', 'Logistics manager · Audit log', 'Logistics manager · Audit log · Entry', 'Logistics manager · Audit log · No results']],
+  [STAFF_ROWS[1], ['Row label · ' + STAFF_ROWS[1]], ['Transport specialist · Clearance checklist', 'Transport specialist · Authorities', 'Transport specialist · Authorities · Overdue', 'Transport specialist · Document review', 'Transport specialist · Document review · Not sent', 'Transport specialist · Document review · Reject', 'Transport specialist · Customer notes', 'Transport specialist · Regulation catalog', 'Transport specialist · Rate catalog', 'Transport specialist · Audit log · Not allowed']],
   [STAFF_ROWS[2], ['Row label · ' + STAFF_ROWS[2]], ['Fleet & route coordinator · Load plan', 'Fleet & route coordinator · Route plan']],
   ['Escort cab surface · Light', ['Row label · Escort cab surface · Light', 'Row label · Operations · Dark'], ['Escort · Checkpoint', 'Escort · Welfare stop', 'Escort · Delivery', 'Escort · Held']],
-  ['Light mode & mobile', ['Row label · Light mode & mobile'], ['Home · Light', 'Quotation · Light', 'Transport specialist · Clearance checklist · Light', 'My horses · Mobile', 'My horses · Mobile · Light']]
+  ['Light mode · Mobile not maintained', ['Row label · Light mode · Mobile not maintained', 'Row label · Light mode & mobile'], ['Landing · Signed out · Light', 'Home · Light', 'Home · Nothing owed · Light', 'Home · On the road · Light', 'Quotation · Light', 'Transport specialist · Clearance checklist · Light', 'My horses · Mobile', 'My horses · Mobile · Light']]
 ];
 async function eCanvas() {
   var page = await rehydrate(PAGE_NAMES[3]);

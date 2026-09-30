@@ -48,15 +48,15 @@ function noteField(label, value, helper, empty) {
 function reviewHead(title, code, meta, due, date) {
   var d = VV({ name: 'Review due', gap: 2, cross: 'MAX' });
   addAll(d, [Tx(due, 'Label/S', 'status/warn/fg', { align: 'RIGHT' }), Tx(date, 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  var h = pageHeader({ shell: 'staff', back: 'Requests', title: title, code: code, summary: meta, right: [stageChip('Request'), d] });
+  var h = pageHeader({ shell: 'staff', back: 'Requests', title: title, code: code, summary: meta, right: [stageMark('Request'), d] });
   h.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 16;
   return h;
 }
-function reviewScreen(name, code, head, left, right) {
+function reviewScreen(name, code, head, left, right, queue) {
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
-  return adminScreen(name, 'Requests', ['Requests', code], STAFF.yen, [head, body], 'Mon 28 Sep 2026');
+  return adminScreen(name, 'Requests', ['Requests', code], STAFF.yen, [head, body], 'Mon 28 Sep 2026', { queue: queue });
 }
 
 /* ---------- REQ-2026-0193: a horse conflict, so ask for information ---------- */
@@ -85,7 +85,8 @@ function scrReview() {
   addAll(other, [Tx('Other outcomes', 'Label/S', 'text/secondary'), btn('Secondary', 'MD', 'Start quotation', { fill: true }), Tx('Waits on the Horses check.', 'Body/S', 'text/tertiary', { fill: true }), btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
   add(dec, fillW(other));
   var right = column([dec]);
-  return reviewScreen('Logistics manager · Request review', 'REQ-2026-0193', reviewHead('Ho Chi Minh City → Bangkok', 'REQ-2026-0193', 'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d', 'Due today', '28 Sep'), left, right);
+  return reviewScreen('Logistics manager · Request review', 'REQ-2026-0193', reviewHead('Ho Chi Minh City → Bangkok', 'REQ-2026-0193', 'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d', 'Due today', '28 Sep'), left, right,
+    { label: 'Review queue', pos: '3 of 4', prev: true, next: true });
 }
 
 /* ---------- REQ-2026-0190: inside the lead time, so an express override ---------- */
@@ -113,7 +114,8 @@ function scrReviewOverride() {
   var other = VV({ name: 'Other outcomes', gap: 10 });
   addAll(other, [Tx('Other outcomes', 'Label/S', 'text/secondary'), btn('Secondary', 'MD', 'Refuse override and reject', { fill: true }), Tx('Rejects with your reason; the customer can copy the request into a new draft dated 25 Oct or later.', 'Body/S', 'text/tertiary', { fill: true })]);
   add(dec, fillW(other));
-  return reviewScreen('Logistics manager · Request review · Override', 'REQ-2026-0190', reviewHead('Hanoi → Vientiane', 'REQ-2026-0190', 'Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'Due today', '28 Sep'), left, column([dec]));
+  return reviewScreen('Logistics manager · Request review · Override', 'REQ-2026-0190', reviewHead('Hanoi → Vientiane', 'REQ-2026-0190', 'Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'Due today', '28 Sep'), left, column([dec]),
+    { label: 'Review queue', pos: '1 of 4', prev: false, next: true });
 }
 
 /* ---------- the customer's side: the request came back with a question ---------- */
@@ -144,7 +146,7 @@ function scrTrackInfo() {
   var est = panel('Estimate', { gap: 10 });
   addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('Still an indicative range. It updates if you change the horses, route or date.', 'Body/S', 'text/tertiary', { fill: true })]);
   var hist = historyPanel([['28 Sep · 09:41', 'Returned with a question: where to collect Shadowfax and Nightfall.', 'Yến, logistics manager'], ['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageChip('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
+  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
 }
 
 /* =====================================================================
@@ -216,7 +218,7 @@ function scrBuilder() {
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Issued 15 Sep · superseded when the departure moved', 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(ver, [Tx('Versions', 'Heading/H4'), fillW(v2), fillW(v1)]);
   return builderScreen('Logistics manager · Quotation builder', ['Requests', 'REQ-2026-0179', 'Quotation'],
-    builderHead('Phnom Penh → Hong Kong (Sha Tin)', 'Q-2026-0188', 'v2 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026', 'REQ-2026-0179', [stageChip('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
+    builderHead('Phnom Penh → Hong Kong (Sha Tin)', 'Q-2026-0188', 'v2 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026', 'REQ-2026-0179', [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
     left, column([issue, ch, ver]), 'Wed 23 Sep 2026');
 }
 
@@ -246,7 +248,7 @@ function scrBuilderBlocked() {
     readyText: (T.lines - T.missing) + ' of ' + T.lines + ' lines priced', issue: 'Issue quotation', 
     facts: [['Lead-time override', 'Granted 28 Sep by Yến']] });
   return builderScreen('Logistics manager · Quotation builder · Blocked', ['Requests', 'REQ-2026-0190', 'Quotation'],
-    builderHead('Hanoi → Vientiane', 'REQ-2026-0190', 'quotation v1 draft · Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'REQ-2026-0190', [stageChip('Request'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
+    builderHead('Hanoi → Vientiane', 'REQ-2026-0190', 'quotation v1 draft · Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'REQ-2026-0190', [stageMark('Request'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
     left, column([issue]), 'Tue 29 Sep 2026');
 }
 

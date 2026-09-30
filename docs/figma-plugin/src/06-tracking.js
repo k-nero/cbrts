@@ -13,13 +13,18 @@ var URGENCY = {
 /* one tone per stage, shared by list and detail chips */
 /* one process vocabulary everywhere: the seven stages, named the same on
    Home, the request wizard, tracking, the quotation and the staff jobs.
-   A stage chip says where a request is, not how urgent it is: urgency lives
-   in the owed items and deadlines, so stage chips are always neutral. */
+   A stage mark says where a request is, not how urgent it is: urgency lives
+   in the owed items and deadlines, so a stage is plain words, never a toned chip. */
 var STAGES = ['Request', 'Quotation', 'Approval', 'Documents', 'Clearance', 'Trip', 'Handover'];
-function stageChip(s) { return chip('Neutral', s + ' · ' + (STAGES.indexOf(s) + 1) + ' of 7', { noDot: true }); }
+/* a stage is a position, not a state, so it is said in words without a pill: the stage name, then where it sits in the seven */
+function stageMark(s) {
+  var h = H({ name: 'Stage · ' + s, gap: 6, cross: 'CENTER' });
+  addAll(h, [Tx(s, 'Label/S', 'text/primary', { name: 'Stage' }), Tx((STAGES.indexOf(s) + 1) + ' of 7', 'Mono/Caption', 'text/tertiary', { name: 'Position' })]);
+  return h;
+}
 
 function buildTrackingComponents(board) {
-  var b = docBlock(board, 'Request tracking', 'Customer-side tracking pieces. Owed item: one thing the customer owes, with its reason and a two-line deadline (time left, then the date); urgency drives tone, and only the top item\'s action is gold. Stage row: a stage (or a collapsed run of stages) with its owner and a two-line deadline. Route stop: a checkpoint on the schematic route; positions come from recorded checkpoints only. Status tones only, never gold.');
+  var b = docBlock(board, 'Request tracking', 'Customer-side tracking pieces. Owed item: one thing the customer owes, with its reason and a two-line deadline (time left, then the date); urgency drives tone, and only the top item’s action is gold. Stage row: a stage (or a collapsed run of stages) with its owner and a two-line deadline. Route stop: a checkpoint on the schematic route; positions come from recorded checkpoints only. Status tones only, never gold.');
 
   var owed = Object.keys(URGENCY).map(function (u) {
     var s = URGENCY[u];
@@ -302,9 +307,9 @@ function scrMyRequests() {
   /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
   var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageChip('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageChip('Quotation'), owe(1, 'Warn'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageChip('Request'), owe(0), rowOpen()] }
+    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageMark('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
+    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageMark('Quotation'), owe(1, 'Warn'), rowOpen()] },
+    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageMark('Request'), owe(0), rowOpen()] }
   ]);
   tableFoot(t, 3, 3, 'requests');
   var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
@@ -329,7 +334,7 @@ function scrTrackReview() {
   addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('An indicative range, not a quote. The quotation will be itemised line by line.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
     fillW(requestSummary(REQ_0193, { title: 'What you sent', bare: true, only: ['Horses', 'Service', 'Route', 'Departure'] }))]);
   var hist = historyPanel([['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageChip('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: documents needed ---------- */
@@ -356,20 +361,25 @@ function scrTrackDocs() {
   var hist = historyPanel([
     ['24 Sep · 16:02', 'Proof of ownership for Silver Bell rejected: the bill of sale is unsigned.', 'Lan, transport specialist'],
     ['21 Sep · 10:15', 'EIA test for Shadowfax uploaded and approved.', 'You, then Lan'],
-    ['16 Sep · 02:00', 'Silver Bell\'s influenza booster lapsed; the item was reopened.', 'System'],
+    ['16 Sep · 02:00', 'Silver Bell’s influenza booster lapsed; the item was reopened.', 'System'],
     ['12 Sep · 11:30', 'Job approved as CBRT-2026-041; document checklist created (23 items).', 'Yến, logistics manager'],
     ['10 Sep · 18:44', 'Quotation v2 accepted; 30% deposit confirmed.', 'You']
   ], 'Show all 14 events');
-  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageChip('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: in transit ---------- */
-function scrTrackTransit() {
-  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+/* CBRT-2026-041 on 18 Oct at 08:41: the last confirmed checkpoint and what is next; Tracking · In transit and Home share it */
+function onTheRoad() {
   var route = panel('Route', { gap: 20 });
   var rh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
   addAll(rh, [VV({ name: 'Title', gap: 2 }, [Tx('On the road', 'Heading/H3'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary')]), Tx('Updated 08:41', 'Mono/Caption', 'text/tertiary')]);
   addAll(route, [fillW(rh), fillW(routeStrip(stopsWith(['Done', 'Current', 'Upcoming', 'Upcoming'], ['06:05 · departed', '08:34 · cleared', 'exp. 09:30', 'exp. 12:30']), 'Clear'))]);
+  return route;
+}
+function scrTrackTransit() {
+  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+  var route = onTheRoad();
   var log = panel('Condition log', { gap: 12 });
   add(log, Tx('Latest condition log', 'Heading/H4'));
   [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom'], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
@@ -382,11 +392,11 @@ function scrTrackTransit() {
   });
   var stagesP = stagePanel([
     ['Done', 'Submitted with 4 horses.', '', '2 Sep'], ['Done', 'Quotation v2 accepted.', '', '10 Sep'], ['Done', 'Approved. Job CBRT-2026-041.', '', '12 Sep'],
-    ['Done', '21 of 21 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
+    ['Done', '23 of 23 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
     ['Current', 'On the road with Minh, driver, and two grooms since 06:05.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
   var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
-  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageChip('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
+  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageMark('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
 /* ---------- Detail: delivered ---------- */
@@ -410,7 +420,7 @@ function scrTrackDelivered() {
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
   var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
-  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageChip('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
+  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 
 /* ---------- entries ---------- */

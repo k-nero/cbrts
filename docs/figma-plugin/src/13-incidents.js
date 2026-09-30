@@ -74,7 +74,7 @@ function optionRow(sel, title, desc, facts) {
 var NOW40 = '09:10';
 function scrIncidentHeld() {
   var head = builderHead('Held at Bavet – Mộc Bài', 'CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City · Mekong Star · shared load · departed 05:30', 'Incidents',
-    [stageChip('Trip'), chip('Bad', 'Held'), dueStack('Held for ' + durText(toMin(NOW40) - toMin(INC40.held)), 'since ' + INC40.held, 'status/bad/fg')]);
+    [stageMark('Trip'), chip('Bad', 'Held'), dueStack('Held for ' + durText(toMin(NOW40) - toMin(INC40.held)), 'since ' + INC40.held, 'status/bad/fg')]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var rec = panel('What the escort recorded', { gap: 12 });
   var rh = H({ name: 'Head', gap: 12, main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -126,8 +126,9 @@ function escortRecord(title) {
   var p = panel('Escort record', { gap: 10 });
   var h = VV({ name: 'Head', gap: 8 });
   addAll(h, [Tx(title, 'Heading/H4'), chip('Ok', 'Sound')]);
-  addAll(p, [fillW(h), Tx('“Walked off well; drinking.”', 'Body/S', 'text/primary', { fill: true }), Tx('Logged at 16:10 by Hạnh, groom, on arrival.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
-    dlRow('Loaded, Bangkok', '05:10 · calm', { valueStyle: 'Label/S' }), dlRow('Siem Reap stop', '10:20 · sound', { valueStyle: 'Label/S' }), dlRow('Delivered', '16:05', { valueStyle: 'Mono/Data' })]);
+  /* the trip's own checks in one line, so the record stays as short as the customer's report beside it */
+  addAll(p, [fillW(h), Tx('“Walked off well; drinking.”', 'Body/S', 'text/primary', { fill: true }), Tx('Logged at 16:10 by Hạnh, groom, on arrival.', 'Body/S', 'text/tertiary', { fill: true }),
+    Tx('Loaded at Bangkok 05:10, calm · Siem Reap stop 10:20, sound · delivered 16:05.', 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
 function scrTrackReport() {
@@ -159,7 +160,7 @@ function scrTrackReport() {
   addAll(r, [Tx('Yến replies', 'Body/S', 'text/secondary'), dueStack('Within 2 hours', 'of sending')]);
   addAll(next, [Tx('What happens next', 'Heading/H4'), Tx('Yến, logistics manager, reads your report with the escort’s arrival record and replies with a next step.', 'Body/S', 'text/secondary', { fill: true }), fillW(r),
     Tx('Sending pauses the 26 Sep handover deadline until the case is settled.', 'Body/S', 'text/secondary', { fill: true })]);
-  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageChip('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
+  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
     [split(form, column([urgent, next]), SIDE.narrow)], '24 Sep 2026, ' + INC36.draft);
   var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
@@ -171,23 +172,23 @@ function scrTrackReport() {
 /* ---------- the same case on Yến's side (18:05) ---------- */
 function scrIncidentReport() {
   var head = builderHead('Golden Lotus · cut on arrival', 'CBRT-2026-036', 'REQ-2026-0151 · Chao Phraya Racing Stables · Bangkok → Ho Chi Minh City', 'Incidents',
-    [stageChip('Handover'), chip('Bad', 'Open'), dueStack('Reply in ' + INC36.left, 'by ' + INC36.due, 'status/warn/fg')]);
+    [stageMark('Handover'), chip('Bad', 'Open'), dueStack('Reply in ' + INC36.left, 'by ' + INC36.due, 'status/warn/fg')]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var rep = panel('Customer report', { gap: 10 });
   var h = VV({ name: 'Head', gap: 8 });
   addAll(h, [Tx('What the customer reported', 'Heading/H4'), chip('Bad', 'Injury')]);
   addAll(rep, [fillW(h), Tx('“' + REPORT_TEXT + '”', 'Body/S', 'text/primary', { fill: true }), photoThumbs(['IMG_2291.jpg', 'IMG_2292.jpg'], false), stamp(INC36.reported, 'Niran, stable manager')]);
   var two = H({ name: 'Records', gap: 24 });
-  addAll(two, [fillW(rep), fillW(escortRecord('What the escort recorded'))]);
+  var esc = escortRecord('What the escort recorded');
+  addAll(two, [fillW(rep), fillW(esc)]);
+  rep.layoutSizingVertical = 'FILL'; esc.layoutSizingVertical = 'FILL';
   var diff = callout('Warn', 'The records differ', 'Logged sound at 16:10 by Hạnh; reported cut at ' + INC36.reported + '. The groom’s statement and the vet’s visit establish what happened; this page doesn’t decide fault.');
   var comp = VV({ name: 'Reply', gap: 14, pad: [18, 20, 18, 20], radius: 12, fill: 'surface/raised', stroke: 'border/strong' });
-  addAll(comp, [Tx('Next steps and reply', 'Label/M'),
-    Tx('Done', 'Label/S', 'text/secondary'),
-    fillW(factLine('Vet visit booked for 25 Sep at 09:00', 'Dr Phạm Quốc Bảo, at the club’s barn. The cost is held until the case closes.', true)),
-    fillW(factLine('Insurer notified under the transit policy', 'PVI Insurance, at ' + INC36.notified + '.', true)),
-    fillW(factLine('Statement requested from Hạnh, groom', 'Due 25 Sep at 12:00.', true)),
+  /* the reply comes first so it sits above the fold; what is already done is one line under it (the timeline has the detail) */
+  addAll(comp, [Tx('Your reply', 'Label/M'),
     fillW(noteField('Reply to Chao Phraya Racing Stables', 'Thank you for the photos. A vet will see Golden Lotus at your barn tomorrow at 09:00, and we have notified our insurer. Hạnh, who logged her on arrival, is writing a statement by noon. Your handover stays open until this is settled.', 'Required. Sent as written; it also appears on the request page.')),
-    btn('Primary', 'MD', 'Send reply', { fill: true, trail: 'arrow-right' })]);
+    btn('Primary', 'MD', 'Send reply', { fill: true, trail: 'arrow-right' }),
+    Tx('Already done: vet visit booked for 25 Sep at 09:00 (Dr Phạm Quốc Bảo; the cost is held until the case closes), PVI Insurance notified at ' + INC36.notified + ', statement requested from Hạnh by 25 Sep 12:00.', 'Body/S', 'text/tertiary', { fill: true })]);
   var left = column([two, diff, comp]);
   var ho = panel('Handover', { gap: 10 });
   var hh = H({ name: 'Head', gap: 12, main: 'SPACE_BETWEEN', cross: 'CENTER' });

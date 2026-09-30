@@ -146,7 +146,7 @@ function buildCheckbox(parent) {
 /* ---------- Option card ---------- */
 function buildOptionCard(parent) {
   var b = docBlock(parent, 'Option card', 'Large selectable target. Multi-select cards (horses on a request) show a checkbox; single-choice cards (mode, outcome, topic, temperament) set Show radio and hide the checkbox. Selected is a strong neutral border and mark, never gold. Disabled cards stay readable and carry the reason.');
-  var comps = ['Default', 'Selected', 'Disabled'].map(function (st) {
+  var comps = ['Default', 'Selected', 'Focus', 'Disabled'].map(function (st) {
     var sel = st === 'Selected';
     var c = VV({ component: true, name: 'State=' + st, gap: 10, pad: 20, w: 320, radius: 12, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'text/secondary' : 'border/default', sw: sel ? 1.5 : 1 });
     var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -167,6 +167,8 @@ function buildOptionCard(parent) {
     add(c, Tx('A short description of this option.', 'Body/S', 'text/tertiary', { name: 'Description', fill: true }));
     add(c, Tx('Meta', 'Mono/Caption', st === 'Disabled' ? 'status/warn/fg' : 'text/tertiary', { name: 'Meta', fill: true }));
     if (st === 'Disabled') c.opacity = 0.55;
+    /* keyboard focus: the Default card with the gold ring 4px outside, so the layout never moves */
+    if (st === 'Focus') focusRing(c, 4, 4, 16);
     return c;
   });
   var set = combine(comps, b, 'Option card');
@@ -272,7 +274,7 @@ function callout(tone, title, body) { var c = inst(C.callout, { Tone: tone }); s
 
 /* ---------- Brass nameplate ---------- */
 function buildNameplate(parent) {
-  var b = docBlock(parent, 'Nameplate', 'The horse\'s identity mark: an engraved brass stall plate on the horse\'s coat colour. Replaces stock photography, which the draft got wrong (a samosa photo, a broken image). Properties: Name, Subtitle.');
+  var b = docBlock(parent, 'Nameplate', 'The horse’s identity mark: an engraved brass stall plate on the horse’s coat colour. Replaces stock photography, which the draft got wrong (a samosa photo, a broken image). Properties: Name, Subtitle.');
   var c = H({ component: true, name: 'Nameplate', gap: 12, pad: [10, 14, 10, 14], cross: 'CENTER', radius: 4 });
   c.fills = [gradient([[0, '#EAD08C'], [0.55, '#C9AA5A'], [1, '#9C7C33']])];
   effect(c, 'Material/Brass');
@@ -309,15 +311,16 @@ function buildHorseCard(parent) {
     add(c, fillW(hdr));
 
     var body = VV({ name: 'Body', gap: 16, pad: 20 });
-    var tags = H({ name: 'Tags', gap: 6 });
+    var tags = H({ name: 'Tags', gap: 6, wrap: true, rowGap: 6 }); // 12px chips wrap in the 390px mobile card
     var t1 = expose(inst(C.chip, { Tone: 'Ok' })); t1.name = 'Tag 1'; setP(t1, { Label: 'Calm' });
     var t2 = expose(inst(C.chip, { Tone: 'Info' })); t2.name = 'Tag 2'; setP(t2, { Label: 'Climate stall' });
     addAll(tags, [t1, t2]);
-    add(body, tags);
+    add(body, fillW(tags));
 
-    var facts = H({ name: 'Facts', gap: 8 });
+    var facts = H({ name: 'Facts', gap: 4 });
     [['Age', '7 y', 'Age'], ['Height', '16.2 hh', 'Height'], ['Weight', '510 kg', 'Weight'], ['Size', 'M · 32', 'Size · in']].forEach(function (f) {
-      var cell = VV({ name: f[0] + ' cell', gap: 4, pad: [10, 10, 10, 10], radius: 8, fill: 'bg/sunken' });
+      /* 4px gaps and 8px sides keep a 7-character figure such as 16.2 hh on one line in the 390px mobile card */
+      var cell = VV({ name: f[0] + ' cell', gap: 4, pad: [10, 8, 10, 8], radius: 8, fill: 'bg/sunken' });
       addAll(cell, [Tx(f[2], 'Body/S', 'text/tertiary', { name: 'Fact label', fill: true }), Tx(f[1], 'Mono/Data', 'text/primary', { name: f[0], fill: true })]);
       add(facts, fillW(cell));
     });
@@ -437,7 +440,7 @@ function buildDocRow(parent) {
     var s = DOC_STATUS[k];
     var c = H({ component: true, name: 'Status=' + k, gap: 16, pad: [14, 20, 14, 20], cross: 'CENTER', w: 1100, fill: 'surface/card' });
     borderSide(c, 'border/default', 'bottom');
-    var sc = H({ name: 'Status col', w: 160 });
+    var sc = H({ name: 'Status col', w: 172 }); // room for the widest 12px chip, EXPIRES IN TRANSIT
     var ch = inst(C.chip, { Tone: s.tone }); ch.name = 'Status'; setP(ch, { Label: s.label });
     add(sc, ch);
     var info = VV({ name: 'Info', gap: 3 });
@@ -507,7 +510,7 @@ function buildQuoteLine(parent) {
 
 /* ---------- Estimate card ---------- */
 function buildEstimate(parent) {
-  var b = docBlock(parent, 'Estimate card', 'The customer\'s instant estimate. Always a range, never one number; never stored, never acceptable; recomputed on every change (BR-Q-10, BR-Q-11).');
+  var b = docBlock(parent, 'Estimate card', 'The customer’s instant estimate. Always a range, never one number; never stored, never acceptable; recomputed on every change (BR-Q-10, BR-Q-11).');
   var c = VV({ component: true, name: 'Estimate card', gap: 14, pad: 24, w: 400, radius: 12, fill: 'surface/card', stroke: 'border/default' });
   add(c, Tx('Indicative range', 'Label/M', 'text/secondary', { name: 'Label' }));
   add(c, Tx('$11,300 – $16,100', 'Display/M', 'text/primary', { name: 'Range' }));
@@ -523,30 +526,12 @@ function buildEstimate(parent) {
   C.estimate = c;
 }
 
-/* ---------- Service card ---------- */
-function buildServiceCard(parent) {
-  var b = docBlock(parent, 'Service card', 'Marketing card for the six services. Prices read "indicative from"; the only binding price is an issued quotation.');
-  var c = VV({ component: true, name: 'Service card', gap: 14, pad: 28, w: 384, radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  var badge = H({ name: 'Icon badge', w: 40, h: 40, radius: 8, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
-  add(badge, Ic('truck', 20, 'text/secondary'));
-  add(c, badge);
-  add(c, Tx('Service', 'Heading/H3', 'text/primary', { name: 'Title' }));
-  add(c, Tx('Scope', 'Body/S', 'text/tertiary', { name: 'Scope', fill: true }));
-  add(c, Tx('What the service includes, in one or two sentences.', 'Body/S', 'text/secondary', { name: 'Body', fill: true }));
-  add(c, divider());
-  var pr = H({ name: 'Price row', main: 'SPACE_BETWEEN', cross: 'MAX' });
-  addAll(pr, [Tx('Indicative from', 'Mono/Caption', 'text/tertiary', { name: 'Price label' }), Tx('$800', 'Mono/Data L', 'text/primary', { name: 'Price' })]);
-  add(c, fillW(pr));
-  single(c, b);
-  wireText(c, ['Scope', 'Title', 'Body', 'Price']);
-  wire(c, 'Icon', 'INSTANCE_SWAP', ICON['truck'].id, 'Icon', 'mainComponent');
-  C.service = c;
-}
 
 /* ---------- Timeline stop ---------- */
 function buildTimeline(parent) {
   var b = docBlock(parent, 'Timeline stop', 'Route plan and journey log entry. Kind drives the marker. Properties: Stop, Time, Details.');
-  var kinds = { Pickup: ['arrow-up', 'text/secondary'], Border: ['shield', 'status/info/fg'], Welfare: ['coffee', 'status/ok/fg'], Delivery: ['check', 'text/secondary'] };
+  /* the icon names the kind of stop; status colours stay for state (DESIGN.md), so every kind is neutral */
+  var kinds = { Pickup: ['arrow-up', 'text/secondary'], Border: ['shield', 'text/secondary'], Welfare: ['coffee', 'text/secondary'], Delivery: ['check', 'text/secondary'] };
   var comps = Object.keys(kinds).map(function (k) {
     var c = H({ component: true, name: 'Kind=' + k, gap: 16, w: 900 });
     var m = H({ name: 'Marker', w: 36, h: 36, radius: 8, fill: 'surface/muted', stroke: 'border/strong', main: 'CENTER', cross: 'CENTER' });
@@ -574,7 +559,7 @@ function brand(small) {
   return g;
 }
 function buildChrome(parent) {
-  var b = docBlock(parent, 'App chrome', 'Owner portal header: customer items only (staff work in the Staff sidebar shell). Request transport is a Secondary button so each page keeps its own gold action. Also the mobile header and footer. Set a nav item\'s State to Active per screen.');
+  var b = docBlock(parent, 'App chrome', 'Owner portal header: customer items only (staff work in the Staff sidebar shell). Request transport is a Secondary button so each page keeps its own gold action. Also the mobile header and footer. Set a nav item’s State to Active per screen.');
   var h = H({ component: true, name: 'App header / Desktop', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [0, 40, 0, 40], h: 64, w: SCREEN_W, fill: 'bg/canvas' });
   borderSide(h, 'border/default', 'bottom');
   var nav = H({ name: 'Nav', gap: 4, cross: 'CENTER' });
@@ -607,7 +592,7 @@ function buildChrome(parent) {
    company line. Compact: the same in one row, so the 900 px access pages don't grow. Both end
    with the demo note; set As of to the screen's own date. */
 var OPS_DESK = { phone: '+84 28 0000 0000', email: 'ops@equifreight.vn', hours: 'Staffed 24 hours, every day' }; // placeholder: no real number yet
-var FOOT_LINKS = [['Help', ['Help', 'How pricing works', 'Document rules by country']], ['Legal', ['Terms of service', 'Privacy']]];
+var FOOT_LINKS = [['Help', ['Help centre', 'How pricing works', 'Document rules by country']], ['Legal', ['Terms of service', 'Privacy']]];
 function footNote() {
   var n = H({ name: 'Demo note', gap: 4, cross: 'CENTER' });
   addAll(n, [Tx('Prototype · demo data as of', 'Mono/Caption', 'text/tertiary', { name: 'Note' }), Tx('26 Sep 2026', 'Mono/Caption', 'text/tertiary', { name: 'As of' })]);
@@ -647,7 +632,7 @@ function buildFooter(b) {
   addAll(line, [Tx('Operations desk, 24 hours', 'Body/S', 'text/secondary', { name: 'Title' }), Tx(OPS_DESK.phone, 'Mono/Data', 'text/primary', { name: 'Phone' })]);
   addAll(compact, [legal, line, footNote()]);
 
-  var set = combine([full, compact], b, 'Footer', 'Owner portal (Full) and access pages (Compact). Staff pages and the cab surface have no footer. Set As of to the screen\'s own date.');
+  var set = combine([full, compact], b, 'Footer', 'Owner portal (Full) and access pages (Compact). Staff pages and the cab surface have no footer. Set As of to the screen’s own date.');
   wireText(set, ['As of']);
   return set;
 }
@@ -672,7 +657,6 @@ function buildComponents(board) {
   buildGate(board);
   buildQuoteLine(board);
   buildEstimate(board);
-  buildServiceCard(board);
   buildTimeline(board);
   buildChrome(board);
 }

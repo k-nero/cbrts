@@ -4,7 +4,7 @@ import { App, Tag } from 'antd';
 import dayjs from 'dayjs';
 
 import type { UserInput } from '@/apis/user';
-import Table from '@/components/Table';
+import Table from '@/components/table';
 import TableActionDropdown from '@/components/TableActionDropdown';
 import type { UseCrudResourceResult } from '@/hooks/crud';
 import { ROLE_LABEL, type RoleName, RoleNameEnum, type User } from '@/interfaces';

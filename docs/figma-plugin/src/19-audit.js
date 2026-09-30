@@ -24,7 +24,7 @@ var AUDIT_WEEK = [
   ['18:02', '24 Sep', 'Vũ Hải Yến', 'Logistics manager', 'Notified PVI Insurance under the transit policy', 'CBRT-2026-036', 'Web'],
   ['17:31', '24 Sep', 'System', 'Automatic', 'Opened an incident for Golden Lotus and paused the handover deadline', 'CBRT-2026-036', 'System'],
   ['17:30', '24 Sep', 'Chao Phraya Racing Stables', 'Customer', 'Reported a problem for Golden Lotus with 2 photos', 'CBRT-2026-036', 'Web'],
-  ['16:10', '24 Sep', 'Hạnh', 'Groom', 'Logged arrival: all three horses sound', 'CBRT-2026-036', 'Cab tablet', '16:12'],
+  ['16:10', '24 Sep', 'Võ Thị Hạnh', 'Driver / escort', 'Logged arrival: all three horses sound', 'CBRT-2026-036', 'Cab tablet', '16:12'],
   ['16:02', '24 Sep', 'Nguyễn Thị Lan', 'Transport specialist', 'Rejected Silver Bell’s proof of ownership: “the bill of sale is unsigned”', 'CBRT-2026-041', 'Web'],
   ['09:48', '24 Sep', 'Saigon Turf Club', 'Customer', 'Uploaded Silver Bell’s proof of ownership (bill of sale)', 'CBRT-2026-041', 'Web'],
   ['14:30', '22 Sep', 'Nguyễn Thị Lan', 'Transport specialist', 'Published version 7 of the Cambodia regulation catalog', 'Catalog KH v7', 'Web'],

@@ -9,7 +9,7 @@ function newCustomer(s) {
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
   if (nm) nm.characters = 'Đà Lạt Highland Stables';
   if (ini) ini.characters = 'DH';
-  setP(s.children[s.children.length - 1], { 'As of': '27 Sep 2026' });
+  setP(s.children[s.children.length - 1], { 'As of': '26 Sep 2026' });
   return s;
 }
 function scrFirstRequests() {

@@ -38,7 +38,7 @@ function docList(title, sub, docs, link) {
   docs.forEach(function (d) {
     var r = H({ name: d[0], gap: 16, pad: [12, 0, 12, 0], cross: 'CENTER' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 170 });
+    var st = H({ name: 'Status col', w: 182 });
     add(st, chip(d[1], d[2], { noDot: d[1] === 'Neutral' }));
     var t = VV({ name: 'Text', gap: 2 });
     addAll(t, [Tx(d[0], 'Label/M'), Tx(d[3], 'Body/S', d[1] === 'Warn' ? 'status/warn/fg' : 'text/secondary', { fill: true })]);
@@ -56,7 +56,7 @@ function tripsPanel() {
     var r = VV({ name: t[0], gap: 6, pad: [12, 0, 12, 0] });
     borderSide(r, 'border/default', 'top');
     var top = H({ name: 'Head', gap: 8, main: 'SPACE_BETWEEN', cross: 'CENTER' });
-    addAll(top, [Tx(t[0], 'Mono/Data', 'text/primary'), stageChip(t[3])]);
+    addAll(top, [Tx(t[0], 'Mono/Data', 'text/primary'), stageMark(t[3])]);
     addAll(r, [fillW(top), Tx(t[1], 'Label/S', 'text/primary'), Tx(t[2], 'Body/S', 'text/tertiary')]);
     if (t[4]) add(r, Tx(t[4], 'Body/S', 'status/warn/fg', { fill: true }));
     add(p, fillW(r));
@@ -117,7 +117,7 @@ function scrHorseEdit() {
    ['Neutral', 'No change', 'REQ-2026-0193', 'Still in review; the new trait is read when it is quoted.']].forEach(function (e) {
     var r = H({ name: e[2], gap: 14, pad: [12, 0, 12, 0], cross: 'MIN' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 110 });
+    var st = H({ name: 'Status col', w: 122 });
     add(st, chip(e[0], e[1], { noDot: e[0] === 'Neutral' }));
     var t = VV({ name: 'Text', gap: 2 });
     addAll(t, [Tx(e[2], 'Mono/Caption', 'text/primary', { fill: true }), Tx(e[3], 'Body/S', 'text/secondary', { fill: true })]);

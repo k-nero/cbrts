@@ -84,7 +84,7 @@ var TYPE = [
   ['Mono/Data', 'mono', 'Regular', 14, 20, 0],
   ['Mono/Caption', 'mono', 'Regular', 12, 16, 0],
   ['Mono/Eyebrow', 'mono', 'Regular', 11, 14, 14, true],
-  ['Mono/Chip', 'mono', 'Medium', 11, 12, 8, true]
+  ['Mono/Chip', 'mono', 'Medium', 12, 14, 8, true]
 ];
 
 function shadow(type, a, y, r, s, rgb) {
@@ -745,7 +745,7 @@ function buildCheckbox(parent) {
 /* ---------- Option card ---------- */
 function buildOptionCard(parent) {
   var b = docBlock(parent, 'Option card', 'Large selectable target. Multi-select cards (horses on a request) show a checkbox; single-choice cards (mode, outcome, topic, temperament) set Show radio and hide the checkbox. Selected is a strong neutral border and mark, never gold. Disabled cards stay readable and carry the reason.');
-  var comps = ['Default', 'Selected', 'Disabled'].map(function (st) {
+  var comps = ['Default', 'Selected', 'Focus', 'Disabled'].map(function (st) {
     var sel = st === 'Selected';
     var c = VV({ component: true, name: 'State=' + st, gap: 10, pad: 20, w: 320, radius: 12, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'text/secondary' : 'border/default', sw: sel ? 1.5 : 1 });
     var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -766,6 +766,8 @@ function buildOptionCard(parent) {
     add(c, Tx('A short description of this option.', 'Body/S', 'text/tertiary', { name: 'Description', fill: true }));
     add(c, Tx('Meta', 'Mono/Caption', st === 'Disabled' ? 'status/warn/fg' : 'text/tertiary', { name: 'Meta', fill: true }));
     if (st === 'Disabled') c.opacity = 0.55;
+    /* keyboard focus: the Default card with the gold ring 4px outside, so the layout never moves */
+    if (st === 'Focus') focusRing(c, 4, 4, 16);
     return c;
   });
   var set = combine(comps, b, 'Option card');
@@ -871,7 +873,7 @@ function callout(tone, title, body) { var c = inst(C.callout, { Tone: tone }); s
 
 /* ---------- Brass nameplate ---------- */
 function buildNameplate(parent) {
-  var b = docBlock(parent, 'Nameplate', 'The horse\'s identity mark: an engraved brass stall plate on the horse\'s coat colour. Replaces stock photography, which the draft got wrong (a samosa photo, a broken image). Properties: Name, Subtitle.');
+  var b = docBlock(parent, 'Nameplate', 'The horse’s identity mark: an engraved brass stall plate on the horse’s coat colour. Replaces stock photography, which the draft got wrong (a samosa photo, a broken image). Properties: Name, Subtitle.');
   var c = H({ component: true, name: 'Nameplate', gap: 12, pad: [10, 14, 10, 14], cross: 'CENTER', radius: 4 });
   c.fills = [gradient([[0, '#EAD08C'], [0.55, '#C9AA5A'], [1, '#9C7C33']])];
   effect(c, 'Material/Brass');
@@ -908,15 +910,16 @@ function buildHorseCard(parent) {
     add(c, fillW(hdr));
 
     var body = VV({ name: 'Body', gap: 16, pad: 20 });
-    var tags = H({ name: 'Tags', gap: 6 });
+    var tags = H({ name: 'Tags', gap: 6, wrap: true, rowGap: 6 }); // 12px chips wrap in the 390px mobile card
     var t1 = expose(inst(C.chip, { Tone: 'Ok' })); t1.name = 'Tag 1'; setP(t1, { Label: 'Calm' });
     var t2 = expose(inst(C.chip, { Tone: 'Info' })); t2.name = 'Tag 2'; setP(t2, { Label: 'Climate stall' });
     addAll(tags, [t1, t2]);
-    add(body, tags);
+    add(body, fillW(tags));
 
-    var facts = H({ name: 'Facts', gap: 8 });
+    var facts = H({ name: 'Facts', gap: 4 });
     [['Age', '7 y', 'Age'], ['Height', '16.2 hh', 'Height'], ['Weight', '510 kg', 'Weight'], ['Size', 'M · 32', 'Size · in']].forEach(function (f) {
-      var cell = VV({ name: f[0] + ' cell', gap: 4, pad: [10, 10, 10, 10], radius: 8, fill: 'bg/sunken' });
+      /* 4px gaps and 8px sides keep a 7-character figure such as 16.2 hh on one line in the 390px mobile card */
+      var cell = VV({ name: f[0] + ' cell', gap: 4, pad: [10, 8, 10, 8], radius: 8, fill: 'bg/sunken' });
       addAll(cell, [Tx(f[2], 'Body/S', 'text/tertiary', { name: 'Fact label', fill: true }), Tx(f[1], 'Mono/Data', 'text/primary', { name: f[0], fill: true })]);
       add(facts, fillW(cell));
     });
@@ -1036,7 +1039,7 @@ function buildDocRow(parent) {
     var s = DOC_STATUS[k];
     var c = H({ component: true, name: 'Status=' + k, gap: 16, pad: [14, 20, 14, 20], cross: 'CENTER', w: 1100, fill: 'surface/card' });
     borderSide(c, 'border/default', 'bottom');
-    var sc = H({ name: 'Status col', w: 160 });
+    var sc = H({ name: 'Status col', w: 172 }); // room for the widest 12px chip, EXPIRES IN TRANSIT
     var ch = inst(C.chip, { Tone: s.tone }); ch.name = 'Status'; setP(ch, { Label: s.label });
     add(sc, ch);
     var info = VV({ name: 'Info', gap: 3 });
@@ -1106,7 +1109,7 @@ function buildQuoteLine(parent) {
 
 /* ---------- Estimate card ---------- */
 function buildEstimate(parent) {
-  var b = docBlock(parent, 'Estimate card', 'The customer\'s instant estimate. Always a range, never one number; never stored, never acceptable; recomputed on every change (BR-Q-10, BR-Q-11).');
+  var b = docBlock(parent, 'Estimate card', 'The customer’s instant estimate. Always a range, never one number; never stored, never acceptable; recomputed on every change (BR-Q-10, BR-Q-11).');
   var c = VV({ component: true, name: 'Estimate card', gap: 14, pad: 24, w: 400, radius: 12, fill: 'surface/card', stroke: 'border/default' });
   add(c, Tx('Indicative range', 'Label/M', 'text/secondary', { name: 'Label' }));
   add(c, Tx('$11,300 – $16,100', 'Display/M', 'text/primary', { name: 'Range' }));
@@ -1122,30 +1125,12 @@ function buildEstimate(parent) {
   C.estimate = c;
 }
 
-/* ---------- Service card ---------- */
-function buildServiceCard(parent) {
-  var b = docBlock(parent, 'Service card', 'Marketing card for the six services. Prices read "indicative from"; the only binding price is an issued quotation.');
-  var c = VV({ component: true, name: 'Service card', gap: 14, pad: 28, w: 384, radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  var badge = H({ name: 'Icon badge', w: 40, h: 40, radius: 8, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
-  add(badge, Ic('truck', 20, 'text/secondary'));
-  add(c, badge);
-  add(c, Tx('Service', 'Heading/H3', 'text/primary', { name: 'Title' }));
-  add(c, Tx('Scope', 'Body/S', 'text/tertiary', { name: 'Scope', fill: true }));
-  add(c, Tx('What the service includes, in one or two sentences.', 'Body/S', 'text/secondary', { name: 'Body', fill: true }));
-  add(c, divider());
-  var pr = H({ name: 'Price row', main: 'SPACE_BETWEEN', cross: 'MAX' });
-  addAll(pr, [Tx('Indicative from', 'Mono/Caption', 'text/tertiary', { name: 'Price label' }), Tx('$800', 'Mono/Data L', 'text/primary', { name: 'Price' })]);
-  add(c, fillW(pr));
-  single(c, b);
-  wireText(c, ['Scope', 'Title', 'Body', 'Price']);
-  wire(c, 'Icon', 'INSTANCE_SWAP', ICON['truck'].id, 'Icon', 'mainComponent');
-  C.service = c;
-}
 
 /* ---------- Timeline stop ---------- */
 function buildTimeline(parent) {
   var b = docBlock(parent, 'Timeline stop', 'Route plan and journey log entry. Kind drives the marker. Properties: Stop, Time, Details.');
-  var kinds = { Pickup: ['arrow-up', 'text/secondary'], Border: ['shield', 'status/info/fg'], Welfare: ['coffee', 'status/ok/fg'], Delivery: ['check', 'text/secondary'] };
+  /* the icon names the kind of stop; status colours stay for state (DESIGN.md), so every kind is neutral */
+  var kinds = { Pickup: ['arrow-up', 'text/secondary'], Border: ['shield', 'text/secondary'], Welfare: ['coffee', 'text/secondary'], Delivery: ['check', 'text/secondary'] };
   var comps = Object.keys(kinds).map(function (k) {
     var c = H({ component: true, name: 'Kind=' + k, gap: 16, w: 900 });
     var m = H({ name: 'Marker', w: 36, h: 36, radius: 8, fill: 'surface/muted', stroke: 'border/strong', main: 'CENTER', cross: 'CENTER' });
@@ -1173,7 +1158,7 @@ function brand(small) {
   return g;
 }
 function buildChrome(parent) {
-  var b = docBlock(parent, 'App chrome', 'Owner portal header: customer items only (staff work in the Staff sidebar shell). Request transport is a Secondary button so each page keeps its own gold action. Also the mobile header and footer. Set a nav item\'s State to Active per screen.');
+  var b = docBlock(parent, 'App chrome', 'Owner portal header: customer items only (staff work in the Staff sidebar shell). Request transport is a Secondary button so each page keeps its own gold action. Also the mobile header and footer. Set a nav item’s State to Active per screen.');
   var h = H({ component: true, name: 'App header / Desktop', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [0, 40, 0, 40], h: 64, w: SCREEN_W, fill: 'bg/canvas' });
   borderSide(h, 'border/default', 'bottom');
   var nav = H({ name: 'Nav', gap: 4, cross: 'CENTER' });
@@ -1206,7 +1191,7 @@ function buildChrome(parent) {
    company line. Compact: the same in one row, so the 900 px access pages don't grow. Both end
    with the demo note; set As of to the screen's own date. */
 var OPS_DESK = { phone: '+84 28 0000 0000', email: 'ops@equifreight.vn', hours: 'Staffed 24 hours, every day' }; // placeholder: no real number yet
-var FOOT_LINKS = [['Help', ['Help', 'How pricing works', 'Document rules by country']], ['Legal', ['Terms of service', 'Privacy']]];
+var FOOT_LINKS = [['Help', ['Help centre', 'How pricing works', 'Document rules by country']], ['Legal', ['Terms of service', 'Privacy']]];
 function footNote() {
   var n = H({ name: 'Demo note', gap: 4, cross: 'CENTER' });
   addAll(n, [Tx('Prototype · demo data as of', 'Mono/Caption', 'text/tertiary', { name: 'Note' }), Tx('26 Sep 2026', 'Mono/Caption', 'text/tertiary', { name: 'As of' })]);
@@ -1246,7 +1231,7 @@ function buildFooter(b) {
   addAll(line, [Tx('Operations desk, 24 hours', 'Body/S', 'text/secondary', { name: 'Title' }), Tx(OPS_DESK.phone, 'Mono/Data', 'text/primary', { name: 'Phone' })]);
   addAll(compact, [legal, line, footNote()]);
 
-  var set = combine([full, compact], b, 'Footer', 'Owner portal (Full) and access pages (Compact). Staff pages and the cab surface have no footer. Set As of to the screen\'s own date.');
+  var set = combine([full, compact], b, 'Footer', 'Owner portal (Full) and access pages (Compact). Staff pages and the cab surface have no footer. Set As of to the screen’s own date.');
   wireText(set, ['As of']);
   return set;
 }
@@ -1271,7 +1256,6 @@ function buildComponents(board) {
   buildGate(board);
   buildQuoteLine(board);
   buildEstimate(board);
-  buildServiceCard(board);
   buildTimeline(board);
   buildChrome(board);
 }
@@ -1355,7 +1339,7 @@ function buildFoundations(page) {
   var board = VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' });
   page.appendChild(board);
   var intro = VV({ name: 'Intro', gap: 12 });
-  addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame\'s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
+  addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame’s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
   add(board, intro);
 
   var pr = H({ name: 'Principles', gap: 20, wrap: true, rowGap: 20 });
@@ -1434,8 +1418,8 @@ function buildFoundations(page) {
 function screen(name, active, blocks, o) {
   o = o || {};
   var s = VV({ name: name, w: SCREEN_W, fill: 'bg/canvas' });
-  var hdr = inst(C.header);
-  if (active) setP(nested(hdr, 'Nav · ' + active), { State: 'Active' });
+  var hdr = o.header || inst(C.header);
+  if (active && !o.header) setP(nested(hdr, 'Nav · ' + active), { State: 'Active' });
   add(s, fillW(hdr));
   var main = VV({ name: 'Content', gap: o.gap != null ? o.gap : 28, pad: [0, PADX, 96, PADX] });
   for (var i = 0; i < blocks.length; i++) add(main, fillW(blocks[i]));
@@ -1448,7 +1432,7 @@ function footer(size, asOf) { var f = inst(C.footer, { Size: size }); if (asOf) 
    Every page (owner, tracking, staff) opens with it: an optional back link, the title (or a
    banner such as a horse's coat), then either a mono code with a one-line summary or a short
    paragraph, and a right slot for chips, a deadline or a control. A page without a back link
-   reserves the back row, so every title in a shell sits at the same height (owner 142, staff 143).
+   reserves the back row, so every owner title sits at y 142; staff pages have no back link (the breadcrumb leads back) and their title sits at y 97.
    o: { shell: 'owner'|'staff', back, title, banner, code, summary, metaChips, right: [nodes], below: [nodes], rule } */
 var HEAD_TOP = { owner: 32, staff: 28 };
 /* two side-column widths on the 1440 grid, both at a 24 gutter: narrow for a decision, the people,
@@ -1456,14 +1440,18 @@ var HEAD_TOP = { owner: 32, staff: 28 };
 var SIDE = { narrow: 400, wide: 456 };
 var BACK_ROW = 46; // a Ghost SM back link (32) plus the header's 14 gap
 function pageHeader(o) {
+  var staff = o.shell === 'staff';
   var top = HEAD_TOP[o.shell || 'owner'];
-  var wrap = VV({ name: 'Page header', gap: 14, pad: [o.back ? top : top + BACK_ROW, 0, o.rule === false ? 0 : 24, 0] });
+  /* staff pages: the top bar's breadcrumb is the way back, so the header drops the back link and its reserved row,
+     and the title steps down to Display M so the work starts higher */
+  if (staff) o.back = null;
+  var wrap = VV({ name: 'Page header', gap: 14, pad: [o.back || staff ? top : top + BACK_ROW, 0, o.rule === false ? 0 : 24, 0] });
   if (o.rule !== false) borderSide(wrap, 'border/default', 'bottom');
   if (o.back) add(wrap, btn('Ghost', 'SM', o.back, { lead: 'arrow-left' }));
   if (o.banner) add(wrap, fillW(o.banner));
   var row = H({ name: 'Title row', gap: 24, main: 'SPACE_BETWEEN', cross: 'MAX' });
   var t = VV({ name: 'Title block', gap: 8 });
-  if (o.title) add(t, Tx(o.title, 'Display/L', 'text/primary', { name: 'Title' }));
+  if (o.title) add(t, Tx(o.title, staff ? 'Display/M' : 'Display/L', 'text/primary', { name: 'Title' }));
   if (o.code || o.metaChips) {
     var m = H({ name: 'Meta', gap: 10, cross: 'CENTER' });
     if (o.code) add(m, Tx(o.code, 'Mono/Data', 'text/secondary', { name: 'Code' }));
@@ -1530,7 +1518,7 @@ function stepper(states) {
    Domain data (demo)
    --------------------------------------------------------------------- */
 var HORSES = [
-  { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '3 of 5 cleared', pct: 60 },
+  { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Nightfall', coat: 'Black', sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
   { name: 'Copper King', coat: 'Chestnut', sub: 'Quarter Horse · Stallion', tags: [['Bad', 'Aggressive'], ['Neutral', 'Box stall']], age: '9 y', height: '15.3 hh', weight: '583 kg', size: 'L · 48', chip: '985 141 000 876 502', value: '$120,000', notes: 'Box stall only. Never next to a mare. Experienced handlers only.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Silver Bell', coat: 'Grey', sub: 'Lipizzan · Mare', tags: [['Ok', 'Calm']], age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32', chip: '203 098 100 554 120', value: '$60,000', notes: 'Travels well. Hay net at shoulder height.', ready: '2 of 5 cleared', pct: 40 }
@@ -1541,7 +1529,7 @@ function horseCard(h) {
   setP(nested(c, 'Tag 1'), { Label: h.tags[0][1], Tone: h.tags[0][0] });
   if (h.tags[1]) setP(nested(c, 'Tag 2'), { Label: h.tags[1][1], Tone: h.tags[1][0] });
   else setP(c, { 'Show tag 2': false });
-  setP(nested(c, 'Readiness bar'), { Value: String(h.pct), Tone: h.pct >= 80 ? 'Ok' : 'Neutral' });
+  setP(nested(c, 'Readiness bar'), { Value: String(h.pct), Tone: h.pct >= 100 ? 'Ok' : 'Neutral' });
   c.name = 'Horse card · ' + h.name;
   return c;
 }
@@ -1549,13 +1537,18 @@ function horseCard(h) {
 /* ---------------------------------------------------------------------
    Screen: Home
    --------------------------------------------------------------------- */
-var HOME_COMMITMENTS = [
-  ['6', 'Countries, by road and air', 'Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong.'],
-  ['21 days', 'Lead time across a border', 'Three days within one country. Too-early requests are told the earliest valid date.'],
-  ['7 days', 'A quotation holds its price', 'Itemised line by line from a rate catalog pinned to that quote.'],
-  ['1 per 3', 'Grooms to horses', 'Rounded up, so four horses travel with two grooms.']
-];
-async function scrHome() {
+/* the signed-out header: no nav and no account, just the way in */
+function publicHeader() {
+  var h = H({ name: 'Public header', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [0, 40, 0, 40], h: 64, fill: 'bg/canvas' });
+  borderSide(h, 'border/default', 'bottom');
+  var right = H({ name: 'Account', gap: 8, cross: 'CENTER' });
+  addAll(right, [btn('Ghost', 'SM', 'Help', { lead: 'info' }), btn('Secondary', 'SM', 'Sign in')]);
+  addAll(h, [brand(), right]);
+  return h;
+}
+/* the public landing page, signed out: what EquiFreight does, the services and how a move runs.
+   A signed-in club never lands here; its Home is the work (scrHome). */
+async function scrLanding() {
   var hero = H({ name: 'Hero', gap: 64, pad: [88, 0, 24, 0], cross: 'CENTER' });
   var left = VV({ name: 'Hero copy', gap: 24 });
   var h1 = Tx('Precision transport\nfor every horse', 'Display/XL', 'text/primary', { name: 'Headline', fill: true });
@@ -1563,39 +1556,40 @@ async function scrHome() {
   var i = h1.characters.indexOf('transport');
   h1.setRangeFontName(i, i + 9, FONT['display/Italic']);
   var ctas = H({ name: 'Actions', gap: 12 });
-  addAll(ctas, [btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' }), btn('Secondary', 'MD', 'Add a horse profile', { lead: 'plus' })]);
+  addAll(ctas, [btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' }), btn('Secondary', 'MD', 'Create a club account')]);
   addAll(left, [h1,
     Tx('Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Every document is checked against your travel dates, and no horse leaves until clearance is complete.', 'Body/L', 'text/secondary', { w: 560 }),
     ctas]);
   addAll(hero, [fillW(left), heroCard()]);
 
-  var services = H({ name: 'Service grid', gap: 24, wrap: true, rowGap: 24 });
-  [
-    ['truck', 'Domestic · up to 500 km', 'Regional road', 'Scheduled and private trailer runs between training centres, studs and racecourses in one country.', '$800'],
-    ['route', 'VN · KH · TH · LA · MY', 'Cross-border road', 'Door to door, with every border document prepared, checked against your dates and filed for you.', '$2,400'],
-    ['plane', 'Economy · Business · First', 'Air freight', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box. A flying groom travels with every three horses.', '$9,500'],
-    ['medical', 'Injury, rehab, post-surgery', 'Veterinary escort', 'A veterinarian travels with the horse and logs its condition at every stop.', '$650 / day'],
-    ['flag', 'Arrive settled, on time', 'Race-day logistics', 'Timed to post time, with stabling at the venue and a groom who knows the horse.', '$1,600'],
-    ['foal', 'Full box · 96 in', 'Mare & foal', 'Mare and foal travel together in a full-width box for the whole journey.', '$2,800']
-  ].forEach(function (s) {
-    var c = inst(C.service);
-    setP(c, { Icon: ICON[s[0]], Scope: s[1], Title: s[2], Body: s[3], Price: s[4] });
-    tint(named(c, 'Icon badge').children[0], 'text/secondary');
-    c.name = 'Service · ' + s[2];
-    add(services, c);
-  });
+  /* the six services as a price list, not a grid of icon cards: what it is, where it runs, what it starts at */
+  var services = tbl('Services', [['Service', null], ['Scope', 240, null, 'Body/S', 'text/secondary'], ['Indicative from', 140, 'RIGHT', 'Mono/Data']], [
+    ['Regional road', 'Scheduled and private trailer runs between training centres, studs and racecourses in one country.', 'Domestic · up to 500 km', '$800'],
+    ['Cross-border road', 'Door to door, with every border document prepared, checked against your dates and filed for you.', 'VN · KH · TH · LA · MY', '$2,400'],
+    ['Air freight', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box. A flying groom travels with every three horses.', 'Economy · Business · First', '$9,500'],
+    ['Veterinary escort', 'A veterinarian travels with the horse and logs its condition at every stop.', 'Injury, rehab, post-surgery', '$650 / day'],
+    ['Race-day logistics', 'Timed to post time, with stabling at the venue and a groom who knows the horse.', 'Arrive settled, on time', '$1,600'],
+    ['Mare & foal', 'Mare and foal travel together in a full-width box for the whole journey.', 'Full box · 96 in', '$2,800']
+  ].map(function (r) {
+    var name = VV({ name: r[0], gap: 4 });
+    addAll(name, [Tx(r[0], 'Heading/H4'), Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    return { cells: [fillW(name), r[2], r[3]] };
+  }));
 
   var how = H({ name: 'Steps', gap: 24 });
   /* the tracker's seven stages, grouped into four phases */
   [
-    ['1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review and holds for 7 days.', 'Logistics Manager'],
-    ['3–4', 'Approval and Documents', 'You accept, the job is approved and your checklist opens. Every upload is checked against your travel dates.', 'Logistics Manager · Transport Specialist'],
-    ['5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist · Fleet & Route Coordinator'],
-    ['7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort']
+    ['1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review.', 'Logistics Manager', '21 days’ notice across a border, 3 within one country. A quotation holds its price for 7 days.'],
+    ['3–4', 'Approval and Documents', 'You accept, the job is approved and your checklist opens. Every upload is checked against your travel dates.', 'Logistics Manager · Transport Specialist', 'A document valid today but expired on departure day is flagged now, with the date a new one must carry.'],
+    ['5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist · Fleet & Route Coordinator', 'One groom for every three horses, rounded up, so four horses travel with two.'],
+    ['7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort', 'Nothing is overwritten: every document version and record is kept.']
   ].forEach(function (s, idx) {
     var c = VV({ name: 'Step ' + (idx + 1), gap: 12, pad: [24, 0, 0, 0] });
     borderSide(c, 'border/default', 'top');
-    addAll(c, [Tx(s.shift(), 'Mono/Data L', 'text/tertiary'), Tx(s[0], 'Heading/H3'), Tx(s[1], 'Body/S', 'text/secondary', { fill: true }), Tx(s[2], 'Body/S', 'text/tertiary', { fill: true })]);
+    var rule = H({ name: 'Rule', gap: 8, pad: [12, 0, 0, 0] });
+    borderSide(rule, 'border/default', 'top');
+    addAll(rule, [Ic('check', 16, 'status/ok/fg'), Tx(s[4], 'Label/S', 'text/primary', { fill: true })]);
+    addAll(c, [Tx(s.shift(), 'Mono/Data L', 'text/tertiary'), Tx(s[0], 'Heading/H3'), Tx(s[1], 'Body/S', 'text/secondary', { fill: true }), Tx(s[2], 'Body/S', 'text/tertiary', { fill: true }), fillW(rule)]);
     add(how, fillW(c));
   });
 
@@ -1606,22 +1600,106 @@ async function scrHome() {
     featureCard(quoteVisual(), 'Quotes that say what can move', 'Every line shows its basis. Lines that can change on the final invoice, such as waiting time, are marked before you accept.')
   ]);
 
-  /* commitments the system enforces, not operating figures (PRODUCT.md: no stats presented as real) */
-  var stats = H({ name: 'Stats', gap: 24, pad: [40, 0, 40, 0] });
-  borderSide(stats, 'border/default', 'top');
-  HOME_COMMITMENTS.forEach(function (s) {
-    var c = VV({ name: s[1], gap: 6 });
-    addAll(c, [Tx(s[0], 'Mono/Data L'), Tx(s[1], 'Label/M'), Tx(s[2], 'Body/S', 'text/secondary', { fill: true })]);
-    add(stats, fillW(c));
-  });
-
-  return screen('Home', 'Home', [
+  return screen('Landing · Signed out', null, [
     hero,
     section('Six ways to move a racehorse', 'Each service is priced from the same rate catalog. What you see here is a starting point; your quotation is itemised line by line.', services),
-    section('Seven stages, one owner each', 'Your request page tracks the same seven stages, shown here in four phases. The next stage never starts until the one before it is done.', how),
-    section('Built around the paperwork and the horse', null, feats),
-    VV({ name: 'Stats wrap', pad: [80, 0, 0, 0] }, [fillW(stats)])
-  ], { gap: 0 });
+    section('Seven stages, one owner each', 'Road and air across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Your request page tracks the same seven stages; the next never starts until the one before it is done, and each holds to a rule.', how),
+    section('Built around the paperwork and the horse', null, feats)
+  ], { gap: 0, header: publicHeader() });
+}
+
+/* ---------- Home, signed in ----------
+   The club's first screen is its work: everything it owes across its requests, soonest first,
+   with the one gold action on the top item; then each move with its stage and what holds it;
+   then the horses and how far each one's documents have got. Principle 1: the next step, always. */
+var HOME_MOVES = [
+  ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Documents', 'Departure locked · you owe 4', 'status/bad/fg', 'In 22 days', '18 Oct 2026'],
+  ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 · 2 horses · air, business class', 'Quotation', 'Quotation waiting for you', 'status/warn/fg', 'In 55 days', '20 Nov 2026'],
+  ['Ho Chi Minh City → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load', 'Request', 'In review with Yến; nothing needed', 'text/secondary', 'In 34 days', '30 Oct 2026']
+];
+var HOME_HORSES = [
+  ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', '4 of 5 cleared', null],
+  ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', '3 of 5 cleared', 'New EIA test due 4 Oct'],
+  ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', '4 of 5 cleared', null],
+  ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '2 of 5 cleared', 'Bill of sale overdue']
+];
+/* one request on the signed-in Home: route and codes, the stage and what holds it, the departure */
+function moveRow(m, i) {
+  var row = H({ name: m[1], gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
+  if (i) borderSide(row, 'border/default', 'top');
+  var id = VV({ name: 'Move', gap: 4 });
+  var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER' });
+  addAll(meta, [Tx(m[1], 'Mono/Caption', 'text/secondary'), Tx(m[2], 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(id, [Tx(m[0], 'Heading/H4'), fillW(meta)]);
+  var st = VV({ name: 'Where it is', gap: 4, w: 220 });
+  addAll(st, [stageMark(m[3]), Tx(m[4], 'Label/S', m[5], { fill: true })]);
+  var due = VV({ name: 'Departs', gap: 2, w: 110, cross: 'MAX' });
+  addAll(due, [Tx(m[6], 'Label/S', 'text/primary', { align: 'RIGHT' }), Tx(m[7], 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
+  addAll(row, [fillW(id), st, due, rowOpen()]);
+  return row;
+}
+/* the signed-in Home in any state: a lead block (what is owed, or that nothing is), then the moves beside the horses */
+/* calm: nothing is owed, so the moves are ordered by departure alone and the caption says so */
+function homeScreen(name, summary, lead, moves, horses, horseNote, asOf, calm) {
+  var list = panel('Moves', { gap: 0, pad: 0, clip: true });
+  moves.forEach(function (m, i) { add(list, fillW(moveRow(m, i))); });
+  var movesBlock = titled('Your moves', moves.length + (calm ? ' in progress, soonest departure first.' : ' in progress, the one that needs you most first.') + ' Each opens its request.', list, btn('Ghost', 'SM', 'My requests', { trail: 'arrow-right' }));
+  var hp = panel('Your horses', { gap: 0, pad: [20, 24, 8, 24] });
+  add(hp, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('Your horses', 'Heading/H4'), Tx(horseNote, 'Body/S', 'text/tertiary')]));
+  horses.forEach(function (h) {
+    var row = H({ name: h[0], gap: 12, pad: [12, 0, 12, 0], cross: 'CENTER' });
+    borderSide(row, 'border/default', 'top');
+    var sw = F({ name: 'Coat', w: 12, h: 12, radius: 999, fill: h[1], stroke: 'border/strong' });
+    var t = VV({ name: 'Horse', gap: 2 });
+    addAll(t, [Tx(h[0], 'Label/M'), Tx(h[2], 'Body/S', 'text/tertiary')]);
+    var r = VV({ name: 'Documents', gap: 2, cross: 'MAX' });
+    add(r, Tx(h[3], 'Mono/Caption', 'text/secondary', { align: 'RIGHT' }));
+    if (h[4]) add(r, Tx(h[4], 'Body/S', h[5] || (h[4].indexOf('overdue') >= 0 ? 'status/bad/fg' : 'status/warn/fg'), { align: 'RIGHT' }));
+    addAll(row, [sw, fillW(t), r]);
+    add(hp, fillW(row));
+  });
+  add(hp, VV({ name: 'More', pad: [4, 0, 8, 0] }, [btn('Ghost', 'SM', 'My horses', { trail: 'arrow-right' })]));
+  return screen(name, 'Home', [pageHeader({ title: 'Saigon Turf Club', summary: summary })].concat(lead, [split(movesBlock, hp, SIDE.narrow)]), { asOf: asOf });
+}
+function scrHome() {
+  var items = [
+    owedItem('Overdue', 'Upload a signed bill of sale', 'CBRT-2026-041 · Silver Bell · Proof of ownership', 'Rejected 24 Sep by Lan, transport specialist: the bill of sale is unsigned. Upload a signed copy.', 'Overdue by 1 day', 'Was due 25 Sep', 'Upload signed copy', 'upload'),
+    owedItem('Soon', 'Accept or decline quotation v2', 'REQ-2026-0179 · Q-2026-0188 · $38,019.20', 'Phnom Penh → Hong Kong (Sha Tin) for Nightfall and Shadowfax. It holds its price until 30 Sep; after that Yến re-prices it.', 'Due in 4 days', '30 Sep 2026', 'Open quotation', null, { secondary: true }),
+    owedItem('Soon', 'Extend transit insurance to 20 Oct', 'CBRT-2026-041 · Shipment · PVI Insurance policy', 'The policy ends 15 Oct, before arrival plus 2 days (20 Oct). Upload the extended policy.', 'Due in 4 days', '30 Sep 2026', 'Upload extended policy', 'upload', { secondary: true }),
+    owedItem('Upcoming', 'Book a new EIA (Coggins) test', 'CBRT-2026-041 · Nightfall · EIA (Coggins) test', 'Valid today, but 77 days old at departure; the limit is 60. The new test must be dated 19 Aug or later.', 'Due in 8 days', '4 Oct 2026', 'Upload test result', 'upload'),
+    owedItem('Upcoming', 'Upload a new influenza booster record', 'CBRT-2026-041 · Silver Bell · Influenza vaccination', 'The booster lapsed on 16 Sep. Give a new booster at least 7 days before departure and upload the record.', 'Due in 15 days', '11 Oct 2026', 'Upload booster record', 'upload')
+  ];
+  var owed = owedPanel('5 items', 'Across 2 requests, soonest first. Each upload is checked against your travel dates the moment you send it.', items, { chipTone: 'Bad', chipLabel: '1 overdue' }, 'See each request in My requests');
+  return homeScreen('Home', '3 requests in progress and 4 horses. Next departure: Ho Chi Minh City → Phnom Penh, 18 Oct, locked until its documents clear.',
+    [owed], HOME_MOVES, HOME_HORSES, 'Documents cleared for the 18 Oct move, CBRT-2026-041.', '26 Sep 2026, 11:20');
+}
+/* 15 Oct: every document cleared and nothing owed anywhere; the page leads with the next event, and nothing is gold */
+function scrHomeClear() {
+  var lead = nothingOwed('Nothing needed from you', 'All 23 documents for CBRT-2026-041 cleared on 14 Oct. Minh, driver, collects all four horses at Phú Thọ training centre.', 'Departs in 3 days', '18 Oct 2026, 06:00');
+  return homeScreen('Home · Nothing owed', '3 requests in progress and 4 horses. Next departure: Ho Chi Minh City → Phnom Penh, 18 Oct, cleared to depart.', [lead], [
+    ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Clearance', 'Cleared to depart', 'status/ok/fg', 'In 3 days', '18 Oct 2026'],
+    ['Phnom Penh → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load · pickup moved to Phnom Penh', 'Quotation', 'Yến is pricing version 2; nothing needed', 'text/secondary', 'In 15 days', '30 Oct 2026'],
+    ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 accepted · 2 horses · air, business class', 'Approval', 'With Yến for approval; nothing needed', 'text/secondary', 'In 36 days', '20 Nov 2026']
+  ], [
+    ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', '5 of 5 cleared', null],
+    ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', '5 of 5 cleared', null],
+    ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', '5 of 5 cleared', null],
+    ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '5 of 5 cleared', null]
+  ], 'Documents cleared for the 18 Oct move, CBRT-2026-041.', '15 Oct 2026, 09:00', true);
+}
+/* 18 Oct, 08:41: the move on the road leads, with its last confirmed checkpoint, the same panel as Tracking · In transit */
+function scrHomeRoad() {
+  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+  return homeScreen('Home · On the road', '3 requests in progress and 4 horses. On the road now: Ho Chi Minh City → Phnom Penh, arriving about 12:30.', [lead, onTheRoad()], [
+    ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Trip', 'On the road since 06:05', 'status/info/fg', 'Arrives in 4 h', '18 Oct, 12:30'],
+    ['Phnom Penh → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load · pickup moved to Phnom Penh', 'Quotation', 'Yến is pricing version 2; nothing needed', 'text/secondary', 'In 12 days', '30 Oct 2026'],
+    ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 accepted · 2 horses · air, business class', 'Approval', 'With Yến for approval; nothing needed', 'text/secondary', 'In 33 days', '20 Nov 2026']
+  ], [
+    ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', 'Stall 1 · standard', 'Sound at 08:40', 'status/ok/fg'],
+    ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', 'Stall 4 · climate', 'Calm again at 08:40', 'status/ok/fg'],
+    ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', 'Stall 2 · box', 'Sound at 08:40', 'status/ok/fg'],
+    ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', 'Stall 6 · standard', 'Sound at 08:40', 'status/ok/fg']
+  ], 'All four on CBRT-2026-041, with Hoa’s last condition log.', '18 Oct 2026, 08:41', true);
 }
 function heroCard() {
   var card = panel('Live job card', { w: 480, gap: 20, pad: 28 });
@@ -1644,22 +1722,23 @@ function heroCard() {
   add(card, Tx('Departs 18 Oct 2026 · 4 horses · Road, private trailer', 'Body/S', 'text/secondary'));
   add(card, divider());
   add(card, Tx('Documents, checked against travel dates', 'Body/S', 'text/tertiary'));
-  var tones = { c: 'status/ok/fg', r: 'status/info/fg', a: 'status/warn/fg', x: 'status/bad/fg' };
-  [['Shadowfax', 'ccc-c', '4/5'], ['Nightfall', 'cca-c', '3/5'], ['Copper King', 'ccc-c', '4/5'], ['Silver Bell', 'cxc-x', '2/5']].forEach(function (h) {
+  /* each state has its own glyph as well as its tone, so the rows read without colour (Said-Twice); an open ring is not issued yet */
+  var glyphs = { c: ['check', 'status/ok/fg'], r: ['clock', 'status/info/fg'], a: ['alert', 'status/warn/fg'], x: ['x', 'status/bad/fg'] };
+  var ring = function (size) { var e = dot(size, null, 'Not issued yet'); e.strokes = [P('border/strong')]; e.strokeWeight = 1.5; return e; };
+  [['Shadowfax', 'ccc-c', '4/5'], ['Nightfall', 'cca-c', '3/5'], ['Copper King', 'ccc-c', '4/5'], ['Silver Bell', 'cxc-x', '2/5'], ['Shipment', 'rac', '1/3']].forEach(function (h) {
     var row = H({ name: h[0], gap: 12, cross: 'CENTER' });
     var dots = H({ name: 'Dots', gap: 6, cross: 'CENTER' });
     h[1].split('').forEach(function (ch) {
-      if (ch === '-') { var e = dot(10, null, 'Required'); e.strokes = [P('border/strong')]; e.strokeWeight = 1.5; add(dots, e); }
-      else add(dots, dot(10, tones[ch]));
+      if (ch === '-') add(dots, ring(12));
+      else { var g = Ic(glyphs[ch][0], 14, glyphs[ch][1]); g.name = glyphs[ch][0]; add(dots, g); }
     });
     addAll(row, [Tx(h[0], 'Label/M', 'text/primary', { fill: true }), dots, Tx(h[2], 'Mono/Caption', 'text/secondary')]);
     add(card, fillW(row));
   });
   var legend = H({ name: 'Legend', gap: 14, wrap: true, rowGap: 6 });
-  [['status/ok/fg', 'Cleared'], ['status/info/fg', 'In review'], ['status/warn/fg', 'Expires in transit'], ['status/bad/fg', 'Fails rule'], [null, 'Not uploaded']].forEach(function (l) {
+  [['c', 'Cleared'], ['r', 'In review'], ['a', 'Expires in transit'], ['x', 'Fails rule'], ['-', 'Not issued yet']].forEach(function (l) {
     var it = H({ name: l[1], gap: 6, cross: 'CENTER' });
-    var d = dot(8, l[0]);
-    if (!l[0]) { d.strokes = [P('border/strong')]; d.strokeWeight = 1.5; }
+    var d = l[0] === '-' ? ring(10) : Ic(glyphs[l[0]][0], 12, glyphs[l[0]][1]);
     addAll(it, [d, Tx(l[1], 'Mono/Caption', 'text/tertiary')]);
     add(legend, it);
   });
@@ -1794,7 +1873,7 @@ function scrRequest3() {
   addAll(cr, [Tx('Border crossings on this route', 'Label/S', 'text/secondary'), chips]);
   add(left, cr);
   var r2 = H({ name: 'Dates', gap: 16 });
-  addAll(r2, [input('Date', 'Error', 'Departure date', '05/10/2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
+  addAll(r2, [input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
   add(left, fillW(r2));
   var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
   add(left, cb);
@@ -1809,7 +1888,7 @@ function scrRequest4() {
   var left = VV({ name: 'Step 4', gap: 24 });
   add(left, Tx('Review and submit', 'Heading/H3'));
   add(left, fillW(requestSummary(REQ_0193, { edit: true })));
-  add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days\' notice. Your departure is 34 days away.'));
+  add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days’ notice. Your departure is 34 days away.'));
   var next = panel('What happens next', { gap: 14 });
   add(next, Tx('What happens next', 'Heading/H4'));
   [['Request: a logistics manager reviews it', 'Usually within 1 business day'], ['Quotation: itemised line by line', 'Valid for 7 days'], ['Approval: you accept; the 30% deposit is acknowledged', 'The job gets its CBRT code'], ['Documents: your checklist opens', 'Then Clearance, Trip and Handover']].forEach(function (s, i) {
@@ -1882,7 +1961,8 @@ function quoteTotals(q) {
 var QUOTE_ESTIMATE = [33900, 43600];
 /* the ledger, shared by the customer quotation and the staff builder.
    after(line) may return a node to place under that line (the inline override editor) */
-function quoteTable(lines, T, after) {
+/* notes: { groupLetter: node } drawn under that group's lines, for the reasoning that belongs to one group */
+function quoteTable(lines, T, after, notes) {
   var table = panel('Quotation lines', { gap: 0, pad: 0, clip: true });
   var th = H({ name: 'Table header', gap: 16, pad: [12, 20, 12, 20], fill: 'bg/sunken' });
   addAll(th, [Tx('Item', 'Mono/Eyebrow', 'text/tertiary', { fill: true }), Tx('Qty', 'Mono/Eyebrow', 'text/tertiary', { w: 48, align: 'RIGHT' }), Tx('Rate', 'Mono/Eyebrow', 'text/tertiary', { w: 96, align: 'RIGHT' }), Tx('Amount', 'Mono/Eyebrow', 'text/tertiary', { w: 120, align: 'RIGHT' }), Tx('', 'Mono/Eyebrow', 'text/tertiary', { w: 110 })]);
@@ -1910,6 +1990,7 @@ function quoteTable(lines, T, after) {
       var extra = after && after(l);
       if (extra) add(table, fillW(extra));
     });
+    if (notes && notes[g[0]]) add(table, fillW(notes[g[0]]));
   });
   return table;
 }
@@ -1937,11 +2018,15 @@ function quoteTotalsPanel(T) {
 function scrQuote() {
   var T = quoteTotals();
   var left = VV({ name: 'Lines', gap: 24 });
-  addAll(left, [fillW(quoteTable(QUOTE, T)), fillW(quoteTotalsPanel(T))]);
+  /* how the air stall was sized sits under the air freight group it explains, not in the side column */
+  var sizing = VV({ name: 'Group note · sizing', gap: 4, pad: [10, 20, 14, 20], fill: 'bg/sunken' });
+  borderSide(sizing, 'border/default', 'top');
+  addAll(sizing, [Tx('How the stall was sized', 'Label/S', 'text/secondary'), Tx('Nightfall and Shadowfax fly business class at 48 in each: 96 in, so 1 position. Flying grooms: 2 ÷ 3, rounded up, is 1. No flight vet: one joins from 8 horses, or when a horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(left, [fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
 
   var est = panel('Against your estimate', { gap: 12 });
   var inside = T.total >= QUOTE_ESTIMATE[0] && T.total <= QUOTE_ESTIMATE[1];
-  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', wrap: true, rowGap: 8 });
   addAll(head, [Tx('Against your estimate', 'Heading/H4'), chip(inside ? 'Ok' : 'Warn', inside ? 'Inside your range' : 'Outside your range')]);
   addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('This quotation', money(T.total)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
     Tx('The largest line is the business-class air stall, $16,800, or ' + Math.round(16800 / T.total * 100) + '% of the total. Waiting time (H) is the only line that can change on the final invoice.', 'Body/S', 'text/tertiary', { fill: true })]);
@@ -1961,29 +2046,27 @@ function scrQuote() {
   var who = peoplePanel([['Yến', 'logistics manager', 'Built this quotation from rate catalog v12 on 23 Sep, and re-issued it when your departure moved to 20 Nov.']], 'Who prepared it');
   add(who, VV({ name: 'Ask', pad: [4, 0, 12, 0] }, [btn('Secondary', 'SM', 'Ask Yến about a line')]));
 
-  var canc = panel('Cancellation', { gap: 8 });
-  add(canc, Tx('Cancellation fee by notice period', 'Label/M'));
+  /* the terms a customer checks before accepting, and the versions behind this one, in one panel */
+  var terms = panel('Terms and versions', { gap: 8 });
+  addAll(terms, [Tx('Terms and versions', 'Heading/H4'), Tx('Cancellation fee by notice period', 'Label/S', 'text/secondary')]);
   [['More than 30 days', '10%', true], ['15–30 days', '25%'], ['7–14 days', '50%'], ['Under 7 days', '100%']].forEach(function (b) {
     var row = H({ name: b[0], gap: 10, pad: [8, 10, 8, 10], radius: 8, cross: 'CENTER', fill: b[2] ? 'status/info/bg' : null });
     addAll(row, [Tx(b[0], 'Body/S', 'text/secondary', { fill: true })]);
     if (b[2]) add(row, chip('Info', 'Now · 55 days', { noDot: true }));
     add(row, Tx(b[1], 'Mono/Data', 'text/primary', { w: 48, align: 'RIGHT' }));
-    add(canc, fillW(row));
+    add(terms, fillW(row));
   });
-  var sizing = panel('Stall sizing', { gap: 10 });
-  addAll(sizing, [Tx('How the stalls were sized', 'Label/M'), dlRow('Nightfall · business class', '48 in'), dlRow('Shadowfax · business class', '48 in'), dlRow('Total width', '96 in → 1 position'), dlRow('Flying grooms', '2 ÷ 3, rounded up = 1'), dlRow('Flight veterinarian', 'Not required'), Tx('In business class every horse gets 48 in, whatever its size class. A flight vet joins from 8 horses, or when any horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
-  var ver = panel('Versions', { gap: 10 });
   var v2 = H({ name: 'v2', gap: 10, cross: 'CENTER' });
   addAll(v2, [Tx('v2', 'Mono/Data'), Tx('Issued 23 Sep 2026', 'Body/S', 'text/secondary', { fill: true }), chip('Info', 'Current', { noDot: true })]);
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Superseded. Departure moved from 12 Nov to 20 Nov.', 'Body/S', 'text/tertiary', { fill: true })]);
-  addAll(ver, [Tx('Version history', 'Label/M'), fillW(v2), fillW(v1)]);
-  var right = column([est, next, who, canc, sizing, ver]);
+  addAll(terms, [divider(), Tx('Versions', 'Label/S', 'text/secondary'), fillW(v2), fillW(v1)]);
+  var right = column([est, next, who, terms]);
 
   var lead = owedPanel('1 item', 'Yến, logistics manager, issued version 2 on 23 Sep. Accepting locks the price and the horse list; declining closes the request.',
     [owedItem('Soon', 'Accept or decline this quotation', 'Q-2026-0188 · version 2 · ' + money(T.total), 'It holds its price for 7 days from 23 Sep. After 30 Sep it expires and Yến re-prices it from the rate catalog in force then.', 'Due in 4 days', '30 Sep 2026', 'Accept quotation', 'check', { second: 'Decline' })],
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
-  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageChip('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
+  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
 }
 
 /* ---------------------------------------------------------------------
@@ -2113,7 +2196,7 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(own, [Tx('Owner', 'Body/S', 'text/tertiary'), Tx(owner, 'Label/S', 'text/primary')]);
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageChip(stage || 'Documents')], below: [gate, tabs], rule: false });
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
@@ -2144,7 +2227,7 @@ function scrRoute() {
     add(tl, fillW(st));
   });
   var refuse = VV({ name: 'Depart', gap: 16 });
-  add(refuse, callout('Bad', 'Departure can\'t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
+  add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
   add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
   return jobScreen('Fleet & route coordinator · Route plan', 'Route', STAFF.khoi, [strip, tl, refuse]);
 }
@@ -2277,7 +2360,7 @@ function userMenu() {
   return m;
 }
 function buildAdminComponents(board) {
-  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system\'s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
+  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
   var items = ['Default', 'Hover', 'Active', 'Focus'].map(sideItem);
   C.sideNav = combine(items, b, 'Side nav item', 'States: Default, Hover, Active (gold ink: the one place gold marks the current page), Focus (gold border and ring). Set aria-current on the Active item.');
   wireText(C.sideNav, ['Label', 'Badge']);
@@ -2362,10 +2445,21 @@ function configSidebar(side, user, active, extra) {
 function breadcrumb(crumbs) {
   var crumb = H({ name: 'Breadcrumb', gap: 8, cross: 'CENTER' });
   crumbs.forEach(function (c, i) {
-    if (i) add(crumb, Tx('/', 'Mono/Caption', 'text/tertiary'));
-    add(crumb, Tx(c, 'Mono/Caption', i === crumbs.length - 1 ? 'text/primary' : 'text/tertiary'));
+    if (i) add(crumb, Tx('/', 'Body/S', 'text/tertiary'));
+    /* page names are words (Outfit); a code in the trail stays mono, as data */
+    add(crumb, Tx(c, /^[A-Z]{1,4}-\d{4}-/.test(c) ? 'Mono/Caption' : 'Label/S', i === crumbs.length - 1 ? 'text/primary' : 'text/tertiary'));
   });
   return crumb;
+}
+/* the review queue in the top bar, so decisions run back to back: where this one sits, then the one before and after.
+   q: { label, pos, prev, next } — prev/next false at either end */
+function queueNav(q) {
+  var g = H({ name: 'Queue', gap: 4, cross: 'CENTER' });
+  addAll(g, [Tx(q.label, 'Body/S', 'text/tertiary', { name: 'Label' }),
+    btn('Ghost', 'SM', 'Previous', { lead: 'chevron-left', state: q.prev ? 'Default' : 'Disabled' }),
+    Tx(q.pos, 'Mono/Caption', 'text/secondary', { name: 'Position' }),
+    btn('Ghost', 'SM', 'Next', { trail: 'chevron-right', state: q.next ? 'Default' : 'Disabled' })]);
+  return g;
 }
 /* crumbs start at the nav item (its exact label), never at a non-destination root */
 function adminScreen(name, active, crumbs, user, blocks, today, o) {
@@ -2380,6 +2474,7 @@ function adminScreen(name, active, crumbs, user, blocks, today, o) {
   var right = H({ name: 'Right', gap: 16, cross: 'CENTER' });
   var bell = H({ name: 'Notifications', w: 36, h: 36, radius: 8, stroke: 'border/strong', main: 'CENTER', cross: 'CENTER' });
   add(bell, Ic('bell', 18, 'text/secondary'));
+  if (o && o.queue) add(right, queueNav(o.queue));
   addAll(right, [Tx(today || 'Sat 26 Sep 2026', 'Mono/Caption', 'text/tertiary'), bell]);
   addAll(bar, [breadcrumb(crumbs), right]);
   add(main, fillW(bar));
@@ -2389,7 +2484,8 @@ function adminScreen(name, active, crumbs, user, blocks, today, o) {
   add(s, fillW(main));
   return s;
 }
-function headAdmin(title, sub, right) { return pageHeader({ shell: 'staff', title: title, summary: sub, right: [right] }); }
+/* rule: false when status tabs follow, which draw their own line */
+function headAdmin(title, sub, right, rule) { return pageHeader({ shell: 'staff', title: title, summary: sub, right: [right], rule: rule }); }
 function titled(title, sub, node, right) {
   var w = VV({ name: title, gap: 12 });
   var h = H({ name: 'Heading', main: 'SPACE_BETWEEN', cross: 'MAX' });
@@ -2443,10 +2539,36 @@ function colHead(sort, st) {
   if (st === 'Focus') focusRing(c, 4, 3);
   return c;
 }
+/* the one page header in both shells: the owner title (Display L) with its back link, the staff title (Display M)
+   with none, because the staff breadcrumb is the way back */
+function buildPageHeaders(parent) {
+  var b = docBlock(parent, 'Page header', 'One header for every page (pageHeader). Owner shell: an optional back link, the Display L title at y 142, the code and summary, status on the right. Staff shell: no back link (the breadcrumb leads back), a Display M title at y 97, and no hairline when status tabs follow.');
+  [['Owner shell', pageHeader({ back: 'My requests', title: 'Ho Chi Minh City → Phnom Penh', code: 'REQ-2026-0162', summary: 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00', right: [stageMark('Documents'), chip('Bad', 'Departure locked')] })],
+   ['Staff shell', pageHeader({ shell: 'staff', title: 'Jobs', summary: 'Every active job, for 26 Sep 2026. Each job has one owner per step.' })]].forEach(function (e) {
+    var w = VV({ name: e[0], gap: 8, w: 1200 });
+    addAll(w, [Tx(e[0], 'Label/S', 'text/secondary'), fillW(e[1])]);
+    add(b, w);
+  });
+  return b;
+}
+/* every clickable thing takes the same focus: a 1.5px gold ring with Focus/Ring, drawn outside so nothing moves */
+function buildFocusStates(parent) {
+  var b = docBlock(parent, 'Keyboard focus', 'One focus for every clickable thing: a 1.5 px Brass Gold ring with the Focus/Ring shadow, 4 px outside the element and following its corners, so focusing never moves the layout. Option card has a Focus variant; rows, tiles and stalls take the ring as an overlay. Gold here marks focus only, never state.');
+  var row = H({ name: 'Examples', gap: 40, pad: [8, 0, 0, 8], cross: 'MIN', wrap: true, rowGap: 32 });
+  var opt = inst(C.option, { State: 'Focus' }); setP(opt, { Title: 'Road', Description: 'Door to door by trailer.', Meta: 'In the estimate' });
+  var stall = inst(C.stall, { Type: 'Standard', State: 'Occupied' });
+  var stallWrap = VV({ name: 'Stall · focus' }); add(stallWrap, stall); focusRing(stallWrap, 4, 4, 12);
+  var move = panel('Move row · focus', { gap: 0, pad: 0, w: 820 }); add(move, fillW(moveRow(HOME_MOVES[0], 0))); focusRing(move, 4, 4, 16);
+  var tile = actionTiles([OVERVIEW_TILES[1]]); tile.name = 'Tile · focus'; tile.resize(280, tile.height); focusRing(tile.children[0], 4, 4, 16);
+  addAll(row, [opt, stallWrap, move, tile]);
+  add(b, fillW(row));
+  return b;
+}
 /* a focus ring drawn outside a label without moving it: an absolute frame that stretches with its parent,
    so a header label stays aligned with the cells below it */
-function focusRing(c, dx, dy) {
-  var r = F({ name: 'Focus ring', radius: 6, stroke: 'accent/default', sw: 1.5 });
+function focusRing(c, dx, dy, radius) {
+  var r = F({ name: 'Focus ring', radius: radius || 6, stroke: 'accent/default', sw: 1.5 });
+  c.clipsContent = false;
   c.appendChild(r);
   r.layoutPositioning = 'ABSOLUTE';
   r.resize(c.width + dx * 2, c.height + dy * 2); r.x = -dx; r.y = -dy;
@@ -2517,7 +2639,7 @@ function tableStatesRow() {
   return row;
 }
 function buildTableComponents(board) {
-  var b = docBlock(board, 'Table controls', 'For list tables only (Jobs, Requests, Users & roles, Audit log). A column header sorts only when its order is the user\'s to choose; the active column takes Parchment and an arrow, and sets aria-sort. A list whose default order is not a column (blocked first, what needs you first) says so in the count line, and a column sort replaces that note with what it sorted by and a Reset order button. Pages hold ' + PAGE_SIZE + ' rows; the foot always shows the range, and Previous or Next is disabled at either end. Quotations, catalogs and document tables keep a fixed order and have none of this.');
+  var b = docBlock(board, 'Table controls', 'For list tables only (Jobs, Requests, Users & roles, Audit log). A column header sorts only when its order is the user’s to choose; the active column takes Parchment and an arrow, and sets aria-sort. A list whose default order is not a column (blocked first, what needs you first) says so in the count line, and a column sort replaces that note with what it sorted by and a Reset order button. Pages hold ' + PAGE_SIZE + ' rows; the foot always shows the range, and Previous or Next is disabled at either end. Quotations, catalogs and document tables keep a fixed order and have none of this.');
   var heads = [];
   ['Unsorted', 'Ascending', 'Descending'].forEach(function (s) { ['Default', 'Focus'].forEach(function (st) { heads.push(colHead(s, st)); }); });
   C.colHead = combine(heads, b, 'Column header', 'Sortable column header. Unsorted shows a faint up-down mark; Ascending and Descending turn the label Parchment with the arrow. Focus: gold border outside the label and the ring. Set aria-sort on the active column.');
@@ -2639,7 +2761,7 @@ function scrRegulations() {
   var rules = tbl('Document rules', [['Document', null], ['Rule shape', 170], ['Parameter', 140, null, 'Mono/Caption'], ['Applies to', 100], ['Blocks', 80], ['', 36, 'RIGHT', 'Label/S', 'text/secondary']], [
     { cells: ['Equine passport', shape('Valid until'), 'arrival + 2 d', 'Per horse', 'Yes', 'Edit'] },
     { cells: ['Influenza vaccination', shape('Booster window'), '7–180 d before', 'Per horse', 'Yes', 'Edit'] },
-    { cells: [withChip('EIA (Coggins) test', 'Warn', 'Changed'), shape('Window before dep.'), 'within 60 d (was 90)', 'Per horse', 'Yes', 'Edit'], hl: true },
+    { cells: [withChip('EIA (Coggins) test', 'Warn', 'Changed'), shape('Window before dep.'), 'within 45 d (was 60)', 'Per horse', 'Yes', 'Edit'], hl: true },
     { cells: ['Export health certificate', shape('Window before dep.'), 'within 10 d', 'Per horse', 'Yes', 'Edit'] },
     { cells: ['Proof of ownership', shape('Presence only'), '—', 'Per horse', 'Yes', 'Edit'] },
     { cells: [withChip('Piroplasmosis test', 'Warn', 'New'), shape('Window before dep.'), 'within 30 d', 'Per horse', 'Yes', 'Edit'], hl: true },
@@ -2655,11 +2777,11 @@ function scrRegulations() {
   addAll(shapes, [chip('Info', 'Window before departure'), chip('Neutral', 'Valid until', { noDot: true }), chip('Neutral', 'Booster window', { noDot: true }), chip('Neutral', 'Presence only', { noDot: true })]);
   add(edit, fillW(shapes));
   var fields = H({ name: 'Fields', gap: 16 });
-  addAll(fields, [input('Text', 'Focus', 'Days before departure', '60', 'Was 90 in v7. Source: GDAHP notice 14/2026.', { fill: true }), input('Select', 'Default', 'Applies to', 'Per horse', null, { fill: true })]);
+  addAll(fields, [input('Text', 'Focus', 'Days before departure', '45', 'Was 60 in v7. Source: GDAHP notice 14/2026.', { fill: true }), input('Select', 'Default', 'Applies to', 'Per horse', null, { fill: true })]);
   add(edit, fillW(fields));
   var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'Blocks departure when not GREEN' });
   add(edit, cb);
-  add(edit, callout('Warn', 'Re-check impact: 2 open jobs', 'CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 60 days at departure. After publishing they are flagged for review; approved documents are not revoked automatically.'));
+  add(edit, callout('Warn', 'Re-check impact: 2 open jobs', 'CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 45 days at departure. After publishing they are flagged for review; approved documents are not revoked automatically.'));
   var ea = H({ name: 'Actions', gap: 12, main: 'MAX' });
   addAll(ea, [btn('Ghost', 'MD', 'Cancel'), btn('Secondary', 'MD', 'Save to draft')]);
   add(edit, fillW(ea));
@@ -2679,7 +2801,7 @@ function scrRegulations() {
   addAll(mainCol, [
     fillW(draftPanel('v8', '3 changes', 'Publishing makes v8 the rules for new jobs. The 3 jobs pinned to v7 keep v7; 2 of them are flagged for review under the new EIA window.')),
     fillW(tiles([['Neutral', '21 d', 'Lead time'], ['Neutral', '7 d', 'Quarantine minimum'], ['Neutral', '2 d', 'Arrival buffer'], ['Info', '3', 'Jobs pinned to v7']])),
-    fillW(titled('Document rules · Cambodia import', 'Each rule is evaluated against the job\'s travel dates, never against today.', rules)),
+    fillW(titled('Document rules · Cambodia import', 'Each rule is evaluated against the job’s travel dates, never against today.', rules)),
     fillW(lower)
   ]);
   var body = H({ name: 'Body', gap: 24 });
@@ -2706,7 +2828,7 @@ function scrRates() {
   ]);
   var policy = panel('Percentages and policy', { gap: 10 });
   add(policy, Tx('Percentages and policy', 'Heading/H4'));
-  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Margin', '12%'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
+  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
   var pair = H({ name: 'Breaks and policy', gap: 24 });
   addAll(pair, [fillW(titled('Volume breaks', 'Applied to air and ground lines.', breaks)), fillW(policy)]);
   var cert = function (c) { return chip(c === 'Fixed' ? 'Neutral' : 'Warn', c, { noDot: true }); };
@@ -2809,12 +2931,34 @@ function legend(items) {
 }
 
 /* ---------- Overview dashboard ---------- */
+/* each number opens the work behind it: [tone, value, what it counts, the case that matters most, where it goes] */
+var OVERVIEW_TILES = [
+  ['Warn', '4', 'Quotes out', 'Q-2026-0188 expires 30 Sep', 'Requests'],
+  ['Bad', '3', 'Jobs blocked', 'CBRT-2026-038: permit overdue', 'Jobs'],
+  ['Warn', '1', 'Incident open', 'Golden Lotus, CBRT-2026-036', 'Incidents'],
+  ['Ok', '96.4%', 'On time, 30 days', '2 of 56 trips late', 'Trips']
+];
+function actionTiles(list) {
+  var r = H({ name: 'Tiles', gap: 16 });
+  var fg = { Neutral: 'text/primary', Ok: 'status/ok/fg', Warn: 'status/warn/fg', Bad: 'status/bad/fg' };
+  list.forEach(function (t) {
+    var c = VV({ name: t[2], gap: 12, pad: [16, 18, 14, 18], radius: 12, fill: 'surface/card', stroke: 'border/default' });
+    var top = VV({ name: 'Figure', gap: 2 });
+    addAll(top, [Tx(t[1], 'Mono/Data L', fg[t[0]], { name: 'Value' }), Tx(t[2], 'Body/S', 'text/tertiary', { name: 'Label' })]);
+    var go = H({ name: 'Open · ' + t[4], gap: 8, pad: [10, 0, 0, 0], cross: 'CENTER' });
+    borderSide(go, 'border/default', 'top');
+    addAll(go, [Tx(t[3], 'Label/S', 'text/secondary', { fill: true, name: 'Case' }), Ic('arrow-right', 16, 'text/tertiary')]);
+    addAll(c, [top, fillW(go)]);
+    add(r, fillW(c));
+  });
+  return r;
+}
 function scrDashboard() {
   var queue = tbl('Review queue', [['Request', 118, null, 'Mono/Caption'], ['Customer', 170], ['Route', null, null, 'Body/S', 'text/secondary'], ['Horses', 50, 'RIGHT', 'Mono/Data'], ['Departs', 64, null, 'Mono/Caption', 'text/secondary'], ['Age', 40, 'RIGHT', 'Mono/Caption'], ['', 24, 'RIGHT']], [
-    { cells: ['REQ-2026-0187', 'Mekong Equestrian', 'Phnom Penh → Hong Kong', '3', '12 Nov', '1 d', rowOpen()] },
-    { cells: ['REQ-2026-0190', stack('Hanoi Riding Club', 'Lead-time override', 'status/warn/fg'), 'Hanoi → Vientiane', '1', '20 Oct', '20 h', rowOpen()] },
-    { cells: ['REQ-2026-0191', 'Bangkok Polo Club', 'Bangkok → Kuala Lumpur', '4', '5 Nov', '9 h', rowOpen()] },
-    { cells: ['REQ-2026-0193', 'Saigon Turf Club', 'Ho Chi Minh City → Bangkok', '2', '30 Oct', '2 h', rowOpen()] }
+    { cells: ['REQ-2026-0187', 'Mekong Equestrian', 'PNH → HKG', '3', '12 Nov', '1 d', rowOpen()] },
+    { cells: ['REQ-2026-0190', stack('Hanoi Riding Club', 'Lead-time override', 'status/warn/fg'), 'HAN → VTE', '1', '20 Oct', '20 h', rowOpen()] },
+    { cells: ['REQ-2026-0191', 'Bangkok Polo Club', 'BKK → KUL', '4', '5 Nov', '9 h', rowOpen()] },
+    { cells: ['REQ-2026-0193', 'Saigon Turf Club', 'HCM → BKK', '2', '30 Oct', '2 h', rowOpen()] }
   ]);
   /* the same words and tone as the Jobs list's "What holds it" for these jobs, never a second description */
   var risk = panel('Clearance at risk', { w: SIDE.narrow, gap: 12 });
@@ -2832,15 +2976,16 @@ function scrDashboard() {
   var c1 = panel('On-time delivery', { gap: 16 });
   addAll(c1, [VV({ name: 'Title', gap: 2 }, [Tx('On-time delivery by week', 'Heading/H4'), Tx('Trips delivered inside the promised window. Dashed line: 95% target.', 'Body/S', 'text/tertiary')]), onTimeChart()]);
   var c2 = panel('Revenue and cost', { gap: 16 });
-  var c2h = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
-  addAll(c2h, [VV({ name: 'Title', gap: 2 }, [Tx('Revenue and direct cost by month', 'Heading/H4'), Tx('USD, thousands. One axis for both series.', 'Body/S', 'text/tertiary')]), legend([['chart/1', 'Revenue'], ['chart/2', 'Direct cost']])]);
+  var c2h = VV({ name: 'Head', gap: 12 });
+  addAll(c2h, [VV({ name: 'Title', gap: 2 }, [Tx('Revenue and direct cost by month', 'Heading/H4'), Tx('USD, thousands. September: $412.8k revenue at an 11.8% gross margin.', 'Body/S', 'text/tertiary')]), legend([['chart/1', 'Revenue'], ['chart/2', 'Direct cost']])]);
   addAll(c2, [fillW(c2h), revenueChart()]);
   var row2 = H({ name: 'Charts', gap: 24 });
   addAll(row2, [fillW(c1), fillW(c2)]);
+  c1.layoutSizingVertical = 'FILL'; c2.layoutSizingVertical = 'FILL';
 
   return adminScreen('Logistics manager · Overview', 'Overview', ['Overview'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
     headAdmin('Overview', 'Logistics Manager view for 26 Sep 2026. Figures cover the last 30 days unless marked.', input('Select', 'Default', 'Period', 'Last 30 days', null)),
-    tiles([['Warn', '4', 'Quotes out'], ['Ok', '96.4%', 'On-time, 30 d'], ['Neutral', '$412.8k', 'Revenue, 30 d'], ['Neutral', '11.8%', 'Gross margin']]),
+    actionTiles(OVERVIEW_TILES),
     row1,
     row2
   ]);
@@ -2868,18 +3013,39 @@ function person(name, id, initials) {
   return h;
 }
 function scrUsersError() { return scrUsers('error'); }
+/* Pending invites: invites are handled in batches, so rows take a checkbox and a selection bar offers the bulk actions */
+function scrUsersInvites() {
+  var box = function (on) { var c = inst(C.checkbox, { Checked: on ? 'True' : 'False' }); setP(c, { 'Show label': false }); c.name = 'Select'; return c; };
+  var t = tbl('Invites', [['', 20], ['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Invited by', 150], ['Expires', 110, null, null, null, 'Ascending'], ['Status', 96]], [
+    { cells: [box(true), person('Bùi Anh Thư', 'thu.bui@equifreight.vn', 'BT'), Tx('Transport specialist', 'Body/S', 'text/secondary'), twoLine('Vũ Hải Yến', '25 Sep, 10:14'), twoLine('In 6 days', '2 Oct 2026'), chip('Warn', 'Invited')], hl: true }
+  ]);
+  tableFoot(t, 1, 1, 'invite');
+  var bulk = H({ name: 'Selection', gap: 12, pad: [8, 8, 8, 16], radius: 8, cross: 'CENTER', fill: 'surface/raised', stroke: 'border/strong' });
+  addAll(bulk, [Tx('1 selected', 'Label/S', 'text/primary', { fill: true }), btn('Secondary', 'SM', 'Resend invite'), btn('Danger', 'SM', 'Revoke invite'), btn('Ghost', 'SM', 'Clear')]);
+  var both = VV({ name: 'Selection and table', gap: 12 });
+  addAll(both, [fillW(bulk), fillW(t)]);
+  var list = tableBlock({ tabs: [['Staff · 9', 'Default'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Active']],
+    filters: [filterField('Search', 'Search', 'Name or email', { placeholder: true })],
+    count: '1 pending invite', order: 'Order: expiring first', table: both });
+  return adminScreen('Logistics manager · Users & roles · Pending invites', 'Users & roles', ['Users & roles', 'Pending invites'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
+    headAdmin('Users & roles', 'Staff accounts and what each role can do. An invite works for 7 days; resending starts a new 7 days.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' }), false),
+    list
+  ]);
+}
 function scrUsers(state) {
   state = state === 'error' ? 'error' : null;
-  var role = function (r) { return chip('Neutral', r, { noDot: true }); };
+  var role = function (r) { return Tx(r, 'Body/S', 'text/secondary'); };
   var status = function (s) { return chip(s === 'Active' ? 'Ok' : 'Warn', s); };
-  var staff = tbl('Staff', [['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Jobs', 64, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Last active', 112, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Status', 84]], [
+  var staff = tbl('Staff', [['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Jobs', 64, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Last active', 112, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Status', 96]], [
     { cells: [person('Vũ Hải Yến', 'EF-001', 'VY'), role('Logistics manager'), '12', 'Today 09:12', status('Active')] },
     { cells: [person('Nguyễn Thị Lan', 'EF-004', 'NL'), role('Transport specialist'), '3', 'Today 10:40', status('Active')] },
     { cells: [person('Bùi Anh Thư', 'EF-015', 'BT'), role('Transport specialist'), '0', '—', status('Invited')] },
     { cells: [person('Đỗ Minh Khôi', 'EF-007', 'DK'), role('Fleet & route coordinator'), '5', 'Today 08:05', status('Active')] },
+    { cells: [person('Võ Thị Hạnh', 'EF-009', 'VH'), role('Driver / escort'), '1', '24 Sep', status('Active')] },
     { cells: [person('Trần Văn Minh', 'EF-011', 'TM'), role('Driver / escort'), '1', '25 Sep', status('Active')] },
     { cells: [person('Lê Thị Hoa', 'EF-012', 'LH'), role('Driver / escort'), '1', '24 Sep', status('Active')] },
-    { cells: [person('Phạm Quốc Tuấn', 'EF-013', 'PT'), role('Driver / escort'), '1', '19 Sep', status('Active')] }
+    { cells: [person('Phạm Quốc Tuấn', 'EF-013', 'PT'), role('Driver / escort'), '1', '19 Sep', status('Active')] },
+    { cells: [person('Nguyễn Văn Tùng', 'EF-014', 'NT'), role('Driver / escort'), '1', '25 Sep', status('Active')] }
   ]);
   var perm = panel('Permissions', { w: SIDE.narrow, gap: 0 });
   add(perm, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('What each role can do', 'Heading/H4'), Tx('Read-only. Roles follow the spec; change them in the spec first.', 'Body/S', 'text/tertiary')]));
@@ -2899,16 +3065,16 @@ function scrUsers(state) {
     add(perm, fillW(row));
   });
   add(perm, VV({ name: 'Note', pad: [12, 0, 0, 0] }, [Tx('CUST customer · LM logistics manager · TS transport specialist · FRC fleet & route coordinator · DRV driver / escort. Only the Logistics Manager approves requests (BR-F1-04); only the Transport Specialist approves documents (BR-F2-04).', 'Body/S', 'text/tertiary', { w: 352 })]));
-  tableFoot(staff, 7, 7, 'staff');
+  tableFoot(staff, 9, 9, 'staff');
   if (state === 'error') staff.remove();
-  var list = tableBlock({ tabs: [['Staff · 7', 'Active'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Default']],
+  var list = tableBlock({ tabs: [['Staff · 9', 'Active'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Default']],
     filters: [filterField('Search', 'Search', 'Name or email', { placeholder: true }), filterField('Select', 'Role', 'All roles')],
-    count: state === 'error' ? 'Staff' : '7 staff', order: state === 'error' ? null : 'Order: by role',
+    count: state === 'error' ? 'Staff' : '9 staff', order: state === 'error' ? null : 'Order: by role',
     table: state === 'error' ? tableState('error', 'accounts') : staff });
   var body = H({ name: 'Body', gap: 24 });
   addAll(body, [fillW(list), perm]);
   return adminScreen('Logistics manager · Users & roles' + (state ? ' · Error' : ''), 'Users & roles', ['Users & roles'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
-    headAdmin('Users & roles', 'Staff accounts and what each role can do. Customers manage their own accounts from the owner portal.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' })),
+    headAdmin('Users & roles', 'Staff accounts and what each role can do. Customers manage their own accounts from the owner portal.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' }), false),
     body
   ]);
 }
@@ -2920,9 +3086,9 @@ var JOBS = [
   ['CBRT-2026-038', 'Bangkok → Phnom Penh', '2 horses · road, via Poipet', 'Clearance', null, 'In 7 days', '3 Oct', 'Bad', 'Import permit overdue since 24 Sep', 'Lan: chase MAFF for the permit'],
   ['CBRT-2026-044', 'Vientiane → Bangkok', '3 horses · road, via Nong Khai', 'Documents', null, 'In 16 days', '12 Oct', 'Warn', 'Thai DLD wants a second EIA test', 'Customer: upload it by 30 Sep'],
   ['CBRT-2026-041', 'Ho Chi Minh City → Phnom Penh', '4 horses · road, private trailer', 'Documents', null, 'In 22 days', '18 Oct', 'Bad', 'Departure locked · 9 items outstanding', 'Customer: 4 uploads, one overdue'],
-  ['CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City', '1 horse · road, shared load', 'Trip', null, 'In 3 days', '29 Sep, 05:30', null, 'Clear to depart', 'Khôi: confirm the load plan'],
+  ['CBRT-2026-036', 'Bangkok → Ho Chi Minh City', '3 horses · road, private trailer', 'Handover', null, 'Delivered', '24 Sep, 16:05', 'Warn', 'Handover not confirmed', 'Customer: confirm by today'],
   ['CBRT-2026-039', 'Hong Kong (Sha Tin) → Kuala Lumpur', '2 horses · air, business class', 'Trip', null, 'Arrives in 2 h', 'Today, 13:40', null, 'Nothing holding it', 'Escort: arrival checkpoint'],
-  ['CBRT-2026-036', 'Bangkok → Ho Chi Minh City', '3 horses · road, private trailer', 'Handover', null, 'Delivered', '24 Sep, 16:05', 'Warn', 'Handover not confirmed', 'Customer: confirm by today']
+  ['CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City', '1 horse · road, shared load', 'Trip', null, 'In 3 days', '29 Sep, 05:30', null, 'Clear to depart', 'Khôi: confirm the load plan']
 ];
 function twoLine(a, b, tone) {
   var v = VV({ name: 'Two lines', gap: 2 });
@@ -2936,17 +3102,17 @@ function scrJobs(sorted) {
   sorted = sorted === true;
   var holdFg = { Bad: 'status/bad/fg', Warn: 'status/warn/fg' };
   var list = sorted ? JOBS_BY_DEPARTURE.map(function (c) { return JOBS.filter(function (j) { return j[0] === c; })[0]; }) : JOBS;
-  var t = tbl('Jobs', [['Job', 118, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Stage', 140, null, null, null, 'Unsorted'], ['Departure', 124, null, null, null, sorted ? 'Ascending' : 'Unsorted'], ['What holds it', 300], ['', 24, 'RIGHT']], list.map(function (j) {
+  var t = tbl('Jobs', [['Job', 118, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Stage', 164, null, null, null, 'Unsorted'], ['Departure', 124, null, null, null, sorted ? 'Ascending' : 'Unsorted'], ['What holds it', 300], ['', 24, 'RIGHT']], list.map(function (j) {
     var hold = VV({ name: 'Hold', gap: 2 });
     addAll(hold, [Tx(j[8], 'Label/S', holdFg[j[7]] || 'text/secondary'), Tx(j[9], 'Body/S', 'text/tertiary')]);
     var route = VV({ name: 'Route', gap: 2 });
     addAll(route, [Tx(j[1], 'Label/S'), Tx(j[2], 'Body/S', 'text/tertiary')]);
-    return { cells: [j[0], route, stageChip(j[3]), twoLine(j[5], j[6]), hold, Ic('arrow-right', 16, 'text/tertiary')] };
+    return { cells: [j[0], route, stageMark(j[3]), twoLine(j[5], j[6]), hold, Ic('arrow-right', 16, 'text/tertiary')] };
   }));
   tableFoot(t, JOBS.length, JOBS.length, 'jobs');
   var hint = Tx('Each row opens the job, where Clearance, Authorities, Load plan and Route sit as tabs with their owner named.', 'Body/S', 'text/tertiary', { w: 760 });
   return adminScreen('Logistics manager · Jobs' + (sorted ? ' · Sorted' : ''), 'Jobs', ['Jobs'], STAFF.yen, [
-    headAdmin('Jobs', 'Every active job, for 26 Sep 2026. Each job has one owner per step.'),
+    headAdmin('Jobs', 'Every active job, for 26 Sep 2026. Each job has one owner per step.', null, false),
     tableBlock({ tabs: [['All · 6', 'Active'], ['Needs me · 1', 'Default'], ['Blocked · 3', 'Default'], ['In transit · 1', 'Default']],
       filters: [filterField('Search', 'Search', 'Code, customer or route', { placeholder: true }), filterField('Select', 'Mode', 'Road and air')],
       count: '6 jobs', order: sorted ? 'Sorted by departure, earliest first' : 'Order: blocked first, then by departure', action: sorted ? 'Reset order' : null, table: t }),
@@ -2999,13 +3165,17 @@ async function eTableComponents() {
   addAdminIcons(board.findOne(function (n) { return n.name === 'Icon grid'; }));
   var old = board.children.filter(function (n) { return n.name === 'Table controls'; });
   buildTableComponents(board);
+  board.children.filter(function (n) { return n.name === 'Keyboard focus'; }).forEach(function (n) { n.remove(); });
+  buildFocusStates(board);
+  board.children.filter(function (n) { return n.name === 'Page header'; }).forEach(function (n) { n.remove(); });
+  buildPageHeaders(board);
   var block = C.colHead.parent;
   if (old.length) { board.insertChild(board.children.indexOf(old[0]), block); old.forEach(function (n) { n.remove(); }); }
   await flush();
   return report({ columnHeader: C.colHead.id, pageNumber: C.pageNum.id });
 }
 async function eAdminCatalogs() { return adminScreensCall([scrRegulations, scrRates]); }
-async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers, scrUsersError]); }
+async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers, scrUsersError, scrUsersInvites]); }
 
 /* ---------- MCP: rebuild the sidebar in place and move every staff screen onto it ---------- */
 /* frame → [staff key, active item, breadcrumb, [[old, new] for the back link or page title]] */
@@ -3017,10 +3187,12 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Jobs': ['yen', 'Jobs', ['Jobs']],
   'Logistics manager · Jobs · Sorted': ['yen', 'Jobs', ['Jobs']],
   'Logistics manager · Users & roles · Error': ['yen', 'Users & roles', ['Users & roles']],
+  'Logistics manager · Users & roles · Pending invites': ['yen', 'Users & roles', ['Users & roles', 'Pending invites']],
   'Transport specialist · Clearance checklist': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Clearance']],
   'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Load plan']],
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Route']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
+  'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Reject': ['lan', 'Documents', ['Documents', 'Silver Bell · Proof of ownership'], [['Clearance checklist', 'Documents']]],
   'Logistics manager · Request review': ['yen', 'Requests', ['Requests', 'REQ-2026-0193'], [['Review queue', 'Requests']]],
   'Logistics manager · Request review · Override': ['yen', 'Requests', ['Requests', 'REQ-2026-0190'], [['Review queue', 'Requests']]],
@@ -3086,13 +3258,18 @@ var URGENCY = {
 /* one tone per stage, shared by list and detail chips */
 /* one process vocabulary everywhere: the seven stages, named the same on
    Home, the request wizard, tracking, the quotation and the staff jobs.
-   A stage chip says where a request is, not how urgent it is: urgency lives
-   in the owed items and deadlines, so stage chips are always neutral. */
+   A stage mark says where a request is, not how urgent it is: urgency lives
+   in the owed items and deadlines, so a stage is plain words, never a toned chip. */
 var STAGES = ['Request', 'Quotation', 'Approval', 'Documents', 'Clearance', 'Trip', 'Handover'];
-function stageChip(s) { return chip('Neutral', s + ' · ' + (STAGES.indexOf(s) + 1) + ' of 7', { noDot: true }); }
+/* a stage is a position, not a state, so it is said in words without a pill: the stage name, then where it sits in the seven */
+function stageMark(s) {
+  var h = H({ name: 'Stage · ' + s, gap: 6, cross: 'CENTER' });
+  addAll(h, [Tx(s, 'Label/S', 'text/primary', { name: 'Stage' }), Tx((STAGES.indexOf(s) + 1) + ' of 7', 'Mono/Caption', 'text/tertiary', { name: 'Position' })]);
+  return h;
+}
 
 function buildTrackingComponents(board) {
-  var b = docBlock(board, 'Request tracking', 'Customer-side tracking pieces. Owed item: one thing the customer owes, with its reason and a two-line deadline (time left, then the date); urgency drives tone, and only the top item\'s action is gold. Stage row: a stage (or a collapsed run of stages) with its owner and a two-line deadline. Route stop: a checkpoint on the schematic route; positions come from recorded checkpoints only. Status tones only, never gold.');
+  var b = docBlock(board, 'Request tracking', 'Customer-side tracking pieces. Owed item: one thing the customer owes, with its reason and a two-line deadline (time left, then the date); urgency drives tone, and only the top item’s action is gold. Stage row: a stage (or a collapsed run of stages) with its owner and a two-line deadline. Route stop: a checkpoint on the schematic route; positions come from recorded checkpoints only. Status tones only, never gold.');
 
   var owed = Object.keys(URGENCY).map(function (u) {
     var s = URGENCY[u];
@@ -3375,9 +3552,9 @@ function scrMyRequests() {
   /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
   var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageChip('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageChip('Quotation'), owe(1, 'Warn'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageChip('Request'), owe(0), rowOpen()] }
+    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageMark('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
+    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageMark('Quotation'), owe(1, 'Warn'), rowOpen()] },
+    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageMark('Request'), owe(0), rowOpen()] }
   ]);
   tableFoot(t, 3, 3, 'requests');
   var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
@@ -3402,7 +3579,7 @@ function scrTrackReview() {
   addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('An indicative range, not a quote. The quotation will be itemised line by line.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
     fillW(requestSummary(REQ_0193, { title: 'What you sent', bare: true, only: ['Horses', 'Service', 'Route', 'Departure'] }))]);
   var hist = historyPanel([['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageChip('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: documents needed ---------- */
@@ -3429,20 +3606,25 @@ function scrTrackDocs() {
   var hist = historyPanel([
     ['24 Sep · 16:02', 'Proof of ownership for Silver Bell rejected: the bill of sale is unsigned.', 'Lan, transport specialist'],
     ['21 Sep · 10:15', 'EIA test for Shadowfax uploaded and approved.', 'You, then Lan'],
-    ['16 Sep · 02:00', 'Silver Bell\'s influenza booster lapsed; the item was reopened.', 'System'],
+    ['16 Sep · 02:00', 'Silver Bell’s influenza booster lapsed; the item was reopened.', 'System'],
     ['12 Sep · 11:30', 'Job approved as CBRT-2026-041; document checklist created (23 items).', 'Yến, logistics manager'],
     ['10 Sep · 18:44', 'Quotation v2 accepted; 30% deposit confirmed.', 'You']
   ], 'Show all 14 events');
-  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageChip('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: in transit ---------- */
-function scrTrackTransit() {
-  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+/* CBRT-2026-041 on 18 Oct at 08:41: the last confirmed checkpoint and what is next; Tracking · In transit and Home share it */
+function onTheRoad() {
   var route = panel('Route', { gap: 20 });
   var rh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
   addAll(rh, [VV({ name: 'Title', gap: 2 }, [Tx('On the road', 'Heading/H3'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary')]), Tx('Updated 08:41', 'Mono/Caption', 'text/tertiary')]);
   addAll(route, [fillW(rh), fillW(routeStrip(stopsWith(['Done', 'Current', 'Upcoming', 'Upcoming'], ['06:05 · departed', '08:34 · cleared', 'exp. 09:30', 'exp. 12:30']), 'Clear'))]);
+  return route;
+}
+function scrTrackTransit() {
+  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+  var route = onTheRoad();
   var log = panel('Condition log', { gap: 12 });
   add(log, Tx('Latest condition log', 'Heading/H4'));
   [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom'], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
@@ -3455,11 +3637,11 @@ function scrTrackTransit() {
   });
   var stagesP = stagePanel([
     ['Done', 'Submitted with 4 horses.', '', '2 Sep'], ['Done', 'Quotation v2 accepted.', '', '10 Sep'], ['Done', 'Approved. Job CBRT-2026-041.', '', '12 Sep'],
-    ['Done', '21 of 21 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
+    ['Done', '23 of 23 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
     ['Current', 'On the road with Minh, driver, and two grooms since 06:05.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
   var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
-  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageChip('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
+  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageMark('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
 /* ---------- Detail: delivered ---------- */
@@ -3483,7 +3665,7 @@ function scrTrackDelivered() {
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
   var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
-  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageChip('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
+  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 
 /* ---------- entries ---------- */
@@ -3578,15 +3760,15 @@ function noteField(label, value, helper, empty) {
 function reviewHead(title, code, meta, due, date) {
   var d = VV({ name: 'Review due', gap: 2, cross: 'MAX' });
   addAll(d, [Tx(due, 'Label/S', 'status/warn/fg', { align: 'RIGHT' }), Tx(date, 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  var h = pageHeader({ shell: 'staff', back: 'Requests', title: title, code: code, summary: meta, right: [stageChip('Request'), d] });
+  var h = pageHeader({ shell: 'staff', back: 'Requests', title: title, code: code, summary: meta, right: [stageMark('Request'), d] });
   h.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 16;
   return h;
 }
-function reviewScreen(name, code, head, left, right) {
+function reviewScreen(name, code, head, left, right, queue) {
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
-  return adminScreen(name, 'Requests', ['Requests', code], STAFF.yen, [head, body], 'Mon 28 Sep 2026');
+  return adminScreen(name, 'Requests', ['Requests', code], STAFF.yen, [head, body], 'Mon 28 Sep 2026', { queue: queue });
 }
 
 /* ---------- REQ-2026-0193: a horse conflict, so ask for information ---------- */
@@ -3615,7 +3797,8 @@ function scrReview() {
   addAll(other, [Tx('Other outcomes', 'Label/S', 'text/secondary'), btn('Secondary', 'MD', 'Start quotation', { fill: true }), Tx('Waits on the Horses check.', 'Body/S', 'text/tertiary', { fill: true }), btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
   add(dec, fillW(other));
   var right = column([dec]);
-  return reviewScreen('Logistics manager · Request review', 'REQ-2026-0193', reviewHead('Ho Chi Minh City → Bangkok', 'REQ-2026-0193', 'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d', 'Due today', '28 Sep'), left, right);
+  return reviewScreen('Logistics manager · Request review', 'REQ-2026-0193', reviewHead('Ho Chi Minh City → Bangkok', 'REQ-2026-0193', 'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d', 'Due today', '28 Sep'), left, right,
+    { label: 'Review queue', pos: '3 of 4', prev: true, next: true });
 }
 
 /* ---------- REQ-2026-0190: inside the lead time, so an express override ---------- */
@@ -3643,7 +3826,8 @@ function scrReviewOverride() {
   var other = VV({ name: 'Other outcomes', gap: 10 });
   addAll(other, [Tx('Other outcomes', 'Label/S', 'text/secondary'), btn('Secondary', 'MD', 'Refuse override and reject', { fill: true }), Tx('Rejects with your reason; the customer can copy the request into a new draft dated 25 Oct or later.', 'Body/S', 'text/tertiary', { fill: true })]);
   add(dec, fillW(other));
-  return reviewScreen('Logistics manager · Request review · Override', 'REQ-2026-0190', reviewHead('Hanoi → Vientiane', 'REQ-2026-0190', 'Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'Due today', '28 Sep'), left, column([dec]));
+  return reviewScreen('Logistics manager · Request review · Override', 'REQ-2026-0190', reviewHead('Hanoi → Vientiane', 'REQ-2026-0190', 'Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'Due today', '28 Sep'), left, column([dec]),
+    { label: 'Review queue', pos: '1 of 4', prev: false, next: true });
 }
 
 /* ---------- the customer's side: the request came back with a question ---------- */
@@ -3674,7 +3858,7 @@ function scrTrackInfo() {
   var est = panel('Estimate', { gap: 10 });
   addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('Still an indicative range. It updates if you change the horses, route or date.', 'Body/S', 'text/tertiary', { fill: true })]);
   var hist = historyPanel([['28 Sep · 09:41', 'Returned with a question: where to collect Shadowfax and Nightfall.', 'Yến, logistics manager'], ['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageChip('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
+  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
 }
 
 /* =====================================================================
@@ -3746,7 +3930,7 @@ function scrBuilder() {
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Issued 15 Sep · superseded when the departure moved', 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(ver, [Tx('Versions', 'Heading/H4'), fillW(v2), fillW(v1)]);
   return builderScreen('Logistics manager · Quotation builder', ['Requests', 'REQ-2026-0179', 'Quotation'],
-    builderHead('Phnom Penh → Hong Kong (Sha Tin)', 'Q-2026-0188', 'v2 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026', 'REQ-2026-0179', [stageChip('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
+    builderHead('Phnom Penh → Hong Kong (Sha Tin)', 'Q-2026-0188', 'v2 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026', 'REQ-2026-0179', [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
     left, column([issue, ch, ver]), 'Wed 23 Sep 2026');
 }
 
@@ -3776,7 +3960,7 @@ function scrBuilderBlocked() {
     readyText: (T.lines - T.missing) + ' of ' + T.lines + ' lines priced', issue: 'Issue quotation', 
     facts: [['Lead-time override', 'Granted 28 Sep by Yến']] });
   return builderScreen('Logistics manager · Quotation builder · Blocked', ['Requests', 'REQ-2026-0190', 'Quotation'],
-    builderHead('Hanoi → Vientiane', 'REQ-2026-0190', 'quotation v1 draft · Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'REQ-2026-0190', [stageChip('Request'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
+    builderHead('Hanoi → Vientiane', 'REQ-2026-0190', 'quotation v1 draft · Hanoi Riding Club · 1 horse · road, private trailer · departs 20 Oct 2026', 'REQ-2026-0190', [stageMark('Request'), chip('Neutral', 'Rates v12 pinned', { noDot: true })]),
     left, column([issue]), 'Tue 29 Sep 2026');
 }
 
@@ -3816,7 +4000,7 @@ function rulePanel(today, outcomes) {
   outcomes.forEach(function (o) {
     var r = H({ name: o[1], gap: 16, pad: [10, 0, 10, 0], cross: 'CENTER' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 172 });
+    var st = H({ name: 'Status col', w: 184 });
     add(st, chip(o[0], o[1]));
     addAll(r, [st, Tx(o[2], 'Body/S', 'text/secondary', { fill: true })]);
     add(list, fillW(r));
@@ -3882,7 +4066,7 @@ function docStatusPanel(tone, word, line, facts, due) {
   return p;
 }
 function docHead() {
-  return trackHead('Nightfall · EIA (Coggins) test', ['REQ-2026-0162', 'job CBRT-2026-041 · Ho Chi Minh City → Phnom Penh · departs 18 Oct 2026'], [stageChip('Documents')], 'Your documents');
+  return trackHead('Nightfall · EIA (Coggins) test', ['REQ-2026-0162', 'job CBRT-2026-041 · Ho Chi Minh City → Phnom Penh · departs 18 Oct 2026'], [stageMark('Documents')], 'Your documents');
 }
 var LAN_CHECKS = [['Lan', 'transport specialist', 'Reviews the test after the automatic check, usually within 1 business day. Only a test she approves counts toward clearance.']];
 
@@ -3977,7 +4161,7 @@ var ALL_DOCS = [
 function allDocRow(d, viewer) {
   var r = H({ name: d[0], gap: 16, pad: [12, 20, 12, 20], cross: 'CENTER' });
   borderSide(r, 'border/default', 'bottom');
-  var st = H({ name: 'Status col', w: 170 });
+  var st = H({ name: 'Status col', w: 182 });
   add(st, chip(d[2], d[3], { noDot: d[2] === 'Neutral' }));
   var info = VV({ name: 'Info', gap: 3 });
   addAll(info, [Tx(d[0], 'Label/M', 'text/primary', { fill: true }), Tx(d[1], 'Body/S', 'text/tertiary', { fill: true })]);
@@ -4022,7 +4206,7 @@ function docTable(viewer) {
 function scrAllDocs() {
   var sum = docTableSummary('owner'), tabs = docTableTabs('owner'), list = docTable('owner');
   var note = Tx('Export health certificates are issued by the Dept. of Animal Health (VN) 8–14 Oct, inside the 10 days before departure; Lan requests them for you. Open any row to see its versions.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageChip('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
 }
 
 /* ---------- MCP entry ---------- */
@@ -4128,19 +4312,21 @@ function autoCheck(tone, word, text) {
   addAll(p, [fillW(h), Tx(text, 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
-function docReviewScreen(name, crumb, title, meta, due, dueDate, dueTone, left, right, hist, today) {
+function docReviewScreen(name, crumb, title, meta, due, dueDate, dueTone, left, right, hist, today, queued) {
   var d = VV({ name: 'Review due', gap: 2, cross: 'MAX' });
   addAll(d, [Tx(due, 'Label/S', dueTone, { align: 'RIGHT' }), Tx(dueDate, 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  var head = builderHead(title, 'CBRT-2026-041', meta, 'Documents', [stageChip('Documents'), chip('Info', 'In review'), d]);
+  var head = builderHead(title, 'CBRT-2026-041', meta, 'Documents', [stageMark('Documents'), chip('Info', 'In review'), d]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
-  return adminScreen(name, 'Documents', ['Documents', crumb], STAFF.lan, [head, body].concat(hist ? [hist] : []), today);
+  /* the Documents badge counts what waits for Lan's review that day, this one included */
+  return adminScreen(name, 'Documents', ['Documents', crumb], STAFF.lan, [head, body].concat(hist ? [hist] : []), today, { badges: { Documents: String(queued) } });
 }
 
 /* ---------- approve: Nightfall's EIA test v2 (Fri 2 Oct) ---------- */
-function scrDocReview() {
+function scrDocReviewNotSent() { return scrDocReview('notsent'); }
+function scrDocReview(state) {
   var paper = paperDoc({ head: 'NAVETCO Laboratory', sub: 'National Centre for Veterinary Diagnostics · Ho Chi Minh City branch', ref: 'Accreditation VILAS 214\nCertificate EIA-2610-0873',
     title: 'Equine Infectious Anaemia · AGID (Coggins) test',
     fields: [['Horse', 'Nightfall'], ['Sex · breed', 'Mare · Thoroughbred'], ['Microchip', '250 259 600 223 311'], ['Owner', 'Saigon Turf Club'], ['Date sampled', '01/10/2026'], ['Date tested', '02/10/2026'], ['Method', 'Agar gel immunodiffusion']],
@@ -4154,8 +4340,15 @@ function scrDocReview() {
     ['on', 'Signed and stamped by the veterinarian']
   ], 'All 5 ticked');
   var dec = panel('Decision', { gap: 12 });
-  addAll(dec, [Tx('Your decision', 'Heading/H4'), Tx('Approving clears Nightfall’s EIA test: 15 of 23 documents cleared. The departure gate still waits for 8.', 'Body/S', 'text/secondary', { fill: true }),
-    btn('Primary', 'MD', 'Approve', { fill: true, lead: 'check' }), btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
+  if (state === 'notsent')
+    /* a decision that didn't reach the server: say what did not happen, keep the work, and hold the queue */
+    addAll(dec, [Tx('Your decision', 'Heading/H4'), fillW(callout('Bad', 'Not sent', 'Nothing was recorded and Saigon Turf Club wasn’t told. Your 5 ticks are kept.')),
+      btn('Primary', 'MD', 'Try again', { fill: true, lead: 'check' }), Tx('Your queue waits here until this is sent: 2 more after it.', 'Body/S', 'text/tertiary', { fill: true }),
+      btn('Ghost', 'MD', 'Keep for later', { fill: true })]);
+  else
+    addAll(dec, [Tx('Your decision', 'Heading/H4'), Tx('Approving clears Nightfall’s EIA test: 15 of 23 documents cleared. The departure gate still waits for 8.', 'Body/S', 'text/secondary', { fill: true }),
+      btn('Primary', 'MD', 'Approve and open next', { fill: true, lead: 'check' }), Tx('Then 2 more in your queue: Silver Bell’s bill of sale and the transit insurance.', 'Body/S', 'text/tertiary', { fill: true }),
+      btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
   var ver = versionsPanel([
     ['v2', '2 Oct 2026', 'Sampled 1 Oct · NAVETCO · 17 days old at departure. This version.', 'Info', 'In review'],
     ['Attempt', '27 Sep 2026', 'Sampled 20 Jul · 90 days old at departure. Refused at upload; not saved.', 'Bad', 'Refused', true],
@@ -4163,7 +4356,7 @@ function scrDocReview() {
   ], 'The customer sees the same list. Approving or rejecting is added to both histories.');
   var right = column([autoCheck('Ok', 'Passes', 'Sampled 1 Oct, 17 days before the 18 Oct departure; the limit is 60 (Cambodia regulation catalog v7, pinned to this job).'), checks, dec, ver]);
   var hist = historyPanel([['2 Oct · 10:12', 'v2 uploaded by Saigon Turf Club. Automatic check: passes, 17 of 60 days.', 'System'], ['2 Oct · 10:12', 'Assigned to Lan for review; due by end of Mon 5 Oct.', 'System'], ['27 Sep · 16:40', 'Upload refused at the automatic check: sampled 20 Jul.', 'System']], null);
-  return docReviewScreen('Transport specialist · Document review', 'Nightfall · EIA test', 'Nightfall · EIA (Coggins) test', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due in 1 business day', '5 Oct', 'text/primary', left, right, hist, 'Fri 2 Oct 2026');
+  return docReviewScreen('Transport specialist · Document review' + (state === 'notsent' ? ' · Not sent' : ''), 'Nightfall · EIA test', 'Nightfall · EIA (Coggins) test', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due in 1 business day', '5 Oct', 'text/primary', left, right, hist, 'Fri 2 Oct 2026', 3);
 }
 
 /* ---------- reject: Silver Bell's unsigned bill of sale (Thu 24 Sep) ---------- */
@@ -4185,14 +4378,14 @@ function scrDocReject() {
   addAll(due, [Tx('New version due', 'Body/S', 'text/secondary'), dd]);
   addAll(comp, [Tx('Reject with a reason', 'Label/M'),
     fillW(noteField('Reason, shown to Saigon Turf Club', 'The bill of sale is not signed by the seller (bottom left). Upload a copy signed by both Hoàng Gia Stud and Saigon Turf Club.', 'Required. The customer sees it exactly as written; the item returns to Required and this version is kept.')),
-    fillW(due), btn('Primary', 'MD', 'Reject and notify customer', { fill: true, trail: 'arrow-right' })]);
+    fillW(due), btn('Primary', 'MD', 'Reject and open next', { fill: true, trail: 'arrow-right' }), Tx('Saigon Turf Club is told at once, with your reason. Then 1 more in your queue, from CBRT-2026-038.', 'Body/S', 'text/tertiary', { fill: true })]);
   var dec = panel('Decision', { gap: 12 });
   addAll(dec, [Tx('Your decision', 'Heading/H4'), fillW(comp), divider(), btn('Secondary', 'MD', 'Approve', { fill: true, state: 'Disabled' }), Tx('Approve needs every check ticked. 1 isn’t: signed by both parties.', 'Body/S', 'text/tertiary', { fill: true })]);
   var ver = versionsPanel([['v1', '24 Sep 2026', 'Bill of sale dated 20 Aug 2026. This version; kept after a rejection.', 'Info', 'In review']], 'The customer sees the same list. A rejected version stays in the history.');
   var right = column([autoCheck('Ok', 'Present', 'Proof of ownership has a presence-only rule, so the system checks that a file is there. It can’t check a signature.'), checks, dec, ver]);
-  return docReviewScreen('Transport specialist · Document review · Reject', 'Silver Bell · Proof of ownership', 'Silver Bell · Proof of ownership', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due today', '24 Sep', 'status/warn/fg', left, right, null, 'Thu 24 Sep 2026');
+  return docReviewScreen('Transport specialist · Document review · Reject', 'Silver Bell · Proof of ownership', 'Silver Bell · Proof of ownership', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due today', '24 Sep', 'status/warn/fg', left, right, null, 'Thu 24 Sep 2026', 2);
 }
-async function eDocReview() { return staffScreensCall([scrDocReview, scrDocReject]); }
+async function eDocReview() { return staffScreensCall([scrDocReview, scrDocReviewNotSent, scrDocReject]); }
 /* =====================================================================
    Authorities tab (Flow 2, staff). One dossier card per authority on the
    route: state in words, what it holds, its reference and the expected
@@ -4392,7 +4585,7 @@ function cabBar(o) {
   var bar = H({ name: 'Cab bar', gap: 20, pad: [14, 32, 14, 32], cross: 'CENTER', fill: 'surface/card' });
   borderSide(bar, 'border/default', 'bottom');
   var job = H({ name: 'Job', gap: 12, cross: 'CENTER' });
-  addAll(job, [Tx(o.code, 'Mono/Data', 'text/secondary'), Tx(o.route, 'Heading/H4'), stageChip('Trip'), chip(o.pillTone, o.pill)]);
+  addAll(job, [Tx(o.code, 'Mono/Data', 'text/secondary'), Tx(o.route, 'Heading/H4'), stageMark('Trip'), chip(o.pillTone, o.pill)]);
   var sync = H({ name: 'Sync', gap: 8, cross: 'CENTER' });
   addAll(sync, [Ic(o.synced ? 'check' : 'clock', 18, o.synced ? 'status/ok/fg' : 'status/warn/fg'), Tx(o.sync, 'Label/S', o.synced ? 'text/secondary' : 'status/warn/fg')]);
   var who = H({ name: 'Who', gap: 10, cross: 'CENTER' });
@@ -4481,14 +4674,15 @@ function customerSees(text) {
   addAll(p, [Tx('What the customer sees', 'Heading/H4'), Tx(text, 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
-/* Sound / Watch / Concern at touch size; the chosen one takes its status tone */
+/* Sound / Watch / Concern at touch size. The chosen one is said three ways so it survives glare in a sunlit cab:
+   a check before the word, a 1.5px border in the full status colour, and its tone fill */
 function conditionControl(pick) {
   var tones = { Sound: 'Ok', Watch: 'Warn', Concern: 'Bad' };
   var s = H({ name: 'Condition', gap: 0, radius: 8, stroke: 'border/strong', clip: true });
   ['Sound', 'Watch', 'Concern'].forEach(function (w, i) {
     var on = w === pick, tn = TONE[tones[w]];
-    var c = H({ name: w, w: 112, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
-    if (on) { c.strokes = [P(tn.border)]; c.strokeWeight = 1.5; c.strokeAlign = 'INSIDE'; }
+    var c = H({ name: w, gap: 6, w: 112, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
+    if (on) { c.strokes = [P(tn.fg)]; c.strokeWeight = 1.5; c.strokeAlign = 'INSIDE'; add(c, Ic('check', 16, tn.fg)); }
     else if (i) { c.strokes = [P('border/strong')]; c.strokeAlign = 'INSIDE'; c.strokeTopWeight = 0; c.strokeBottomWeight = 0; c.strokeRightWeight = 0; c.strokeLeftWeight = 1; }
     add(c, Tx(w, 'Label/M', on ? tn.fg : 'text/secondary'));
     add(s, c);
@@ -4683,7 +4877,7 @@ function scrTrackClosed() {
   var stagesP = stagePanel([['Done', 'Submitted 2 Sep.', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', 'Closed after you confirmed the handover.', 'Done', '19 Oct']]);
   var route = routePanel('Route as recorded', 'Every checkpoint was recorded by the escort.', stopsWith(['Done', 'Done', 'Done', 'Done'], ['06:05', '08:34', '09:36', '12:41']), 'Clear', [['Vehicle', 'Trailer TX-447', true], ['Escort', 'Minh, driver · Hoa and Tuấn'], ['Distance', '240 km · 6 h 36 min', true]]);
   var hist = historyPanel([['19 Oct · 09:14', 'Handover confirmed; the job is closed.', 'You'], ['18 Oct · 12:48', 'Handed over to Sophea, receiving groom; arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver']], 'Show all 38 events');
-  return trackScreen('Tracking · Closed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageChip('Handover'), chip('Ok', 'Closed')], true),
+  return trackScreen('Tracking · Closed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover'), chip('Ok', 'Closed')], true),
     [closedLead(), sum, split(column([arr, docs, stagesP]), route, SIDE.wide), hist], '19 Oct 2026, 09:20');
 }
 async function eHandover() { return insertChainCall([scrTrackClosed], 'Tracking · Delivered'); }
@@ -4763,7 +4957,7 @@ function optionRow(sel, title, desc, facts) {
 var NOW40 = '09:10';
 function scrIncidentHeld() {
   var head = builderHead('Held at Bavet – Mộc Bài', 'CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City · Mekong Star · shared load · departed 05:30', 'Incidents',
-    [stageChip('Trip'), chip('Bad', 'Held'), dueStack('Held for ' + durText(toMin(NOW40) - toMin(INC40.held)), 'since ' + INC40.held, 'status/bad/fg')]);
+    [stageMark('Trip'), chip('Bad', 'Held'), dueStack('Held for ' + durText(toMin(NOW40) - toMin(INC40.held)), 'since ' + INC40.held, 'status/bad/fg')]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var rec = panel('What the escort recorded', { gap: 12 });
   var rh = H({ name: 'Head', gap: 12, main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -4815,8 +5009,9 @@ function escortRecord(title) {
   var p = panel('Escort record', { gap: 10 });
   var h = VV({ name: 'Head', gap: 8 });
   addAll(h, [Tx(title, 'Heading/H4'), chip('Ok', 'Sound')]);
-  addAll(p, [fillW(h), Tx('“Walked off well; drinking.”', 'Body/S', 'text/primary', { fill: true }), Tx('Logged at 16:10 by Hạnh, groom, on arrival.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
-    dlRow('Loaded, Bangkok', '05:10 · calm', { valueStyle: 'Label/S' }), dlRow('Siem Reap stop', '10:20 · sound', { valueStyle: 'Label/S' }), dlRow('Delivered', '16:05', { valueStyle: 'Mono/Data' })]);
+  /* the trip's own checks in one line, so the record stays as short as the customer's report beside it */
+  addAll(p, [fillW(h), Tx('“Walked off well; drinking.”', 'Body/S', 'text/primary', { fill: true }), Tx('Logged at 16:10 by Hạnh, groom, on arrival.', 'Body/S', 'text/tertiary', { fill: true }),
+    Tx('Loaded at Bangkok 05:10, calm · Siem Reap stop 10:20, sound · delivered 16:05.', 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
 function scrTrackReport() {
@@ -4848,7 +5043,7 @@ function scrTrackReport() {
   addAll(r, [Tx('Yến replies', 'Body/S', 'text/secondary'), dueStack('Within 2 hours', 'of sending')]);
   addAll(next, [Tx('What happens next', 'Heading/H4'), Tx('Yến, logistics manager, reads your report with the escort’s arrival record and replies with a next step.', 'Body/S', 'text/secondary', { fill: true }), fillW(r),
     Tx('Sending pauses the 26 Sep handover deadline until the case is settled.', 'Body/S', 'text/secondary', { fill: true })]);
-  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageChip('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
+  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
     [split(form, column([urgent, next]), SIDE.narrow)], '24 Sep 2026, ' + INC36.draft);
   var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
@@ -4860,23 +5055,23 @@ function scrTrackReport() {
 /* ---------- the same case on Yến's side (18:05) ---------- */
 function scrIncidentReport() {
   var head = builderHead('Golden Lotus · cut on arrival', 'CBRT-2026-036', 'REQ-2026-0151 · Chao Phraya Racing Stables · Bangkok → Ho Chi Minh City', 'Incidents',
-    [stageChip('Handover'), chip('Bad', 'Open'), dueStack('Reply in ' + INC36.left, 'by ' + INC36.due, 'status/warn/fg')]);
+    [stageMark('Handover'), chip('Bad', 'Open'), dueStack('Reply in ' + INC36.left, 'by ' + INC36.due, 'status/warn/fg')]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var rep = panel('Customer report', { gap: 10 });
   var h = VV({ name: 'Head', gap: 8 });
   addAll(h, [Tx('What the customer reported', 'Heading/H4'), chip('Bad', 'Injury')]);
   addAll(rep, [fillW(h), Tx('“' + REPORT_TEXT + '”', 'Body/S', 'text/primary', { fill: true }), photoThumbs(['IMG_2291.jpg', 'IMG_2292.jpg'], false), stamp(INC36.reported, 'Niran, stable manager')]);
   var two = H({ name: 'Records', gap: 24 });
-  addAll(two, [fillW(rep), fillW(escortRecord('What the escort recorded'))]);
+  var esc = escortRecord('What the escort recorded');
+  addAll(two, [fillW(rep), fillW(esc)]);
+  rep.layoutSizingVertical = 'FILL'; esc.layoutSizingVertical = 'FILL';
   var diff = callout('Warn', 'The records differ', 'Logged sound at 16:10 by Hạnh; reported cut at ' + INC36.reported + '. The groom’s statement and the vet’s visit establish what happened; this page doesn’t decide fault.');
   var comp = VV({ name: 'Reply', gap: 14, pad: [18, 20, 18, 20], radius: 12, fill: 'surface/raised', stroke: 'border/strong' });
-  addAll(comp, [Tx('Next steps and reply', 'Label/M'),
-    Tx('Done', 'Label/S', 'text/secondary'),
-    fillW(factLine('Vet visit booked for 25 Sep at 09:00', 'Dr Phạm Quốc Bảo, at the club’s barn. The cost is held until the case closes.', true)),
-    fillW(factLine('Insurer notified under the transit policy', 'PVI Insurance, at ' + INC36.notified + '.', true)),
-    fillW(factLine('Statement requested from Hạnh, groom', 'Due 25 Sep at 12:00.', true)),
+  /* the reply comes first so it sits above the fold; what is already done is one line under it (the timeline has the detail) */
+  addAll(comp, [Tx('Your reply', 'Label/M'),
     fillW(noteField('Reply to Chao Phraya Racing Stables', 'Thank you for the photos. A vet will see Golden Lotus at your barn tomorrow at 09:00, and we have notified our insurer. Hạnh, who logged her on arrival, is writing a statement by noon. Your handover stays open until this is settled.', 'Required. Sent as written; it also appears on the request page.')),
-    btn('Primary', 'MD', 'Send reply', { fill: true, trail: 'arrow-right' })]);
+    btn('Primary', 'MD', 'Send reply', { fill: true, trail: 'arrow-right' }),
+    Tx('Already done: vet visit booked for 25 Sep at 09:00 (Dr Phạm Quốc Bảo; the cost is held until the case closes), PVI Insurance notified at ' + INC36.notified + ', statement requested from Hạnh by 25 Sep 12:00.', 'Body/S', 'text/tertiary', { fill: true })]);
   var left = column([two, diff, comp]);
   var ho = panel('Handover', { gap: 10 });
   var hh = H({ name: 'Head', gap: 12, main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -4921,6 +5116,8 @@ function svcOptions(opts, single) {
     if (mt) restyle(mt, /^[+\u2212$\d-]/.test(o[3]) ? 'Mono/Caption' : 'Label/S', tone);
     c.name = 'Option · ' + o[1];
     add(r, fillW(c));
+    /* cards in one row share a height, whatever their copy */
+    c.layoutSizingVertical = 'FILL';
   });
   return r;
 }
@@ -5023,7 +5220,7 @@ function docList(title, sub, docs, link) {
   docs.forEach(function (d) {
     var r = H({ name: d[0], gap: 16, pad: [12, 0, 12, 0], cross: 'CENTER' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 170 });
+    var st = H({ name: 'Status col', w: 182 });
     add(st, chip(d[1], d[2], { noDot: d[1] === 'Neutral' }));
     var t = VV({ name: 'Text', gap: 2 });
     addAll(t, [Tx(d[0], 'Label/M'), Tx(d[3], 'Body/S', d[1] === 'Warn' ? 'status/warn/fg' : 'text/secondary', { fill: true })]);
@@ -5041,7 +5238,7 @@ function tripsPanel() {
     var r = VV({ name: t[0], gap: 6, pad: [12, 0, 12, 0] });
     borderSide(r, 'border/default', 'top');
     var top = H({ name: 'Head', gap: 8, main: 'SPACE_BETWEEN', cross: 'CENTER' });
-    addAll(top, [Tx(t[0], 'Mono/Data', 'text/primary'), stageChip(t[3])]);
+    addAll(top, [Tx(t[0], 'Mono/Data', 'text/primary'), stageMark(t[3])]);
     addAll(r, [fillW(top), Tx(t[1], 'Label/S', 'text/primary'), Tx(t[2], 'Body/S', 'text/tertiary')]);
     if (t[4]) add(r, Tx(t[4], 'Body/S', 'status/warn/fg', { fill: true }));
     add(p, fillW(r));
@@ -5102,7 +5299,7 @@ function scrHorseEdit() {
    ['Neutral', 'No change', 'REQ-2026-0193', 'Still in review; the new trait is read when it is quoted.']].forEach(function (e) {
     var r = H({ name: e[2], gap: 14, pad: [12, 0, 12, 0], cross: 'MIN' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 110 });
+    var st = H({ name: 'Status col', w: 122 });
     add(st, chip(e[0], e[1], { noDot: e[0] === 'Neutral' }));
     var t = VV({ name: 'Text', gap: 2 });
     addAll(t, [Tx(e[2], 'Mono/Caption', 'text/primary', { fill: true }), Tx(e[3], 'Body/S', 'text/secondary', { fill: true })]);
@@ -5163,7 +5360,7 @@ function scrTrackAsk() {
   addAll(route, [Tx('Goes to Lan, transport specialist. Yến can read it too.', 'Body/S', 'text/secondary', { fill: true }), dueStack('Within 1 business day', 'by Mon 28 Sep')]);
   add(form, fillW(route));
   add(form, btn('Primary', 'MD', 'Send to Lan', { trail: 'arrow-right' }));
-  return trackScreen('Tracking · Ask a question', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageChip('Documents')], 'Back to the request'),
+  return trackScreen('Tracking · Ask a question', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents')], 'Back to the request'),
     [split(form, column([earlierNotes(), whoAnswers()]), SIDE.narrow)], '26 Sep 2026, 11:30');
 }
 
@@ -5227,7 +5424,7 @@ function newCustomer(s) {
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
   if (nm) nm.characters = 'Đà Lạt Highland Stables';
   if (ini) ini.characters = 'DH';
-  setP(s.children[s.children.length - 1], { 'As of': '27 Sep 2026' });
+  setP(s.children[s.children.length - 1], { 'As of': '26 Sep 2026' });
   return s;
 }
 function scrFirstRequests() {
@@ -5566,7 +5763,7 @@ var AUDIT_WEEK = [
   ['18:02', '24 Sep', 'Vũ Hải Yến', 'Logistics manager', 'Notified PVI Insurance under the transit policy', 'CBRT-2026-036', 'Web'],
   ['17:31', '24 Sep', 'System', 'Automatic', 'Opened an incident for Golden Lotus and paused the handover deadline', 'CBRT-2026-036', 'System'],
   ['17:30', '24 Sep', 'Chao Phraya Racing Stables', 'Customer', 'Reported a problem for Golden Lotus with 2 photos', 'CBRT-2026-036', 'Web'],
-  ['16:10', '24 Sep', 'Hạnh', 'Groom', 'Logged arrival: all three horses sound', 'CBRT-2026-036', 'Cab tablet', '16:12'],
+  ['16:10', '24 Sep', 'Võ Thị Hạnh', 'Driver / escort', 'Logged arrival: all three horses sound', 'CBRT-2026-036', 'Cab tablet', '16:12'],
   ['16:02', '24 Sep', 'Nguyễn Thị Lan', 'Transport specialist', 'Rejected Silver Bell’s proof of ownership: “the bill of sale is unsigned”', 'CBRT-2026-041', 'Web'],
   ['09:48', '24 Sep', 'Saigon Turf Club', 'Customer', 'Uploaded Silver Bell’s proof of ownership (bill of sale)', 'CBRT-2026-041', 'Web'],
   ['14:30', '22 Sep', 'Nguyễn Thị Lan', 'Transport specialist', 'Published version 7 of the Cambodia regulation catalog', 'Catalog KH v7', 'Web'],
@@ -5714,7 +5911,7 @@ async function main() {
   await flush();
 
   await figma.setCurrentPageAsync(screens);
-  var row1 = [await scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
+  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
   var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld()];
   await flush();
   var lbl1 = Tx('Owner portal · Dark', 'Display/M');

@@ -83,8 +83,8 @@ var TYPE = [
   ['Mono/Data L', 'mono', 'Medium', 28, 32, -1],
   ['Mono/Data', 'mono', 'Regular', 14, 20, 0],
   ['Mono/Caption', 'mono', 'Regular', 12, 16, 0],
-  ['Mono/Eyebrow', 'mono', 'Regular', 11, 14, 14, true],
-  ['Mono/Chip', 'mono', 'Medium', 11, 12, 8, true]
+  ['Mono/Eyebrow', 'mono', 'Regular', 12, 16, 14, true],
+  ['Mono/Chip', 'mono', 'Medium', 12, 14, 8, true]
 ];
 
 function shadow(type, a, y, r, s, rgb) {
@@ -115,6 +115,10 @@ var SZ = {};       // node.id -> deferred sizing ({ w, h, abs })
 var STATS = { components: 0, variants: 0 };
 
 function flush() { var p = PENDING.splice(0); return Promise.all(p); }
+/* queue a text style; a node removed before the style lands (e.g. a table dropped for an error state) is not an error */
+function styleLater(t, id) {
+  PENDING.push(t.setTextStyleIdAsync(id).catch(function (e) { if (!t.removed) throw e; }));
+}
 
 /* ---------------------------------------------------------------------
    Colour + paint helpers
@@ -269,7 +273,7 @@ function Tx(str, style, color, o) {
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   if (s.upper) t.textCase = 'UPPER';
   t.characters = String(str);
-  if (!o.noStyle) PENDING.push(t.setTextStyleIdAsync(s.id));
+  if (!o.noStyle) styleLater(t, s.id);
   t.fills = [P(color || 'text/primary')];
   if (o.align) t.textAlignHorizontal = o.align;
   if (o.w) { t.textAutoResize = 'HEIGHT'; t.resize(o.w, t.height); } else t.textAutoResize = 'WIDTH_AND_HEIGHT';
@@ -287,7 +291,7 @@ function restyle(t, style, color) {
   t.lineHeight = { unit: 'PIXELS', value: s.lh };
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   t.textCase = s.upper ? 'UPPER' : 'ORIGINAL';
-  PENDING.push(t.setTextStyleIdAsync(s.id));
+  styleLater(t, s.id);
   if (color) t.fills = [P(color)];
   return t;
 }

@@ -18,7 +18,7 @@ function rulePanel(today, outcomes) {
   outcomes.forEach(function (o) {
     var r = H({ name: o[1], gap: 16, pad: [10, 0, 10, 0], cross: 'CENTER' });
     borderSide(r, 'border/default', 'top');
-    var st = H({ name: 'Status col', w: 172 });
+    var st = H({ name: 'Status col', w: 184 });
     add(st, chip(o[0], o[1]));
     addAll(r, [st, Tx(o[2], 'Body/S', 'text/secondary', { fill: true })]);
     add(list, fillW(r));
@@ -84,7 +84,7 @@ function docStatusPanel(tone, word, line, facts, due) {
   return p;
 }
 function docHead() {
-  return trackHead('Nightfall · EIA (Coggins) test', ['REQ-2026-0162', 'job CBRT-2026-041 · Ho Chi Minh City → Phnom Penh · departs 18 Oct 2026'], [stageChip('Documents')], 'Your documents');
+  return trackHead('Nightfall · EIA (Coggins) test', ['REQ-2026-0162', 'job CBRT-2026-041 · Ho Chi Minh City → Phnom Penh · departs 18 Oct 2026'], [stageMark('Documents')], 'Your documents');
 }
 var LAN_CHECKS = [['Lan', 'transport specialist', 'Reviews the test after the automatic check, usually within 1 business day. Only a test she approves counts toward clearance.']];
 
@@ -179,7 +179,7 @@ var ALL_DOCS = [
 function allDocRow(d, viewer) {
   var r = H({ name: d[0], gap: 16, pad: [12, 20, 12, 20], cross: 'CENTER' });
   borderSide(r, 'border/default', 'bottom');
-  var st = H({ name: 'Status col', w: 170 });
+  var st = H({ name: 'Status col', w: 182 });
   add(st, chip(d[2], d[3], { noDot: d[2] === 'Neutral' }));
   var info = VV({ name: 'Info', gap: 3 });
   addAll(info, [Tx(d[0], 'Label/M', 'text/primary', { fill: true }), Tx(d[1], 'Body/S', 'text/tertiary', { fill: true })]);
@@ -224,7 +224,7 @@ function docTable(viewer) {
 function scrAllDocs() {
   var sum = docTableSummary('owner'), tabs = docTableTabs('owner'), list = docTable('owner');
   var note = Tx('Export health certificates are issued by the Dept. of Animal Health (VN) 8–14 Oct, inside the 10 days before departure; Lan requests them for you. Open any row to see its versions.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageChip('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
 }
 
 /* ---------- MCP entry ---------- */
@@ -330,19 +330,21 @@ function autoCheck(tone, word, text) {
   addAll(p, [fillW(h), Tx(text, 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
-function docReviewScreen(name, crumb, title, meta, due, dueDate, dueTone, left, right, hist, today) {
+function docReviewScreen(name, crumb, title, meta, due, dueDate, dueTone, left, right, hist, today, queued) {
   var d = VV({ name: 'Review due', gap: 2, cross: 'MAX' });
   addAll(d, [Tx(due, 'Label/S', dueTone, { align: 'RIGHT' }), Tx(dueDate, 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  var head = builderHead(title, 'CBRT-2026-041', meta, 'Documents', [stageChip('Documents'), chip('Info', 'In review'), d]);
+  var head = builderHead(title, 'CBRT-2026-041', meta, 'Documents', [stageMark('Documents'), chip('Info', 'In review'), d]);
   head.findOne(function (n) { return n.name === 'Status'; }).itemSpacing = 12;
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
-  return adminScreen(name, 'Documents', ['Documents', crumb], STAFF.lan, [head, body].concat(hist ? [hist] : []), today);
+  /* the Documents badge counts what waits for Lan's review that day, this one included */
+  return adminScreen(name, 'Documents', ['Documents', crumb], STAFF.lan, [head, body].concat(hist ? [hist] : []), today, { badges: { Documents: String(queued) } });
 }
 
 /* ---------- approve: Nightfall's EIA test v2 (Fri 2 Oct) ---------- */
-function scrDocReview() {
+function scrDocReviewNotSent() { return scrDocReview('notsent'); }
+function scrDocReview(state) {
   var paper = paperDoc({ head: 'NAVETCO Laboratory', sub: 'National Centre for Veterinary Diagnostics · Ho Chi Minh City branch', ref: 'Accreditation VILAS 214\nCertificate EIA-2610-0873',
     title: 'Equine Infectious Anaemia · AGID (Coggins) test',
     fields: [['Horse', 'Nightfall'], ['Sex · breed', 'Mare · Thoroughbred'], ['Microchip', '250 259 600 223 311'], ['Owner', 'Saigon Turf Club'], ['Date sampled', '01/10/2026'], ['Date tested', '02/10/2026'], ['Method', 'Agar gel immunodiffusion']],
@@ -356,8 +358,15 @@ function scrDocReview() {
     ['on', 'Signed and stamped by the veterinarian']
   ], 'All 5 ticked');
   var dec = panel('Decision', { gap: 12 });
-  addAll(dec, [Tx('Your decision', 'Heading/H4'), Tx('Approving clears Nightfall’s EIA test: 15 of 23 documents cleared. The departure gate still waits for 8.', 'Body/S', 'text/secondary', { fill: true }),
-    btn('Primary', 'MD', 'Approve', { fill: true, lead: 'check' }), btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
+  if (state === 'notsent')
+    /* a decision that didn't reach the server: say what did not happen, keep the work, and hold the queue */
+    addAll(dec, [Tx('Your decision', 'Heading/H4'), fillW(callout('Bad', 'Not sent', 'Nothing was recorded and Saigon Turf Club wasn’t told. Your 5 ticks are kept.')),
+      btn('Primary', 'MD', 'Try again', { fill: true, lead: 'check' }), Tx('Your queue waits here until this is sent: 2 more after it.', 'Body/S', 'text/tertiary', { fill: true }),
+      btn('Ghost', 'MD', 'Keep for later', { fill: true })]);
+  else
+    addAll(dec, [Tx('Your decision', 'Heading/H4'), Tx('Approving clears Nightfall’s EIA test: 15 of 23 documents cleared. The departure gate still waits for 8.', 'Body/S', 'text/secondary', { fill: true }),
+      btn('Primary', 'MD', 'Approve and open next', { fill: true, lead: 'check' }), Tx('Then 2 more in your queue: Silver Bell’s bill of sale and the transit insurance.', 'Body/S', 'text/tertiary', { fill: true }),
+      btn('Ghost', 'MD', 'Reject with a reason', { fill: true })]);
   var ver = versionsPanel([
     ['v2', '2 Oct 2026', 'Sampled 1 Oct · NAVETCO · 17 days old at departure. This version.', 'Info', 'In review'],
     ['Attempt', '27 Sep 2026', 'Sampled 20 Jul · 90 days old at departure. Refused at upload; not saved.', 'Bad', 'Refused', true],
@@ -365,7 +374,7 @@ function scrDocReview() {
   ], 'The customer sees the same list. Approving or rejecting is added to both histories.');
   var right = column([autoCheck('Ok', 'Passes', 'Sampled 1 Oct, 17 days before the 18 Oct departure; the limit is 60 (Cambodia regulation catalog v7, pinned to this job).'), checks, dec, ver]);
   var hist = historyPanel([['2 Oct · 10:12', 'v2 uploaded by Saigon Turf Club. Automatic check: passes, 17 of 60 days.', 'System'], ['2 Oct · 10:12', 'Assigned to Lan for review; due by end of Mon 5 Oct.', 'System'], ['27 Sep · 16:40', 'Upload refused at the automatic check: sampled 20 Jul.', 'System']], null);
-  return docReviewScreen('Transport specialist · Document review', 'Nightfall · EIA test', 'Nightfall · EIA (Coggins) test', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due in 1 business day', '5 Oct', 'text/primary', left, right, hist, 'Fri 2 Oct 2026');
+  return docReviewScreen('Transport specialist · Document review' + (state === 'notsent' ? ' · Not sent' : ''), 'Nightfall · EIA test', 'Nightfall · EIA (Coggins) test', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due in 1 business day', '5 Oct', 'text/primary', left, right, hist, 'Fri 2 Oct 2026', 3);
 }
 
 /* ---------- reject: Silver Bell's unsigned bill of sale (Thu 24 Sep) ---------- */
@@ -387,11 +396,11 @@ function scrDocReject() {
   addAll(due, [Tx('New version due', 'Body/S', 'text/secondary'), dd]);
   addAll(comp, [Tx('Reject with a reason', 'Label/M'),
     fillW(noteField('Reason, shown to Saigon Turf Club', 'The bill of sale is not signed by the seller (bottom left). Upload a copy signed by both Hoàng Gia Stud and Saigon Turf Club.', 'Required. The customer sees it exactly as written; the item returns to Required and this version is kept.')),
-    fillW(due), btn('Primary', 'MD', 'Reject and notify customer', { fill: true, trail: 'arrow-right' })]);
+    fillW(due), btn('Primary', 'MD', 'Reject and open next', { fill: true, trail: 'arrow-right' }), Tx('Saigon Turf Club is told at once, with your reason. Then 1 more in your queue, from CBRT-2026-038.', 'Body/S', 'text/tertiary', { fill: true })]);
   var dec = panel('Decision', { gap: 12 });
   addAll(dec, [Tx('Your decision', 'Heading/H4'), fillW(comp), divider(), btn('Secondary', 'MD', 'Approve', { fill: true, state: 'Disabled' }), Tx('Approve needs every check ticked. 1 isn’t: signed by both parties.', 'Body/S', 'text/tertiary', { fill: true })]);
   var ver = versionsPanel([['v1', '24 Sep 2026', 'Bill of sale dated 20 Aug 2026. This version; kept after a rejection.', 'Info', 'In review']], 'The customer sees the same list. A rejected version stays in the history.');
   var right = column([autoCheck('Ok', 'Present', 'Proof of ownership has a presence-only rule, so the system checks that a file is there. It can’t check a signature.'), checks, dec, ver]);
-  return docReviewScreen('Transport specialist · Document review · Reject', 'Silver Bell · Proof of ownership', 'Silver Bell · Proof of ownership', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due today', '24 Sep', 'status/warn/fg', left, right, null, 'Thu 24 Sep 2026');
+  return docReviewScreen('Transport specialist · Document review · Reject', 'Silver Bell · Proof of ownership', 'Silver Bell · Proof of ownership', 'REQ-2026-0162 · Saigon Turf Club · departs 18 Oct 2026', 'Due today', '24 Sep', 'status/warn/fg', left, right, null, 'Thu 24 Sep 2026', 2);
 }
-async function eDocReview() { return staffScreensCall([scrDocReview, scrDocReject]); }
+async function eDocReview() { return staffScreensCall([scrDocReview, scrDocReviewNotSent, scrDocReject]); }

@@ -20,7 +20,7 @@ function authBar() {
 /* title and a one-paragraph summary, left-aligned over the form */
 function authHead(title, summary) {
   var h = VV({ name: 'Head', gap: 12 });
-  addAll(h, [Tx(title, 'Display/L', 'text/primary', { name: 'Title' }), Tx(summary, 'Body/M', 'text/secondary', { name: 'Summary', w: AUTH_FORM })]);
+  addAll(h, [Tx(title, 'Display/L', 'text/primary', { name: 'Title', w: AUTH_FORM }), Tx(summary, 'Body/M', 'text/secondary', { name: 'Summary', w: AUTH_FORM })]);
   return h;
 }
 function authForm(head, blocks) {

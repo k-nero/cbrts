@@ -45,7 +45,7 @@ function scrTrackAsk() {
   addAll(route, [Tx('Goes to Lan, transport specialist. Yến can read it too.', 'Body/S', 'text/secondary', { fill: true }), dueStack('Within 1 business day', 'by Mon 28 Sep')]);
   add(form, fillW(route));
   add(form, btn('Primary', 'MD', 'Send to Lan', { trail: 'arrow-right' }));
-  return trackScreen('Tracking · Ask a question', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageChip('Documents')], 'Back to the request'),
+  return trackScreen('Tracking · Ask a question', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents')], 'Back to the request'),
     [split(form, column([earlierNotes(), whoAnswers()]), SIDE.narrow)], '26 Sep 2026, 11:30');
 }
 

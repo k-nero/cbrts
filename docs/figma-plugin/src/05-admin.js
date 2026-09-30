@@ -98,7 +98,7 @@ function userMenu() {
   return m;
 }
 function buildAdminComponents(board) {
-  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system\'s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
+  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
   var items = ['Default', 'Hover', 'Active', 'Focus'].map(sideItem);
   C.sideNav = combine(items, b, 'Side nav item', 'States: Default, Hover, Active (gold ink: the one place gold marks the current page), Focus (gold border and ring). Set aria-current on the Active item.');
   wireText(C.sideNav, ['Label', 'Badge']);
@@ -183,10 +183,21 @@ function configSidebar(side, user, active, extra) {
 function breadcrumb(crumbs) {
   var crumb = H({ name: 'Breadcrumb', gap: 8, cross: 'CENTER' });
   crumbs.forEach(function (c, i) {
-    if (i) add(crumb, Tx('/', 'Mono/Caption', 'text/tertiary'));
-    add(crumb, Tx(c, 'Mono/Caption', i === crumbs.length - 1 ? 'text/primary' : 'text/tertiary'));
+    if (i) add(crumb, Tx('/', 'Body/S', 'text/tertiary'));
+    /* page names are words (Outfit); a code in the trail stays mono, as data */
+    add(crumb, Tx(c, /^[A-Z]{1,4}-\d{4}-/.test(c) ? 'Mono/Caption' : 'Label/S', i === crumbs.length - 1 ? 'text/primary' : 'text/tertiary'));
   });
   return crumb;
+}
+/* the review queue in the top bar, so decisions run back to back: where this one sits, then the one before and after.
+   q: { label, pos, prev, next } — prev/next false at either end */
+function queueNav(q) {
+  var g = H({ name: 'Queue', gap: 4, cross: 'CENTER' });
+  addAll(g, [Tx(q.label, 'Body/S', 'text/tertiary', { name: 'Label' }),
+    btn('Ghost', 'SM', 'Previous', { lead: 'chevron-left', state: q.prev ? 'Default' : 'Disabled' }),
+    Tx(q.pos, 'Mono/Caption', 'text/secondary', { name: 'Position' }),
+    btn('Ghost', 'SM', 'Next', { trail: 'chevron-right', state: q.next ? 'Default' : 'Disabled' })]);
+  return g;
 }
 /* crumbs start at the nav item (its exact label), never at a non-destination root */
 function adminScreen(name, active, crumbs, user, blocks, today, o) {
@@ -201,6 +212,7 @@ function adminScreen(name, active, crumbs, user, blocks, today, o) {
   var right = H({ name: 'Right', gap: 16, cross: 'CENTER' });
   var bell = H({ name: 'Notifications', w: 36, h: 36, radius: 8, stroke: 'border/strong', main: 'CENTER', cross: 'CENTER' });
   add(bell, Ic('bell', 18, 'text/secondary'));
+  if (o && o.queue) add(right, queueNav(o.queue));
   addAll(right, [Tx(today || 'Sat 26 Sep 2026', 'Mono/Caption', 'text/tertiary'), bell]);
   addAll(bar, [breadcrumb(crumbs), right]);
   add(main, fillW(bar));
@@ -210,7 +222,8 @@ function adminScreen(name, active, crumbs, user, blocks, today, o) {
   add(s, fillW(main));
   return s;
 }
-function headAdmin(title, sub, right) { return pageHeader({ shell: 'staff', title: title, summary: sub, right: [right] }); }
+/* rule: false when status tabs follow, which draw their own line */
+function headAdmin(title, sub, right, rule) { return pageHeader({ shell: 'staff', title: title, summary: sub, right: [right], rule: rule }); }
 function titled(title, sub, node, right) {
   var w = VV({ name: title, gap: 12 });
   var h = H({ name: 'Heading', main: 'SPACE_BETWEEN', cross: 'MAX' });
@@ -264,10 +277,36 @@ function colHead(sort, st) {
   if (st === 'Focus') focusRing(c, 4, 3);
   return c;
 }
+/* the one page header in both shells: the owner title (Display L) with its back link, the staff title (Display M)
+   with none, because the staff breadcrumb is the way back */
+function buildPageHeaders(parent) {
+  var b = docBlock(parent, 'Page header', 'One header for every page (pageHeader). Owner shell: an optional back link, the Display L title at y 142, the code and summary, status on the right. Staff shell: no back link (the breadcrumb leads back), a Display M title at y 97, and no hairline when status tabs follow.');
+  [['Owner shell', pageHeader({ back: 'My requests', title: 'Ho Chi Minh City → Phnom Penh', code: 'REQ-2026-0162', summary: 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00', right: [stageMark('Documents'), chip('Bad', 'Departure locked')] })],
+   ['Staff shell', pageHeader({ shell: 'staff', title: 'Jobs', summary: 'Every active job, for 26 Sep 2026. Each job has one owner per step.' })]].forEach(function (e) {
+    var w = VV({ name: e[0], gap: 8, w: 1200 });
+    addAll(w, [Tx(e[0], 'Label/S', 'text/secondary'), fillW(e[1])]);
+    add(b, w);
+  });
+  return b;
+}
+/* every clickable thing takes the same focus: a 1.5px gold ring with Focus/Ring, drawn outside so nothing moves */
+function buildFocusStates(parent) {
+  var b = docBlock(parent, 'Keyboard focus', 'One focus for every clickable thing: a 1.5 px Brass Gold ring with the Focus/Ring shadow, 4 px outside the element and following its corners, so focusing never moves the layout. Option card has a Focus variant; rows, tiles and stalls take the ring as an overlay. Gold here marks focus only, never state.');
+  var row = H({ name: 'Examples', gap: 40, pad: [8, 0, 0, 8], cross: 'MIN', wrap: true, rowGap: 32 });
+  var opt = inst(C.option, { State: 'Focus' }); setP(opt, { Title: 'Road', Description: 'Door to door by trailer.', Meta: 'In the estimate' });
+  var stall = inst(C.stall, { Type: 'Standard', State: 'Occupied' });
+  var stallWrap = VV({ name: 'Stall · focus' }); add(stallWrap, stall); focusRing(stallWrap, 4, 4, 12);
+  var move = panel('Move row · focus', { gap: 0, pad: 0, w: 820 }); add(move, fillW(moveRow(HOME_MOVES[0], 0))); focusRing(move, 4, 4, 16);
+  var tile = actionTiles([OVERVIEW_TILES[1]]); tile.name = 'Tile · focus'; tile.resize(280, tile.height); focusRing(tile.children[0], 4, 4, 16);
+  addAll(row, [opt, stallWrap, move, tile]);
+  add(b, fillW(row));
+  return b;
+}
 /* a focus ring drawn outside a label without moving it: an absolute frame that stretches with its parent,
    so a header label stays aligned with the cells below it */
-function focusRing(c, dx, dy) {
-  var r = F({ name: 'Focus ring', radius: 6, stroke: 'accent/default', sw: 1.5 });
+function focusRing(c, dx, dy, radius) {
+  var r = F({ name: 'Focus ring', radius: radius || 6, stroke: 'accent/default', sw: 1.5 });
+  c.clipsContent = false;
   c.appendChild(r);
   r.layoutPositioning = 'ABSOLUTE';
   r.resize(c.width + dx * 2, c.height + dy * 2); r.x = -dx; r.y = -dy;
@@ -338,7 +377,7 @@ function tableStatesRow() {
   return row;
 }
 function buildTableComponents(board) {
-  var b = docBlock(board, 'Table controls', 'For list tables only (Jobs, Requests, Users & roles, Audit log). A column header sorts only when its order is the user\'s to choose; the active column takes Parchment and an arrow, and sets aria-sort. A list whose default order is not a column (blocked first, what needs you first) says so in the count line, and a column sort replaces that note with what it sorted by and a Reset order button. Pages hold ' + PAGE_SIZE + ' rows; the foot always shows the range, and Previous or Next is disabled at either end. Quotations, catalogs and document tables keep a fixed order and have none of this.');
+  var b = docBlock(board, 'Table controls', 'For list tables only (Jobs, Requests, Users & roles, Audit log). A column header sorts only when its order is the user’s to choose; the active column takes Parchment and an arrow, and sets aria-sort. A list whose default order is not a column (blocked first, what needs you first) says so in the count line, and a column sort replaces that note with what it sorted by and a Reset order button. Pages hold ' + PAGE_SIZE + ' rows; the foot always shows the range, and Previous or Next is disabled at either end. Quotations, catalogs and document tables keep a fixed order and have none of this.');
   var heads = [];
   ['Unsorted', 'Ascending', 'Descending'].forEach(function (s) { ['Default', 'Focus'].forEach(function (st) { heads.push(colHead(s, st)); }); });
   C.colHead = combine(heads, b, 'Column header', 'Sortable column header. Unsorted shows a faint up-down mark; Ascending and Descending turn the label Parchment with the arrow. Focus: gold border outside the label and the ring. Set aria-sort on the active column.');
@@ -460,7 +499,7 @@ function scrRegulations() {
   var rules = tbl('Document rules', [['Document', null], ['Rule shape', 170], ['Parameter', 140, null, 'Mono/Caption'], ['Applies to', 100], ['Blocks', 80], ['', 36, 'RIGHT', 'Label/S', 'text/secondary']], [
     { cells: ['Equine passport', shape('Valid until'), 'arrival + 2 d', 'Per horse', 'Yes', 'Edit'] },
     { cells: ['Influenza vaccination', shape('Booster window'), '7–180 d before', 'Per horse', 'Yes', 'Edit'] },
-    { cells: [withChip('EIA (Coggins) test', 'Warn', 'Changed'), shape('Window before dep.'), 'within 60 d (was 90)', 'Per horse', 'Yes', 'Edit'], hl: true },
+    { cells: [withChip('EIA (Coggins) test', 'Warn', 'Changed'), shape('Window before dep.'), 'within 45 d (was 60)', 'Per horse', 'Yes', 'Edit'], hl: true },
     { cells: ['Export health certificate', shape('Window before dep.'), 'within 10 d', 'Per horse', 'Yes', 'Edit'] },
     { cells: ['Proof of ownership', shape('Presence only'), '—', 'Per horse', 'Yes', 'Edit'] },
     { cells: [withChip('Piroplasmosis test', 'Warn', 'New'), shape('Window before dep.'), 'within 30 d', 'Per horse', 'Yes', 'Edit'], hl: true },
@@ -476,11 +515,11 @@ function scrRegulations() {
   addAll(shapes, [chip('Info', 'Window before departure'), chip('Neutral', 'Valid until', { noDot: true }), chip('Neutral', 'Booster window', { noDot: true }), chip('Neutral', 'Presence only', { noDot: true })]);
   add(edit, fillW(shapes));
   var fields = H({ name: 'Fields', gap: 16 });
-  addAll(fields, [input('Text', 'Focus', 'Days before departure', '60', 'Was 90 in v7. Source: GDAHP notice 14/2026.', { fill: true }), input('Select', 'Default', 'Applies to', 'Per horse', null, { fill: true })]);
+  addAll(fields, [input('Text', 'Focus', 'Days before departure', '45', 'Was 60 in v7. Source: GDAHP notice 14/2026.', { fill: true }), input('Select', 'Default', 'Applies to', 'Per horse', null, { fill: true })]);
   add(edit, fillW(fields));
   var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'Blocks departure when not GREEN' });
   add(edit, cb);
-  add(edit, callout('Warn', 'Re-check impact: 2 open jobs', 'CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 60 days at departure. After publishing they are flagged for review; approved documents are not revoked automatically.'));
+  add(edit, callout('Warn', 'Re-check impact: 2 open jobs', 'CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 45 days at departure. After publishing they are flagged for review; approved documents are not revoked automatically.'));
   var ea = H({ name: 'Actions', gap: 12, main: 'MAX' });
   addAll(ea, [btn('Ghost', 'MD', 'Cancel'), btn('Secondary', 'MD', 'Save to draft')]);
   add(edit, fillW(ea));
@@ -500,7 +539,7 @@ function scrRegulations() {
   addAll(mainCol, [
     fillW(draftPanel('v8', '3 changes', 'Publishing makes v8 the rules for new jobs. The 3 jobs pinned to v7 keep v7; 2 of them are flagged for review under the new EIA window.')),
     fillW(tiles([['Neutral', '21 d', 'Lead time'], ['Neutral', '7 d', 'Quarantine minimum'], ['Neutral', '2 d', 'Arrival buffer'], ['Info', '3', 'Jobs pinned to v7']])),
-    fillW(titled('Document rules · Cambodia import', 'Each rule is evaluated against the job\'s travel dates, never against today.', rules)),
+    fillW(titled('Document rules · Cambodia import', 'Each rule is evaluated against the job’s travel dates, never against today.', rules)),
     fillW(lower)
   ]);
   var body = H({ name: 'Body', gap: 24 });
@@ -517,7 +556,7 @@ function scrRates() {
     ['Air', [['AIR', 'PNH → HKG', 'v12', { sel: true, chip: ['Warn', 'Draft'] }], ['AIR', 'SGN → HKG', 'v12']]],
     ['Road', [['RD', 'HCM → PNH', 'v12'], ['RD', 'HCM → BKK', 'v12'], ['RD', 'BKK → KUL', 'v11'], ['RD', 'HAN → VTE', '', { chip: ['Bad', '2 missing'] }]]]
   ]);
-  var classes = tbl('Service classes', [['Class', null], ['Width per horse', 140, null, 'Mono/Data'], ['Horses per position', 160, 'RIGHT', 'Mono/Data'], ['Position rate', 130, 'RIGHT', 'Mono/Data'], ['Per horse', 130, 'RIGHT', 'Mono/Data']], [
+  var classes = tbl('Service classes', [['Class', null], ['Width per horse', 140, null, 'Mono/Data'], ['Horses per position', 180, 'RIGHT', 'Mono/Data'], ['Position rate', 130, 'RIGHT', 'Mono/Data'], ['Per horse', 130, 'RIGHT', 'Mono/Data']], [
     { cells: ['Economy', '32 in', '3', '$16,800', '$5,600'] },
     { cells: ['Business', '48 in', '2', '$16,800', '$8,400'] },
     { cells: ['First', '96 in', '1', '$16,800', '$16,800'] }
@@ -527,7 +566,7 @@ function scrRates() {
   ]);
   var policy = panel('Percentages and policy', { gap: 10 });
   add(policy, Tx('Percentages and policy', 'Heading/H4'));
-  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Margin', '12%'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
+  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
   var pair = H({ name: 'Breaks and policy', gap: 24 });
   addAll(pair, [fillW(titled('Volume breaks', 'Applied to air and ground lines.', breaks)), fillW(policy)]);
   var cert = function (c) { return chip(c === 'Fixed' ? 'Neutral' : 'Warn', c, { noDot: true }); };
@@ -630,12 +669,34 @@ function legend(items) {
 }
 
 /* ---------- Overview dashboard ---------- */
+/* each number opens the work behind it: [tone, value, what it counts, the case that matters most, where it goes] */
+var OVERVIEW_TILES = [
+  ['Warn', '4', 'Quotes out', 'Q-2026-0188 expires 30 Sep', 'Requests'],
+  ['Bad', '3', 'Jobs blocked', 'CBRT-2026-038: permit overdue', 'Jobs'],
+  ['Warn', '1', 'Incident open', 'Golden Lotus, CBRT-2026-036', 'Incidents'],
+  ['Ok', '96.4%', 'On time, 30 days', '2 of 56 trips late', 'Trips']
+];
+function actionTiles(list) {
+  var r = H({ name: 'Tiles', gap: 16 });
+  var fg = { Neutral: 'text/primary', Ok: 'status/ok/fg', Warn: 'status/warn/fg', Bad: 'status/bad/fg' };
+  list.forEach(function (t) {
+    var c = VV({ name: t[2], gap: 12, pad: [16, 18, 14, 18], radius: 12, fill: 'surface/card', stroke: 'border/default' });
+    var top = VV({ name: 'Figure', gap: 2 });
+    addAll(top, [Tx(t[1], 'Mono/Data L', fg[t[0]], { name: 'Value' }), Tx(t[2], 'Body/S', 'text/tertiary', { name: 'Label' })]);
+    var go = H({ name: 'Open · ' + t[4], gap: 8, pad: [10, 0, 0, 0], cross: 'CENTER' });
+    borderSide(go, 'border/default', 'top');
+    addAll(go, [Tx(t[3], 'Label/S', 'text/secondary', { fill: true, name: 'Case' }), Ic('arrow-right', 16, 'text/tertiary')]);
+    addAll(c, [top, fillW(go)]);
+    add(r, fillW(c));
+  });
+  return r;
+}
 function scrDashboard() {
-  var queue = tbl('Review queue', [['Request', 118, null, 'Mono/Caption'], ['Customer', 170], ['Route', null, null, 'Body/S', 'text/secondary'], ['Horses', 50, 'RIGHT', 'Mono/Data'], ['Departs', 64, null, 'Mono/Caption', 'text/secondary'], ['Age', 40, 'RIGHT', 'Mono/Caption'], ['', 24, 'RIGHT']], [
-    { cells: ['REQ-2026-0187', 'Mekong Equestrian', 'Phnom Penh → Hong Kong', '3', '12 Nov', '1 d', rowOpen()] },
-    { cells: ['REQ-2026-0190', stack('Hanoi Riding Club', 'Lead-time override', 'status/warn/fg'), 'Hanoi → Vientiane', '1', '20 Oct', '20 h', rowOpen()] },
-    { cells: ['REQ-2026-0191', 'Bangkok Polo Club', 'Bangkok → Kuala Lumpur', '4', '5 Nov', '9 h', rowOpen()] },
-    { cells: ['REQ-2026-0193', 'Saigon Turf Club', 'Ho Chi Minh City → Bangkok', '2', '30 Oct', '2 h', rowOpen()] }
+  var queue = tbl('Review queue', [['Request', 118, null, 'Mono/Caption'], ['Customer', 170], ['Route', null, null, 'Body/S', 'text/secondary'], ['Horses', 60, 'RIGHT', 'Mono/Data'], ['Departs', 64, null, 'Mono/Caption', 'text/secondary'], ['Age', 40, 'RIGHT', 'Mono/Caption'], ['', 24, 'RIGHT']], [
+    { cells: ['REQ-2026-0187', 'Mekong Equestrian', 'PNH → HKG', '3', '12 Nov', '1 d', rowOpen()] },
+    { cells: ['REQ-2026-0190', stack('Hanoi Riding Club', 'Lead-time override', 'status/warn/fg'), 'HAN → VTE', '1', '20 Oct', '20 h', rowOpen()] },
+    { cells: ['REQ-2026-0191', 'Bangkok Polo Club', 'BKK → KUL', '4', '5 Nov', '9 h', rowOpen()] },
+    { cells: ['REQ-2026-0193', 'Saigon Turf Club', 'HCM → BKK', '2', '30 Oct', '2 h', rowOpen()] }
   ]);
   /* the same words and tone as the Jobs list's "What holds it" for these jobs, never a second description */
   var risk = panel('Clearance at risk', { w: SIDE.narrow, gap: 12 });
@@ -653,15 +714,16 @@ function scrDashboard() {
   var c1 = panel('On-time delivery', { gap: 16 });
   addAll(c1, [VV({ name: 'Title', gap: 2 }, [Tx('On-time delivery by week', 'Heading/H4'), Tx('Trips delivered inside the promised window. Dashed line: 95% target.', 'Body/S', 'text/tertiary')]), onTimeChart()]);
   var c2 = panel('Revenue and cost', { gap: 16 });
-  var c2h = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
-  addAll(c2h, [VV({ name: 'Title', gap: 2 }, [Tx('Revenue and direct cost by month', 'Heading/H4'), Tx('USD, thousands. One axis for both series.', 'Body/S', 'text/tertiary')]), legend([['chart/1', 'Revenue'], ['chart/2', 'Direct cost']])]);
+  var c2h = VV({ name: 'Head', gap: 12 });
+  addAll(c2h, [VV({ name: 'Title', gap: 2 }, [Tx('Revenue and direct cost by month', 'Heading/H4'), Tx('USD, thousands. September: $412.8k revenue at an 11.8% gross margin.', 'Body/S', 'text/tertiary')]), legend([['chart/1', 'Revenue'], ['chart/2', 'Direct cost']])]);
   addAll(c2, [fillW(c2h), revenueChart()]);
   var row2 = H({ name: 'Charts', gap: 24 });
   addAll(row2, [fillW(c1), fillW(c2)]);
+  c1.layoutSizingVertical = 'FILL'; c2.layoutSizingVertical = 'FILL';
 
   return adminScreen('Logistics manager · Overview', 'Overview', ['Overview'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
     headAdmin('Overview', 'Logistics Manager view for 26 Sep 2026. Figures cover the last 30 days unless marked.', input('Select', 'Default', 'Period', 'Last 30 days', null)),
-    tiles([['Warn', '4', 'Quotes out'], ['Ok', '96.4%', 'On-time, 30 d'], ['Neutral', '$412.8k', 'Revenue, 30 d'], ['Neutral', '11.8%', 'Gross margin']]),
+    actionTiles(OVERVIEW_TILES),
     row1,
     row2
   ]);
@@ -689,18 +751,39 @@ function person(name, id, initials) {
   return h;
 }
 function scrUsersError() { return scrUsers('error'); }
+/* Pending invites: invites are handled in batches, so rows take a checkbox and a selection bar offers the bulk actions */
+function scrUsersInvites() {
+  var box = function (on) { var c = inst(C.checkbox, { Checked: on ? 'True' : 'False' }); setP(c, { 'Show label': false }); c.name = 'Select'; return c; };
+  var t = tbl('Invites', [['', 20], ['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Invited by', 150], ['Expires', 110, null, null, null, 'Ascending'], ['Status', 96]], [
+    { cells: [box(true), person('Bùi Anh Thư', 'thu.bui@equifreight.vn', 'BT'), Tx('Transport specialist', 'Body/S', 'text/secondary'), twoLine('Vũ Hải Yến', '25 Sep, 10:14'), twoLine('In 6 days', '2 Oct 2026'), chip('Warn', 'Invited')], hl: true }
+  ]);
+  tableFoot(t, 1, 1, 'invite');
+  var bulk = H({ name: 'Selection', gap: 12, pad: [8, 8, 8, 16], radius: 8, cross: 'CENTER', fill: 'surface/raised', stroke: 'border/strong' });
+  addAll(bulk, [Tx('1 selected', 'Label/S', 'text/primary', { fill: true }), btn('Secondary', 'SM', 'Resend invite'), btn('Danger', 'SM', 'Revoke invite'), btn('Ghost', 'SM', 'Clear')]);
+  var both = VV({ name: 'Selection and table', gap: 12 });
+  addAll(both, [fillW(bulk), fillW(t)]);
+  var list = tableBlock({ tabs: [['Staff · 9', 'Default'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Active']],
+    filters: [filterField('Search', 'Search', 'Name or email', { placeholder: true })],
+    count: '1 pending invite', order: 'Order: expiring first', table: both });
+  return adminScreen('Logistics manager · Users & roles · Pending invites', 'Users & roles', ['Users & roles', 'Pending invites'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
+    headAdmin('Users & roles', 'Staff accounts and what each role can do. An invite works for 7 days; resending starts a new 7 days.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' }), false),
+    list
+  ]);
+}
 function scrUsers(state) {
   state = state === 'error' ? 'error' : null;
-  var role = function (r) { return chip('Neutral', r, { noDot: true }); };
+  var role = function (r) { return Tx(r, 'Body/S', 'text/secondary'); };
   var status = function (s) { return chip(s === 'Active' ? 'Ok' : 'Warn', s); };
-  var staff = tbl('Staff', [['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Jobs', 64, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Last active', 112, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Status', 84]], [
+  var staff = tbl('Staff', [['Name', null, null, null, null, 'Unsorted'], ['Role', 170], ['Jobs', 64, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Last active', 112, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Status', 96]], [
     { cells: [person('Vũ Hải Yến', 'EF-001', 'VY'), role('Logistics manager'), '12', 'Today 09:12', status('Active')] },
     { cells: [person('Nguyễn Thị Lan', 'EF-004', 'NL'), role('Transport specialist'), '3', 'Today 10:40', status('Active')] },
     { cells: [person('Bùi Anh Thư', 'EF-015', 'BT'), role('Transport specialist'), '0', '—', status('Invited')] },
     { cells: [person('Đỗ Minh Khôi', 'EF-007', 'DK'), role('Fleet & route coordinator'), '5', 'Today 08:05', status('Active')] },
+    { cells: [person('Võ Thị Hạnh', 'EF-009', 'VH'), role('Driver / escort'), '1', '24 Sep', status('Active')] },
     { cells: [person('Trần Văn Minh', 'EF-011', 'TM'), role('Driver / escort'), '1', '25 Sep', status('Active')] },
     { cells: [person('Lê Thị Hoa', 'EF-012', 'LH'), role('Driver / escort'), '1', '24 Sep', status('Active')] },
-    { cells: [person('Phạm Quốc Tuấn', 'EF-013', 'PT'), role('Driver / escort'), '1', '19 Sep', status('Active')] }
+    { cells: [person('Phạm Quốc Tuấn', 'EF-013', 'PT'), role('Driver / escort'), '1', '19 Sep', status('Active')] },
+    { cells: [person('Nguyễn Văn Tùng', 'EF-014', 'NT'), role('Driver / escort'), '1', '25 Sep', status('Active')] }
   ]);
   var perm = panel('Permissions', { w: SIDE.narrow, gap: 0 });
   add(perm, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('What each role can do', 'Heading/H4'), Tx('Read-only. Roles follow the spec; change them in the spec first.', 'Body/S', 'text/tertiary')]));
@@ -720,16 +803,16 @@ function scrUsers(state) {
     add(perm, fillW(row));
   });
   add(perm, VV({ name: 'Note', pad: [12, 0, 0, 0] }, [Tx('CUST customer · LM logistics manager · TS transport specialist · FRC fleet & route coordinator · DRV driver / escort. Only the Logistics Manager approves requests (BR-F1-04); only the Transport Specialist approves documents (BR-F2-04).', 'Body/S', 'text/tertiary', { w: 352 })]));
-  tableFoot(staff, 7, 7, 'staff');
+  tableFoot(staff, 9, 9, 'staff');
   if (state === 'error') staff.remove();
-  var list = tableBlock({ tabs: [['Staff · 7', 'Active'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Default']],
+  var list = tableBlock({ tabs: [['Staff · 9', 'Active'], ['Customers · 8', 'Default'], ['Pending invites · 1', 'Default']],
     filters: [filterField('Search', 'Search', 'Name or email', { placeholder: true }), filterField('Select', 'Role', 'All roles')],
-    count: state === 'error' ? 'Staff' : '7 staff', order: state === 'error' ? null : 'Order: by role',
+    count: state === 'error' ? 'Staff' : '9 staff', order: state === 'error' ? null : 'Order: by role',
     table: state === 'error' ? tableState('error', 'accounts') : staff });
   var body = H({ name: 'Body', gap: 24 });
   addAll(body, [fillW(list), perm]);
   return adminScreen('Logistics manager · Users & roles' + (state ? ' · Error' : ''), 'Users & roles', ['Users & roles'], ['Vũ Hải Yến', 'Logistics manager', 'VY'], [
-    headAdmin('Users & roles', 'Staff accounts and what each role can do. Customers manage their own accounts from the owner portal.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' })),
+    headAdmin('Users & roles', 'Staff accounts and what each role can do. Customers manage their own accounts from the owner portal.', btn('Secondary', 'MD', 'Invite staff', { lead: 'plus' }), false),
     body
   ]);
 }
@@ -741,9 +824,9 @@ var JOBS = [
   ['CBRT-2026-038', 'Bangkok → Phnom Penh', '2 horses · road, via Poipet', 'Clearance', null, 'In 7 days', '3 Oct', 'Bad', 'Import permit overdue since 24 Sep', 'Lan: chase MAFF for the permit'],
   ['CBRT-2026-044', 'Vientiane → Bangkok', '3 horses · road, via Nong Khai', 'Documents', null, 'In 16 days', '12 Oct', 'Warn', 'Thai DLD wants a second EIA test', 'Customer: upload it by 30 Sep'],
   ['CBRT-2026-041', 'Ho Chi Minh City → Phnom Penh', '4 horses · road, private trailer', 'Documents', null, 'In 22 days', '18 Oct', 'Bad', 'Departure locked · 9 items outstanding', 'Customer: 4 uploads, one overdue'],
-  ['CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City', '1 horse · road, shared load', 'Trip', null, 'In 3 days', '29 Sep, 05:30', null, 'Clear to depart', 'Khôi: confirm the load plan'],
+  ['CBRT-2026-036', 'Bangkok → Ho Chi Minh City', '3 horses · road, private trailer', 'Handover', null, 'Delivered', '24 Sep, 16:05', 'Warn', 'Handover not confirmed', 'Customer: confirm by today'],
   ['CBRT-2026-039', 'Hong Kong (Sha Tin) → Kuala Lumpur', '2 horses · air, business class', 'Trip', null, 'Arrives in 2 h', 'Today, 13:40', null, 'Nothing holding it', 'Escort: arrival checkpoint'],
-  ['CBRT-2026-036', 'Bangkok → Ho Chi Minh City', '3 horses · road, private trailer', 'Handover', null, 'Delivered', '24 Sep, 16:05', 'Warn', 'Handover not confirmed', 'Customer: confirm by today']
+  ['CBRT-2026-040', 'Phnom Penh → Ho Chi Minh City', '1 horse · road, shared load', 'Trip', null, 'In 3 days', '29 Sep, 05:30', null, 'Clear to depart', 'Khôi: confirm the load plan']
 ];
 function twoLine(a, b, tone) {
   var v = VV({ name: 'Two lines', gap: 2 });
@@ -757,17 +840,17 @@ function scrJobs(sorted) {
   sorted = sorted === true;
   var holdFg = { Bad: 'status/bad/fg', Warn: 'status/warn/fg' };
   var list = sorted ? JOBS_BY_DEPARTURE.map(function (c) { return JOBS.filter(function (j) { return j[0] === c; })[0]; }) : JOBS;
-  var t = tbl('Jobs', [['Job', 118, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Stage', 140, null, null, null, 'Unsorted'], ['Departure', 124, null, null, null, sorted ? 'Ascending' : 'Unsorted'], ['What holds it', 300], ['', 24, 'RIGHT']], list.map(function (j) {
+  var t = tbl('Jobs', [['Job', 118, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Stage', 164, null, null, null, 'Unsorted'], ['Departure', 124, null, null, null, sorted ? 'Ascending' : 'Unsorted'], ['What holds it', 300], ['', 24, 'RIGHT']], list.map(function (j) {
     var hold = VV({ name: 'Hold', gap: 2 });
     addAll(hold, [Tx(j[8], 'Label/S', holdFg[j[7]] || 'text/secondary'), Tx(j[9], 'Body/S', 'text/tertiary')]);
     var route = VV({ name: 'Route', gap: 2 });
     addAll(route, [Tx(j[1], 'Label/S'), Tx(j[2], 'Body/S', 'text/tertiary')]);
-    return { cells: [j[0], route, stageChip(j[3]), twoLine(j[5], j[6]), hold, Ic('arrow-right', 16, 'text/tertiary')] };
+    return { cells: [j[0], route, stageMark(j[3]), twoLine(j[5], j[6]), hold, Ic('arrow-right', 16, 'text/tertiary')] };
   }));
   tableFoot(t, JOBS.length, JOBS.length, 'jobs');
   var hint = Tx('Each row opens the job, where Clearance, Authorities, Load plan and Route sit as tabs with their owner named.', 'Body/S', 'text/tertiary', { w: 760 });
   return adminScreen('Logistics manager · Jobs' + (sorted ? ' · Sorted' : ''), 'Jobs', ['Jobs'], STAFF.yen, [
-    headAdmin('Jobs', 'Every active job, for 26 Sep 2026. Each job has one owner per step.'),
+    headAdmin('Jobs', 'Every active job, for 26 Sep 2026. Each job has one owner per step.', null, false),
     tableBlock({ tabs: [['All · 6', 'Active'], ['Needs me · 1', 'Default'], ['Blocked · 3', 'Default'], ['In transit · 1', 'Default']],
       filters: [filterField('Search', 'Search', 'Code, customer or route', { placeholder: true }), filterField('Select', 'Mode', 'Road and air')],
       count: '6 jobs', order: sorted ? 'Sorted by departure, earliest first' : 'Order: blocked first, then by departure', action: sorted ? 'Reset order' : null, table: t }),
@@ -820,13 +903,17 @@ async function eTableComponents() {
   addAdminIcons(board.findOne(function (n) { return n.name === 'Icon grid'; }));
   var old = board.children.filter(function (n) { return n.name === 'Table controls'; });
   buildTableComponents(board);
+  board.children.filter(function (n) { return n.name === 'Keyboard focus'; }).forEach(function (n) { n.remove(); });
+  buildFocusStates(board);
+  board.children.filter(function (n) { return n.name === 'Page header'; }).forEach(function (n) { n.remove(); });
+  buildPageHeaders(board);
   var block = C.colHead.parent;
   if (old.length) { board.insertChild(board.children.indexOf(old[0]), block); old.forEach(function (n) { n.remove(); }); }
   await flush();
   return report({ columnHeader: C.colHead.id, pageNumber: C.pageNum.id });
 }
 async function eAdminCatalogs() { return adminScreensCall([scrRegulations, scrRates]); }
-async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers, scrUsersError]); }
+async function eAdminOverview() { return adminScreensCall([scrDashboard, scrUsers, scrUsersError, scrUsersInvites]); }
 
 /* ---------- MCP: rebuild the sidebar in place and move every staff screen onto it ---------- */
 /* frame → [staff key, active item, breadcrumb, [[old, new] for the back link or page title]] */
@@ -838,10 +925,12 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Jobs': ['yen', 'Jobs', ['Jobs']],
   'Logistics manager · Jobs · Sorted': ['yen', 'Jobs', ['Jobs']],
   'Logistics manager · Users & roles · Error': ['yen', 'Users & roles', ['Users & roles']],
+  'Logistics manager · Users & roles · Pending invites': ['yen', 'Users & roles', ['Users & roles', 'Pending invites']],
   'Transport specialist · Clearance checklist': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Clearance']],
   'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Load plan']],
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Route']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
+  'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Reject': ['lan', 'Documents', ['Documents', 'Silver Bell · Proof of ownership'], [['Clearance checklist', 'Documents']]],
   'Logistics manager · Request review': ['yen', 'Requests', ['Requests', 'REQ-2026-0193'], [['Review queue', 'Requests']]],
   'Logistics manager · Request review · Override': ['yen', 'Requests', ['Requests', 'REQ-2026-0190'], [['Review queue', 'Requests']]],

@@ -28,6 +28,8 @@ function svcOptions(opts, single) {
     if (mt) restyle(mt, /^[+\u2212$\d-]/.test(o[3]) ? 'Mono/Caption' : 'Label/S', tone);
     c.name = 'Option · ' + o[1];
     add(r, fillW(c));
+    /* cards in one row share a height, whatever their copy */
+    c.layoutSizingVertical = 'FILL';
   });
   return r;
 }

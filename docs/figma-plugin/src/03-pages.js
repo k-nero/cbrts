@@ -78,7 +78,7 @@ function buildFoundations(page) {
   var board = VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' });
   page.appendChild(board);
   var intro = VV({ name: 'Intro', gap: 12 });
-  addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame\'s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
+  addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame’s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
   add(board, intro);
 
   var pr = H({ name: 'Principles', gap: 20, wrap: true, rowGap: 20 });
@@ -157,8 +157,8 @@ function buildFoundations(page) {
 function screen(name, active, blocks, o) {
   o = o || {};
   var s = VV({ name: name, w: SCREEN_W, fill: 'bg/canvas' });
-  var hdr = inst(C.header);
-  if (active) setP(nested(hdr, 'Nav · ' + active), { State: 'Active' });
+  var hdr = o.header || inst(C.header);
+  if (active && !o.header) setP(nested(hdr, 'Nav · ' + active), { State: 'Active' });
   add(s, fillW(hdr));
   var main = VV({ name: 'Content', gap: o.gap != null ? o.gap : 28, pad: [0, PADX, 96, PADX] });
   for (var i = 0; i < blocks.length; i++) add(main, fillW(blocks[i]));
@@ -171,7 +171,7 @@ function footer(size, asOf) { var f = inst(C.footer, { Size: size }); if (asOf) 
    Every page (owner, tracking, staff) opens with it: an optional back link, the title (or a
    banner such as a horse's coat), then either a mono code with a one-line summary or a short
    paragraph, and a right slot for chips, a deadline or a control. A page without a back link
-   reserves the back row, so every title in a shell sits at the same height (owner 142, staff 143).
+   reserves the back row, so every owner title sits at y 142; staff pages have no back link (the breadcrumb leads back) and their title sits at y 97.
    o: { shell: 'owner'|'staff', back, title, banner, code, summary, metaChips, right: [nodes], below: [nodes], rule } */
 var HEAD_TOP = { owner: 32, staff: 28 };
 /* two side-column widths on the 1440 grid, both at a 24 gutter: narrow for a decision, the people,
@@ -179,14 +179,18 @@ var HEAD_TOP = { owner: 32, staff: 28 };
 var SIDE = { narrow: 400, wide: 456 };
 var BACK_ROW = 46; // a Ghost SM back link (32) plus the header's 14 gap
 function pageHeader(o) {
+  var staff = o.shell === 'staff';
   var top = HEAD_TOP[o.shell || 'owner'];
-  var wrap = VV({ name: 'Page header', gap: 14, pad: [o.back ? top : top + BACK_ROW, 0, o.rule === false ? 0 : 24, 0] });
+  /* staff pages: the top bar's breadcrumb is the way back, so the header drops the back link and its reserved row,
+     and the title steps down to Display M so the work starts higher */
+  if (staff) o.back = null;
+  var wrap = VV({ name: 'Page header', gap: 14, pad: [o.back || staff ? top : top + BACK_ROW, 0, o.rule === false ? 0 : 24, 0] });
   if (o.rule !== false) borderSide(wrap, 'border/default', 'bottom');
   if (o.back) add(wrap, btn('Ghost', 'SM', o.back, { lead: 'arrow-left' }));
   if (o.banner) add(wrap, fillW(o.banner));
   var row = H({ name: 'Title row', gap: 24, main: 'SPACE_BETWEEN', cross: 'MAX' });
   var t = VV({ name: 'Title block', gap: 8 });
-  if (o.title) add(t, Tx(o.title, 'Display/L', 'text/primary', { name: 'Title' }));
+  if (o.title) add(t, Tx(o.title, staff ? 'Display/M' : 'Display/L', 'text/primary', { name: 'Title' }));
   if (o.code || o.metaChips) {
     var m = H({ name: 'Meta', gap: 10, cross: 'CENTER' });
     if (o.code) add(m, Tx(o.code, 'Mono/Data', 'text/secondary', { name: 'Code' }));
@@ -253,7 +257,7 @@ function stepper(states) {
    Domain data (demo)
    --------------------------------------------------------------------- */
 var HORSES = [
-  { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '3 of 5 cleared', pct: 60 },
+  { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Nightfall', coat: 'Black', sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
   { name: 'Copper King', coat: 'Chestnut', sub: 'Quarter Horse · Stallion', tags: [['Bad', 'Aggressive'], ['Neutral', 'Box stall']], age: '9 y', height: '15.3 hh', weight: '583 kg', size: 'L · 48', chip: '985 141 000 876 502', value: '$120,000', notes: 'Box stall only. Never next to a mare. Experienced handlers only.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Silver Bell', coat: 'Grey', sub: 'Lipizzan · Mare', tags: [['Ok', 'Calm']], age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32', chip: '203 098 100 554 120', value: '$60,000', notes: 'Travels well. Hay net at shoulder height.', ready: '2 of 5 cleared', pct: 40 }
@@ -264,7 +268,7 @@ function horseCard(h) {
   setP(nested(c, 'Tag 1'), { Label: h.tags[0][1], Tone: h.tags[0][0] });
   if (h.tags[1]) setP(nested(c, 'Tag 2'), { Label: h.tags[1][1], Tone: h.tags[1][0] });
   else setP(c, { 'Show tag 2': false });
-  setP(nested(c, 'Readiness bar'), { Value: String(h.pct), Tone: h.pct >= 80 ? 'Ok' : 'Neutral' });
+  setP(nested(c, 'Readiness bar'), { Value: String(h.pct), Tone: h.pct >= 100 ? 'Ok' : 'Neutral' });
   c.name = 'Horse card · ' + h.name;
   return c;
 }
@@ -272,138 +276,221 @@ function horseCard(h) {
 /* ---------------------------------------------------------------------
    Screen: Home
    --------------------------------------------------------------------- */
-var HOME_COMMITMENTS = [
-  ['6', 'Countries, by road and air', 'Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong.'],
-  ['21 days', 'Lead time across a border', 'Three days within one country. Too-early requests are told the earliest valid date.'],
-  ['7 days', 'A quotation holds its price', 'Itemised line by line from a rate catalog pinned to that quote.'],
-  ['1 per 3', 'Grooms to horses', 'Rounded up, so four horses travel with two grooms.']
-];
-async function scrHome() {
-  var hero = H({ name: 'Hero', gap: 64, pad: [88, 0, 24, 0], cross: 'CENTER' });
-  var left = VV({ name: 'Hero copy', gap: 24 });
+/* the signed-out header: no nav and no account, just the way in */
+function publicHeader() {
+  var h = H({ name: 'Public header', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [0, 40, 0, 40], h: 64, fill: 'bg/canvas' });
+  borderSide(h, 'border/default', 'bottom');
+  var right = H({ name: 'Account', gap: 8, cross: 'CENTER' });
+  addAll(right, [btn('Ghost', 'SM', 'Help', { lead: 'info' }), btn('Secondary', 'SM', 'Sign in')]);
+  addAll(h, [brand(), right]);
+  return h;
+}
+/* the public landing page, signed out: what EquiFreight does, the services and how a move runs.
+   A signed-in club never lands here; its Home is the work (scrHome). No customer, horse or job
+   appears on it (PRODUCT.md, Absences): the hero shows the rules at work on an example date instead. */
+async function scrLanding() {
+  var hero = H({ name: 'Hero', gap: 64, pad: [88, 0, 24, 0] });
+  var left = VV({ name: 'Hero copy', gap: 24, pad: [24, 0, 0, 0] });
   var h1 = Tx('Precision transport\nfor every horse', 'Display/XL', 'text/primary', { name: 'Headline', fill: true });
   await flush();
   var i = h1.characters.indexOf('transport');
   h1.setRangeFontName(i, i + 9, FONT['display/Italic']);
   var ctas = H({ name: 'Actions', gap: 12 });
-  addAll(ctas, [btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' }), btn('Secondary', 'MD', 'Add a horse profile', { lead: 'plus' })]);
+  addAll(ctas, [btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' }), btn('Secondary', 'MD', 'Create a club account')]);
   addAll(left, [h1,
     Tx('Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Every document is checked against your travel dates, and no horse leaves until clearance is complete.', 'Body/L', 'text/secondary', { w: 560 }),
     ctas]);
-  addAll(hero, [fillW(left), heroCard()]);
+  addAll(hero, [fillW(left), rulesCard()]);
 
-  var services = H({ name: 'Service grid', gap: 24, wrap: true, rowGap: 24 });
-  [
-    ['truck', 'Domestic · up to 500 km', 'Regional road', 'Scheduled and private trailer runs between training centres, studs and racecourses in one country.', '$800'],
-    ['route', 'VN · KH · TH · LA · MY', 'Cross-border road', 'Door to door, with every border document prepared, checked against your dates and filed for you.', '$2,400'],
-    ['plane', 'Economy · Business · First', 'Air freight', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box. A flying groom travels with every three horses.', '$9,500'],
-    ['medical', 'Injury, rehab, post-surgery', 'Veterinary escort', 'A veterinarian travels with the horse and logs its condition at every stop.', '$650 / day'],
-    ['flag', 'Arrive settled, on time', 'Race-day logistics', 'Timed to post time, with stabling at the venue and a groom who knows the horse.', '$1,600'],
-    ['foal', 'Full box · 96 in', 'Mare & foal', 'Mare and foal travel together in a full-width box for the whole journey.', '$2,800']
-  ].forEach(function (s) {
-    var c = inst(C.service);
-    setP(c, { Icon: ICON[s[0]], Scope: s[1], Title: s[2], Body: s[3], Price: s[4] });
-    tint(named(c, 'Icon badge').children[0], 'text/secondary');
-    c.name = 'Service · ' + s[2];
-    add(services, c);
-  });
+  /* the services the request flow offers, as a table, not a grid of icon cards: what it is, where it runs,
+     and what moves its price. No figures: an estimate is always a range, worked out for the request. */
+  var services = tbl('Services', [['Service', null], ['Scope', 220, null, 'Body/S', 'text/secondary'], ['What drives the price', 320, null, 'Body/S', 'text/secondary']], [
+    ['Road, within one country', 'Shared or private trailer runs between training centres, studs and racecourses.', 'One country · 3 days’ notice', 'Distance, a shared or private trailer, each horse’s stall'],
+    ['Road, across borders', 'Door to door, with every border document prepared and filed for you.', 'Vietnam, Cambodia, Thailand, Laos, Malaysia · 21 days’ notice', 'Border crossings, distance, grooms, a shared or private trailer'],
+    ['Air', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box, with a flying groom on board.', 'Economy, Business and First stalls', 'Stall width, pre-export isolation, flying grooms']
+  ].map(function (r) {
+    var name = VV({ name: r[0], gap: 4 });
+    addAll(name, [Tx(r[0], 'Heading/H4'), Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    return { cells: [fillW(name), r[2], r[3]] };
+  }));
 
   var how = H({ name: 'Steps', gap: 24 });
-  /* the tracker's seven stages, grouped into four phases */
+  /* the tracker's seven stages, grouped into four phases; each stage has one owner, named in stage order */
   [
-    ['1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review and holds for 7 days.', 'Logistics Manager'],
-    ['3–4', 'Approval and Documents', 'You accept, the job is approved and your checklist opens. Every upload is checked against your travel dates.', 'Logistics Manager · Transport Specialist'],
-    ['5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist · Fleet & Route Coordinator'],
-    ['7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort']
+    ['Stages 1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review.', 'Logistics Manager', '21 days’ notice across a border, 3 within one country. Quotations hold for a week.'],
+    ['Stages 3–4', 'Approval and Documents', 'You accept, the job is approved and your document checklist opens.', 'Logistics Manager, then Transport Specialist', 'A refused document always says why, and what a new one must show.'],
+    ['Stages 5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist, then Fleet & Route Coordinator', 'One groom for every three horses, rounded up, so four horses travel with two.'],
+    ['Stage 7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort', 'Nothing is overwritten: every document version and record is kept.']
   ].forEach(function (s, idx) {
     var c = VV({ name: 'Step ' + (idx + 1), gap: 12, pad: [24, 0, 0, 0] });
     borderSide(c, 'border/default', 'top');
-    addAll(c, [Tx(s.shift(), 'Mono/Data L', 'text/tertiary'), Tx(s[0], 'Heading/H3'), Tx(s[1], 'Body/S', 'text/secondary', { fill: true }), Tx(s[2], 'Body/S', 'text/tertiary', { fill: true })]);
-    add(how, fillW(c));
+    var rule = H({ name: 'Rule', gap: 8, pad: [12, 0, 0, 0] });
+    borderSide(rule, 'border/default', 'top');
+    addAll(rule, [Ic('check', 16, 'status/ok/fg'), Tx(s[4], 'Body/S', 'text/secondary', { fill: true })]);
+    addAll(c, [Tx(s[0], 'Label/S', 'text/tertiary', { name: 'Stages' }), Tx(s[1], 'Heading/H3'), Tx(s[2], 'Body/S', 'text/secondary', { fill: true }), Tx('Owner: ' + s[3], 'Body/S', 'text/tertiary', { name: 'Owner', fill: true }), fillW(rule)]);
+    add(how, sz(fillW(c), 'h', 'FILL'));
   });
 
   var feats = H({ name: 'Features', gap: 24 });
   addAll(feats, [
-    featureCard(windowVisual(), 'Documents checked against your travel dates', 'A Coggins test that is valid today but 77 days old on departure day is flagged now, with the date a new test must carry.'),
-    featureCard(widthVisual(), 'Stalls planned by width and temperament', 'A 96 in air stall takes three standard horses, two at 48 in, or one in a full box. Stallions get box stalls and never stand beside a mare.'),
+    featureCard(windowVisual(), 'Caught before departure day', 'A Coggins test that is valid today but 77 days old on departure day is flagged now, with the date a new test must carry.'),
+    featureCard(widthVisual(), 'Stalls planned by width', 'A 96 in air stall takes three standard horses, two at 48 in, or one in a full box. Stallions get box stalls and never stand beside a mare.'),
     featureCard(quoteVisual(), 'Quotes that say what can move', 'Every line shows its basis. Lines that can change on the final invoice, such as waiting time, are marked before you accept.')
   ]);
 
-  /* commitments the system enforces, not operating figures (PRODUCT.md: no stats presented as real) */
-  var stats = H({ name: 'Stats', gap: 24, pad: [40, 0, 40, 0] });
-  borderSide(stats, 'border/default', 'top');
-  HOME_COMMITMENTS.forEach(function (s) {
-    var c = VV({ name: s[1], gap: 6 });
-    addAll(c, [Tx(s[0], 'Mono/Data L'), Tx(s[1], 'Label/M'), Tx(s[2], 'Body/S', 'text/secondary', { fill: true })]);
-    add(stats, fillW(c));
-  });
+  /* the page ends on the way in, with the one promise a visitor needs before they ask */
+  var close = H({ name: 'Close', gap: 48, pad: [40, 48, 40, 48], radius: 12, fill: 'surface/card', stroke: 'border/default', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var cc = VV({ name: 'Copy', gap: 10 });
+  addAll(cc, [Tx('Send us the horses, the route and the date', 'Display/M', 'text/primary', { name: 'Title' }), Tx('Nothing is booked until you accept the itemised quotation.', 'Body/M', 'text/secondary', { name: 'Summary' })]);
+  addAll(close, [cc, btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' })]);
 
-  return screen('Home', 'Home', [
+  return screen('Landing · Signed out', null, [
     hero,
-    section('Six ways to move a racehorse', 'Each service is priced from the same rate catalog. What you see here is a starting point; your quotation is itemised line by line.', services),
-    section('Seven stages, one owner each', 'Your request page tracks the same seven stages, shown here in four phases. The next stage never starts until the one before it is done.', how),
+    section('Three ways to move a racehorse', 'Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them.', services),
+    section('Seven stages in four phases', 'Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule.', how),
     section('Built around the paperwork and the horse', null, feats),
-    VV({ name: 'Stats wrap', pad: [80, 0, 0, 0] }, [fillW(stats)])
-  ], { gap: 0 });
+    VV({ name: 'Closing', pad: [80, 0, 0, 0] }, [fillW(close)])
+  ], { gap: 0, header: publicHeader() });
 }
-function heroCard() {
-  var card = panel('Live job card', { w: 480, gap: 20, pad: 28 });
+
+/* ---------- Home, signed in ----------
+   The club's first screen is its work: everything it owes across its requests, soonest first,
+   with the one gold action on the top item; then each move with its stage and what holds it;
+   then the horses and how far each one's documents have got. Principle 1: the next step, always. */
+var HOME_MOVES = [
+  ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Documents', 'Departure locked · you owe 4', 'status/bad/fg', 'In 22 days', '18 Oct 2026'],
+  ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 · 2 horses · air, business class', 'Quotation', 'Quotation waiting for you', 'status/warn/fg', 'In 55 days', '20 Nov 2026'],
+  ['Ho Chi Minh City → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load', 'Request', 'In review with Yến; nothing needed', 'text/secondary', 'In 34 days', '30 Oct 2026']
+];
+var HOME_HORSES = [
+  ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', '4 of 5 cleared', null],
+  ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', '3 of 5 cleared', 'New EIA test due 4 Oct'],
+  ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', '4 of 5 cleared', null],
+  ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '2 of 5 cleared', 'Bill of sale overdue']
+];
+/* one request on the signed-in Home: route and codes, the stage and what holds it, the departure */
+function moveRow(m, i) {
+  var row = H({ name: m[1], gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
+  if (i) borderSide(row, 'border/default', 'top');
+  var id = VV({ name: 'Move', gap: 4 });
+  var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER' });
+  addAll(meta, [Tx(m[1], 'Mono/Caption', 'text/secondary'), Tx(m[2], 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(id, [Tx(m[0], 'Heading/H4'), fillW(meta)]);
+  var st = VV({ name: 'Where it is', gap: 4, w: 220 });
+  addAll(st, [stageMark(m[3]), Tx(m[4], 'Label/S', m[5], { fill: true })]);
+  var due = VV({ name: 'Departs', gap: 2, w: 110, cross: 'MAX' });
+  addAll(due, [Tx(m[6], 'Label/S', 'text/primary', { align: 'RIGHT' }), Tx(m[7], 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
+  addAll(row, [fillW(id), st, due, rowOpen()]);
+  return row;
+}
+/* the signed-in Home in any state: a lead block (what is owed, or that nothing is), then the moves beside the horses */
+/* calm: nothing is owed, so the moves are ordered by departure alone and the caption says so */
+function homeScreen(name, summary, lead, moves, horses, horseNote, asOf, calm) {
+  var list = panel('Moves', { gap: 0, pad: 0, clip: true });
+  moves.forEach(function (m, i) { add(list, fillW(moveRow(m, i))); });
+  var movesBlock = titled('Your moves', moves.length + (calm ? ' in progress, soonest departure first.' : ' in progress, the one that needs you most first.') + ' Each opens its request.', list, btn('Ghost', 'SM', 'My requests', { trail: 'arrow-right' }));
+  var hp = panel('Your horses', { gap: 0, pad: [20, 24, 8, 24] });
+  add(hp, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('Your horses', 'Heading/H4'), Tx(horseNote, 'Body/S', 'text/tertiary')]));
+  horses.forEach(function (h) {
+    var row = H({ name: h[0], gap: 12, pad: [12, 0, 12, 0], cross: 'CENTER' });
+    borderSide(row, 'border/default', 'top');
+    var sw = F({ name: 'Coat', w: 12, h: 12, radius: 999, fill: h[1], stroke: 'border/strong' });
+    var t = VV({ name: 'Horse', gap: 2 });
+    addAll(t, [Tx(h[0], 'Label/M'), Tx(h[2], 'Body/S', 'text/tertiary')]);
+    var r = VV({ name: 'Documents', gap: 2, cross: 'MAX' });
+    add(r, Tx(h[3], 'Mono/Caption', 'text/secondary', { align: 'RIGHT' }));
+    if (h[4]) add(r, Tx(h[4], 'Body/S', h[5] || (h[4].indexOf('overdue') >= 0 ? 'status/bad/fg' : 'status/warn/fg'), { align: 'RIGHT' }));
+    addAll(row, [sw, fillW(t), r]);
+    add(hp, fillW(row));
+  });
+  add(hp, VV({ name: 'More', pad: [4, 0, 8, 0] }, [btn('Ghost', 'SM', 'My horses', { trail: 'arrow-right' })]));
+  return screen(name, 'Home', [pageHeader({ title: 'Saigon Turf Club', summary: summary })].concat(lead, [split(movesBlock, hp, SIDE.narrow)]), { asOf: asOf });
+}
+function scrHome() {
+  var items = [
+    owedItem('Overdue', 'Upload a signed bill of sale', 'CBRT-2026-041 · Silver Bell · Proof of ownership', 'Rejected 24 Sep by Lan, transport specialist: the bill of sale is unsigned. Upload a signed copy.', 'Overdue by 1 day', 'Was due 25 Sep', 'Upload signed copy', 'upload'),
+    owedItem('Soon', 'Accept or decline quotation v2', 'REQ-2026-0179 · Q-2026-0188 · $38,019.20', 'Phnom Penh → Hong Kong (Sha Tin) for Nightfall and Shadowfax. It holds its price until 30 Sep; after that Yến re-prices it.', 'Due in 4 days', '30 Sep 2026', 'Open quotation', null, { secondary: true }),
+    owedItem('Soon', 'Extend transit insurance to 20 Oct', 'CBRT-2026-041 · Shipment · PVI Insurance policy', 'The policy ends 15 Oct, before arrival plus 2 days (20 Oct). Upload the extended policy.', 'Due in 4 days', '30 Sep 2026', 'Upload extended policy', 'upload', { secondary: true }),
+    owedItem('Upcoming', 'Book a new EIA (Coggins) test', 'CBRT-2026-041 · Nightfall · EIA (Coggins) test', 'Valid today, but 77 days old at departure; the limit is 60. The new test must be dated 19 Aug or later.', 'Due in 8 days', '4 Oct 2026', 'Upload test result', 'upload'),
+    owedItem('Upcoming', 'Upload a new influenza booster record', 'CBRT-2026-041 · Silver Bell · Influenza vaccination', 'The booster lapsed on 16 Sep. Give a new booster at least 7 days before departure and upload the record.', 'Due in 15 days', '11 Oct 2026', 'Upload booster record', 'upload')
+  ];
+  var owed = owedPanel('5 items', 'Across 2 requests, soonest first. Each upload is checked against your travel dates the moment you send it.', items, { chipTone: 'Bad', chipLabel: '1 overdue' }, 'See each request in My requests');
+  return homeScreen('Home', '3 requests in progress and 4 horses. Next departure: Ho Chi Minh City → Phnom Penh, 18 Oct, locked until its documents clear.',
+    [owed], HOME_MOVES, HOME_HORSES, 'Documents cleared for the 18 Oct move, CBRT-2026-041.', '26 Sep 2026, 11:20');
+}
+/* 15 Oct: every document cleared and nothing owed anywhere; the page leads with the next event, and nothing is gold */
+function scrHomeClear() {
+  var lead = nothingOwed('Nothing needed from you', 'All 23 documents for CBRT-2026-041 cleared on 14 Oct. Minh, driver, collects all four horses at Phú Thọ training centre.', 'Departs in 3 days', '18 Oct 2026, 06:00');
+  return homeScreen('Home · Nothing owed', '3 requests in progress and 4 horses. Next departure: Ho Chi Minh City → Phnom Penh, 18 Oct, cleared to depart.', [lead], [
+    ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Clearance', 'Cleared to depart', 'status/ok/fg', 'In 3 days', '18 Oct 2026'],
+    ['Phnom Penh → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load · pickup moved to Phnom Penh', 'Quotation', 'Yến is pricing version 2; nothing needed', 'text/secondary', 'In 15 days', '30 Oct 2026'],
+    ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 accepted · 2 horses · air, business class', 'Approval', 'With Yến for approval; nothing needed', 'text/secondary', 'In 36 days', '20 Nov 2026']
+  ], [
+    ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', '5 of 5 cleared', null],
+    ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', '5 of 5 cleared', null],
+    ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', '5 of 5 cleared', null],
+    ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '5 of 5 cleared', null]
+  ], 'Documents cleared for the 18 Oct move, CBRT-2026-041.', '15 Oct 2026, 09:00', true);
+}
+/* 18 Oct, 08:41: the move on the road leads, with its last confirmed checkpoint, the same panel as Tracking · In transit */
+function scrHomeRoad() {
+  var lead = nothingOwed('Nothing needed from you', 'Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop.', 'Expected in 49 min', '09:30');
+  return homeScreen('Home · On the road', '3 requests in progress and 4 horses. On the road now: Ho Chi Minh City → Phnom Penh, arriving about 12:30.', [lead, onTheRoad()], [
+    ['Ho Chi Minh City → Phnom Penh', 'REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer', 'Trip', 'On the road since 06:05', 'status/info/fg', 'Arrives in 4 h', '18 Oct, 12:30'],
+    ['Phnom Penh → Bangkok', 'REQ-2026-0193', '2 horses · road, shared load · pickup moved to Phnom Penh', 'Quotation', 'Yến is pricing version 2; nothing needed', 'text/secondary', 'In 12 days', '30 Oct 2026'],
+    ['Phnom Penh → Hong Kong (Sha Tin)', 'REQ-2026-0179', 'quotation Q-2026-0188 accepted · 2 horses · air, business class', 'Approval', 'With Yến for approval; nothing needed', 'text/secondary', 'In 33 days', '20 Nov 2026']
+  ], [
+    ['Shadowfax', 'coat/grey', 'Grey · Andalusian gelding', 'Stall 1 · standard', 'Sound at 08:40', 'status/ok/fg'],
+    ['Nightfall', 'coat/black', 'Black · Thoroughbred mare', 'Stall 4 · climate', 'Calm again at 08:40', 'status/ok/fg'],
+    ['Copper King', 'coat/chestnut', 'Chestnut · Quarter Horse stallion', 'Stall 2 · box', 'Sound at 08:40', 'status/ok/fg'],
+    ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', 'Stall 6 · standard', 'Sound at 08:40', 'status/ok/fg']
+  ], 'All four on CBRT-2026-041, with Hoa’s last condition log.', '18 Oct 2026, 08:41', true);
+}
+/* the hero's picture: the document rules worked out for an example route and date. It is labelled an example
+   and names no horse or customer; a club sees the same dates for its own request once it asks. */
+var RULES_EXAMPLE = [['passport', 'Valid through 20 Oct'], ['vacc', '21 Apr–11 Oct'], ['eia', 'On or after 19 Aug'], ['health', '8–18 Oct'], ['own', 'Any date']];
+function rulesCard() {
+  var card = panel('Rules card · Example', { w: 480, gap: 20, pad: 28 });
   R(card, 16);
   effect(card, 'Elevation/1 Card');
-  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
-  var id = VV({ name: 'Job', gap: 2 });
-  addAll(id, [Tx('Transport job', 'Body/S', 'text/tertiary'), Tx('CBRT-2026-041', 'Mono/Data', 'text/primary')]);
-  addAll(top, [id, chip('Bad', 'Locked')]);
+  var top = H({ name: 'Top', gap: 16, main: 'SPACE_BETWEEN' });
+  var id = VV({ name: 'Trip', gap: 4 });
+  addAll(id, [Tx('Ho Chi Minh City → Phnom Penh', 'Heading/H4', 'text/primary', { name: 'Route' }), Tx('By road through Mộc Bài – Bavet', 'Body/S', 'text/secondary', { name: 'Crossing' })]);
+  addAll(top, [id, chip('Neutral', 'Example', { noDot: true })]);
   add(card, fillW(top));
-
-  var route = H({ name: 'Route', gap: 8 });
-  [['Ho Chi Minh City', '06:00'], ['Mộc Bài – Bavet', '08:30'], ['Phnom Penh', '12:30']].forEach(function (s, idx) {
-    var stop = VV({ name: s[0], gap: 6 });
-    addAll(stop, [dot(10, 'text/tertiary'), Tx(s[0], 'Label/S', 'text/primary'), Tx(s[1], 'Mono/Caption', 'text/tertiary')]);
-    add(route, stop);
-    if (idx < 2) add(route, fillW(VV({ name: 'Leg', pad: [4, 0, 0, 0] }, [fillW(rect(40, 1, 'border/strong', 'Line'))])));
-  });
-  add(card, fillW(route));
-  add(card, Tx('Departs 18 Oct 2026 · 4 horses · Road, private trailer', 'Body/S', 'text/secondary'));
+  add(card, dlRow('If you depart on', '18 Oct 2026'));
   add(card, divider());
-  add(card, Tx('Documents, checked against travel dates', 'Body/S', 'text/tertiary'));
-  var tones = { c: 'status/ok/fg', r: 'status/info/fg', a: 'status/warn/fg', x: 'status/bad/fg' };
-  [['Shadowfax', 'ccc-c', '4/5'], ['Nightfall', 'cca-c', '3/5'], ['Copper King', 'ccc-c', '4/5'], ['Silver Bell', 'cxc-x', '2/5']].forEach(function (h) {
-    var row = H({ name: h[0], gap: 12, cross: 'CENTER' });
-    var dots = H({ name: 'Dots', gap: 6, cross: 'CENTER' });
-    h[1].split('').forEach(function (ch) {
-      if (ch === '-') { var e = dot(10, null, 'Required'); e.strokes = [P('border/strong')]; e.strokeWeight = 1.5; add(dots, e); }
-      else add(dots, dot(10, tones[ch]));
-    });
-    addAll(row, [Tx(h[0], 'Label/M', 'text/primary', { fill: true }), dots, Tx(h[2], 'Mono/Caption', 'text/secondary')]);
-    add(card, fillW(row));
+  add(card, Tx('Each document must carry', 'Body/S', 'text/tertiary'));
+  var list = VV({ name: 'Documents', gap: 14 });
+  RULES_EXAMPLE.forEach(function (d) {
+    var row = H({ name: DOCNAME[d[0]], gap: 16, cross: 'CENTER' });
+    var t = VV({ name: 'Text', gap: 2 });
+    addAll(t, [Tx(DOCNAME[d[0]], 'Label/M', 'text/primary', { name: 'Document' }), Tx(RULE[d[0]], 'Body/S', 'text/tertiary', { name: 'Rule', fill: true })]);
+    addAll(row, [fillW(t), Tx(d[1], 'Mono/Data', 'text/primary', { name: 'Date', align: 'RIGHT' })]);
+    add(list, fillW(row));
   });
-  var legend = H({ name: 'Legend', gap: 14, wrap: true, rowGap: 6 });
-  [['status/ok/fg', 'Cleared'], ['status/info/fg', 'In review'], ['status/warn/fg', 'Expires in transit'], ['status/bad/fg', 'Fails rule'], [null, 'Not uploaded']].forEach(function (l) {
-    var it = H({ name: l[1], gap: 6, cross: 'CENTER' });
-    var d = dot(8, l[0]);
-    if (!l[0]) { d.strokes = [P('border/strong')]; d.strokeWeight = 1.5; }
-    addAll(it, [d, Tx(l[1], 'Mono/Caption', 'text/tertiary')]);
-    add(legend, it);
-  });
-  add(card, fillW(legend));
-  var foot = H({ name: 'Gate', gap: 10, pad: [12, 14, 12, 14], radius: 8, cross: 'CENTER', fill: 'status/bad/bg', stroke: 'status/bad/border' });
-  addAll(foot, [Ic('lock', 16, 'status/bad/fg'), Tx('Departure locked · 9 items outstanding', 'Label/S', 'text/primary', { fill: true }), Tx('Open clearance', 'Label/S', 'text/primary')]);
+  add(card, fillW(list));
+  var foot = H({ name: 'Note', gap: 10, pad: [12, 14, 12, 14], radius: 8, fill: 'bg/sunken' });
+  addAll(foot, [Ic('info', 16, 'text/secondary'), Tx('Your request works these dates out for your own route, and flags any document that lapses before you arrive.', 'Body/S', 'text/secondary', { fill: true })]);
   add(card, fillW(foot));
   return card;
 }
+/* feature cards stretch to the tallest, and every visual is one height, so the titles line up */
+var FEATURE_VISUAL_H = 132;
 function featureCard(visual, title, body) {
   var c = panel(title, { gap: 16, pad: 28 });
+  visual.resize(visual.width, FEATURE_VISUAL_H); visual.layoutSizingVertical = 'FIXED';
   addAll(c, [fillW(visual), Tx(title, 'Heading/H3', 'text/primary', { fill: true }), Tx(body, 'Body/S', 'text/secondary', { fill: true })]);
-  return fillW(c);
+  return sz(fillW(c), 'h', 'FILL');
 }
+/* the track fills its panel; its marks are pinned by constraints, so they land inside it at any width */
 function windowVisual() {
   var f = VV({ name: 'Window visual', gap: 8, pad: 16, radius: 8, fill: 'bg/sunken' });
   var track = F({ name: 'Track', w: 300, h: 28 });
-  var line = rect(300, 2, 'border/strong', 'Axis'); line.y = 13; track.appendChild(line);
-  var win = rect(150, 10, 'status/ok/bg', 'Valid window', 999); win.x = 150; win.y = 9; win.strokes = [P('status/ok/border')]; win.strokeWeight = 1; track.appendChild(win);
-  var issued = dot(12, 'status/warn/fg', 'Test date'); issued.x = 92; issued.y = 8; track.appendChild(issued);
-  var dep = rect(2, 28, 'text/primary', 'Departure'); dep.x = 298; track.appendChild(dep);
+  var line = rect(300, 2, 'border/strong', 'Axis'); line.y = 13; track.appendChild(line); line.constraints = { horizontal: 'STRETCH', vertical: 'MIN' };
+  var win = rect(148, 10, 'status/ok/bg', 'Valid window', 999); track.appendChild(win); win.x = 150; win.y = 9; win.strokes = [P('status/ok/border')]; win.strokeWeight = 1; win.constraints = { horizontal: 'SCALE', vertical: 'MIN' };
+  var issued = dot(12, 'status/warn/fg', 'Test date'); issued.x = 92; issued.y = 8; track.appendChild(issued); issued.constraints = { horizontal: 'CENTER', vertical: 'MIN' };
+  var dep = rect(2, 28, 'text/primary', 'Departure'); dep.x = 298; track.appendChild(dep); dep.constraints = { horizontal: 'MAX', vertical: 'MIN' };
   add(f, fillW(track));
   var lbl = H({ name: 'Labels', gap: 8, wrap: true, rowGap: 4 });
   addAll(lbl, [Tx('Test 2 Aug', 'Mono/Caption', 'status/warn/fg'), Tx('60-day window', 'Mono/Caption', 'status/ok/fg'), Tx('Departs 18 Oct', 'Mono/Caption', 'text/primary')]);
@@ -411,14 +498,15 @@ function windowVisual() {
   add(f, chip('Warn', 'Expires in transit'));
   return f;
 }
+/* each row: the class name, a bar that fills what is left, then the positions it holds */
 function widthVisual() {
-  var f = VV({ name: 'Width visual', gap: 10, pad: 16, radius: 8, fill: 'bg/sunken' });
+  var f = VV({ name: 'Width visual', gap: 10, pad: 16, radius: 8, fill: 'bg/sunken', main: 'CENTER' });
   [['Economy', 3, '3 × 32 in'], ['Business', 2, '2 × 48 in'], ['First', 1, '1 × 96 in']].forEach(function (r) {
     var row = H({ name: r[0], gap: 10, cross: 'CENTER' });
-    var bar = H({ name: 'Stall', gap: 3, w: 180, h: 18 });
+    var bar = H({ name: 'Stall', gap: 3, h: 18 });
     for (var i = 0; i < r[1]; i++) add(bar, fillW(rect(10, 18, i === 0 ? 'stall/standard' : 'stall/box', 'Position', 4)));
-    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/secondary', { w: 70 }), bar, Tx(r[2], 'Mono/Caption', 'text/tertiary')]);
-    add(f, row);
+    addAll(row, [Tx(r[0], 'Body/S', 'text/secondary', { w: 64 }), fillW(bar), Tx(r[2], 'Mono/Caption', 'text/tertiary')]);
+    add(f, fillW(row));
   });
   return f;
 }
@@ -517,7 +605,7 @@ function scrRequest3() {
   addAll(cr, [Tx('Border crossings on this route', 'Label/S', 'text/secondary'), chips]);
   add(left, cr);
   var r2 = H({ name: 'Dates', gap: 16 });
-  addAll(r2, [input('Date', 'Error', 'Departure date', '05/10/2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
+  addAll(r2, [input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
   add(left, fillW(r2));
   var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
   add(left, cb);
@@ -532,7 +620,7 @@ function scrRequest4() {
   var left = VV({ name: 'Step 4', gap: 24 });
   add(left, Tx('Review and submit', 'Heading/H3'));
   add(left, fillW(requestSummary(REQ_0193, { edit: true })));
-  add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days\' notice. Your departure is 34 days away.'));
+  add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days’ notice. Your departure is 34 days away.'));
   var next = panel('What happens next', { gap: 14 });
   add(next, Tx('What happens next', 'Heading/H4'));
   [['Request: a logistics manager reviews it', 'Usually within 1 business day'], ['Quotation: itemised line by line', 'Valid for 7 days'], ['Approval: you accept; the 30% deposit is acknowledged', 'The job gets its CBRT code'], ['Documents: your checklist opens', 'Then Clearance, Trip and Handover']].forEach(function (s, i) {
@@ -605,7 +693,8 @@ function quoteTotals(q) {
 var QUOTE_ESTIMATE = [33900, 43600];
 /* the ledger, shared by the customer quotation and the staff builder.
    after(line) may return a node to place under that line (the inline override editor) */
-function quoteTable(lines, T, after) {
+/* notes: { groupLetter: node } drawn under that group's lines, for the reasoning that belongs to one group */
+function quoteTable(lines, T, after, notes) {
   var table = panel('Quotation lines', { gap: 0, pad: 0, clip: true });
   var th = H({ name: 'Table header', gap: 16, pad: [12, 20, 12, 20], fill: 'bg/sunken' });
   addAll(th, [Tx('Item', 'Mono/Eyebrow', 'text/tertiary', { fill: true }), Tx('Qty', 'Mono/Eyebrow', 'text/tertiary', { w: 48, align: 'RIGHT' }), Tx('Rate', 'Mono/Eyebrow', 'text/tertiary', { w: 96, align: 'RIGHT' }), Tx('Amount', 'Mono/Eyebrow', 'text/tertiary', { w: 120, align: 'RIGHT' }), Tx('', 'Mono/Eyebrow', 'text/tertiary', { w: 110 })]);
@@ -633,6 +722,7 @@ function quoteTable(lines, T, after) {
       var extra = after && after(l);
       if (extra) add(table, fillW(extra));
     });
+    if (notes && notes[g[0]]) add(table, fillW(notes[g[0]]));
   });
   return table;
 }
@@ -660,11 +750,15 @@ function quoteTotalsPanel(T) {
 function scrQuote() {
   var T = quoteTotals();
   var left = VV({ name: 'Lines', gap: 24 });
-  addAll(left, [fillW(quoteTable(QUOTE, T)), fillW(quoteTotalsPanel(T))]);
+  /* how the air stall was sized sits under the air freight group it explains, not in the side column */
+  var sizing = VV({ name: 'Group note · sizing', gap: 4, pad: [10, 20, 14, 20], fill: 'bg/sunken' });
+  borderSide(sizing, 'border/default', 'top');
+  addAll(sizing, [Tx('How the stall was sized', 'Label/S', 'text/secondary'), Tx('Nightfall and Shadowfax fly business class at 48 in each: 96 in, so 1 position. Flying grooms: 2 ÷ 3, rounded up, is 1. No flight vet: one joins from 8 horses, or when a horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(left, [fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
 
   var est = panel('Against your estimate', { gap: 12 });
   var inside = T.total >= QUOTE_ESTIMATE[0] && T.total <= QUOTE_ESTIMATE[1];
-  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', wrap: true, rowGap: 8 });
   addAll(head, [Tx('Against your estimate', 'Heading/H4'), chip(inside ? 'Ok' : 'Warn', inside ? 'Inside your range' : 'Outside your range')]);
   addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('This quotation', money(T.total)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
     Tx('The largest line is the business-class air stall, $16,800, or ' + Math.round(16800 / T.total * 100) + '% of the total. Waiting time (H) is the only line that can change on the final invoice.', 'Body/S', 'text/tertiary', { fill: true })]);
@@ -684,29 +778,27 @@ function scrQuote() {
   var who = peoplePanel([['Yến', 'logistics manager', 'Built this quotation from rate catalog v12 on 23 Sep, and re-issued it when your departure moved to 20 Nov.']], 'Who prepared it');
   add(who, VV({ name: 'Ask', pad: [4, 0, 12, 0] }, [btn('Secondary', 'SM', 'Ask Yến about a line')]));
 
-  var canc = panel('Cancellation', { gap: 8 });
-  add(canc, Tx('Cancellation fee by notice period', 'Label/M'));
+  /* the terms a customer checks before accepting, and the versions behind this one, in one panel */
+  var terms = panel('Terms and versions', { gap: 8 });
+  addAll(terms, [Tx('Terms and versions', 'Heading/H4'), Tx('Cancellation fee by notice period', 'Label/S', 'text/secondary')]);
   [['More than 30 days', '10%', true], ['15–30 days', '25%'], ['7–14 days', '50%'], ['Under 7 days', '100%']].forEach(function (b) {
     var row = H({ name: b[0], gap: 10, pad: [8, 10, 8, 10], radius: 8, cross: 'CENTER', fill: b[2] ? 'status/info/bg' : null });
     addAll(row, [Tx(b[0], 'Body/S', 'text/secondary', { fill: true })]);
     if (b[2]) add(row, chip('Info', 'Now · 55 days', { noDot: true }));
     add(row, Tx(b[1], 'Mono/Data', 'text/primary', { w: 48, align: 'RIGHT' }));
-    add(canc, fillW(row));
+    add(terms, fillW(row));
   });
-  var sizing = panel('Stall sizing', { gap: 10 });
-  addAll(sizing, [Tx('How the stalls were sized', 'Label/M'), dlRow('Nightfall · business class', '48 in'), dlRow('Shadowfax · business class', '48 in'), dlRow('Total width', '96 in → 1 position'), dlRow('Flying grooms', '2 ÷ 3, rounded up = 1'), dlRow('Flight veterinarian', 'Not required'), Tx('In business class every horse gets 48 in, whatever its size class. A flight vet joins from 8 horses, or when any horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
-  var ver = panel('Versions', { gap: 10 });
   var v2 = H({ name: 'v2', gap: 10, cross: 'CENTER' });
   addAll(v2, [Tx('v2', 'Mono/Data'), Tx('Issued 23 Sep 2026', 'Body/S', 'text/secondary', { fill: true }), chip('Info', 'Current', { noDot: true })]);
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Superseded. Departure moved from 12 Nov to 20 Nov.', 'Body/S', 'text/tertiary', { fill: true })]);
-  addAll(ver, [Tx('Version history', 'Label/M'), fillW(v2), fillW(v1)]);
-  var right = column([est, next, who, canc, sizing, ver]);
+  addAll(terms, [divider(), Tx('Versions', 'Label/S', 'text/secondary'), fillW(v2), fillW(v1)]);
+  var right = column([est, next, who, terms]);
 
   var lead = owedPanel('1 item', 'Yến, logistics manager, issued version 2 on 23 Sep. Accepting locks the price and the horse list; declining closes the request.',
     [owedItem('Soon', 'Accept or decline this quotation', 'Q-2026-0188 · version 2 · ' + money(T.total), 'It holds its price for 7 days from 23 Sep. After 30 Sep it expires and Yến re-prices it from the rate catalog in force then.', 'Due in 4 days', '30 Sep 2026', 'Accept quotation', 'check', { second: 'Decline' })],
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
-  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageChip('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
+  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
 }
 
 /* ---------------------------------------------------------------------
@@ -836,7 +928,7 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(own, [Tx('Owner', 'Body/S', 'text/tertiary'), Tx(owner, 'Label/S', 'text/primary')]);
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageChip(stage || 'Documents')], below: [gate, tabs], rule: false });
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
@@ -867,7 +959,7 @@ function scrRoute() {
     add(tl, fillW(st));
   });
   var refuse = VV({ name: 'Depart', gap: 16 });
-  add(refuse, callout('Bad', 'Departure can\'t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
+  add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
   add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
   return jobScreen('Fleet & route coordinator · Route plan', 'Route', STAFF.khoi, [strip, tl, refuse]);
 }
