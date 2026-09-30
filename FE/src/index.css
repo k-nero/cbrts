@@ -3,6 +3,8 @@
 /*
  * EquiFreight tokens (DESIGN.md): navy control surface, gold for the one forward action,
  * status in tone plus word. Fraunces for titles, Outfit for everything else, DM Mono for data only.
+ * Dark is the default; [data-theme='light'] (set by stores/themeStore.ts) swaps in the paper
+ * palette. constant/color.ts holds the same values for AntD; keep them in step.
  */
 @theme {
   --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -21,6 +23,52 @@
   --color-ink-3: #7a8fa3;
   --color-gold: #c9aa5a;
   --color-gold-ink: #d9bd72;
+  --color-gold-hover: #d6b96b;
+  --color-gold-on: #0c1520;
+  --color-input: #0e1826;
+  --color-disabled: #4a5b70;
+  --color-control-on: #b3bfcc;
+  --color-success: #5dc688;
+  --color-warning: #fdb47a;
+  --color-error: #ef6b6b;
+  --color-info: #7fb0e8;
+}
+
+/* Referenced only from inline styles, so declared outside @theme where nothing prunes them. */
+:root {
+  --color-shadow: rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='light'] {
+  --color-canvas: #f6f4ef;
+  --color-sunken: #efece5;
+  --color-card: #ffffff;
+  --color-raised: #ffffff;
+  --color-muted: #eae6dc;
+  --color-line: #e2ddd2;
+  --color-line-strong: #c9c2b2;
+  --color-ink: #0c1520;
+  --color-ink-2: #3d4e63;
+  --color-ink-3: #66788c;
+  --color-gold: #c9aa5a;
+  --color-gold-ink: #8a6d1f;
+  --color-gold-hover: #b8983f;
+  --color-gold-on: #0c1520;
+  --color-input: #ffffff;
+  --color-disabled: #a3aebb;
+  --color-control-on: #3d4e63;
+  --color-success: #1e8a4c;
+  --color-warning: #b45f06;
+  --color-error: #c93a3a;
+  --color-info: #2f6fb8;
+  --color-shadow: rgba(12, 21, 32, 0.12);
+
+  --shadow-box-1: 0 1px 0 #e2ddd2;
+  --neutral-500: #66788c;
+  --scrollbar-track: #efece5;
+  --scrollbar-thumb: #c9c2b2;
+  --scrollbar-thumb-hover: #a89f8c;
+  --scrollbar-thumb-active: #8c8370;
 }
 
 html,

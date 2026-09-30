@@ -131,7 +131,7 @@ const ColumnSettingButton = <T,>({
         })}
       </div>
       {showResetButton && onReset && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--color-line)' }}>
           <Button type="link" size="small" onClick={onReset} style={{ padding: 0, width: '100%' }}>
             {resetIncludesColumnWidths ? labels.resetWithWidths : labels.reset}
           </Button>

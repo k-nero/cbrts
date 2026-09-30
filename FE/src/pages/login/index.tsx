@@ -13,6 +13,7 @@ import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
+import ThemeToggle from '@/components/ThemeToggle';
 import { useLogin } from '@/hooks/auth';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
@@ -71,8 +72,9 @@ const LoginPage = () => {
 
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
-      <header className="flex h-16 shrink-0 items-center border-b border-line px-10">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
         <Brand />
+        <ThemeToggle />
       </header>
       <Flex style={{ flex: 1 }}>
         <Flex vertical gap={32} style={{ width: 720, padding: '96px 120px 64px 160px' }}>

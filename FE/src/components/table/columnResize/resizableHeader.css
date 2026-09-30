@@ -131,6 +131,18 @@
   --wt-accent-active: rgba(179, 191, 204, 0.55);
 }
 
+/* Light theme (stores/themeStore.ts): the same strong neutral, on paper. */
+[data-theme='light'] .wt-table-resize-handle-line,
+[data-theme='light'] .wt-table-resize-guide,
+[data-theme='light'] .wt-table-column-settings-trigger,
+[data-theme='light'] .wt-table-toolbar-refresh,
+[data-theme='light'] .wt-table-column-settings-popover {
+  --wt-accent: #3d4e63;
+  --wt-accent-rgb: 61, 78, 99;
+  --wt-accent-soft: #eae6dc;
+  --wt-accent-active: rgba(61, 78, 99, 0.45);
+}
+
 .wt-table-column-settings-popover .ant-btn-link {
   color: var(--wt-accent) !important;
 }

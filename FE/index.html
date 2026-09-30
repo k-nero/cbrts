@@ -5,6 +5,21 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>EquiFreight</title>
+        <script>
+            // Pick the theme before first paint so a light-mode browser never flashes navy.
+            // stores/themeStore.ts owns it from here; keep the key ('ef.theme') in step.
+            (function () {
+                var mode;
+                try {
+                    mode = localStorage.getItem('ef.theme');
+                } catch (e) {}
+                if (mode !== 'light' && mode !== 'dark') {
+                    mode = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                }
+                document.documentElement.dataset.theme = mode;
+                document.documentElement.style.colorScheme = mode;
+            })();
+        </script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link

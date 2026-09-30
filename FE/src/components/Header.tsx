@@ -5,6 +5,7 @@ import { Dropdown, Flex, Layout } from 'antd';
 import type { ItemType } from 'antd/es/menu/interface';
 
 import Brand from './Brand';
+import ThemeToggle from './ThemeToggle';
 
 import { COLOR_BG_CANVAS, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
@@ -65,15 +66,18 @@ const Header: React.FC = () => {
             </NavLink>
           ))}
         </nav>
-        <Dropdown menu={{ items: userItems }} placement="bottomRight" trigger={['click']}>
-          <button type="button" className={ACCOUNT_CHIP}>
-            <span className={AVATAR}>
-              {me ? `${me.firstName.at(0) ?? ''}${me.lastName.at(0) ?? ''}`.toUpperCase() : '?'}
-            </span>
-            {me ? `${me.firstName} ${me.lastName}` : 'Loading…'}
-            <DownOutlined style={{ fontSize: 10 }} />
-          </button>
-        </Dropdown>
+        <Flex align="center" gap={12}>
+          <ThemeToggle />
+          <Dropdown menu={{ items: userItems }} placement="bottomRight" trigger={['click']}>
+            <button type="button" className={ACCOUNT_CHIP}>
+              <span className={AVATAR}>
+                {me ? `${me.firstName.at(0) ?? ''}${me.lastName.at(0) ?? ''}`.toUpperCase() : '?'}
+              </span>
+              {me ? `${me.firstName} ${me.lastName}` : 'Loading…'}
+              <DownOutlined style={{ fontSize: 10 }} />
+            </button>
+          </Dropdown>
+        </Flex>
       </Flex>
     </HeaderLayout>
   );

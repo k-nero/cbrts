@@ -2,7 +2,7 @@ import { FC } from 'react';
 
 const MARK = [
   'grid size-[30px] place-items-center rounded-md bg-gold',
-  'font-display text-[18px] text-canvas italic',
+  'font-display text-[18px] text-gold-on italic',
 ].join(' ');
 
 /** The EquiFreight mark and wordmark, as the app header and staff sidebar show it. */

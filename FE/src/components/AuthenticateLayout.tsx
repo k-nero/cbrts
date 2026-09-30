@@ -9,6 +9,7 @@ import Breadcrumb from './Breadscrumb';
 import ErrorBoundaryHandling from './ErrorBoundaryHandling';
 import Footer from './Footer';
 import Header from './Header';
+import ThemeToggle from './ThemeToggle';
 
 import { COLOR_BG_CANVAS, COLOR_BG_SUNKEN, COLOR_BORDER, ZINDEX_MENU } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
@@ -89,7 +90,12 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
         style={{ padding: '18px 40px', borderBottom: `1px solid ${COLOR_BORDER}` }}
       >
         <Breadcrumb />
-        <span className="font-mono text-[12px] text-ink-3">{dayjs().format('ddd D MMM YYYY')}</span>
+        <Flex align="center" gap={16}>
+          <span className="font-mono text-[12px] text-ink-3">
+            {dayjs().format('ddd D MMM YYYY')}
+          </span>
+          <ThemeToggle />
+        </Flex>
       </Flex>
       <ErrorBoundaryHandling key={pathname}>
         <Content style={{ padding: '28px 40px 96px' }}>{children}</Content>
