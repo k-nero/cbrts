@@ -566,7 +566,7 @@ function scrRates() {
   ]);
   var policy = panel('Percentages and policy', { gap: 10 });
   add(policy, Tx('Percentages and policy', 'Heading/H4'));
-  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
+  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%'], ['Arrival window', 'Road · +20% of ground lines'], ['Late arrival', '10% per started hour · max 30%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
   var pair = H({ name: 'Breaks and policy', gap: 24 });
   addAll(pair, [fillW(titled('Volume breaks', 'Applied to air and ground lines.', breaks)), fillW(policy)]);
   var cert = function (c) { return chip(c === 'Fixed' ? 'Neutral' : 'Warn', c, { noDot: true }); };

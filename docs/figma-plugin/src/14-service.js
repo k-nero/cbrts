@@ -80,6 +80,7 @@ function scrRequest2() {
 }
 async function eService() {
   var out = await insertChainCall([scrRequest2], 'Request · 1 Horses');
+  await insertChainCall([scrRequest3Window], 'Request · 3 Route & dates (error)');
   var rv = figma.currentPage.children.filter(function (n) { return n.name === 'Request · 4 Review'; })[0];
   var sum = rv && rv.findOne(function (n) { return n.type === 'FRAME' && n.name === 'Summary'; });
   var svc = sum && sum.children.filter(function (n) { return n.name === 'Service'; })[0];

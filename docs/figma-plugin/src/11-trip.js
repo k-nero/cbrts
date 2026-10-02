@@ -306,7 +306,7 @@ var TRIP_PLAN = [
   ['Phú Thọ training centre', 'Pickup · Ho Chi Minh City', '06:00', '06:05', 'Departed · Minh, driver', 'Ok', 'Departed'],
   ['Mộc Bài – Bavet', 'Border · Vietnam exit, Cambodia entry', '08:30', '08:34', 'Arrived 07:58, cleared both sides · Minh, driver', 'Ok', 'Cleared'],
   ['Svay Rieng welfare stop', 'Welfare stop · 45 min rest', '09:30', null, 'Expected in ' + durText(toMin('09:30') - toMin(NOW041)), 'Info', 'Next'],
-  ['Phnom Penh Equestrian Centre', 'Delivery · handover to the receiving groom', '12:30', null, 'Not reached', 'Neutral', 'Upcoming']
+  ['Phnom Penh Equestrian Centre', 'Delivery · handover to the receiving groom', '12:30', null, 'Window ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ', ' + durText(toMin(JOB_WINDOW.until) - toMin('12:30')) + ' to spare at plan', 'Neutral', 'Upcoming']
 ];
 function againstPlan(planned, recorded) {
   if (!recorded) return '—';
@@ -319,7 +319,7 @@ function scrTripCoordinator() {
   var tiles = H({ name: 'Tiles', gap: 16 });
   addAll(tiles, [
     fillW(stat('Neutral', againstPlan(last[2], last[3]), 'Against plan at ' + last[0])),
-    fillW(stat('Neutral', durText(toMin(NOW041) - toMin(TRIP_LOG[0][0])), 'On the trailer since loading at ' + TRIP_LOG[0][0])),
+    fillW(stat('Neutral', JOB_WINDOW.from + '–' + JOB_WINDOW.until, 'Arrival window · plan arrives ' + TRIP_PLAN[3][2])),
     fillW(stat('Info', TRIP_PLAN[2][2], 'Next checkpoint · Svay Rieng')),
     fillW(stat('Ok', '4 of 4', 'Horses sound at the last check, ' + log[log.length - 1][0]))
   ]);

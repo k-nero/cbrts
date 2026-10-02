@@ -10,14 +10,14 @@ function closedLead() {
   var ic = H({ name: 'Icon wrap', w: 40, h: 40, radius: 999, fill: 'status/ok/bg', main: 'CENTER', cross: 'CENTER' });
   add(ic, Ic('check', 20, 'status/ok/fg'));
   var t = VV({ name: 'Text', gap: 4 });
-  addAll(t, [Tx('Closed. Nothing more is needed.', 'Heading/H3'), Tx('You confirmed the handover on 19 Oct at 09:14. This page stays as the record of the move.', 'Body/M', 'text/secondary', { fill: true })]);
+  addAll(t, [Tx('Closed. Your final invoice follows today.', 'Heading/H3'), Tx('You confirmed the handover on 19 Oct at 09:14. This page stays as the record of the move; the invoice appears here when Yến issues it.', 'Body/M', 'text/secondary', { fill: true })]);
   addAll(p, [ic, fillW(t), btn('Secondary', 'MD', 'Download the record (PDF)', { lead: 'file' })]);
   return p;
 }
 function scrTrackClosed() {
   var sum = panel('Summary', { gap: 0, pad: 0, clip: true });
   var f = H({ name: 'Facts', gap: 48, pad: [18, 24, 18, 24] });
-  [['Delivered', '18 Oct · 12:41', true], ['Against plan', '11 min late'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold'], ['Incidents', 'None'], ['Documents', '23 kept', true]].forEach(function (x) {
+  [['Delivered', '18 Oct · 12:41', true], ['Arrival window', 'Kept · 11 min after plan'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold'], ['Incidents', 'None'], ['Documents', '23 kept', true]].forEach(function (x) {
     var cell = VV({ name: x[0], gap: 3 });
     addAll(cell, [Tx(x[0], 'Body/S', 'text/tertiary'), Tx(x[1], x[2] ? 'Mono/Data' : 'Label/S', 'text/primary')]);
     add(f, cell);

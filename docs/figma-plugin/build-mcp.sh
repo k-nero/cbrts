@@ -5,9 +5,9 @@ set -e
 cd "$(dirname "$0")"
 rm -rf mcp .tmp
 mkdir -p mcp .tmp
-cat src/01-core.js src/02-components.js src/03-pages.js src/04-mcp.js src/05-admin.js src/06-tracking.js src/07-review.js src/08-documents.js src/10-authorities.js src/11-trip.js src/12-handover.js src/13-incidents.js src/14-service.js src/15-horse.js src/16-contact.js src/17-firstrun.js src/18-access.js src/19-audit.js > .tmp/all.js
+cat src/01-core.js src/02-components.js src/03-pages.js src/04-mcp.js src/05-admin.js src/06-tracking.js src/07-review.js src/08-documents.js src/10-authorities.js src/11-trip.js src/12-handover.js src/13-incidents.js src/14-service.js src/15-horse.js src/16-contact.js src/17-firstrun.js src/18-access.js src/19-audit.js src/20-invoice.js > .tmp/all.js
 i=1
-for entry in eTokens eComponentsA eComponentsB eFoundations eScreensOwnerA eScreensOwnerB eArrange eCover eAdminComponents eTableComponents eAdminCatalogs eAdminOverview eTrackComponents eHomeScreens eTrackScreensA eTrackScreensB eQuoteScreen eStaffScreensA eStaffScreensB eReviewScreens eReviewCustomer eBuilderScreens eDocScreens eDocReview eAuthorities eTripA eTripB eHandover eIncidents eService eHorse eContact eFirstRun eSidebar eFooter eAccess eAudit eCanvas; do
+for entry in eTokens eComponentsA eComponentsB eFoundations eScreensOwnerA eScreensOwnerB eArrange eCover eAdminComponents eTableComponents eAdminCatalogs eAdminOverview eTrackComponents eHomeScreens eTrackScreensA eTrackScreensB eQuoteScreen eStaffScreensA eStaffScreensB eReviewScreens eReviewCustomer eBuilderScreens eDocScreens eDocReview eAuthorities eTripA eTripB eHandover eIncidents eService eHorse eContact eFirstRun eInvoice eSidebar eFooter eAccess eAudit eCanvas; do
   n=$(printf "%02d" $i)
   { cat .tmp/all.js; echo "globalThis.__EF = $entry;"; } > .tmp/$n.js
   bun build .tmp/$n.js --minify-whitespace --minify-syntax --target=browser --outfile .tmp/$n.min.js > /dev/null

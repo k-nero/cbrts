@@ -593,7 +593,18 @@ function scrRequest1() {
   add(left, fillW(foot));
   return requestLayout('Request · 1 Horses', ['Current', 'Upcoming', 'Upcoming', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
 }
-function scrRequest3() {
+/* Arrival on step 3: by default we plan the fastest safe route and give an expected time; a road
+   customer can instead buy an arrival window. A window is never an exact hour (at least 3 hours), it
+   needs a private trailer so the departure is theirs, and if we arrive after it closes we pay the
+   contract penalty from the rate catalog. The clock stops while an authority holds the trailer or a
+   horse's welfare stops it, so the deadline never cuts a welfare stop or a border check. */
+var WINDOW = { minHours: 3, premium: '+ $3,100 – $4,200', penalty: '10% of the job total for each started hour after the window closes, up to 30%' };
+function arrivalOptions(win) {
+  return svcSection('Arrival', 'Road moves only. By air, the airline’s schedule sets the arrival time.', svcOptions([
+    [win ? 'Default' : 'Selected', 'Any time on the day', 'We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days.', 'In the estimate', 'clock'],
+    [win ? 'Selected' : 'Default', 'Within a window', 'You choose a window of at least ' + WINDOW.minHours + ' hours. We use a private trailer so the departure is yours.', WINDOW.premium, 'calendar']], true));
+}
+function routeDates(name, win) {
   var left = VV({ name: 'Step 3', gap: 24 });
   addAll(left, [Tx('Route and dates', 'Heading/H3'), Tx('We work out the border crossings from the route. Cross-border moves need time for documents to clear.', 'Body/M', 'text/secondary', { fill: true })]);
   var r1 = H({ name: 'Places', gap: 16 });
@@ -605,17 +616,29 @@ function scrRequest3() {
   addAll(cr, [Tx('Border crossings on this route', 'Label/S', 'text/secondary'), chips]);
   add(left, cr);
   var r2 = H({ name: 'Dates', gap: 16 });
-  addAll(r2, [input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
+  addAll(r2, [win ? input('Date', 'Default', 'Departure date', '30 Oct 2026', null, { fill: true }) : input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }),
+    input('Text', 'Default', 'Special instructions', win ? 'Quiet loading. Vet check on arrival.' : 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
   add(left, fillW(r2));
-  var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
-  add(left, cb);
+  add(left, fillW(arrivalOptions(win)));
+  if (win) {
+    var w = H({ name: 'Window', gap: 16 });
+    addAll(w, [input('Date', 'Default', 'Arrive on', '31 Oct 2026', null, { fill: true }), input('Select', 'Default', 'From', '08:00', null, { fill: true }), input('Select', 'Default', 'Until', '12:00', 'A 4-hour window.', { fill: true })]);
+    add(left, fillW(w));
+    add(left, callout('Info', 'If we arrive after 12:00, we pay', 'The penalty is ' + WINDOW.penalty + ', credited on the final invoice. The clock stops while a border authority holds the trailer or a vet stops it for a horse’s welfare. Your quotation states the exact terms.'));
+  } else {
+    var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
+    add(left, cb);
+  }
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   var rightBtns = H({ name: 'Forward', gap: 12 });
-  addAll(rightBtns, [btn('Secondary', 'MD', 'Use 17 Oct 2026', { lead: 'calendar' }), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: 'Disabled' })]);
+  if (!win) add(rightBtns, btn('Secondary', 'MD', 'Use 17 Oct 2026', { lead: 'calendar' }));
+  add(rightBtns, btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: win ? 'Default' : 'Disabled' }));
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), rightBtns]);
   add(left, fillW(foot));
-  return requestLayout('Request · 3 Route & dates (error)', ['Done', 'Done', 'Current', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout(name, ['Done', 'Done', 'Current', 'Upcoming'], left, estimateCard(win ? '$14,400 – $20,300' : '$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
 }
+function scrRequest3() { return routeDates('Request · 3 Route & dates (error)', false); }
+function scrRequest3Window() { return routeDates('Request · 3 Route & dates · Arrival window', true); }
 function scrRequest4() {
   var left = VV({ name: 'Step 4', gap: 24 });
   add(left, Tx('Review and submit', 'Heading/H3'));
@@ -910,6 +933,8 @@ var CHECKLIST = [
 /* 23 items: 14 cleared, 4 with the customer, 4 health certificates and 1 permit with authorities */
 var STAFF = { yen: ['Vũ Hải Yến', 'Logistics manager', 'VY'], lan: ['Nguyễn Thị Lan', 'Transport specialist', 'NL'], khoi: ['Đỗ Minh Khôi', 'Fleet & route coordinator', 'DK'], minh: ['Trần Văn Minh', 'Driver', 'TM'], hoa: ['Lê Thị Hoa', 'Groom', 'LH'] };
 var JOB = { code: 'CBRT-2026-041', title: 'Ho Chi Minh City → Phnom Penh', meta: '4 horses · trailer TX-447 · departs 18 Oct 2026, 06:00' };
+/* the customer bought an arrival window for this job; the route is planned backwards from its close */
+var JOB_WINDOW = { from: '11:00', until: '14:00', text: '18 Oct, 11:00–14:00' };
 var JOB_TABS = [['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist'], ['Load plan', 'Khôi, fleet & route coordinator'], ['Route', 'Khôi, fleet & route coordinator'], ['Trip', 'Minh, driver']];
 /* one header for every tab of a job: route title, code, stage, the clearance gate, then tabs with the tab's owner */
 function jobHead(tab, gateBody, stage, gateState) {
@@ -943,7 +968,7 @@ function scrClearance() {
 }
 function scrRoute() {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1']].forEach(function (s) {
+  [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
     var c = VV({ name: s[0], gap: 4 });
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
@@ -952,7 +977,7 @@ function scrRoute() {
   [['Pickup', 'Phú Thọ training centre, HCMC', '06:00', 'Loading and condition check, logged with photos.'],
    ['Border', 'Mộc Bài – Bavet border', '08:30', 'Vietnam export clearance and Cambodia entry. Recorded per leg as Cleared or Held.'],
    ['Welfare', 'Svay Rieng welfare stop', '09:30', '45-minute rest, water and hay, welfare check by the escort.'],
-   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log.']].forEach(function (s) {
+   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s) {
     var st = inst(C.stop, { Kind: s[0] });
     setP(st, { Stop: s[1], Time: s[2], Details: s[3] });
     st.name = 'Stop · ' + s[1];
