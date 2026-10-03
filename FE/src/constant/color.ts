@@ -1,6 +1,7 @@
 /*
- * EquiFreight colours (DESIGN.md). Navy surfaces, gold only for the one forward action,
- * status always in tone plus word. Two palettes: dark (the control room) and light (paper).
+ * EquiFreight colours (DESIGN.md; values from docs/figma-plugin/src/01-core.js). Navy surfaces,
+ * gold only for the one forward action, status always in tone plus word. Two palettes: light (the
+ * presented theme) and dark.
  *
  * The same values are CSS variables in index.css (dark on :root, light under
  * [data-theme='light']) and AntD tokens in config/themeConfig.ts; keep the three in step.
@@ -60,28 +61,28 @@ export const PALETTE: Record<ThemeMode, Palette> = {
     shadow: 'rgba(0, 0, 0, 0.4)',
   },
   light: {
-    bgCanvas: '#F6F4EF',
-    bgSunken: '#EFECE5',
+    bgCanvas: '#F3F5F8',
+    bgSunken: '#E9EDF2',
     bgInput: '#FFFFFF',
     bgCard: '#FFFFFF',
-    bgRaised: '#FFFFFF',
-    bgMuted: '#EAE6DC',
-    border: '#E2DDD2',
-    borderStrong: '#C9C2B2',
-    textPrimary: '#0C1520',
-    textSecondary: '#3D4E63',
-    textTertiary: '#66788C',
+    bgRaised: '#F8F9FB',
+    bgMuted: '#EEF1F5',
+    border: '#DDE3EA',
+    borderStrong: '#C3CDD9',
+    textPrimary: '#0F1A28',
+    textSecondary: '#3C4A5B',
+    textTertiary: '#5A6A7D',
     disabled: '#A3AEBB',
     accent: '#C9AA5A',
-    accentHover: '#B8983F',
+    accentHover: '#B89846',
     accentOn: '#0C1520',
-    accentText: '#8A6D1F',
-    controlOn: '#3D4E63',
-    success: '#1E8A4C',
-    warning: '#B45F06',
-    error: '#C93A3A',
-    info: '#2F6FB8',
-    shadow: 'rgba(12, 21, 32, 0.12)',
+    accentText: '#80611A',
+    controlOn: '#3C4A5B',
+    success: '#1D7A47',
+    warning: '#7F3B00',
+    error: '#B3261E',
+    info: '#1F5FA8',
+    shadow: 'rgba(15, 26, 40, 0.12)',
   },
 };
 
@@ -129,4 +130,7 @@ export const ZINDEX_HEADER = 1;
 export const ZINDEX_MENU = ZINDEX_HEADER + 3;
 export const ZINDEX_SELECTBOX = ZINDEX_MENU + 10;
 
+/** Buttons and compact controls (MD button height). */
 export const HEIGHT_FORM_ITEM = 40;
+/** Text, select and date fields (DESIGN.md, Inputs). */
+export const HEIGHT_FIELD = 44;

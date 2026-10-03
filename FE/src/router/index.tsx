@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import AuthenticateLayout from '@/components/AuthenticateLayout';
 import StaffMenu from '@/components/menu/StaffMenu';
 import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
+import DesignSystemPage from '@/pages/design-system';
 import ForbiddenPage from '@/pages/ForbiddenPage';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/login" replace /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/forbidden', element: <ForbiddenPage /> },
+      { path: '/design-system', element: <DesignSystemPage /> },
       {
         path: '/app',
         element: (

@@ -109,6 +109,11 @@ var EFX = {};      // effect style name -> id
 var ICON = {};     // icon name -> ComponentNode
 var C = {};        // components / component sets
 var COLL = {};     // variable collections + mode ids
+/* Light is the presented theme (DESIGN.md, Theme): every frame sets it explicitly, because the collection's
+   default mode is still Dark. Dark stays supported; a frame's dark copy is named with ALT_SUFFIX. */
+var ALT_SUFFIX = ' · Dark';
+function primaryTheme(n) { if (COLL.light) n.setExplicitVariableModeForCollection(COLL.color, COLL.light); return n; }
+function altCopy(src) { var c = src.clone(); c.name = src.name + ALT_SUFFIX; c.setExplicitVariableModeForCollection(COLL.color, COLL.dark); return c; }
 var FONT = {};     // role/style -> FontName
 var PENDING = [];  // async style applications
 var SZ = {};       // node.id -> deferred sizing ({ w, h, abs })
