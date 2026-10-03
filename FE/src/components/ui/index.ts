@@ -22,6 +22,7 @@ export * from './OwedItem';
 export * from './Panel';
 export * from './Progress';
 export * from './QuoteLine';
+export * from './RouteStrip';
 export * from './StageMark';
 export * from './StallTile';
 export * from './StatTile';

@@ -47,6 +47,8 @@ const Header: React.FC = () => {
         borderBottom: `1px solid ${COLOR_BORDER}`,
         zIndex: ZINDEX_HEADER,
         padding: '0 40px',
+        // AntD's Layout.Header sets line-height: 64px, which every child would inherit.
+        lineHeight: 'normal',
       }}
     >
       <Flex align="center" justify="space-between" style={{ height: '100%' }}>

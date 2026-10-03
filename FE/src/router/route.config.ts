@@ -19,28 +19,29 @@ export const routesConfig = [
     breadcrumb: 'Design system',
     name: 'design-system',
   },
+  // The public landing page. The guard matches by path segment, so "/" has no config check;
+  // the page itself sends a signed-in visitor to their own home.
+  { path: '/', roles: ['*'], type: 'public', breadcrumb: '', name: 'landing' },
   {
-    path: '/app',
+    path: '/home',
     roles: ['CUSTOMER'],
     type: 'authenticated',
     breadcrumb: 'Home',
     name: 'customer-home',
-    children: [
-      {
-        path: '/horses',
-        roles: ['*'],
-        type: 'authenticated',
-        breadcrumb: 'My horses',
-        name: 'my-horses',
-      },
-      {
-        path: '/requests',
-        roles: ['*'],
-        type: 'authenticated',
-        breadcrumb: 'My requests',
-        name: 'my-requests',
-      },
-    ],
+  },
+  {
+    path: '/horses',
+    roles: ['CUSTOMER'],
+    type: 'authenticated',
+    breadcrumb: 'My horses',
+    name: 'my-horses',
+  },
+  {
+    path: '/requests',
+    roles: ['CUSTOMER'],
+    type: 'authenticated',
+    breadcrumb: 'My requests',
+    name: 'my-requests',
   },
   {
     path: '/staff',

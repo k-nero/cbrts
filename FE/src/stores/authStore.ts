@@ -114,7 +114,7 @@ export const ROLE_HOMES: Record<RoleName, string> = {
   TRANSPORT_SPECIALIST: '/staff/jobs',
   FLEET_COORDINATOR: '/staff/jobs',
   ESCORT: '/escort',
-  CUSTOMER: '/app',
+  CUSTOMER: '/home',
 };
 
 const ROLE_PRIORITY: readonly RoleName[] = [

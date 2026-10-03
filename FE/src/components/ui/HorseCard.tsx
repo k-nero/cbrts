@@ -7,7 +7,8 @@ import { cx } from './tone';
 
 export type Coat = 'grey' | 'black' | 'chestnut' | 'bay';
 
-const COAT: Record<Coat, string> = {
+/** The coat as a fill: the horse card band, and the 12 px swatch in horse lists. */
+export const COAT_SWATCH: Record<Coat, string> = {
   grey: 'bg-coat-grey',
   black: 'bg-coat-black',
   chestnut: 'bg-coat-chestnut',
@@ -37,7 +38,7 @@ export const CoatBand: FC<{ coat: Coat; name: ReactNode; subtitle?: ReactNode }>
   name,
   subtitle,
 }) => (
-  <div className={cx('relative h-[148px] overflow-hidden', COAT[coat])}>
+  <div className={cx('relative h-[148px] overflow-hidden', COAT_SWATCH[coat])}>
     <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45" />
     <span className="type-mono-label absolute top-[18px] right-5 text-white/80">{coat}</span>
     <Nameplate name={name} subtitle={subtitle} className="absolute bottom-5 left-5" />

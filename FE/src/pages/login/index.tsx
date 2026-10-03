@@ -73,7 +73,7 @@ const LoginPage = () => {
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand />
+        <Brand onClick={() => router.push(router.paths.get('landing'))} />
         <ThemeToggle />
       </header>
       <Flex style={{ flex: 1 }}>

@@ -1,0 +1,95 @@
+import type { Coat, IconName, Stage, Tone, Urgency } from '@/components/ui';
+
+/*
+ * The customer's Home (DESIGN.md, Home signed in): what the club owes across every request,
+ * each move with its stage and what holds it, and the horses. Dates are ISO strings; the page
+ * words them ("Due in 4 days") against `asOf`, so the server's clock decides "now".
+ */
+
+export interface OwedEntry {
+  id: string;
+  urgency: Urgency;
+  title: string;
+  /** "CBRT-2026-041 · Silver Bell · Proof of ownership". */
+  subject: string;
+  /** The rule, or who asked and why. */
+  reason: string;
+  dueAt: string;
+  action: { label: string; icon?: IconName };
+}
+
+export interface MoveEntry {
+  /** The customer's reference; it never changes. */
+  requestCode: string;
+  /** "Ho Chi Minh City → Phnom Penh". */
+  route: string;
+  /** "job CBRT-2026-041 · 4 horses · road, private trailer". */
+  detail: string;
+  stage: Stage;
+  /** What holds it, in words and a tone: "Departure locked · you owe 4". */
+  holds: { text: string; tone: Tone };
+  departsAt: string;
+  /** Set while the move is on the road: the departs column shows the arrival instead. */
+  arrivesAt?: string;
+}
+
+export interface HomeHorse {
+  id: string;
+  name: string;
+  coat: Coat;
+  /** "Grey · Andalusian gelding". */
+  line: string;
+  /** "4 of 5 cleared", or on the road "Stall 1 · standard". */
+  documents: string;
+  /** The one thing the horse is waiting on, toned: "Bill of sale overdue". */
+  note?: { text: string; tone: Tone };
+}
+
+/** When nothing is owed, the next event leads instead (DESIGN.md, Home states). */
+export interface NextEvent {
+  title: string;
+  body: string;
+  /** "Departs" or "Expected": the verb before the time left. */
+  verb: string;
+  at: string;
+  /** Show the date or only the time on the second line. */
+  dateStyle: 'date' | 'dayTime' | 'time';
+}
+
+/** The move on the road, as recorded checkpoints (Tracking · In transit shares it). */
+export interface TripNow {
+  updatedAt: string;
+  gate: 'locked' | 'clear';
+  stops: {
+    name: string;
+    kind: string;
+    state: 'done' | 'current' | 'upcoming';
+    /** "06:05 · departed", "exp. 09:30". */
+    time: string;
+  }[];
+}
+
+export interface CustomerHome {
+  /** The server's "now"; every relative time on the page is measured from it. */
+  asOf: string;
+  clubName: string;
+  requestCount: number;
+  horseCount: number;
+  nextDeparture?: {
+    route: string;
+    departsAt: string;
+    state: 'locked' | 'cleared' | 'on-road';
+    arrivesAt?: string;
+  };
+  /** Soonest first; the first item's action is the page's one gold button. */
+  owed: OwedEntry[];
+  /** Requests the owed items span. */
+  owedRequestCount: number;
+  nextEvent?: NextEvent;
+  trip?: TripNow;
+  /** Ordered by what needs the club first, then by departure. */
+  moves: MoveEntry[];
+  horses: HomeHorse[];
+  /** "Documents cleared for the 18 Oct move, CBRT-2026-041." */
+  horsesNote: string;
+}

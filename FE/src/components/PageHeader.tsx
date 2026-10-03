@@ -11,15 +11,24 @@ type Props = {
   summary?: ReactNode;
   /** Chips, a deadline or a Secondary control. Never the gold action (DESIGN.md, One Gold Button). */
   right?: ReactNode;
+  /**
+   * Owner shell pages without a back link reserve its row (46 px), so every owner title sits at
+   * the same height (DESIGN.md, One page header). Staff pages have no back row.
+   */
+  reserveBack?: boolean;
 };
 
 /** The one page header: title in Fraunces Display L, summary beneath, a hairline under both. */
-const PageHeader: FC<Props> = ({ title, summary, right }) => (
+const PageHeader: FC<Props> = ({ title, summary, right, reserveBack }) => (
   <Flex
     justify="space-between"
     align="end"
     gap={24}
-    style={{ paddingBottom: 24, borderBottom: `1px solid ${COLOR_BORDER}` }}
+    style={{
+      paddingTop: reserveBack ? 46 : 0,
+      paddingBottom: 24,
+      borderBottom: `1px solid ${COLOR_BORDER}`,
+    }}
   >
     <Flex vertical gap={8}>
       <h1 className={TITLE}>{title}</h1>

@@ -5,6 +5,8 @@ import StaffMenu from '@/components/menu/StaffMenu';
 import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
 import DesignSystemPage from '@/pages/design-system';
 import ForbiddenPage from '@/pages/ForbiddenPage';
+import CustomerHomePage from '@/pages/customer/home';
+import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import UsersPage from '@/pages/staff/users';
@@ -23,21 +25,21 @@ export const router = createBrowserRouter([
       </RoutesGuardWrapper>
     ),
     children: [
-      { path: '/', element: <Navigate to="/login" replace /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/forbidden', element: <ForbiddenPage /> },
       { path: '/design-system', element: <DesignSystemPage /> },
+      { path: '/', element: <LandingPage /> },
       {
-        path: '/app',
+        // The owner portal: Home, My horses, My requests (customers only, by route.config.ts).
         element: (
           <AuthenticateLayout>
             <Outlet />
           </AuthenticateLayout>
         ),
         children: [
-          { index: true, element: todo('Home') },
-          { path: 'horses', element: todo('My horses') },
-          { path: 'requests', element: todo('My requests') },
+          { path: '/home', element: <CustomerHomePage /> },
+          { path: '/horses', element: todo('My horses') },
+          { path: '/requests', element: todo('My requests') },
         ],
       },
       {

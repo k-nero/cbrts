@@ -5,4 +5,5 @@
 export const queryKeys = {
   me: () => ['me'] as const,
   roles: () => ['admin', 'roles'] as const,
+  customerHome: () => ['customer', 'home'] as const,
 } as const;
