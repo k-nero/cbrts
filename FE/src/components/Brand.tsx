@@ -1,7 +1,7 @@
 import { FC } from 'react';
 
 const MARK = [
-  'grid size-[30px] place-items-center rounded-md bg-gold',
+  'grid size-[30px] place-items-center rounded-[6px] bg-gold',
   'font-display text-[18px] text-gold-on italic',
 ].join(' ');
 

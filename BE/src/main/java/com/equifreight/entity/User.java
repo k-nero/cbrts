@@ -1,9 +1,12 @@
 package com.equifreight.entity;
 
+import com.equifreight.entity.enums.EscortKind;
+import com.equifreight.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -26,6 +29,36 @@ public class User extends BaseEntity {
 
     @Column(name = "password", nullable = false, length = 255)
     private String password;
+
+    /** Set for CUSTOMER users, null for staff. One account per club (partial unique index). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id")
+    private Club club;
+
+    /** EF-015. Staff only. */
+    @Column(name = "staff_code", unique = true, length = 10)
+    private String staffCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "escort_kind", length = 20)
+    private EscortKind escortKind;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Column(name = "last_active_at")
+    private Instant lastActiveAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invited_by")
+    private User invitedBy;
 
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JoinTable(

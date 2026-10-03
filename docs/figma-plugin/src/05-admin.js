@@ -874,7 +874,7 @@ async function adminScreensCall(builders) {
   var page = await rehydrate(PAGE_NAMES[3]);
   var made = [];
   for (var i = 0; i < builders.length; i++) {
-    var s = builders[i]();
+    var s = primaryTheme(builders[i]());
     await flush();
     page.children.filter(function (n) { return n.name === s.name && n !== s; }).forEach(function (n) { n.remove(); });
     var label = adminRowLabel(page), y = label.y + 120, x = 0;
@@ -960,7 +960,7 @@ async function eSidebar() {
     if (f.type !== 'FRAME') return;
     var old1 = f.children.filter(function (n) { return n.name === 'Staff sidebar'; })[0];
     if (!old1) return;
-    var cfg = SIDEBAR_FRAMES[f.name.replace(/ · Light$/, '')];
+    var cfg = SIDEBAR_FRAMES[f.name.replace(/ · (Light|Dark)$/, '')];
     if (!cfg) { missing.push(f.name); return; }
     /* a fresh instance, not a swap: a swap keeps overrides on same-named layers that point at the old nav-item variants */
     var side = C.adminSide.createInstance();

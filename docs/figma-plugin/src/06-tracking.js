@@ -441,7 +441,7 @@ async function trackScreensCall(builders) {
   var page = await rehydrate(PAGE_NAMES[3]);
   var made = [];
   for (var i = 0; i < builders.length; i++) {
-    var s = builders[i]();
+    var s = primaryTheme(builders[i]());
     await flush();
     var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
     var label = trackRowLabel(page), y = label.y + 120;

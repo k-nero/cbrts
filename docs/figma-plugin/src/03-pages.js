@@ -38,7 +38,7 @@ var COLOR_GROUPS = [
 function colorPanel(mode) {
   var dark = mode === 'Dark';
   var p = VV({ name: 'Colour · ' + mode, gap: 28, pad: 40, w: 1080, radius: 16, fill: 'bg/canvas', stroke: 'border/default' });
-  if (!dark) p.setExplicitVariableModeForCollection(COLL.color, COLL.light);
+  p.setExplicitVariableModeForCollection(COLL.color, dark ? COLL.dark : COLL.light);
   add(p, Tx(mode + ' mode', 'Heading/H3'));
   var hex = {};
   COLORS.forEach(function (c) { hex[c[0]] = dark ? c[1] : c[2]; });
@@ -75,7 +75,7 @@ var PRINCIPLES = [
   ['Estimates are ranges.', 'Customer-facing prices before a quotation is issued are always a low–high range with a non-binding notice.']
 ];
 function buildFoundations(page) {
-  var board = VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' });
+  var board = primaryTheme(VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' }));
   page.appendChild(board);
   var intro = VV({ name: 'Intro', gap: 12 });
   addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame’s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
@@ -993,7 +993,7 @@ function scrRoute() {
    Components page toast demo + Cover
    --------------------------------------------------------------------- */
 function buildCover(page) {
-  var f = VV({ name: 'Cover', gap: 32, pad: 96, w: 1600, h: 1000, fill: 'bg/canvas', main: 'SPACE_BETWEEN' });
+  var f = primaryTheme(VV({ name: 'Cover', gap: 32, pad: 96, w: 1600, h: 1000, fill: 'bg/canvas', main: 'SPACE_BETWEEN' }));
   page.appendChild(f);
   var top = VV({ name: 'Top', gap: 24 });
   var mk = H({ name: 'Mark', w: 72, h: 72, radius: 12, fill: 'accent/default', main: 'CENTER', cross: 'CENTER' });

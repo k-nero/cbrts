@@ -11,16 +11,15 @@
           src="//unpkg.com/react-scan/dist/auto.global.js"
         ></script>
         <script>
-            // Pick the theme before first paint so a light-mode browser never flashes navy.
-            // stores/themeStore.ts owns it from here; keep the key ('ef.theme') in step.
+            // Pick the theme before first paint so the page never flashes the wrong mode. Light is the
+            // presented theme; Dark only when picked. stores/themeStore.ts owns it from here; keep
+            // the key ('ef.theme') in step.
             (function () {
                 let mode;
                 try {
                     mode = localStorage.getItem('ef.theme');
                 } catch (e) {}
-                if (mode !== 'light' && mode !== 'dark') {
-                    mode = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-                }
+                if (mode !== 'dark') mode = 'light';
                 document.documentElement.dataset.theme = mode;
                 document.documentElement.style.colorScheme = mode;
             })();

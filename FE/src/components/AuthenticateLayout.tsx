@@ -18,7 +18,7 @@ import { useCustomRouter } from '@/router/route.hook';
 import { primaryRole, primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
 const USER_BUTTON = [
-  'flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border-0',
+  'flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md border-0',
   'bg-transparent px-2 text-left hover:bg-muted',
 ].join(' ');
 const AVATAR =

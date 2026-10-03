@@ -11,10 +11,13 @@ import {
   COLOR_TEXT_PRIMARY,
   COLOR_TEXT_SECONDARY,
   COLOR_TEXT_TERTIARY,
+  HEIGHT_FIELD,
   HEIGHT_FORM_ITEM,
   PALETTE,
   type ThemeMode,
 } from '@/constant/color';
+
+const FOCUS_RING = '0 0 0 3px rgba(201, 170, 90, 0.45)';
 
 /**
  * AntD on the EquiFreight tokens (DESIGN.md): navy and paper, gold only for the one forward action.
@@ -22,6 +25,13 @@ import {
  */
 const buildThemeAntd = (mode: ThemeMode): ThemeConfig => {
   const p = PALETTE[mode];
+  const FIELD = {
+    colorBgContainer: p.bgInput,
+    controlHeight: HEIGHT_FIELD,
+    activeShadow: FOCUS_RING,
+    errorActiveShadow: FOCUS_RING,
+    warningActiveShadow: FOCUS_RING,
+  };
   return {
     hashed: false,
     algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -48,10 +58,11 @@ const buildThemeAntd = (mode: ThemeMode): ThemeConfig => {
       boxShadow: 'none',
     },
     components: {
-      Input: { colorBgContainer: p.bgInput, activeBorderColor: p.accent },
-      InputNumber: { colorBgContainer: p.bgInput, activeBorderColor: p.accent },
-      Select: { colorBgContainer: p.bgInput },
-      DatePicker: { colorBgContainer: p.bgInput },
+      // Fields (DESIGN.md, Inputs): 44 px on Field Navy with a Rule border; focus is gold plus the ring.
+      Input: { ...FIELD, activeBorderColor: p.accent, hoverBorderColor: p.borderStrong },
+      InputNumber: { ...FIELD, activeBorderColor: p.accent, hoverBorderColor: p.borderStrong },
+      Select: { ...FIELD, activeBorderColor: p.accent, hoverBorderColor: p.borderStrong },
+      DatePicker: { ...FIELD, activeBorderColor: p.accent, hoverBorderColor: p.borderStrong },
       Button: {
         fontWeight: 500,
         primaryColor: p.accentOn,

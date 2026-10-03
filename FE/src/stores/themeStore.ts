@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import type { ThemeMode } from '@/constant/color';
 
 const STORAGE_KEY = 'ef.theme';
-const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
 
-const systemMode = (): ThemeMode => (media?.matches === false ? 'light' : 'dark');
+/** Light is the presented theme (DESIGN.md); Dark is an explicit pick from the toggle. */
+const DEFAULT_MODE: ThemeMode = 'light';
 
 function readStorage(): ThemeMode | null {
   try {
@@ -16,10 +16,9 @@ function readStorage(): ThemeMode | null {
   }
 }
 
-function writeStorage(mode: ThemeMode | null) {
+function writeStorage(mode: ThemeMode) {
   try {
-    if (mode === null) localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, mode);
+    localStorage.setItem(STORAGE_KEY, mode);
   } catch {
     // Private mode or blocked storage: the choice just lasts for this tab.
   }
@@ -33,30 +32,19 @@ function applyToDocument(mode: ThemeMode) {
 }
 
 interface ThemeState {
-  /** The user's explicit pick, or null to follow the browser's prefers-color-scheme. */
-  preference: ThemeMode | null;
-  /** What's on screen: the preference, else the browser's scheme. */
+  /** What's on screen: the user's pick, else Light. */
   mode: ThemeMode;
   toggle: () => void;
 }
 
-const initialPreference = readStorage();
-
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  preference: initialPreference,
-  mode: initialPreference ?? systemMode(),
+  mode: readStorage() ?? DEFAULT_MODE,
   toggle: () => {
     const next: ThemeMode = get().mode === 'dark' ? 'light' : 'dark';
-    // Toggling back to the browser's scheme drops the override, so the app follows it again.
-    const preference = next === systemMode() ? null : next;
-    writeStorage(preference);
-    set({ preference, mode: next });
+    writeStorage(next);
+    set({ mode: next });
   },
 }));
 
 applyToDocument(useThemeStore.getState().mode);
 useThemeStore.subscribe((state) => applyToDocument(state.mode));
-
-media?.addEventListener('change', () => {
-  if (useThemeStore.getState().preference === null) useThemeStore.setState({ mode: systemMode() });
-});

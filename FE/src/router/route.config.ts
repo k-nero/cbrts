@@ -13,6 +13,13 @@ export const routesConfig = [
   { path: '/login', roles: ['*'], type: 'unauthenticated', breadcrumb: '', name: 'login' },
   { path: '/forbidden', roles: ['*'], type: 'public', breadcrumb: '', name: 'forbidden' },
   {
+    path: '/design-system',
+    roles: ['*'],
+    type: 'public',
+    breadcrumb: 'Design system',
+    name: 'design-system',
+  },
+  {
     path: '/app',
     roles: ['CUSTOMER'],
     type: 'authenticated',

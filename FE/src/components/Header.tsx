@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { NavLink } from 'react-router-dom';
 import { DownOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Dropdown, Flex, Layout } from 'antd';
 import type { ItemType } from 'antd/es/menu/interface';
 
 import Brand from './Brand';
 import ThemeToggle from './ThemeToggle';
+import { NavItem } from './ui';
 
 import { COLOR_BG_CANVAS, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
@@ -19,7 +19,6 @@ const NAV: [RouteName, string, boolean][] = [
   ['my-requests', 'My requests', false],
 ];
 
-const NAV_ITEM = 'rounded-lg px-3 py-2 text-[13px] font-medium no-underline transition-colors';
 const AVATAR =
   'grid size-7 place-items-center rounded-full bg-muted font-mono text-[11px] text-ink-2';
 const ACCOUNT_CHIP = [
@@ -54,16 +53,9 @@ const Header: React.FC = () => {
         <Brand onClick={() => router.push(router.paths.get('customer-home'))} />
         <nav className="flex items-center gap-1" aria-label="Main">
           {NAV.map(([name, label, end]) => (
-            <NavLink
-              key={name}
-              to={router.paths.get(name)}
-              end={end}
-              className={({ isActive }) =>
-                `${NAV_ITEM} ${isActive ? 'bg-muted text-gold-ink' : 'text-ink-2 hover:text-ink'}`
-              }
-            >
+            <NavItem key={name} to={router.paths.get(name)} end={end}>
               {label}
-            </NavLink>
+            </NavItem>
           ))}
         </nav>
         <Flex align="center" gap={12}>
