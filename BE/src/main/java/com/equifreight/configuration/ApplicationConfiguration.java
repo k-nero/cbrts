@@ -13,17 +13,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class ApplicationConfiguration {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final UserJwtAuthenticationConverter userJwtAuthenticationConverter;
 
-    public ApplicationConfiguration(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    public ApplicationConfiguration(UserJwtAuthenticationConverter userJwtAuthenticationConverter) {
+        this.userJwtAuthenticationConverter = userJwtAuthenticationConverter;
     }
 
     @Bean
@@ -55,7 +54,10 @@ public class ApplicationConfiguration {
                                 RoleName.LOGISTICS_MANAGER, RoleName.TRANSPORT_SPECIALIST, RoleName.FLEET_COORDINATOR)
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // Bearer access tokens, verified by JwtConfiguration's decoder. A bad or expired token
+                // answers 401 so the client refreshes, or returns to sign-in once refreshing fails too.
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(userJwtAuthenticationConverter)));
         return http.build();
     }
 }

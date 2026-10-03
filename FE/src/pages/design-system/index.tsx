@@ -47,7 +47,7 @@ const Section: FC<{ title: string; description: string; children: ReactNode }> =
   <section className="flex flex-col gap-5 rounded-xl border border-line bg-card p-10">
     <div className="flex flex-col gap-2">
       <h2 className="type-display-m m-0 text-ink">{title}</h2>
-      <p className="type-body-m m-0 max-w-[900px] text-ink-2">{description}</p>
+      <p className="type-body-m m-0 max-w-225 text-ink-2">{description}</p>
     </div>
     {children}
   </section>
@@ -78,7 +78,7 @@ const DesignSystemPage: FC = () => {
         <Brand />
         <ThemeToggle />
       </header>
-      <main className="mx-auto flex max-w-[1200px] flex-col gap-8 px-0 pt-8 pb-24">
+      <main className="mx-auto flex max-w-300 flex-col gap-8 px-0 pt-8 pb-24">
         <PageHeader
           title="Design system"
           summary="The EquiFreight components as built in the app, in both themes. Gold marks the one action that moves a job forward; status is always a tone plus a word."

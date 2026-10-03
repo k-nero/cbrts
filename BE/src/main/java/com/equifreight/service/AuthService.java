@@ -8,16 +8,18 @@ import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.TokenResponse;
 import com.equifreight.repository.RefreshTokenRepository;
 import com.equifreight.repository.UserRepository;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import com.equifreight.configuration.JwtConfiguration;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,17 +29,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtEncoder jwtEncoder;
 
     AuthService(UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            JwtEncoder jwtEncoder) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtEncoder = jwtEncoder;
     }
-
-    @Value("${jwt.secret}")
-    private String jwtSecret;
 
     @Value("${jwt.expirationMs}")
     private long jwtExpirationMs;
@@ -88,14 +90,16 @@ public class AuthService {
 
     private String generateAccessToken(User user) {
         List<String> roles = user.getRoles().stream().map(Role::getName).toList();
-        return Jwts.builder()
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(user.getEmail())
                 .claim("roles", roles)
                 .claim("uid", user.getId().toString())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()))
-                .compact();
+                .issuedAt(now)
+                .expiresAt(now.plusMillis(jwtExpirationMs))
+                .build();
+        JwsHeader header = JwsHeader.with(JwtConfiguration.ALGORITHM).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
     private RefreshToken createRefreshToken(User user) {
