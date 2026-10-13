@@ -3,6 +3,7 @@ import { FC, ReactNode, useState } from 'react';
 import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
 import PageHeader from '@/components/PageHeader';
+import signInPhoto from '@/assets/photos/draft-signin-grey-window.jpg';
 import ThemeToggle from '@/components/ThemeToggle';
 import {
   Button,
@@ -23,6 +24,8 @@ import {
   OptionCard,
   OwedItem,
   Panel,
+  Perforation,
+  PhotoPanel,
   Progress,
   QuoteLine as QL,
   Radio,
@@ -607,6 +610,41 @@ const DesignSystemPage: FC = () => {
                 with a gold focus border and ring.
               </p>
             </Panel>
+          </div>
+        </Section>
+
+        <Section
+          title="Pass and photograph"
+          description="A pass tears between its body and stub on a line of 3 px Strong Border holes. A photograph is a material: its panel is Dark in both themes, with a navy scrim under its text."
+        >
+          <div className="grid grid-cols-2 gap-6">
+            <div className="flex overflow-hidden rounded-lg border border-line bg-card">
+              <div className="flex flex-1 flex-col gap-1 px-5 py-4">
+                <span className="type-h4 text-ink">Ho Chi Minh City → Phnom Penh</span>
+                <span className="type-caption text-ink-2">CBRT-2026-041</span>
+              </div>
+              <Perforation gap={6} inset={6} />
+              <div className="flex w-[160px] flex-col gap-0.5 bg-sunken py-4 pr-4 pl-5">
+                <span className="type-label-m text-ink">In 5 days</span>
+                <span className="type-caption text-ink-3">18 Oct 2026</span>
+              </div>
+            </div>
+            <PhotoPanel
+              src={signInPhoto}
+              direction="to bottom"
+              scrim={[
+                [0, 0],
+                [0.45, 0.4],
+                [1, 0.96],
+              ]}
+              focus="center 30%"
+              className="flex h-[240px] flex-col justify-end rounded-lg p-6"
+            >
+              <span className="type-h4 text-ink">Text on the scrim</span>
+              <span className="type-body-s text-ink-2">
+                Always Dark tokens, whatever the theme.
+              </span>
+            </PhotoPanel>
           </div>
         </Section>
       </main>

@@ -20,6 +20,8 @@ export * from './NavItem';
 export * from './OptionCard';
 export * from './OwedItem';
 export * from './Panel';
+export * from './Perforation';
+export * from './PhotoPanel';
 export * from './Progress';
 export * from './QuoteLine';
 export * from './RouteStrip';
