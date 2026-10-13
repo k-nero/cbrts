@@ -18,6 +18,14 @@ console.warn = (...a) => warns.push(a.join(' '));
     // a frame the canvas can't file is either a new screen missing from CANVAS or a node a builder made and never used
     if (out && out.loose && out.loose.length) { console.error('FAILED: loose frames on the canvas: ' + out.loose.join(', ')); process.exit(1); }
   }
+  // MCP_EXTRA: comma-separated one-off bundles (live patches) run after the full sequence, against the built file
+  for (const f of (process.env.MCP_EXTRA || '').split(',').filter(Boolean)) {
+    mock.resetPage();
+    delete globalThis.__EF;
+    const out = await new AsyncFunction(fs.readFileSync(f, 'utf8'))();
+    const s = JSON.stringify(out);
+    console.log(`extra ${path.basename(f)}: ${s.length > 300 ? s.slice(0, 300) + '…' : s}`);
+  }
   console.log('\npages:', mock.root.children.map((p) => `${p.name} (${p.children.length})`).join(', '));
   console.log('node counts:', JSON.stringify(mock.counts));
   if (warns.length) { console.log('\nwarnings:'); [...new Set(warns)].slice(0, 30).forEach((w) => console.log('  ' + w)); process.exit(1); }

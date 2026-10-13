@@ -35,7 +35,7 @@ async function main() {
   await flush();
 
   await figma.setCurrentPageAsync(screens);
-  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
+  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest2Window(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
   var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld()];
   row1.concat(row2).forEach(primaryTheme);
   await flush();

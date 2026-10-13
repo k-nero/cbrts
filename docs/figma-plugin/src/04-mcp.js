@@ -213,12 +213,12 @@ async function eHomeScreens() {
   await flush();
   return out;
 }
-async function eScreensOwnerB() { return screensCall([scrRequest1, scrRequest3, scrRequest4]); }
+async function eScreensOwnerB() { return screensCall([scrRequest1, scrRequest2, scrRequest4]); }
 /* The quotation (tracking page model) and the staff job tabs need components
    built later in the sequence, so they come after them: eQuoteScreen, eStaffScreens*. */
 
 var ROWS = [
-  ['Owner portal', ['Landing · Signed out', 'Home', 'My horses', 'Request · 1 Horses', 'Request · 3 Route & dates (error)', 'Request · 4 Review']],
+  ['Owner portal', ['Landing · Signed out', 'Home', 'My horses', 'Request · 1 Horses', 'Request · 2 Route & dates (error)', 'Request · 4 Review']],
   ['Operations', ['Quotation', 'Fleet & route coordinator · Load plan', 'Transport specialist · Clearance checklist', 'Fleet & route coordinator · Route plan']],
   ['Dark mode & mobile', ['Landing · Signed out · Dark', 'Home · Dark', 'Transport specialist · Clearance checklist · Dark', 'Quotation · Dark', 'My horses · Mobile', 'My horses · Mobile · Dark']]
 ];
@@ -301,7 +301,7 @@ var STAFF_ROWS = ['Logistics manager · Vũ Hải Yến', 'Transport specialist 
 /* [label text, existing label names it may carry, frames in reading order] */
 var CANVAS = [
   ['Access', ['Row label · Access', 'Row label · Access · Dark'], ['Access · Sign in', 'Access · Sign in · Wrong password', 'Access · Sign in · Locked', 'Access · Create account', 'Access · Create account · Check your email', 'Access · Staff invite', 'Access · Staff invite · Expired', 'Access · Reset password', 'Access · Reset password · Link sent', 'Access · Reset password · New password', 'Access · Reset password · Link expired']],
-  ['Owner portal', ['Row label · Owner portal', 'Row label · Owner portal · Dark'], ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'My horses', 'My horses · Nightfall', 'My horses · Nightfall · Edit', 'Request · 1 Horses', 'Request · 2 Service', 'Request · 3 Route & dates (error)', 'Request · 3 Route & dates · Arrival window', 'Request · 4 Review', 'First run · My requests', 'First run · Add a horse']],
+  ['Owner portal', ['Row label · Owner portal', 'Row label · Owner portal · Dark'], ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'My horses', 'My horses · Nightfall', 'My horses · Nightfall · Edit', 'Request · 1 Horses', 'Request · 2 Route & dates (error)', 'Request · 2 Route & dates · Arrival window', 'Request · 3 Service', 'Request · 4 Review', 'First run · My requests', 'First run · Add a horse']],
   ['Owner · Request tracking', ['Row label · Owner · Request tracking'], ['Tracking · My requests', 'Tracking · In review', 'Tracking · Info required', 'Quotation', 'Tracking · Documents needed', 'Tracking · All documents', 'Tracking · Ask a question', 'Tracking · Document upload · Refused', 'Tracking · Document upload', 'Tracking · In transit', 'Tracking · Re-routed', 'Tracking · Delivered', 'Tracking · Closed', 'Tracking · Invoice', 'Tracking · Report a problem']],
   [STAFF_ROWS[0], ['Row label · ' + STAFF_ROWS[0], 'Row label · Staff workspace · Dark', 'Row label · Staff workspace'], ['Logistics manager · Overview', 'Logistics manager · Jobs', 'Logistics manager · Jobs · Sorted', 'Logistics manager · Request review', 'Logistics manager · Request review · Override', 'Logistics manager · Quotation builder', 'Logistics manager · Quotation builder · Blocked', 'Logistics manager · Incident · Held', 'Logistics manager · Incident · Customer report', 'Logistics manager · Users & roles', 'Logistics manager · Users & roles · Error', 'Logistics manager · Users & roles · Pending invites', 'Logistics manager · Audit log', 'Logistics manager · Audit log · Entry', 'Logistics manager · Audit log · No results']],
   [STAFF_ROWS[1], ['Row label · ' + STAFF_ROWS[1]], ['Transport specialist · Clearance checklist', 'Transport specialist · Authorities', 'Transport specialist · Authorities · Overdue', 'Transport specialist · Document review', 'Transport specialist · Document review · Not sent', 'Transport specialist · Document review · Reject', 'Transport specialist · Customer notes', 'Transport specialist · Regulation catalog', 'Transport specialist · Rate catalog', 'Transport specialist · Audit log · Not allowed']],

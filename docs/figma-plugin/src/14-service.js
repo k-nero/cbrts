@@ -1,5 +1,5 @@
 /* =====================================================================
-   Request wizard, step 2: Service. How the horses travel, the stalls each
+   Request wizard, step 3: Service. How the horses travel, the stalls each
    horse needs, extras and who insures them. Every option says what it
    does to the estimate (a range delta, "Included", or why it isn't
    available); the estimate card stays a range, never a price.
@@ -43,15 +43,15 @@ function effectRow(lead, title, sub, effect, effectTone) {
   addAll(r, [lead, fillW(t), Tx(effect, 'Mono/Caption', effectTone || 'text/secondary', { align: 'RIGHT' })]);
   return r;
 }
-function scrRequest2() {
-  var left = VV({ name: 'Step 2', gap: 28 });
+function scrRequest3() {
+  var left = VV({ name: 'Step 3', gap: 28 });
   var intro = VV({ name: 'Intro', gap: 8 });
   addAll(intro, [Tx('How should they travel?', 'Heading/H3'), Tx('Each choice shows what it does to your estimate. The estimate stays a range; the itemised quotation comes after review.', 'Body/M', 'text/secondary', { fill: true })]);
   add(left, fillW(intro));
   add(left, fillW(svcSection('Mode', null, svcOptions([
     ['Selected', 'Road', 'Door to door by trailer · ~960 km · 2 border crossings.', 'In the estimate', 'truck'],
     ['Disabled', 'Air', 'No equine air service Ho Chi Minh City → Bangkok. The nearest goes via Hong Kong and takes 3 days longer.', 'Unavailable', 'plane']], true))));
-  add(left, fillW(svcSection('Trailer', null, svcOptions([
+  add(left, fillW(svcSection('Trailer', 'An arrival window on step 2 books a private trailer.', svcOptions([
     ['Selected', 'Shared load', 'Shares a trailer with other consignments on set departures.', 'In the estimate', null],
     ['Default', 'Private trailer', 'Your own trailer and your own departure time.', '+ $2,400 – $3,300', null]], true))));
   var stalls = panel('Stalls', { gap: 0, pad: 0, clip: true });
@@ -76,20 +76,12 @@ function scrRequest2() {
   foot.paddingTop = 20;
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), Tx('Road · shared load · 1 climate stall · your own insurance', 'Label/S', 'text/secondary', { fill: true, align: 'CENTER' }), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 2 Service', ['Done', 'Current', 'Upcoming', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 3 Service', ['Done', 'Done', 'Current', 'Upcoming'], left, draftPass({ route: true,
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    range: '$11,300 – $16,100', rangeSub: DRAFT_SUB }));
 }
 async function eService() {
-  var out = await insertChainCall([scrRequest2], 'Request · 1 Horses');
-  await insertChainCall([scrRequest3Window], 'Request · 3 Route & dates (error)');
-  var rv = figma.currentPage.children.filter(function (n) { return n.name === 'Request · 4 Review'; })[0];
-  var sum = rv && rv.findOne(function (n) { return n.type === 'FRAME' && n.name === 'Summary'; });
-  var svc = sum && sum.children.filter(function (n) { return n.name === 'Service'; })[0];
-  if (svc && !sum.children.some(function (n) { return n.name === 'Insurance'; })) {
-    var row = svc.clone(); row.name = 'Insurance';
-    sum.insertChild(sum.children.indexOf(svc) + 1, row);
-    var t = row.children.filter(function (n) { return n.type === 'TEXT'; });
-    t[0].characters = 'Insurance'; t[1].characters = 'Your own policy · upload it with your documents once the job is approved';
-    out.reviewEdited = true;
-  }
+  var out = await insertChainCall([scrRequest2Window], 'Request · 2 Route & dates (error)');
+  await insertChainCall([scrRequest3], 'Request · 2 Route & dates · Arrival window');
   return out;
 }

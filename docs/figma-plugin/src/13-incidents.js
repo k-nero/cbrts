@@ -160,7 +160,7 @@ function scrTrackReport() {
   addAll(r, [Tx('Yến replies', 'Body/S', 'text/secondary'), dueStack('Within 2 hours', 'of sending')]);
   addAll(next, [Tx('What happens next', 'Heading/H4'), Tx('Yến, logistics manager, reads your report with the escort’s arrival record and replies with a next step.', 'Body/S', 'text/secondary', { fill: true }), fillW(r),
     Tx('Sending pauses the 26 Sep handover deadline until the case is settled.', 'Body/S', 'text/secondary', { fill: true })]);
-  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
+  var s = trackScreen('Tracking · Report a problem', passHead({ back: 'Back to the request', codes: ['REQ-2026-0151', 'CBRT-2026-036'], chips: [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], from: ['BKK', 'Bangkok'], to: ['HCM', 'Ho Chi Minh City'], facts: [['Delivered', '24 Sep · 16:05', true], ['Horses', '3 · Golden Lotus and two more'], ['Borders', 'Poipet, then Mộc Bài']], stub: ['Confirm handover by', '26 Sep', 'paused once you send this report'] }),
     [split(form, column([urgent, next]), SIDE.narrow)], '24 Sep 2026, ' + INC36.draft);
   var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });

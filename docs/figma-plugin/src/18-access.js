@@ -47,9 +47,16 @@ function authScreen(name, form, aside, o) {
     body = H({ name: 'Body' });
     var left = VV({ name: 'Form column', w: 720, pad: [96, 120, 64, 160] });
     add(left, form);
-    var right = VV({ name: 'Aside', gap: 28, pad: [96, 120, 64, 96], fill: 'bg/sunken' });
-    right.strokes = [P('border/default')]; right.strokeAlign = 'INSIDE';
-    right.strokeTopWeight = 0; right.strokeBottomWeight = 0; right.strokeRightWeight = 0; right.strokeLeftWeight = 1;
+    var right;
+    if (o.photo) {
+      /* a photograph, so Dark mode and a scrim from the bottom; the list sits on the dark end */
+      right = photoPanel({ key: o.photo, dir: 'V', gap: 28, pad: [96, 120, 64, 96], main: 'MAX', vertical: true, scrim: [[0, NAVY + '00'], [0.3, NAVY + '26'], [0.55, NAVY + 'B3'], [1, NAVY + 'F5']] });
+      right.name = 'Aside · Photo · ' + o.photo;
+    } else {
+      right = VV({ name: 'Aside', gap: 28, pad: [96, 120, 64, 96], fill: 'bg/sunken' });
+      right.strokes = [P('border/default')]; right.strokeAlign = 'INSIDE';
+      right.strokeTopWeight = 0; right.strokeBottomWeight = 0; right.strokeRightWeight = 0; right.strokeLeftWeight = 1;
+    }
     aside.forEach(function (a) { add(right, a); });
     addAll(body, [left, fillW(right)]);
     right.layoutSizingVertical = 'FILL';
@@ -77,7 +84,8 @@ function asideList(title, rows, o) {
       add(row, n);
     } else if (r[2]) add(row, Ic(r[2], 20, 'text/tertiary'));
     var t = VV({ name: 'Text', gap: 2 });
-    addAll(t, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    add(t, Tx(r[0], 'Label/M'));
+    if (!o.compact) add(t, Tx(r[1], 'Body/S', 'text/secondary', { fill: true }));
     add(row, fillW(t));
     add(v, fillW(row));
   });
@@ -89,7 +97,8 @@ var ACCOUNT_KEEPS = [
   ['Quotations you can read line by line', 'Every line says how it was worked out. You accept or decline in one place.', 'tag'],
   ['Your horses, entered once', 'Passport details, size and handling needs are reused on every move.', 'check']
 ];
-function signInAside() { return [asideList('One account for every move', ACCOUNT_KEEPS)]; }
+/* on the photograph only the four titles are shown, so the list stays on the dark end of the scrim */
+function signInAside() { return [asideList('One account for every move', ACCOUNT_KEEPS, { compact: true })]; }
 
 /* ---------- Sign in ---------- */
 function signInForm(o) {
@@ -116,9 +125,9 @@ function signInForm(o) {
   blocks.push(Tx('Staff sign in here too, with the email your invite was sent to. Your role decides where you land.', 'Body/S', 'text/tertiary', { fill: true }));
   return authForm(authHead('Sign in', 'One sign-in for racing clubs and EquiFreight staff.'), blocks);
 }
-function scrSignIn() { return authScreen('Access · Sign in', signInForm(), signInAside()); }
-function scrSignInError() { return authScreen('Access · Sign in · Wrong password', signInForm({ error: true }), signInAside()); }
-function scrSignInLocked() { return authScreen('Access · Sign in · Locked', signInForm({ locked: true }), signInAside(), { asOf: '26 Sep 2026, 14:20', tall: true }); } // the lock notice and its two actions need more than 900
+function scrSignIn() { return authScreen('Access · Sign in', signInForm(), signInAside(), { photo: 'Sign in' }); }
+function scrSignInError() { return authScreen('Access · Sign in · Wrong password', signInForm({ error: true }), signInAside(), { photo: 'Sign in' }); }
+function scrSignInLocked() { return authScreen('Access · Sign in · Locked', signInForm({ locked: true }), signInAside(), { asOf: '26 Sep 2026, 14:20', tall: true, photo: 'Sign in' }); } // the lock notice and its two actions need more than 900
 
 /* ---------- Create a club account ---------- */
 var NEXT_STEPS = [

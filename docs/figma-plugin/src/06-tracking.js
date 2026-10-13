@@ -358,6 +358,7 @@ function scrTrackDocs() {
   ]);
   var people = peoplePanel([['Lan', 'transport specialist', 'Checks your documents and files the border dossiers.'], ['Yến', 'logistics manager', 'Approved the job; handles changes to dates or price.'], ['Minh', 'driver', 'Drives trailer TX-447 on 18 Oct with two grooms.']]);
   var route = routePanel('Route', 'Planned. Positions will come from checkpoints recorded by the escort.', stopsWith(['Upcoming', 'Upcoming', 'Upcoming', 'Upcoming']), 'Locked', [['Vehicle', 'Trailer TX-447', true], ['Driver', 'Minh'], ['Grooms', '2, one per 3 horses'], ['Distance', '240 km · 6.5 h', true]]);
+  route.insertChild(1, map041('plan', 408, 280));
   var hist = historyPanel([
     ['24 Sep · 16:02', 'Proof of ownership for Silver Bell rejected: the bill of sale is unsigned.', 'Lan, transport specialist'],
     ['21 Sep · 10:15', 'EIA test for Shadowfax uploaded and approved.', 'You, then Lan'],
@@ -365,7 +366,7 @@ function scrTrackDocs() {
     ['12 Sep · 11:30', 'Job approved as CBRT-2026-041; document checklist created (23 items).', 'Yến, logistics manager'],
     ['10 Sep · 18:44', 'Quotation v2 accepted; 30% deposit confirmed.', 'You']
   ], 'Show all 14 events');
-  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · Documents needed', pass041(['Departs in', '22 days', '18 Oct 2026 · 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')]), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: in transit ---------- */
@@ -374,7 +375,7 @@ function onTheRoad() {
   var route = panel('Route', { gap: 20 });
   var rh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
   addAll(rh, [VV({ name: 'Title', gap: 2 }, [Tx('On the road', 'Heading/H3'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary')]), Tx('Updated 08:41', 'Mono/Caption', 'text/tertiary')]);
-  addAll(route, [fillW(rh), fillW(routeStrip(stopsWith(['Done', 'Current', 'Upcoming', 'Upcoming'], ['06:05 · departed', '08:34 · cleared', 'exp. 09:30', 'exp. 12:30']), 'Clear'))]);
+  addAll(route, [fillW(rh), map041('transit', 1152, 380), mapLegend(['done', 'todo'])]);
   return route;
 }
 function scrTrackTransit() {
@@ -396,15 +397,16 @@ function scrTrackTransit() {
     ['Current', 'On the road with Minh, driver, and two grooms since 06:05. Planned to arrive inside your ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ' window.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
   var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
-  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageMark('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
+  return trackScreen('Tracking · In transit', pass041(['Arrives in about', '4 h', '12:30 · in your window'], [stageMark('Trip')]), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
 /* ---------- Detail: delivered ---------- */
 function scrTrackDelivered() {
   var items = [owedItem('Soon', 'Confirm handover and condition', 'Shipment · 4 horses delivered 12:41', 'Hoa, groom, logged all four horses sound on arrival. Confirm receipt, or report a problem. If you don’t reply by 20 Oct, the handover is taken as accepted on Hoa’s record.', 'Due in 2 days', '20 Oct 2026', 'Confirm handover', 'check', { second: 'Report a problem' })];
-  var lead = owedPanel('1 item', 'Your horses arrived at Phnom Penh Equestrian Centre at 12:41, eleven minutes after the planned time.', items,
+  var lead = owedPanel('1 item', 'Your horses arrived at Phnom Penh Equestrian Centre at 12:41, inside your 11:00–14:00 window.', items,
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
   var route = routePanel('Route', 'Completed. Every checkpoint was recorded by the escort.', stopsWith(['Done', 'Done', 'Done', 'Done'], ['06:05', '08:34', '09:36', '12:41']), 'Clear', [['On time', 'Yes, 11 min after plan'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold']]);
+  route.insertChild(1, map041('done', 408, 280));
   var arr = panel('Arrival record', { gap: 12 });
   add(arr, Tx('Arrival condition', 'Heading/H4'));
   [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.'], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
@@ -420,7 +422,7 @@ function scrTrackDelivered() {
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
   var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
-  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
+  return trackScreen('Tracking · Delivered', pass041(['Delivered', '12:41', '18 Oct · inside your window'], [stageMark('Handover')]), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 
 /* ---------- entries ---------- */

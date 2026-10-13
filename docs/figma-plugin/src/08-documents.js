@@ -224,7 +224,7 @@ function docTable(viewer) {
 function scrAllDocs() {
   var sum = docTableSummary('owner'), tabs = docTableTabs('owner'), list = docTable('owner');
   var note = Tx('Export health certificates are issued by the Dept. of Animal Health (VN) 8–14 Oct, inside the 10 days before departure; Lan requests them for you. Open any row to see its versions.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · All documents', pass041(['Departs in', '22 days', '18 Oct 2026 · 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], { back: 'Back to the request' }), [sum, tabs, list, note], '26 Sep 2026, 11:20');
 }
 
 /* ---------- MCP entry ---------- */
