@@ -9,11 +9,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
 import { z } from 'zod';
 
+import signInPhoto from '@/assets/photos/draft-signin-grey-window.jpg';
 import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import ThemeToggle from '@/components/ThemeToggle';
+import { PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
@@ -24,29 +26,15 @@ const schema = z.object({
 });
 type LoginForm = z.infer<typeof schema>;
 
-/** What the account keeps for a club (the Access design's aside). */
-const ACCOUNT_KEEPS: [string, string, React.ReactNode][] = [
-  [
-    'What you owe, and by when',
-    'Every upload and answer we need from you, sorted by deadline, each with its due date.',
-    <ClockCircleOutlined key="i" />,
-  ],
-  [
-    'Documents checked against your travel dates',
-    'Each test and certificate is checked against the day the horse travels, ' +
-      'not the day you upload it.',
-    <FileTextOutlined key="i" />,
-  ],
-  [
-    'Quotations you can read line by line',
-    'Every line says how it was worked out. You accept or decline in one place.',
-    <TagOutlined key="i" />,
-  ],
-  [
-    'Your horses, entered once',
-    'Passport details, size and handling needs are reused on every move.',
-    <CheckOutlined key="i" />,
-  ],
+/**
+ * What the account keeps for a club (the Access design's aside). On the photograph only the titles
+ * are shown, so the list stays on the dark end of the scrim.
+ */
+const ACCOUNT_KEEPS: [string, React.ReactNode][] = [
+  ['What you owe, and by when', <ClockCircleOutlined key="i" />],
+  ['Documents checked against your travel dates', <FileTextOutlined key="i" />],
+  ['Quotations you can read line by line', <TagOutlined key="i" />],
+  ['Your horses, entered once', <CheckOutlined key="i" />],
 ];
 
 /** One sign-in for racing clubs and staff; the account's role decides where it lands. */
@@ -116,25 +104,34 @@ const LoginPage = () => {
             )}
           </FormWrapper>
         </Flex>
-        <aside
-          className="flex-1 border-l border-line bg-sunken"
+        <PhotoPanel
+          src={signInPhoto}
+          alt="A hand rests on a grey horse's rugged neck as it looks out of a trailer window."
+          direction="to bottom"
+          scrim={[
+            [0, 0],
+            [0.3, 0.15],
+            [0.55, 0.7],
+            [1, 0.96],
+          ]}
+          className="flex flex-1 flex-col justify-end"
           style={{ padding: '96px 120px 64px 96px' }}
         >
-          <Flex vertical style={{ maxWidth: 480 }}>
-            <h2 className="m-0 pb-4 font-display text-[22px] leading-7 font-semibold text-ink">
+          <aside aria-labelledby="keeps-title" className="flex max-w-[480px] flex-col">
+            <h2
+              id="keeps-title"
+              className="m-0 pb-4 font-display text-[22px] leading-7 font-semibold text-ink"
+            >
               One account for every move
             </h2>
-            {ACCOUNT_KEEPS.map(([title, body, icon]) => (
-              <Flex key={title} gap={14} className="border-t border-line py-3.5">
-                <span className="pt-0.5 text-[18px] text-ink-3">{icon}</span>
-                <Flex vertical gap={2}>
-                  <span className="text-[14px] font-medium text-ink">{title}</span>
-                  <span className="text-[13px] leading-5 text-ink-2">{body}</span>
-                </Flex>
+            {ACCOUNT_KEEPS.map(([title, icon]) => (
+              <Flex key={title} gap={14} align="center" className="border-t border-line py-3.5">
+                <span className="text-[18px] text-ink-3">{icon}</span>
+                <span className="text-[14px] font-medium text-ink">{title}</span>
               </Flex>
             ))}
-          </Flex>
-        </aside>
+          </aside>
+        </PhotoPanel>
       </Flex>
       <Footer size="compact" />
     </Flex>

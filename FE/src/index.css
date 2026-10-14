@@ -128,6 +128,45 @@
 }
 
 /*
+ * A photograph is a material, like the brass nameplate: it reads the same in both themes, so a
+ * photo panel (components/ui/PhotoPanel) is always Dark, with a navy scrim under its text
+ * (03-pages.js, photoPanel). This puts the Dark values back on that subtree inside a Light page.
+ */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #0c1520;
+  --color-sunken: #09111a;
+  --color-input: #0e1826;
+  --color-card: #111b2c;
+  --color-raised: #15223a;
+  --color-muted: #182538;
+  --color-line: #1c2e44;
+  --color-line-strong: #2a4266;
+  --color-ink: #ede9e1;
+  --color-ink-2: #b3bfcc;
+  --color-ink-3: #7a8fa3;
+  --color-gold-hover: #d6b96b;
+  --color-gold-ink: #d9bd72;
+  --color-gold-soft: #c9aa5a1f;
+  --color-gold-line: #c9aa5a59;
+  --color-ok: #5dc688;
+  --color-ok-soft: #5dc6881f;
+  --color-ok-line: #5dc68859;
+  --color-warn: #fdb47a;
+  --color-warn-soft: #fdb47a1f;
+  --color-warn-line: #fdb47a61;
+  --color-bad: #ef6b6b;
+  --color-bad-soft: #ef6b6b1f;
+  --color-bad-line: #ef6b6b61;
+  --color-info: #7fb0e8;
+  --color-info-soft: #7fb0e81f;
+  --color-info-line: #7fb0e859;
+  --color-disabled: #4a5b70;
+  --color-scrim: #00000066;
+  --color-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/*
  * The type scale (DESIGN.md, Typography), one utility per Figma text style, family included.
  * Fraunces for names and headings, Outfit for prose and labels, DM Mono for data.
  */

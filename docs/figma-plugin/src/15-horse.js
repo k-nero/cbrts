@@ -5,13 +5,51 @@
    what an edit would touch before it is saved.
    ===================================================================== */
 var NF = HORSES[1];
-/* the horse's coat band stands in for the title; the nameplate carries her name */
-function horseHead(right) {
-  var band = H({ name: 'Coat', h: 132, pad: [0, 24, 22, 24], radius: 12, cross: 'MAX', fill: 'coat/' + NF.coat.toLowerCase(), clip: true });
+/* the horse's coat band stands in for the title; the nameplate carries her name. With a photo, the band fades
+   from her coat colour on the left into the picture, so the nameplate always sits on her colour. The photo is a
+   flat placeholder named "Photo · <name>" that the picture is uploaded into (docs/design-assets/). After the upload,
+   set the fill to CROP with PHOTO_CROP.band; the same picture goes on her My horses card's Coat band (over the coat
+   colour, under its Shade) with PHOTO_CROP.card, which puts her head right of the nameplate. */
+var PHOTO_CROP = { band: [[0.908, 0, 0], [0, 0.326, 0.195]], card: [[0.632, 0, 0], [0, 0.439, 0.143]], avatar: [[0.218, 0, 0.407], [0, 0.39, 0.156]] }; // avatar: the request wizard's horse pick
+var COAT_HEX = { Grey: '#8E949B', Black: '#202329', Chestnut: '#7B3F1F', Bay: '#5B3522' };
+function horseBand(h, o) {
+  o = o || {};
+  var band = H({ name: 'Coat', w: 1200, h: o.photo ? 240 : 132, pad: [0, 32, 28, 32], radius: 16, cross: 'MAX', fill: 'coat/' + h.coat.toLowerCase(), clip: true });
+  if (o.photo) {
+    var hex = COAT_HEX[h.coat];
+    var ph = figma.createRectangle(); ph.name = 'Photo · ' + h.name; ph.fills = [P('coat/' + h.coat.toLowerCase())];
+    var sc = figma.createRectangle(); sc.name = 'Scrim'; sc.fills = [gradient([[0, hex + 'FF'], [0.22, hex + 'CC'], [0.46, hex + '00']])];
+    [ph, sc].forEach(function (r) { band.appendChild(r); r.layoutPositioning = 'ABSOLUTE'; r.x = 0; r.y = 0; r.resize(1200, 240); r.constraints = { horizontal: 'STRETCH', vertical: 'STRETCH' }; });
+  }
   var plate = inst(C.nameplate);
-  setP(plate, { Name: NF.name, Subtitle: NF.sub });
+  setP(plate, { Name: h.name, Subtitle: h.sub });
   add(band, plate);
-  return pageHeader({ back: 'My horses', banner: band, code: NF.chip, summary: 'Thoroughbred · mare · 4 y · black', metaChips: NF.tags.map(function (t) { return chip(t[0], t[1]); }), right: [right] });
+  return band;
+}
+function horseHead(right) {
+  return pageHeader({ back: 'My horses', banner: horseBand(NF, { photo: true }), code: NF.chip, summary: 'Thoroughbred · mare · 4 y · black', metaChips: NF.tags.map(function (t) { return chip(t[0], t[1]); }), right: [right] });
+}
+/* how ready she is to travel: a ring of documents cleared, and who holds the rest */
+function readinessPanel(done, total, rest) {
+  var p = panel('Ready to travel', { gap: 14 });
+  add(p, Tx('Ready to travel?', 'Heading/H4'));
+  var row = H({ name: 'Row', gap: 20, cross: 'CENTER' });
+  var r = 38, c = 48, a = done / total * 2 * Math.PI;
+  var ex = c + r * Math.sin(a), ey = c - r * Math.cos(a);
+  var svg = '<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="48" cy="48" r="38" stroke="#000" stroke-width="8"/><path d="M48 10 A38 38 0 ' + (a > Math.PI ? 1 : 0) + ' 1 ' + ex.toFixed(2) + ' ' + ey.toFixed(2) + '" stroke="#000" stroke-width="8"/></svg>';
+  var ring = figma.createNodeFromSvg(svg); ring.name = 'Ring'; ring.fills = [];
+  var vs = ring.findAll(function (n) { return n.type === 'VECTOR' || n.type === 'ELLIPSE'; });
+  vs.forEach(function (v, i) { v.strokes = [P(i === 0 ? 'surface/muted' : 'status/ok/fg')]; v.strokeWeight = 8; v.strokeCap = 'ROUND'; });
+  var wrap = F({ name: 'Readiness', w: 96, h: 96 });
+  wrap.appendChild(ring); ring.x = 0; ring.y = 0;
+  var n = Tx(done + '/' + total, 'Mono/Data', 'text/primary', { name: 'Count' });
+  wrap.appendChild(n); n.x = Math.round(48 - n.width / 2); n.y = Math.round(48 - n.height / 2);
+  var t = VV({ name: 'Text', gap: 6 });
+  add(t, Tx('Not yet: ' + (total - done) + ' of ' + total + ' documents to go', 'Label/M', 'text/primary', { fill: true }));
+  rest.forEach(function (x) { add(t, Tx(x, 'Body/S', 'text/secondary', { fill: true })); });
+  addAll(row, [wrap, fillW(t)]);
+  add(p, fillW(row));
+  return p;
 }
 /* facts: [label, value, mono] in a two-column grid */
 function factGrid(facts) {
@@ -85,7 +123,7 @@ function scrHorseProfile() {
     ['EIA (Coggins) test · CBRT-2026-041', 'Warn', 'Expires in transit', '77 days old at departure; a new test is due 4 Oct.'],
     ['Export health certificate · CBRT-2026-041', 'Neutral', 'Not issued yet', 'Issued 8–14 Oct by the vet authority.']], true);
   var left = column([owed, needs, keep, trip]);
-  var s = screen('My horses · Nightfall', 'My horses', [horseHead(btn('Secondary', 'MD', 'Edit profile', { lead: 'pencil' })), split(left, column([tripsPanel(), valuePanel()]), SIDE.narrow)], { gap: 28, asOf: '26 Sep 2026, 11:20' });
+  var s = screen('My horses · Nightfall', 'My horses', [horseHead(btn('Secondary', 'MD', 'Edit profile', { lead: 'pencil' })), split(left, column([readinessPanel(3, 5, ['EIA (Coggins) test: yours, due 4 Oct', 'Export health certificate: the vet authority, 8–14 Oct']), tripsPanel(), valuePanel()]), SIDE.narrow)], { gap: 28, asOf: '26 Sep 2026, 11:20' });
   return s;
 }
 

@@ -143,7 +143,7 @@ function scrInvoice() {
   var lead = owedPanel('1 item', 'Yến, logistics manager, issued the final invoice on 19 Oct after you confirmed the handover. It settles your quotation against what happened on the trip.',
     [owedItem('Soon', 'Pay the final invoice', INV041.code + ' · ' + money(T041.due), 'By bank transfer with ' + INV041.code + ' as the reference. The deposit you paid on ' + INV041.paidOn + ' is already taken off.', 'Due in 7 days', INV041.due, 'Download invoice (PDF)', 'file')],
     { chipTone: 'Warn', chipLabel: 'Payment due' }, null);
-  return trackScreen('Tracking · Invoice', trackHead('Ho Chi Minh City → Phnom Penh', [INV041.code, 'final invoice · job CBRT-2026-041 · REQ-2026-0162 · issued ' + INV041.issued], [stageMark('Handover'), chip('Warn', 'Payment due')], true), [lead, split(left, right, SIDE.narrow)], '19 Oct 2026, 10:05');
+  return trackScreen('Tracking · Invoice', pass041(['Amount due', money(T041.due), 'by ' + INV041.due], [stageMark('Handover'), chip('Warn', 'Payment due')], { codes: ['REQ-2026-0162', 'CBRT-2026-041', INV041.code] }), [lead, split(left, right, SIDE.narrow)], '19 Oct 2026, 10:05');
 }
 
 /* ---------- CBRT-2026-040, 29 Sep 09:40: re-routed through Xa Mát ---------- */
@@ -155,13 +155,24 @@ var REROUTE040 = {
   v2: [['Done', 'Phnom Penh', 'Pickup · Sokha Stables', '05:30'], ['Current', 'Bavet', 'Held 08:12–09:25, turned back', '09:25'], ['Upcoming', 'Xa Mát – Trapeang Phlong', 'Border', 'exp. 10:50'], ['Upcoming', 'Xa Mát yard', 'Rest stop · unloaded', '11:10'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '15:40']],
   v1: [['Upcoming', 'Phnom Penh', 'Pickup', '05:30'], ['Upcoming', 'Bavet – Mộc Bài', 'Border', '08:00'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '09:30'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '13:30']]
 };
+/* CBRT-2026-040's two plans on one map: v2 through Xa Mát drawn, v1 through Mộc Bài faint and dashed */
+function map040(w, h) {
+  return jobMap({ w: w, h: h, bounds: [104.6, 106.95, 10.65, 11.9],
+    border: [[106.3, 11.9], [106.0, 11.7], [106.2, 11.42], [106.12, 11.08], [105.95, 10.88], [105.7, 10.65]],
+    areas: [['VIETNAM', 106.6, 11.5], ['CAMBODIA', 105.3, 11.2]],
+    paths: [{ pts: [[104.92, 11.56], [105.3, 11.35], [105.8, 11.09], [106.12, 11.08]], kind: 'done' },
+      { pts: [[106.12, 11.08], [105.75, 11.45], [106.0, 11.7], [106.06, 11.6], [106.1, 11.31], [106.66, 10.86]], kind: 'todo' },
+      { pts: [[106.12, 11.08], [106.36, 11.03], [106.66, 10.86]], kind: 'old' }],
+    stops: [[104.92, 11.56, 'Phnom Penh', '05:30 · Sokha Stables', 'stop', 'done', 'b'], [106.12, 11.08, 'Bavet', 'held 08:12–09:25', 'gate', 'done', 'b'], [106.0, 11.7, 'Xa Mát – Trapeang Phlong', 'exp. 10:50', 'gate', 'next', 'l'], [106.06, 11.6, 'Xa Mát yard', '11:10 · rest, unloaded', 'stop', 'todo', 'r'], [106.66, 10.86, 'Ho Chi Minh City', '15:40', 'stop', 'todo', 'r'], [106.36, 11.03, 'Tây Ninh', 'v1 welfare 09:30', 'stop', 'old', 'r']],
+    at: [106.12, 11.08, 'Last confirmed 09:25'] });
+}
 /* the current plan in full, then each earlier plan, newest first, with when, who and why it changed */
 function routeHistoryPanel() {
   var p = panel('Route', { gap: 18 });
   var h = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
   addAll(h, [VV({ name: 'Title', gap: 2 }, [Tx('Route · version 2', 'Heading/H4'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary', { fill: true })]), Tx('Updated ' + REROUTE040.now, 'Mono/Caption', 'text/tertiary')]);
   h.children[0].layoutSizingHorizontal = 'FILL';
-  addAll(p, [fillW(h), fillW(routeList(REROUTE040.v2.map(function (s) { return s; })))]);
+  addAll(p, [fillW(h), map040(728, 400), mapLegend(['done', 'todo', 'old']), fillW(routeList(REROUTE040.v2))]);
   add(p, divider());
   add(p, Tx('Earlier plans', 'Label/S', 'text/secondary'));
   var old = VV({ name: 'Version 1', gap: 12, pad: [16, 18, 16, 18], radius: 8, fill: 'bg/sunken' });
@@ -184,7 +195,7 @@ function scrTrackRerouted() {
   [['Arrival', '15:40 instead of 13:30'], ['Price', 'Unchanged; the extra 95 km is ours'], ['Documents', '1 new, filed by Lan']].forEach(function (r) { add(change, factRow(r)); });
   var people = peoplePanel([['Tùng', 'driver', 'Driving Mekong Star on the new route.'], ['Yến', 'logistics manager', 'Decided the re-route and answers your questions.'], ['Lan', 'transport specialist', 'Files the declaration for the Xa Mát crossing.']]);
   var hist = historyPanel([['29 Sep · 09:25', 'Left Bavet for the Xa Mát crossing.', 'Tùng, driver'], ['29 Sep · 09:24', 'Route changed to version 2, via Xa Mát – Trapeang Phlong.', 'Khôi, fleet & route coordinator'], ['29 Sep · 09:20', 'Re-route decided; message sent to you.', 'Yến, logistics manager'], ['29 Sep · 08:12', 'Held at Bavet: Mộc Bài closed until 16:00.', 'Tùng, driver']], 'Show all 27 events');
-  var s = trackScreen('Tracking · Re-routed', trackHead('Phnom Penh → Ho Chi Minh City', ['REQ-2026-0144', 'job CBRT-2026-040 · Mekong Star · shared load · departed 29 Sep 2026, 05:30'], [stageMark('Trip'), chip('Warn', 'Re-routed')], true),
+  var s = trackScreen('Tracking · Re-routed', passHead({ back: true, codes: ['REQ-2026-0144', 'CBRT-2026-040'], chips: [stageMark('Trip'), chip('Warn', 'Re-routed')], from: ['PNH', 'Phnom Penh'], to: ['HCM', 'Ho Chi Minh City'], facts: [['Departed', '29 Sep · 05:30', true], ['Horse', coatRow([['Mekong Star', 'coat/bay']], 'Mekong Star')], ['Border', 'Xa Mát – Trapeang Phlong'], ['Trailer', 'Shared load']], stub: ['Arrives about', '15:40', 'planned 13:30 · 95 km added'] }),
     [lead, split(routeHistoryPanel(), column([msg, change, people]), SIDE.narrow), hist], '29 Sep 2026, ' + REROUTE040.now);
   var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });

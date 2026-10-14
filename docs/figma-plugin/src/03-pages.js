@@ -244,7 +244,7 @@ function section(title, sub, content) {
   return s;
 }
 function stepper(states) {
-  var labels = ['Horses', 'Service', 'Route & dates', 'Review'];
+  var labels = ['Horses', 'Route & dates', 'Service', 'Review'];
   var r = H({ name: 'Stepper', gap: 16, cross: 'CENTER', pad: [8, 0, 8, 0] });
   for (var i = 0; i < 4; i++) {
     add(r, stepI(states[i], i + 1, labels[i]));
@@ -258,7 +258,7 @@ function stepper(states) {
    --------------------------------------------------------------------- */
 var HORSES = [
   { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '4 of 5 cleared', pct: 80 },
-  { name: 'Nightfall', coat: 'Black', sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
+  { name: 'Nightfall', coat: 'Black', photo: true, sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
   { name: 'Copper King', coat: 'Chestnut', sub: 'Quarter Horse · Stallion', tags: [['Bad', 'Aggressive'], ['Neutral', 'Box stall']], age: '9 y', height: '15.3 hh', weight: '583 kg', size: 'L · 48', chip: '985 141 000 876 502', value: '$120,000', notes: 'Box stall only. Never next to a mare. Experienced handlers only.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Silver Bell', coat: 'Grey', sub: 'Lipizzan · Mare', tags: [['Ok', 'Calm']], age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32', chip: '203 098 100 554 120', value: '$60,000', notes: 'Travels well. Hay net at shoulder height.', ready: '2 of 5 cleared', pct: 40 }
 ];
@@ -289,8 +289,9 @@ function publicHeader() {
    A signed-in club never lands here; its Home is the work (scrHome). No customer, horse or job
    appears on it (PRODUCT.md, Absences): the hero shows the rules at work on an example date instead. */
 async function scrLanding() {
-  var hero = H({ name: 'Hero', gap: 64, pad: [88, 0, 24, 0] });
-  var left = VV({ name: 'Hero copy', gap: 24, pad: [24, 0, 0, 0] });
+  /* the hero is a photograph, so it is drawn in Dark mode whatever the theme; the copy sits on the scrim, the horse on the right */
+  var hero = photoPanel({ key: 'Hero', dir: 'H', h: 720, pad: [0, PADX, 0, PADX], gap: 64, cross: 'CENTER', scrim: [[0, NAVY + 'F5'], [0.45, NAVY + 'B3'], [0.75, NAVY + '33'], [1, NAVY + '1A']] });
+  var left = VV({ name: 'Hero copy', gap: 24, w: 620 });
   var h1 = Tx('Precision transport\nfor every horse', 'Display/XL', 'text/primary', { name: 'Headline', fill: true });
   await flush();
   var i = h1.characters.indexOf('transport');
@@ -300,7 +301,7 @@ async function scrLanding() {
   addAll(left, [h1,
     Tx('Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Every document is checked against your travel dates, and no horse leaves until clearance is complete.', 'Body/L', 'text/secondary', { w: 560 }),
     ctas]);
-  addAll(hero, [fillW(left), rulesCard()]);
+  add(hero, left); // the right half is the photograph: the horse being loaded
 
   /* the services the request flow offers, as a table, not a grid of icon cards: what it is, where it runs,
      and what moves its price. No figures: an estimate is always a range, worked out for the request. */
@@ -344,13 +345,18 @@ async function scrLanding() {
   addAll(cc, [Tx('Send us the horses, the route and the date', 'Display/M', 'text/primary', { name: 'Title' }), Tx('Nothing is booked until you accept the itemised quotation.', 'Body/M', 'text/secondary', { name: 'Summary' })]);
   addAll(close, [cc, btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' })]);
 
-  return screen('Landing · Signed out', null, [
-    hero,
+  var land = screen('Landing · Signed out', null, [
+    passSection(),
     section('Three ways to move a racehorse', 'Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them.', services),
+    section('Where we move horses', 'Six countries by road, and Hong Kong by air. Every border crossing has its own document rules, and each one is checked against your travel dates.', routeMapRow()),
     section('Seven stages in four phases', 'Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule.', how),
     section('Built around the paperwork and the horse', null, feats),
     VV({ name: 'Closing', pad: [80, 0, 0, 0] }, [fillW(close)])
   ], { gap: 0, header: publicHeader() });
+  /* full bleed: the hero sits between the header and the 1200 content column */
+  land.insertChild(1, hero);
+  hero.layoutSizingHorizontal = 'FILL';
+  return land;
 }
 
 /* ---------- Home, signed in ----------
@@ -369,25 +375,30 @@ var HOME_HORSES = [
   ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '2 of 5 cleared', 'Bill of sale overdue']
 ];
 /* one request on the signed-in Home: route and codes, the stage and what holds it, the departure */
-function moveRow(m, i) {
-  var row = H({ name: m[1], gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
-  if (i) borderSide(row, 'border/default', 'top');
-  var id = VV({ name: 'Move', gap: 4 });
+/* a move on Home is a small pass: the route and where it stands, a tear line, and a stub with the date */
+function moveRow(m) {
+  var card = H({ name: m[1], radius: 12, fill: 'surface/card', stroke: 'border/default', clip: true });
+  var main = H({ name: 'Move', gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
+  var id = VV({ name: 'Route', gap: 4 });
   var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER' });
   addAll(meta, [Tx(m[1], 'Mono/Caption', 'text/secondary'), Tx(m[2], 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(id, [Tx(m[0], 'Heading/H4'), fillW(meta)]);
-  var st = VV({ name: 'Where it is', gap: 4, w: 220 });
+  var st = VV({ name: 'Where it is', gap: 4, w: 200 });
   addAll(st, [stageMark(m[3]), Tx(m[4], 'Label/S', m[5], { fill: true })]);
-  var due = VV({ name: 'Departs', gap: 2, w: 110, cross: 'MAX' });
-  addAll(due, [Tx(m[6], 'Label/S', 'text/primary', { align: 'RIGHT' }), Tx(m[7], 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  addAll(row, [fillW(id), st, due, rowOpen()]);
-  return row;
+  addAll(main, [fillW(id), st]);
+  var perf = VV({ name: 'Perforation', gap: 6, pad: [6, 0, 6, 0], w: 4, cross: 'CENTER', clip: true });
+  for (var k = 0; k < 9; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = H({ name: 'Stub', gap: 12, pad: [14, 16, 14, 20], w: 190, fill: 'bg/sunken', cross: 'CENTER' });
+  var due = VV({ name: 'Departs', gap: 2 });
+  addAll(due, [Tx(m[6], 'Label/M', 'text/primary'), Tx(m[7], 'Mono/Caption', 'text/tertiary')]);
+  addAll(stub, [fillW(due), rowOpen()]);
+  addAll(card, [fillW(main), perf, stub]);
+  perf.layoutSizingVertical = 'FILL'; stub.layoutSizingVertical = 'FILL';
+  return card;
 }
-/* the signed-in Home in any state: a lead block (what is owed, or that nothing is), then the moves beside the horses */
-/* calm: nothing is owed, so the moves are ordered by departure alone and the caption says so */
 function homeScreen(name, summary, lead, moves, horses, horseNote, asOf, calm) {
-  var list = panel('Moves', { gap: 0, pad: 0, clip: true });
-  moves.forEach(function (m, i) { add(list, fillW(moveRow(m, i))); });
+  var list = VV({ name: 'Moves', gap: 12 });
+  moves.forEach(function (m) { add(list, fillW(moveRow(m))); });
   var movesBlock = titled('Your moves', moves.length + (calm ? ' in progress, soonest departure first.' : ' in progress, the one that needs you most first.') + ' Each opens its request.', list, btn('Ghost', 'SM', 'My requests', { trail: 'arrow-right' }));
   var hp = panel('Your horses', { gap: 0, pad: [20, 24, 8, 24] });
   add(hp, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('Your horses', 'Heading/H4'), Tx(horseNote, 'Body/S', 'text/tertiary')]));
@@ -446,34 +457,165 @@ function scrHomeRoad() {
     ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', 'Stall 6 · standard', 'Sound at 08:40', 'status/ok/fg']
   ], 'All four on CBRT-2026-041, with Hoa’s last condition log.', '18 Oct 2026, 08:41', true);
 }
-/* the hero's picture: the document rules worked out for an example route and date. It is labelled an example
-   and names no horse or customer; a club sees the same dates for its own request once it asks. */
 var RULES_EXAMPLE = [['passport', 'Valid through 20 Oct'], ['vacc', '21 Apr–11 Oct'], ['eia', 'On or after 19 Aug'], ['health', '8–18 Oct'], ['own', 'Any date']];
-function rulesCard() {
-  var card = panel('Rules card · Example', { w: 480, gap: 20, pad: 28 });
-  R(card, 16);
-  effect(card, 'Elevation/1 Card');
-  var top = H({ name: 'Top', gap: 16, main: 'SPACE_BETWEEN' });
-  var id = VV({ name: 'Trip', gap: 4 });
-  addAll(id, [Tx('Ho Chi Minh City → Phnom Penh', 'Heading/H4', 'text/primary', { name: 'Route' }), Tx('By road through Mộc Bài – Bavet', 'Body/S', 'text/secondary', { name: 'Crossing' })]);
-  addAll(top, [id, chip('Neutral', 'Example', { noDot: true })]);
-  add(card, fillW(top));
-  add(card, dlRow('If you depart on', '18 Oct 2026'));
-  add(card, divider());
-  add(card, Tx('Each document must carry', 'Body/S', 'text/tertiary'));
-  var list = VV({ name: 'Documents', gap: 14 });
-  RULES_EXAMPLE.forEach(function (d) {
-    var row = H({ name: DOCNAME[d[0]], gap: 16, cross: 'CENTER' });
-    var t = VV({ name: 'Text', gap: 2 });
-    addAll(t, [Tx(DOCNAME[d[0]], 'Label/M', 'text/primary', { name: 'Document' }), Tx(RULE[d[0]], 'Body/S', 'text/tertiary', { name: 'Rule', fill: true })]);
-    addAll(row, [fillW(t), Tx(d[1], 'Mono/Data', 'text/primary', { name: 'Date', align: 'RIGHT' })]);
-    add(list, fillW(row));
+/* ---------- Photography ----------
+   A photo is a material, like the brass nameplate: it reads the same in both themes, so a photo panel is drawn
+   in Dark mode with a navy scrim under its text. The generator draws the panel with a flat placeholder fill
+   named "Photo · <key>"; the picture is uploaded into that fill from docs/design-assets/ (drafts for now,
+   to be replaced by licensed photographs). */
+var NAVY = '#0B1524';
+function photoPanel(o) {
+  var f = F({ name: 'Photo · ' + o.key, dir: o.dir || 'V', w: o.w, h: o.h, gap: o.gap || 0, pad: o.pad, main: o.main, cross: o.cross, fill: 'bg/sunken', clip: true });
+  if (COLL.dark) f.setExplicitVariableModeForCollection(COLL.color, COLL.dark);
+  var scrim = figma.createRectangle(); scrim.name = 'Scrim';
+  scrim.fills = [gradient(o.scrim, o.vertical)];
+  f.appendChild(scrim);
+  scrim.layoutPositioning = 'ABSOLUTE'; scrim.x = 0; scrim.y = 0; scrim.resize(Math.max(f.width, 1), Math.max(f.height, 1));
+  scrim.constraints = { horizontal: 'STRETCH', vertical: 'STRETCH' };
+  return f;
+}
+/* ---------- The travel pass ----------
+   An example of what a club holds when a move is ready: the route, the facts that matter, the date each
+   document must carry, and a stub that says the gate is open. Labelled Example; it names no horse or club. */
+function travelPass() {
+  var pass = primaryTheme(H({ name: 'Travel pass · Example', w: 520, radius: 16, fill: 'surface/card', clip: true }));
+  effect(pass, 'Elevation/2 Overlay');
+  var main = VV({ name: 'Pass', gap: 18, pad: [24, 24, 24, 28] });
+  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(top, [Tx('Travel pass', 'Label/S', 'text/tertiary'), chip('Neutral', 'Example', { noDot: true })]);
+  var end = function (code, city, align) { var v = VV({ name: city, gap: 2, cross: align }); addAll(v, [Tx(code, 'Mono/Data L', 'text/primary', { name: 'Code' }), Tx(city, 'Body/S', 'text/secondary', { name: 'City' })]); return v; };
+  var leg = H({ name: 'Leg', gap: 8, cross: 'CENTER', pad: [0, 0, 18, 0] });
+  addAll(leg, [fillW(rect(20, 1, 'border/strong', 'Line')), Ic('truck', 18, 'text/secondary'), fillW(rect(20, 1, 'border/strong', 'Line'))]);
+  var route = H({ name: 'Route', gap: 14, cross: 'CENTER' });
+  addAll(route, [end('HCM', 'Ho Chi Minh City', 'MIN'), fillW(leg), end('PNH', 'Phnom Penh', 'MAX')]);
+  var facts = VV({ name: 'Facts', gap: 12 });
+  [[['Departs', '18 Oct · 06:00', true], ['Border', 'Mộc Bài – Bavet']], [['Horses', '4 · private trailer'], ['Arrival window', '11:00–14:00', true]]].forEach(function (pair, i) {
+    var r = H({ name: 'Row ' + (i + 1), gap: 16 });
+    pair.forEach(function (f) { var c = VV({ name: f[0], gap: 2 }); addAll(c, [Tx(f[0], 'Body/S', 'text/tertiary'), Tx(f[1], f[2] ? 'Mono/Data' : 'Label/M', 'text/primary')]); add(r, fillW(c)); });
+    add(facts, fillW(r));
   });
-  add(card, fillW(list));
-  var foot = H({ name: 'Note', gap: 10, pad: [12, 14, 12, 14], radius: 8, fill: 'bg/sunken' });
-  addAll(foot, [Ic('info', 16, 'text/secondary'), Tx('Your request works these dates out for your own route, and flags any document that lapses before you arrive.', 'Body/S', 'text/secondary', { fill: true })]);
-  add(card, fillW(foot));
-  return card;
+  var docs = VV({ name: 'Documents', gap: 8 });
+  add(docs, Tx('Each document must carry', 'Body/S', 'text/tertiary'));
+  RULES_EXAMPLE.forEach(function (d) {
+    var r = H({ name: DOCNAME[d[0]], gap: 12, cross: 'CENTER' });
+    addAll(r, [Tx(DOCNAME[d[0]], 'Label/S', 'text/primary', { fill: true }), Tx(d[1], 'Mono/Caption', 'text/secondary', { align: 'RIGHT' })]);
+    add(docs, fillW(r));
+  });
+  addAll(main, [fillW(top), fillW(route), fillW(facts), divider(), fillW(docs)]);
+  /* the tear line between pass and stub */
+  var perf = VV({ name: 'Perforation', gap: 8, pad: [10, 0, 10, 0], w: 4, cross: 'CENTER', clip: true });
+  for (var k = 0; k < 36; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = VV({ name: 'Stub', gap: 12, pad: [24, 18, 24, 18], w: 140, fill: 'bg/sunken', main: 'SPACE_BETWEEN' });
+  var gate = VV({ name: 'Gate', gap: 8 });
+  var ic = H({ name: 'Icon wrap', w: 32, h: 32, radius: 999, fill: 'status/ok/bg', main: 'CENTER', cross: 'CENTER' });
+  add(ic, Ic('unlock', 16, 'status/ok/fg'));
+  addAll(gate, [ic, Tx('Clear to depart', 'Label/M', 'text/primary', { w: 104 }), Tx('23 of 23 documents cleared', 'Body/S', 'text/secondary', { w: 104 })]);
+  var bars = H({ name: 'Code bars', gap: 2, h: 36 });
+  [2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 2].forEach(function (w) { add(bars, rect(w, 36, 'text/primary', 'Bar')); });
+  addAll(stub, [gate, VV({ name: 'Code', gap: 6 }, [bars, Tx('Example only', 'Mono/Caption', 'text/tertiary')])]);
+  addAll(pass, [fillW(main), perf, stub]);
+  perf.layoutSizingVertical = 'FILL'; stub.layoutSizingVertical = 'FILL';
+  return pass;
+}
+/* the pass, introduced: what a club holds once a move is approved */
+function passSection() {
+  var row = H({ name: 'Pass row', gap: 64, cross: 'CENTER' });
+  var t = VV({ name: 'Copy', gap: 16 });
+  addAll(t, [Tx('Every move, on one pass', 'Display/L'), Tx('Once a request is approved, the move gets its own pass: the route, the departure, your arrival window, and the date each document must carry for the crossings on your route.', 'Body/M', 'text/secondary', { w: 520 })]);
+  var pts = VV({ name: 'Points', gap: 10, pad: [8, 0, 0, 0] });
+  ['Dates worked out for your route and departure', 'Every upload checked against those dates, not today', 'Departure unlocks the moment every document clears'].forEach(function (x) {
+    var r = H({ name: x, gap: 10, cross: 'CENTER' });
+    addAll(r, [Ic('check', 16, 'status/ok/fg'), Tx(x, 'Body/M', 'text/primary')]);
+    add(pts, r);
+  });
+  add(t, pts);
+  addAll(row, [fillW(t), travelPass()]);
+  return VV({ name: 'Your move', pad: [80, 0, 0, 0] }, [fillW(row)]);
+}
+/* ---------- Where we move horses: a schematic map ----------
+   Drawn like a transit map, not a survey map: positions follow longitude and latitude, but the empty sea
+   east of 107°E is squeezed so the six countries get the room. Roads are solid, air is dashed, and each
+   border crossing is a gate on its road. */
+var MAP = { w: 760, h: 560 };
+function mx(lon) { return lon <= 107 ? 40 + (lon - 99.5) * 62 : 505 + (lon - 107) * 28; }
+function my(lat) { return 30 + (23 - lat) * 24.4; }
+/* label side: r right, l left, la left and above (where a road leaves to the right or below) */
+var MAP_CITIES = [['HCM', 'Ho Chi Minh City', 106.7, 10.8, 'r'], ['PNH', 'Phnom Penh', 104.9, 11.6, 'l'], ['BKK', 'Bangkok', 100.5, 13.8, 'la'], ['VTE', 'Vientiane', 102.6, 17.97, 'l'], ['HAN', 'Hanoi', 105.8, 21.0, 'r'], ['KUL', 'Kuala Lumpur', 101.7, 3.1, 'r'], ['HKG', 'Hong Kong', 114.2, 22.3, 'la']];
+/* [from, to, crossing, gate lon/lat, label offset] */
+var MAP_ROADS = [
+  ['HCM', 'PNH', 'Mộc Bài – Bavet', 105.8, 11.2, [-96, 16]],
+  ['PNH', 'BKK', 'Poipet – Aranyaprathet', 102.55, 13.65, [-74, -28]],
+  ['BKK', 'VTE', 'Nong Khai – Vientiane', 102.18, 17.14, [16, -2]],
+  ['BKK', 'KUL', 'Sadao – Bukit Kayu Hitam', 100.45, 6.55, [16, -8]],
+  ['HAN', 'VTE', 'Cầu Treo – Nam Phao', 105.1, 18.4, [16, -6]]
+];
+var MAP_AIR = [['HCM', 112, 12], ['PNH', 110, 16]];
+var MAP_LABELS = [['VIETNAM', 106.3, 14.6], ['CAMBODIA', 104.5, 13.2], ['THAILAND', 101.3, 19.3], ['LAOS', 104, 19.8], ['MALAYSIA', 102.8, 4.8], ['Gulf of Thailand', 101.8, 9.5], ['South China Sea', 111.5, 9]];
+function cityXY(code) { var c = MAP_CITIES.filter(function (x) { return x[0] === code; })[0]; return [mx(c[2]), my(c[3])]; }
+function mapSvg(paths, dashed) {
+  return '<svg width="' + MAP.w + '" height="' + MAP.h + '" viewBox="0 0 ' + MAP.w + ' ' + MAP.h + '" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    paths.map(function (d) { return '<path d="' + d + '" stroke="#000" stroke-width="2"' + (dashed ? ' stroke-dasharray="6 6"' : '') + '/>'; }).join('') + '</svg>';
+}
+function mapLayer(name, paths, token, weight, dash) {
+  var f = figma.createNodeFromSvg(mapSvg(paths, !!dash));
+  f.name = name; f.fills = [];
+  f.findAll(function (n) { return n.type === 'VECTOR'; }).forEach(function (v) {
+    v.strokes = [P(token)]; v.strokeWeight = weight; v.strokeCap = 'ROUND'; v.strokeJoin = 'ROUND';
+    if (dash) v.dashPattern = dash;
+  });
+  return f;
+}
+function routeMap() {
+  var m = F({ name: 'Map', w: MAP.w, h: MAP.h, fill: 'bg/sunken', radius: 12, clip: true });
+  var put = function (n, x, y) { m.appendChild(n); n.x = Math.round(x); n.y = Math.round(y); return n; };
+  for (var gx = 76; gx < MAP.w; gx += 76) { var v = rect(1, MAP.h, 'border/default', 'Grid'); v.opacity = 0.6; put(v, gx, 0); }
+  for (var gy = 70; gy < MAP.h; gy += 70) { var hz = rect(MAP.w, 1, 'border/default', 'Grid'); hz.opacity = 0.6; put(hz, 0, gy); }
+  MAP_LABELS.forEach(function (l) {
+    var sea = l[0] !== l[0].toUpperCase();
+    var t = Tx(l[0], sea ? 'Body/S' : 'Mono/Eyebrow', 'text/tertiary', { name: 'Area · ' + l[0], noStyle: sea });
+    if (sea) t.fontName = FONT['display/Italic'];
+    put(t, mx(l[1]) - t.width / 2, my(l[2]) - t.height / 2);
+  });
+  var roads = MAP_ROADS.map(function (r) { var a = cityXY(r[0]), b = cityXY(r[1]); return 'M' + a[0] + ' ' + a[1] + ' L' + mx(r[3]) + ' ' + my(r[4]) + ' L' + b[0] + ' ' + b[1]; });
+  var hk = cityXY('HKG');
+  var air = MAP_AIR.map(function (r) { var a = cityXY(r[0]); return 'M' + a[0] + ' ' + a[1] + ' Q' + mx(r[1]) + ' ' + my(r[2]) + ' ' + hk[0] + ' ' + hk[1]; });
+  put(mapLayer('Air', air, 'text/tertiary', 2, [6, 6]), 0, 0);
+  put(mapLayer('Roads', roads, 'text/primary', 3), 0, 0);
+  MAP_ROADS.forEach(function (r) {
+    var g = H({ name: 'Gate · ' + r[2], w: 20, h: 20, radius: 999, fill: 'surface/card', stroke: 'text/primary', sw: 1.5, main: 'CENTER', cross: 'CENTER' });
+    add(g, Ic('flag', 11, 'text/primary'));
+    put(g, mx(r[3]) - 10, my(r[4]) - 10);
+    put(Tx(r[2], 'Mono/Caption', 'text/secondary', { name: 'Crossing · ' + r[2] }), mx(r[3]) + r[5][0], my(r[4]) + r[5][1]);
+  });
+  MAP_CITIES.forEach(function (c) {
+    var x = mx(c[2]), y = my(c[3]);
+    var d = dot(14, 'surface/card', 'City · ' + c[1]); d.strokes = [P('text/primary')]; d.strokeWeight = 3; d.strokeAlign = 'INSIDE';
+    put(d, x - 7, y - 7);
+    var lb = VV({ name: 'Label · ' + c[1], gap: 0, cross: c[4] === 'r' ? 'MIN' : 'MAX' });
+    addAll(lb, [Tx(c[1], 'Label/S', 'text/primary'), Tx(c[0], 'Mono/Caption', 'text/tertiary')]);
+    m.appendChild(lb);
+    lb.x = Math.round(c[4] === 'r' ? x + 12 : c[4] === 'l' ? x - 12 - lb.width : x + 8 - lb.width); lb.y = Math.round(c[4] === 'la' ? y - 44 : y - 10);
+  });
+  return m;
+}
+function routeMapRow() {
+  var row = H({ name: 'Map row', gap: 24 });
+  var side = panel('Corridors', { gap: 0, pad: [20, 24, 12, 24] });
+  add(side, VV({ name: 'Title', gap: 4, pad: [0, 0, 14, 0] }, [Tx('Corridors we run', 'Heading/H4'), Tx('Each road corridor crosses at one border post. Air goes through Hong Kong.', 'Body/S', 'text/tertiary', { w: 360 })]));
+  [['Ho Chi Minh City → Phnom Penh', 'Road · Mộc Bài – Bavet'], ['Phnom Penh → Bangkok', 'Road · Poipet – Aranyaprathet'], ['Bangkok → Vientiane', 'Road · Nong Khai – Vientiane'], ['Bangkok → Kuala Lumpur', 'Road · Sadao – Bukit Kayu Hitam'], ['Hanoi → Vientiane', 'Road · Cầu Treo – Nam Phao'], ['Ho Chi Minh City, Phnom Penh → Hong Kong', 'Air · Economy, Business, First stalls']].forEach(function (c) {
+    var r = H({ name: c[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var air = c[1].indexOf('Air') === 0;
+    var key = H({ name: 'Key', w: 28, h: 12, cross: 'CENTER' });
+    var ln = rect(28, air ? 2 : 3, air ? 'text/tertiary' : 'text/primary', 'Line'); if (air) ln.dashPattern = [6, 6];
+    add(key, fillW(ln));
+    var t = VV({ name: 'Text', gap: 2 });
+    addAll(t, [Tx(c[0], 'Label/S', 'text/primary', { fill: true }), Tx(c[1], 'Body/S', 'text/tertiary', { fill: true })]);
+    addAll(r, [key, fillW(t)]);
+    add(side, fillW(r));
+  });
+  addAll(row, [routeMap(), fillW(side)]);
+  return row;
 }
 /* feature cards stretch to the tallest, and every visual is one height, so the titles line up */
 var FEATURE_VISUAL_H = 132;
@@ -552,48 +694,111 @@ function scrHorsesMobile() {
 }
 
 /* ---------------------------------------------------------------------
-   Screens: Request transport (steps 1, 3, 4)
+   Screens: Request transport (steps 1, 2, 4; step 3 Service is in 14-service.js)
+   The route comes before the service: distance, border crossings and whether
+   any air service exists all depend on it, and they decide the service choices.
    --------------------------------------------------------------------- */
-function estimateCard(range, horses, grooms, crossings, dist) {
-  var e = inst(C.estimate);
-  setP(e, { Range: range, Horses: horses, Grooms: grooms, 'Border crossings': crossings, Distance: dist });
-  e.name = 'Estimate';
-  return e;
+/* ---------- the draft pass ----------
+   The wizard's side column is the request drawn as the pass it becomes once approved (the landing
+   introduces the pass). It fills in as the steps are done: a value no step has set yet says which step
+   sets it, and the stub carries the indicative range, never a price.
+   o: { route: bool, rows: [[label, value, mono, tone] | [label, null, step]], range, rangeSub } */
+var DRAFT_ROUTE = { from: ['HCM', 'Ho Chi Minh City'], to: ['BKK', 'Bangkok'] };
+function draftPass(o) {
+  var pass = VV({ name: 'Draft pass', w: SIDE.narrow, radius: 16, fill: 'surface/card', stroke: 'border/default', clip: true });
+  effect(pass, 'Elevation/1 Card');
+  var main = VV({ name: 'Pass', gap: 18, pad: [20, 24, 18, 24] });
+  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(top, [Tx('Your move', 'Label/S', 'text/tertiary'), chip('Neutral', 'Draft', { noDot: true })]);
+  var set = !!o.route;
+  var end = function (c, align) {
+    var v = VV({ name: set ? c[1] : 'Not set', gap: 2, cross: align });
+    addAll(v, [Tx(set ? c[0] : '···', 'Mono/Data L', set ? 'text/primary' : 'text/tertiary', { name: 'Code' }), Tx(set ? c[1] : (align === 'MIN' ? 'From' : 'To'), 'Body/S', set ? 'text/secondary' : 'text/tertiary', { name: 'City' })]);
+    return v;
+  };
+  var leg = H({ name: 'Leg', gap: 8, cross: 'CENTER', pad: [0, 0, 18, 0] });
+  addAll(leg, [fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line')), Ic('truck', 18, set ? 'text/secondary' : 'text/tertiary'), fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line'))]);
+  var route = H({ name: 'Route', gap: 14, cross: 'CENTER' });
+  addAll(route, [end(DRAFT_ROUTE.from, 'MIN'), fillW(leg), end(DRAFT_ROUTE.to, 'MAX')]);
+  var facts = VV({ name: 'Facts', gap: 0 });
+  [['Horses', coatRow(COAT041.slice(0, 2), '2 horses')]].concat(o.rows).forEach(function (f) {
+    var r = H({ name: f[0], gap: 16, pad: [10, 0, 10, 0], main: 'SPACE_BETWEEN', cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var val = f[1] == null ? Tx('Set on step ' + f[2], 'Body/S', 'text/tertiary', { name: 'Not set' })
+      : typeof f[1] === 'string' ? Tx(f[1], f[2] ? 'Mono/Data' : 'Label/S', f[3] || 'text/primary', { name: 'Value', align: 'RIGHT' }) : f[1];
+    addAll(r, [Tx(f[0], 'Body/S', 'text/tertiary'), val]);
+    add(facts, fillW(r));
+  });
+  addAll(main, [fillW(top), fillW(route), fillW(facts)]);
+  /* the tear line between the pass and its stub */
+  var perf = H({ name: 'Perforation', gap: 8, pad: [0, 12, 0, 12], h: 12, main: 'CENTER', cross: 'CENTER', clip: true });
+  for (var k = 0; k < 34; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = VV({ name: 'Stub', gap: 6, pad: [16, 24, 22, 24], fill: 'bg/sunken' });
+  addAll(stub, [Tx('Indicative range', 'Body/S', 'text/secondary'), Tx(o.range || '—', 'Display/M', o.range ? 'text/primary' : 'text/tertiary', { name: 'Range' }), Tx(o.rangeSub, 'Body/S', 'text/tertiary', { name: 'Sub', fill: true })]);
+  addAll(pass, [fillW(main), fillW(perf), fillW(stub)]);
+  return pass;
 }
+var DRAFT_SUB = 'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.';
+var DRAFT_BORDERS = ['Borders', '2 · Mộc Bài, Poipet'];
 function requestLayout(title, stepStates, left, right) {
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
   return screen(title, 'My requests', [
-    pageHead('Request transport', 'Draft saved 25 Sep 2026. Your estimate updates as you go; the binding price comes as an itemised quotation.'),
+    pageHead('Request transport', 'Draft saved 25 Sep 2026. Your move fills in on the right as you go; the binding price comes as an itemised quotation.'),
     stepper(stepStates),
     body
   ]);
 }
+/* a horse to pick: her coat (or her photo) as a swatch, her name, what decides her stall, and a note
+   when choosing her changes the plan for another horse */
+function horsePick(h, sel, note) {
+  var c = VV({ name: 'Horse · ' + h.name, gap: 14, pad: 20, radius: 12, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'text/secondary' : 'border/default', sw: sel ? 1.5 : 1 });
+  var top = H({ name: 'Top', gap: 14, cross: 'CENTER' });
+  var sw = F({ name: h.photo ? 'Photo · ' + h.name : 'Coat', w: 48, h: 48, radius: 999, fill: 'coat/' + h.coat.toLowerCase() });
+  var id = VV({ name: 'Name', gap: 2 });
+  addAll(id, [Tx(h.name, 'Heading/H4'), Tx(h.sub + ' · ' + h.age, 'Body/S', 'text/tertiary')]);
+  var cb = inst(C.checkbox, { Checked: sel ? 'True' : 'False' }); setP(cb, { 'Show label': false }); cb.name = 'Indicator';
+  addAll(top, [sw, fillW(id), cb]);
+  var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER', wrap: true, rowGap: 8 });
+  add(meta, Tx(h.size + ' in · ' + h.weight, 'Mono/Caption', 'text/secondary'));
+  h.tags.forEach(function (t) { add(meta, chip(t[0], t[1], { noDot: t[0] === 'Neutral' })); });
+  addAll(c, [fillW(top), fillW(meta)]);
+  if (note) add(c, Tx(note, 'Body/S', 'status/warn/fg', { fill: true }));
+  return c;
+}
 function scrRequest1() {
   var left = VV({ name: 'Step 1', gap: 24 });
   addAll(left, [Tx('Which horses are travelling?', 'Heading/H3'), Tx('All horses in one request share the same route and dates. Size class and temperament decide stall allocation.', 'Body/M', 'text/secondary', { fill: true })]);
-  var grid = H({ name: 'Horse options', gap: 16, wrap: true, rowGap: 16 });
-  [['Selected', 'Shadowfax', 'Andalusian · Gelding · 510 kg', 'Size M · 32 in · Calm'],
-   ['Selected', 'Nightfall', 'Thoroughbred · Mare · 478 kg', 'Size M · 32 in · Nervous · Climate stall'],
-   ['Default', 'Copper King', 'Quarter Horse · Stallion · 583 kg', 'Size L · 48 in · Box stall only'],
-   ['Default', 'Silver Bell', 'Lipizzan · Mare · 445 kg', 'Size M · 32 in · Calm']].forEach(function (o) {
-    var c = inst(C.option, { State: o[0] });
-    setP(c, { Title: o[1], Description: o[2], Meta: o[3], 'Show icon': false });
-    var mt = c.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Meta'; });
-    if (mt) restyle(mt, 'Label/S', 'text/secondary');
-    c.resize(380, c.height); // two per row in the 776 left column: (776 − 16) / 2
-    c.name = 'Option · ' + o[1];
-    add(grid, c);
+  var grid = VV({ name: 'Horse options', gap: 16 });
+  [[[HORSES[0], true], [HORSES[1], true]], [[HORSES[2], false, 'Never next to a mare: with Nightfall on board, the load plan keeps them apart.'], [HORSES[3], false]]].forEach(function (pair, i) {
+    var row = H({ name: 'Row ' + (i + 1), gap: 16 });
+    pair.forEach(function (p) { var c = horsePick(p[0], p[1], p[2]); add(row, fillW(c)); c.layoutSizingVertical = 'FILL'; });
+    add(grid, fillW(row));
   });
   add(left, fillW(grid));
-  add(left, callout('Info', 'Nightfall needs a climate-controlled stall', 'We have added a climate stall to this request. You can see it on the next step.'));
+  add(left, callout('Info', 'Nightfall needs a climate-controlled stall', 'We have added one to this request. You will see it on the Service step.'));
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   addAll(foot, [Tx('2 horses selected', 'Label/M', 'text/secondary'), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 1 Horses', ['Current', 'Upcoming', 'Upcoming', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 1 Horses', ['Current', 'Upcoming', 'Upcoming', 'Upcoming'], left, draftPass({ route: false,
+    rows: [['Departs', null, 2], ['Arrival', null, 2], ['Borders', null, 2], ['Service', null, 3]],
+    range: null, rangeSub: 'Appears once your route is set: distance and border crossings drive most of the price.' }));
 }
-/* Arrival on step 3: by default we plan the fastest safe route and give an expected time; a road
+/* the route as the customer sets it: the road from pickup to destination, each border crossing a gate */
+var MAP_REQ = {
+  bounds: [100.2, 107.0, 10.4, 14.3],
+  /* each border is a short tick through its gate, so it never runs through a label */
+  borders: [[[106.18, 11.3], [106.12, 11.08], [106.05, 10.95]], [[102.48, 13.95], [102.56, 13.66], [102.66, 13.35]]],
+  areas: [['VIETNAM', 106.5, 12.6], ['CAMBODIA', 104.6, 13.5], ['THAILAND', 101.6, 11.8]],
+  road: [[106.66, 10.86], [106.12, 11.08], [104.92, 11.56], [103.5, 13.0], [102.56, 13.66], [100.5, 13.75]]
+};
+function routeReqMap(w, h) {
+  return jobMap({ w: w, h: h, end: 100.5, bounds: MAP_REQ.bounds, borders: MAP_REQ.borders, areas: MAP_REQ.areas, paths: [{ pts: MAP_REQ.road, kind: 'todo' }],
+    stops: [[106.66, 10.86, 'Ho Chi Minh City', 'Pickup', 'stop', 'todo', 'a'], [106.12, 11.08, 'Mộc Bài – Bavet', 'Border 1', 'gate', 'todo', 'b'], [104.92, 11.56, 'Phnom Penh', 'Via', 'stop', 'todo', 'a'],
+      [102.56, 13.66, 'Poipet – Aranyaprathet', 'Border 2', 'gate', 'todo', 'a'], [100.5, 13.75, 'Bangkok', '~960 km', 'stop', 'todo', 'b']] });
+}
+/* Arrival on step 2: by default we plan the fastest safe route and give an expected time; a road
    customer can instead buy an arrival window. A window is never an exact hour (at least 3 hours), it
    needs a private trailer so the departure is theirs, and if we arrive after it closes we pay the
    contract penalty from the rate catalog. The clock stops while an authority holds the trailer or a
@@ -605,19 +810,17 @@ function arrivalOptions(win) {
     [win ? 'Selected' : 'Default', 'Within a window', 'You choose a window of at least ' + WINDOW.minHours + ' hours. We use a private trailer so the departure is yours.', WINDOW.premium, 'calendar']], true));
 }
 function routeDates(name, win) {
-  var left = VV({ name: 'Step 3', gap: 24 });
+  var left = VV({ name: 'Step 2', gap: 24 });
   addAll(left, [Tx('Route and dates', 'Heading/H3'), Tx('We work out the border crossings from the route. Cross-border moves need time for documents to clear.', 'Body/M', 'text/secondary', { fill: true })]);
   var r1 = H({ name: 'Places', gap: 16 });
   addAll(r1, [input('Select', 'Default', 'From', 'Ho Chi Minh City, Vietnam', null, { fill: true }), input('Select', 'Default', 'To', 'Bangkok, Thailand', null, { fill: true })]);
   add(left, fillW(r1));
-  var cr = VV({ name: 'Crossings', gap: 10 });
-  var chips = H({ name: 'Chips', gap: 8 });
-  addAll(chips, [chip('Neutral', 'Mộc Bài – Bavet'), chip('Neutral', 'Poipet – Aranyaprathet')]);
-  addAll(cr, [Tx('Border crossings on this route', 'Label/S', 'text/secondary'), chips]);
-  add(left, cr);
+  var mp = VV({ name: 'Your route', gap: 10 });
+  addAll(mp, [fillW(routeReqMap(776, 280)), Tx('About 960 km by road with 2 border crossings, worked out from your route. The fleet coordinator plans the exact road and stops after approval.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(left, fillW(mp));
   var r2 = H({ name: 'Dates', gap: 16 });
   addAll(r2, [win ? input('Date', 'Default', 'Departure date', '30 Oct 2026', null, { fill: true }) : input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }),
-    input('Text', 'Default', 'Special instructions', win ? 'Quiet loading. Vet check on arrival.' : 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
+    input('Text', 'Default', 'Special instructions', 'Quiet loading. Vet check on arrival.', null, { fill: true })]);
   add(left, fillW(r2));
   add(left, fillW(arrivalOptions(win)));
   if (win) {
@@ -635,14 +838,22 @@ function routeDates(name, win) {
   add(rightBtns, btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: win ? 'Default' : 'Disabled' }));
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), rightBtns]);
   add(left, fillW(foot));
-  return requestLayout(name, ['Done', 'Done', 'Current', 'Upcoming'], left, estimateCard(win ? '$14,400 – $20,300' : '$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout(name, ['Done', 'Current', 'Upcoming', 'Upcoming'], left, draftPass({ route: true,
+    rows: win ? [['Departs', '30 Oct 2026', true], ['Arrival', '31 Oct · 08:00–12:00', true], DRAFT_BORDERS, ['Service', null, 3]]
+      : [['Departs', '5 Oct · too soon', true, 'status/bad/fg'], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', null, 3]],
+    range: win ? '$14,400 – $20,300' : '$11,300 – $16,100',
+    rangeSub: win ? 'Includes the private trailer your window needs. Not a quote.' : 'Assumes road with a shared load until you choose a service on step 3. Not a quote.' }));
 }
-function scrRequest3() { return routeDates('Request · 3 Route & dates (error)', false); }
-function scrRequest3Window() { return routeDates('Request · 3 Route & dates · Arrival window', true); }
+function scrRequest2() { return routeDates('Request · 2 Route & dates (error)', false); }
+function scrRequest2Window() { return routeDates('Request · 2 Route & dates · Arrival window', true); }
+/* the review reads in the order the steps were done */
+var REVIEW_ORDER = ['Horses', 'Pickup', 'Route', 'Departure', 'Arrival', 'Instructions', 'Service', 'Insurance'];
 function scrRequest4() {
   var left = VV({ name: 'Step 4', gap: 24 });
   add(left, Tx('Review and submit', 'Heading/H3'));
-  add(left, fillW(requestSummary(REQ_0193, { edit: true })));
+  var rows = REQ_0193.concat([['Arrival', 'Any time on the day']]).map(function (r) { return r[0] === 'Instructions' ? ['Instructions', 'Quiet loading. Vet check on arrival.'] : r[0] === 'Insurance' ? ['Insurance', 'Your own policy · upload it with your documents once the job is approved'] : r; });
+  rows.sort(function (a, b) { return REVIEW_ORDER.indexOf(a[0]) - REVIEW_ORDER.indexOf(b[0]); });
+  add(left, fillW(requestSummary(rows, { edit: true })));
   add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days’ notice. Your departure is 34 days away.'));
   var next = panel('What happens next', { gap: 14 });
   add(next, Tx('What happens next', 'Heading/H4'));
@@ -657,7 +868,9 @@ function scrRequest4() {
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), btn('Primary', 'MD', 'Submit request', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 4 Review', ['Done', 'Done', 'Done', 'Current'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 4 Review', ['Done', 'Done', 'Done', 'Current'], left, draftPass({ route: true,
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    range: '$11,300 – $16,100', rangeSub: 'Not a quote. Once you approve the quotation, this becomes your travel pass.' }));
 }
 
 /* ---------------------------------------------------------------------

@@ -1,12 +1,14 @@
 import type { FC, ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
-import { QuoteVisual, RulesCard, WidthVisual, WindowVisual } from './visuals';
+import { Corridors, RouteMap } from './routeMap';
+import { QuoteVisual, TravelPass, WidthVisual, WindowVisual } from './visuals';
 
+import heroPhoto from '@/assets/photos/draft-hero-loading-dawn.jpg';
 import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
 import ThemeToggle from '@/components/ThemeToggle';
-import { Button, Icon } from '@/components/ui';
+import { Button, Icon, PhotoPanel } from '@/components/ui';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
@@ -63,6 +65,13 @@ const PHASES = [
   },
 ];
 
+/* What the pass promises, beside the example. */
+const PASS_POINTS = [
+  'Dates worked out for your route and departure',
+  'Every upload checked against those dates, not today',
+  'Departure unlocks the moment every document clears',
+];
+
 const FEATURES = [
   {
     visual: <WindowVisual />,
@@ -100,7 +109,8 @@ const Section: FC<{ id: string; title: string; summary?: string; children: React
 
 /**
  * The signed-out landing page (DESIGN.md, Landing): what EquiFreight does, the services and how
- * a move runs. Its own header, no app nav. The hero's gold is the one exception to the One Gold
+ * a move runs. Its own header, no app nav. The hero is a full-bleed photograph of a horse being
+ * loaded, so it is Dark whatever the theme, with the copy on the scrim. The hero's gold is the one exception to the One Gold
  * Button rule, repeated by the closing band 2,000 px below it. A signed-in visitor never lands
  * here: their home is their work.
  */
@@ -131,117 +141,163 @@ const LandingPage: FC = () => {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 pb-24">
-        <section className="flex items-start gap-16 pt-[88px] pb-6">
-          <div className="flex min-w-0 flex-1 flex-col gap-6 pt-6">
-            <h1 className="type-display-xl m-0 text-ink">
-              Precision <em className="italic">transport</em>
-              <br />
-              for every horse
-            </h1>
-            <p className="type-body-l m-0 max-w-[560px] text-ink-2">
-              Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong.
-              Every document is checked against your travel dates, and no horse leaves until
-              clearance is complete.
-            </p>
-            <div className="flex gap-3">
+      <main className="flex-1">
+        <PhotoPanel
+          src={heroPhoto}
+          alt="A groom leads a horse in a quilted rug down the ramp of a horse lorry before dawn."
+          scrim={[
+            [0, 0.96],
+            [0.45, 0.7],
+            [0.75, 0.2],
+            [1, 0.1],
+          ]}
+          className="h-[720px]"
+        >
+          <div className="mx-auto flex h-full max-w-[1200px] items-center">
+            <div className="flex w-[620px] flex-col gap-6">
+              <h1 className="type-display-xl m-0 text-ink">
+                Precision <em className="italic">transport</em>
+                <br />
+                for every horse
+              </h1>
+              <p className="type-body-l m-0 max-w-[560px] text-ink-2">
+                Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong.
+                Every document is checked against your travel dates, and no horse leaves until
+                clearance is complete.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="primary" trailingIcon="arrow-right" onClick={toSignIn}>
+                  Request transport
+                </Button>
+                <Button onClick={toSignIn}>Create a club account</Button>
+              </div>
+            </div>
+          </div>
+        </PhotoPanel>
+
+        <div className="mx-auto w-full max-w-[1200px] pb-24">
+          <section aria-labelledby="pass-title" className="flex items-center gap-16 pt-20">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
+              <h2 id="pass-title" className="type-display-l m-0 text-ink">
+                Every move, on one pass
+              </h2>
+              <p className="type-body-m m-0 max-w-[520px] text-ink-2">
+                Once a request is approved, the move gets its own pass: the route, the departure,
+                your arrival window, and the date each document must carry for the crossings on your
+                route.
+              </p>
+              <ul className="m-0 flex list-none flex-col gap-2.5 p-0 pt-2">
+                {PASS_POINTS.map((point) => (
+                  <li key={point} className="type-body-m flex items-center gap-2.5 text-ink">
+                    <Icon name="check" size={16} className="shrink-0 text-ok" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <TravelPass />
+          </section>
+
+          <Section
+            id="services"
+            title="Three ways to move a racehorse"
+            summary="Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them."
+          >
+            {/* A fixed-order table: no sort, no filters, and no price figures (an estimate is always a range). */}
+            <div className="overflow-hidden rounded-lg border border-line bg-card">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-sunken">
+                  <tr>
+                    <th className="type-mono-label px-4 py-2.5 font-normal text-ink-3">Service</th>
+                    <th className="type-mono-label w-[220px] px-4 py-2.5 font-normal text-ink-3">
+                      Scope
+                    </th>
+                    <th className="type-mono-label w-[320px] px-4 py-2.5 font-normal text-ink-3">
+                      What drives the price
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SERVICES.map((s) => (
+                    <tr key={s.name} className="border-t border-line align-middle">
+                      <td className="px-4 py-3">
+                        <span className="flex flex-col gap-1">
+                          <span className="type-h4 text-ink">{s.name}</span>
+                          <span className="type-body-s text-ink-2">{s.what}</span>
+                        </span>
+                      </td>
+                      <td className="type-body-s px-4 py-3 text-ink-2">{s.scope}</td>
+                      <td className="type-body-s px-4 py-3 text-ink-2">{s.price}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
+          <Section
+            id="where"
+            title="Where we move horses"
+            summary="Six countries by road, and Hong Kong by air. Every border crossing has its own document rules, and each one is checked against your travel dates."
+          >
+            <div className="flex items-start gap-6">
+              <RouteMap />
+              <Corridors />
+            </div>
+          </Section>
+
+          <Section
+            id="how-it-works"
+            title="Seven stages in four phases"
+            summary="Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule."
+          >
+            <ol className="m-0 grid list-none grid-cols-4 gap-6 p-0">
+              {PHASES.map((p) => (
+                <li key={p.title} className="flex flex-col gap-3 border-t border-line pt-6">
+                  <span className="type-label-s text-ink-3">{p.stages}</span>
+                  <h3 className="type-h3 m-0 text-ink">{p.title}</h3>
+                  <p className="type-body-s m-0 text-ink-2">{p.body}</p>
+                  <p className="type-body-s m-0 text-ink-3">Owner: {p.owner}</p>
+                  <p className="type-body-s m-0 mt-auto flex gap-2 border-t border-line pt-3 text-ink-2">
+                    <Icon name="check" size={16} className="mt-0.5 shrink-0 text-ok" />
+                    {p.rule}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </Section>
+
+          <Section id="features" title="Built around the paperwork and the horse">
+            <div className="grid grid-cols-3 gap-6">
+              {FEATURES.map((f) => (
+                <article
+                  key={f.title}
+                  className="flex flex-col gap-4 rounded-lg border border-line bg-card p-7"
+                >
+                  {f.visual}
+                  <h3 className="type-h3 m-0 text-ink">{f.title}</h3>
+                  <p className="type-body-s m-0 text-ink-2">{f.body}</p>
+                </article>
+              ))}
+            </div>
+          </Section>
+
+          <section className="pt-20">
+            <div className="flex items-center justify-between gap-12 rounded-lg border border-line bg-card px-12 py-10">
+              <div className="flex flex-col gap-2.5">
+                <h2 className="type-display-m m-0 text-ink">
+                  Send us the horses, the route and the date
+                </h2>
+                <p className="type-body-m m-0 text-ink-2">
+                  Nothing is booked until you accept the itemised quotation.
+                </p>
+              </div>
               <Button variant="primary" trailingIcon="arrow-right" onClick={toSignIn}>
                 Request transport
               </Button>
-              <Button onClick={toSignIn}>Create a club account</Button>
             </div>
-          </div>
-          <RulesCard />
-        </section>
-
-        <Section
-          id="services"
-          title="Three ways to move a racehorse"
-          summary="Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them."
-        >
-          {/* A fixed-order table: no sort, no filters, and no price figures (an estimate is always a range). */}
-          <div className="overflow-hidden rounded-lg border border-line bg-card">
-            <table className="w-full border-collapse text-left">
-              <thead className="bg-sunken">
-                <tr>
-                  <th className="type-mono-label px-4 py-2.5 font-normal text-ink-3">Service</th>
-                  <th className="type-mono-label w-[220px] px-4 py-2.5 font-normal text-ink-3">
-                    Scope
-                  </th>
-                  <th className="type-mono-label w-[320px] px-4 py-2.5 font-normal text-ink-3">
-                    What drives the price
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {SERVICES.map((s) => (
-                  <tr key={s.name} className="border-t border-line align-middle">
-                    <td className="px-4 py-3">
-                      <span className="flex flex-col gap-1">
-                        <span className="type-h4 text-ink">{s.name}</span>
-                        <span className="type-body-s text-ink-2">{s.what}</span>
-                      </span>
-                    </td>
-                    <td className="type-body-s px-4 py-3 text-ink-2">{s.scope}</td>
-                    <td className="type-body-s px-4 py-3 text-ink-2">{s.price}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-
-        <Section
-          id="how-it-works"
-          title="Seven stages in four phases"
-          summary="Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule."
-        >
-          <ol className="m-0 grid list-none grid-cols-4 gap-6 p-0">
-            {PHASES.map((p) => (
-              <li key={p.title} className="flex flex-col gap-3 border-t border-line pt-6">
-                <span className="type-label-s text-ink-3">{p.stages}</span>
-                <h3 className="type-h3 m-0 text-ink">{p.title}</h3>
-                <p className="type-body-s m-0 text-ink-2">{p.body}</p>
-                <p className="type-body-s m-0 text-ink-3">Owner: {p.owner}</p>
-                <p className="type-body-s m-0 mt-auto flex gap-2 border-t border-line pt-3 text-ink-2">
-                  <Icon name="check" size={16} className="mt-0.5 shrink-0 text-ok" />
-                  {p.rule}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </Section>
-
-        <Section id="features" title="Built around the paperwork and the horse">
-          <div className="grid grid-cols-3 gap-6">
-            {FEATURES.map((f) => (
-              <article
-                key={f.title}
-                className="flex flex-col gap-4 rounded-lg border border-line bg-card p-7"
-              >
-                {f.visual}
-                <h3 className="type-h3 m-0 text-ink">{f.title}</h3>
-                <p className="type-body-s m-0 text-ink-2">{f.body}</p>
-              </article>
-            ))}
-          </div>
-        </Section>
-
-        <section className="pt-20">
-          <div className="flex items-center justify-between gap-12 rounded-lg border border-line bg-card px-12 py-10">
-            <div className="flex flex-col gap-2.5">
-              <h2 className="type-display-m m-0 text-ink">
-                Send us the horses, the route and the date
-              </h2>
-              <p className="type-body-m m-0 text-ink-2">
-                Nothing is booked until you accept the itemised quotation.
-              </p>
-            </div>
-            <Button variant="primary" trailingIcon="arrow-right" onClick={toSignIn}>
-              Request transport
-            </Button>
-          </div>
-        </section>
+          </section>
+        </div>
       </main>
 
       <Footer />
