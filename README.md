@@ -25,9 +25,24 @@ The earlier coursework (`prj301/`, and the SWP391 parking management system in `
 
 ## Running
 
+### Docker
+
+```bash
+cp .env.example .env   # then set DB_PASSWORD and JWT_SECRET
+docker compose up -d --build
+```
+
+This starts PostgreSQL, the API and the web app. Open `http://localhost:3000`. nginx serves the SPA and proxies `/api` and Swagger UI (`/swagger-ui.html`) to the backend. The API is also published on `http://localhost:8080`, and Postgres on `localhost:5433`.
+
+The backend image runs on a JRE with two ahead-of-time steps that cut startup time:
+- **Spring AOT:** `processAot` generates the bean-definition code at build time, and the app runs with `-Dspring.aot.enabled=true`. Beans are fixed at build time, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
+- **JDK AOT cache:** the build starts the app once against a throwaway Postgres and records `app.aot`, which the container loads with `-XX:AOTCache`. The cache is rebuilt with every image build, so nothing needs regenerating by hand.
+
+### Local development
+
 Prerequisites: JDK 25, PostgreSQL, and [Bun](https://bun.sh).
 
-### Backend
+#### Backend
 
 ```bash
 createdb cbrtsdb
@@ -49,7 +64,7 @@ On first start, `DataSeeder` creates the five roles and one account per role. Ea
 | `khoi.do@equifreight.vn` | Fleet & route coordinator |
 | `minh.tran@equifreight.vn` | Escort |
 
-### Frontend
+#### Frontend
 
 ```bash
 cd FE
