@@ -102,6 +102,103 @@ public final class ClearanceMapper {
         return builder.build();
     }
 
+    public static DocumentTypeResponse toDocumentTypeResponse(com.equifreight.entity.DocumentType dt) {
+        if (dt == null) return null;
+        return DocumentTypeResponse.builder()
+                .id(dt.getId())
+                .code(dt.getCode())
+                .name(dt.getName())
+                .scope(dt.getScope())
+                .providedBy(dt.getProvidedBy())
+                .build();
+    }
+
+    public static RegulationRuleResponse toRuleResponse(com.equifreight.entity.RegulationRule rule) {
+        if (rule == null) return null;
+        return RegulationRuleResponse.builder()
+                .id(rule.getId())
+                .documentType(toDocumentTypeResponse(rule.getDocumentType()))
+                .mandatory(rule.isMandatory())
+                .ruleKind(rule.getRuleKind())
+                .minDays(rule.getMinDays())
+                .maxDays(rule.getMaxDays())
+                .description(rule.getDescription())
+                .build();
+    }
+
+    public static RegulationVersionResponse toVersionResponse(com.equifreight.entity.RegulationVersion rv) {
+        if (rv == null) return null;
+        String pubName = rv.getPublishedBy() != null ? formatUserName(rv.getPublishedBy()) : null;
+        return RegulationVersionResponse.builder()
+                .id(rv.getId())
+                .catalogId(rv.getCatalog() != null ? rv.getCatalog().getId() : null)
+                .versionNo(rv.getVersionNo())
+                .status(rv.getStatus())
+                .publishedAt(rv.getPublishedAt())
+                .publishedByName(pubName)
+                .leadTimeDays((short) rv.getLeadTimeDays())
+                .quarantineMinDays((short) rv.getQuarantineMinDays())
+                .arrivalBufferDays((short) rv.getArrivalBufferDays())
+                .rules(java.util.List.of())
+                .build();
+    }
+
+    public static AuthorityResponse toAuthorityResponse(com.equifreight.entity.Authority auth) {
+        if (auth == null) return null;
+        return AuthorityResponse.builder()
+                .id(auth.getId())
+                .name(auth.getName())
+                .countryCode(auth.getCountry() != null ? auth.getCountry().getCode() : null)
+                .kind(auth.getKind())
+                .slaDays(auth.getSlaDays())
+                .build();
+    }
+
+    public static AuthoritySubmissionResponse toSubmissionResponse(com.equifreight.entity.AuthoritySubmission sub) {
+        if (sub == null) return null;
+        boolean isOverdue = sub.getExpectedBy() != null
+                && sub.getStatus() != com.equifreight.entity.enums.SubmissionStatus.ISSUED
+                && sub.getStatus() != com.equifreight.entity.enums.SubmissionStatus.REFUSED
+                && java.time.LocalDate.now().isAfter(sub.getExpectedBy());
+
+        java.util.List<UUID> itemIds = sub.getChecklistItems() == null ? java.util.List.of()
+                : sub.getChecklistItems().stream().map(ChecklistItem::getId).toList();
+
+        return AuthoritySubmissionResponse.builder()
+                .id(sub.getId())
+                .jobId(sub.getJob() != null ? sub.getJob().getId() : null)
+                .jobCode(sub.getJob() != null ? sub.getJob().getCode() : null)
+                .authority(toAuthorityResponse(sub.getAuthority()))
+                .kind(sub.getKind())
+                .status(sub.getStatus())
+                .filedAt(sub.getFiledAt())
+                .filedByName(sub.getFiledBy() != null ? formatUserName(sub.getFiledBy()) : null)
+                .referenceNo(sub.getReferenceNo())
+                .expectedBy(sub.getExpectedBy())
+                .isOverdue(isOverdue)
+                .issuedAt(sub.getIssuedAt())
+                .resultFileId(sub.getResultFile() != null ? sub.getResultFile().getId() : null)
+                .resultFileName(sub.getResultFile() != null ? sub.getResultFile().getFileName() : null)
+                .checklistItemIds(itemIds)
+                .build();
+    }
+
+    public static QuarantinePeriodResponse toQuarantineResponse(com.equifreight.entity.QuarantinePeriod q) {
+        if (q == null) return null;
+        return QuarantinePeriodResponse.builder()
+                .id(q.getId())
+                .jobId(q.getJob() != null ? q.getJob().getId() : null)
+                .horseId(q.getHorse() != null ? q.getHorse().getId() : null)
+                .horseName(q.getHorse() != null ? q.getHorse().getName() : "Toàn bộ lô ngựa")
+                .placeId(q.getPlace() != null ? q.getPlace().getId() : null)
+                .placeName(q.getPlace() != null ? q.getPlace().getName() : null)
+                .startsOn(q.getStartsOn())
+                .endsOn(q.getEndsOn())
+                .completedAt(q.getCompletedAt())
+                .isCompleted(q.getCompletedAt() != null)
+                .build();
+    }
+
     private static String formatUserName(User user) {
         if (user == null) {
             return null;
