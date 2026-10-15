@@ -1,0 +1,8 @@
+.gradle
+.idea
+build
+bin
+out
+.env
+.env.*
+src/main/resources/application-local.properties
