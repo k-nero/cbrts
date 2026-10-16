@@ -314,10 +314,16 @@ const DocumentsPage: FC = () => {
               className="w-full max-w-md"
               filterOption={false}
               notFoundContent={jobsLoading ? <Spin size="small" /> : 'No open dossier matches'}
-              options={jobs.map((j) => ({
-                value: j.id,
-                label: `${j.code}${j.clubName ? ' · ' + j.clubName : ''}`,
-              }))}
+              options={[
+                ...jobs.map((j) => ({
+                  value: j.id,
+                  label: `${j.code}${j.clubName ? ' · ' + j.clubName : ''}`,
+                })),
+                // A job opened by link (e.g. a departed one) may not be in the open-dossier list; label it by its code.
+                ...(selectedJobId && statusData && !jobs.some((j) => j.id === selectedJobId)
+                  ? [{ value: selectedJobId, label: statusData.jobCode }]
+                  : []),
+              ]}
             />
             {selectedJobId && (
               <Button variant="secondary" size="sm" onClick={() => handleSelectJob(null)}>
