@@ -8,6 +8,7 @@ var ADMIN_ICONS = {
   'book': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V21h16"/>',
   'tag': '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   'search': '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  'receipt': '<path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5-2 1.5-2.5-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   'ledger': '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
   'sort': '<path d="m8 9 4-4 4 4"/><path d="m8 15 4 4 4-4"/>',
   'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
@@ -20,12 +21,12 @@ var CHART_COLORS = [
 ];
 /* The staff sidebar lists the work each role owns (PRODUCT.md: one accountable owner per step),
    not the system's tables. Every item exists once in the component; each role shows its own. */
-var NAV_MAIN = [['Overview', 'chart'], ['Requests', 'history'], ['Jobs', 'route'], ['Incidents', 'alert'], ['Documents', 'file'], ['Authorities', 'shield'], ['Customer notes', 'pencil'], ['Fleet calendar', 'calendar'], ['Vehicles', 'truck']];
+var NAV_MAIN = [['Overview', 'chart'], ['Requests', 'history'], ['Jobs', 'route'], ['Incidents', 'alert'], ['Invoices', 'receipt'], ['Documents', 'file'], ['Authorities', 'shield'], ['Customer notes', 'pencil'], ['Fleet calendar', 'calendar'], ['Vehicles', 'truck']];
 /* sections below the main list: a label only when the section holds more than one item */
 var NAV_MORE = [['Catalogs', [['Regulations', 'book'], ['Rates', 'tag']]], ['Admin', [['Users & roles', 'users'], ['Audit log', 'ledger']]]];
 /* what a badge counts: always items where this person owns the next step; 0 hides the badge, over 99 reads 99+ */
 var BADGE_MEANS = {
-  'Requests': 'requests waiting for your review', 'Jobs': 'jobs where you own the next step', 'Incidents': 'open incidents',
+  'Requests': 'requests waiting for your review', 'Jobs': 'jobs where you own the next step', 'Incidents': 'open incidents', 'Invoices': 'invoices overdue or part paid',
   'Documents': 'documents waiting for your check', 'Authorities': 'filings or follow-ups due from you', 'Customer notes': 'notes due today',
   'Fleet calendar': 'capacity checks asked of you', 'Regulations': 'changes waiting to publish', 'Rates': 'missing rates'
 };
@@ -33,7 +34,7 @@ var BADGE_MEANS = {
    2 due today, Draft v8 · 3 changes, 2 missing), and the recent codes. The escort (driver, grooms)
    has no sidebar: they work on the cab surface. */
 var ROLE_NAV = {
-  'Logistics manager': { items: ['Overview', 'Requests', 'Jobs', 'Incidents', 'Users & roles', 'Audit log'], badges: { 'Requests': '4', 'Jobs': '1', 'Incidents': '1' },
+  'Logistics manager': { items: ['Overview', 'Requests', 'Jobs', 'Incidents', 'Invoices', 'Users & roles', 'Audit log'], badges: { 'Requests': '4', 'Jobs': '1', 'Incidents': '1', 'Invoices': '2' },
     recent: [['REQ-2026-0193', 'HCM → BKK'], ['CBRT-2026-040', 'PNH → HCM'], ['CBRT-2026-041', 'HCM → PNH']] },
   'Transport specialist': { items: ['Jobs', 'Documents', 'Authorities', 'Customer notes', 'Regulations', 'Rates'], badges: { 'Jobs': '1', 'Documents': '1', 'Authorities': '1', 'Customer notes': '2', 'Regulations': '3', 'Rates': '2' },
     recent: [['CBRT-2026-041', 'HCM → PNH'], ['CBRT-2026-038', 'BKK → PNH'], ['CBRT-2026-044', 'VTE → BKK']] },
@@ -98,7 +99,7 @@ function userMenu() {
   return m;
 }
 function buildAdminComponents(board) {
-  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
+  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Invoices, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
   var items = ['Default', 'Hover', 'Active', 'Focus'].map(sideItem);
   C.sideNav = combine(items, b, 'Side nav item', 'States: Default, Hover, Active (gold ink: the one place gold marks the current page), Focus (gold border and ring). Set aria-current on the Active item.');
   wireText(C.sideNav, ['Label', 'Badge']);
@@ -941,7 +942,9 @@ var SIDEBAR_FRAMES = {
   'Transport specialist · Authorities · Overdue': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Authorities']],
   'Logistics manager · Incident · Held': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-040'], [['Jobs', 'Incidents']]],
   'Logistics manager · Incident · Customer report': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-036'], [['Jobs', 'Incidents']]],
-  'Transport specialist · Customer notes': ['lan', 'Customer notes', ['Customer notes']]
+  'Transport specialist · Customer notes': ['lan', 'Customer notes', ['Customer notes']],
+  'Logistics manager · Invoices': ['yen', 'Invoices', ['Invoices']],
+  'Logistics manager · Invoices · Record payment': ['yen', 'Invoices', ['Invoices', 'INV-2026-0041']]
 };
 async function eSidebar() {
   var page = await rehydrate(PAGE_NAMES[2]);

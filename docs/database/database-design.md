@@ -30,7 +30,7 @@ This is the logical and physical design for PostgreSQL. It is not yet a migratio
 |---|---|---|---|
 | A | Accounts and access | `roles`, `users`, `user_roles`, `refresh_tokens`, `account_tokens`, `sign_in_attempts` | Access · Sign in / Create account / Staff invite / Reset password, Users & roles |
 | B | Clubs and horses | `clubs`, `horses`, `horse_size_classes` | My horses, Horse profile, Add a horse |
-| C | Places and corridors | `countries`, `places`, `border_crossings`, `corridors`, `corridor_crossings` | Request · 3, Route plan, Rate catalog |
+| C | Places and corridors | `countries`, `places`, `border_crossings`, `corridors`, `corridor_crossings` | Request · 2 (Route & dates), Route plan, Rate catalog |
 | D | Rate catalog | `rate_catalog_versions`, `rate_service_classes`, `rate_lines`, `rate_volume_breaks`, `rate_policies`, `rate_fee_bands` | Rate catalog, Quotation builder |
 | E | Regulation catalog | `regulation_catalogs`, `regulation_versions`, `document_types`, `regulation_rules` | Regulation catalog, Clearance checklist |
 | F | Requests and quotations | `transport_requests`, `request_horses`, `request_revisions`, `quotations`, `quotation_lines` | Request wizard, Request review, Quotation builder, Quotation, Tracking |
@@ -39,7 +39,7 @@ This is the logical and physical design for PostgreSQL. It is not yet a migratio
 | I | Trip and handover | `trip_records`, `condition_logs`, `handovers` | Escort cab screens, Coordinator · Trip, In transit, Delivered, Closed |
 | J | Incidents | `incidents`, `incident_options`, `incident_files` | Incident · Held, Incident · Customer report, Report a problem |
 | K | Notes and notifications | `notes`, `note_replies`, `notifications` | Ask a question, Customer notes |
-| M | Invoices and payments | `invoices`, `invoice_lines`, `payments` | Quotation (deposit), Delivered, Closed, Invoice (to be drawn) |
+| M | Invoices and payments | `invoices`, `invoice_lines`, `payments` | Quotation (deposit), Delivered, Closed, Tracking · Invoice, Invoices, Invoices · Record payment |
 | L | Audit and codes | `audit_log`, `code_counters` | Audit log |
 
 ---
@@ -277,8 +277,9 @@ erDiagram
 | `air_class` | varchar(10) | `ECONOMY`, `BUSINESS`, `FIRST`. Air only. |
 | `insurance` | varchar(20) | `OWN_POLICY`, `EQUIFREIGHT`. |
 | `vet_escort` | boolean default false | Added automatically from 8 horses or when a declared value is over the threshold (application rule). |
-| `origin_place_id`, `destination_place_id` | → `places` | |
-| `corridor_id` | → `corridors` | Resolved from the places. |
+| `origin_place_id`, `destination_place_id` | → `places` | Null while a draft names a city we don't run. |
+| `origin_text`, `destination_text` | varchar(160) | What the customer typed when it matches no place ("Singapore"). Kept so the logistics manager sees the ask. |
+| `corridor_id` | → `corridors` | Resolved from the places. Null means the route is not one we run. |
 | `departure_date` | date not null | |
 | `date_flex_days` | smallint default 0 | 0 or 3 ("My dates can move by ±3 days"). |
 | `arrival_mode` | varchar(10) default 'ANY_TIME' | `ANY_TIME`, `WINDOW`. |
@@ -294,6 +295,8 @@ erDiagram
 Checks (the arrival-window rule):
 - `(arrival_mode = 'ANY_TIME' and window_start is null and window_end is null) or (arrival_mode = 'WINDOW' and mode = 'ROAD' and trailer = 'PRIVATE' and date_flex_days = 0 and window_end - window_start >= interval '3 hours')`
 - `(mode = 'ROAD' and air_class is null) or (mode = 'AIR' and trailer is null)`
+
+Check (routes we run): `status = 'DRAFT' or corridor_id is not null`. A route outside the catalog can be saved as a draft and asked about (a `notes` row with topic `ROUTE`), never submitted or quoted.
 
 The 3 hours in the check mirrors `ARRIVAL_WINDOW_MIN_HOURS`. If the catalog value changes, the check moves to the application.
 
@@ -571,7 +574,7 @@ erDiagram
 
 | Table | Columns | Rules |
 |---|---|---|
-| `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. The topic decides who answers (documents → transport specialist; dates, price or changes → logistics manager). Never a free chat. |
+| `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
 | `note_replies` | `note_id`, `author_id`, `body` | |
 | `notifications` | `user_id`, `kind`, `title`, `body`, `entity_type`, `entity_id`, `read_at`, `emailed_at` | Index `(user_id, read_at)`. Sidebar badges and the bell read from it. |
 
@@ -620,7 +623,7 @@ Partial unique index: one non-void `DEPOSIT` and one non-void `FINAL` invoice pe
 
 **`payments`**: `invoice_id` not null, `amount`, `method` (`BANK_TRANSFER`, `CARD`), `reference`, `received_at`, `recorded_by`, `status` (`PENDING`, `CONFIRMED`, `REFUNDED`). Recording a confirmed payment updates `invoices.amount_paid` and the status in the same transaction. Online card payment is not designed; staff record bank transfers by hand, like authority steps.
 
-Screens: the customer's **Tracking · Invoice** page (drawn 2 Oct 2026) under the request (lines, what changed from the quotation and why, amount due, bank details), and, still to draw, an **Invoices** list for the logistics manager with a "Record payment" action. The Quotation's "After you accept" panel and the Delivered and Closed pages link to them.
+Screens: the customer's **Tracking · Invoice** page (drawn 2 Oct 2026) under the request (lines, what changed from the quotation and why, amount due, bank details), and the logistics manager's **Invoices** list with its **Record payment** state (drawn 21 Oct 2026): overdue first, then by due date; the amount, method, bank reference and date of each payment against one invoice; a recorded payment is never edited, only reversed with a refund entry. The Quotation's "After you accept" panel and the Delivered and Closed pages link to the customer's invoice.
 
 ## 14. Domain L: audit and codes
 
@@ -677,12 +680,12 @@ Indexes: `(occurred_at desc)`, `(entity_code, occurred_at desc)`, `(actor_id, oc
 
 | Screen | Reads | Writes |
 |---|---|---|
-| Request · 1–4 | `horses`, `corridors`, `rate_*` (estimate) | `transport_requests`, `request_horses` |
+| Request · 1–4 (Horses, Route & dates, Service, Review) | `horses`, `corridors`, `rate_*` (estimate) | `transport_requests`, `request_horses` |
 | Request review (staff) | `transport_requests`, `request_revisions`, `audit_log` | status, `info_required_note`, override |
 | Quotation builder | `rate_*` (pinned), `request_horses` | `quotations`, `quotation_lines` |
 | Quotation (customer) | `quotations`, `quotation_lines`, `rate_fee_bands` | accept or decline; creates the deposit `invoices` row |
 | Tracking · Invoice (customer) | `invoices`, `invoice_lines`, `payments`, `quotation_lines` | — |
-| Invoices list, Record payment (staff, to be drawn) | `invoices`, `payments` | final invoice, payments |
+| Invoices, Invoices · Record payment (logistics manager) | `invoices`, `payments`, `clubs` | `payments` (status `CONFIRMED`), `invoices.amount_paid` and status |
 | Tracking pages, Home | `transport_requests`, `transport_jobs`, `checklist_items`, `trip_records`, `audit_log` | — |
 | Clearance checklist, All documents | `checklist_items`, `document_versions` | due dates, planned departure |
 | Document upload / review | `checklist_items` | `document_versions`, `files` |
