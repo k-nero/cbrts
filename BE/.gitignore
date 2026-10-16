@@ -43,3 +43,5 @@ CLAUDE.MD
 !.env.example
 application-local.properties
 src/main/resources/application-local.properties
+### Uploaded files (STORAGE_TYPE=local) ###
+/data/

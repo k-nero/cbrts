@@ -6,3 +6,4 @@ out
 .env
 .env.*
 src/main/resources/application-local.properties
+data
