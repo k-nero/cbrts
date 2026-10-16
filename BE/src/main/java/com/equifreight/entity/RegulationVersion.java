@@ -33,9 +33,13 @@ public class RegulationVersion extends BaseEntity {
     @JoinColumn(name = "published_by")
     private User publishedBy;
 
-    /** 21 cross-border, 3 domestic (BR-F1-01). */
+    /** The cross-border lead time into this country: 21 days, Laos 30 in the demo (BR-F1-01). */
     @Column(nullable = false)
     private short leadTimeDays;
+
+    /** The lead time for a move within this country: 3 days (BR-F1-01). */
+    @Column(nullable = false)
+    private short domesticLeadTimeDays = 3;
 
     @Column(nullable = false)
     private short quarantineMinDays;
