@@ -2,16 +2,20 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fileApi } from '@/apis/file';
 
-export const useFileBlobUrl = (id: string, contentUrl: string) => {
+/** A blob URL for a stored file, fetched with the access token and revoked when it changes or unmounts. */
+export const useFileBlobUrl = (id: string) => {
   const query = useQuery({
     queryKey: ['files', id, 'blob'],
-    queryFn: () => fileApi.getBlob(contentUrl),
+    queryFn: () => fileApi.getBlob(id),
     enabled: Boolean(id),
     staleTime: Infinity,
   });
   const [url, setUrl] = useState<string>();
   useEffect(() => {
-    if (!query.data) { setUrl(undefined); return; }
+    if (!query.data) {
+      setUrl(undefined);
+      return;
+    }
     const nextUrl = URL.createObjectURL(query.data);
     setUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);

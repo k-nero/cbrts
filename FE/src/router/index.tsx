@@ -9,6 +9,7 @@ import CustomerHomePage from '@/pages/customer/home';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import DocumentsPage from '@/pages/staff/documents';
 import UsersPage from '@/pages/staff/users';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 
@@ -59,7 +60,7 @@ export const router = createBrowserRouter([
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: todo('Audit log') },
-          { path: 'documents', element: todo('Documents') },
+          { path: 'documents', element: <DocumentsPage /> },
           { path: 'authorities', element: todo('Authorities') },
           { path: 'customer-notes', element: todo('Customer notes') },
           { path: 'regulations', element: todo('Regulations') },
