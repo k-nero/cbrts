@@ -3,6 +3,7 @@ package com.equifreight.controller;
 import com.equifreight.entity.User;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.model.trip.TripRecordResponse;
+import com.equifreight.model.trip.TripSummaryResponse;
 import com.equifreight.model.trip.TripViewResponse;
 import com.equifreight.service.TripService;
 import jakarta.validation.Valid;
@@ -22,8 +23,8 @@ public class TripController {
 
     @GetMapping("/api/v1/escort/trips")
     @PreAuthorize("hasRole('ESCORT')")
-    public Page<TripViewResponse> escortTrips(@AuthenticationPrincipal User user,
-                                              @PageableDefault(size = 20, sort = "job.plannedDepartureAt", direction = Sort.Direction.ASC) Pageable pageable) {
+    public Page<TripSummaryResponse> escortTrips(@AuthenticationPrincipal User user,
+                                                  @PageableDefault(size = 20, sort = "job.plannedDepartureAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return trips.escortTrips(user, pageable);
     }
 
@@ -40,7 +41,7 @@ public class TripController {
 
     @GetMapping("/api/v1/staff/trips")
     @PreAuthorize("hasRole('FLEET_COORDINATOR')")
-    public Page<TripViewResponse> coordinatorTrips(@PageableDefault(size = 20, sort = "plannedDepartureAt", direction = Sort.Direction.ASC) Pageable pageable) {
+    public Page<TripSummaryResponse> coordinatorTrips(@PageableDefault(size = 20, sort = "plannedDepartureAt", direction = Sort.Direction.ASC) Pageable pageable) {
         return trips.coordinatorTrips(pageable);
     }
 
@@ -57,7 +58,7 @@ public class TripController {
 
     @GetMapping("/api/v1/customer/trips")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public Page<TripViewResponse> customerTrips(@AuthenticationPrincipal User user,
+    public Page<TripSummaryResponse> customerTrips(@AuthenticationPrincipal User user,
                                                 @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return trips.customerTrips(user, pageable);
     }

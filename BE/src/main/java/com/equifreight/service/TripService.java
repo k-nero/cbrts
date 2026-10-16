@@ -34,17 +34,17 @@ public class TripService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TripViewResponse> escortTrips(User user, Pageable pageable) {
-        return crew.findByUser_Id(user.getId(), pageable).map(CrewAssignment::getJob).map(this::view);
+    public Page<TripSummaryResponse> escortTrips(User user, Pageable pageable) {
+        return crew.findTripSummariesByUserId(user.getId(), pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<TripViewResponse> coordinatorTrips(Pageable pageable) { return jobs.findActiveTrips(pageable).map(this::view); }
+    public Page<TripSummaryResponse> coordinatorTrips(Pageable pageable) { return jobs.findActiveTrips(pageable); }
 
     @Transactional(readOnly = true)
-    public Page<TripViewResponse> customerTrips(User user, Pageable pageable) {
+    public Page<TripSummaryResponse> customerTrips(User user, Pageable pageable) {
         if (user.getClub() == null) return Page.empty(pageable);
-        return jobs.findAllByClubId(user.getClub().getId(), pageable).map(this::view);
+        return jobs.findAllByClubId(user.getClub().getId(), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -67,14 +67,14 @@ public class TripService {
 
     @Transactional
     public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request) {
-        TransportJob job = job(code);
+        TransportJob job = jobForUpdate(code);
         if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId())) throw ResourceNotFoundException.of("Trip", code);
         return addRecord(job, user, request, Channel.CAB_TABLET);
     }
 
     @Transactional
     public TripRecordResponse addCoordinatorRecord(String code, User user, TripRecordRequest request) {
-        return addRecord(job(code), user, request, Channel.WEB);
+        return addRecord(jobForUpdate(code), user, request, Channel.WEB);
     }
 
     private TripRecordResponse addRecord(TransportJob job, User user, TripRecordRequest request, Channel channel) {
@@ -84,6 +84,12 @@ public class TripService {
                 throw new ConflictException("TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
             return mapRecord(existing.get());
         }
+        validateTransition(job, request.kind(), request.occurredAt());
+        boolean hasConditions = request.conditions() != null && !request.conditions().isEmpty();
+        if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
+            throw new BusinessException("CONDITION_LOG_REQUIRED", "A condition check must include at least one horse observation");
+        if (request.kind() != TripRecordKind.CONDITION_CHECK && hasConditions)
+            throw new BusinessException("CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
         if ((request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
                 && (job.getDossierStatus() != DossierStatus.CLEARANCE_READY || job.getClearanceReadyAt() == null
                 || job.getClearanceReadyAt().isAfter(request.occurredAt())))
@@ -100,6 +106,7 @@ public class TripService {
         record.setOccurredAt(request.occurredAt()); record.setReceivedAt(Instant.now());
         record.setClientRef(request.clientRef()); record.setRecordedBy(user); record.setChannel(channel); record.setText(request.text());
         Set<UUID> seen = new HashSet<>();
+        Set<UUID> attachedFiles = new HashSet<>();
         if (request.conditions() != null) for (TripConditionRequest condition : request.conditions()) {
             if (!seen.add(condition.horseId())) throw new BusinessException("DUPLICATE_HORSE_CONDITION", "A horse can appear only once in a condition check");
             RequestHorse requestHorse = requestHorses.findByRequest_IdAndHorse_Id(job.getRequest().getId(), condition.horseId())
@@ -107,15 +114,51 @@ public class TripService {
             ConditionLog log = new ConditionLog(); log.setTripRecord(record);
             log.setHorse(requestHorse.getHorse());
             log.setCondition(condition.condition()); log.setDrinking(condition.drinking()); log.setEating(condition.eating()); log.setNote(condition.note());
-            if (condition.photoFileIds() != null) for (UUID fileId : condition.photoFileIds())
-                if (!log.getFiles().add(files.requireAttachable(fileId, user)))
+            if (condition.photoFileIds() != null) for (UUID fileId : condition.photoFileIds()) {
+                if (!attachedFiles.add(fileId))
                     throw new BusinessException("DUPLICATE_PHOTO", "A photo can be attached only once to a condition entry");
+                log.getFiles().add(files.requireAttachable(fileId, user));
+            }
             record.getConditionLogs().add(log);
         }
         TripRecord saved = records.save(record);
         updateJobStatus(job, request.kind(), request.occurredAt(), stop);
         writeAudit(saved, user, channel, stop);
         return mapRecord(saved);
+    }
+
+    private void validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt) {
+        TripStatus status = job.getTripStatus();
+        TripRecord latest = records.findTopByJob_IdOrderByOccurredAtDesc(job.getId()).orElse(null);
+        if (latest != null && occurredAt.isBefore(latest.getOccurredAt()))
+            throw transitionConflict(status, "A trip update cannot predate the latest recorded checkpoint");
+        if (job.getStage() == JobStage.CLOSED)
+            throw transitionConflict(status, "A closed trip cannot receive new journey events");
+        if (job.getStage() == JobStage.HANDOVER && (status != TripStatus.DELIVERED
+                || !EnumSet.of(TripRecordKind.HANDED_OVER, TripRecordKind.NOTE).contains(kind)))
+            throw transitionConflict(status, "Only handover or a note can be recorded at the handover stage");
+        if (job.getStage() == JobStage.HANDOVER
+                && records.existsByJob_IdAndKind(job.getId(), TripRecordKind.HANDED_OVER)
+                && kind != TripRecordKind.NOTE)
+            throw transitionConflict(status, "Only a note can be added after handover");
+
+        boolean allowed = switch (status) {
+            case NOT_STARTED -> EnumSet.of(TripRecordKind.LOADED, TripRecordKind.NOTE,
+                    TripRecordKind.DEPARTED, TripRecordKind.FLIGHT_DEPARTED).contains(kind);
+            case DEPARTED -> EnumSet.of(TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.HELD,
+                    TripRecordKind.LEFT_STOP, TripRecordKind.CONDITION_CHECK, TripRecordKind.ACCEPTED_BY_AIRLINE,
+                    TripRecordKind.FLIGHT_DEPARTED, TripRecordKind.FLIGHT_LANDED, TripRecordKind.RELEASED_BY_AIRLINE,
+                    TripRecordKind.NOTE).contains(kind);
+            case HELD -> EnumSet.of(TripRecordKind.LEFT_STOP, TripRecordKind.CLEARED_BORDER,
+                    TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE).contains(kind);
+            case ARRIVED -> EnumSet.of(TripRecordKind.DELIVERED, TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE).contains(kind);
+            case DELIVERED -> EnumSet.of(TripRecordKind.HANDED_OVER, TripRecordKind.NOTE).contains(kind);
+        };
+        if (!allowed) throw transitionConflict(status, "This event is not allowed in the current trip state");
+    }
+
+    private static ConflictException transitionConflict(TripStatus status, String reason) {
+        return new ConflictException("TRIP_STATE_CONFLICT", "%s Current trip status: %s.".formatted(reason, status));
     }
 
     private void updateJobStatus(TransportJob job, TripRecordKind kind, Instant at, RouteStop stop) {
@@ -182,4 +225,5 @@ public class TripService {
     }
 
     private TransportJob job(String code) { return jobs.findByCode(code).orElseThrow(() -> ResourceNotFoundException.of("Trip", code)); }
+    private TransportJob jobForUpdate(String code) { return jobs.findByCodeForUpdate(code).orElseThrow(() -> ResourceNotFoundException.of("Trip", code)); }
 }

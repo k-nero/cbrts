@@ -52,7 +52,8 @@ export const router = createBrowserRouter([
           </AuthenticateLayout>
         ),
         children: [
-          { path: 'jobs', element: <StaffTripPage /> },
+          { path: 'jobs', element: todo('Jobs') },
+          { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },

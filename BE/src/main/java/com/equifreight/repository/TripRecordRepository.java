@@ -14,4 +14,8 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, UUID> {
 
     @EntityGraph(attributePaths = {"routeStop", "routeStop.place", "routeStop.borderCrossing", "conditionLogs", "conditionLogs.horse"})
     Optional<TripRecord> findByClientRef(UUID clientRef);
+
+    Optional<TripRecord> findTopByJob_IdOrderByOccurredAtDesc(UUID jobId);
+
+    boolean existsByJob_IdAndKind(UUID jobId, com.equifreight.entity.enums.TripRecordKind kind);
 }
