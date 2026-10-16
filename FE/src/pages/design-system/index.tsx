@@ -392,6 +392,14 @@ const DesignSystemPage: FC = () => {
               tags={<Chip tone="bad">Needs a box</Chip>}
               facts={{ age: '5 y', height: '16.3 hh', weight: '545 kg', size: 'L · 48' }}
             />
+            <HorseCard
+              coat="other"
+              name="Silver Bell"
+              subtitle="Lipizzan · Mare"
+              status={<Chip tone="neutral">Archived · 3 Oct 2026</Chip>}
+              tags={<Chip tone="ok">Calm</Chip>}
+              facts={{ age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32' }}
+            />
           </div>
         </Section>
 
