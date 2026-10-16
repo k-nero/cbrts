@@ -34,6 +34,14 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Uploaded files live in S3-compatible object storage (SeaweedFS in compose, S3 or R2 in production).
+    // Only the sync client is used, so the Netty async transport is left out.
+    implementation platform('software.amazon.awssdk:bom:2.56.0')
+    implementation('software.amazon.awssdk:s3') {
+        exclude group: 'software.amazon.awssdk', module: 'netty-nio-client'
+    }
+    // File type detection from the bytes themselves (magic numbers), not the client's Content-Type.
+    implementation 'org.apache.tika:tika-core:4.1.0'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
