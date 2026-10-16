@@ -80,6 +80,10 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       // Spinner until the first page arrives, and while a new page or sort loads.
       loading={listQuery.isPending || listQuery.isFetching}
       ignoreKeys={['actions']}
+      // Controlled, so the header highlight follows the page's sort and "Reset order" clears it.
+      sorter={
+        pageState.sort ? { columnKey: pageState.sort.field, order: pageState.sort.order } : null
+      }
       pagination={{
         current: pageState.number + 1,
         pageSize: pageState.size,
