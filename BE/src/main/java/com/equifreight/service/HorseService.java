@@ -79,7 +79,7 @@ public class HorseService {
                 var matches = new ArrayList<Predicate>();
                 matches.add(cb.like(cb.lower(root.get("name")), like));
                 matches.add(cb.like(cb.lower(root.get("passportNo")), like));
-                String digits = q.replaceAll("\\s", "");
+                String digits = stripSpaces(q);
                 if (!digits.isEmpty()) {
                     matches.add(cb.like(root.get("microchip"), "%" + digits + "%"));
                 }
@@ -199,9 +199,15 @@ public class HorseService {
         }
     }
 
+    /** Removes every kind of space, including the non-breaking ones a copy from a PDF carries. */
+    static String stripSpaces(String raw) {
+        return raw == null ? null : raw.replaceAll("[\\s\\p{Z}]", "");
+    }
+
+    /** ASCII digits only: full-width or other scripts' digits would slip past the unique microchip. */
     static String normalizeMicrochip(String raw) {
-        String microchip = raw == null ? "" : raw.replaceAll("\\s", "");
-        if (!microchip.chars().allMatch(Character::isDigit)) {
+        String microchip = raw == null ? "" : stripSpaces(raw);
+        if (!microchip.matches("[0-9]*")) {
             throw new BusinessException("INVALID_MICROCHIP",
                     "A microchip is 15 digits; " + microchip + " has letters or symbols.");
         }
@@ -222,8 +228,7 @@ public class HorseService {
         if (!Objects.equals(horse.getName(), trimToNull(request.getName()))) {
             changed.add("Name");
         }
-        if (!Objects.equals(horse.getMicrochip(), request.getMicrochip() == null
-                ? null : request.getMicrochip().replaceAll("\\s", ""))) {
+        if (!Objects.equals(horse.getMicrochip(), stripSpaces(request.getMicrochip()))) {
             changed.add("Microchip");
         }
         if (horse.getSex() != request.getSex()) {

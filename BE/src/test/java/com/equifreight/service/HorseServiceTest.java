@@ -121,6 +121,27 @@ class HorseServiceTest {
     }
 
     @Test
+    void createRefusesAMicrochipWithNonAsciiDigits() {
+        HorseRequest request = nightfallRequest();
+        request.setMicrochip("２５０２５９６００２２３３１１");
+
+        assertThatThrownBy(() -> service.create(user, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("A microchip is 15 digits; ２５０２５９６００２２３３１１ has letters or symbols.")
+                .extracting("code").isEqualTo("INVALID_MICROCHIP");
+    }
+
+    @Test
+    void createStripsNonBreakingSpacesFromTheMicrochip() {
+        HorseRequest request = nightfallRequest();
+        request.setMicrochip("250 259 600 223 311");
+
+        service.create(user, request);
+
+        assertThat(savedHorse().getMicrochip()).isEqualTo("250259600223311");
+    }
+
+    @Test
     void createRefusesADuplicateActiveNameIgnoringCase() {
         Horse existing = horse("Nightfall", "250259600223311");
         when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(CLUB_ID, "NIGHTFALL"))
@@ -282,6 +303,18 @@ class HorseServiceTest {
 
         assertThat(savedHorse().getWeightKg()).isEqualTo((short) 480);
         assertThat(response.isIdentityLocked()).isTrue();
+    }
+
+    @Test
+    void aLockedMicrochipResentWithNonBreakingSpacesPasses() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setMicrochip("250 259 600 223 311");
+
+        service.update(user, nightfall.getId(), request);
+
+        assertThat(savedHorse().getMicrochip()).isEqualTo("250259600223311");
     }
 
     @Test

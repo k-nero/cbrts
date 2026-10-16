@@ -152,7 +152,14 @@ public class DataSeeder implements ApplicationRunner {
         return club;
     }
 
+    /**
+     * Only into a club that has never had a horse: a demo horse edited through the API (a new name or
+     * microchip) must not come back, or collide with its edited self on the unique name, on the next start.
+     */
     private void seedHorses(Club club) {
+        if (horseRepository.existsByClubId(club.getId())) {
+            return;
+        }
         List<HorseSizeClass> classes = sizeClassRepository.findAllByOrderByMinHeightHhAsc();
         for (DemoHorse demo : HORSES) {
             if (horseRepository.findByMicrochip(demo.microchip()).isPresent()) {

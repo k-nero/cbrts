@@ -17,6 +17,9 @@ public interface HorseRepository extends JpaRepository<Horse, UUID>, JpaSpecific
     /** An active horse of the club with this name, ignoring case (names are unique among active horses). */
     Optional<Horse> findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(UUID clubId, String name);
 
+    /** Archived horses count too: the seeder leaves a club that has ever had horses alone. */
+    boolean existsByClubId(UUID clubId);
+
     /** Microchips are unique across every club. */
     Optional<Horse> findByMicrochip(String microchip);
 }
