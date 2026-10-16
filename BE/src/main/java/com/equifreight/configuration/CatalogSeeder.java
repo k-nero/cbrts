@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The demo route catalog (spec §7): pickup and delivery places, border crossings, the corridors we run and one
@@ -137,9 +138,21 @@ public class CatalogSeeder {
             }));
         }
         for (DemoCorridor demo : CORRIDORS) {
-            if (corridors.findByCode(demo.code()).isEmpty()) {
+            if (corridors.findByCode(demo.code()).isPresent()) {
+                continue;
+            }
+            // Another seeder may have run the same route under another code (Flow 3's "RD HCM -> PNH"):
+            // reuse it, and give it the crossings it lacks, rather than add a second corridor.
+            Optional<Corridor> sameRoute = corridors.findBetweenCities(demo.from(), demo.to()).stream()
+                    .filter(c -> c.getMode() == demo.mode() && c.getOriginCity().equalsIgnoreCase(demo.from()))
+                    .findFirst();
+            if (sameRoute.isEmpty()) {
                 corridors.save(corridor(demo, crossingsByName));
                 log.info("Seeded corridor {}", demo.code());
+            } else if (sameRoute.get().getCrossings().isEmpty() && !demo.crossings().isEmpty()) {
+                link(sameRoute.get(), demo, crossingsByName);
+                corridors.save(sameRoute.get());
+                log.info("Linked the crossings of corridor {}", sameRoute.get().getCode());
             }
         }
         for (DemoRegulation demo : REGULATIONS) {
@@ -154,6 +167,11 @@ public class CatalogSeeder {
         corridor.setOriginCity(demo.from());
         corridor.setDestinationCity(demo.to());
         corridor.setDistanceKm(demo.km());
+        link(corridor, demo, crossingsByName);
+        return corridor;
+    }
+
+    private static void link(Corridor corridor, DemoCorridor demo, Map<String, BorderCrossing> crossingsByName) {
         for (int i = 0; i < demo.crossings().size(); i++) {
             String name = demo.crossings().get(i);
             CorridorCrossing link = new CorridorCrossing();
@@ -162,7 +180,6 @@ public class CatalogSeeder {
             link.setBorderCrossing(crossingsByName.get(name));
             corridor.getCrossings().add(link);
         }
-        return corridor;
     }
 
     private void seedRegulation(DemoRegulation demo) {

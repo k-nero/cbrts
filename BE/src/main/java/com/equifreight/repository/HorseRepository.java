@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -27,4 +28,9 @@ public interface HorseRepository extends JpaRepository<Horse, UUID>, JpaSpecific
 
     /** Microchips are unique across every club. */
     Optional<Horse> findByMicrochip(String microchip);
+
+    /** Flow 3's planning reads a club's horses and looks demo horses up by name. */
+    List<Horse> findByClubId(UUID clubId);
+
+    Optional<Horse> findByName(String name);
 }

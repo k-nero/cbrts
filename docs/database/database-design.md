@@ -391,6 +391,7 @@ erDiagram
 | `trip_status` | varchar(12) | `NOT_STARTED`, `DEPARTED`, `HELD`, `ARRIVED`, `DELIVERED`. |
 | `planned_departure_at`, `planned_arrival_at` | timestamptz | Changing them re-evaluates every checklist item (Flow 2, B8). |
 | `window_start`, `window_end` | timestamptz | Copied from the request; the route is planned backwards from `window_end`. |
+| `signed_off_at`, `signed_off_by` | | Logistics manager only (US-F3-08); released to crew. |
 | `departed_at`, `delivered_at`, `closed_at` | timestamptz | |
 
 Checks:
@@ -502,6 +503,8 @@ erDiagram
   USERS ||--o{ TRIP_RECORDS : records
   TRIP_RECORDS ||--o{ CONDITION_LOGS : "checks horses"
   HORSES ||--o{ CONDITION_LOGS : "condition of"
+  CONDITION_LOGS ||--o{ CONDITION_LOG_FILES : "attaches photos"
+  FILES ||--o{ CONDITION_LOG_FILES : stores
   TRANSPORT_JOBS ||--o| HANDOVERS : "ends with"
 ```
 
@@ -522,6 +525,8 @@ erDiagram
 Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
 
 **`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
+
+**`condition_log_files`**: `(condition_log_id, file_id)`, the photos attached to one horse's condition entry. A file can be attached once; links are append-only and follow the same ownership checks as other job files.
 
 **`handovers`**: one per job
 

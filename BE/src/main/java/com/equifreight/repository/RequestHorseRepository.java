@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -46,4 +47,10 @@ public interface RequestHorseRepository extends JpaRepository<RequestHorse, Requ
 
         RequestStatus getStatus();
     }
+
+    List<RequestHorse> findByRequest_Id(UUID requestId);
+
+    boolean existsByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
+
+    Optional<RequestHorse> findByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
 }

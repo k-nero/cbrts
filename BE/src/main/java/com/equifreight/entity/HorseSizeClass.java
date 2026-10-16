@@ -7,7 +7,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 /**
- * S, M, L, XL: the stall width one horse of the class takes. Seeded by V2; V14 adds the height bands
+ * S, M, L, XL: the stall width one horse of the class takes. Seeded by V2; V16 adds the height bands
  * the server derives a horse's class from (HorseSizing).
  */
 @Setter

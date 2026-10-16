@@ -117,6 +117,31 @@ class CatalogSeederTest {
     }
 
     @Test
+    void aCorridorSeededUnderAnotherCodeIsReusedAndGetsItsCrossing() {
+        when(places.findByName(anyString())).thenReturn(Optional.of(new Place()));
+        when(crossings.findByName(anyString())).thenReturn(Optional.empty());
+        when(corridors.findByCode(anyString())).thenReturn(Optional.empty());
+        Corridor flow3 = new Corridor();
+        flow3.setCode("RD HCM -> PNH");
+        flow3.setMode(com.equifreight.entity.enums.TransportMode.ROAD);
+        flow3.setOriginCity("Ho Chi Minh City");
+        flow3.setDestinationCity("Phnom Penh");
+        when(corridors.findBetweenCities(anyString(), anyString())).thenReturn(List.of());
+        when(corridors.findBetweenCities("Ho Chi Minh City", "Phnom Penh")).thenReturn(List.of(flow3));
+        when(catalogs.findByCountryCode(anyString())).thenReturn(Optional.empty());
+        when(versions.findByCatalogId(any())).thenReturn(List.of());
+
+        seeder.seed();
+
+        ArgumentCaptor<Corridor> corridor = ArgumentCaptor.forClass(Corridor.class);
+        verify(corridors, times(9)).save(corridor.capture());
+        assertThat(corridor.getAllValues()).extracting(Corridor::getCode).contains("RD HCM -> PNH")
+                .doesNotContain("RD HCM → PNH");
+        assertThat(flow3.getCrossings()).singleElement()
+                .satisfies(cc -> assertThat(cc.getBorderCrossing().getName()).isEqualTo("Mộc Bài – Bavet"));
+    }
+
+    @Test
     void restartAddsNothing() {
         when(places.findByName(anyString())).thenReturn(Optional.of(new Place()));
         when(crossings.findByName(anyString())).thenReturn(Optional.of(new BorderCrossing()));

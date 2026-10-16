@@ -11,6 +11,11 @@ alter table transport_requests alter column departure_date drop not null;
 alter table transport_requests add column origin_text varchar(160);
 alter table transport_requests add column destination_text varchar(160);
 
+-- Rows written before these checks (Flow 3's seeded REQ-2026-0193) were submitted without a time; the
+-- creation time stands in, so the checks below hold for them.
+update transport_requests set submitted_at = created_at
+where submitted_at is null and status not in ('DRAFT', 'CANCELLED');
+
 alter table transport_requests
     -- A request has a code exactly when it has been submitted.
     add constraint transport_requests_code_check check ((code is null) = (submitted_at is null)),

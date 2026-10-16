@@ -105,6 +105,30 @@ class AuditServiceTest {
         assertThat(log.getAfter()).isNull();
     }
 
+    @Test
+    void aStaffDecisionWrapsBareStatusesForJsonb() {
+        User lan = user("Lan", "Nguyen", RoleName.TRANSPORT_SPECIALIST);
+        when(clubs.findClub(lan)).thenReturn(Optional.empty());
+
+        service.recordDecision(lan, "DOCUMENT_APPROVED", "Approved passport", "DOCUMENT_VERSION", REQUEST_ID,
+                "CBRT-2026-001", null, "PENDING", "APPROVED");
+
+        AuditLog log = saved();
+        assertThat(log.getBefore()).isEqualTo("{\"status\":\"PENDING\"}");
+        assertThat(log.getAfter()).isEqualTo("{\"status\":\"APPROVED\"}");
+    }
+
+    @Test
+    void validJsonIsKeptAsGiven() {
+        service.recordDecision(null, "CATALOG_PUBLISHED", "Published catalog", "REGULATION_VERSION", REQUEST_ID,
+                "CAT-1", null, "{\"version\":1}", "{\"version\":2}");
+
+        AuditLog log = saved();
+        assertThat(log.getActorLabel()).isEqualTo("System");
+        assertThat(log.getBefore()).isEqualTo("{\"version\":1}");
+        assertThat(log.getAfter()).isEqualTo("{\"version\":2}");
+    }
+
     private AuditLog saved() {
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(logs).save(captor.capture());
