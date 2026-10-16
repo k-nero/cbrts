@@ -5,7 +5,8 @@ import { Nameplate } from './Nameplate';
 import { Progress } from './Progress';
 import { cx } from './tone';
 
-export type Coat = 'grey' | 'black' | 'chestnut' | 'bay';
+/** `other` is the neutral band for a coat outside the four (OTHER) or none given. */
+export type Coat = 'grey' | 'black' | 'chestnut' | 'bay' | 'other';
 
 /** The coat as a fill: the horse card band, and the 12 px swatch in horse lists. */
 export const COAT_SWATCH: Record<Coat, string> = {
@@ -13,6 +14,7 @@ export const COAT_SWATCH: Record<Coat, string> = {
   black: 'bg-coat-black',
   chestnut: 'bg-coat-chestnut',
   bay: 'bg-coat-bay',
+  other: 'bg-muted',
 };
 
 type Props = {

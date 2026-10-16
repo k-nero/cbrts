@@ -4,3 +4,4 @@ export * from './path';
 export * from './rbac';
 export * from './time';
 export * from './error';
+export * from './horse';
