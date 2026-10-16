@@ -9,6 +9,7 @@ import com.equifreight.entity.enums.LoadPlanStatus;
 import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
@@ -156,11 +157,9 @@ public class TransportJobService {
         TransportJob job = transportJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        // Role check: Only the Logistics Manager may sign off the trip plan (US-F3-08, AGENTS.md)
-        boolean isManager = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().stream()
-                .anyMatch(r -> "LOGISTICS_MANAGER".equalsIgnoreCase(r.getName()) || "ROLE_LOGISTICS_MANAGER".equalsIgnoreCase(r.getName()));
-        if (!isManager) {
-            throw new com.equifreight.exception.UnauthorizedException("Only the Logistics Manager can sign off a trip plan");
+        // Only the logistics manager signs off (US-F3-08); enforced once, by @PreAuthorize on the controller.
+        if (job.getDepartedAt() != null) {
+            throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
         }
 
         // Clearance gate check: departure gate must be CLEAR (US-F3-08)
@@ -200,11 +199,22 @@ public class TransportJobService {
             throw new BusinessException("Cannot sign off trip plan: Requires " + reqGrooms + " groom(s), found " + groomCount);
         }
 
+        // The confirmed route has set the travel dates by now, so check every crew member is free for them
+        // (US-F3-06). Crew assigned before the route was confirmed couldn't be checked then.
+        if (job.getPlannedDepartureAt() != null && job.getPlannedArrivalAt() != null) {
+            for (CrewAssignment member : crewAssignments) {
+                if (!crewAssignmentRepository.findOverlappingAssignments(member.getUser().getId(), job.getId(),
+                        job.getPlannedDepartureAt(), job.getPlannedArrivalAt()).isEmpty()) {
+                    throw new ConflictException("CREW_OVERLAP", "Cannot sign off trip plan: "
+                            + member.getUser().getFirstName() + " " + member.getUser().getLastName()
+                            + " is already on another trip at the same time");
+                }
+            }
+        }
+
+        // The stage stays where it is: recording the departure moves the job to TRIP (TripService).
         job.setSignedOffAt(Instant.now());
         job.setSignedOffBy(currentUser);
-        if (job.getStage() == JobStage.DOCUMENTS || job.getStage() == JobStage.CLEARANCE) {
-            job.setStage(JobStage.TRIP);
-        }
         transportJobRepository.save(job);
 
         auditService.recordDecision(
@@ -215,8 +225,8 @@ public class TransportJobService {
                 job.getId(),
                 job.getCode(),
                 null,
-                "PLANNING",
-                "TRIP");
+                "NOT_SIGNED_OFF",
+                "SIGNED_OFF");
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);

@@ -44,7 +44,7 @@ export function LoadPlanTab({ job }: Props) {
 
     return (
       <div className="flex flex-col items-center justify-center p-12">
-        <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-line bg-card p-8 text-center shadow-xs">
+        <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-xl border border-line bg-card p-8 text-center">
           <div className="flex size-14 items-center justify-center rounded-full bg-muted text-ink-2">
             <Icon name="truck" size={26} />
           </div>
@@ -57,7 +57,7 @@ export function LoadPlanTab({ job }: Props) {
           </div>
 
           {loadingVehicles ? (
-            <span className="type-body-s text-ink-3">Loading fleet vehicles...</span>
+            <span className="type-body-s text-ink-3">Loading fleet vehicles…</span>
           ) : (
             <div className="flex w-full flex-col gap-4">
               <div className="flex flex-col gap-1.5 text-left">
@@ -65,7 +65,7 @@ export function LoadPlanTab({ job }: Props) {
                 <select
                   value={vehicleToUse || ''}
                   onChange={(e) => setSelectedVehicleId(e.target.value)}
-                  className="focus-ring h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                  className="focus-ring type-body-s h-10 w-full rounded-md border border-line bg-canvas px-3 text-ink outline-none"
                 >
                   {activeVehicles?.map((v) => (
                     <option key={v.id} value={v.id}>
@@ -81,7 +81,7 @@ export function LoadPlanTab({ job }: Props) {
                 disabled={!vehicleToUse || createLoadPlanMutation.isPending}
                 onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
               >
-                {createLoadPlanMutation.isPending ? 'Creating load plan...' : 'Create load plan'}
+                {createLoadPlanMutation.isPending ? 'Creating load plan…' : 'Create load plan'}
               </Button>
             </div>
           )}

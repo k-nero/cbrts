@@ -54,9 +54,9 @@ public class CrewAssignmentService {
         TransportJob job = transportJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        // Stage guard: cannot modify crew during trip or after departure
-        if (job.getStage() == com.equifreight.entity.enums.JobStage.TRIP || job.getDepartedAt() != null) {
-            throw new BusinessException("Cannot modify crew assignments after departure or during trip");
+        // The crew can change until departure; a change after sign-off clears it, so it needs a new one (US-F3-08).
+        if (job.getDepartedAt() != null) {
+            throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }
 
         // Duplicate check
@@ -82,9 +82,11 @@ public class CrewAssignmentService {
             throw new BusinessException("At least " + requiredGrooms + " groom(s) required for " + horseCount + " horses (1 per 3 horses, rounded up). Found " + groomCount);
         }
 
-        // Compute job travel window for overlap detection
-        java.time.Instant startsAt = job.getPlannedDepartureAt() != null ? job.getPlannedDepartureAt() : (job.getWindowStart() != null ? job.getWindowStart() : java.time.Instant.now());
-        java.time.Instant endsAt = job.getPlannedArrivalAt() != null ? job.getPlannedArrivalAt() : (job.getWindowEnd() != null ? job.getWindowEnd() : startsAt.plus(java.time.Duration.ofDays(2)));
+        // Overlaps can only be checked once the confirmed route has set the travel dates; until then they are
+        // checked again at sign-off (TransportJobService.signOffTripPlan).
+        java.time.Instant startsAt = job.getPlannedDepartureAt();
+        java.time.Instant endsAt = job.getPlannedArrivalAt();
+        boolean datesKnown = startsAt != null && endsAt != null;
 
         List<CrewAssignment> assignments = new ArrayList<>();
         for (AssignCrewRequest.CrewItem item : request.getCrew()) {
@@ -109,8 +111,7 @@ public class CrewAssignmentService {
             }
 
             // Overlapping jobs check (US-F3-06)
-            List<CrewAssignment> overlaps = crewAssignmentRepository.findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt);
-            if (!overlaps.isEmpty()) {
+            if (datesKnown && !crewAssignmentRepository.findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt).isEmpty()) {
                 throw new com.equifreight.exception.ConflictException("CREW_OVERLAP", "Crew member " + user.getFirstName() + " " + user.getLastName() + " is already assigned to another overlapping trip");
             }
 

@@ -156,7 +156,8 @@ public class VehicleService {
         booking.setEndsAt(request.getEndsAt());
 
         try {
-            VehicleBooking saved = vehicleBookingRepository.save(booking);
+            // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
+            VehicleBooking saved = vehicleBookingRepository.saveAndFlush(booking);
             log.info("Booked vehicle {} for {} from {} to {}", vehicle.getCode(), request.getKind(), request.getStartsAt(), request.getEndsAt());
             return toBookingResponse(saved);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {

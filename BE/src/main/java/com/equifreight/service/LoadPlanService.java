@@ -76,7 +76,7 @@ public class LoadPlanService {
         if (existingDraft.isPresent()) {
             plan = existingDraft.get();
             if (!plan.getVehicle().getId().equals(vehicle.getId())) {
-                loadPlanStallRepository.deleteAll(loadPlanStallRepository.findByLoadPlanId(plan.getId()));
+                loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
                 plan.setVehicle(vehicle);
                 plan = loadPlanRepository.save(plan);
             }
@@ -112,10 +112,7 @@ public class LoadPlanService {
             throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
         }
 
-        // Remove any existing assignment on this stall
-        loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(plan.getId(), vehicleStallId);
-
-        // If assigning a horse, remove horse from previous stall if any, then insert
+        // Validate before changing anything: the horse must travel on this job.
         if (horseId != null) {
             boolean horseOnJob = plan.getJob().getRequest() != null &&
                     plan.getJob().getRequest().getHorses() != null &&
@@ -123,7 +120,13 @@ public class LoadPlanService {
             if (!horseOnJob) {
                 throw new ResourceNotFoundException("Horse " + horseId + " is not assigned to this job");
             }
+        }
 
+        // Free the stall (bulk delete, runs before the insert below)
+        loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(plan.getId(), vehicleStallId);
+
+        // If assigning a horse, take it out of its previous stall, then place it here
+        if (horseId != null) {
             loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horseId);
 
             Horse horse = horseRepository.findById(horseId)
@@ -153,10 +156,6 @@ public class LoadPlanService {
             throw new BusinessException("Cannot auto-arrange a CONFIRMED load plan");
         }
 
-        // Clear existing stall assignments for this plan
-        List<LoadPlanStall> current = loadPlanStallRepository.findByLoadPlanId(plan.getId());
-        loadPlanStallRepository.deleteAll(current);
-
         List<Horse> horses = getJobHorses(plan.getJob());
         List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(plan.getVehicle().getId());
 
@@ -176,6 +175,9 @@ public class LoadPlanService {
             throw new BusinessException("Could not automatically find a placement satisfying all welfare rules");
         }
 
+        // Replace the current placements. A bulk delete runs before the inserts; deleteAll(entities)
+        // would be flushed after them and break the unique constraints when a horse was already placed.
+        loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
         for (Map.Entry<Horse, VehicleStall> entry : solution.entrySet()) {
             LoadPlanStall lps = new LoadPlanStall();
             lps.setLoadPlan(plan);
@@ -212,10 +214,14 @@ public class LoadPlanService {
             throw new BusinessException("Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first (" + state.getConflicts().get(0).getDescription() + ")");
         }
 
-        // Determine travel interval for booking
+        // The vehicle is booked for the trip's planned dates, which the confirmed route sets.
         TransportJob job = plan.getJob();
-        Instant startsAt = job.getPlannedDepartureAt() != null ? job.getPlannedDepartureAt() : (job.getWindowStart() != null ? job.getWindowStart() : Instant.now());
-        Instant endsAt = job.getPlannedArrivalAt() != null ? job.getPlannedArrivalAt() : (job.getWindowEnd() != null ? job.getWindowEnd() : startsAt.plus(java.time.Duration.ofDays(2)));
+        Instant startsAt = job.getPlannedDepartureAt();
+        Instant endsAt = job.getPlannedArrivalAt();
+        if (startsAt == null || endsAt == null) {
+            throw new BusinessException("Cannot confirm load plan: confirm the route plan first, so the vehicle can be booked "
+                    + "for the planned departure and arrival");
+        }
 
         // Check overlapping bookings excluding this job
         List<VehicleBooking> overlaps = vehicleBookingRepository.findOverlappingBookings(
@@ -236,7 +242,8 @@ public class LoadPlanService {
         booking.setEndsAt(endsAt);
 
         try {
-            vehicleBookingRepository.save(booking);
+            // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
+            vehicleBookingRepository.saveAndFlush(booking);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + plan.getVehicle().getCode() + " is already booked for this interval");
         }

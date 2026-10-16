@@ -5,7 +5,6 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.fleet.VehicleBookingRequest;
 import com.equifreight.model.job.AssignCrewRequest;
@@ -453,23 +452,6 @@ class Flow3ServiceTest {
     }
 
     @Test
-    @DisplayName("Sign-off refuses non-LOGISTICS_MANAGER user (US-F3-08)")
-    void signOff_refusesNonLogisticsManager() {
-        UUID jobId = UUID.randomUUID();
-        TransportJob job = new TransportJob();
-        job.setId(jobId);
-        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
-
-        User coordinator = new User();
-        coordinator.setEmail("khoi.do@equifreight.vn");
-        Role role = new Role();
-        role.setName(RoleName.FLEET_COORDINATOR); // Not LOGISTICS_MANAGER!
-        coordinator.setRoles(Set.of(role));
-
-        assertThrows(UnauthorizedException.class, () -> transportJobService.signOffTripPlan(jobId, coordinator));
-    }
-
-    @Test
     @DisplayName("Sign-off refuses when clearance gate is LOCKED (US-F3-08)")
     void signOff_refusesWhenClearanceGateLocked() {
         UUID jobId = UUID.randomUUID();
@@ -530,5 +512,177 @@ class Flow3ServiceTest {
 
         assertNull(job.getSignedOffAt());
         verify(clearanceService).recheckJobDocuments(jobId);
+    }
+
+    // ---------- sign-off, crew and load-plan follow-up (review of #83) ----------
+
+    @Test
+    @DisplayName("Sign-off records who and when but leaves the stage for the departure to change")
+    void signOff_keepsTheStageAndRecordsSignOff() {
+        TransportJob job = readyJob();
+        User manager = user("yen.vu@equifreight.vn", RoleName.LOGISTICS_MANAGER);
+        stubPlansAndCrew(job, List.of());
+
+        transportJobService.signOffTripPlan(job.getId(), manager);
+
+        assertEquals(JobStage.CLEARANCE, job.getStage());
+        assertNotNull(job.getSignedOffAt());
+        assertEquals(manager, job.getSignedOffBy());
+    }
+
+    @Test
+    @DisplayName("Sign-off refuses a crew member who is on another trip at the same time (US-F3-06)")
+    void signOff_refusesOverlappingCrew() {
+        TransportJob job = readyJob();
+        CrewAssignment busy = new CrewAssignment();
+        busy.setJob(new TransportJob());
+        stubPlansAndCrew(job, List.of(busy));
+
+        ConflictException ex = assertThrows(ConflictException.class,
+                () -> transportJobService.signOffTripPlan(job.getId(), user("yen.vu@equifreight.vn", RoleName.LOGISTICS_MANAGER)));
+        assertEquals("CREW_OVERLAP", ex.getCode());
+        assertNull(job.getSignedOffAt());
+    }
+
+    @Test
+    @DisplayName("The crew can still change after sign-off until departure, and the change clears the sign-off")
+    void crewAssignment_afterSignOffBeforeDepartureClearsSignOff() {
+        TransportJob job = readyJob();
+        job.setSignedOffAt(Instant.now());
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        User driver = user("minh.tran@equifreight.vn", RoleName.ESCORT);
+        User groom = user("hoa.le@equifreight.vn", RoleName.ESCORT);
+        when(userRepository.findById(driver.getId())).thenReturn(Optional.of(driver));
+        when(userRepository.findById(groom.getId())).thenReturn(Optional.of(groom));
+        when(crewAssignmentRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        crewAssignmentService.assignCrew(job.getId(), crew(driver, CrewRole.DRIVER, groom, CrewRole.GROOM), user("khoi.do@equifreight.vn", RoleName.FLEET_COORDINATOR));
+
+        assertNull(job.getSignedOffAt());
+    }
+
+    @Test
+    @DisplayName("The crew can't change once the job has departed")
+    void crewAssignment_refusedAfterDeparture() {
+        TransportJob job = readyJob();
+        job.setDepartedAt(Instant.now());
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        User driver = user("minh.tran@equifreight.vn", RoleName.ESCORT);
+
+        assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(job.getId(),
+                crew(driver, CrewRole.DRIVER, driver, CrewRole.GROOM), user("khoi.do@equifreight.vn", RoleName.FLEET_COORDINATOR)));
+        verify(crewAssignmentRepository, never()).deleteByJobId(any());
+    }
+
+    @Test
+    @DisplayName("A load plan can't be confirmed (and its vehicle booked) before the route sets the travel dates")
+    void loadPlan_confirmRefusedWithoutPlannedDates() {
+        TransportJob job = readyJob();
+        job.setPlannedDepartureAt(null);
+        job.setPlannedArrivalAt(null);
+        job.getRequest().setHorses(List.of());
+        LoadPlan plan = loadPlan(job);
+        when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(plan));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.confirmLoadPlan(job.getId(), user("khoi.do@equifreight.vn", RoleName.FLEET_COORDINATOR)));
+        assertTrue(ex.getMessage().contains("confirm the route plan first"));
+        verify(vehicleBookingRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("Auto-arrange replaces placements with a bulk delete that runs before the inserts")
+    void loadPlan_autoArrangeUsesABulkDelete() {
+        TransportJob job = readyJob();
+        job.getRequest().setHorses(List.of());
+        LoadPlan plan = loadPlan(job);
+        when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(plan));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository, never()).deleteAll(anyList());
+    }
+
+    private TransportJob readyJob() {
+        TransportJob job = new TransportJob();
+        job.setId(UUID.randomUUID());
+        job.setCode("CBRT-2026-041");
+        job.setStage(JobStage.CLEARANCE);
+        job.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        job.setPlannedDepartureAt(Instant.parse("2026-10-18T06:00:00Z"));
+        job.setPlannedArrivalAt(Instant.parse("2026-10-18T12:30:00Z"));
+        Horse horse = new Horse();
+        horse.setId(UUID.randomUUID());
+        horse.setName("Nightfall");
+        RequestHorse onRequest = new RequestHorse();
+        onRequest.setHorse(horse);
+        TransportRequest request = new TransportRequest();
+        request.setHorses(List.of(onRequest));
+        job.setRequest(request);
+        return job;
+    }
+
+    private void stubPlansAndCrew(TransportJob job, List<CrewAssignment> overlaps) {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        ClearanceStatusResponse gate = new ClearanceStatusResponse();
+        gate.setClearanceReady(true);
+        gate.setOutstandingIssues(List.of());
+        lenient().when(clearanceService.getClearanceStatus(job.getId())).thenReturn(gate);
+        LoadPlan load = loadPlan(job);
+        load.setStatus(LoadPlanStatus.CONFIRMED);
+        lenient().when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(load));
+        RoutePlan route = new RoutePlan();
+        route.setJob(job);
+        lenient().when(routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED)).thenReturn(Optional.of(route));
+        CrewAssignment driver = assignment(job, user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
+        CrewAssignment groom = assignment(job, user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
+        lenient().when(crewAssignmentRepository.findByJobId(job.getId())).thenReturn(List.of(driver, groom));
+        lenient().when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(job.getId()), any(), any())).thenReturn(overlaps);
+    }
+
+    private static LoadPlan loadPlan(TransportJob job) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(UUID.randomUUID());
+        vehicle.setCode("TX-447");
+        vehicle.setStatus(VehicleStatus.ACTIVE);
+        vehicle.setPayloadKg(5504);
+        LoadPlan plan = new LoadPlan();
+        plan.setId(UUID.randomUUID());
+        plan.setJob(job);
+        plan.setVehicle(vehicle);
+        plan.setStatus(LoadPlanStatus.DRAFT);
+        return plan;
+    }
+
+    private static CrewAssignment assignment(TransportJob job, User user, CrewRole role) {
+        CrewAssignment ca = new CrewAssignment();
+        ca.setJob(job);
+        ca.setUser(user);
+        ca.setCrewRole(role);
+        return ca;
+    }
+
+    private static AssignCrewRequest crew(User a, CrewRole roleA, User b, CrewRole roleB) {
+        AssignCrewRequest.CrewItem first = new AssignCrewRequest.CrewItem();
+        first.setUserId(a.getId());
+        first.setCrewRole(roleA);
+        AssignCrewRequest.CrewItem second = new AssignCrewRequest.CrewItem();
+        second.setUserId(b.getId());
+        second.setCrewRole(roleB);
+        AssignCrewRequest request = new AssignCrewRequest();
+        request.setCrew(List.of(first, second));
+        return request;
+    }
+
+    private static User user(String email, String roleName) {
+        Role role = new Role();
+        role.setName(roleName);
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setFirstName(email.substring(0, email.indexOf('.')));
+        user.setLastName("Test");
+        user.setRoles(Set.of(role));
+        return user;
     }
 }
