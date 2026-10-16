@@ -83,6 +83,16 @@ public class StaffJobController {
         return loadPlanService.assignStall(jobId, request.getVehicleStallId(), request.getHorseId());
     }
 
+    /**
+     * US-F3-05: Load plan - move, swap or unload one horse (drag and drop). Refused with 409 when
+     * the plan no longer matches what the coordinator saw.
+     */
+    @PostMapping("/{jobId}/load-plan/move")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public LoadPlanResponse moveHorse(@PathVariable UUID jobId, @Valid @RequestBody MoveHorseRequest request) {
+        return loadPlanService.moveHorse(jobId, request);
+    }
+
     /** US-F3-05: Load plan - auto-arrange horses into valid stalls. */
     @PostMapping("/{jobId}/load-plan/auto-arrange")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
