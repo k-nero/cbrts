@@ -10,6 +10,7 @@ import type {
   DocumentType,
   DocumentUploadRequest,
   DocumentVersion,
+  JobSummary,
   QuarantinePeriod,
   RegulationCatalog,
   RegulationVersion,
@@ -18,6 +19,10 @@ import type {
 } from '@/interfaces';
 
 export const clearanceApi = {
+  // Jobs
+  getActiveJobs: () =>
+    client.get<JobSummary[]>('/staff/clearance/jobs'),
+
   // Checklist & Clearance Gate
   getChecklist: (jobId: string) =>
     client.get<ChecklistItem[]>(`/staff/clearance/jobs/${jobId}/checklist`),
@@ -73,4 +78,11 @@ export const clearanceApi = {
 
   publishRegulationVersion: (versionId: string) =>
     client.post<RegulationVersion>(`/staff/regulations/versions/${versionId}/publish`),
+
+  // Customer Clearance Endpoints (US-F2-03)
+  getCustomerChecklist: (jobId: string) =>
+    client.get<ChecklistItem[]>(`/customer/clearance/jobs/${jobId}/checklist`),
+
+  uploadCustomerDocumentVersion: (checklistItemId: string, data: DocumentUploadRequest) =>
+    client.post<ChecklistItem>(`/customer/clearance/checklist/${checklistItemId}/versions`, data),
 };

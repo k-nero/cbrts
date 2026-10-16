@@ -8,6 +8,7 @@ export const queryKeys = {
   customerHome: () => ['customer', 'home'] as const,
   clearance: {
     all: () => ['clearance'] as const,
+    jobs: () => ['clearance', 'jobs'] as const,
     pendingReviews: () => ['clearance', 'pending-reviews'] as const,
     checklist: (jobId: string) => ['clearance', 'jobs', jobId, 'checklist'] as const,
     status: (jobId: string) => ['clearance', 'jobs', jobId, 'status'] as const,

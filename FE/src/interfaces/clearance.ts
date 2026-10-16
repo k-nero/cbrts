@@ -211,3 +211,11 @@ export interface RegulationCatalog {
   name: string;
   activeVersion?: RegulationVersion;
 }
+
+export interface JobSummary {
+  id: string;
+  code: string;
+  dossierStatus: DossierStatus;
+  stage: string;
+  clubName?: string;
+}

@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent, type FC } from 'react';
-import { Alert, Empty, Input, Modal, Spin } from 'antd';
+import { useSearchParams } from 'react-router-dom';
+import { Alert, Empty, Input, Modal, Select, Spin } from 'antd';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Callout } from '@/components/ui/Callout';
@@ -9,6 +10,7 @@ import { DocumentRow, type DocumentStatus } from '@/components/ui/DocumentRow';
 import { StatTile } from '@/components/ui/StatTile';
 import { fileApi } from '@/apis/file';
 import {
+  useClearanceJobs,
   useClearanceStatus,
   useEvaluateClearanceGate,
   useJobChecklist,
@@ -27,9 +29,11 @@ function mapToRowStatus(item: ChecklistItem): DocumentStatus {
 }
 
 const DocumentsPage: FC = () => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>('pending');
-  const [selectedJobId, setSelectedJobId] = useState<string>('job-1');
-  const [searchInput, setSearchInput] = useState<string>('job-1');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialJobId = searchParams.get('jobId');
+
+  const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>(initialJobId ? 'checklist' : 'pending');
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(initialJobId);
 
   // Review modal state
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -49,6 +53,8 @@ const DocumentsPage: FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Queries (TanStack Query, zero useEffect)
+  const { data: jobs = [], isLoading: jobsLoading } = useClearanceJobs();
+
   const {
     data: pendingReviews = [],
     isLoading: pendingLoading,
@@ -65,7 +71,6 @@ const DocumentsPage: FC = () => {
 
   const {
     data: statusData,
-    isLoading: statusLoading,
     refetch: refetchStatus,
   } = useClearanceStatus(selectedJobId);
 
@@ -73,6 +78,15 @@ const DocumentsPage: FC = () => {
   const reviewMutation = useReviewDocument(selectedJobId);
   const uploadMutation = useUploadDocumentVersion(selectedJobId);
   const evaluateGateMutation = useEvaluateClearanceGate(selectedJobId);
+
+  const handleSelectJob = (jobId: string | null) => {
+    setSelectedJobId(jobId);
+    if (jobId) {
+      setSearchParams({ jobId });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const openReviewModal = (version: DocumentVersion) => {
     setSelectedVersion(version);
@@ -85,7 +99,7 @@ const DocumentsPage: FC = () => {
   const handleReviewSubmit = async () => {
     if (!selectedVersion) return;
     if (reviewDecision === 'REJECTED' && !rejectReason.trim()) {
-      setReviewError('A reason is strictly required when rejecting a document.');
+      setReviewError('A reason is strictly required when rejecting a document (BR-F2-07).');
       return;
     }
     setReviewError(null);
@@ -127,19 +141,23 @@ const DocumentsPage: FC = () => {
       setUploadError('Please choose a file to upload.');
       return;
     }
+    if (!issuedOn.trim() || !validUntil.trim()) {
+      setUploadError('Issue date and expiry date are strictly required (US-F2-03, US-F2-09).');
+      return;
+    }
     setUploadError(null);
     setUploadingFile(true);
     try {
-      // 1. Upload file to /api/v1/files (PR #79)
+      // 1. Upload file via authenticated POST /api/v1/files (PR #79)
       const stored = await fileApi.upload(uploadFile);
 
-      // 2. Attach fileId to document version
+      // 2. Attach fileId to document version and evaluate validity
       await uploadMutation.mutateAsync({
         checklistItemId: selectedChecklistItem.id,
         data: {
           fileId: stored.id,
-          issuedOn: issuedOn.trim() || undefined,
-          validUntil: validUntil.trim() || undefined,
+          issuedOn: issuedOn.trim(),
+          validUntil: validUntil.trim(),
           issuer: issuer.trim() || undefined,
         },
       });
@@ -243,7 +261,7 @@ const DocumentsPage: FC = () => {
             <Alert
               type="error"
               message="Failed to load pending reviews"
-              description="Please ensure you have Transport Specialist role and valid session."
+              description="Please ensure you have Transport Specialist role and a valid session."
               showIcon
             />
           )}
@@ -275,14 +293,13 @@ const DocumentsPage: FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={fileApi.getContentUrl(v.fileId, true)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="type-label-s px-3 py-1.5 rounded border border-line hover:bg-surface text-ink-2"
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void fileApi.viewFile(v.fileId)}
                     >
                       View File
-                    </a>
+                    </Button>
                     <Button
                       variant="primary"
                       size="sm"
@@ -301,168 +318,190 @@ const DocumentsPage: FC = () => {
       {/* Tab 2: Job Clearance Checklist & Gate */}
       {activeTab === 'checklist' && (
         <div className="flex flex-col gap-6">
-          {/* Job Search bar */}
-          <div className="flex items-center gap-3 p-4 rounded-lg border border-line bg-card">
-            <span className="type-label-s text-ink-2 shrink-0">Job Identifier:</span>
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="e.g. job-1"
-              className="max-w-xs"
-              onPressEnter={() => setSelectedJobId(searchInput.trim())}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setSelectedJobId(searchInput.trim())}
-            >
-              Load Job Dossier
-            </Button>
-          </div>
-
-          {/* Clearance Gate Component */}
-          {statusData && (
-            <ClearanceGate
-              state={statusData.clearanceReady ? 'clear' : 'locked'}
-              title={statusData.clearanceReady ? 'Clear to depart' : 'Departure locked'}
-              action={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={evaluateGateMutation.isPending}
-                  onClick={handleEvaluateGate}
-                >
-                  {evaluateGateMutation.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
-                </Button>
+          {/* Job Selection Dropdown (Finding 10: No hardcoded IDs) */}
+          <div className="flex items-center gap-4 p-4 rounded-lg border border-line bg-card">
+            <span className="type-label-s text-ink-2 shrink-0 font-medium">Select Transport Job:</span>
+            <Select
+              showSearch
+              placeholder="Choose a job from the active shipments..."
+              value={selectedJobId || undefined}
+              onChange={(val) => handleSelectJob(val ?? null)}
+              loading={jobsLoading}
+              className="min-w-[320px] max-w-md"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
-            >
-              {statusData.clearanceReady
-                ? 'All mandatory documents are GREEN, approved, and quarantines are fulfilled.'
-                : `${statusData.clearedMandatoryItems}/${statusData.mandatoryItems} mandatory documents cleared. ${statusData.outstandingIssues.length} outstanding issues.`}
-            </ClearanceGate>
-          )}
-
-          {/* Stat Tiles */}
-          {statusData && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatTile
-                tone="neutral"
-                label="Total Items"
-                value={statusData.totalChecklistItems}
-              />
-              <StatTile
-                tone="ok"
-                label="Cleared Items"
-                value={statusData.clearedMandatoryItems}
-              />
-              <StatTile
-                tone="warn"
-                label="Mandatory Remaining"
-                value={Math.max(0, statusData.mandatoryItems - statusData.clearedMandatoryItems)}
-              />
-              <StatTile
-                tone={statusData.outstandingIssues.length > 0 ? 'bad' : 'ok'}
-                label="Outstanding Issues"
-                value={statusData.outstandingIssues.length}
-              />
-            </div>
-          )}
-
-          {/* Outstanding issues callout */}
-          {statusData && statusData.outstandingIssues.length > 0 && (
-            <Callout
-              tone="bad"
-              title="Outstanding Clearance Blockers"
-            >
-              <ul className="list-disc list-inside space-y-1 mt-1 text-ink-2">
-                {statusData.outstandingIssues.map((issue, idx) => (
-                  <li key={idx}>{issue}</li>
-                ))}
-              </ul>
-            </Callout>
-          )}
-
-          {/* Checklist table */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <h3 className="type-h3 text-ink">Job Document Checklist</h3>
-              <span className="type-caption text-ink-3">
-                {checklist.length} items configured
-              </span>
-            </div>
-
-            {checklistLoading && (
-              <div className="flex justify-center p-12">
-                <Spin size="large" />
-              </div>
-            )}
-
-            {checklistError && (
-              <Alert
-                type="error"
-                message="Failed to load job checklist"
-                description="Check the Job ID or your permissions."
-                showIcon
-              />
-            )}
-
-            {!checklistLoading && !checklistError && checklist.length === 0 && (
-              <div className="rounded-lg border border-line bg-card p-12 text-center">
-                <Empty description="No checklist items found for this job." />
-              </div>
-            )}
-
-            {!checklistLoading && checklist.length > 0 && (
-              <div className="rounded-lg border border-line bg-card overflow-hidden">
-                {checklist.map((item) => (
-                  <DocumentRow
-                    key={item.id}
-                    status={mapToRowStatus(item)}
-                    statusLabel={item.status === 'REJECTED' ? 'Rejected' : undefined}
-                    document={
-                      <div className="flex items-center gap-2">
-                        <span>{item.documentTypeName || item.documentTypeCode}</span>
-                        {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
-                        {item.horseName && <span className="text-xs text-ink-3">({item.horseName})</span>}
-                      </div>
-                    }
-                    rule={item.ruleDescription || 'Standard validity validation'}
-                    result={
-                      item.validityNote ||
-                      (item.status === 'AWAITING_UPLOAD' ? 'Not uploaded yet' : undefined)
-                    }
-                    holder={item.holder ? `With ${item.holder.toLowerCase()}` : undefined}
-                    version={
-                      item.currentVersion
-                        ? `v${item.currentVersion.versionNo} · ${item.currentVersion.fileName}`
-                        : 'No version'
-                    }
-                    actions={
-                      <div className="flex items-center gap-2">
-                        {item.currentVersion && (
-                          <a
-                            href={fileApi.getContentUrl(item.currentVersion.fileId, true)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="type-label-s px-2.5 py-1 rounded border border-line hover:bg-surface text-ink-2 text-xs"
-                          >
-                            View
-                          </a>
-                        )}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => openUploadModal(item)}
-                        >
-                          Upload
-                        </Button>
-                      </div>
-                    }
-                  />
-                ))}
-              </div>
+              options={jobs.map((j) => ({
+                value: j.id,
+                label: `${j.code} ${j.clubName ? '· ' + j.clubName : ''} (${j.dossierStatus})`,
+              }))}
+            />
+            {selectedJobId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleSelectJob(null)}
+              >
+                Clear
+              </Button>
             )}
           </div>
+
+          {!selectedJobId && (
+            <div className="rounded-lg border border-line bg-card p-12 text-center">
+              <Empty
+                description="Please select a transport job from the dropdown above to view its checklist and clearance gate."
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            </div>
+          )}
+
+          {selectedJobId && (
+            <>
+              {/* Clearance Gate Component */}
+              {statusData && (
+                <ClearanceGate
+                  state={statusData.clearanceReady ? 'clear' : 'locked'}
+                  title={statusData.clearanceReady ? 'Clear to depart' : 'Departure locked'}
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={evaluateGateMutation.isPending}
+                      onClick={handleEvaluateGate}
+                    >
+                      {evaluateGateMutation.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
+                    </Button>
+                  }
+                >
+                  {statusData.clearanceReady
+                    ? 'All mandatory documents are GREEN, approved, and quarantines/permits are fulfilled.'
+                    : `${statusData.clearedMandatoryItems}/${statusData.mandatoryItems} mandatory documents cleared. ${statusData.outstandingIssues.length} outstanding issues.`}
+                </ClearanceGate>
+              )}
+
+              {/* Stat Tiles */}
+              {statusData && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatTile
+                    tone="neutral"
+                    label="Total Items"
+                    value={statusData.totalChecklistItems}
+                  />
+                  <StatTile
+                    tone="ok"
+                    label="Cleared Items"
+                    value={statusData.clearedMandatoryItems}
+                  />
+                  <StatTile
+                    tone="warn"
+                    label="Mandatory Remaining"
+                    value={Math.max(0, statusData.mandatoryItems - statusData.clearedMandatoryItems)}
+                  />
+                  <StatTile
+                    tone={statusData.outstandingIssues.length > 0 ? 'bad' : 'ok'}
+                    label="Outstanding Issues"
+                    value={statusData.outstandingIssues.length}
+                  />
+                </div>
+              )}
+
+              {/* Outstanding issues callout */}
+              {statusData && statusData.outstandingIssues.length > 0 && (
+                <Callout
+                  tone="bad"
+                  title="Outstanding Clearance Blockers"
+                >
+                  <ul className="list-disc list-inside space-y-1 mt-1 text-ink-2">
+                    {statusData.outstandingIssues.map((issue, idx) => (
+                      <li key={idx}>{issue}</li>
+                    ))}
+                  </ul>
+                </Callout>
+              )}
+
+              {/* Checklist table */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="type-h3 text-ink">Job Document Checklist</h3>
+                  <span className="type-caption text-ink-3">
+                    {checklist.length} items configured
+                  </span>
+                </div>
+
+                {checklistLoading && (
+                  <div className="flex justify-center p-12">
+                    <Spin size="large" />
+                  </div>
+                )}
+
+                {checklistError && (
+                  <Alert
+                    type="error"
+                    message="Failed to load job checklist"
+                    description="Please verify your session and permissions."
+                    showIcon
+                  />
+                )}
+
+                {!checklistLoading && !checklistError && checklist.length === 0 && (
+                  <div className="rounded-lg border border-line bg-card p-12 text-center">
+                    <Empty description="No checklist items found for this job." />
+                  </div>
+                )}
+
+                {!checklistLoading && checklist.length > 0 && (
+                  <div className="rounded-lg border border-line bg-card overflow-hidden">
+                    {checklist.map((item) => (
+                      <DocumentRow
+                        key={item.id}
+                        status={mapToRowStatus(item)}
+                        statusLabel={item.status === 'REJECTED' ? 'Rejected' : undefined}
+                        document={
+                          <div className="flex items-center gap-2">
+                            <span>{item.documentTypeName || item.documentTypeCode}</span>
+                            {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
+                            {item.horseName && <span className="text-xs text-ink-3">({item.horseName})</span>}
+                          </div>
+                        }
+                        rule={item.ruleDescription || 'Standard validity validation'}
+                        result={
+                          item.validityNote ||
+                          (item.status === 'AWAITING_UPLOAD' ? 'Not uploaded yet' : undefined)
+                        }
+                        holder={item.holder ? `With ${item.holder.toLowerCase()}` : undefined}
+                        version={
+                          item.currentVersion
+                            ? `v${item.currentVersion.versionNo} · ${item.currentVersion.fileName}`
+                            : 'No version'
+                        }
+                        actions={
+                          <div className="flex items-center gap-2">
+                            {item.currentVersion && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => void fileApi.viewFile(item.currentVersion!.fileId)}
+                              >
+                                View
+                              </Button>
+                            )}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => openUploadModal(item)}
+                            >
+                              Upload
+                            </Button>
+                          </div>
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -587,18 +626,24 @@ const DocumentsPage: FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="type-label-s text-ink">Issued Date</label>
+              <label className="type-label-s text-ink">
+                Issued Date <span className="text-bad">*</span>
+              </label>
               <Input
                 type="date"
+                required
                 value={issuedOn}
                 onChange={(e) => setIssuedOn(e.target.value)}
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="type-label-s text-ink">Valid Until</label>
+              <label className="type-label-s text-ink">
+                Valid Until <span className="text-bad">*</span>
+              </label>
               <Input
                 type="date"
+                required
                 value={validUntil}
                 onChange={(e) => setValidUntil(e.target.value)}
               />

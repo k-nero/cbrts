@@ -6,12 +6,27 @@ import type {
   ClearanceStatus,
   DocumentUploadRequest,
   DocumentVersion,
+  JobSummary,
   ReviewDocumentRequest,
 } from '@/interfaces';
 
 /**
+ * Active jobs list query for staff job picker dropdown (Finding 10 / AGENTS.md).
+ */
+export const useClearanceJobs = () => {
+  return useQuery({
+    queryKey: queryKeys.clearance.jobs(),
+    queryFn: async (): Promise<JobSummary[]> => {
+      const res = await clearanceApi.getActiveJobs();
+      return res.data;
+    },
+  });
+};
+
+/**
  * Transport Specialist pending reviews inbox.
  * Uses TanStack Query with caching and invalidation (AGENTS.md).
+ * Safely extracts items whether returned as a plain array or paginated content.
  */
 export const usePendingReviews = () => {
   return useQuery({
@@ -32,6 +47,7 @@ export const usePendingReviews = () => {
 
 /**
  * Job document checklist query.
+ * Only enabled when a valid jobId is provided.
  */
 export const useJobChecklist = (jobId: string | null | undefined) => {
   return useQuery({
@@ -47,6 +63,7 @@ export const useJobChecklist = (jobId: string | null | undefined) => {
 
 /**
  * Job clearance gate evaluation status.
+ * Only enabled when a valid jobId is provided.
  */
 export const useClearanceStatus = (jobId: string | null | undefined) => {
   return useQuery({
@@ -64,7 +81,7 @@ export const useClearanceStatus = (jobId: string | null | undefined) => {
  * Review document version mutation (Approve / Reject).
  * Invalidates affected queries on success (AGENTS.md).
  */
-export const useReviewDocument = (jobId?: string) => {
+export const useReviewDocument = (jobId?: string | null) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ versionId, data }: { versionId: string; data: ReviewDocumentRequest }) =>
@@ -82,7 +99,7 @@ export const useReviewDocument = (jobId?: string) => {
 /**
  * Upload new document version mutation.
  */
-export const useUploadDocumentVersion = (jobId?: string) => {
+export const useUploadDocumentVersion = (jobId?: string | null) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ checklistItemId, data }: { checklistItemId: string; data: DocumentUploadRequest }) =>
@@ -100,7 +117,7 @@ export const useUploadDocumentVersion = (jobId?: string) => {
 /**
  * Trigger clearance gate evaluation mutation.
  */
-export const useEvaluateClearanceGate = (jobId?: string) => {
+export const useEvaluateClearanceGate = (jobId?: string | null) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (targetJobId: string) => clearanceApi.evaluateClearanceGate(targetJobId),

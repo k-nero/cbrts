@@ -1,13 +1,13 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.AuthorityKind;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
 import org.springframework.stereotype.Service;
@@ -15,81 +15,95 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 /**
- * Service managing regulatory authority filings and quarantine tracking (AGENTS.md).
- * Transport Specialists submit dossier packets to veterinary/customs agencies and track outcomes.
+ * Service managing veterinary, customs, and quarantine authority submissions and quarantine tracks (AGENTS.md).
+ * Uses business calendar zone (Asia/Ho_Chi_Minh) and enforces file attachability rules.
  */
 @Service
 public class AuthoritySubmissionService {
 
     private final AuthorityRepository authorityRepository;
     private final AuthoritySubmissionRepository submissionRepository;
-    private final QuarantinePeriodRepository quarantinePeriodRepository;
     private final TransportJobRepository transportJobRepository;
     private final ChecklistItemRepository checklistItemRepository;
-    private final StoredFileRepository storedFileRepository;
+    private final QuarantinePeriodRepository quarantinePeriodRepository;
     private final PlaceRepository placeRepository;
     private final HorseRepository horseRepository;
-    private final NotificationService notificationService;
-    private final ClearanceService clearanceService;
+    private final FileService fileService;
     private final AuditService auditService;
+    private final ClearanceService clearanceService;
+    private final NotificationService notificationService;
 
     public AuthoritySubmissionService(
             AuthorityRepository authorityRepository,
             AuthoritySubmissionRepository submissionRepository,
-            QuarantinePeriodRepository quarantinePeriodRepository,
             TransportJobRepository transportJobRepository,
             ChecklistItemRepository checklistItemRepository,
-            StoredFileRepository storedFileRepository,
+            QuarantinePeriodRepository quarantinePeriodRepository,
             PlaceRepository placeRepository,
             HorseRepository horseRepository,
-            NotificationService notificationService,
+            FileService fileService,
+            AuditService auditService,
             ClearanceService clearanceService,
-            AuditService auditService) {
+            NotificationService notificationService) {
         this.authorityRepository = authorityRepository;
         this.submissionRepository = submissionRepository;
-        this.quarantinePeriodRepository = quarantinePeriodRepository;
         this.transportJobRepository = transportJobRepository;
         this.checklistItemRepository = checklistItemRepository;
-        this.storedFileRepository = storedFileRepository;
+        this.quarantinePeriodRepository = quarantinePeriodRepository;
         this.placeRepository = placeRepository;
         this.horseRepository = horseRepository;
-        this.notificationService = notificationService;
-        this.clearanceService = clearanceService;
+        this.fileService = fileService;
         this.auditService = auditService;
+        this.clearanceService = clearanceService;
+        this.notificationService = notificationService;
     }
 
-    /** List government authorities filtered optionally by country and kind. */
+    /** List all recognized authorities (Veterinary, Customs, Quarantine). */
     @Transactional(readOnly = true)
-    public List<AuthorityResponse> listAuthorities(String countryCode, AuthorityKind kind) {
-        List<Authority> list;
-        if (countryCode != null && !countryCode.isBlank() && kind != null) {
-            list = authorityRepository.findByCountryCodeAndKind(countryCode, kind);
-        } else if (countryCode != null && !countryCode.isBlank()) {
-            list = authorityRepository.findByCountryCode(countryCode);
-        } else if (kind != null) {
-            list = authorityRepository.findByKind(kind);
-        } else {
-            list = authorityRepository.findAll();
+    public List<AuthorityResponse> listAuthorities(String countryCode, com.equifreight.entity.enums.AuthorityKind kind) {
+        return authorityRepository.findAll().stream()
+                .filter(a -> countryCode == null || countryCode.isBlank() || a.getCountry().getCode().equalsIgnoreCase(countryCode.trim()))
+                .filter(a -> kind == null || a.getKind() == kind)
+                .map(ClearanceMapper::toAuthorityResponse)
+                .toList();
+    }
+
+    public List<AuthoritySubmissionResponse> getSubmissionsByJob(UUID jobId) {
+        return listSubmissionsByJob(jobId);
+    }
+
+    public List<AuthorityResponse> listAuthorities(String countryCode) {
+        if (countryCode != null && !countryCode.isBlank()) {
+            return authorityRepository.findByCountryCode(countryCode.trim().toUpperCase()).stream()
+                    .map(ClearanceMapper::toAuthorityResponse)
+                    .toList();
         }
-        return list.stream().map(ClearanceMapper::toAuthorityResponse).toList();
+        return authorityRepository.findAll().stream()
+                .map(ClearanceMapper::toAuthorityResponse)
+                .toList();
     }
 
     /** List all authority submissions filed for a transport job. */
     @Transactional(readOnly = true)
-    public List<AuthoritySubmissionResponse> getSubmissionsByJob(UUID jobId) {
+    public List<AuthoritySubmissionResponse> listSubmissionsByJob(UUID jobId) {
         findJobOrThrow(jobId);
         return submissionRepository.findByJobId(jobId).stream()
                 .map(ClearanceMapper::toSubmissionResponse)
                 .toList();
     }
 
-    /** File a new submission with a government authority. */
+    /**
+     * File a new authority submission dossier on behalf of transport specialist (Flow 2, B11).
+     * Validates that all associated checklist items strictly belong to the specified job.
+     */
     @Transactional
     public AuthoritySubmissionResponse createSubmission(UUID jobId, CreateAuthoritySubmissionRequest request, User specialist) {
-        assertSpecialist(specialist);
         TransportJob job = findJobOrThrow(jobId);
         Authority authority = authorityRepository.findById(request.getAuthorityId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Authority", request.getAuthorityId()));
@@ -103,16 +117,24 @@ public class AuthoritySubmissionService {
         submission.setFiledBy(specialist);
         submission.setReferenceNo(request.getReferenceNo());
 
-        // SLA calculation
+        // SLA deadline calculated using business calendar zone (Asia/Ho_Chi_Minh)
         if (request.getExpectedBy() != null) {
             submission.setExpectedBy(request.getExpectedBy());
         } else if (authority.getSlaDays() != null) {
-            submission.setExpectedBy(LocalDate.now().plusDays(authority.getSlaDays()));
+            submission.setExpectedBy(LocalDate.now(AppConstants.BUSINESS_ZONE).plusDays(authority.getSlaDays()));
         }
 
-        // Attach checklist items
         if (request.getChecklistItemIds() != null && !request.getChecklistItemIds().isEmpty()) {
-            Set<ChecklistItem> items = new HashSet<>(checklistItemRepository.findAllById(request.getChecklistItemIds()));
+            Set<ChecklistItem> items = new HashSet<>();
+            for (UUID cid : request.getChecklistItemIds()) {
+                ChecklistItem ci = checklistItemRepository.findById(cid)
+                        .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", cid));
+                if (!ci.getJob().getId().equals(job.getId())) {
+                    throw new ConflictException("CHECKLIST_ITEM_MISMATCH",
+                            "Checklist item " + cid + " does not belong to job " + job.getId());
+                }
+                items.add(ci);
+            }
             submission.setChecklistItems(items);
         }
 
@@ -140,7 +162,6 @@ public class AuthoritySubmissionService {
     /** Update an authority submission outcome (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED). */
     @Transactional
     public AuthoritySubmissionResponse updateSubmission(UUID submissionId, UpdateAuthoritySubmissionRequest request, User specialist) {
-        assertSpecialist(specialist);
         AuthoritySubmission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("AuthoritySubmission", submissionId));
 
@@ -157,8 +178,8 @@ public class AuthoritySubmissionService {
         if (request.getStatus() == SubmissionStatus.ISSUED) {
             submission.setIssuedAt(Instant.now());
             if (request.getResultFileId() != null) {
-                StoredFile resultFile = storedFileRepository.findById(request.getResultFileId())
-                        .orElseThrow(() -> ResourceNotFoundException.of("File", request.getResultFileId()));
+                // Enforce attachability rules (PR #79)
+                StoredFile resultFile = fileService.requireAttachable(request.getResultFileId(), specialist);
                 submission.setResultFile(resultFile);
             }
         } else if (request.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
@@ -209,7 +230,6 @@ public class AuthoritySubmissionService {
     /** Schedule a new quarantine period for a horse or the entire job shipment. */
     @Transactional
     public QuarantinePeriodResponse createQuarantine(UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
-        assertSpecialist(specialist);
         TransportJob job = findJobOrThrow(jobId);
         Place place = placeRepository.findById(request.getPlaceId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Place", request.getPlaceId()));
@@ -251,7 +271,6 @@ public class AuthoritySubmissionService {
     /** Confirm quarantine completion by supervising vet / transport specialist. */
     @Transactional
     public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist) {
-        assertSpecialist(specialist);
         QuarantinePeriod quarantine = quarantinePeriodRepository.findById(quarantineId)
                 .orElseThrow(() -> ResourceNotFoundException.of("QuarantinePeriod", quarantineId));
 
@@ -276,18 +295,6 @@ public class AuthoritySubmissionService {
 
         clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
         return ClearanceMapper.toQuarantineResponse(updated);
-    }
-
-    private void assertSpecialist(User user) {
-        if (user == null || user.getRoles() == null) {
-            throw new UnauthorizedException("Authentication is required.");
-        }
-        boolean hasPerm = user.getRoles().stream()
-                .map(Role::getName)
-                .anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
-        if (!hasPerm) {
-            throw new UnauthorizedException("Only Transport Specialists are authorized for regulatory authority operations.");
-        }
     }
 
     private TransportJob findJobOrThrow(UUID jobId) {
