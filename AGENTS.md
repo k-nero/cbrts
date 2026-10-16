@@ -47,7 +47,18 @@ These are product decisions, not suggestions. Enforce them on the backend; the f
   - Fleet & route coordinator: routes, vehicles and stalls.
   - Escort: checkpoints and horse condition.
 - **Audit log** is append-only.
-- **UI language** is English only.
+- **UI language** is English only (see Write everything in English).
+
+## Write everything in English
+
+Everything that goes into the repository or the product is written in English, even when you were asked in another language:
+
+- **Code:** identifiers, comments, Javadoc and JSDoc, log messages, exception and error messages, and test names.
+- **Product text:** every label, heading, button, helper text, empty state, validation message, toast, email and notification the app shows, plus the Figma frames and the generator copy.
+- **Data and config:** seed and demo data descriptions, enum labels, API documentation (SpringDoc summaries), and comments in SQL migrations and config files.
+- **Project writing:** commit messages, branch names, PR titles and descriptions, issue text, and the docs in `docs/`, `AGENTS.md`, `PRODUCT.md` and `DESIGN.md`.
+
+Proper nouns keep their own spelling: people (Vũ Hải Yến), places and border crossings (Mộc Bài – Bavet), clubs and authorities. If existing code or text you touch is in another language, translate it in the same change.
 
 ## Reuse before you build
 
@@ -145,4 +156,5 @@ Where to look elsewhere:
 - Don't overwrite a document, quotation, invoice, payment or catalog version. Create a new version or a correcting entry.
 - Don't weaken a legality block into a warning.
 - Don't present demo figures as real data.
+- Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
