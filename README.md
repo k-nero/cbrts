@@ -2,16 +2,13 @@
 
 SWP391 project. Racing clubs request road or air transport for their horses across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
 
-The earlier coursework (`prj301/`, and the SWP391 parking management system in `swp391/`) lives on the `archive/prj301-swp391` branch.
-
 ## Layout
 
 | Folder | What it is |
 |---|---|
 | `BE/` | Spring Boot 4 REST API (Java 25, Gradle, PostgreSQL, Flyway, Spring Security with JWT, SpringDoc) |
 | `FE/` | React 19 single-page app (Rsbuild, Ant Design 6, Tailwind 4, React Router 7, TanStack Query, React Hook Form with Zod). Layout: `apis/` + `hooks/` per domain, `router/route.config.ts` for pages and roles, `components/form` and `components/Table` as the base kits |
-| `docs/` | The core-flows spec and quotation builder (`.docx`), the diagrams, and the Figma design generator (`docs/figma-plugin/`) |
-| `requirement.txt` | The course requirement (Vietnamese) |
+| `docs/` | The course requirement (`requirement.txt`), the core-flows spec and quotation builder (`.docx`), the diagrams, and the Figma design generator (`docs/figma-plugin/`) |
 
 ## Roles
 
