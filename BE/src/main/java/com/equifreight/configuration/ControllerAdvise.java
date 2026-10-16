@@ -50,7 +50,7 @@ public class ControllerAdvise {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(ConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiError.of(HttpStatus.CONFLICT.value(), ex.getCode(), ex.getMessage()));
+                .body(ApiError.of(HttpStatus.CONFLICT.value(), ex.getCode(), ex.getMessage(), ex.getDetails()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
