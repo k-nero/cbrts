@@ -1,0 +1,62 @@
+{
+  "title": "Request tracking: choose the layout",
+  "question": "Three of seven layouts, dealt by the roll. The EquiFreight style stays as it is; this choice is only about how the page is organised.",
+  "options": [
+    {
+      "id": "owed-first",
+      "label": "Owed first",
+      "kicker": "THE ROLL",
+      "lineage": "task inbox, then status",
+      "thesis": "Opens on what the customer owes and by when, then shows where the move stands.",
+      "palette": ["#0C1520", "#111B2C", "#C9AA5A", "#E0B04A", "#5DC688"],
+      "materials": ["Callout and document-row components", "compact stage track", "mini schematic route"],
+      "viewport": "Request header and stage chip, then a full-width 'You owe' list (upload Nightfall's EIA test by 11 Oct, extend insurance), then stage track, route and history side by side.",
+      "risk": "When the customer owes nothing, the lead area goes empty and needs a strong 'nothing needed from you' state.",
+      "wireframe": {"cols": 12, "rows": 14, "regions": [
+        {"label": "Request header · stage chip", "x": 0, "y": 0, "w": 12, "h": 1},
+        {"label": "You owe · 3 items, due dates", "x": 0, "y": 1, "w": 12, "h": 5, "accent": true},
+        {"label": "Where it stands · stage track", "x": 0, "y": 6, "w": 7, "h": 5},
+        {"label": "Schematic route", "x": 7, "y": 6, "w": 5, "h": 5},
+        {"label": "History", "x": 0, "y": 11, "w": 12, "h": 3}
+      ]}
+    },
+    {
+      "id": "route-page",
+      "label": "Route as the page",
+      "lineage": "one line from stable to destination",
+      "thesis": "One continuous line: the paperwork is the stretch before the ramp, the journey is the stretch after it.",
+      "palette": ["#0C1520", "#111B2C", "#C9AA5A", "#7FB0E8", "#EF6B6B"],
+      "materials": ["schematic route line with stage nodes", "clearance gate drawn as a lock on the line", "Timeline stop component"],
+      "viewport": "A full-width line: request, quote, approval, documents, a locked gate, then pickup, border, welfare stop, delivery. The current node is lit; the panel below expands whichever node is selected.",
+      "risk": "Pre-departure stages take weeks and trip legs take hours, so the line must be spaced by stage, not by time, and say so.",
+      "wireframe": {"cols": 12, "rows": 14, "regions": [
+        {"label": "Request header", "x": 0, "y": 0, "w": 12, "h": 1},
+        {"label": "Route line · before departure | gate | on the road", "x": 0, "y": 1, "w": 12, "h": 3, "accent": true},
+        {"label": "Selected node detail", "x": 0, "y": 4, "w": 8, "h": 6},
+        {"label": "Your to-do", "x": 8, "y": 4, "w": 4, "h": 6},
+        {"label": "History", "x": 0, "y": 10, "w": 12, "h": 4}
+      ]}
+    },
+    {
+      "id": "spine",
+      "label": "Next-step spine",
+      "lineage": "vertical stage list, current stage open",
+      "thesis": "A vertical spine of seven stages. The current one opens in place; everything else is one line.",
+      "palette": ["#0C1520", "#111B2C", "#C9AA5A", "#5DC688", "#7A8FA3"],
+      "materials": ["Step component scaled up to a spine", "the current stage's own content inline (quote, documents, route)", "sticky summary rail"],
+      "viewport": "A banner naming the next step and its owner ('You: upload 4 health certificates by 11 Oct'). Below it the spine, with done stages collapsed to a date and the current stage expanded, next to a sticky summary of horses, route, quote and key dates.",
+      "risk": "The page gets long when the documents stage is open for four horses; it needs per-horse grouping to stay scannable.",
+      "wireframe": {"cols": 12, "rows": 14, "regions": [
+        {"label": "Request header", "x": 0, "y": 0, "w": 12, "h": 1},
+        {"label": "Next step · owner · due", "x": 0, "y": 1, "w": 12, "h": 2, "accent": true},
+        {"label": "Done · request, quote, approval", "x": 0, "y": 3, "w": 8, "h": 2},
+        {"label": "Current · documents (open)", "x": 0, "y": 5, "w": 8, "h": 6, "accent": true},
+        {"label": "Upcoming · clearance, trip, handover", "x": 0, "y": 11, "w": 8, "h": 3},
+        {"label": "Summary rail · horses, route, quote, dates", "x": 8, "y": 3, "w": 4, "h": 11}
+      ]}
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": {"value": "code"}
+}
