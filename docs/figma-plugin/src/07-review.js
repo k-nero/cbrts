@@ -119,17 +119,39 @@ function scrReviewOverride() {
 }
 
 /* ---------- the customer's side: the request came back with a question ---------- */
+/* the answer's effect on the route: the Ho Chi Minh City leg and the Mộc Bài crossing drop away (faint and dashed),
+   and the move starts in Phnom Penh */
+function infoChangeMap(w, h) {
+  var r = MAP_REQ.road;
+  return jobMap({ w: w, h: h, end: 100.5, bounds: MAP_REQ.bounds, borders: MAP_REQ.borders, areas: MAP_REQ.areas,
+    paths: [{ pts: r.slice(0, 3), kind: 'old' }, { pts: r.slice(2), kind: 'todo' }],
+    stops: [[106.66, 10.86, 'Ho Chi Minh City', 'Not needed', 'stop', 'old', 'b'], [106.12, 11.08, 'Mộc Bài – Bavet', 'Not crossed', 'gate', 'old', 'a'], [104.92, 11.56, 'Phnom Penh', 'New pickup', 'stop', 'todo', 'b'],
+      [102.56, 13.66, 'Poipet – Aranyaprathet', 'Border', 'gate', 'todo', 'a'], [100.5, 13.75, 'Bangkok', '~660 km', 'stop', 'todo', 'b']] });
+}
 function scrTrackInfo() {
   /* the question has three answers, so the customer picks one here; each opens the matching edit, prefilled */
   var answer = VV({ name: 'Your answer', gap: 12, pad: [0, 20, 20, 72] });
   var go = H({ name: 'Actions', gap: 16, cross: 'CENTER' });
   addAll(go, [btn('Primary', 'MD', 'Continue with this answer', { trail: 'arrow-right' }), Tx('Opens your request with the pickup set to Phnom Penh Equestrian Centre. Check it, then send it back as version 2.', 'Body/S', 'text/tertiary', { fill: true })]);
+  /* what the chosen answer does, before it is sent: the leg it drops, the crossing it saves, the distance */
+  var change = H({ name: 'What this answer changes', gap: 20, pad: 16, radius: 12, fill: 'bg/sunken', cross: 'MIN' });
+  var diffs = VV({ name: 'Changes', gap: 0 });
+  add(diffs, fillW(VV({ name: 'Head', gap: 2, pad: [0, 0, 8, 0] }, [Tx('What this answer changes', 'Label/M'), Tx('Shown before you send it. Yến re-checks capacity on version 2.', 'Body/S', 'text/tertiary', { fill: true })])));
+  [['Pickup', 'Phú Thọ, Ho Chi Minh City', 'Phnom Penh Equestrian Centre'], ['Border crossings', '2', '1 · Poipet only'], ['Distance', '~960 km', '~660 km'], ['Estimate', '$11,300 – $16,100', 'New range on version 2']].forEach(function (d) {
+    var r = VV({ name: d[0], gap: 2, pad: [8, 0, 8, 0] });
+    borderSide(r, 'border/default', 'top');
+    var v = H({ name: 'Values', gap: 8, cross: 'CENTER', wrap: true, rowGap: 2 });
+    addAll(v, [Tx(d[1], 'Body/S', 'text/tertiary', { strike: true }), Ic('arrow-right', 14, 'text/tertiary'), Tx(d[2], 'Label/S', 'text/primary')]);
+    addAll(r, [Tx(d[0], 'Body/S', 'text/tertiary'), fillW(v)]);
+    add(diffs, fillW(r));
+  });
+  addAll(change, [infoChangeMap(640, 220), fillW(diffs)]);
   addAll(answer, [Tx('Your answer', 'Label/S', 'text/secondary'), fillW(svcOptions([
     ['Selected', 'Collect them in Phnom Penh', 'Both arrive at Phnom Penh Equestrian Centre on 18 Oct.', 'Pickup moves; the estimate updates', null],
     ['Default', 'Move the date', 'Pick a later departure. Yến checks it against their other bookings.', 'Lead time checked again', null],
-    ['Default', 'Choose other horses', 'Swap in horses from your list that are free on 30 Oct.', 'The estimate updates', null]], true)), fillW(go)]);
-  var items = [owedItem('Soon', 'Answer Yến’s question', 'REQ-2026-0193 · version 1', REVIEW_NOTE + ' Reply by 9 Oct to keep the 30 Oct departure; after that the 21-day lead time moves it.', 'Reply in 11 days', '9 Oct 2026', 'Withdraw request', null, { secondary: true }), fillW(answer)];
-  var lead = owedPanel('1 item', 'Yến, logistics manager, reviewed your request this morning and needs one answer before she can quote.', items, { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
+    ['Default', 'Choose other horses', 'Swap in horses from your list that are free on 30 Oct.', 'The estimate updates', null]], true)), fillW(change), fillW(go)]);
+  var items = [owedItem('Soon', 'Answer Yến’s question', 'REQ-2026-0193 · version 1', REVIEW_NOTE + ' Reply by 9 Oct to keep the 30 Oct departure; after that the 21-day lead time moves it.', 'Reply in 11 days', '9 Oct 2026', null), fillW(answer)];
+  var lead = owedPanel('1 item', 'Yến, logistics manager, reviewed your request this morning and needs one answer before she can quote.', items, { chipTone: 'Warn', chipLabel: 'Waiting for you' }, 'Withdraw request');
   var stagesP = stagePanel([
     ['Current', 'Returned to you on 28 Sep with one question from Yến. Your answer is above.', '', ''],
     ['Upcoming', 'Itemised and valid for 7 days. You accept and your 30% deposit is acknowledged.', '', ''],
@@ -143,10 +165,12 @@ function scrTrackInfo() {
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data'), Tx('Submitted 26 Sep 09:14 · returned 28 Sep 09:41', 'Body/S', 'text/secondary', { fill: true }), chip('Info', 'Current', { noDot: true })]);
   addAll(ver, [Tx('Versions', 'Heading/H4'), fillW(v1), Tx('Your changes become v2. You and Yến both keep v1, so nothing you sent is lost.', 'Body/S', 'text/tertiary', { fill: true })]);
-  var est = panel('Estimate', { gap: 10 });
-  addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('Still an indicative range. It updates if you change the horses, route or date.', 'Body/S', 'text/tertiary', { fill: true })]);
+  /* the request's pass, waiting on the answer; version 1's values until version 2 is sent */
+  var est = draftPass({ route: true, chip: ['Warn', 'Needs your answer'],
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    stubLabel: 'Your estimate at submission', range: '$11,300 – $16,100', rangeSub: 'Version 1. It updates when you send version 2.' });
   var hist = historyPanel([['28 Sep · 09:41', 'Returned with a question: where to collect Shadowfax and Nightfall.', 'Yến, logistics manager'], ['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
+  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', 'Version 1 · returned 28 Sep 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([est, ver]), SIDE.narrow), hist], '28 Sep 2026, 10:05');
 }
 
 /* =====================================================================
