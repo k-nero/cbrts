@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Files reach a job through three tables: document versions (via their checklist item), incident
- * photos and authority filing results. A file referenced from none of them is an orphan.
+ * Files reach a job through document versions, incident photos, horse condition logs and authority filing results.
+ * A file referenced from none of them is an orphan.
  */
 @Repository
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
@@ -26,6 +26,12 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       from document_versions dv
                       join checklist_items ci on ci.id = dv.checklist_item_id
                       where dv.file_id = :fileId
+                      union all
+                      select tr.job_id
+                      from condition_log_files clf
+                      join condition_logs cl on cl.id = clf.condition_log_id
+                      join trip_records tr on tr.id = cl.trip_record_id
+                      where clf.file_id = :fileId
                       union all
                       select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
                 join transport_jobs tj on tj.id = j.job_id
@@ -48,6 +54,12 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       join incidents i on i.id = f.incident_id
                       where f.file_id = :fileId
                       union all
+                      select tr.job_id
+                      from condition_log_files clf
+                      join condition_logs cl on cl.id = clf.condition_log_id
+                      join trip_records tr on tr.id = cl.trip_record_id
+                      where clf.file_id = :fileId
+                      union all
                       select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
                 join crew_assignments ca on ca.job_id = j.job_id
                 where ca.user_id = :userId)
@@ -58,6 +70,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     @Query(value = """
             select exists (select 1 from document_versions where file_id = :fileId)
                 or exists (select 1 from incident_files where file_id = :fileId)
+                or exists (select 1 from condition_log_files where file_id = :fileId)
                 or exists (select 1 from authority_submissions where result_file_id = :fileId)
             """, nativeQuery = true)
     boolean isAttached(@Param("fileId") UUID fileId);
@@ -68,6 +81,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
             where f.created_at < :cutoff
               and not exists (select 1 from document_versions dv where dv.file_id = f.id)
               and not exists (select 1 from incident_files i where i.file_id = f.id)
+              and not exists (select 1 from condition_log_files clf where clf.file_id = f.id)
               and not exists (select 1 from authority_submissions s where s.result_file_id = f.id)
             order by f.created_at
             limit :limit

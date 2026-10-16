@@ -67,6 +67,7 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
     {
       items: [
         ['jobs', 'Jobs', <NodeIndexOutlined key="i" />],
+        ['staff-trips', 'Trip progress', <HistoryOutlined key="i" />],
         ['fleet-calendar', 'Fleet calendar', <CalendarOutlined key="i" />],
         ['vehicles', 'Vehicles', <CarOutlined key="i" />],
       ],
