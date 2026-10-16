@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.RegulationRule;
@@ -9,12 +10,12 @@ import com.equifreight.entity.enums.Validity;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 
 /**
- * BR-F2-02: Automatic document validity check.
+ * BR-F2-02: Automatic document validity evaluation engine.
  * Evaluates document versions against the job's planned schedule and pinned regulation rules.
+ * All calendar day calculations work in the business calendar time zone (Asia/Ho_Chi_Minh).
  */
 @Component
 public class ValidityEngine {
@@ -23,75 +24,75 @@ public class ValidityEngine {
 
     public Result evaluate(ChecklistItem item, DocumentVersion version, TransportJob job) {
         if (version == null) {
-            return new Result(Validity.RED, "Chưa có tài liệu được tải lên.");
+            return new Result(Validity.RED, "No document uploaded yet.");
         }
 
         RegulationRule rule = item.getRegulationRule();
         if (rule == null) {
-            return new Result(Validity.GREEN, "Tài liệu hợp lệ (không áp dụng quy tắc ngày tháng).");
+            return new Result(Validity.GREEN, "Valid document (no date rules apply).");
         }
 
         RegulationRuleKind kind = rule.getRuleKind();
         if (kind == RegulationRuleKind.PRESENCE_ONLY) {
-            return new Result(Validity.GREEN, "Tài liệu đã được tải lên và sẵn sàng kiểm tra nội dung.");
+            return new Result(Validity.GREEN, "Document uploaded and ready for inspection.");
         }
 
         LocalDate departureDate = job != null && job.getPlannedDepartureAt() != null
-                ? job.getPlannedDepartureAt().atZone(ZoneOffset.UTC).toLocalDate()
+                ? job.getPlannedDepartureAt().atZone(AppConstants.BUSINESS_ZONE).toLocalDate()
                 : null;
 
         LocalDate arrivalDate = job != null && job.getPlannedArrivalAt() != null
-                ? job.getPlannedArrivalAt().atZone(ZoneOffset.UTC).toLocalDate()
+                ? job.getPlannedArrivalAt().atZone(AppConstants.BUSINESS_ZONE).toLocalDate()
                 : null;
 
         return switch (kind) {
             case WINDOW_BEFORE_DEPARTURE -> evaluateWindowBeforeDeparture(rule, version, departureDate);
             case VALID_THROUGH_ARRIVAL_PLUS -> evaluateValidThroughArrivalPlus(rule, version, arrivalDate);
             case BOOSTER_WINDOW -> evaluateBoosterWindow(rule, version, departureDate);
-            case PRESENCE_ONLY -> new Result(Validity.GREEN, "Tài liệu hợp lệ.");
+            case PRESENCE_ONLY -> new Result(Validity.GREEN, "Valid document.");
         };
     }
 
     private Result evaluateWindowBeforeDeparture(RegulationRule rule, DocumentVersion version, LocalDate departureDate) {
         LocalDate date = version.getSampledOn() != null ? version.getSampledOn() : version.getIssuedOn();
         if (date == null) {
-            return new Result(Validity.RED, "Thiếu ngày lấy mẫu/ngày cấp chứng nhận.");
+            return new Result(Validity.RED, "Missing sampling or issue date.");
         }
         if (departureDate == null) {
-            return new Result(Validity.AMBER, "Chưa xác định ngày khởi hành dự kiến.");
+            return new Result(Validity.AMBER, "Planned departure date is not scheduled yet.");
         }
 
         long daysBefore = ChronoUnit.DAYS.between(date, departureDate);
         if (daysBefore < 0) {
-            return new Result(Validity.RED, "Ngày tài liệu cấp sau ngày khởi hành dự kiến.");
+            return new Result(Validity.RED, "Document issued after scheduled departure.");
         }
 
         Short maxDays = rule.getMaxDays();
         if (maxDays != null && daysBefore > maxDays) {
             LocalDate earliestValidDate = departureDate.minusDays(maxDays);
             return new Result(Validity.RED, String.format(
-                    "Đã quá hạn %d ngày so với ngày khởi hành (tối đa %d ngày). Cần lấy mẫu vào hoặc sau ngày %s.",
+                    "Expired %d days before departure (max allowed %d days). Sampling must be on or after %s.",
                     daysBefore, maxDays, earliestValidDate));
         }
 
         if (maxDays != null && (maxDays - daysBefore) <= 3) {
             return new Result(Validity.AMBER, String.format(
-                    "Hợp lệ tại thời điểm khởi hành (%d ngày trước xuất phát), nhưng sắp hết hạn (tối đa %d ngày).",
+                    "Valid at departure (%d days before), but nearing expiration window (max %d days).",
                     daysBefore, maxDays));
         }
 
         return new Result(Validity.GREEN, String.format(
-                "Được cấp %d ngày trước ngày khởi hành (trong khung cho phép tối đa %s ngày).",
+                "Issued %d days before departure (within allowed window of max %s days).",
                 daysBefore, maxDays != null ? maxDays : "N/A"));
     }
 
     private Result evaluateValidThroughArrivalPlus(RegulationRule rule, DocumentVersion version, LocalDate arrivalDate) {
         LocalDate validUntil = version.getValidUntil();
         if (validUntil == null) {
-            return new Result(Validity.RED, "Thiếu ngày hết hạn tài liệu (validUntil).");
+            return new Result(Validity.RED, "Missing document expiration date (validUntil).");
         }
         if (arrivalDate == null) {
-            return new Result(Validity.AMBER, "Chưa xác định ngày đến dự kiến.");
+            return new Result(Validity.AMBER, "Planned arrival date is not scheduled yet.");
         }
 
         short bufferDays = (rule.getVersion() != null)
@@ -102,28 +103,28 @@ public class ValidityEngine {
 
         if (validUntil.isBefore(arrivalDate)) {
             return new Result(Validity.RED, String.format(
-                    "Tài liệu hết hạn vào ngày %s trước ngày đến dự kiến %s.",
+                    "Document expires on %s before planned arrival on %s.",
                     validUntil, arrivalDate));
         }
 
         if (validUntil.isBefore(requiredDate)) {
             return new Result(Validity.AMBER, String.format(
-                    "Tài liệu còn hạn khi đến (%s), nhưng hết hạn trước thời gian đệm an toàn (%d ngày sau khi đến: %s).",
+                    "Document valid at arrival (%s), but expires before mandatory buffer (%d days after arrival: %s).",
                     arrivalDate, bufferDays, requiredDate));
         }
 
         return new Result(Validity.GREEN, String.format(
-                "Hạn sử dụng đến %s (thỏa mãn điều kiện đến nơi + %d ngày đệm an toàn).",
+                "Valid through %s (meets arrival date + %d buffer days).",
                 validUntil, bufferDays));
     }
 
     private Result evaluateBoosterWindow(RegulationRule rule, DocumentVersion version, LocalDate departureDate) {
         LocalDate date = version.getIssuedOn() != null ? version.getIssuedOn() : version.getSampledOn();
         if (date == null) {
-            return new Result(Validity.RED, "Thiếu ngày tiêm chủng nhắc lại.");
+            return new Result(Validity.RED, "Missing booster vaccination date.");
         }
         if (departureDate == null) {
-            return new Result(Validity.AMBER, "Chưa xác định ngày khởi hành dự kiến.");
+            return new Result(Validity.AMBER, "Planned departure date is not scheduled yet.");
         }
 
         long daysBefore = ChronoUnit.DAYS.between(date, departureDate);
@@ -132,18 +133,18 @@ public class ValidityEngine {
 
         if (minDays != null && daysBefore < minDays) {
             return new Result(Validity.RED, String.format(
-                    "Mũi tiêm được thực hiện trước ngày khởi hành %d ngày (yêu cầu tối thiểu %d ngày để có kháng thể).",
+                    "Vaccination administered %d days before departure (requires minimum %d days to develop immunity).",
                     daysBefore, minDays));
         }
 
         if (maxDays != null && daysBefore > maxDays) {
             return new Result(Validity.RED, String.format(
-                    "Mũi tiêm đã quá %d ngày trước khởi hành (vượt quá thời hạn hiệu lực tối đa %d ngày). Cần tiêm nhắc lại.",
+                    "Vaccination administered %d days before departure (exceeds maximum allowed %d days). Booster required.",
                     daysBefore, maxDays));
         }
 
         return new Result(Validity.GREEN, String.format(
-                "Mũi tiêm hợp lệ: thực hiện trước ngày khởi hành %d ngày (trong khoảng %s - %s ngày).",
-                daysBefore, minDays != null ? minDays : 0, maxDays != null ? maxDays : "vô hạn"));
+                "Booster vaccination valid: administered %d days before departure (allowed window: %s to %s days).",
+                daysBefore, minDays != null ? minDays : 0, maxDays != null ? maxDays : "unlimited"));
     }
 }

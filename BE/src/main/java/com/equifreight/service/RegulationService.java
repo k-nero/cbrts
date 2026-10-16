@@ -2,10 +2,11 @@ package com.equifreight.service;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.CatalogStatus;
-import com.equifreight.entity.enums.RoleName;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.*;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Service managing country health, quarantine, and customs regulation catalogs (AGENTS.md).
+ * Catalogs are maintained and published exclusively by Transport Specialists.
+ */
 @Service
 public class RegulationService {
 
@@ -21,19 +26,22 @@ public class RegulationService {
     private final RegulationVersionRepository versionRepository;
     private final RegulationRuleRepository ruleRepository;
     private final DocumentTypeRepository documentTypeRepository;
+    private final AuditService auditService;
 
     public RegulationService(
             RegulationCatalogRepository catalogRepository,
             RegulationVersionRepository versionRepository,
             RegulationRuleRepository ruleRepository,
-            DocumentTypeRepository documentTypeRepository) {
+            DocumentTypeRepository documentTypeRepository,
+            AuditService auditService) {
         this.catalogRepository = catalogRepository;
         this.versionRepository = versionRepository;
         this.ruleRepository = ruleRepository;
         this.documentTypeRepository = documentTypeRepository;
+        this.auditService = auditService;
     }
 
-    /** Lấy danh mục quy định y tế & kiểm dịch của các quốc gia. */
+    /** List all regulation catalogs by country with their current active published version. */
     @Transactional(readOnly = true)
     public List<RegulationCatalogResponse> listCatalogs() {
         return catalogRepository.findAll().stream()
@@ -51,7 +59,7 @@ public class RegulationService {
                 .toList();
     }
 
-    /** Lấy chi tiết phiên bản quy định kèm các quy tắc giấy tờ. */
+    /** Get detailed information for a regulation version, including all document rules. */
     @Transactional(readOnly = true)
     public RegulationVersionResponse getVersionDetails(UUID versionId) {
         RegulationVersion version = versionRepository.findById(versionId)
@@ -66,7 +74,7 @@ public class RegulationService {
         return resp;
     }
 
-    /** Lấy danh sách các loại tài liệu trong hệ thống. */
+    /** List all recognized document types in the system. */
     @Transactional(readOnly = true)
     public List<DocumentTypeResponse> listDocumentTypes() {
         return documentTypeRepository.findAll().stream()
@@ -74,7 +82,10 @@ public class RegulationService {
                 .toList();
     }
 
-    /** Xuất bản một phiên bản quy định mới (chuyển từ DRAFT -> PUBLISHED). */
+    /**
+     * Publish a draft regulation version (DRAFT -> PUBLISHED).
+     * Retires the previously active published version and writes an audit log entry.
+     */
     @Transactional
     public RegulationVersionResponse publishVersion(UUID versionId, User publisher) {
         assertSpecialist(publisher);
@@ -82,10 +93,10 @@ public class RegulationService {
                 .orElseThrow(() -> ResourceNotFoundException.of("RegulationVersion", versionId));
 
         if (version.getStatus() != CatalogStatus.DRAFT) {
-            throw new BusinessException("Chỉ có thể xuất bản phiên bản đang ở trạng thái DRAFT.");
+            throw new BusinessException("Only draft regulation versions can be published.");
         }
 
-        // Đánh dấu các bản PUBLISHED trước đó thành RETIRED
+        // Retire previously published versions for this catalog
         List<RegulationVersion> activeVersions = versionRepository
                 .findByCatalogIdAndStatusOrdered(version.getCatalog().getId(), CatalogStatus.PUBLISHED);
         for (RegulationVersion v : activeVersions) {
@@ -98,18 +109,32 @@ public class RegulationService {
         version.setPublishedBy(publisher);
 
         RegulationVersion saved = versionRepository.save(version);
+
+        // Record audit decision (BR-F1-08)
+        String catalogName = version.getCatalog() != null ? version.getCatalog().getName() : "Regulation Catalog";
+        auditService.recordDecision(
+                publisher,
+                "CATALOG_PUBLISHED",
+                String.format("Published %s version %d.", catalogName, version.getVersionNo()),
+                "REGULATION_VERSION",
+                saved.getId(),
+                "CATALOG-" + version.getVersionNo(),
+                null,
+                "DRAFT",
+                "PUBLISHED");
+
         return getVersionDetails(saved.getId());
     }
 
     private void assertSpecialist(User user) {
         if (user == null || user.getRoles() == null) {
-            throw new BusinessException("Yêu cầu đăng nhập.");
+            throw new UnauthorizedException("Authentication is required.");
         }
         boolean hasPerm = user.getRoles().stream()
                 .map(Role::getName)
-                .anyMatch(r -> RoleName.TRANSPORT_SPECIALIST.equals(r) || RoleName.LOGISTICS_MANAGER.equals(r));
+                .anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
         if (!hasPerm) {
-            throw new BusinessException("Chỉ Chuyên viên thủ tục hoặc Quản lý Logistics mới có quyền thực hiện.");
+            throw new UnauthorizedException("Only Transport Specialists are authorized to manage regulation catalogs.");
         }
     }
 }

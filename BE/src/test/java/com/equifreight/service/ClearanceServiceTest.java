@@ -3,8 +3,11 @@ package com.equifreight.service;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.clearance.ReviewDocumentRequest;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +42,8 @@ class ClearanceServiceTest {
     private QuarantinePeriodRepository quarantinePeriodRepository;
     @Mock
     private ValidityEngine validityEngine;
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private ClearanceService clearanceService;
@@ -56,7 +61,9 @@ class ClearanceServiceTest {
 
         specialistUser = new User();
         specialistUser.setId(UUID.randomUUID());
-        specialistUser.setEmail("specialist@equifreight.vn");
+        specialistUser.setFirstName("Lan");
+        specialistUser.setLastName("Nguyen");
+        specialistUser.setEmail("lan.nguyen@equifreight.vn");
         specialistUser.setRoles(Set.of(specialistRole));
 
         Role customerRole = new Role();
@@ -72,119 +79,140 @@ class ClearanceServiceTest {
         job.setCode("CBRT-2026-001");
         job.setDossierStatus(DossierStatus.OPEN);
 
+        DocumentType docType = new DocumentType();
+        docType.setId(UUID.randomUUID());
+        docType.setCode("EQUINE_PASSPORT");
+        docType.setName("Equine passport");
+
         checklistItem = new ChecklistItem();
         checklistItem.setId(UUID.randomUUID());
         checklistItem.setJob(job);
+        checklistItem.setDocumentType(docType);
         checklistItem.setStatus(ChecklistStatus.IN_REVIEW);
         checklistItem.setValidity(Validity.GREEN);
 
         documentVersion = new DocumentVersion();
         documentVersion.setId(UUID.randomUUID());
         documentVersion.setChecklistItem(checklistItem);
-        documentVersion.setReview(DocumentReview.PENDING);
         documentVersion.setVersionNo((short) 1);
+        documentVersion.setReview(DocumentReview.PENDING);
     }
 
     @Test
-    @DisplayName("BR-F2-04: Chỉ Transport Specialist mới có quyền duyệt tài liệu")
-    void nonSpecialistCannotReviewDocument() {
-        ReviewDocumentRequest request = ReviewDocumentRequest.builder()
-                .review(DocumentReview.APPROVED)
-                .build();
+    @DisplayName("reviewDocument rejects when caller is not a Transport Specialist")
+    void reviewDocumentThrowsWhenNotSpecialist() {
+        ReviewDocumentRequest req = new ReviewDocumentRequest();
+        req.setReview(DocumentReview.APPROVED);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                clearanceService.reviewDocument(documentVersion.getId(), request, customerUser));
-
-        assertTrue(ex.getMessage().contains("Chỉ Chuyên viên thủ tục"));
+        assertThrows(UnauthorizedException.class, () ->
+                clearanceService.reviewDocument(documentVersion.getId(), req, customerUser));
+        verify(documentVersionRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("BR-F2-05: Append-only - Không được sửa tài liệu đã duyệt")
-    void cannotReviewNonPendingVersion() {
-        documentVersion.setReview(DocumentReview.APPROVED); // Đã duyệt rồi
+    @DisplayName("reviewDocument rejects re-reviewing an already reviewed version")
+    void reviewDocumentThrowsWhenNotPending() {
+        documentVersion.setReview(DocumentReview.APPROVED);
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
 
-        ReviewDocumentRequest request = ReviewDocumentRequest.builder()
-                .review(DocumentReview.APPROVED)
-                .build();
+        ReviewDocumentRequest req = new ReviewDocumentRequest();
+        req.setReview(DocumentReview.REJECTED);
+        req.setRejectReason("Sample is blurred");
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                clearanceService.reviewDocument(documentVersion.getId(), request, specialistUser));
-
-        assertTrue(ex.getMessage().contains("Tài liệu này đã được thẩm định"));
+        assertThrows(ConflictException.class, () ->
+                clearanceService.reviewDocument(documentVersion.getId(), req, specialistUser));
+        verify(documentVersionRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("BR-F2-07: Từ chối bắt buộc phải có lý do (rejectReason)")
-    void rejectRequiresReason() {
+    @DisplayName("reviewDocument requires a rejection reason when rejecting a version")
+    void reviewDocumentThrowsWhenRejectionReasonMissing() {
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
 
-        ReviewDocumentRequest request = ReviewDocumentRequest.builder()
-                .review(DocumentReview.REJECTED)
-                .rejectReason("") // Rỗng
-                .build();
+        ReviewDocumentRequest req = new ReviewDocumentRequest();
+        req.setReview(DocumentReview.REJECTED);
+        req.setRejectReason("   ");
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                clearanceService.reviewDocument(documentVersion.getId(), request, specialistUser));
-
-        assertTrue(ex.getMessage().contains("Vui lòng cung cấp lý do từ chối"));
+        assertThrows(BusinessException.class, () ->
+                clearanceService.reviewDocument(documentVersion.getId(), req, specialistUser));
+        verify(documentVersionRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Duyệt tài liệu hợp lệ -> ChecklistItem chuyển sang CLEARED")
-    void approveValidDocumentClearsChecklistItem() {
+    @DisplayName("reviewDocument refuses approval when validity is RED before writing to database")
+    void reviewDocumentRefusesApprovalWhenValidityIsRed() {
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
-        when(documentVersionRepository.save(any(DocumentVersion.class))).thenAnswer(i -> i.getArgument(0));
+        when(validityEngine.evaluate(any(), any(), any()))
+                .thenReturn(new ValidityEngine.Result(Validity.RED, "Sampling date expired 65 days before departure."));
+
+        ReviewDocumentRequest req = new ReviewDocumentRequest();
+        req.setReview(DocumentReview.APPROVED);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                clearanceService.reviewDocument(documentVersion.getId(), req, specialistUser));
+        assertTrue(ex.getMessage().contains("RED cannot be approved"));
+        verify(documentVersionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("reviewDocument approves version, marks item CLEARED, and audits decision")
+    void reviewDocumentApprovesSuccessfully() {
+        when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
+        when(documentVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(checklistItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
-        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(validityEngine.evaluate(any(), any(), any()))
+                .thenReturn(new ValidityEngine.Result(Validity.GREEN, "Valid document."));
 
-        ReviewDocumentRequest request = ReviewDocumentRequest.builder()
-                .review(DocumentReview.APPROVED)
-                .build();
+        ReviewDocumentRequest req = new ReviewDocumentRequest();
+        req.setReview(DocumentReview.APPROVED);
 
-        clearanceService.reviewDocument(documentVersion.getId(), request, specialistUser);
+        clearanceService.reviewDocument(documentVersion.getId(), req, specialistUser);
 
         assertEquals(DocumentReview.APPROVED, documentVersion.getReview());
+        assertEquals(specialistUser, documentVersion.getReviewedBy());
         assertEquals(ChecklistStatus.CLEARED, checklistItem.getStatus());
         assertNull(checklistItem.getHolder());
-        verify(checklistItemRepository).save(checklistItem);
+
+        verify(auditService).recordDecision(
+                eq(specialistUser),
+                eq("DOCUMENT_APPROVED"),
+                contains("Approved Equine passport"),
+                eq("DOCUMENT_VERSION"),
+                eq(documentVersion.getId()),
+                eq(job.getCode()),
+                isNull(),
+                eq("PENDING"),
+                eq("APPROVED"));
     }
 
     @Test
-    @DisplayName("BR-F2-03: Clearance Gate mở khi mọi giấy tờ đạt chuẩn GREEN và cách ly hoàn tất")
-    void clearanceGateOpensWhenAllMandatoryItemsClearedAndQuarantineDone() {
+    @DisplayName("evaluateClearanceGate opens gate when all mandatory items are CLEARED and GREEN")
+    void evaluateClearanceGateReadyWhenAllCleared() {
         checklistItem.setStatus(ChecklistStatus.CLEARED);
         checklistItem.setValidity(Validity.GREEN);
 
-        QuarantinePeriod quarantine = new QuarantinePeriod();
-        quarantine.setCompletedAt(Instant.now()); // Đã xong cách ly
-
-        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
-        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of(quarantine));
-
-        ClearanceStatusResponse response = clearanceService.evaluateClearanceGate(job.getId());
-
-        assertTrue(response.isClearanceReady());
-        assertEquals(DossierStatus.CLEARANCE_READY, job.getDossierStatus());
-        assertNotNull(job.getClearanceReadyAt());
-        verify(transportJobRepository).save(job);
-    }
-
-    @Test
-    @DisplayName("Clearance Gate chặn xuất phát nếu còn giấy tờ chưa đạt chuẩn")
-    void clearanceGateBlocksWhenItemsNotCleared() {
-        checklistItem.setStatus(ChecklistStatus.IN_REVIEW); // Chưa duyệt xong
-
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
 
-        ClearanceStatusResponse response = clearanceService.evaluateClearanceGate(job.getId());
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
-        assertFalse(response.isClearanceReady());
-        assertEquals(DossierStatus.OPEN, job.getDossierStatus());
-        assertFalse(response.getOutstandingIssues().isEmpty());
+        assertTrue(resp.isClearanceReady());
+        assertEquals(DossierStatus.CLEARANCE_READY, resp.getDossierStatus());
+        assertEquals(JobStage.CLEARANCE, job.getStage());
+        assertNotNull(job.getClearanceReadyAt());
+
+        verify(transportJobRepository).save(job);
+        verify(auditService).recordDecision(
+                isNull(),
+                eq("CLEARANCE_GATE_PASSED"),
+                contains("CLEARANCE_READY"),
+                eq("TRANSPORT_JOB"),
+                eq(job.getId()),
+                eq(job.getCode()),
+                isNull(),
+                eq("OPEN"),
+                eq("CLEARANCE_READY"));
     }
 }

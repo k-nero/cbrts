@@ -1,568 +1,621 @@
-import { FC, useEffect, useState, useMemo } from 'react';
-import { Flex, Input, Modal, Form, Select, Alert, Spin, Tag, message } from 'antd';
-import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
-  FileDoneOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
-
+import { useState, type ChangeEvent, type FC } from 'react';
+import { Alert, Empty, Input, Modal, Spin } from 'antd';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
+import { Callout } from '@/components/ui/Callout';
+import { Chip } from '@/components/ui/Chip';
 import { ClearanceGate } from '@/components/ui/ClearanceGate';
 import { DocumentRow, type DocumentStatus } from '@/components/ui/DocumentRow';
 import { StatTile } from '@/components/ui/StatTile';
-import { clearanceApi } from '@/apis/clearance';
-import type {
-  ChecklistItem,
-  ClearanceStatus,
-  DocumentVersion,
-  ReviewDocumentRequest,
-  DocumentUploadRequest,
-} from '@/interfaces';
+import { fileApi } from '@/apis/file';
+import {
+  useClearanceStatus,
+  useEvaluateClearanceGate,
+  useJobChecklist,
+  usePendingReviews,
+  useReviewDocument,
+  useUploadDocumentVersion,
+} from '@/hooks/clearance';
+import type { ChecklistItem, DocumentReview, DocumentVersion } from '@/interfaces';
 
-// Default mock Job ID for local exploration if no job is selected yet
-const DEFAULT_JOB_ID = '00000000-0000-0000-0000-000000000001';
+function mapToRowStatus(item: ChecklistItem): DocumentStatus {
+  if (item.status === 'CLEARED') return 'cleared';
+  if (item.validity === 'RED') return 'red';
+  if (item.validity === 'AMBER') return 'amber';
+  if (item.status === 'IN_REVIEW') return 'review';
+  return 'required';
+}
 
 const DocumentsPage: FC = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>('pending');
-  const [jobId, setJobId] = useState<string>(DEFAULT_JOB_ID);
-  const [jobCodeInput, setJobCodeInput] = useState<string>('CBRT-2026-001');
+  const [selectedJobId, setSelectedJobId] = useState<string>('job-1');
+  const [searchInput, setSearchInput] = useState<string>('job-1');
 
-  // Data states
-  const [pendingReviews, setPendingReviews] = useState<DocumentVersion[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [clearanceStatus, setClearanceStatus] = useState<ClearanceStatus | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [gateEvaluating, setGateEvaluating] = useState<boolean>(false);
+  // Review modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<DocumentVersion | null>(null);
+  const [reviewDecision, setReviewDecision] = useState<DocumentReview>('APPROVED');
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
-  // Review Modal state
-  const [reviewingVersion, setReviewingVersion] = useState<DocumentVersion | null>(null);
-  const [reviewForm] = Form.useForm<ReviewDocumentRequest>();
-  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
+  // Upload modal state
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedChecklistItem, setSelectedChecklistItem] = useState<ChecklistItem | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [issuedOn, setIssuedOn] = useState('');
+  const [validUntil, setValidUntil] = useState('');
+  const [issuer, setIssuer] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Upload Modal state
-  const [uploadingItem, setUploadingItem] = useState<ChecklistItem | null>(null);
-  const [uploadForm] = Form.useForm<DocumentUploadRequest>();
-  const [submittingUpload, setSubmittingUpload] = useState<boolean>(false);
+  // Queries (TanStack Query, zero useEffect)
+  const {
+    data: pendingReviews = [],
+    isLoading: pendingLoading,
+    isError: pendingError,
+    refetch: refetchPending,
+  } = usePendingReviews();
 
-  // Load Pending Reviews
-  const fetchPendingReviews = async () => {
+  const {
+    data: checklist = [],
+    isLoading: checklistLoading,
+    isError: checklistError,
+    refetch: refetchChecklist,
+  } = useJobChecklist(selectedJobId);
+
+  const {
+    data: statusData,
+    isLoading: statusLoading,
+    refetch: refetchStatus,
+  } = useClearanceStatus(selectedJobId);
+
+  // Mutations
+  const reviewMutation = useReviewDocument(selectedJobId);
+  const uploadMutation = useUploadDocumentVersion(selectedJobId);
+  const evaluateGateMutation = useEvaluateClearanceGate(selectedJobId);
+
+  const openReviewModal = (version: DocumentVersion) => {
+    setSelectedVersion(version);
+    setReviewDecision('APPROVED');
+    setRejectReason('');
+    setReviewError(null);
+    setReviewModalOpen(true);
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!selectedVersion) return;
+    if (reviewDecision === 'REJECTED' && !rejectReason.trim()) {
+      setReviewError('A reason is strictly required when rejecting a document.');
+      return;
+    }
+    setReviewError(null);
     try {
-      setLoading(true);
-      const res = await clearanceApi.getPendingReviews();
-      setPendingReviews(res.data);
-    } catch {
-      // Graceful fallback for mock/demo mode
-      setPendingReviews([]);
-    } finally {
-      setLoading(false);
+      await reviewMutation.mutateAsync({
+        versionId: selectedVersion.id,
+        data: {
+          review: reviewDecision,
+          rejectReason: reviewDecision === 'REJECTED' ? rejectReason.trim() : undefined,
+        },
+      });
+      setReviewModalOpen(false);
+      setSelectedVersion(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to submit review decision.';
+      setReviewError(msg);
     }
   };
 
-  // Load Checklist & Clearance Status for the current job
-  const fetchJobData = async (targetJobId: string) => {
-    try {
-      setLoading(true);
-      const [checklistRes, statusRes] = await Promise.allSettled([
-        clearanceApi.getChecklist(targetJobId),
-        clearanceApi.getClearanceStatus(targetJobId),
-      ]);
+  const openUploadModal = (item: ChecklistItem) => {
+    setSelectedChecklistItem(item);
+    setUploadFile(null);
+    setIssuedOn('');
+    setValidUntil('');
+    setIssuer('');
+    setUploadError(null);
+    setUploadModalOpen(true);
+  };
 
-      if (checklistRes.status === 'fulfilled') {
-        setChecklist(checklistRes.value.data);
-      } else {
-        setChecklist([]);
-      }
-
-      if (statusRes.status === 'fulfilled') {
-        setClearanceStatus(statusRes.value.data);
-      } else {
-        setClearanceStatus(null);
-      }
-    } finally {
-      setLoading(false);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setUploadFile(e.target.files[0]);
     }
   };
 
-  useEffect(() => {
-    void fetchPendingReviews();
-    void fetchJobData(jobId);
-  }, [jobId]);
+  const handleUploadSubmit = async () => {
+    if (!selectedChecklistItem) return;
+    if (!uploadFile) {
+      setUploadError('Please choose a file to upload.');
+      return;
+    }
+    setUploadError(null);
+    setUploadingFile(true);
+    try {
+      // 1. Upload file to /api/v1/files (PR #79)
+      const stored = await fileApi.upload(uploadFile);
 
-  // Handle Clearance Gate re-evaluation
+      // 2. Attach fileId to document version
+      await uploadMutation.mutateAsync({
+        checklistItemId: selectedChecklistItem.id,
+        data: {
+          fileId: stored.id,
+          issuedOn: issuedOn.trim() || undefined,
+          validUntil: validUntil.trim() || undefined,
+          issuer: issuer.trim() || undefined,
+        },
+      });
+      setUploadModalOpen(false);
+      setSelectedChecklistItem(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload document version.';
+      setUploadError(msg);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const handleEvaluateGate = async () => {
+    if (!selectedJobId) return;
     try {
-      setGateEvaluating(true);
-      const res = await clearanceApi.evaluateClearanceGate(jobId);
-      setClearanceStatus(res.data);
-      if (res.data.clearanceReady) {
-        message.success('Cổng thông quan đã MỞ (Clear to depart)!');
-      } else {
-        message.warning('Chuyến đi chưa đủ điều kiện thông quan. Vui lòng kiểm tra các mục còn thiếu.');
-      }
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      message.error(e?.response?.data?.message || 'Không thể kiểm tra cổng thông quan.');
-    } finally {
-      setGateEvaluating(false);
+      await evaluateGateMutation.mutateAsync(selectedJobId);
+    } catch {
+      // error handled by mutation state
     }
   };
-
-  // Handle Review submission (Approve / Reject)
-  const handleReviewSubmit = async (values: ReviewDocumentRequest) => {
-    if (!reviewingVersion) return;
-    try {
-      setSubmittingReview(true);
-      await clearanceApi.reviewDocument(reviewingVersion.id, values);
-      message.success(`Đã thẩm định tài liệu thành công: ${values.review}`);
-      setReviewingVersion(null);
-      reviewForm.resetFields();
-      void fetchPendingReviews();
-      void fetchJobData(jobId);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      message.error(e?.response?.data?.message || 'Lỗi khi duyệt tài liệu.');
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
-
-  // Handle Upload submission
-  const handleUploadSubmit = async (values: DocumentUploadRequest) => {
-    if (!uploadingItem) return;
-    try {
-      setSubmittingUpload(true);
-      await clearanceApi.uploadDocumentVersion(uploadingItem.id, values);
-      message.success('Đã tải lên phiên bản mới thành công!');
-      setUploadingItem(null);
-      uploadForm.resetFields();
-      void fetchJobData(jobId);
-      void fetchPendingReviews();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      message.error(e?.response?.data?.message || 'Lỗi khi tải lên tài liệu.');
-    } finally {
-      setSubmittingUpload(false);
-    }
-  };
-
-  // Map Checklist item to DocumentRow status
-  const mapItemStatus = (item: ChecklistItem): DocumentStatus => {
-    if (item.status === 'CLEARED') return 'cleared';
-    if (item.validity === 'RED') return 'red';
-    if (item.validity === 'AMBER') return 'amber';
-    if (item.status === 'IN_REVIEW') return 'review';
-    return 'required';
-  };
-
-  // Calculate metrics
-  const stats = useMemo(() => {
-    const total = checklist.length;
-    const cleared = checklist.filter((i) => i.status === 'CLEARED').length;
-    const inReview = checklist.filter((i) => i.status === 'IN_REVIEW').length;
-    const issues = checklist.filter((i) => i.validity === 'RED' || i.validity === 'AMBER').length;
-    return { total, cleared, inReview, issues };
-  }, [checklist]);
 
   return (
-    <Flex vertical gap={28} className="max-w-[1240px] pb-16">
+    <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
       <PageHeader
-        title="Documents & Clearance"
-        summary="Chuyên viên Thủ tục & Kiểm dịch: thẩm định hồ sơ y tế, tiêm chủng, hộ chiếu và kiểm tra tính hợp lệ trước khi cấp phép xuất cảnh."
+        title="Clearance & Document Management"
+        summary="Transport Specialist dossier review, document validity verification, and clearance gate evaluation."
         right={
-          <Flex gap={8}>
+          <div className="flex items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
-              leadingIcon="history"
               onClick={() => {
-                void fetchPendingReviews();
-                void fetchJobData(jobId);
+                void refetchPending();
+                if (selectedJobId) {
+                  void refetchChecklist();
+                  void refetchStatus();
+                }
               }}
             >
-              Làm mới
+              Refresh
             </Button>
-          </Flex>
+          </div>
         }
       />
 
-      {/* Clearance Gate Section */}
-      <ClearanceGate
-        state={clearanceStatus?.clearanceReady ? 'clear' : 'locked'}
-        title={
-          clearanceStatus?.clearanceReady
-            ? `Cổng thông quan ĐÃ MỞ (Job ${clearanceStatus.jobCode ?? jobCodeInput})`
-            : `Cổng thông quan ĐANG KHÓA (Job ${clearanceStatus?.jobCode ?? jobCodeInput})`
-        }
-        action={
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={gateEvaluating}
-            onClick={handleEvaluateGate}
-          >
-            <ReloadOutlined spin={gateEvaluating} className="mr-1" /> Kiểm tra lại cổng
-          </Button>
-        }
-      >
-        {clearanceStatus?.clearanceReady ? (
-          'Tất cả giấy tờ kiểm dịch bắt buộc đã đạt chuẩn GREEN và thời gian cách ly kiểm dịch hoàn tất. Chuyến xe được phép xuất phát.'
-        ) : clearanceStatus?.outstandingIssues && clearanceStatus.outstandingIssues.length > 0 ? (
-          <ul className="m-0 list-disc pl-4 text-[13px] text-bad">
-            {clearanceStatus.outstandingIssues.map((issue, idx) => (
-              <li key={idx}>{issue}</li>
-            ))}
-          </ul>
-        ) : (
-          'Còn các giấy tờ pháp lý cần chuyên viên kiểm tra và phê duyệt trước khi mở cổng khởi hành.'
-        )}
-      </ClearanceGate>
-
-      {/* KPI Stat Tiles */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile
-          tone="neutral"
-          value={stats.total}
-          label="Tổng giấy tờ yêu cầu"
-          lead={`Chuyến đi: ${clearanceStatus?.jobCode ?? jobCodeInput}`}
-        />
-        <StatTile
-          tone="ok"
-          value={stats.cleared}
-          label="Đã thông quan (Cleared)"
-          lead={`${stats.cleared}/${stats.total} mục đạt chuẩn`}
-        />
-        <StatTile
-          tone="info"
-          value={pendingReviews.length}
-          label="Đang chờ chuyên viên duyệt"
-          lead="Trong hộp thư kiểm duyệt"
-          onClick={() => setActiveTab('pending')}
-        />
-        <StatTile
-          tone={stats.issues > 0 ? 'bad' : 'neutral'}
-          value={stats.issues}
-          label="Cảnh báo hạn / Vi phạm"
-          lead={stats.issues > 0 ? 'Cần bổ sung/cấp lại' : 'Không có vi phạm'}
-        />
-      </div>
-
-      {/* Tabs navigation */}
-      <Flex gap={12} className="border-b border-line pb-2">
+      {/* Navigation tabs */}
+      <div className="flex border-b border-line gap-4">
         <button
           type="button"
           onClick={() => setActiveTab('pending')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-[14px] font-medium transition-colors ${
+          className={`pb-3 type-label-m flex items-center gap-2 border-b-2 font-medium transition-colors ${
             activeTab === 'pending'
-              ? 'border-gold text-ink'
-              : 'border-transparent text-ink-3 hover:text-ink'
+              ? 'border-ink text-ink font-semibold'
+              : 'border-transparent text-ink-3 hover:text-ink-2'
           }`}
         >
-          <ClockCircleOutlined className="mr-2" />
-          Hộp thư chờ duyệt ({pendingReviews.length})
+          <span>Pending Reviews</span>
+          {pendingReviews.length > 0 && (
+            <Chip tone="warn">
+              {pendingReviews.length}
+            </Chip>
+          )}
         </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('checklist')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-[14px] font-medium transition-colors ${
+          className={`pb-3 type-label-m flex items-center gap-2 border-b-2 font-medium transition-colors ${
             activeTab === 'checklist'
-              ? 'border-gold text-ink'
-              : 'border-transparent text-ink-3 hover:text-ink'
+              ? 'border-ink text-ink font-semibold'
+              : 'border-transparent text-ink-3 hover:text-ink-2'
           }`}
         >
-          <FileDoneOutlined className="mr-2" />
-          Checklist hồ sơ theo Chuyến ({checklist.length})
+          <span>Job Dossier & Clearance Gate</span>
         </button>
-      </Flex>
+      </div>
 
-      {/* Tab 1: Pending Reviews Inbox */}
+      {/* Tab 1: Pending Reviews */}
       {activeTab === 'pending' && (
-        <Flex vertical gap={16}>
-          <Flex justify="space-between" align="center">
-            <span className="type-h3 text-ink">Danh sách chứng từ cần thẩm định</span>
-            <span className="text-[13px] text-ink-3">
-              Chỉ Chuyên viên thủ tục mới có quyền phê duyệt hoặc từ chối
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="type-h3 text-ink">Review Inbox</h2>
+              <p className="type-body-s text-ink-3">
+                Exclusively reviewed by Transport Specialist. Approvals are blocked if document validity is RED.
+              </p>
+            </div>
+            <span className="type-caption text-ink-3">
+              {pendingReviews.length} {pendingReviews.length === 1 ? 'document' : 'documents'} pending review
             </span>
-          </Flex>
+          </div>
 
-          {loading ? (
-            <Flex justify="center" className="py-10">
-              <Spin tip="Đang tải danh sách chờ duyệt..." />
-            </Flex>
-          ) : pendingReviews.length === 0 ? (
+          {pendingLoading && (
+            <div className="flex justify-center p-12">
+              <Spin size="large" />
+            </div>
+          )}
+
+          {pendingError && (
             <Alert
-              type="success"
+              type="error"
+              message="Failed to load pending reviews"
+              description="Please ensure you have Transport Specialist role and valid session."
               showIcon
-              message="Hộp thư kiểm duyệt trống"
-              description="Hiện không có phiên bản tài liệu nào đang chờ duyệt. Tất cả hồ sơ đã được xử lý."
             />
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-line bg-card">
-              {pendingReviews.map((ver) => (
-                <div
-                  key={ver.id}
-                  className="flex flex-col gap-3 border-b border-line p-5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <Flex vertical gap={4} className="flex-1">
-                    <Flex gap={8} align="center">
-                      <Tag color="processing">v{ver.versionNo}</Tag>
-                      <span className="font-semibold text-ink">
-                        {ver.fileName || 'Tài liệu đính kèm'}
-                      </span>
-                      {ver.issuer && <span className="text-ink-3">· Cấp bởi: {ver.issuer}</span>}
-                    </Flex>
-                    <div className="text-[13px] text-ink-2">
-                      {ver.sampledOn && <span>Lấy mẫu: {ver.sampledOn} | </span>}
-                      {ver.issuedOn && <span>Cấp ngày: {ver.issuedOn} | </span>}
-                      {ver.validUntil && <span>Hết hạn: {ver.validUntil}</span>}
-                    </div>
-                    <span className="text-[12px] text-ink-3">
-                      Tải lên bởi: {ver.uploadedByName ?? 'Khách hàng'} (
-                      {new Date(ver.uploadedAt).toLocaleString('vi-VN')})
-                    </span>
-                  </Flex>
+          )}
 
-                  <Flex gap={8} align="center">
+          {!pendingLoading && !pendingError && pendingReviews.length === 0 && (
+            <div className="rounded-lg border border-line bg-card p-12 text-center">
+              <Empty
+                description="No pending reviews at this time. All documents are up to date."
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            </div>
+          )}
+
+          {!pendingLoading && pendingReviews.length > 0 && (
+            <div className="rounded-lg border border-line bg-card overflow-hidden divide-y divide-line">
+              {pendingReviews.map((v) => (
+                <div key={v.id} className="p-4 flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="type-label-m text-ink font-medium">{v.fileName}</span>
+                      <Chip tone="info">v{v.versionNo}</Chip>
+                      <Chip tone="warn">PENDING REVIEW</Chip>
+                    </div>
+                    <div className="type-body-s text-ink-3 flex items-center gap-3">
+                      {v.uploadedByName && <span>Uploaded by: {v.uploadedByName}</span>}
+                      {v.validUntil && <span>Valid until: {v.validUntil}</span>}
+                      {v.issuer && <span>Issuer: {v.issuer}</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={fileApi.getContentUrl(v.fileId, true)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="type-label-s px-3 py-1.5 rounded border border-line hover:bg-surface text-ink-2"
+                    >
+                      View File
+                    </a>
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => {
-                        setReviewingVersion(ver);
-                        reviewForm.setFieldsValue({ review: 'APPROVED' });
-                      }}
+                      onClick={() => openReviewModal(v)}
                     >
-                      <CheckCircleOutlined className="mr-1" /> Duyệt đạt
+                      Review
                     </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => {
-                        setReviewingVersion(ver);
-                        reviewForm.setFieldsValue({ review: 'REJECTED' });
-                      }}
-                    >
-                      <ExclamationCircleOutlined className="mr-1" /> Từ chối
-                    </Button>
-                  </Flex>
+                  </div>
                 </div>
               ))}
             </div>
           )}
-        </Flex>
+        </div>
       )}
 
-      {/* Tab 2: Job Checklist */}
+      {/* Tab 2: Job Clearance Checklist & Gate */}
       {activeTab === 'checklist' && (
-        <Flex vertical gap={16}>
-          <Flex gap={16} align="end" wrap="wrap">
-            <Flex vertical gap={4}>
-              <label htmlFor="job-id-input" className="text-[13px] text-ink-2">
-                Mã chuyến đi (Job Code / ID)
-              </label>
-              <Input
-                id="job-id-input"
-                value={jobCodeInput}
-                onChange={(e) => setJobCodeInput(e.target.value)}
-                placeholder="VD: CBRT-2026-001"
-                style={{ width: 280 }}
-              />
-            </Flex>
+        <div className="flex flex-col gap-6">
+          {/* Job Search bar */}
+          <div className="flex items-center gap-3 p-4 rounded-lg border border-line bg-card">
+            <span className="type-label-s text-ink-2 shrink-0">Job Identifier:</span>
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="e.g. job-1"
+              className="max-w-xs"
+              onPressEnter={() => setSelectedJobId(searchInput.trim())}
+            />
             <Button
               variant="secondary"
-              onClick={() => {
-                setJobId(jobCodeInput);
-                void fetchJobData(jobCodeInput);
-              }}
+              size="sm"
+              onClick={() => setSelectedJobId(searchInput.trim())}
             >
-              Xem Checklist
+              Load Job Dossier
             </Button>
-          </Flex>
+          </div>
 
-          {loading ? (
-            <Flex justify="center" className="py-10">
-              <Spin tip="Đang tải danh mục checklist..." />
-            </Flex>
-          ) : checklist.length === 0 ? (
-            <Alert
-              type="info"
-              showIcon
-              message="Chưa có dữ liệu checklist cho chuyến đi này"
-              description="Hãy kiểm tra lại mã chuyến đi (Job ID/Code) hoặc tạo mới một chuyến đi đã được phê duyệt."
-            />
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-line bg-card">
-              {checklist.map((item) => (
-                <DocumentRow
-                  key={item.id}
-                  status={mapItemStatus(item)}
-                  document={
-                    <span>
-                      {item.documentTypeName}{' '}
-                      {item.horseName && (
-                        <span className="font-normal text-ink-3">({item.horseName})</span>
-                      )}
-                    </span>
-                  }
-                  rule={
-                    item.ruleDescription ||
-                    `Quy tắc: ${item.ruleKind ?? 'PRESENCE_ONLY'} (${item.mandatory ? 'Bắt buộc' : 'Tùy chọn'})`
-                  }
-                  result={item.validityNote || 'Chưa kiểm tra'}
-                  holder={item.holder ? `Bên giữ: ${item.holder}` : undefined}
-                  version={
-                    item.currentVersion ? (
-                      `v${item.currentVersion.versionNo} · ${new Date(
-                        item.currentVersion.uploadedAt,
-                      ).toLocaleDateString('vi-VN')}`
-                    ) : (
-                      <span className="text-bad">Chưa nộp</span>
-                    )
-                  }
-                  actions={
-                    <Flex gap={6}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setUploadingItem(item);
-                          uploadForm.resetFields();
-                        }}
-                      >
-                        <UploadOutlined /> Nộp bản mới
-                      </Button>
-                      {item.currentVersion && item.currentVersion.review === 'PENDING' && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => {
-                            setReviewingVersion(item.currentVersion ?? null);
-                            reviewForm.setFieldsValue({ review: 'APPROVED' });
-                          }}
-                        >
-                          Duyệt
-                        </Button>
-                      )}
-                    </Flex>
-                  }
-                />
-              ))}
+          {/* Clearance Gate Component */}
+          {statusData && (
+            <ClearanceGate
+              state={statusData.clearanceReady ? 'clear' : 'locked'}
+              title={statusData.clearanceReady ? 'Clear to depart' : 'Departure locked'}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={evaluateGateMutation.isPending}
+                  onClick={handleEvaluateGate}
+                >
+                  {evaluateGateMutation.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
+                </Button>
+              }
+            >
+              {statusData.clearanceReady
+                ? 'All mandatory documents are GREEN, approved, and quarantines are fulfilled.'
+                : `${statusData.clearedMandatoryItems}/${statusData.mandatoryItems} mandatory documents cleared. ${statusData.outstandingIssues.length} outstanding issues.`}
+            </ClearanceGate>
+          )}
+
+          {/* Stat Tiles */}
+          {statusData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatTile
+                tone="neutral"
+                label="Total Items"
+                value={statusData.totalChecklistItems}
+              />
+              <StatTile
+                tone="ok"
+                label="Cleared Items"
+                value={statusData.clearedMandatoryItems}
+              />
+              <StatTile
+                tone="warn"
+                label="Mandatory Remaining"
+                value={Math.max(0, statusData.mandatoryItems - statusData.clearedMandatoryItems)}
+              />
+              <StatTile
+                tone={statusData.outstandingIssues.length > 0 ? 'bad' : 'ok'}
+                label="Outstanding Issues"
+                value={statusData.outstandingIssues.length}
+              />
             </div>
           )}
-        </Flex>
+
+          {/* Outstanding issues callout */}
+          {statusData && statusData.outstandingIssues.length > 0 && (
+            <Callout
+              tone="bad"
+              title="Outstanding Clearance Blockers"
+            >
+              <ul className="list-disc list-inside space-y-1 mt-1 text-ink-2">
+                {statusData.outstandingIssues.map((issue, idx) => (
+                  <li key={idx}>{issue}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+
+          {/* Checklist table */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h3 className="type-h3 text-ink">Job Document Checklist</h3>
+              <span className="type-caption text-ink-3">
+                {checklist.length} items configured
+              </span>
+            </div>
+
+            {checklistLoading && (
+              <div className="flex justify-center p-12">
+                <Spin size="large" />
+              </div>
+            )}
+
+            {checklistError && (
+              <Alert
+                type="error"
+                message="Failed to load job checklist"
+                description="Check the Job ID or your permissions."
+                showIcon
+              />
+            )}
+
+            {!checklistLoading && !checklistError && checklist.length === 0 && (
+              <div className="rounded-lg border border-line bg-card p-12 text-center">
+                <Empty description="No checklist items found for this job." />
+              </div>
+            )}
+
+            {!checklistLoading && checklist.length > 0 && (
+              <div className="rounded-lg border border-line bg-card overflow-hidden">
+                {checklist.map((item) => (
+                  <DocumentRow
+                    key={item.id}
+                    status={mapToRowStatus(item)}
+                    statusLabel={item.status === 'REJECTED' ? 'Rejected' : undefined}
+                    document={
+                      <div className="flex items-center gap-2">
+                        <span>{item.documentTypeName || item.documentTypeCode}</span>
+                        {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
+                        {item.horseName && <span className="text-xs text-ink-3">({item.horseName})</span>}
+                      </div>
+                    }
+                    rule={item.ruleDescription || 'Standard validity validation'}
+                    result={
+                      item.validityNote ||
+                      (item.status === 'AWAITING_UPLOAD' ? 'Not uploaded yet' : undefined)
+                    }
+                    holder={item.holder ? `With ${item.holder.toLowerCase()}` : undefined}
+                    version={
+                      item.currentVersion
+                        ? `v${item.currentVersion.versionNo} · ${item.currentVersion.fileName}`
+                        : 'No version'
+                    }
+                    actions={
+                      <div className="flex items-center gap-2">
+                        {item.currentVersion && (
+                          <a
+                            href={fileApi.getContentUrl(item.currentVersion.fileId, true)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="type-label-s px-2.5 py-1 rounded border border-line hover:bg-surface text-ink-2 text-xs"
+                          >
+                            View
+                          </a>
+                        )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openUploadModal(item)}
+                        >
+                          Upload
+                        </Button>
+                      </div>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Modal Duyệt Hồ Sơ */}
+      {/* Review Modal */}
       <Modal
-        title={`Thẩm định hồ sơ (v${reviewingVersion?.versionNo})`}
-        open={Boolean(reviewingVersion)}
-        onCancel={() => setReviewingVersion(null)}
-        footer={null}
-        destroyOnClose
+        open={reviewModalOpen}
+        title={`Review Document: ${selectedVersion?.fileName ?? ''}`}
+        onCancel={() => setReviewModalOpen(false)}
+        footer={[
+          <Button
+            key="cancel"
+            variant="secondary"
+            size="sm"
+            onClick={() => setReviewModalOpen(false)}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            variant="primary"
+            size="sm"
+            disabled={reviewMutation.isPending}
+            onClick={handleReviewSubmit}
+          >
+            {reviewMutation.isPending ? 'Submitting...' : 'Confirm Decision'}
+          </Button>,
+        ]}
       >
-        <Form
-          form={reviewForm}
-          layout="vertical"
-          onFinish={handleReviewSubmit}
-          initialValues={{ review: 'APPROVED' }}
-          className="mt-4"
-        >
-          <Form.Item name="review" label="Quyết định thẩm định" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { label: 'Phê duyệt đạt chuẩn (APPROVED)', value: 'APPROVED' },
-                { label: 'Từ chối (REJECTED)', value: 'REJECTED' },
-              ]}
+        <div className="flex flex-col gap-4 py-3">
+          {reviewError && (
+            <Alert type="error" message={reviewError} showIcon />
+          )}
+
+          <div className="type-body-s text-ink-2">
+            Please select your review decision. Note that documents with RED validity cannot be approved.
+          </div>
+
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="decision"
+                checked={reviewDecision === 'APPROVED'}
+                onChange={() => setReviewDecision('APPROVED')}
+              />
+              <span className="type-label-m text-ink">Approve Document</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="decision"
+                checked={reviewDecision === 'REJECTED'}
+                onChange={() => setReviewDecision('REJECTED')}
+              />
+              <span className="type-label-m text-ink">Reject Document</span>
+            </label>
+          </div>
+
+          {reviewDecision === 'REJECTED' && (
+            <div className="flex flex-col gap-1.5">
+              <label className="type-label-s text-ink">
+                Rejection Reason <span className="text-bad">*</span>
+              </label>
+              <Input.TextArea
+                rows={3}
+                placeholder="Provide explicit reason why this document version was rejected..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Upload Modal */}
+      <Modal
+        open={uploadModalOpen}
+        title={`Upload New Version: ${selectedChecklistItem?.documentTypeName ?? ''}`}
+        onCancel={() => setUploadModalOpen(false)}
+        footer={[
+          <Button
+            key="cancel"
+            variant="secondary"
+            size="sm"
+            onClick={() => setUploadModalOpen(false)}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            variant="primary"
+            size="sm"
+            disabled={uploadingFile || uploadMutation.isPending}
+            onClick={handleUploadSubmit}
+          >
+            {uploadingFile || uploadMutation.isPending ? 'Uploading...' : 'Upload & Evaluate'}
+          </Button>,
+        ]}
+      >
+        <div className="flex flex-col gap-4 py-3">
+          {uploadError && (
+            <Alert type="error" message={uploadError} showIcon />
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="type-label-s text-ink">
+              Choose File (PDF, PNG, JPG) <span className="text-bad">*</span>
+            </label>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              accept=".pdf,.png,.jpg,.jpeg"
+              className="border border-line rounded p-2 text-sm"
             />
-          </Form.Item>
+            {uploadFile && (
+              <span className="type-caption text-ink-3">
+                Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+              </span>
+            )}
+          </div>
 
-          <Form.Item
-            noStyle
-            shouldUpdate={(prev, curr) => prev.review !== curr.review}
-          >
-            {({ getFieldValue }) =>
-              getFieldValue('review') === 'REJECTED' ? (
-                <Form.Item
-                  name="rejectReason"
-                  label="Lý do từ chối (bắt buộc thông báo cho khách hàng)"
-                  rules={[{ required: true, message: 'Vui lòng điền lý do từ chối hồ sơ' }]}
-                >
-                  <Input.TextArea
-                    rows={3}
-                    placeholder="VD: Bản scan mờ, sai số vi mạch của ngựa, hoặc giấy xét nghiệm quá hạn..."
-                  />
-                </Form.Item>
-              ) : null
-            }
-          </Form.Item>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="type-label-s text-ink">Issued Date</label>
+              <Input
+                type="date"
+                value={issuedOn}
+                onChange={(e) => setIssuedOn(e.target.value)}
+              />
+            </div>
 
-          <Flex justify="end" gap={8} className="mt-6">
-            <Button variant="secondary" onClick={() => setReviewingVersion(null)}>
-              Hủy
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={submittingReview}
-            >
-              {submittingReview ? 'Đang lưu...' : 'Xác nhận quyết định'}
-            </Button>
-          </Flex>
-        </Form>
+            <div className="flex flex-col gap-1.5">
+              <label className="type-label-s text-ink">Valid Until</label>
+              <Input
+                type="date"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="type-label-s text-ink">Issuing Authority / Laboratory</label>
+            <Input
+              placeholder="e.g. DAH Vietnam, USDA APHIS"
+              value={issuer}
+              onChange={(e) => setIssuer(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
-
-      {/* Modal Tải lên phiên bản tài liệu mới */}
-      <Modal
-        title={`Tải lên tài liệu: ${uploadingItem?.documentTypeName ?? ''}`}
-        open={Boolean(uploadingItem)}
-        onCancel={() => setUploadingItem(null)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={uploadForm} layout="vertical" onFinish={handleUploadSubmit} className="mt-4">
-          <Form.Item
-            name="fileId"
-            label="Mã file lưu trữ (File ID)"
-            initialValue="00000000-0000-0000-0000-000000000001"
-            rules={[{ required: true, message: 'Vui lòng cung cấp file ID' }]}
-          >
-            <Input placeholder="Nhập UUID của file đã tải lên" />
-          </Form.Item>
-
-          <Form.Item name="issuer" label="Cơ quan / Đơn vị cấp">
-            <Input placeholder="VD: Chi cục Chăn nuôi & Thú y, PVI Insurance..." />
-          </Form.Item>
-
-          <Flex gap={12}>
-            <Form.Item name="sampledOn" label="Ngày lấy mẫu (nếu có)" className="flex-1">
-              <Input type="date" />
-            </Form.Item>
-            <Form.Item name="issuedOn" label="Ngày cấp chứng nhận" className="flex-1">
-              <Input type="date" />
-            </Form.Item>
-          </Flex>
-
-          <Form.Item name="validUntil" label="Ngày hết hạn (nếu có)">
-            <Input type="date" />
-          </Form.Item>
-
-          <Flex justify="end" gap={8} className="mt-6">
-            <Button variant="secondary" onClick={() => setUploadingItem(null)}>
-              Hủy
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={submittingUpload}
-            >
-              {submittingUpload ? 'Đang gửi...' : 'Tải lên phiên bản mới'}
-            </Button>
-          </Flex>
-        </Form>
-      </Modal>
-    </Flex>
+    </div>
   );
 };
 

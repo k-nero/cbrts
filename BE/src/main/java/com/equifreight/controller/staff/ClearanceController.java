@@ -4,6 +4,9 @@ import com.equifreight.entity.User;
 import com.equifreight.model.clearance.*;
 import com.equifreight.service.ClearanceService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -12,8 +15,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Flow 2: Luồng Quản lý Hồ sơ Pháp lý & Kiểm dịch Thông quan.
- * Chuyên viên Thủ tục & Kiểm dịch (Transport Specialist) và các vai trò vận hành liên quan.
+ * Flow 2: Clearance Dossier & Legal Quarantine Controller (AGENTS.md).
+ * Transport Specialist endpoints for reviewing documents, evaluating validity, and controlling the clearance gate.
  */
 @RestController
 @RequestMapping("/api/v1/staff/clearance")
@@ -25,27 +28,30 @@ public class ClearanceController {
         this.clearanceService = clearanceService;
     }
 
-    /** Lấy toàn bộ danh sách checklist hồ sơ theo Job. */
+    /** Retrieve all checklist items for a job. */
     @GetMapping("/jobs/{jobId}/checklist")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
     public List<ChecklistItemResponse> getChecklist(@PathVariable UUID jobId) {
         return clearanceService.getChecklist(jobId);
     }
 
-    /** Xem trạng thái cổng thông quan (Clearance Gate) của Job. */
+    /** View clearance gate evaluation status of a job. */
     @GetMapping("/jobs/{jobId}/status")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
     public ClearanceStatusResponse getClearanceStatus(@PathVariable UUID jobId) {
         return clearanceService.getClearanceStatus(jobId);
     }
 
-    /** Hộp thư kiểm duyệt: Danh sách các phiên bản tài liệu đang chờ duyệt (review = PENDING). */
+    /** Transport Specialist pending reviews inbox with pagination. */
     @GetMapping("/pending-reviews")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
-    public List<DocumentVersionResponse> getPendingReviews() {
-        return clearanceService.getPendingReviews();
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
+    public Page<DocumentVersionResponse> getPendingReviews(@PageableDefault(size = 20) Pageable pageable) {
+        return clearanceService.getPendingReviews(pageable);
     }
 
-    /** Tải lên một phiên bản tài liệu mới cho một mục checklist (Append-only). */
+    /** Upload a new document version for a checklist item (Append-only). */
     @PostMapping("/checklist/{checklistItemId}/versions")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public ChecklistItemResponse uploadDocumentVersion(
             @PathVariable UUID checklistItemId,
             @Valid @RequestBody DocumentUploadRequest request,
@@ -53,9 +59,9 @@ public class ClearanceController {
         return clearanceService.uploadDocumentVersion(checklistItemId, request, user);
     }
 
-    /** Chuyên viên thẩm định/phê duyệt phiên bản tài liệu (APPROVE / REJECT). */
+    /** Transport Specialist reviews a document version (APPROVE / REJECT). */
     @PostMapping("/versions/{documentVersionId}/review")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public DocumentVersionResponse reviewDocument(
             @PathVariable UUID documentVersionId,
             @Valid @RequestBody ReviewDocumentRequest request,
@@ -63,9 +69,9 @@ public class ClearanceController {
         return clearanceService.reviewDocument(documentVersionId, request, user);
     }
 
-    /** Kích hoạt đánh giá lại cổng thông quan (Clearance Gate) cho chuyến đi. */
+    /** Manually trigger re-evaluation of the Clearance Gate for a job. */
     @PostMapping("/jobs/{jobId}/evaluate-gate")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public ClearanceStatusResponse evaluateClearanceGate(@PathVariable UUID jobId) {
         return clearanceService.evaluateClearanceGate(jobId);
     }

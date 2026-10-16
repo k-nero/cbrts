@@ -7,6 +7,7 @@ import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
+/**
+ * Service managing regulatory authority filings and quarantine tracking (AGENTS.md).
+ * Transport Specialists submit dossier packets to veterinary/customs agencies and track outcomes.
+ */
 @Service
 public class AuthoritySubmissionService {
 
@@ -29,6 +34,7 @@ public class AuthoritySubmissionService {
     private final HorseRepository horseRepository;
     private final NotificationService notificationService;
     private final ClearanceService clearanceService;
+    private final AuditService auditService;
 
     public AuthoritySubmissionService(
             AuthorityRepository authorityRepository,
@@ -40,7 +46,8 @@ public class AuthoritySubmissionService {
             PlaceRepository placeRepository,
             HorseRepository horseRepository,
             NotificationService notificationService,
-            ClearanceService clearanceService) {
+            ClearanceService clearanceService,
+            AuditService auditService) {
         this.authorityRepository = authorityRepository;
         this.submissionRepository = submissionRepository;
         this.quarantinePeriodRepository = quarantinePeriodRepository;
@@ -51,9 +58,10 @@ public class AuthoritySubmissionService {
         this.horseRepository = horseRepository;
         this.notificationService = notificationService;
         this.clearanceService = clearanceService;
+        this.auditService = auditService;
     }
 
-    /** Lấy danh sách cơ quan chức năng (Bộ Nông nghiệp, Thú y, Hải quan, Kiểm dịch). */
+    /** List government authorities filtered optionally by country and kind. */
     @Transactional(readOnly = true)
     public List<AuthorityResponse> listAuthorities(String countryCode, AuthorityKind kind) {
         List<Authority> list;
@@ -69,7 +77,7 @@ public class AuthoritySubmissionService {
         return list.stream().map(ClearanceMapper::toAuthorityResponse).toList();
     }
 
-    /** Lấy tất cả đợt trình hồ sơ của một chuyến vận chuyển. */
+    /** List all authority submissions filed for a transport job. */
     @Transactional(readOnly = true)
     public List<AuthoritySubmissionResponse> getSubmissionsByJob(UUID jobId) {
         findJobOrThrow(jobId);
@@ -78,7 +86,7 @@ public class AuthoritySubmissionService {
                 .toList();
     }
 
-    /** Tạo một đợt nộp hồ sơ mới tới cơ quan chức năng (Export cert, Import permit, Customs dossier). */
+    /** File a new submission with a government authority. */
     @Transactional
     public AuthoritySubmissionResponse createSubmission(UUID jobId, CreateAuthoritySubmissionRequest request, User specialist) {
         assertSpecialist(specialist);
@@ -95,14 +103,14 @@ public class AuthoritySubmissionService {
         submission.setFiledBy(specialist);
         submission.setReferenceNo(request.getReferenceNo());
 
-        // Tính ngày dự kiến hoàn thành theo SLA nếu không truyền vào
+        // SLA calculation
         if (request.getExpectedBy() != null) {
             submission.setExpectedBy(request.getExpectedBy());
         } else if (authority.getSlaDays() != null) {
             submission.setExpectedBy(LocalDate.now().plusDays(authority.getSlaDays()));
         }
 
-        // Đính kèm các checklist item vào bộ hồ sơ nộp
+        // Attach checklist items
         if (request.getChecklistItemIds() != null && !request.getChecklistItemIds().isEmpty()) {
             Set<ChecklistItem> items = new HashSet<>(checklistItemRepository.findAllById(request.getChecklistItemIds()));
             submission.setChecklistItems(items);
@@ -110,20 +118,33 @@ public class AuthoritySubmissionService {
 
         AuthoritySubmission saved = submissionRepository.save(submission);
 
-        // Cập nhật trạng thái job sang SUBMITTED_TO_AUTHORITY
         job.setDossierStatus(DossierStatus.SUBMITTED_TO_AUTHORITY);
         transportJobRepository.save(job);
+
+        // Audit log (BR-F1-08)
+        auditService.recordDecision(
+                specialist,
+                "AUTHORITY_SUBMISSION_CREATED",
+                String.format("Filed %s submission to %s for job %s.",
+                        request.getKind(), authority.getName(), job.getCode()),
+                "AUTHORITY_SUBMISSION",
+                saved.getId(),
+                job.getCode(),
+                null,
+                null,
+                "FILED");
 
         return ClearanceMapper.toSubmissionResponse(saved);
     }
 
-    /** Cập nhật tiến độ duyệt hồ sơ từ cơ quan chức năng (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED). */
+    /** Update an authority submission outcome (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED). */
     @Transactional
     public AuthoritySubmissionResponse updateSubmission(UUID submissionId, UpdateAuthoritySubmissionRequest request, User specialist) {
         assertSpecialist(specialist);
         AuthoritySubmission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("AuthoritySubmission", submissionId));
 
+        SubmissionStatus prevStatus = submission.getStatus();
         submission.setStatus(request.getStatus());
 
         if (request.getReferenceNo() != null) {
@@ -141,18 +162,16 @@ public class AuthoritySubmissionService {
                 submission.setResultFile(resultFile);
             }
         } else if (request.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
-            // Cơ quan chức năng yêu cầu bổ sung hồ sơ
             TransportJob job = submission.getJob();
             job.setDossierStatus(DossierStatus.ADDITIONAL_INFO_REQUIRED);
             transportJobRepository.save(job);
 
-            // Gửi thông báo
             if (job.getRequest() != null && job.getRequest().getCreatedBy() != null) {
                 notificationService.sendNotification(
                         job.getRequest().getCreatedBy(),
                         "ADDITIONAL_INFO_REQUIRED",
-                        "Yêu cầu bổ sung hồ sơ từ cơ quan " + submission.getAuthority().getName(),
-                        "Cơ quan chức năng yêu cầu cung cấp thêm thông tin đối với bộ hồ sơ " + submission.getKind(),
+                        "Additional information requested by " + submission.getAuthority().getName(),
+                        "Authority requested additional documentation for submission " + submission.getKind(),
                         "AuthoritySubmission",
                         submission.getId()
                 );
@@ -161,13 +180,24 @@ public class AuthoritySubmissionService {
 
         AuthoritySubmission updated = submissionRepository.save(submission);
 
-        // Đánh giá lại cổng thông quan (Clearance Gate) nếu có giấy phép được cấp
-        clearanceService.evaluateClearanceGate(submission.getJob().getId());
+        // Audit log (BR-F1-08)
+        String jobCode = submission.getJob() != null ? submission.getJob().getCode() : "JOB";
+        auditService.recordDecision(
+                specialist,
+                "AUTHORITY_SUBMISSION_UPDATED",
+                String.format("Updated authority submission status to %s for job %s.", request.getStatus(), jobCode),
+                "AUTHORITY_SUBMISSION",
+                updated.getId(),
+                jobCode,
+                null,
+                prevStatus != null ? prevStatus.name() : "FILED",
+                request.getStatus().name());
 
+        clearanceService.evaluateClearanceGate(submission.getJob().getId());
         return ClearanceMapper.toSubmissionResponse(updated);
     }
 
-    /** Lấy danh sách đợt cách ly kiểm dịch của chuyến đi. */
+    /** List quarantine periods scheduled or completed for a job. */
     @Transactional(readOnly = true)
     public List<QuarantinePeriodResponse> listQuarantines(UUID jobId) {
         findJobOrThrow(jobId);
@@ -176,13 +206,13 @@ public class AuthoritySubmissionService {
                 .toList();
     }
 
-    /** Thiết lập đợt cách ly kiểm dịch cho ngựa/lô ngựa. */
+    /** Schedule a new quarantine period for a horse or the entire job shipment. */
     @Transactional
     public QuarantinePeriodResponse createQuarantine(UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
         assertSpecialist(specialist);
         TransportJob job = findJobOrThrow(jobId);
         Place place = placeRepository.findById(request.getPlaceId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Place (Trạm kiểm dịch)", request.getPlaceId()));
+                .orElseThrow(() -> ResourceNotFoundException.of("Place", request.getPlaceId()));
 
         Horse horse = null;
         if (request.getHorseId() != null) {
@@ -191,7 +221,7 @@ public class AuthoritySubmissionService {
         }
 
         if (request.getEndsOn().isBefore(request.getStartsOn())) {
-            throw new BusinessException("Ngày kết thúc cách ly không thể trước ngày bắt đầu.");
+            throw new BusinessException("Quarantine end date cannot precede start date.");
         }
 
         QuarantinePeriod quarantine = new QuarantinePeriod();
@@ -202,34 +232,61 @@ public class AuthoritySubmissionService {
         quarantine.setEndsOn(request.getEndsOn());
 
         QuarantinePeriod saved = quarantinePeriodRepository.save(quarantine);
+
+        auditService.recordDecision(
+                specialist,
+                "QUARANTINE_CREATED",
+                String.format("Scheduled quarantine at %s for job %s.", place.getName(), job.getCode()),
+                "QUARANTINE_PERIOD",
+                saved.getId(),
+                job.getCode(),
+                null,
+                null,
+                "SCHEDULED");
+
+        clearanceService.evaluateClearanceGate(job.getId());
         return ClearanceMapper.toQuarantineResponse(saved);
     }
 
-    /** Ghi nhận hoàn thành đợt cách ly kiểm dịch. */
+    /** Confirm quarantine completion by supervising vet / transport specialist. */
     @Transactional
     public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist) {
         assertSpecialist(specialist);
         QuarantinePeriod quarantine = quarantinePeriodRepository.findById(quarantineId)
                 .orElseThrow(() -> ResourceNotFoundException.of("QuarantinePeriod", quarantineId));
 
+        if (quarantine.getCompletedAt() != null) {
+            throw new BusinessException("This quarantine period has already been completed.");
+        }
+
         quarantine.setCompletedAt(Instant.now());
         QuarantinePeriod updated = quarantinePeriodRepository.save(quarantine);
 
-        // Tự động kiểm tra lại Clearance Gate khi kiểm dịch hoàn thành
-        clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
+        String jobCode = quarantine.getJob() != null ? quarantine.getJob().getCode() : "JOB";
+        auditService.recordDecision(
+                specialist,
+                "QUARANTINE_COMPLETED",
+                String.format("Completed quarantine for job %s.", jobCode),
+                "QUARANTINE_PERIOD",
+                updated.getId(),
+                jobCode,
+                null,
+                "ACTIVE",
+                "COMPLETED");
 
+        clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
         return ClearanceMapper.toQuarantineResponse(updated);
     }
 
     private void assertSpecialist(User user) {
         if (user == null || user.getRoles() == null) {
-            throw new BusinessException("Yêu cầu đăng nhập.");
+            throw new UnauthorizedException("Authentication is required.");
         }
         boolean hasPerm = user.getRoles().stream()
                 .map(Role::getName)
-                .anyMatch(r -> RoleName.TRANSPORT_SPECIALIST.equals(r) || RoleName.LOGISTICS_MANAGER.equals(r));
+                .anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
         if (!hasPerm) {
-            throw new BusinessException("Chỉ Chuyên viên thủ tục hoặc Quản lý Logistics mới có quyền thực hiện.");
+            throw new UnauthorizedException("Only Transport Specialists are authorized for regulatory authority operations.");
         }
     }
 

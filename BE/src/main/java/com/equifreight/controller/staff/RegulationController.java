@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Controller quản lý danh mục quy định y tế, kiểm dịch và hải quan của từng quốc gia/cửa khẩu.
+ * Staff controller managing country regulation catalogs, document types, and rule definitions (AGENTS.md).
+ * Transport Specialists own and maintain these catalogs.
  */
 @RestController
 @RequestMapping("/api/v1/staff/regulations")
@@ -25,27 +26,30 @@ public class RegulationController {
         this.regulationService = regulationService;
     }
 
-    /** Danh sách danh mục quy định theo quốc gia. */
+    /** List all regulation catalogs by country. */
     @GetMapping("/catalogs")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<RegulationCatalogResponse> listCatalogs() {
         return regulationService.listCatalogs();
     }
 
-    /** Chi tiết phiên bản quy định và các quy tắc kiểm tra giấy tờ. */
+    /** Get detailed version information and document validation rules. */
     @GetMapping("/versions/{versionId}")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public RegulationVersionResponse getVersionDetails(@PathVariable UUID versionId) {
         return regulationService.getVersionDetails(versionId);
     }
 
-    /** Danh mục tất cả các loại giấy tờ trong hệ thống. */
+    /** List all recognized document types in the system. */
     @GetMapping("/document-types")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<DocumentTypeResponse> listDocumentTypes() {
         return regulationService.listDocumentTypes();
     }
 
-    /** Xuất bản phiên bản quy định mới (DRAFT -> PUBLISHED). */
+    /** Publish a new regulation catalog version (DRAFT -> PUBLISHED). Transport Specialist only. */
     @PostMapping("/versions/{versionId}/publish")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public RegulationVersionResponse publishVersion(
             @PathVariable UUID versionId,
             @AuthenticationPrincipal User user) {

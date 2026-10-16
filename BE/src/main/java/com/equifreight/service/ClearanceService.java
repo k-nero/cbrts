@@ -3,9 +3,13 @@ package com.equifreight.service;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +18,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Flow 2: Clearance Dossier and Legal Document Management Service (AGENTS.md).
+ * Manages document checklists, validity evaluation, specialist reviews, and the clearance gate.
+ */
 @Service
 public class ClearanceService {
 
@@ -23,6 +31,7 @@ public class ClearanceService {
     private final StoredFileRepository storedFileRepository;
     private final QuarantinePeriodRepository quarantinePeriodRepository;
     private final ValidityEngine validityEngine;
+    private final AuditService auditService;
 
     public ClearanceService(
             ChecklistItemRepository checklistItemRepository,
@@ -30,16 +39,18 @@ public class ClearanceService {
             TransportJobRepository transportJobRepository,
             StoredFileRepository storedFileRepository,
             QuarantinePeriodRepository quarantinePeriodRepository,
-            ValidityEngine validityEngine) {
+            ValidityEngine validityEngine,
+            AuditService auditService) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.transportJobRepository = transportJobRepository;
         this.storedFileRepository = storedFileRepository;
         this.quarantinePeriodRepository = quarantinePeriodRepository;
         this.validityEngine = validityEngine;
+        this.auditService = auditService;
     }
 
-    /** Lấy toàn bộ danh sách checklist hồ sơ của một chuyến đi. */
+    /** Retrieve all checklist items for a transport job. */
     @Transactional(readOnly = true)
     public List<ChecklistItemResponse> getChecklist(UUID jobId) {
         findJobOrThrow(jobId);
@@ -48,7 +59,14 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** Lấy danh sách các tài liệu đang chờ chuyên viên kiểm duyệt (PENDING inbox). */
+    /** Retrieve unreviewed document versions for the specialist inbox with pagination. */
+    @Transactional(readOnly = true)
+    public Page<DocumentVersionResponse> getPendingReviews(Pageable pageable) {
+        return documentVersionRepository.findAllByReview(DocumentReview.PENDING, pageable)
+                .map(ClearanceMapper::toVersionResponse);
+    }
+
+    /** Retrieve unreviewed document versions for the specialist inbox as a list. */
     @Transactional(readOnly = true)
     public List<DocumentVersionResponse> getPendingReviews() {
         return documentVersionRepository.findAllByReview(DocumentReview.PENDING).stream()
@@ -56,7 +74,10 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** Khách hàng hoặc Chuyên viên tải lên một phiên bản tài liệu mới (Append-only). */
+    /**
+     * Upload a new document version for a checklist item (Append-only).
+     * Re-runs the validity engine and updates the checklist item status.
+     */
     @Transactional
     public ChecklistItemResponse uploadDocumentVersion(UUID checklistItemId, DocumentUploadRequest request, User uploader) {
         ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
@@ -84,54 +105,75 @@ public class ClearanceService {
         item.setStatus(ChecklistStatus.IN_REVIEW);
         item.setHolder(ChecklistHolder.SPECIALIST);
 
-        // Chạy kiểm tra tính hợp lệ tự động (BR-F2-02)
+        // Evaluate validity using the business rules engine (BR-F2-02)
         ValidityEngine.Result valResult = validityEngine.evaluate(item, savedVersion, item.getJob());
         item.setValidity(valResult.validity());
         item.setValidityNote(valResult.note());
         item.setEvaluatedAt(Instant.now());
 
         checklistItemRepository.save(item);
+
+        // Record audit log for the upload (BR-F1-08)
+        String jobCode = item.getJob() != null ? item.getJob().getCode() : "JOB";
+        String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
+        auditService.recordDecision(
+                uploader,
+                "DOCUMENT_UPLOADED",
+                String.format("Uploaded %s v%d for job %s.", docName, nextVersionNo, jobCode),
+                "DOCUMENT_VERSION",
+                savedVersion.getId(),
+                jobCode,
+                null,
+                null,
+                "PENDING");
+
         return ClearanceMapper.toItemResponse(item);
     }
 
-    /** Chuyên viên thủ tục & kiểm dịch duyệt tài liệu (BR-F2-04, BR-F2-05, BR-F2-07). */
+    /**
+     * Transport specialist review decision (BR-F2-04, BR-F2-05, BR-F2-07).
+     * Enforces validate-then-write and audits the decision in the same transaction.
+     */
     @Transactional
     public DocumentVersionResponse reviewDocument(UUID documentVersionId, ReviewDocumentRequest request, User reviewer) {
-        // BR-F2-04: Bắt buộc người duyệt phải có quyền TRANSPORT_SPECIALIST
-        boolean isSpecialist = reviewer.getRoles() != null && reviewer.getRoles().stream()
+        // Enforce role: only Transport Specialist may review documents (AGENTS.md)
+        boolean isSpecialist = reviewer != null && reviewer.getRoles() != null && reviewer.getRoles().stream()
                 .map(Role::getName)
-                .anyMatch(name -> RoleName.TRANSPORT_SPECIALIST.equals(name) || RoleName.LOGISTICS_MANAGER.equals(name));
+                .anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
         if (!isSpecialist) {
-            throw new BusinessException("Chỉ Chuyên viên thủ tục (Transport Specialist) mới có quyền duyệt tài liệu.");
+            throw new UnauthorizedException("Only the Transport Specialist is authorized to review documents.");
         }
 
         DocumentVersion version = documentVersionRepository.findById(documentVersionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("DocumentVersion", documentVersionId));
 
-        // BR-F2-05: Tính bất biến (Append-only) - Chỉ được phép duyệt bản đang PENDING
+        // Immutable append-only check: only PENDING versions may be reviewed
         if (version.getReview() != DocumentReview.PENDING) {
-            throw new BusinessException("Tài liệu này đã được thẩm định trước đó. Không thể thay đổi quyết định.");
+            throw new ConflictException("DOCUMENT_ALREADY_REVIEWED", "This document version has already been reviewed.");
         }
 
-        // BR-F2-07: Bắt buộc có lý do khi từ chối
+        ChecklistItem item = version.getChecklistItem();
+
+        // Validate-then-write: check all conditions BEFORE making any state changes
         if (request.getReview() == DocumentReview.REJECTED) {
             if (request.getRejectReason() == null || request.getRejectReason().isBlank()) {
-                throw new BusinessException("Vui lòng cung cấp lý do từ chối để thông báo cho khách hàng.");
+                throw new BusinessException("A rejection reason is required.");
+            }
+        } else if (request.getReview() == DocumentReview.APPROVED) {
+            ValidityEngine.Result valResult = validityEngine.evaluate(item, version, item.getJob());
+            if (valResult.validity() == Validity.RED) {
+                throw new BusinessException("A document evaluated as RED cannot be approved: " + valResult.note());
             }
         }
 
+        // Apply changes
         version.setReview(request.getReview());
         version.setReviewedBy(reviewer);
         version.setReviewedAt(Instant.now());
         version.setRejectReason(request.getRejectReason());
         DocumentVersion updatedVersion = documentVersionRepository.save(version);
 
-        // Cập nhật trạng thái ChecklistItem
-        ChecklistItem item = version.getChecklistItem();
         if (request.getReview() == DocumentReview.APPROVED) {
-            if (item.getValidity() == Validity.RED) {
-                throw new BusinessException("Không thể duyệt phê duyệt tài liệu vi phạm quy tắc ngày tháng (Validity đang ở mức RED).");
-            }
             item.setStatus(ChecklistStatus.CLEARED);
             item.setHolder(null);
         } else {
@@ -140,13 +182,38 @@ public class ClearanceService {
         }
         checklistItemRepository.save(item);
 
-        // Tự động kiểm tra cổng Clearance Gate sau khi duyệt
-        evaluateClearanceGate(item.getJob().getId());
+        // Audit the review decision (BR-F1-08)
+        String jobCode = item.getJob() != null ? item.getJob().getCode() : "JOB";
+        String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
+        String action = request.getReview() == DocumentReview.APPROVED ? "DOCUMENT_APPROVED" : "DOCUMENT_REJECTED";
+        String summary = String.format("%s %s v%d for job %s.",
+                request.getReview() == DocumentReview.APPROVED ? "Approved" : "Rejected",
+                docName, version.getVersionNo(), jobCode);
+
+        auditService.recordDecision(
+                reviewer,
+                action,
+                summary,
+                "DOCUMENT_VERSION",
+                version.getId(),
+                jobCode,
+                request.getRejectReason(),
+                "PENDING",
+                request.getReview().name());
+
+        // Re-evaluate clearance gate
+        if (item.getJob() != null) {
+            evaluateClearanceGate(item.getJob().getId());
+        }
 
         return ClearanceMapper.toVersionResponse(updatedVersion);
     }
 
-    /** Kiểm tra và kích hoạt cổng thông quan (BR-F2-03 Clearance Gate). */
+    /**
+     * Evaluates and updates the Clearance Gate status for a job (BR-F2-03).
+     * Clearance dossier is CLEARANCE_READY only if all mandatory items are CLEARED with GREEN validity,
+     * and all required quarantine periods are completed.
+     */
     @Transactional
     public ClearanceStatusResponse evaluateClearanceGate(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
@@ -154,7 +221,6 @@ public class ClearanceService {
         List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(jobId);
 
         List<String> outstandingIssues = new ArrayList<>();
-
         int totalMandatory = 0;
         int clearedMandatory = 0;
 
@@ -165,9 +231,9 @@ public class ClearanceService {
                 if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
                     clearedMandatory++;
                 } else {
-                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Tài liệu";
-                    String horseInfo = item.getHorse() != null ? " (Ngựa: " + item.getHorse().getName() + ")" : "";
-                    outstandingIssues.add(String.format("%s%s chưa đạt chuẩn (Trạng thái: %s, Tính hợp lệ: %s)",
+                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
+                    String horseInfo = item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
+                    outstandingIssues.add(String.format("%s%s not cleared (Status: %s, Validity: %s)",
                             docName, horseInfo, item.getStatus(), item.getValidity()));
                 }
             }
@@ -180,22 +246,47 @@ public class ClearanceService {
                 completedQuarantines++;
             } else {
                 allQuarantinesCompleted = false;
-                outstandingIssues.add("Đợt cách ly kiểm dịch chưa hoàn thành (bắt đầu " + q.getStartsOn() + " đến " + q.getEndsOn() + ")");
+                outstandingIssues.add(String.format("Quarantine period pending (starts %s, ends %s)",
+                        q.getStartsOn(), q.getEndsOn()));
             }
         }
 
         boolean ready = (totalMandatory > 0 && clearedMandatory == totalMandatory) && allQuarantinesCompleted;
+        DossierStatus previousStatus = job.getDossierStatus();
 
         if (ready) {
             job.setDossierStatus(DossierStatus.CLEARANCE_READY);
             job.setClearanceReadyAt(Instant.now());
             job.setStage(JobStage.CLEARANCE);
             transportJobRepository.save(job);
+
+            if (previousStatus != DossierStatus.CLEARANCE_READY) {
+                auditService.recordDecision(
+                        null,
+                        "CLEARANCE_GATE_PASSED",
+                        String.format("Clearance dossier for job %s transitioned to CLEARANCE_READY.", job.getCode()),
+                        "TRANSPORT_JOB",
+                        job.getId(),
+                        job.getCode(),
+                        null,
+                        previousStatus != null ? previousStatus.name() : "OPEN",
+                        "CLEARANCE_READY");
+            }
         } else if (job.getDossierStatus() == DossierStatus.CLEARANCE_READY) {
-            // Nếu có giấy tờ bị hết hạn hoặc thêm vào làm mất chuẩn, đóng cổng lại
             job.setDossierStatus(DossierStatus.OPEN);
             job.setClearanceReadyAt(null);
             transportJobRepository.save(job);
+
+            auditService.recordDecision(
+                    null,
+                    "CLEARANCE_GATE_BLOCKED",
+                    String.format("Clearance dossier for job %s re-opened due to incomplete items or expired validity.", job.getCode()),
+                    "TRANSPORT_JOB",
+                    job.getId(),
+                    job.getCode(),
+                    String.join("; ", outstandingIssues),
+                    "CLEARANCE_READY",
+                    "OPEN");
         }
 
         return ClearanceStatusResponse.builder()
@@ -214,7 +305,7 @@ public class ClearanceService {
                 .build();
     }
 
-    /** Lấy trạng thái hiện tại của Clearance Gate mà không kích hoạt thay đổi. */
+    /** Retrieve clearance gate status without mutating state. */
     @Transactional(readOnly = true)
     public ClearanceStatusResponse getClearanceStatus(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
@@ -232,9 +323,9 @@ public class ClearanceService {
                 if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
                     clearedMandatory++;
                 } else {
-                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Tài liệu";
-                    String horseInfo = item.getHorse() != null ? " (Ngựa: " + item.getHorse().getName() + ")" : "";
-                    outstandingIssues.add(String.format("%s%s: %s (Hợp lệ: %s)",
+                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
+                    String horseInfo = item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
+                    outstandingIssues.add(String.format("%s%s: %s (Validity: %s)",
                             docName, horseInfo, item.getStatus(), item.getValidity()));
                 }
             }
@@ -247,7 +338,7 @@ public class ClearanceService {
                 completedQuarantines++;
             } else {
                 allQuarantinesCompleted = false;
-                outstandingIssues.add("Đợt cách ly chưa hoàn tất: " + q.getStartsOn() + " đến " + q.getEndsOn());
+                outstandingIssues.add(String.format("Quarantine pending: %s to %s", q.getStartsOn(), q.getEndsOn()));
             }
         }
 

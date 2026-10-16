@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Controller quản lý nộp hồ sơ tới các cơ quan chức năng & đợt cách ly kiểm dịch.
+ * Controller for regulatory authority filings and quarantine management (AGENTS.md).
+ * Transport Specialist handles filings to government agencies and schedules quarantine periods.
  */
 @RestController
 @RequestMapping("/api/v1/staff/clearance")
@@ -25,23 +26,25 @@ public class AuthoritySubmissionController {
         this.submissionService = submissionService;
     }
 
-    /** Danh sách các cơ quan chức năng (Bộ Nông nghiệp, Hải quan, Thú y, Trạm kiểm dịch). */
+    /** List government authorities filtered optionally by country and agency kind. */
     @GetMapping("/authorities")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<AuthorityResponse> listAuthorities(
             @RequestParam(required = false) String countryCode,
             @RequestParam(required = false) AuthorityKind kind) {
         return submissionService.listAuthorities(countryCode, kind);
     }
 
-    /** Danh sách các đợt nộp hồ sơ theo chuyến đi. */
+    /** List all authority submissions filed for a transport job. */
     @GetMapping("/jobs/{jobId}/submissions")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<AuthoritySubmissionResponse> getSubmissionsByJob(@PathVariable UUID jobId) {
         return submissionService.getSubmissionsByJob(jobId);
     }
 
-    /** Tạo mới một đợt nộp hồ sơ tới cơ quan thẩm quyền. */
+    /** File a new submission with an authority. Transport Specialist only. */
     @PostMapping("/jobs/{jobId}/submissions")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public AuthoritySubmissionResponse createSubmission(
             @PathVariable UUID jobId,
             @Valid @RequestBody CreateAuthoritySubmissionRequest request,
@@ -49,9 +52,9 @@ public class AuthoritySubmissionController {
         return submissionService.createSubmission(jobId, request, user);
     }
 
-    /** Cập nhật tiến độ xử lý hồ sơ từ cơ quan thẩm quyền (Được cấp / Bổ sung thông tin / Bị từ chối). */
+    /** Update an authority submission outcome (APPROVED, REJECTED, INFO_REQUESTED). Transport Specialist only. */
     @PutMapping("/submissions/{submissionId}")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public AuthoritySubmissionResponse updateSubmission(
             @PathVariable UUID submissionId,
             @Valid @RequestBody UpdateAuthoritySubmissionRequest request,
@@ -59,15 +62,16 @@ public class AuthoritySubmissionController {
         return submissionService.updateSubmission(submissionId, request, user);
     }
 
-    /** Danh sách các đợt cách ly kiểm dịch của chuyến đi. */
+    /** List quarantine periods scheduled or completed for a transport job. */
     @GetMapping("/jobs/{jobId}/quarantines")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<QuarantinePeriodResponse> listQuarantines(@PathVariable UUID jobId) {
         return submissionService.listQuarantines(jobId);
     }
 
-    /** Thiết lập đợt cách ly kiểm dịch mới. */
+    /** Schedule a new quarantine period for a horse or job shipment. Transport Specialist only. */
     @PostMapping("/jobs/{jobId}/quarantines")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public QuarantinePeriodResponse createQuarantine(
             @PathVariable UUID jobId,
             @Valid @RequestBody CreateQuarantinePeriodRequest request,
@@ -75,9 +79,9 @@ public class AuthoritySubmissionController {
         return submissionService.createQuarantine(jobId, request, user);
     }
 
-    /** Xác nhận hoàn tất đợt cách ly kiểm dịch. */
+    /** Confirm completion of a quarantine period. Transport Specialist only. */
     @PostMapping("/quarantines/{quarantineId}/complete")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public QuarantinePeriodResponse completeQuarantine(
             @PathVariable UUID quarantineId,
             @AuthenticationPrincipal User user) {

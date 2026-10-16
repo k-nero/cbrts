@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RegulationRuleKind;
 import com.equifreight.entity.enums.Validity;
@@ -7,9 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,10 +25,10 @@ class ValidityEngineTest {
     void setUp() {
         validityEngine = new ValidityEngine();
 
-        // Giả lập chuyến đi: Khởi hành 2026-11-01, đến nơi 2026-11-05
+        // Simulated job: Departure 2026-11-01, Arrival 2026-11-05 in Asia/Ho_Chi_Minh business zone
         job = new TransportJob();
-        job.setPlannedDepartureAt(LocalDate.of(2026, 11, 1).atStartOfDay().toInstant(ZoneOffset.UTC));
-        job.setPlannedArrivalAt(LocalDate.of(2026, 11, 5).atStartOfDay().toInstant(ZoneOffset.UTC));
+        job.setPlannedDepartureAt(LocalDate.of(2026, 11, 1).atStartOfDay(AppConstants.BUSINESS_ZONE).toInstant());
+        job.setPlannedArrivalAt(LocalDate.of(2026, 11, 5).atStartOfDay(AppConstants.BUSINESS_ZONE).toInstant());
 
         regulationVersion = new RegulationVersion();
         regulationVersion.setArrivalBufferDays((short) 2);
@@ -47,14 +46,15 @@ class ValidityEngineTest {
     }
 
     @Test
-    @DisplayName("Nếu chưa có file upload thì trả về RED")
+    @DisplayName("returns RED when no document version is uploaded")
     void returnsRedWhenNoVersion() {
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, null, job);
         assertEquals(Validity.RED, result.validity());
+        assertEquals("No document uploaded yet.", result.note());
     }
 
     @Test
-    @DisplayName("PRESENCE_ONLY: Có file là đạt GREEN")
+    @DisplayName("PRESENCE_ONLY returns GREEN when document version is present")
     void presenceOnlyReturnsGreen() {
         regulationRule.setRuleKind(RegulationRuleKind.PRESENCE_ONLY);
 
@@ -63,52 +63,52 @@ class ValidityEngineTest {
     }
 
     @Test
-    @DisplayName("WINDOW_BEFORE_DEPARTURE: Xét nghiệm EIA trong khung 60 ngày -> GREEN")
+    @DisplayName("WINDOW_BEFORE_DEPARTURE returns GREEN when test sampled within 60 days before departure")
     void windowBeforeDepartureValid() {
         regulationRule.setRuleKind(RegulationRuleKind.WINDOW_BEFORE_DEPARTURE);
         regulationRule.setMaxDays((short) 60);
 
-        // Lấy mẫu ngày 2026-10-10 (trước ngày 1/11 là 22 ngày, <= 60 ngày)
+        // Sampled on 2026-10-10 (22 days before departure, <= 60 days)
         documentVersion.setSampledOn(LocalDate.of(2026, 10, 10));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.GREEN, result.validity());
-        assertTrue(result.note().contains("trong khung cho phép"));
+        assertTrue(result.note().contains("within allowed window"));
     }
 
     @Test
-    @DisplayName("WINDOW_BEFORE_DEPARTURE: Xét nghiệm quá 60 ngày trước khởi hành -> RED")
+    @DisplayName("WINDOW_BEFORE_DEPARTURE returns RED when test sampled beyond 60 days before departure")
     void windowBeforeDepartureExpired() {
         regulationRule.setRuleKind(RegulationRuleKind.WINDOW_BEFORE_DEPARTURE);
         regulationRule.setMaxDays((short) 60);
 
-        // Lấy mẫu ngày 2026-08-01 (trước ngày 1/11 là 92 ngày > 60 ngày)
+        // Sampled on 2026-08-01 (92 days before departure > 60 days)
         documentVersion.setSampledOn(LocalDate.of(2026, 8, 1));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.RED, result.validity());
-        assertTrue(result.note().contains("Đã quá hạn"));
+        assertTrue(result.note().contains("Expired"));
     }
 
     @Test
-    @DisplayName("WINDOW_BEFORE_DEPARTURE: Sát hạn trong vòng 3 ngày -> AMBER")
+    @DisplayName("WINDOW_BEFORE_DEPARTURE returns AMBER when within 3 days of expiration window")
     void windowBeforeDepartureNearExpiry() {
         regulationRule.setRuleKind(RegulationRuleKind.WINDOW_BEFORE_DEPARTURE);
         regulationRule.setMaxDays((short) 60);
 
-        // Lấy mẫu ngày 2026-09-03 (trước 1/11 đúng 59 ngày, sắp chạm mốc 60)
+        // Sampled on 2026-09-03 (59 days before departure, near the 60-day threshold)
         documentVersion.setSampledOn(LocalDate.of(2026, 9, 3));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.AMBER, result.validity());
-        assertTrue(result.note().contains("sắp hết hạn"));
+        assertTrue(result.note().contains("nearing expiration window"));
     }
 
     @Test
-    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS: Hộ chiếu còn hạn qua ngày đến + 2 ngày buffer -> GREEN")
+    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS returns GREEN when passport valid past arrival plus 2 buffer days")
     void validThroughArrivalPlusSatisfied() {
         regulationRule.setRuleKind(RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS);
-        // Ngày đến là 2026-11-05, buffer 2 ngày => cần còn hạn ít nhất đến 2026-11-07
+        // Arrival 2026-11-05 + 2 days buffer = 2026-11-07; valid until 2026-12-31
         documentVersion.setValidUntil(LocalDate.of(2026, 12, 31));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
@@ -116,37 +116,37 @@ class ValidityEngineTest {
     }
 
     @Test
-    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS: Hết hạn trước ngày đến -> RED")
+    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS returns RED when passport expires before planned arrival")
     void validThroughArrivalPlusExpiredBeforeArrival() {
         regulationRule.setRuleKind(RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS);
-        // Hết hạn 2026-11-03, trước ngày đến 2026-11-05
+        // Expires 2026-11-03 before arrival on 2026-11-05
         documentVersion.setValidUntil(LocalDate.of(2026, 11, 3));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.RED, result.validity());
-        assertTrue(result.note().contains("trước ngày đến dự kiến"));
+        assertTrue(result.note().contains("before planned arrival"));
     }
 
     @Test
-    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS: Còn hạn ngày đến nhưng không đủ buffer an toàn -> AMBER")
+    @DisplayName("VALID_THROUGH_ARRIVAL_PLUS returns AMBER when valid at arrival but expires inside buffer")
     void validThroughArrivalPlusExpiredWithinBuffer() {
         regulationRule.setRuleKind(RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS);
-        // Đến ngày 2026-11-05, buffer 2 ngày (cần 2026-11-07), nhưng hết hạn ngày 2026-11-06
+        // Arrival 2026-11-05, buffer requires 2026-11-07, expires on 2026-11-06
         documentVersion.setValidUntil(LocalDate.of(2026, 11, 6));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.AMBER, result.validity());
-        assertTrue(result.note().contains("thời gian đệm an toàn"));
+        assertTrue(result.note().contains("mandatory buffer"));
     }
 
     @Test
-    @DisplayName("BOOSTER_WINDOW: Tiêm vắc-xin cúm trong khoảng 7 đến 180 ngày -> GREEN")
+    @DisplayName("BOOSTER_WINDOW returns GREEN when vaccine administered between 7 and 180 days before departure")
     void boosterWindowValid() {
         regulationRule.setRuleKind(RegulationRuleKind.BOOSTER_WINDOW);
         regulationRule.setMinDays((short) 7);
         regulationRule.setMaxDays((short) 180);
 
-        // Tiêm trước khởi hành 30 ngày (2026-10-02)
+        // Vaccinated 30 days before departure (2026-10-02)
         documentVersion.setIssuedOn(LocalDate.of(2026, 10, 2));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
@@ -154,17 +154,17 @@ class ValidityEngineTest {
     }
 
     @Test
-    @DisplayName("BOOSTER_WINDOW: Tiêm quá gấp (< 7 ngày trước khởi hành) chưa đủ kháng thể -> RED")
+    @DisplayName("BOOSTER_WINDOW returns RED when vaccine administered less than 7 days before departure")
     void boosterWindowTooRecent() {
         regulationRule.setRuleKind(RegulationRuleKind.BOOSTER_WINDOW);
         regulationRule.setMinDays((short) 7);
         regulationRule.setMaxDays((short) 180);
 
-        // Tiêm ngày 2026-10-30 (trước 1/11 chỉ 2 ngày)
+        // Vaccinated on 2026-10-30 (2 days before departure, < 7 minimum)
         documentVersion.setIssuedOn(LocalDate.of(2026, 10, 30));
 
         ValidityEngine.Result result = validityEngine.evaluate(checklistItem, documentVersion, job);
         assertEquals(Validity.RED, result.validity());
-        assertTrue(result.note().contains("tối thiểu 7 ngày"));
+        assertTrue(result.note().contains("minimum 7 days"));
     }
 }
