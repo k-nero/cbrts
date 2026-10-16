@@ -63,6 +63,12 @@ public class RequestController {
         return requestService.update(user, id, body);
     }
 
+    /** Submits a draft: SUBMITTED with its REQ code, or 409 SUBMISSION_BLOCKED with every blocker in details. */
+    @PostMapping("/requests/{id}/submit")
+    public RequestResponse submit(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        return requestService.submit(user, id);
+    }
+
     /** Discards a draft that was never submitted. */
     @DeleteMapping("/requests/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

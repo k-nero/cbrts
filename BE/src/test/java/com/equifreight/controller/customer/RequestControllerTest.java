@@ -9,7 +9,15 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.equifreight.exception.ConflictException;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,6 +44,18 @@ class RequestControllerTest {
                         .content("{\"mode\":\"BOAT\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
+    }
+
+    @Test
+    void aBlockedSubmitListsEveryBlockerInDetails() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.submit(any(), eq(id))).thenThrow(new ConflictException("SUBMISSION_BLOCKED",
+                "This request can't be submitted yet.", List.of("Add at least one horse.", "Choose road or air.")));
+
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/submit"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("SUBMISSION_BLOCKED"))
+                .andExpect(jsonPath("$.details[1]").value("Choose road or air."));
     }
 
     @Test

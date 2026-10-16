@@ -5,6 +5,8 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
+import com.equifreight.entity.RequestRevision;
+import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
@@ -63,6 +65,7 @@ public class RequestService {
     /** Mirrors transport_requests_arrival_window_check until the rate catalog's ARRIVAL_WINDOW_MIN_HOURS exists. */
     static final Duration MIN_ARRIVAL_WINDOW = Duration.ofHours(3);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+    private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
 
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
@@ -133,6 +136,53 @@ public class RequestService {
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
         return toResponse(requests.save(request), resolution);
+    }
+
+    /**
+     * R-07, in one transaction with the request row locked, so a double click can't issue two codes: re-run
+     * the blockers, refresh the horse snapshots, issue the REQ code, set SUBMITTED, and keep revision 1 and the
+     * audit trail (BR-F1-08).
+     */
+    @Transactional
+    public RequestResponse submit(User user, UUID id) {
+        Club club = clubs.requireClub(user);
+        TransportRequest request = findDraftForUpdate(club, id);
+        LocalDate today = LocalDate.now(clock);
+        RouteResolution resolution = resolve(request);
+        List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
+        if (!blockers.isEmpty()) {
+            throw new ConflictException("SUBMISSION_BLOCKED", "This request can't be submitted yet.",
+                    blockers.stream().map(Blocker::getMessage).toList());
+        }
+        // No blocker means a resolved corridor with a known lead time (ROUTE_NOT_RUN, CATALOG_INCOMPLETE).
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(), today,
+                request.getDepartureDate());
+
+        request.getHorses().forEach(RequestService::snapshot);
+        request.setCorridor(resolution.corridor());
+        String code = codes.next(CodePrefix.REQ, today.getYear());
+        Instant now = Instant.now(clock);
+        request.setCode(code);
+        request.setStatus(RequestStatus.SUBMITTED);
+        request.setSubmittedAt(now);
+        TransportRequest saved = requests.save(request);
+        RequestResponse response = RequestMapper.toResponse(saved, resolution.route(), null, List.of());
+
+        RequestRevision revision = new RequestRevision();
+        revision.setRequest(saved);
+        revision.setRevisionNo((short) 1);
+        revision.setPayload(json.writeValueAsString(response));
+        revision.setSubmittedAt(now);
+        revisions.save(revision);
+
+        List<String> names = response.getHorses().stream().map(h -> h.getName()).toList();
+        audit.recordDecision(user, "REQUEST_SUBMITTED", "Submitted with " + names.size()
+                        + (names.size() == 1 ? " horse: " : " horses: ") + String.join(", ", names) + ".",
+                ENTITY_TYPE, saved.getId(), code, null, "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
+        audit.recordSystem("LEAD_TIME_CHECKED", "Lead time checked: " + leadTime.getDaysBeforeDeparture()
+                        + " days before departure, " + leadTime.getRequiredDays() + " required.",
+                ENTITY_TYPE, saved.getId(), code, null, null);
+        return response;
     }
 
     /** A draft was never submitted, has no code and nothing refers to it, so it is removed. */

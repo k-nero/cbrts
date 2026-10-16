@@ -31,8 +31,12 @@ import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.entity.RequestRevision;
+import com.equifreight.entity.enums.CodePrefix;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -60,6 +64,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Spec R-01 to R-05, R-08 and R-09: building and editing a draft request. */
@@ -448,6 +453,136 @@ class RequestServiceTest {
         assertThat(page.getContent()).extracting(RequestSummaryResponse::getHorseCount).containsExactly(2L, 1L);
         assertThat(service.list(user, RequestStatus.DRAFT, pageable).getContent())
                 .extracting(RequestSummaryResponse::getId).containsExactly(second.getId());
+    }
+
+    /** Spec R-07: submitting a draft. */
+    @Nested
+    class Submit {
+
+        TransportRequest draft;
+        Corridor hcmBkk;
+
+        @BeforeEach
+        void completeDraft() {
+            draft = draft(shadowfax, nightfall);
+            draft.setOriginPlace(phuTho);
+            draft.setDestinationPlace(chaoPhraya);
+            draft.setDepartureDate(LocalDate.of(2026, 10, 30));
+            draft.setMode(TransportMode.ROAD);
+            draft.setTrailer(TrailerType.SHARED);
+            draft.setInsurance(com.equifreight.entity.enums.InsuranceOption.OWN_POLICY);
+            hcmBkk = new Corridor();
+            hcmBkk.setCode("RD HCM → BKK");
+            when(routes.resolve(any(), any(), any(), any(), any()))
+                    .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
+            when(codes.next(CodePrefix.REQ, 2026)).thenReturn("REQ-2026-0193");
+        }
+
+        @Test
+        void submitIssuesTheCodeAndSetsSubmitted() {
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(response.getCode()).isEqualTo("REQ-2026-0193");
+            assertThat(response.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
+            assertThat(response.getSubmittedAt()).isEqualTo(NOW);
+            assertThat(response.getBlockers()).isEmpty();
+            assertThat(draft.getCode()).isEqualTo("REQ-2026-0193");
+            assertThat(draft.getCorridor()).isSameAs(hcmBkk);
+        }
+
+        @Test
+        void submitRefreshesTheHorseSnapshots() {
+            nightfall.setDeclaredValue(new BigDecimal("250000"));
+
+            service.submit(user, draft.getId());
+
+            assertThat(draft.getHorses()).filteredOn(rh -> rh.getHorse() == nightfall).singleElement()
+                    .satisfies(rh -> assertThat(rh.getDeclaredValue()).isEqualByComparingTo("250000"));
+        }
+
+        @Test
+        void submitWritesRevisionOne() {
+            service.submit(user, draft.getId());
+
+            ArgumentCaptor<RequestRevision> captor = ArgumentCaptor.forClass(RequestRevision.class);
+            verify(revisions).save(captor.capture());
+            RequestRevision revision = captor.getValue();
+            assertThat(revision.getRequest()).isSameAs(draft);
+            assertThat(revision.getRevisionNo()).isEqualTo((short) 1);
+            assertThat(revision.getSubmittedAt()).isEqualTo(NOW);
+            assertThat(revision.getPayload()).contains("\"code\":\"REQ-2026-0193\"")
+                    .contains("\"status\":\"SUBMITTED\"");
+        }
+
+        @Test
+        void submitWritesTheTwoAuditRows() {
+            service.submit(user, draft.getId());
+
+            verify(audit).recordDecision(user, "REQUEST_SUBMITTED", "Submitted with 2 horses: Nightfall, Shadowfax.",
+                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null,
+                    "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
+            verify(audit).recordSystem("LEAD_TIME_CHECKED",
+                    "Lead time checked: 34 days before departure, 21 required.",
+                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+        }
+
+        @Test
+        void oneHorseIsSingular() {
+            draft.getHorses().removeIf(rh -> rh.getHorse() == shadowfax);
+
+            service.submit(user, draft.getId());
+
+            verify(audit).recordDecision(eq(user), eq("REQUEST_SUBMITTED"), eq("Submitted with 1 horse: Nightfall."),
+                    any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void aBlockedSubmitListsEveryBlockerAndSavesNothing() {
+            draft.getHorses().clear();
+            draft.setMode(null);
+            draft.setTrailer(null);
+
+            assertThatThrownBy(() -> service.submit(user, draft.getId()))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("This request can't be submitted yet.")
+                    .satisfies(e -> {
+                        ConflictException conflict = (ConflictException) e;
+                        assertThat(conflict.getCode()).isEqualTo("SUBMISSION_BLOCKED");
+                        assertThat(conflict.getDetails()).contains("Add at least one horse.", "Choose road or air.");
+                    });
+            verifyNoInteractions(codes, revisions, audit);
+            verify(requests, never()).save(any());
+            assertThat(draft.getStatus()).isEqualTo(RequestStatus.DRAFT);
+        }
+
+        @Test
+        void submittingANonDraftIsRefused() {
+            TransportRequest submitted = submitted();
+
+            assertThatThrownBy(() -> service.submit(user, submitted.getId()))
+                    .isInstanceOf(ConflictException.class)
+                    .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+        }
+
+        @Test
+        void submitReadsTheRequestWithARowLock() {
+            service.submit(user, draft.getId());
+
+            verify(requests).findForUpdate(draft.getId(), CLUB_ID);
+            verify(requests, never()).findByIdAndClubId(any(), any());
+        }
+
+        @Test
+        void theCodeYearIsTakenInBusinessTime() {
+            service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit,
+                    JsonMapper.builder().build(),
+                    Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE));
+            draft.setDepartureDate(LocalDate.of(2027, 2, 15));
+            when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
+
+            assertThat(service.submit(user, draft.getId()).getCode()).isEqualTo("REQ-2027-0001");
+            verify(codes).next(CodePrefix.REQ, 2027);
+        }
     }
 
     // --- helpers -------------------------------------------------------------------------------------------
