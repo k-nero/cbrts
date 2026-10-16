@@ -106,7 +106,9 @@ function owedItem(u, title, subject, reason, due, date, action, icon, o) {
   var it = inst(C.owed, { Urgency: u });
   setP(it, { Title: title, Subject: subject, Reason: reason, Due: due, Date: date });
   var a = nested(it, 'Action');
-  if (a) {
+  /* no action: the item is answered in place, right below it */
+  if (a && action == null) a.visible = false;
+  else if (a) {
     var m = { Label: action };
     if (icon) m['Leading icon'] = ICON[icon]; else m['Show leading icon'] = false;
     setP(a, m);
@@ -299,17 +301,40 @@ function stopsWith(states, times) { return HCMC_PNH.map(function (s, i) { return
 
 /* ---------- My requests ---------- */
 /* the requests table, the same with no rows (first run) or three; a row opens with its chevron */
-var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 70, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
+var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 96, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
 function rowOpen() { var i = Ic('arrow-right', 16, 'text/tertiary'); i.name = 'Open'; return i; }
+/* a move's stage at a glance under its name: seven segments, the stages done solid, the current one in the
+   secondary ink, the rest faint. Position, not status, so it never takes a status colour */
+function stageTrack(s) {
+  var v = VV({ name: 'Stage · ' + s, gap: 6 });
+  var segs = H({ name: 'Track', gap: 3 });
+  var at = STAGES.indexOf(s);
+  for (var i = 0; i < 7; i++) add(segs, rect(14, 4, i < at ? 'text/primary' : i === at ? 'text/secondary' : 'border/default', 'Segment', 2));
+  addAll(v, [stageMark(s), segs]);
+  return v;
+}
 function scrMyRequests() {
-  var owe = function (n, tone) { return n ? chip(tone, 'You owe ' + n) : Tx('Nothing needed', 'Body/S', 'text/tertiary'); };
-  var route = function (a, b) { var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]); return v; };
+  /* what is owed, with the date the first of it is due */
+  var owe = function (n, tone, due) {
+    if (!n) return Tx('Nothing needed', 'Body/S', 'text/tertiary');
+    var v = VV({ name: 'Owed', gap: 4, cross: 'MAX' });
+    addAll(v, [chip(tone, 'You owe ' + n), Tx(due, 'Mono/Caption', 'text/tertiary')]);
+    return v;
+  };
+  /* the route with its mode, as on the pass */
+  var route = function (a, b, mode) {
+    var r = H({ name: 'Route', gap: 10, cross: 'MIN' });
+    var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]);
+    addAll(r, [VV({ name: 'Mode', pad: [1, 0, 0, 0] }, [Ic(mode, 16, 'text/tertiary')]), v]);
+    return r;
+  };
+  var horses = function (names) { return coatRow(COAT041.filter(function (c) { return names.indexOf(c[0]) >= 0; }), String(names.length)); };
   /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
   var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageMark('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageMark('Quotation'), owe(1, 'Warn'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageMark('Request'), owe(0), rowOpen()] }
+    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer', 'truck'), horses(['Shadowfax', 'Nightfall', 'Copper King', 'Silver Bell']), '18 Oct 2026', stageTrack('Documents'), owe(4, 'Bad', 'First due 4 Oct'), rowOpen()], hl: true },
+    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class', 'plane'), horses(['Shadowfax', 'Nightfall']), '20 Nov 2026', stageTrack('Quotation'), owe(1, 'Warn', 'Due 30 Sep'), rowOpen()] },
+    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load', 'truck'), horses(['Shadowfax', 'Nightfall']), '30 Oct 2026', stageTrack('Request'), owe(0), rowOpen()] }
   ]);
   tableFoot(t, 3, 3, 'requests');
   var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
@@ -330,11 +355,17 @@ function scrTrackReview() {
     ['Upcoming', 'Departs 30 Oct 2026, flexible by 3 days.', '', ''],
     ['Upcoming', 'Departure 30 Oct; you confirm handover on arrival.', 'In 34 days', '30 Oct']
   ]);
-  var est = panel('Estimate', { gap: 10 });
-  addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('An indicative range, not a quote. The quotation will be itemised line by line.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
-    fillW(requestSummary(REQ_0193, { title: 'What you sent', bare: true, only: ['Horses', 'Service', 'Route', 'Departure'] }))]);
+  /* the wizard's pass, now submitted: draft → submitted → quoted → travel pass */
+  var pass = draftPass({ route: true, chip: ['Neutral', 'Submitted'],
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    stubLabel: 'Your estimate at submission', range: '$11,300 – $16,100', rangeSub: 'Not a quote. Yến prices it line by line; the quotation arrives here.' });
+  /* only what the pass doesn't show, and the one way to change it while it is in review */
+  var sent = requestSummary([['Pickup', 'Phú Thọ training centre, Ho Chi Minh City'], ['Route', 'Via Mộc Bài – Bavet and Poipet – Aranyaprathet'], ['Instructions', 'Quiet loading. Vet check on arrival.'], ['Insurance', 'Your own policy']], { title: 'What you sent' });
+  add(sent, fillW(VV({ name: 'Change', gap: 6, pad: [12, 0, 12, 0] }, [Tx('Need to change something? Yến can still update it before she quotes.', 'Body/S', 'text/tertiary', { fill: true }), btn('Secondary', 'SM', 'Ask Yến to change it')])));
+  var route = panel('Your route', { gap: 12 });
+  addAll(route, [Tx('Your route', 'Heading/H4'), routeReqMap(728, 240), Tx('About 960 km by road with 2 border crossings. Khôi, fleet & route coordinator, plans the exact road and stops after approval.', 'Body/S', 'text/tertiary', { fill: true })]);
   var hist = historyPanel([['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', 'Submitted 26 Sep 2026'], [stageMark('Request')], true), [lead, split(column([stagesP, route]), column([pass, sent]), SIDE.narrow), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: documents needed ---------- */
@@ -465,5 +496,6 @@ async function eTrackComponents() {
   await flush();
   return report({ owed: C.owed.id, stageRow: C.stageRow.id, stop: C.stop2.id });
 }
-async function eTrackScreensA() { return trackScreensCall([scrMyRequests, scrTrackReview, scrTrackDocs]); }
+async function eTrackScreensA() { return trackScreensCall([scrMyRequests, scrTrackReview]); }
+async function eTrackScreensA2() { return trackScreensCall([scrTrackDocs]); }
 async function eTrackScreensB() { return trackScreensCall([scrTrackTransit, scrTrackDelivered]); }

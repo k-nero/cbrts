@@ -123,7 +123,7 @@ function jobMap(o) {
   return m;
 }
 /* the map legend: what each line means, in the same order as the map draws them */
-function mapLegend(kinds) {
+function mapLegend(kinds, names) {
   var r = H({ name: 'Legend', gap: 24, cross: 'CENTER' });
   /* the samples are drawn from the same marks as the map: a solid bar, dots, dashes */
   var sample = function (k) {
@@ -136,7 +136,7 @@ function mapLegend(kinds) {
   [['done', 'Travelled'], ['todo', 'Still to go'], ['old', 'Replaced plan']].forEach(function (k) {
     if (kinds.indexOf(k[0]) < 0) return;
     var it = H({ name: k[1], gap: 8, cross: 'CENTER' });
-    addAll(it, [sample(k[0]), Tx(k[1], 'Body/S', 'text/secondary')]);
+    addAll(it, [sample(k[0]), Tx((names && names[k[0]]) || k[1], 'Body/S', 'text/secondary')]);
     add(r, it);
   });
   return r;

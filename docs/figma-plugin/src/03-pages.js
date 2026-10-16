@@ -702,14 +702,16 @@ function scrHorsesMobile() {
    The wizard's side column is the request drawn as the pass it becomes once approved (the landing
    introduces the pass). It fills in as the steps are done: a value no step has set yet says which step
    sets it, and the stub carries the indicative range, never a price.
-   o: { route: bool, rows: [[label, value, mono, tone] | [label, null, step]], range, rangeSub } */
+   o: { route: bool, from, to: [code, city], mode: 'air', chip: [tone, label], rows: [[label, value, mono, tone] | [label, null, step]], stubLabel, range, rangeSub }
+   The quotation page reuses it with the quoted total in the stub. */
 var DRAFT_ROUTE = { from: ['HCM', 'Ho Chi Minh City'], to: ['BKK', 'Bangkok'] };
 function draftPass(o) {
   var pass = VV({ name: 'Draft pass', w: SIDE.narrow, radius: 16, fill: 'surface/card', stroke: 'border/default', clip: true });
   effect(pass, 'Elevation/1 Card');
   var main = VV({ name: 'Pass', gap: 18, pad: [20, 24, 18, 24] });
   var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
-  addAll(top, [Tx('Your move', 'Label/S', 'text/tertiary'), chip('Neutral', 'Draft', { noDot: true })]);
+  var ch = o.chip || ['Neutral', 'Draft'];
+  addAll(top, [Tx('Your move', 'Label/S', 'text/tertiary'), chip(ch[0], ch[1], { noDot: ch[0] === 'Neutral' })]);
   var set = !!o.route;
   var end = function (c, align) {
     var v = VV({ name: set ? c[1] : 'Not set', gap: 2, cross: align });
@@ -717,9 +719,9 @@ function draftPass(o) {
     return v;
   };
   var leg = H({ name: 'Leg', gap: 8, cross: 'CENTER', pad: [0, 0, 18, 0] });
-  addAll(leg, [fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line')), Ic('truck', 18, set ? 'text/secondary' : 'text/tertiary'), fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line'))]);
+  addAll(leg, [fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line')), Ic(o.mode === 'air' ? 'plane' : 'truck', 18, set ? 'text/secondary' : 'text/tertiary'), fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line'))]);
   var route = H({ name: 'Route', gap: 14, cross: 'CENTER' });
-  addAll(route, [end(DRAFT_ROUTE.from, 'MIN'), fillW(leg), end(DRAFT_ROUTE.to, 'MAX')]);
+  addAll(route, [end(o.from || DRAFT_ROUTE.from, 'MIN'), fillW(leg), end(o.to || DRAFT_ROUTE.to, 'MAX')]);
   var facts = VV({ name: 'Facts', gap: 0 });
   [['Horses', coatRow(COAT041.slice(0, 2), '2 horses')]].concat(o.rows).forEach(function (f) {
     var r = H({ name: f[0], gap: 16, pad: [10, 0, 10, 0], main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -734,7 +736,7 @@ function draftPass(o) {
   var perf = H({ name: 'Perforation', gap: 8, pad: [0, 12, 0, 12], h: 12, main: 'CENTER', cross: 'CENTER', clip: true });
   for (var k = 0; k < 34; k++) add(perf, dot(3, 'border/strong', 'Hole'));
   var stub = VV({ name: 'Stub', gap: 6, pad: [16, 24, 22, 24], fill: 'bg/sunken' });
-  addAll(stub, [Tx('Indicative range', 'Body/S', 'text/secondary'), Tx(o.range || '—', 'Display/M', o.range ? 'text/primary' : 'text/tertiary', { name: 'Range' }), Tx(o.rangeSub, 'Body/S', 'text/tertiary', { name: 'Sub', fill: true })]);
+  addAll(stub, [Tx(o.stubLabel || 'Indicative range', 'Body/S', 'text/secondary'), Tx(o.range || '—', 'Display/M', o.range ? 'text/primary' : 'text/tertiary', { name: 'Range' }), Tx(o.rangeSub, 'Body/S', 'text/tertiary', { name: 'Sub', fill: true })]);
   addAll(pass, [fillW(main), fillW(perf), fillW(stub)]);
   return pass;
 }
@@ -790,7 +792,7 @@ var MAP_REQ = {
   bounds: [100.2, 107.0, 10.4, 14.3],
   /* each border is a short tick through its gate, so it never runs through a label */
   borders: [[[106.18, 11.3], [106.12, 11.08], [106.05, 10.95]], [[102.48, 13.95], [102.56, 13.66], [102.66, 13.35]]],
-  areas: [['VIETNAM', 106.5, 12.6], ['CAMBODIA', 104.6, 13.5], ['THAILAND', 101.6, 11.8]],
+  areas: [['VIETNAM', 106.5, 13.6], ['CAMBODIA', 104.6, 13.5], ['THAILAND', 101.6, 11.8]],
   road: [[106.66, 10.86], [106.12, 11.08], [104.92, 11.56], [103.5, 13.0], [102.56, 13.66], [100.5, 13.75]]
 };
 function routeReqMap(w, h) {
@@ -846,6 +848,50 @@ function routeDates(name, win) {
 }
 function scrRequest2() { return routeDates('Request · 2 Route & dates (error)', false); }
 function scrRequest2Window() { return routeDates('Request · 2 Route & dates · Arrival window', true); }
+/* A route we don't run. The customer can name any city, but only a corridor in the catalog can be
+   estimated or quoted, so the step says so in words, shows where our road ends, offers the nearest
+   route we run, and lets the customer ask instead of guessing. Dates wait until the route is one we run.
+   The map is schematic (a straight line, not geography): a transit map of where coverage stops. */
+function routeNotRunMap(w, h) {
+  return jobMap({ w: w, h: h, end: 9, bounds: [0, 10, 0, 1], borders: [[[3.6, 0.78], [3.6, 0.22]], [[7.9, 0.78], [7.9, 0.22]]],
+    areas: [['THAILAND', 1.9, 0.86], ['MALAYSIA', 5.6, 0.86], ['SINGAPORE', 9, 0.86]],
+    paths: [{ pts: [[1, 0.5], [6.6, 0.5]], kind: 'todo' }, { pts: [[6.6, 0.5], [9, 0.5]], kind: 'old' }],
+    stops: [[1, 0.5, 'Bangkok', 'From', 'stop', 'todo', 'b'], [3.6, 0.5, 'Sadao – Bukit Kayu Hitam', 'Border', 'gate', 'todo', 'b'],
+      [6.6, 0.5, 'Kuala Lumpur', 'Our road ends here', 'stop', 'todo', 'b'], [9, 0.5, 'Singapore', 'Not run yet', 'stop', 'old', 'b']] });
+}
+function scrRequest2NotRun() {
+  var left = VV({ name: 'Step 2', gap: 24 });
+  addAll(left, [Tx('Route and dates', 'Heading/H3'), Tx('We work out the border crossings from the route. Cross-border moves need time for documents to clear.', 'Body/M', 'text/secondary', { fill: true })]);
+  var r1 = H({ name: 'Places', gap: 16 });
+  addAll(r1, [input('Select', 'Default', 'From', 'Bangkok, Thailand', null, { fill: true }), input('Select', 'Default', 'To', 'Singapore', 'Outside the region we run.', { fill: true })]);
+  add(left, fillW(r1));
+  add(left, callout('Warn', 'We don’t run Bangkok → Singapore yet', 'We move horses by road within Vietnam, Cambodia, Thailand, Laos and Malaysia, and by air through Hong Kong. Singapore isn’t in our catalog, so there is no estimate or quotation for it.'));
+  var mp = VV({ name: 'Where our road ends', gap: 10 });
+  addAll(mp, [fillW(routeNotRunMap(776, 220)), mapLegend(['todo', 'old'], { todo: 'A road we run', old: 'Not run yet' })]);
+  add(left, fillW(mp));
+  var near = panel('Nearest route we run', { gap: 14 });
+  var nh = H({ name: 'Head', gap: 16, cross: 'CENTER' });
+  var nt = VV({ name: 'Text', gap: 4 });
+  addAll(nt, [Tx('The nearest route we run', 'Heading/H4'), Tx('Bangkok → Kuala Lumpur by road · ~1,450 km · 1 border crossing', 'Body/S', 'text/secondary', { fill: true })]);
+  addAll(nh, [fillW(nt), btn('Secondary', 'MD', 'Use this route', { trail: 'arrow-right' })]);
+  addAll(near, [fillW(nh), Tx('We hand the horses over in Kuala Lumpur; the last leg to Singapore would be yours to arrange.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(left, fillW(near));
+  var ask = panel('Ask us', { gap: 14 });
+  var ah = VV({ name: 'Head', gap: 4 });
+  addAll(ah, [Tx('Ask us about this route', 'Heading/H4'), Tx('Yến, logistics manager, replies within 1 business day and tells you whether we can add it. Your draft stays saved; nothing is priced until it is a route we run.', 'Body/S', 'text/secondary', { fill: true })]);
+  var send = H({ name: 'Send', gap: 12, main: 'MAX' });
+  add(send, btn('Secondary', 'MD', 'Send to Yến'));
+  addAll(ask, [fillW(ah), input('Text', 'Default', 'What you need', 'Two mares, Bangkok to Kranji racecourse, mid-November.', null, { fill: true }), fillW(send)]);
+  add(left, fillW(ask));
+  var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var fwd = H({ name: 'Forward', gap: 16, cross: 'CENTER' });
+  addAll(fwd, [Tx('Choose a route we run to continue', 'Body/S', 'text/tertiary'), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: 'Disabled' })]);
+  addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), fwd]);
+  add(left, fillW(foot));
+  return requestLayout('Request · 2 Route & dates · Not run', ['Done', 'Current', 'Upcoming', 'Upcoming'], left, draftPass({ route: true, from: ['BKK', 'Bangkok'], to: ['SIN', 'Singapore'],
+    rows: [['Departs', null, 2], ['Arrival', null, 2], ['Borders', 'Not run yet', false, 'status/warn/fg'], ['Service', null, 3]],
+    range: null, rangeSub: 'No range: we don’t run Bangkok → Singapore yet.' }));
+}
 /* the review reads in the order the steps were done */
 var REVIEW_ORDER = ['Horses', 'Pickup', 'Route', 'Departure', 'Arrival', 'Instructions', 'Service', 'Insurance'];
 function scrRequest4() {
@@ -983,6 +1029,35 @@ function quoteTotalsPanel(T) {
   add(tot, Tx('Applied in a fixed order: the volume break on air and ground lines, fuel on the discounted air lines, insurance on declared value, then contingency, then the service fee. USD at the 23 Sep rate; rate catalog v12 is pinned to this quotation.', 'Body/S', 'text/tertiary', { fill: true }));
   return tot;
 }
+/* Where the money goes: one bar per ledger group, largest first, and the fees and cover added after the
+   subtotal as one row, so the customer sees the shape of the price before the lines. One series, so one hue
+   and no legend; the letter badges match the ledger; values and shares in mono. */
+var BREAK_TRACK = 220;
+function sharePct(v, total) { var x = v / total * 100; return x < 1 ? '<1%' : Math.round(x) + '%'; }
+function quoteBreakdown(T, q) {
+  var p = panel('Where the money goes', { gap: 12 });
+  var rows = (q || QUOTE).map(function (g) { return [g[0], g[1], T.groups[g[0]]]; });
+  rows.push(['+', 'Fees, fuel and cover', T.total - T.subtotal, 'Fuel, insurance, contingency and the service fee, less the volume break']);
+  rows.sort(function (a, b) { return b[2] - a[2]; });
+  var top = rows[0];
+  var h = VV({ name: 'Head', gap: 2 });
+  addAll(h, [Tx('Where the ' + money(T.total) + ' goes', 'Heading/H4'), Tx(top[1] + ' is ' + Math.round(top[2] / T.total * 100) + '% of the total. Each group is itemised in the lines below.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(p, fillW(h));
+  rows.forEach(function (r) {
+    var row = H({ name: r[1], gap: 12, cross: 'CENTER' });
+    var badge = H({ name: 'Letter', w: 26, h: 26, radius: 6, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
+    add(badge, Tx(r[0], 'Mono/Chip', 'text/secondary'));
+    var nm = VV({ name: 'Name', gap: 0 });
+    add(nm, Tx(r[1], 'Label/S', 'text/primary', { fill: true }));
+    if (r[3]) add(nm, Tx(r[3], 'Body/S', 'text/tertiary', { fill: true }));
+    var track = F({ name: 'Track', w: BREAK_TRACK, h: 8, radius: 4, fill: 'surface/muted' });
+    var bar = rect(Math.max(4, Math.round(r[2] / T.total * BREAK_TRACK)), 8, 'text/secondary', 'Bar', 4);
+    track.appendChild(bar);
+    addAll(row, [badge, fillW(nm), track, Tx(money(r[2]), 'Mono/Data', 'text/primary', { w: 96, align: 'RIGHT' }), Tx(sharePct(r[2], T.total), 'Mono/Caption', 'text/tertiary', { w: 40, align: 'RIGHT' })]);
+    add(p, fillW(row));
+  });
+  return p;
+}
 function scrQuote() {
   var T = quoteTotals();
   var left = VV({ name: 'Lines', gap: 24 });
@@ -990,13 +1065,13 @@ function scrQuote() {
   var sizing = VV({ name: 'Group note · sizing', gap: 4, pad: [10, 20, 14, 20], fill: 'bg/sunken' });
   borderSide(sizing, 'border/default', 'top');
   addAll(sizing, [Tx('How the stall was sized', 'Label/S', 'text/secondary'), Tx('Nightfall and Shadowfax fly business class at 48 in each: 96 in, so 1 position. Flying grooms: 2 ÷ 3, rounded up, is 1. No flight vet: one joins from 8 horses, or when a horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
-  addAll(left, [fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
+  addAll(left, [fillW(quoteBreakdown(T)), fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
 
   var est = panel('Against your estimate', { gap: 12 });
   var inside = T.total >= QUOTE_ESTIMATE[0] && T.total <= QUOTE_ESTIMATE[1];
   var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', wrap: true, rowGap: 8 });
   addAll(head, [Tx('Against your estimate', 'Heading/H4'), chip(inside ? 'Ok' : 'Warn', inside ? 'Inside your range' : 'Outside your range')]);
-  addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('This quotation', money(T.total)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
+  addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
     Tx('The largest line is the business-class air stall, $16,800, or ' + Math.round(16800 / T.total * 100) + '% of the total. Waiting time (H) is the only line that can change on the final invoice.', 'Body/S', 'text/tertiary', { fill: true })]);
 
   var next = panel('After you accept', { gap: 14 });
@@ -1029,12 +1104,16 @@ function scrQuote() {
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Superseded. Departure moved from 12 Nov to 20 Nov.', 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(terms, [divider(), Tx('Versions', 'Label/S', 'text/secondary'), fillW(v2), fillW(v1)]);
-  var right = column([est, next, who, terms]);
+  /* the request as the pass it becomes, now quoted: the wizard's draft pass with the total in the stub */
+  var pass = draftPass({ route: true, mode: 'air', from: ['PNH', 'Phnom Penh'], to: ['HKG', 'Hong Kong'], chip: ['Info', 'Quoted · v2'],
+    rows: [['Departs', '20 Nov 2026', true], ['Mode', 'Air · business class'], ['Arrival', 'Airline schedule'], ['Service', 'Flying groom · insured with us']],
+    stubLabel: 'Quoted total', range: money(T.total), rangeSub: 'Valid until 30 Sep 2026. Once you accept and Yến approves, this becomes your travel pass.' });
+  var right = column([pass, est, next, who, terms]);
 
   var lead = owedPanel('1 item', 'Yến, logistics manager, issued version 2 on 23 Sep. Accepting locks the price and the horse list; declining closes the request.',
     [owedItem('Soon', 'Accept or decline this quotation', 'Q-2026-0188 · version 2 · ' + money(T.total), 'It holds its price for 7 days from 23 Sep. After 30 Sep it expires and Yến re-prices it from the rate catalog in force then.', 'Due in 4 days', '30 Sep 2026', 'Accept quotation', 'check', { second: 'Decline' })],
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
-  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
+  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'Q-2026-0188 · version 2'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
 }
 
 /* ---------------------------------------------------------------------
