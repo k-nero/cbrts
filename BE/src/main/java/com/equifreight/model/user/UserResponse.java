@@ -22,6 +22,8 @@ public class UserResponse {
     private String lastName;
     private String phone;
     private List<String> roles;
+    /** The customer's club name on /me; null for staff and on the admin user list. */
+    private String clubName;
     private Instant createdAt;
     private Instant updatedAt;
 }
