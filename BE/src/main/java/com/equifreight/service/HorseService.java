@@ -4,6 +4,8 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.HorseSex;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -24,11 +26,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,6 +44,11 @@ import java.util.UUID;
  */
 @Service
 public class HorseService {
+
+    /** A horse on a request in one of these statuses can't be archived (an unclosed job is checked too). */
+    static final Set<RequestStatus> ARCHIVE_BLOCKING_STATUSES = Collections.unmodifiableSet(EnumSet.of(
+            RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW, RequestStatus.INFO_REQUIRED,
+            RequestStatus.QUOTED, RequestStatus.CUSTOMER_ACCEPTED));
 
     private static final String DEFAULT_CURRENCY = "USD";
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
@@ -98,6 +109,42 @@ public class HorseService {
         return HorseMapper.toResponse(saveChecked(horse), false);
     }
 
+    /** Full update. Identity fields are refused once the horse was on a submitted request (H-07). */
+    @Transactional
+    public HorseResponse update(User user, UUID id, HorseRequest request) {
+        Club club = clubs.requireClub(user);
+        Horse horse = findOwned(club, id);
+        if (horse.getArchivedAt() != null) {
+            throw new ConflictException("HORSE_ARCHIVED",
+                    horse.getName() + " is archived. Archived horses can't be edited.");
+        }
+        List<String> submittedOn = requestHorses.findSubmittedRequestCodes(horse.getId());
+        if (!submittedOn.isEmpty()) {
+            requireIdentityUnchanged(horse, request, submittedOn.getFirst());
+        }
+        applyChecked(club, horse, request);
+        return HorseMapper.toResponse(saveChecked(horse), !submittedOn.isEmpty());
+    }
+
+    /** Archived, never deleted: past requests and jobs refer to the horse (H-08). */
+    @Transactional
+    public HorseResponse archive(User user, UUID id) {
+        Horse horse = findOwned(user, id);
+        if (horse.getArchivedAt() != null) {
+            return HorseMapper.toResponse(horse, isIdentityLocked(horse));
+        }
+        List<RequestHorseRepository.HorseUse> uses =
+                requestHorses.findActiveUses(horse.getId(), ARCHIVE_BLOCKING_STATUSES);
+        if (!uses.isEmpty()) {
+            RequestHorseRepository.HorseUse use = uses.getFirst();
+            throw new ConflictException("HORSE_IN_USE", horse.getName() + " is on " + use.getCode() + ", which "
+                    + whereItStands(use.getStatus()) + ". Archive " + objectPronoun(horse.getSex())
+                    + " after it ends.");
+        }
+        horse.setArchivedAt(Instant.now());
+        return HorseMapper.toResponse(saveChecked(horse), isIdentityLocked(horse));
+    }
+
     @Transactional(readOnly = true)
     public List<SizeClassResponse> sizeClasses() {
         return sizeClasses.findAllByOrderByMinHeightHhAsc().stream().map(HorseMapper::toResponse).toList();
@@ -105,8 +152,11 @@ public class HorseService {
 
     /** The club's horse, archived or not; anyone else's, or an unknown id, is not found. */
     Horse findOwned(User user, UUID id) {
-        UUID clubId = clubs.requireClub(user).getId();
-        return horses.findByIdAndClubId(id, clubId).orElseThrow(() -> ResourceNotFoundException.of("Horse", id));
+        return findOwned(clubs.requireClub(user), id);
+    }
+
+    private Horse findOwned(Club club, UUID id) {
+        return horses.findByIdAndClubId(id, club.getId()).orElseThrow(() -> ResourceNotFoundException.of("Horse", id));
     }
 
     boolean isIdentityLocked(Horse horse) {
@@ -164,6 +214,72 @@ public class HorseService {
 
     static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** Compares the request's identity with the stored one, normalised as it would be saved. */
+    private static void requireIdentityUnchanged(Horse horse, HorseRequest request, String requestCode) {
+        List<String> changed = new ArrayList<>();
+        if (!Objects.equals(horse.getName(), trimToNull(request.getName()))) {
+            changed.add("Name");
+        }
+        if (!Objects.equals(horse.getMicrochip(), request.getMicrochip() == null
+                ? null : request.getMicrochip().replaceAll("\\s", ""))) {
+            changed.add("Microchip");
+        }
+        if (horse.getSex() != request.getSex()) {
+            changed.add("Sex");
+        }
+        if (!Objects.equals(horse.getBreed(), trimToNull(request.getBreed()))) {
+            changed.add("Breed");
+        }
+        if (!Objects.equals(horse.getDateOfBirth(), request.getDateOfBirth())) {
+            changed.add("Date of birth");
+        }
+        if (horse.getCoat() != request.getCoat()) {
+            changed.add("Coat");
+        }
+        if (changed.isEmpty()) {
+            return;
+        }
+        throw new ConflictException("HORSE_IDENTITY_LOCKED", joinFields(changed) + " can't be changed: "
+                + horse.getName() + " travelled on " + requestCode + ". Ask the transport specialist to correct "
+                + (changed.size() == 1 ? "it" : "them") + " against " + possessivePronoun(horse.getSex())
+                + " passport.");
+    }
+
+    /** "Name", "Name and sex", "Name, sex and coat". */
+    private static String joinFields(List<String> labels) {
+        List<String> words = new ArrayList<>();
+        for (int i = 0; i < labels.size(); i++) {
+            words.add(i == 0 ? labels.get(i) : labels.get(i).toLowerCase(Locale.ROOT));
+        }
+        if (words.size() == 1) {
+            return words.getFirst();
+        }
+        return String.join(", ", words.subList(0, words.size() - 1)) + " and " + words.getLast();
+    }
+
+    private static String whereItStands(RequestStatus status) {
+        return switch (status) {
+            case SUBMITTED, UNDER_REVIEW -> "is in review";
+            case INFO_REQUIRED -> "is waiting for information from you";
+            case QUOTED -> "has a quotation waiting for you";
+            case CUSTOMER_ACCEPTED -> "is waiting for approval";
+            case APPROVED -> "is an approved job that hasn't closed";
+            default -> "is still open";
+        };
+    }
+
+    private static boolean isFemale(HorseSex sex) {
+        return sex == HorseSex.MARE || sex == HorseSex.FILLY;
+    }
+
+    private static String objectPronoun(HorseSex sex) {
+        return isFemale(sex) ? "her" : "him";
+    }
+
+    private static String possessivePronoun(HorseSex sex) {
+        return isFemale(sex) ? "her" : "his";
     }
 
     private static void requireDateOfBirthNotAfterToday(LocalDate dateOfBirth) {

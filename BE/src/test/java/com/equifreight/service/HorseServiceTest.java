@@ -4,7 +4,9 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -24,8 +26,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -220,6 +225,196 @@ class HorseServiceTest {
         assertThat(page).extracting(HorseResponse::isIdentityLocked).containsExactly(true, false);
         verify(requestHorses, times(1)).findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
                 ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
+    }
+
+    @Test
+    void identityFieldsCanChangeBeforeAnySubmittedRequest() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setName("Nightfall II");
+
+        service.update(user, nightfall.getId(), request);
+
+        assertThat(savedHorse().getName()).isEqualTo("Nightfall II");
+    }
+
+    @Test
+    void changingIdentityAfterASubmittedRequestIsRefused() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setName("Nightfall II");
+        request.setSex(HorseSex.FILLY);
+
+        assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Name and sex can't be changed: Nightfall travelled on REQ-2026-0193. "
+                        + "Ask the transport specialist to correct them against her passport.")
+                .extracting("code").isEqualTo("HORSE_IDENTITY_LOCKED");
+        verify(horses, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void oneLockedFieldUsesSingularWording() {
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        nightfall.setCoat(HorseCoat.BLACK);
+        owned(nightfall);
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setCoat(HorseCoat.BAY);
+
+        assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Coat can't be changed: Nightfall travelled on REQ-2026-0193. "
+                        + "Ask the transport specialist to correct it against her passport.");
+    }
+
+    @Test
+    void resendingTheSameIdentityInADifferentFormatPassesWhenLocked() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setMicrochip("250 259 600 223 311");
+        request.setName("Nightfall ");
+        request.setWeightKg((short) 480);
+
+        HorseResponse response = service.update(user, nightfall.getId(), request);
+
+        assertThat(savedHorse().getWeightKg()).isEqualTo((short) 480);
+        assertThat(response.isIdentityLocked()).isTrue();
+    }
+
+    @Test
+    void nonIdentityFieldsStayEditableWhenLocked() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        HorseRequest request = requestFrom(nightfall);
+        request.setDeclaredValue(new BigDecimal("250000"));
+        request.setHandlingNotes("Kicks at the partition when the trailer stops.");
+
+        service.update(user, nightfall.getId(), request);
+
+        Horse saved = savedHorse();
+        assertThat(saved.getDeclaredValue()).isEqualByComparingTo("250000");
+        assertThat(saved.getHandlingNotes()).isEqualTo("Kicks at the partition when the trailer stops.");
+    }
+
+    @Test
+    void updatingAnArchivedHorseIsRefused() {
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        nightfall.setArchivedAt(Instant.parse("2026-10-01T03:00:00Z"));
+        owned(nightfall);
+
+        assertThatThrownBy(() -> service.update(user, nightfall.getId(), requestFrom(nightfall)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Nightfall is archived. Archived horses can't be edited.")
+                .extracting("code").isEqualTo("HORSE_ARCHIVED");
+    }
+
+    @Test
+    void updateDoesNotCountTheHorseAsItsOwnDuplicate() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(CLUB_ID, "Nightfall"))
+                .thenReturn(Optional.of(nightfall));
+        when(horses.findByMicrochip("250259600223311")).thenReturn(Optional.of(nightfall));
+
+        service.update(user, nightfall.getId(), requestFrom(nightfall));
+
+        verify(horses).saveAndFlush(nightfall);
+    }
+
+    @Test
+    void archiveIsRefusedWhileTheHorseIsOnARequestInReview() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findActiveUses(eq(nightfall.getId()), any()))
+                .thenReturn(List.of(use("REQ-2026-0193", RequestStatus.UNDER_REVIEW)));
+
+        assertThatThrownBy(() -> service.archive(user, nightfall.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Nightfall is on REQ-2026-0193, which is in review. Archive her after it ends.")
+                .extracting("code").isEqualTo("HORSE_IN_USE");
+        verify(horses, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void archiveIsRefusedWhileTheHorseIsOnAnUnclosedJob() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findActiveUses(eq(nightfall.getId()), any()))
+                .thenReturn(List.of(use("REQ-2026-0162", RequestStatus.APPROVED)));
+
+        assertThatThrownBy(() -> service.archive(user, nightfall.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Nightfall is on REQ-2026-0162, which is an approved job that hasn't closed. "
+                        + "Archive her after it ends.");
+    }
+
+    @Test
+    void archiveChecksOnlyTheActiveStatuses() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+
+        service.archive(user, nightfall.getId());
+
+        verify(requestHorses).findActiveUses(eq(nightfall.getId()), argThat((Collection<RequestStatus> statuses) ->
+                Set.copyOf(statuses).equals(EnumSet.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW,
+                        RequestStatus.INFO_REQUIRED, RequestStatus.QUOTED, RequestStatus.CUSTOMER_ACCEPTED))));
+    }
+
+    @Test
+    void archiveSetsArchivedAtWhenNothingActiveRemains() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+
+        HorseResponse response = service.archive(user, nightfall.getId());
+
+        assertThat(savedHorse().getArchivedAt()).isNotNull();
+        assertThat(response.getArchivedAt()).isNotNull();
+    }
+
+    @Test
+    void archivingAnArchivedHorseChangesNothing() {
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        Instant archivedAt = Instant.parse("2026-10-01T03:00:00Z");
+        nightfall.setArchivedAt(archivedAt);
+        owned(nightfall);
+
+        HorseResponse response = service.archive(user, nightfall.getId());
+
+        assertThat(response.getArchivedAt()).isEqualTo(archivedAt);
+        verify(horses, never()).saveAndFlush(any());
+    }
+
+    private Horse owned(Horse horse) {
+        when(horses.findByIdAndClubId(horse.getId(), CLUB_ID)).thenReturn(Optional.of(horse));
+        return horse;
+    }
+
+    private static HorseRequest requestFrom(Horse horse) {
+        HorseRequest request = new HorseRequest();
+        request.setName(horse.getName());
+        request.setSex(horse.getSex());
+        request.setCoat(horse.getCoat());
+        request.setBreed(horse.getBreed());
+        request.setDateOfBirth(horse.getDateOfBirth());
+        request.setHeightHh(horse.getHeightHh());
+        request.setWeightKg(horse.getWeightKg());
+        request.setMicrochip(horse.getMicrochip());
+        request.setPassportNo(horse.getPassportNo());
+        request.setDeclaredValue(horse.getDeclaredValue());
+        request.setRequiredStall(horse.getRequiredStall());
+        return request;
+    }
+
+    private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
+        return new RequestHorseRepository.HorseUse() {
+            @Override
+            public String getCode() {
+                return code;
+            }
+
+            @Override
+            public RequestStatus getStatus() {
+                return status;
+            }
+        };
     }
 
     private Horse savedHorse() {
