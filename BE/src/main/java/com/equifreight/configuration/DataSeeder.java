@@ -33,7 +33,8 @@ import java.util.Set;
 
 /**
  * Seeds the five roles and one demo account per role (the people in the Figma demo data), the customer's
- * club and its four horses (docs/figma-plugin/src/03-pages.js, HORSES). Every value is a demo placeholder.
+ * club and its four horses (docs/figma-plugin/src/03-pages.js, HORSES), and the route catalog through
+ * {@link CatalogSeeder}. Every value is a demo placeholder.
  * Idempotent: existing roles, emails, clubs and microchips are left alone.
  */
 @Component
@@ -87,12 +88,14 @@ public class DataSeeder implements ApplicationRunner {
     private final CountryRepository countryRepository;
     private final HorseRepository horseRepository;
     private final HorseSizeClassRepository sizeClassRepository;
+    private final CatalogSeeder catalogSeeder;
     private final PasswordEncoder passwordEncoder;
     private final String seedPassword;
 
     public DataSeeder(RoleRepository roleRepository, UserRepository userRepository, ClubRepository clubRepository,
                       CountryRepository countryRepository, HorseRepository horseRepository,
-                      HorseSizeClassRepository sizeClassRepository, PasswordEncoder passwordEncoder,
+                      HorseSizeClassRepository sizeClassRepository, CatalogSeeder catalogSeeder,
+                      PasswordEncoder passwordEncoder,
                       @Value("${app.seed.default.password}") String seedPassword) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -100,6 +103,7 @@ public class DataSeeder implements ApplicationRunner {
         this.countryRepository = countryRepository;
         this.horseRepository = horseRepository;
         this.sizeClassRepository = sizeClassRepository;
+        this.catalogSeeder = catalogSeeder;
         this.passwordEncoder = passwordEncoder;
         this.seedPassword = seedPassword;
     }
@@ -129,6 +133,8 @@ public class DataSeeder implements ApplicationRunner {
             userRepository.save(user);
             log.info("Seeded {} ({})", u[0], u[3]);
         }
+        // After the accounts: the regulation versions name the transport specialist who published them.
+        catalogSeeder.seed();
         Club club = seedClub();
         seedHorses(club);
     }

@@ -43,7 +43,7 @@ class DataSeederTest {
         HorseSizeClassRepository sizeClasses = mock(HorseSizeClassRepository.class);
         horses = mock(HorseRepository.class);
         seeder = new DataSeeder(roles, users, clubs, mock(CountryRepository.class), horses, sizeClasses,
-                mock(PasswordEncoder.class), "changeme123!");
+                mock(CatalogSeeder.class), mock(PasswordEncoder.class), "changeme123!");
 
         Club club = new Club();
         club.setId(CLUB_ID);
