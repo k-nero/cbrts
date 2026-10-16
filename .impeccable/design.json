@@ -1,0 +1,1034 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T08:48:57.027Z",
+  "title": "Design System: EquiFreight",
+  "extensions": {
+    "modes": {
+      "primary": "Dark",
+      "secondary": "Light",
+      "note": "Light values are in colorMeta.<token>.light; set per frame via EquiFreight / Color → Light."
+    },
+    "scope": {
+      "maintained": "Desktop 1440",
+      "unmaintained": "Mobile frames (App header / Mobile, My horses · Mobile and its Light copy) exist but are not maintained."
+    },
+    "colorMeta": {
+      "bg-canvas": {
+        "role": "neutral",
+        "displayName": "Night Navy",
+        "figmaVariable": "EquiFreight / Color / bg/canvas",
+        "canonical": "#0C1520",
+        "light": "#F3F5F8",
+        "purpose": "Page background",
+        "tonalRamp": [
+          "#040C16",
+          "#1C2632",
+          "#384350",
+          "#576270",
+          "#788492",
+          "#9AA6B6",
+          "#BECADA",
+          "#E4F0FF"
+        ]
+      },
+      "bg-sunken": {
+        "role": "neutral",
+        "displayName": "Deep Well",
+        "figmaVariable": "EquiFreight / Color / bg/sunken",
+        "canonical": "#09111A",
+        "light": "#E9EDF2",
+        "purpose": "Wells, table headers, fact cells",
+        "tonalRamp": [
+          "#050C14",
+          "#1D2630",
+          "#39434E",
+          "#58626E",
+          "#798490",
+          "#9BA6B3",
+          "#BFCAD8",
+          "#E4F0FE"
+        ]
+      },
+      "bg-input": {
+        "role": "neutral",
+        "displayName": "Field Navy",
+        "figmaVariable": "EquiFreight / Color / bg/input",
+        "canonical": "#0E1826",
+        "light": "#FFFFFF",
+        "purpose": "Form control fill",
+        "tonalRamp": [
+          "#040B18",
+          "#1B2634",
+          "#374353",
+          "#566273",
+          "#768396",
+          "#99A6B9",
+          "#BCCADE",
+          "#E5EFFF"
+        ]
+      },
+      "surface-card": {
+        "role": "neutral",
+        "displayName": "Card Navy",
+        "figmaVariable": "EquiFreight / Color / surface/card",
+        "canonical": "#111B2C",
+        "light": "#FFFFFF",
+        "purpose": "Cards and panels",
+        "tonalRamp": [
+          "#040B1A",
+          "#1B2537",
+          "#374256",
+          "#556276",
+          "#768399",
+          "#98A6BD",
+          "#BCCAE2",
+          "#E6EFFE"
+        ]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Lifted Navy",
+        "figmaVariable": "EquiFreight / Color / surface/raised",
+        "canonical": "#15223A",
+        "light": "#F8F9FB",
+        "purpose": "Selected or hovered card, toasts",
+        "tonalRamp": [
+          "#020A1F",
+          "#18253D",
+          "#34425C",
+          "#52627E",
+          "#7283A0",
+          "#94A6C5",
+          "#B8CAEA",
+          "#E6EFFF"
+        ]
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "Muted Navy",
+        "figmaVariable": "EquiFreight / Color / surface/muted",
+        "canonical": "#182538",
+        "light": "#EEF1F5",
+        "purpose": "Hover fill, neutral chips",
+        "tonalRamp": [
+          "#020B1C",
+          "#182539",
+          "#354358",
+          "#536278",
+          "#74849B",
+          "#96A6BF",
+          "#B9CBE4",
+          "#E5EFFE"
+        ]
+      },
+      "border-default": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "figmaVariable": "EquiFreight / Color / border/default",
+        "canonical": "#1C2E44",
+        "light": "#DDE3EA",
+        "purpose": "Hairlines and card borders",
+        "tonalRamp": [
+          "#000B1E",
+          "#14263B",
+          "#30435B",
+          "#4F637C",
+          "#6F849E",
+          "#91A7C2",
+          "#B5CBE8",
+          "#E4F0FE"
+        ]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "figmaVariable": "EquiFreight / Color / border/strong",
+        "canonical": "#2A4266",
+        "light": "#C3CDD9",
+        "purpose": "Controls and emphasised borders",
+        "tonalRamp": [
+          "#000A22",
+          "#0E2446",
+          "#2A4266",
+          "#496288",
+          "#6984AC",
+          "#8BA7D1",
+          "#AECBF7",
+          "#E5EFFE"
+        ]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Parchment",
+        "figmaVariable": "EquiFreight / Color / text/primary",
+        "canonical": "#EDE9E1",
+        "light": "#0F1A28",
+        "purpose": "Headings and body copy",
+        "tonalRamp": [
+          "#0D0B06",
+          "#28251F",
+          "#45423B",
+          "#64615A",
+          "#85827B",
+          "#A8A59D",
+          "#CDC9C1",
+          "#F2EEE6"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "figmaVariable": "EquiFreight / Color / text/secondary",
+        "canonical": "#B3BFCC",
+        "light": "#3C4A5B",
+        "purpose": "Supporting copy",
+        "tonalRamp": [
+          "#050C14",
+          "#1D2630",
+          "#39434E",
+          "#58626E",
+          "#788490",
+          "#9BA6B3",
+          "#BFCBD8",
+          "#E4F0FE"
+        ]
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "figmaVariable": "EquiFreight / Color / text/tertiary",
+        "canonical": "#7A8FA3",
+        "light": "#5F6F82",
+        "purpose": "Captions, labels, placeholders",
+        "tonalRamp": [
+          "#000C1A",
+          "#152737",
+          "#314456",
+          "#506476",
+          "#708599",
+          "#92A8BC",
+          "#B6CCE2",
+          "#E2F1FF"
+        ]
+      },
+      "accent-default": {
+        "role": "primary",
+        "displayName": "Brass Gold",
+        "figmaVariable": "EquiFreight / Color / accent/default",
+        "canonical": "#C9AA5A",
+        "light": "#C9AA5A",
+        "purpose": "Brand gold. Primary actions only, never status",
+        "tonalRamp": [
+          "#100A00",
+          "#302300",
+          "#523F02",
+          "#785D02",
+          "#9C7E2B",
+          "#C0A151",
+          "#E5C676",
+          "#FFEDC1"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Polished Gold",
+        "figmaVariable": "EquiFreight / Color / accent/hover",
+        "canonical": "#D6B96B",
+        "light": "#B89846",
+        "purpose": "Primary action hover",
+        "tonalRamp": [
+          "#100A00",
+          "#2F2301",
+          "#523F00",
+          "#775E04",
+          "#9B7F2F",
+          "#BFA254",
+          "#E4C678",
+          "#FFEDC0"
+        ]
+      },
+      "accent-on": {
+        "role": "primary",
+        "displayName": "Navy Ink",
+        "figmaVariable": "EquiFreight / Color / accent/on",
+        "canonical": "#0C1520",
+        "light": "#0C1520",
+        "purpose": "Content placed on gold",
+        "tonalRamp": [
+          "#040C16",
+          "#1C2632",
+          "#384350",
+          "#576270",
+          "#788492",
+          "#9AA6B6",
+          "#BECADA",
+          "#E4F0FF"
+        ]
+      },
+      "accent-text": {
+        "role": "primary",
+        "displayName": "Gold Ink",
+        "figmaVariable": "EquiFreight / Color / accent/text",
+        "canonical": "#D9BD72",
+        "light": "#80611A",
+        "purpose": "Gold used as text or icon",
+        "tonalRamp": [
+          "#100A00",
+          "#2F2300",
+          "#523F03",
+          "#785E03",
+          "#9A7F33",
+          "#BEA257",
+          "#E3C77B",
+          "#FFEDC0"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Gold Wash",
+        "figmaVariable": "EquiFreight / Color / accent/soft",
+        "canonical": "#C9AA5A1F",
+        "light": "#C9AA5A29",
+        "purpose": "Gold tint fill",
+        "tonalRamp": [
+          "#100A00",
+          "#302300",
+          "#523F02",
+          "#785D02",
+          "#9C7E2B",
+          "#C0A151",
+          "#E5C676",
+          "#FFEDC1"
+        ]
+      },
+      "accent-line": {
+        "role": "primary",
+        "displayName": "Gold Hairline",
+        "figmaVariable": "EquiFreight / Color / accent/line",
+        "canonical": "#C9AA5A59",
+        "light": "#A07D2873",
+        "purpose": "Gold tint border",
+        "tonalRamp": [
+          "#100A00",
+          "#302300",
+          "#523F02",
+          "#785D02",
+          "#9C7E2B",
+          "#C0A151",
+          "#E5C676",
+          "#FFEDC1"
+        ]
+      },
+      "status-ok-fg": {
+        "role": "status",
+        "displayName": "Pasture Green",
+        "figmaVariable": "EquiFreight / Color / status/ok/fg",
+        "canonical": "#5DC688",
+        "light": "#1D7A47",
+        "purpose": "GREEN · cleared, valid",
+        "tonalRamp": [
+          "#000F05",
+          "#012E17",
+          "#03502C",
+          "#057442",
+          "#29995E",
+          "#54BD80",
+          "#7BE3A3",
+          "#C5FFD8"
+        ]
+      },
+      "status-ok-bg": {
+        "role": "status",
+        "displayName": "Pasture Green Tint",
+        "figmaVariable": "EquiFreight / Color / status/ok/bg",
+        "canonical": "#5DC6881F",
+        "light": "#E2F3E9",
+        "tonalRamp": [
+          "#000F05",
+          "#012E17",
+          "#03502C",
+          "#057442",
+          "#29995E",
+          "#54BD80",
+          "#7BE3A3",
+          "#C5FFD8"
+        ]
+      },
+      "status-ok-border": {
+        "role": "status",
+        "displayName": "Pasture Green Border",
+        "figmaVariable": "EquiFreight / Color / status/ok/border",
+        "canonical": "#5DC68859",
+        "light": "#A9D8BB",
+        "tonalRamp": [
+          "#000F05",
+          "#012E17",
+          "#03502C",
+          "#057442",
+          "#29995E",
+          "#54BD80",
+          "#7BE3A3",
+          "#C5FFD8"
+        ]
+      },
+      "status-warn-fg": {
+        "role": "status",
+        "displayName": "Amber",
+        "figmaVariable": "EquiFreight / Color / status/warn/fg",
+        "canonical": "#FDB47A",
+        "light": "#7F3B00",
+        "purpose": "AMBER · valid today, fails on the travel dates",
+        "tonalRamp": [
+          "#110A00",
+          "#322200",
+          "#553E02",
+          "#7C5B03",
+          "#A67A02",
+          "#CC9D33",
+          "#F2C15D",
+          "#FFECC9"
+        ]
+      },
+      "status-warn-bg": {
+        "role": "status",
+        "displayName": "Amber Tint",
+        "figmaVariable": "EquiFreight / Color / status/warn/bg",
+        "canonical": "#FDB47A1F",
+        "light": "#FCE9D8",
+        "tonalRamp": [
+          "#110A00",
+          "#322200",
+          "#553E02",
+          "#7C5B03",
+          "#A67A02",
+          "#CC9D33",
+          "#F2C15D",
+          "#FFECC9"
+        ]
+      },
+      "status-warn-border": {
+        "role": "status",
+        "displayName": "Amber Border",
+        "figmaVariable": "EquiFreight / Color / status/warn/border",
+        "canonical": "#FDB47A61",
+        "light": "#EFC199",
+        "tonalRamp": [
+          "#110A00",
+          "#322200",
+          "#553E02",
+          "#7C5B03",
+          "#A67A02",
+          "#CC9D33",
+          "#F2C15D",
+          "#FFECC9"
+        ]
+      },
+      "status-bad-fg": {
+        "role": "status",
+        "displayName": "Signal Red",
+        "figmaVariable": "EquiFreight / Color / status/bad/fg",
+        "canonical": "#EF6B6B",
+        "light": "#B3261E",
+        "purpose": "RED · fails its rule, blocked",
+        "tonalRamp": [
+          "#1E0002",
+          "#4C010A",
+          "#800118",
+          "#AB2B33",
+          "#D25153",
+          "#FB7675",
+          "#FEB2AF",
+          "#FEE9E7"
+        ]
+      },
+      "status-bad-bg": {
+        "role": "status",
+        "displayName": "Signal Red Tint",
+        "figmaVariable": "EquiFreight / Color / status/bad/bg",
+        "canonical": "#EF6B6B1F",
+        "light": "#FBE6E4",
+        "tonalRamp": [
+          "#1E0002",
+          "#4C010A",
+          "#800118",
+          "#AB2B33",
+          "#D25153",
+          "#FB7675",
+          "#FEB2AF",
+          "#FEE9E7"
+        ]
+      },
+      "status-bad-border": {
+        "role": "status",
+        "displayName": "Signal Red Border",
+        "figmaVariable": "EquiFreight / Color / status/bad/border",
+        "canonical": "#EF6B6B61",
+        "light": "#F0B5B0",
+        "tonalRamp": [
+          "#1E0002",
+          "#4C010A",
+          "#800118",
+          "#AB2B33",
+          "#D25153",
+          "#FB7675",
+          "#FEB2AF",
+          "#FEE9E7"
+        ]
+      },
+      "status-info-fg": {
+        "role": "status",
+        "displayName": "Harbour Blue",
+        "figmaVariable": "EquiFreight / Color / status/info/fg",
+        "canonical": "#7FB0E8",
+        "light": "#1F5FA8",
+        "purpose": "Informational, awaiting review, operations role",
+        "tonalRamp": [
+          "#000B1D",
+          "#01254A",
+          "#144373",
+          "#356397",
+          "#5685BB",
+          "#78A9E0",
+          "#A3CDFE",
+          "#E4F0FE"
+        ]
+      },
+      "status-info-bg": {
+        "role": "status",
+        "displayName": "Harbour Blue Tint",
+        "figmaVariable": "EquiFreight / Color / status/info/bg",
+        "canonical": "#7FB0E81F",
+        "light": "#E4EEFA",
+        "tonalRamp": [
+          "#000B1D",
+          "#01254A",
+          "#144373",
+          "#356397",
+          "#5685BB",
+          "#78A9E0",
+          "#A3CDFE",
+          "#E4F0FE"
+        ]
+      },
+      "status-info-border": {
+        "role": "status",
+        "displayName": "Harbour Blue Border",
+        "figmaVariable": "EquiFreight / Color / status/info/border",
+        "canonical": "#7FB0E859",
+        "light": "#B3CDEF",
+        "tonalRamp": [
+          "#000B1D",
+          "#01254A",
+          "#144373",
+          "#356397",
+          "#5685BB",
+          "#78A9E0",
+          "#A3CDFE",
+          "#E4F0FE"
+        ]
+      },
+      "stall-standard": {
+        "role": "domain",
+        "displayName": "Standard Stall Blue",
+        "figmaVariable": "EquiFreight / Color / stall/standard",
+        "canonical": "#4A6FA0",
+        "light": "#4F78AD",
+        "purpose": "Standard stall",
+        "tonalRamp": [
+          "#000A20",
+          "#01244E",
+          "#1F4270",
+          "#3E6393",
+          "#5E84B7",
+          "#80A8DC",
+          "#A6CCFF",
+          "#E5F0FE"
+        ]
+      },
+      "stall-box": {
+        "role": "domain",
+        "displayName": "Box Stall Green",
+        "figmaVariable": "EquiFreight / Color / stall/box",
+        "canonical": "#4C9068",
+        "light": "#3F8A5D",
+        "purpose": "Box stall",
+        "tonalRamp": [
+          "#000F05",
+          "#002E18",
+          "#00502D",
+          "#2B714B",
+          "#4F936B",
+          "#72B78D",
+          "#96DCB0",
+          "#C5FFD9"
+        ]
+      },
+      "stall-climate": {
+        "role": "domain",
+        "displayName": "Climate Stall Terracotta",
+        "figmaVariable": "EquiFreight / Color / stall/climate",
+        "canonical": "#C7804F",
+        "light": "#C2703F",
+        "purpose": "Climate-controlled stall",
+        "tonalRamp": [
+          "#170600",
+          "#3C1A00",
+          "#673102",
+          "#904D19",
+          "#B46F3E",
+          "#DA9261",
+          "#FEB788",
+          "#FEEADE"
+        ]
+      },
+      "material-brass-light": {
+        "role": "domain",
+        "displayName": "Brass Highlight",
+        "figmaVariable": "EquiFreight / Color / material/brass-light",
+        "canonical": "#E6CB84",
+        "light": "#E6CB84",
+        "purpose": "Nameplate highlight",
+        "tonalRamp": [
+          "#100A00",
+          "#2F2301",
+          "#523F01",
+          "#775E10",
+          "#997F39",
+          "#BDA25C",
+          "#E2C780",
+          "#FFEDC1"
+        ]
+      },
+      "material-brass-dark": {
+        "role": "domain",
+        "displayName": "Brass Shade",
+        "figmaVariable": "EquiFreight / Color / material/brass-dark",
+        "canonical": "#A8863B",
+        "light": "#A8863B",
+        "purpose": "Nameplate shade",
+        "tonalRamp": [
+          "#110A00",
+          "#312200",
+          "#553E03",
+          "#7B5C03",
+          "#9F7D31",
+          "#C3A056",
+          "#E8C47A",
+          "#FFECC8"
+        ]
+      },
+      "material-brass-ink": {
+        "role": "domain",
+        "displayName": "Engraving Ink",
+        "figmaVariable": "EquiFreight / Color / material/brass-ink",
+        "canonical": "#2A1F08",
+        "light": "#2A1F08",
+        "purpose": "Engraved nameplate text",
+        "tonalRamp": [
+          "#110A00",
+          "#2E230C",
+          "#4C4029",
+          "#6C6047",
+          "#8E8167",
+          "#B1A389",
+          "#D6C7AC",
+          "#FCEDD1"
+        ]
+      },
+      "coat-grey": {
+        "role": "domain",
+        "displayName": "Grey Coat",
+        "figmaVariable": "EquiFreight / Color / coat/grey",
+        "canonical": "#8E949B",
+        "light": "#8E949B",
+        "purpose": "Horse coat · grey",
+        "tonalRamp": [
+          "#080C10",
+          "#21262B",
+          "#3D4349",
+          "#5C6268",
+          "#7D838A",
+          "#A0A6AD",
+          "#C3CAD1",
+          "#E9EFF7"
+        ]
+      },
+      "coat-black": {
+        "role": "domain",
+        "displayName": "Black Coat",
+        "figmaVariable": "EquiFreight / Color / coat/black",
+        "canonical": "#202329",
+        "light": "#202329",
+        "purpose": "Horse coat · black",
+        "tonalRamp": [
+          "#090B10",
+          "#22252B",
+          "#3F4249",
+          "#5E6168",
+          "#7F828A",
+          "#A1A5AD",
+          "#C5C9D1",
+          "#EAEFF7"
+        ]
+      },
+      "coat-chestnut": {
+        "role": "domain",
+        "displayName": "Chestnut Coat",
+        "figmaVariable": "EquiFreight / Color / coat/chestnut",
+        "canonical": "#7B3F1F",
+        "light": "#7B3F1F",
+        "purpose": "Horse coat · chestnut",
+        "tonalRamp": [
+          "#180500",
+          "#401700",
+          "#692F0C",
+          "#8C4F2F",
+          "#B17050",
+          "#D69371",
+          "#FDB694",
+          "#FFEAE0"
+        ]
+      },
+      "coat-bay": {
+        "role": "domain",
+        "displayName": "Bay Coat",
+        "figmaVariable": "EquiFreight / Color / coat/bay",
+        "canonical": "#5B3522",
+        "light": "#5B3522",
+        "purpose": "Horse coat · bay",
+        "tonalRamp": [
+          "#180500",
+          "#3D1A06",
+          "#5D3724",
+          "#7F5642",
+          "#A27762",
+          "#C79A84",
+          "#EDBDA7",
+          "#FFEAE0"
+        ]
+      },
+      "overlay-scrim": {
+        "role": "neutral",
+        "displayName": "Scrim",
+        "figmaVariable": "EquiFreight / Color / overlay/scrim",
+        "canonical": "#00000066",
+        "light": "#0F1A2840",
+        "purpose": "Dialog backdrop",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "chart-1": {
+        "role": "domain",
+        "displayName": "Chart Blue",
+        "figmaVariable": "EquiFreight / Color / chart/1",
+        "canonical": "#5B93DB",
+        "light": "#3F72B8",
+        "purpose": "Chart series 1",
+        "tonalRamp": [
+          "#000B1F",
+          "#00244E",
+          "#034081",
+          "#2B61A5",
+          "#4C84CB",
+          "#6FA8F1",
+          "#A6CCFE",
+          "#E4F0FF"
+        ]
+      },
+      "chart-2": {
+        "role": "domain",
+        "displayName": "Chart Terracotta",
+        "figmaVariable": "EquiFreight / Color / chart/2",
+        "canonical": "#C7804F",
+        "light": "#B8662F",
+        "purpose": "Chart series 2",
+        "tonalRamp": [
+          "#170600",
+          "#3C1A00",
+          "#673102",
+          "#904D19",
+          "#B46F3E",
+          "#DA9261",
+          "#FEB788",
+          "#FEEADE"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display-xl": {
+        "displayName": "Display XL",
+        "figmaStyle": "EquiFreight/Display/XL",
+        "purpose": "Home hero headline only."
+      },
+      "display-l": {
+        "displayName": "Display L",
+        "figmaStyle": "EquiFreight/Display/L",
+        "purpose": "Page titles; the route on tracking pages."
+      },
+      "display-m": {
+        "displayName": "Display M",
+        "figmaStyle": "EquiFreight/Display/M",
+        "purpose": "Headline money figures (estimate ranges, quote totals)."
+      },
+      "heading-h3": {
+        "displayName": "Heading H3",
+        "figmaStyle": "EquiFreight/Heading/H3",
+        "purpose": "Panel leads, card and gate titles."
+      },
+      "heading-h4": {
+        "displayName": "Heading H4",
+        "figmaStyle": "EquiFreight/Heading/H4",
+        "purpose": "Panel titles, horse and stop names."
+      },
+      "body-l": {
+        "displayName": "Body L",
+        "figmaStyle": "EquiFreight/Body/L",
+        "purpose": "Intro copy."
+      },
+      "body-m": {
+        "displayName": "Body M",
+        "figmaStyle": "EquiFreight/Body/M",
+        "purpose": "Page summaries, input values."
+      },
+      "body-s": {
+        "displayName": "Body S",
+        "figmaStyle": "EquiFreight/Body/S",
+        "purpose": "Reasons, details, helper text."
+      },
+      "label-m": {
+        "displayName": "Label M",
+        "figmaStyle": "EquiFreight/Label/M",
+        "purpose": "MD button labels, row titles, tabs."
+      },
+      "label-s": {
+        "displayName": "Label S",
+        "figmaStyle": "EquiFreight/Label/S",
+        "purpose": "SM buttons, nav, people, time-left line of a deadline."
+      },
+      "mono-data-l": {
+        "displayName": "Mono Data L",
+        "figmaStyle": "EquiFreight/Mono/Data L",
+        "purpose": "Stat tile values."
+      },
+      "mono-data": {
+        "displayName": "Mono Data",
+        "figmaStyle": "EquiFreight/Mono/Data",
+        "purpose": "Codes, amounts, distances in rows."
+      },
+      "mono-caption": {
+        "displayName": "Mono Caption",
+        "figmaStyle": "EquiFreight/Mono/Caption",
+        "purpose": "Dates, times, versions, the date line of a deadline."
+      },
+      "mono-label": {
+        "displayName": "Mono Label",
+        "figmaStyle": "EquiFreight/Mono/Eyebrow",
+        "purpose": "Uppercase table headers, fact labels, stop kinds, stat captions. Never above a heading."
+      },
+      "mono-chip": {
+        "displayName": "Mono Chip",
+        "figmaStyle": "EquiFreight/Mono/Chip",
+        "purpose": "Chip labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "elevation-1-card",
+        "value": "0 10px 28px -14px rgba(0,0,0,0.28)",
+        "purpose": "Home hero job card only."
+      },
+      {
+        "name": "elevation-2-overlay",
+        "value": "0 24px 56px -16px rgba(0,0,0,0.45)",
+        "purpose": "Toasts and overlays."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px rgba(201,170,90,0.45)",
+        "purpose": "Focused controls, with a 1.5 px gold border."
+      },
+      {
+        "name": "material-brass",
+        "value": "inset 0 -1px 0 rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.45)",
+        "purpose": "Brass nameplate only."
+      }
+    ],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "desktop",
+        "value": "1440px"
+      }
+    ],
+    "layout": {
+      "screenWidth": "1440px",
+      "contentWidth": "1200px",
+      "gutter": "120px",
+      "headerHeight": "64px",
+      "adminSidebar": "248px"
+    },
+    "icons": {
+      "grid": "24px",
+      "stroke": "1.75",
+      "caps": "round",
+      "count": 41
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single forward action on a view. One per view.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m17 8-5-5-5 5M12 3v12\"/></svg>Upload signed copy</button>",
+      "css": ".ds-btn-primary { font-family: Outfit, Inter, system-ui, sans-serif; font-weight: 500; font-size: 14px; line-height: 20px; height: 40px; padding: 0 18px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s, color 0.15s; background: #C9AA5A; color: #0C1520; border: none; } .ds-btn-primary:hover { background: #D6B96B; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); } .ds-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Alternatives and every non-top action.",
+      "html": "<button class=\"ds-btn-secondary\">Upload extended policy</button>",
+      "css": ".ds-btn-secondary { font-family: Outfit, Inter, system-ui, sans-serif; font-weight: 500; font-size: 14px; line-height: 20px; height: 40px; padding: 0 18px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s, color 0.15s; background: transparent; color: #EDE9E1; border: 1px solid #2A4266; } .ds-btn-secondary:hover { background: #182538; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Tertiary inline actions: back links, Show all, History.",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19 12H5M11 18l-6-6 6-6\"/></svg>My requests</button>",
+      "css": ".ds-btn-ghost { font-family: Outfit, Inter, system-ui, sans-serif; font-weight: 500; font-size: 14px; line-height: 20px; height: 40px; padding: 0 18px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s, color 0.15s; background: transparent; color: #B3BFCC; border: none; } .ds-btn-ghost:hover { background: #182538; color: #EDE9E1; } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive, always outlined, never filled.",
+      "html": "<button class=\"ds-btn-danger\">Remove</button>",
+      "css": ".ds-btn-danger { font-family: Outfit, Inter, system-ui, sans-serif; font-weight: 500; font-size: 14px; line-height: 20px; height: 40px; padding: 0 18px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s, color 0.15s; background: transparent; color: #EF6B6B; border: 1px solid #EF6B6B61; } .ds-btn-danger:hover { background: #EF6B6B1F; } .ds-btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); }"
+    },
+    {
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "chip-ok",
+      "description": "Status said twice: tone plus word.",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-chip ds-chip-ok\"><i></i>Cleared</span><span class=\"ds-chip ds-chip-warn\"><i></i>Documents</span><span class=\"ds-chip ds-chip-bad\"><i></i>Departure locked</span><span class=\"ds-chip ds-chip-info\"><i></i>In review</span><span class=\"ds-chip ds-chip-neutral\"><i></i>Required</span></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; flex-wrap: wrap; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px; font-family: 'DM Mono', 'Roboto Mono', monospace; font-weight: 500; font-size: 11px; line-height: 12px; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid; } .ds-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; } .ds-chip-ok { background: #5DC6881F; border-color: #5DC68859; color: #5DC688; } .ds-chip-warn { background: #FDB47A1F; border-color: #FDB47A61; color: #FDB47A; } .ds-chip-bad { background: #EF6B6B1F; border-color: #EF6B6B61; color: #EF6B6B; } .ds-chip-info { background: #7FB0E81F; border-color: #7FB0E859; color: #7FB0E8; } .ds-chip-neutral { background: #182538; border-color: #2A4266; color: #B3BFCC; } .ds-chip-neutral i { background: #7A8FA3; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above, 44 px control, helper or error below that names the fix.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Departure date</span><input class=\"ds-input ds-input-error\" value=\"05/10/2026\"><span class=\"ds-field-help\">Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.</span></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; width: 320px; } .ds-field-label { font-family: Outfit, Inter, sans-serif; font-weight: 500; font-size: 13px; line-height: 18px; color: #B3BFCC; } .ds-input { height: 44px; padding: 0 12px; background: #0E1826; color: #EDE9E1; border: 1px solid #2A4266; border-radius: 8px; font-family: Outfit, Inter, sans-serif; font-size: 15px; line-height: 24px; } .ds-input:focus-visible { outline: none; border: 1.5px solid #C9AA5A; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); } .ds-input-error { border-color: #EF6B6B; } .ds-field-help { font-family: Outfit, Inter, sans-serif; font-size: 13px; line-height: 20px; color: #EF6B6B; }"
+    },
+    {
+      "name": "App Header Nav",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Owner items, an Ops divider, operations items; active item is a muted pill with gold ink.",
+      "html": "<nav class=\"ds-nav\"><a>Home</a><a>My horses</a><a>Request transport</a><a class=\"is-active\">My requests</a><span class=\"ds-nav-ops\">Ops</span><a>Load plan</a><a>Clearance</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 4px; background: #0C1520; padding: 12px 16px; border-bottom: 1px solid #1C2E44; } .ds-nav a { padding: 8px 12px; border-radius: 8px; font-family: Outfit, Inter, sans-serif; font-weight: 500; font-size: 13px; line-height: 18px; color: #B3BFCC; cursor: pointer; text-decoration: none; } .ds-nav a:hover { background: #182538; color: #EDE9E1; } .ds-nav a:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); } .ds-nav a.is-active { background: #182538; color: #D9BD72; } .ds-nav-ops { margin: 0 10px; padding-left: 10px; border-left: 1px solid #2A4266; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7FB0E8; }"
+    },
+    {
+      "name": "Owed Item",
+      "kind": "custom",
+      "refersTo": "owed-item",
+      "description": "One thing the customer owes: reason, two-line deadline, its own action. Only the top item is gold.",
+      "html": "<div class=\"ds-owed\"><div class=\"ds-owed-ic\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#EF6B6B\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z\"/><path d=\"M12 9v4M12 17h.01\"/></svg></div><div class=\"ds-owed-txt\"><b>Upload a signed bill of sale</b><span class=\"ds-owed-sub\">Silver Bell · Proof of ownership</span><span class=\"ds-owed-why\">Rejected 24 Sep by Lan, transport specialist: the bill of sale is unsigned.</span></div><div class=\"ds-owed-due\"><span class=\"ds-owed-left\">Overdue by 1 day</span><span class=\"ds-owed-date\">Was due 25 Sep</span></div><button class=\"ds-owed-btn\">Upload signed copy</button></div>",
+      "css": ".ds-owed { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: #111B2C; border-top: 1px solid #1C2E44; font-family: Outfit, Inter, sans-serif; } .ds-owed-ic { width: 36px; height: 36px; border-radius: 8px; background: #EF6B6B1F; display: grid; place-items: center; flex: none; } .ds-owed-txt { flex: 1; display: flex; flex-direction: column; gap: 3px; } .ds-owed-txt b { font-weight: 500; font-size: 14px; line-height: 20px; color: #EDE9E1; } .ds-owed-sub { font-weight: 500; font-size: 13px; line-height: 18px; color: #7A8FA3; } .ds-owed-why { font-size: 13px; line-height: 20px; color: #B3BFCC; } .ds-owed-due { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; width: 140px; } .ds-owed-left { font-weight: 500; font-size: 13px; line-height: 18px; color: #EF6B6B; } .ds-owed-date { font-family: 'DM Mono', monospace; font-size: 12px; line-height: 16px; color: #7A8FA3; } .ds-owed-btn { height: 32px; padding: 0 12px; border: none; border-radius: 8px; background: #C9AA5A; color: #0C1520; font-family: Outfit, Inter, sans-serif; font-weight: 500; font-size: 13px; cursor: pointer; } .ds-owed-btn:hover { background: #D6B96B; } .ds-owed-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(201,170,90,0.45); }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered container: 12 px radius, hairline border, no shadow.",
+      "html": "<section class=\"ds-panel\"><h4>Where it stands</h4><p>Lan files the dossiers once documents are cleared. Departure stays locked until then.</p></section>",
+      "css": ".ds-panel { background: #111B2C; border: 1px solid #1C2E44; border-radius: 12px; padding: 24px; color: #EDE9E1; } .ds-panel h4 { margin: 0 0 12px; font-family: Fraunces, 'Playfair Display', Georgia, serif; font-weight: 400; font-size: 18px; line-height: 24px; } .ds-panel p { margin: 0; font-family: Outfit, Inter, sans-serif; font-size: 13px; line-height: 20px; color: #B3BFCC; }"
+    },
+    {
+      "name": "Brass Nameplate",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Horse identity: engraved brass plate on the coat colour, replacing photography.",
+      "html": "<div class=\"ds-coat\"><div class=\"ds-plate\"><i></i><div><b>Shadowfax</b><span>Andalusian · Gelding</span></div><i></i></div></div>",
+      "css": ".ds-coat { background: linear-gradient(180deg, #8E949B, #5a5e63); padding: 60px 20px 20px; border-radius: 12px; width: 344px; } .ds-plate { display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 4px; background: linear-gradient(90deg, #EAD08C 0%, #C9AA5A 55%, #9C7C33 100%); box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.45); } .ds-plate i { width: 7px; height: 7px; border-radius: 50%; background: #A8863B; } .ds-plate b { display: block; font-family: Fraunces, 'Playfair Display', Georgia, serif; font-weight: 600; font-size: 22px; line-height: 28px; color: #2A1F08; } .ds-plate span { font-family: 'DM Mono', monospace; font-size: 11px; line-height: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: #2A1F08; opacity: 0.72; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Dispatch Desk",
+    "overview": "EquiFreight is an operations desk read after dark: a deep navy canvas, cards one step lighter, hairline borders, and a single gold fitting that marks the one thing to do next. Everything else is information, and information is either a name (set in Fraunces, a warm serif that gives places and horses their dignity), prose (Outfit, plain and even), or data (DM Mono, for the values you would copy into a form). The system never decorates; its only material flourish is the brass stall nameplate on a horse's coat colour, which replaces photography.\n\nDensity is moderate and table-like. Pages are 1440 wide with a 1200 content column (120 px gutters). Surfaces are flat, bordered panels at 12 px radius, stacked with 24 to 32 px gaps; depth comes from tonal steps between canvas, sunken wells and cards, not from shadow. Status is always said twice, as a tone and as a word, and every deadline is said twice, as time left and as a date. The newest surface (customer request tracking) is the reference for how pages open: the route or page name as a Fraunces title, the code and summary beneath it in mono and prose, status chips top right, then what the reader owes.\n\nDark is the primary mode. Light is a second mode of the same `EquiFreight / Color` variable collection, applied per frame; its values live in `.impeccable/design.json` (`colorMeta.<token>.light`). Desktop 1440 is the maintained scope. Mobile frames (the mobile app header and \"My horses · Mobile\" in both modes) exist in the file but are not maintained; do not treat them as reference.",
+    "keyCharacteristics": [
+      "Navy canvas (#0C1520) with card, raised and muted surfaces stepping up in lightness.",
+      "One filled-gold button per view; gold never carries status.",
+      "Status in four tones (ok, warn, bad, info) plus neutral, always with a word.",
+      "Three type voices with fixed jobs: Fraunces for names and headings, Outfit for prose and labels, DM Mono for data.",
+      "Deadlines shown twice; estimates shown as ranges; demo figures marked as demo.",
+      "Flat bordered panels, 12 px corners, hairline dividers; shadow only for overlays, focus and brass.",
+      "24 px line icons, 1.75 stroke, round caps."
+    ],
+    "rules": [
+      {
+        "name": "The One Gold Button Rule",
+        "body": "A view has at most one filled gold button, and it is the action that moves the job forward. In a list of owed items only the top item's action is gold; the rest are Secondary. Gold tints (accent-text, accent-soft, accent-line) may mark selection, focus, the active nav item and the brand, but never state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Gold Is Not a Status Rule",
+        "body": "Nothing that describes the state of a document, stage, horse or job is gold. State uses ok, warn, bad, info or neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The Said-Twice Rule",
+        "body": "Status is a tone plus a word (\"Departure locked\", \"Cleared\", \"Waiting for you\"); a coloured dot or border alone never carries meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Voices Rule",
+        "body": "Fraunces for places, horse names and headings. Outfit for prose, people's names and labels. DM Mono for codes, dates, times, counts and distances. The two small uppercase mono styles (Mono Label, Mono Chip) are the only mono text that carries words, and only as tags on data. A value row puts a name in Label S and a code or distance in Mono Data (Vehicle \"Trailer TX-447\" mono; Driver \"Minh\" Outfit).",
+        "section": "typography"
+      },
+      {
+        "name": "The Two-Line Deadline Rule",
+        "body": "Every deadline is shown twice: time left first (Label S, toned by urgency: \"Overdue by 1 day\", \"Due in 4 days\"), then the date beneath it (Mono Caption, text-tertiary: \"30 Sep 2026\"), right-aligned.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Panel Rule",
+        "body": "Panels, rows and cards carry a 1 px border and no shadow. If something needs to stand out, give it a surface step or a tone, not a drop shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** give each view exactly one Brass Gold (#C9AA5A) filled button, on the action that moves the job forward; make every other action Secondary or Ghost.",
+      "**Do** state every status as a tone plus a word, using the ok, warn, bad, info or neutral chip.",
+      "**Do** show every deadline as time left (Label S, toned) over the date (Mono Caption, tertiary).",
+      "**Do** set places, routes and horse names in Fraunces, people and prose in Outfit, and codes, dates, times, counts and distances in DM Mono.",
+      "**Do** show customer estimates as a range (\"$11,300 – $16,100\") with a line saying it is not a quote.",
+      "**Do** open a page with its subject as the Fraunces title, the code and summary beneath, and status chips top right.",
+      "**Do** name the rule, the value found and the fix in every error or refusal, and keep refused actions visible but disabled.",
+      "**Do** mark demo figures as demo (the footer reads \"Prototype · demo data as of ...\").",
+      "**Do** fill a numbers band with commitments the system enforces (6 countries, 21-day cross-border lead time, 7-day quotation validity, one groom per 3 horses), not operating results the product cannot yet claim."
+    ],
+    "donts": [
+      "**Don't** use gold for any state, progress tone or status chip.",
+      "**Don't** put an eyebrow label (small uppercase text above a heading) anywhere; the page or section title stands alone, with its summary beneath. The old role-dot Eyebrow component has been removed from the library.",
+      "**Don't** set names, places or sentences in DM Mono, or codes and dates in Fraunces or Outfit.",
+      "**Don't** show a single price before a quotation exists.",
+      "**Don't** present placeholder statistics (\"4,200+ horses moved\", \"99.2% on-time\") as real operating figures.",
+      "**Don't** use colour alone for meaning: no bare dots, borders or bars without a word beside them.",
+      "**Don't** add drop shadows to panels or cards; use a surface step or a border.",
+      "**Don't** draw live map tiles, moving dots or times finer than the recorded checkpoints on route views.",
+      "**Don't** use stock photography for horses; use the nameplate on the coat colour."
+    ]
+  }
+}

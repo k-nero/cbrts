@@ -1,9 +1,6 @@
 .DS_Store
 /lib
-CLAUDE.md
 .claude/
-PRODUCT.md
-.impeccable/
-DESIGN.md
+.impeccable/hook.cache.json
 graphify-out/
 .env
