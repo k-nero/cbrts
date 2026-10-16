@@ -142,6 +142,7 @@ Where to look elsewhere:
 - **Sentence case** everywhere. Uppercase is only for the small mono chip and column-header styles.
 - **Next step.** Every customer-facing state says what happens next, who owns it, and what the customer owes and by when.
 - **Demo data.** All figures, names and statistics are demo placeholders; never present them as real.
+- **AI-generated images are drafts.** A generated picture is saved with a `draft-` prefix (as in `docs/design-assets/` and `FE/src/assets/photos/`) and is replaced with a licensed photograph before anything is shown outside the team. Never generate a picture of a real person, logo or brand.
 - **Match the frame.** When a Figma frame exists for the page you are building, match its structure, copy and states. Don't invent new patterns when one already exists in `components/ui` or the generator.
 
 ## Figma generator (`docs/figma-plugin/`)
@@ -158,7 +159,7 @@ Where to look elsewhere:
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
 - **No CI build or test gate.** A green check does not mean it compiles. Before opening or approving a PR, run `./gradlew test` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`.
-- **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only.
+- **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only. Never paste them into an AI chat either.
 
 ## Don't
 
