@@ -38,13 +38,13 @@ public class StaffJobController {
         this.crewAssignmentService = crewAssignmentService;
     }
 
-    /** US-F3-01: Planning backlog of approved jobs. */
+    /** US-F3-01: Planning backlog of approved jobs, soonest departure first (jobs without a date last). */
     @GetMapping
     public Page<JobSummaryResponse> list(
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "stage", required = false) JobStage stage,
             @RequestParam(value = "filter", required = false) String filter,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "plannedDepartureAt", direction = Sort.Direction.ASC) Pageable pageable) {
         return transportJobService.search(q, stage, filter, pageable);
     }
 
