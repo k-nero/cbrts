@@ -74,3 +74,19 @@ The app runs on `http://localhost:5173` and proxies `/api` to the backend. Other
 - `bun run lint`
 - `bun run format`
 - `bun run build`
+
+## Using AI on this project
+
+The course allows AI assistants. Every tool follows the same rules in [`AGENTS.md`](AGENTS.md), which point to [`PRODUCT.md`](PRODUCT.md) for product rules and [`DESIGN.md`](DESIGN.md) for the design system.
+
+- **Coding agents that read the repository** pick the rules up on their own:
+  - Codex, Cursor, Windsurf and GitHub Copilot read `AGENTS.md`;
+  - Copilot also reads `.github/copilot-instructions.md`;
+  - Claude Code reads `CLAUDE.md`;
+  - Gemini CLI reads `GEMINI.md`.
+
+  The last three files only point back to `AGENTS.md`. Change the rules in `AGENTS.md` only, so the files never disagree.
+- **Chat assistants on the web** (ChatGPT, Gemini, Claude) can't see the repository. Start each chat by attaching `AGENTS.md`, plus the section of `PRODUCT.md` or `DESIGN.md` that the task touches, and the files you want changed.
+- **Never paste secrets into a chat:** no `.env`, API keys, JWT secrets, tokens or real customer data.
+- **You own what you commit.** Read and run AI-written code before you push it. Check it against `AGENTS.md` and the story's acceptance criteria, as you would a teammate's.
+- **Images:** AI-generated pictures are labelled drafts (`draft-…`) and are replaced with licensed photographs before anything is shown outside the team.
