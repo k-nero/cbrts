@@ -4,10 +4,9 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.repository.AuditLogRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.Map;
@@ -22,11 +21,12 @@ import java.util.UUID;
 public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
-    private final ObjectMapper objectMapper;
+    /** Spring Boot 4 auto-configures Jackson 3's JsonMapper; there is no Jackson 2 ObjectMapper bean. */
+    private final JsonMapper jsonMapper;
 
-    public AuditService(AuditLogRepository auditLogRepository, ObjectMapper objectMapper) {
+    public AuditService(AuditLogRepository auditLogRepository, JsonMapper jsonMapper) {
         this.auditLogRepository = auditLogRepository;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     @Transactional
@@ -75,10 +75,6 @@ public class AuditService {
         if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
             return trimmed;
         }
-        try {
-            return objectMapper.writeValueAsString(Map.of("status", trimmed));
-        } catch (JsonProcessingException e) {
-            return "{\"status\":\"" + trimmed.replace("\"", "\\\"") + "\"}";
-        }
+        return jsonMapper.writeValueAsString(Map.of("status", trimmed));
     }
 }
