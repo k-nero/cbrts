@@ -1,4 +1,4 @@
-# AGENT.md
+# AGENTS.md
 
 Instructions for AI coding agents working in this repository. Read this before changing code, specs or the design generator. `README.md` covers running the stack; this file covers the rules, conventions and sources of truth.
 

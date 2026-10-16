@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Spring Boot (Java) backend with a React single-page frontend, the same stack the team used on its previous SWP391 project. `README.md` lists versions and how to run it; `AGENT.md` lists the conventions.
+Spring Boot (Java) backend with a React single-page frontend, the same stack the team used on its previous SWP391 project. `README.md` lists versions and how to run it; `AGENTS.md` lists the conventions.
 
 ## Users
 
