@@ -12,6 +12,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
@@ -66,6 +67,8 @@ public class RequestService {
     static final Duration MIN_ARRIVAL_WINDOW = Duration.ofHours(3);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
+    /** audit_log.summary is varchar(500). */
+    private static final int AUDIT_SUMMARY_MAX = 500;
 
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
@@ -175,14 +178,37 @@ public class RequestService {
         revision.setSubmittedAt(now);
         revisions.save(revision);
 
-        List<String> names = response.getHorses().stream().map(h -> h.getName()).toList();
-        audit.recordDecision(user, "REQUEST_SUBMITTED", "Submitted with " + names.size()
-                        + (names.size() == 1 ? " horse: " : " horses: ") + String.join(", ", names) + ".",
+        audit.recordDecision(user, "REQUEST_SUBMITTED",
+                submittedSummary(response.getHorses().stream().map(h -> h.getName()).toList()),
                 ENTITY_TYPE, saved.getId(), code, null, "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
         audit.recordSystem("LEAD_TIME_CHECKED", "Lead time checked: " + leadTime.getDaysBeforeDeparture()
                         + " days before departure, " + leadTime.getRequiredDays() + " required.",
                 ENTITY_TYPE, saved.getId(), code, null, null);
         return response;
+    }
+
+    /**
+     * "Submitted with 2 horses: Nightfall, Shadowfax." A long string is cut to "… and 12 more." so the line
+     * fits audit_log.summary.
+     */
+    static String submittedSummary(List<String> names) {
+        String head = "Submitted with " + names.size() + (names.size() == 1 ? " horse: " : " horses: ");
+        String all = head + String.join(", ", names) + ".";
+        if (all.length() <= AUDIT_SUMMARY_MAX) {
+            return all;
+        }
+        StringBuilder listed = new StringBuilder();
+        int shown = 0;
+        for (String name : names) {
+            String next = (shown == 0 ? "" : ", ") + name;
+            String tail = " and " + (names.size() - shown - 1) + " more.";
+            if (head.length() + listed.length() + next.length() + tail.length() > AUDIT_SUMMARY_MAX) {
+                break;
+            }
+            listed.append(next);
+            shown++;
+        }
+        return head + listed + " and " + (names.size() - shown) + " more.";
     }
 
     /** A draft was never submitted, has no code and nothing refers to it, so it is removed. */
@@ -263,15 +289,17 @@ public class RequestService {
             throw new BusinessException("PLACE_OR_TEXT",
                     "Choose a place or type a city for the destination, not both.");
         }
-        Place origin = body.getOriginPlaceId() == null ? null : findPlace(body.getOriginPlaceId());
-        Place destination = body.getDestinationPlaceId() == null ? null : findPlace(body.getDestinationPlaceId());
+        Place origin = body.getOriginPlaceId() == null ? null : findEnd(body.getOriginPlaceId());
+        Place destination = body.getDestinationPlaceId() == null ? null : findEnd(body.getDestinationPlaceId());
         if (origin != null && destination != null && origin.getId().equals(destination.getId())) {
             throw new BusinessException("SAME_PLACE", "The horses can't be collected and delivered at the same place.");
         }
 
         TransportMode mode = body.getMode();
+        // Mirrors transport_requests_mode_options_check, which also refuses both without a mode.
         if ((mode == TransportMode.ROAD && body.getAirClass() != null)
-                || (mode == TransportMode.AIR && body.getTrailer() != null)) {
+                || (mode == TransportMode.AIR && body.getTrailer() != null)
+                || (body.getTrailer() != null && body.getAirClass() != null)) {
             throw new BusinessException("MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
         }
         int flex = body.getDateFlexDays() == null ? 0 : body.getDateFlexDays();
@@ -382,8 +410,14 @@ public class RequestService {
         return RequestMapper.toResponse(request, route, leadTime, blockers);
     }
 
-    private Place findPlace(UUID id) {
-        return places.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Place", id));
+    /** A pickup or delivery point; a welfare stop is a stop on the way, not an end of the trip. */
+    private Place findEnd(UUID id) {
+        Place place = places.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Place", id));
+        if (place.getKind() == PlaceKind.WELFARE_STOP) {
+            throw new BusinessException("PLACE_NOT_AN_END",
+                    place.getName() + " is a stop on the way, not a pickup or delivery point.");
+        }
+        return place;
     }
 
     private static String clean(String text) {

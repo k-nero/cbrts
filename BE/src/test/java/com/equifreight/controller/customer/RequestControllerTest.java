@@ -59,6 +59,15 @@ class RequestControllerTest {
     }
 
     @Test
+    void aNullHorseAnswers400() throws Exception {
+        mvc.perform(post("/api/v1/customer/requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"horses\":[null]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation Failed"));
+    }
+
+    @Test
     void aMalformedDepartureDateAnswers400() throws Exception {
         mvc.perform(post("/api/v1/customer/requests")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -6,6 +6,7 @@ import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,7 +26,7 @@ import java.util.UUID;
 public class RequestDraftRequest {
 
     @Valid
-    private List<RequestHorseInput> horses;
+    private List<@NotNull RequestHorseInput> horses;
 
     /** A catalog place, or {@code originText} for a city that matches none; not both. */
     private UUID originPlaceId;

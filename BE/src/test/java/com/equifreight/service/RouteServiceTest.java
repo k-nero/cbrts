@@ -158,8 +158,8 @@ class RouteServiceTest {
 
     @Test
     void aTypedCityNeverResolves() {
-        when(places.existsByCityIgnoreCase("Bangkok")).thenReturn(true);
-        when(places.existsByCityIgnoreCase("Singapore")).thenReturn(false);
+        when(places.existsByCityIgnoreCaseAndKindNot("Bangkok", PlaceKind.WELFARE_STOP)).thenReturn(true);
+        when(places.existsByCityIgnoreCaseAndKindNot("Singapore", PlaceKind.WELFARE_STOP)).thenReturn(false);
 
         RouteResolution resolution = service.resolve(null, "Bangkok", null, "Singapore", TransportMode.ROAD);
 

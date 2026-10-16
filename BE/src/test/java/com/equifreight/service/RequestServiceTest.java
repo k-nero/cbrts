@@ -286,6 +286,27 @@ class RequestServiceTest {
     }
 
     @Test
+    void aTrailerAndAnAirClassWithoutAModeAreRefused() {
+        RequestDraftRequest body = body();
+        body.setTrailer(TrailerType.SHARED);
+        body.setAirClass(ServiceClass.BUSINESS);
+
+        assertRefused(body, "MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
+    }
+
+    @Test
+    void aWelfareStopIsNotAnEnd() {
+        Place welfare = place("Svay Rieng welfare stop", "Svay Rieng");
+        welfare.setKind(PlaceKind.WELFARE_STOP);
+        when(places.findById(welfare.getId())).thenReturn(Optional.of(welfare));
+        RequestDraftRequest body = body();
+        body.setOriginPlaceId(welfare.getId());
+
+        assertRefused(body, "PLACE_NOT_AN_END",
+                "Svay Rieng welfare stop is a stop on the way, not a pickup or delivery point.");
+    }
+
+    @Test
     void flexIsZeroOrThree() {
         RequestDraftRequest two = body();
         two.setDateFlexDays(2);
@@ -524,6 +545,28 @@ class RequestServiceTest {
             verify(audit).recordSystem("LEAD_TIME_CHECKED",
                     "Lead time checked: 34 days before departure, 21 required.",
                     "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+        }
+
+        @Test
+        void aLongHorseListIsCappedInTheAuditSummary() {
+            draft.getHorses().clear();
+            for (int i = 1; i <= 40; i++) {
+                Horse h = horse(String.format("Horse %02d of the Saigon Turf Club long-distance string", i),
+                        HorseSex.GELDING, "50000");
+                RequestHorse rh = new RequestHorse();
+                rh.setRequest(draft);
+                rh.setHorse(h);
+                draft.getHorses().add(rh);
+            }
+
+            service.submit(user, draft.getId());
+
+            ArgumentCaptor<String> summary = ArgumentCaptor.forClass(String.class);
+            verify(audit).recordDecision(eq(user), eq("REQUEST_SUBMITTED"), summary.capture(),
+                    any(), any(), any(), any(), any(), any());
+            assertThat(summary.getValue()).hasSizeLessThanOrEqualTo(500)
+                    .startsWith("Submitted with 40 horses: Horse 01 of the Saigon Turf Club long-distance string, ")
+                    .matches(".* and \\d+ more\\.$");
         }
 
         @Test

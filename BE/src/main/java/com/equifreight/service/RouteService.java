@@ -105,8 +105,10 @@ public class RouteService {
      */
     public RouteResolution resolve(Place origin, String originText, Place destination, String destinationText,
                                    TransportMode mode) {
-        boolean originServed = originText != null && places.existsByCityIgnoreCase(originText);
-        boolean destinationServed = destinationText != null && places.existsByCityIgnoreCase(destinationText);
+        boolean originServed = originText != null
+                && places.existsByCityIgnoreCaseAndKindNot(originText, PlaceKind.WELFARE_STOP);
+        boolean destinationServed = destinationText != null
+                && places.existsByCityIgnoreCaseAndKindNot(destinationText, PlaceKind.WELFARE_STOP);
         if (origin == null || destination == null || origin.getCity() == null || destination.getCity() == null) {
             return new RouteResolution(null, null, Set.of(), null, originServed, destinationServed);
         }
