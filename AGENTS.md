@@ -24,6 +24,7 @@ Two root files carry the product and design context:
 
 - **`PRODUCT.md`**: who the users are, the product principles, the domain rules and what is in or out of scope.
 - **`DESIGN.md`**: the design system and how every page is built: tokens, typography, components, page patterns, and the rules behind them. Read the sections for the pages you touch before building UI; it is long, so search it rather than reading it whole.
+- **`.impeccable/`**: the design tooling's working files. `design.json` holds the colour tokens with their Light values; `critique/`, `decision/`, `surfaces/`, `review/` and `tmp/` hold past design reviews and page briefs. Use them as background, not as rules; `DESIGN.md` wins where they differ.
 
 ## Domain rules the code must enforce
 
@@ -47,6 +48,35 @@ These are product decisions, not suggestions. Enforce them on the backend; the f
   - Escort: checkpoints and horse condition.
 - **Audit log** is append-only.
 - **UI language** is English only.
+
+## Reuse before you build
+
+Look for what already exists before writing anything new, and follow the pattern the codebase already uses. Consistency matters more than a locally neater solution: a second way of doing the same thing is a bug the next person has to untangle.
+
+1. **Search first.** Before creating a component, hook, helper, endpoint or table, search the repo for something that already does the job or nearly does. Read one or two places that solve the same kind of problem and copy their shape.
+2. **Extend, don't duplicate.** If an existing piece almost fits, add a prop, a variant or an option to it rather than making a near-copy beside it. A sibling such as `HorseCard2`, `MyChip` or a page-local re-implementation is not acceptable.
+3. **Build new only when nothing fits,** and say why in the PR. Put the new piece where its kind lives, in the same file style and naming as its neighbours, and export it the same way.
+4. **Follow the nearest example.** When adding a page, endpoint or migration, start from the most similar one that exists and keep its structure, naming and error handling.
+
+Where to look in the frontend (`FE/src/`):
+
+- **`components/ui`**: the design-system components, one per Figma component, exported from `components/ui/index.ts`. They include Button, Chip, Callout, OptionCard, Tabs, Steps, StatTile, Progress, Panel, FactCell, Deadline, StageMark, Nameplate, HorseCard, OwedItem, QuoteLine, EstimateCard, DocumentRow, ClearanceGate, StallTile, LoadItem, TimelineStop, RouteStrip, Perforation, PhotoPanel, Toast and Icon.
+  - Compose pages from these and don't restyle Ant Design to imitate them.
+  - A new design-system component also goes into `components/ui/index.ts` and onto the `/design-system` page, matching its Figma component.
+- **Forms:** `components/form` (`FormWrapper`, `FormField`, `fields/*`).
+- **Tables:** `components/table`.
+- **Modals:** `components/modal/BaseModal`.
+- **Row actions:** `components/buttons` (`EditButton`, `DeleteButton`).
+- **Staff menu:** `components/menu/StaffMenu`.
+- **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
+- **Helpers:** `lib/utils` (time, number, file, path, rbac) and `constant/`. Check them before writing a formatter or date helper.
+- **Page templates:** `pages/staff/users` (a list with an add/edit modal) and `pages/customer/home` (a composed customer page).
+
+Where to look elsewhere:
+
+- **Backend (`BE/`):** follow the controller → service → repository → DTO shape of `controller/admin/UserController` and `service/UserService`. Reuse `BaseEntity`, the exceptions in `exception/` and `ApiError`; don't add a new error format or response wrapper.
+- **Database:** new tables and columns follow `docs/database/database-design.md` and the naming of the existing migrations.
+- **Figma generator:** reuse the helpers in `docs/figma-plugin/src/` (`panel`, `chip`, `btn`, `input`, `tbl`, `tableBlock`, `pageHeader`, `draftPass`, `jobMap` and the rest) instead of drawing from scratch. A design change that needs a new pattern also gets its rule in `DESIGN.md`.
 
 ## Backend conventions (`BE/`)
 
@@ -115,3 +145,4 @@ These are product decisions, not suggestions. Enforce them on the backend; the f
 - Don't overwrite a document, quotation, invoice, payment or catalog version. Create a new version or a correcting entry.
 - Don't weaken a legality block into a warning.
 - Don't present demo figures as real data.
+- Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
