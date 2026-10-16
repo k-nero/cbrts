@@ -1,4 +1,6 @@
 import type { BaseEntity } from './api';
+import type { DossierStatus } from './clearance';
+import type { TripStatus } from './trip';
 import type { StallSide, StallType } from './vehicle';
 
 export const JobStageEnum = {
@@ -9,23 +11,6 @@ export const JobStageEnum = {
   CLOSED: 'CLOSED',
 } as const;
 export type JobStage = (typeof JobStageEnum)[keyof typeof JobStageEnum];
-
-export const DossierStatusEnum = {
-  OPEN: 'OPEN',
-  SUBMITTED_TO_AUTHORITY: 'SUBMITTED_TO_AUTHORITY',
-  ADDITIONAL_INFO_REQUIRED: 'ADDITIONAL_INFO_REQUIRED',
-  CLEARANCE_READY: 'CLEARANCE_READY',
-} as const;
-export type DossierStatus = (typeof DossierStatusEnum)[keyof typeof DossierStatusEnum];
-
-export const TripStatusEnum = {
-  NOT_STARTED: 'NOT_STARTED',
-  DEPARTED: 'DEPARTED',
-  HELD: 'HELD',
-  ARRIVED: 'ARRIVED',
-  DELIVERED: 'DELIVERED',
-} as const;
-export type TripStatus = (typeof TripStatusEnum)[keyof typeof TripStatusEnum];
 
 export const CrewRoleEnum = {
   DRIVER: 'DRIVER',
@@ -175,6 +160,7 @@ export interface JobSummary extends BaseEntity {
   clearanceReadyAt?: string | null;
   blockingReason?: string | null;
   nextStepOwner?: string | null;
+  clubName?: string | null;
 }
 
 export interface JobDetail extends BaseEntity {

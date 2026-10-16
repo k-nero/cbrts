@@ -13,4 +13,5 @@ public interface RoutePlanRepository extends JpaRepository<RoutePlan, UUID> {
     Optional<RoutePlan> findByJobIdAndStatus(UUID jobId, RoutePlanStatus status);
     Optional<RoutePlan> findFirstByJobIdOrderByVersionNoDesc(UUID jobId);
     Optional<RoutePlan> findByJobIdAndVersionNo(UUID jobId, short versionNo);
+    Optional<RoutePlan> findTopByJob_IdAndStatusOrderByVersionNoDesc(UUID jobId, RoutePlanStatus status);
 }

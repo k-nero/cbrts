@@ -12,4 +12,5 @@ public interface LoadPlanRepository extends JpaRepository<LoadPlan, UUID> {
     List<LoadPlan> findByJobId(UUID jobId);
     Optional<LoadPlan> findByJobIdAndStatus(UUID jobId, LoadPlanStatus status);
     Optional<LoadPlan> findFirstByJobIdOrderByCreatedAtDesc(UUID jobId);
+    Optional<LoadPlan> findTopByJob_IdAndStatusOrderByConfirmedAtDesc(UUID jobId, LoadPlanStatus status);
 }

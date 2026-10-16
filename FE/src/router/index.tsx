@@ -9,11 +9,13 @@ import CustomerHomePage from '@/pages/customer/home';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import DocumentsPage from '@/pages/staff/documents';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
+import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
@@ -44,6 +46,7 @@ export const router = createBrowserRouter([
           { path: '/home', element: <CustomerHomePage /> },
           { path: '/horses', element: todo('My horses') },
           { path: '/requests', element: todo('My requests') },
+          { path: '/tracking', element: <CustomerTripPage /> },
         ],
       },
       {
@@ -56,12 +59,13 @@ export const router = createBrowserRouter([
         children: [
           { path: 'jobs', element: <JobsPage /> },
           { path: 'jobs/:id', element: <JobDetailPage /> },
+          { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: todo('Audit log') },
-          { path: 'documents', element: todo('Documents') },
+          { path: 'documents', element: <DocumentsPage /> },
           { path: 'authorities', element: todo('Authorities') },
           { path: 'customer-notes', element: todo('Customer notes') },
           { path: 'regulations', element: todo('Regulations') },
@@ -70,7 +74,7 @@ export const router = createBrowserRouter([
           { path: 'vehicles', element: <VehiclesPage /> },
         ],
       },
-      { path: '/escort', element: todo('Cab surface') },
+      { path: '/escort', element: <EscortTripPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
