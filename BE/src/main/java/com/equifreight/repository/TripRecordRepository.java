@@ -1,9 +1,11 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.TripRecord;
+import com.equifreight.entity.enums.TripRecordKind;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +17,8 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, UUID> {
     @EntityGraph(attributePaths = {"routeStop", "routeStop.place", "routeStop.borderCrossing", "conditionLogs", "conditionLogs.horse"})
     Optional<TripRecord> findByClientRef(UUID clientRef);
 
-    Optional<TripRecord> findTopByJob_IdOrderByOccurredAtDesc(UUID jobId);
+    /** The newest record of one of {@code kinds}: the events that move the trip status. */
+    Optional<TripRecord> findTopByJob_IdAndKindInOrderByOccurredAtDesc(UUID jobId, Collection<TripRecordKind> kinds);
 
-    boolean existsByJob_IdAndKind(UUID jobId, com.equifreight.entity.enums.TripRecordKind kind);
+    boolean existsByJob_IdAndKind(UUID jobId, TripRecordKind kind);
 }

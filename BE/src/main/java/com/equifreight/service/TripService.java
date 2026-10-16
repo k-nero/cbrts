@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -84,7 +85,7 @@ public class TripService {
                 throw new ConflictException("TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
             return mapRecord(existing.get());
         }
-        validateTransition(job, request.kind(), request.occurredAt());
+        boolean late = validateTransition(job, request.kind(), request.occurredAt());
         boolean hasConditions = request.conditions() != null && !request.conditions().isEmpty();
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
             throw new BusinessException("CONDITION_LOG_REQUIRED", "A condition check must include at least one horse observation");
@@ -122,29 +123,58 @@ public class TripService {
             record.getConditionLogs().add(log);
         }
         TripRecord saved = records.save(record);
-        updateJobStatus(job, request.kind(), request.occurredAt(), stop);
+        // A record synced late from the cab joins the log in time order but never moves the status back.
+        if (!late) updateJobStatus(job, request.kind(), request.occurredAt(), stop);
         writeAudit(saved, user, channel, stop);
         return mapRecord(saved);
     }
 
-    private void validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt) {
+    /** Events that move the trip status; a record older than the newest of these is a late sync. */
+    private static final Set<TripRecordKind> STATUS_EVENTS = EnumSet.of(TripRecordKind.DEPARTED, TripRecordKind.FLIGHT_DEPARTED,
+            TripRecordKind.HELD, TripRecordKind.LEFT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.FLIGHT_LANDED,
+            TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.DELIVERED, TripRecordKind.HANDED_OVER);
+    /** What a late-synced record may be: observations and checkpoints, never a lifecycle step. */
+    private static final Set<TripRecordKind> LOG_ONLY_WHEN_LATE = EnumSet.of(TripRecordKind.NOTE, TripRecordKind.CONDITION_CHECK,
+            TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.LEFT_STOP,
+            TripRecordKind.ACCEPTED_BY_AIRLINE, TripRecordKind.RELEASED_BY_AIRLINE);
+    /** Tablet and server clocks drift; anything further ahead than this is a wrong clock, not a record. */
+    private static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
+
+    /**
+     * Checks the event against the trip's state and returns true when it is a late sync: a record made
+     * offline in the cab that reaches the server after a newer status event. Late records are kept for the
+     * log but don't change the status; lifecycle steps (loading, departure, hold, delivery, handover) must
+     * still arrive in order.
+     */
+    private boolean validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt) {
         TripStatus status = job.getTripStatus();
-        TripRecord latest = records.findTopByJob_IdOrderByOccurredAtDesc(job.getId()).orElse(null);
-        if (latest != null && occurredAt.isBefore(latest.getOccurredAt()))
-            throw transitionConflict(status, "A trip update cannot predate the latest recorded checkpoint");
+        if (occurredAt.isAfter(Instant.now().plus(CLOCK_SKEW)))
+            throw new BusinessException("TRIP_RECORD_IN_FUTURE", "A trip update can't be recorded for a time that hasn't happened yet. Check the device clock.");
         if (job.getStage() == JobStage.CLOSED)
-            throw transitionConflict(status, "A closed trip cannot receive new journey events");
+            throw transitionConflict(status, "A closed trip cannot receive new journey events.");
+
+        Instant newestStatusEvent = records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(job.getId(), STATUS_EVENTS)
+                .map(TripRecord::getOccurredAt).orElse(null);
+        if (newestStatusEvent != null && occurredAt.isBefore(newestStatusEvent)) {
+            boolean afterDeparture = job.getDepartedAt() != null && !occurredAt.isBefore(job.getDepartedAt());
+            if (!LOG_ONLY_WHEN_LATE.contains(kind) || !afterDeparture)
+                throw transitionConflict(status, "This %s is older than the trip's latest status update; record it as a note instead.".formatted(kind));
+            return true;
+        }
+
         if (job.getStage() == JobStage.HANDOVER && (status != TripStatus.DELIVERED
                 || !EnumSet.of(TripRecordKind.HANDED_OVER, TripRecordKind.NOTE).contains(kind)))
-            throw transitionConflict(status, "Only handover or a note can be recorded at the handover stage");
+            throw transitionConflict(status, "Only handover or a note can be recorded at the handover stage.");
         if (job.getStage() == JobStage.HANDOVER
                 && records.existsByJob_IdAndKind(job.getId(), TripRecordKind.HANDED_OVER)
                 && kind != TripRecordKind.NOTE)
-            throw transitionConflict(status, "Only a note can be added after handover");
+            throw transitionConflict(status, "Only a note can be added after handover.");
 
         boolean allowed = switch (status) {
-            case NOT_STARTED -> EnumSet.of(TripRecordKind.LOADED, TripRecordKind.NOTE,
+            // A condition check at loading is the baseline for any later welfare question.
+            case NOT_STARTED -> EnumSet.of(TripRecordKind.LOADED, TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE,
                     TripRecordKind.DEPARTED, TripRecordKind.FLIGHT_DEPARTED).contains(kind);
+            // Landing keeps the trip in transit: release by the airline, import customs and the ground leg follow.
             case DEPARTED -> EnumSet.of(TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.HELD,
                     TripRecordKind.LEFT_STOP, TripRecordKind.CONDITION_CHECK, TripRecordKind.ACCEPTED_BY_AIRLINE,
                     TripRecordKind.FLIGHT_DEPARTED, TripRecordKind.FLIGHT_LANDED, TripRecordKind.RELEASED_BY_AIRLINE,
@@ -154,7 +184,8 @@ public class TripService {
             case ARRIVED -> EnumSet.of(TripRecordKind.DELIVERED, TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE).contains(kind);
             case DELIVERED -> EnumSet.of(TripRecordKind.HANDED_OVER, TripRecordKind.NOTE).contains(kind);
         };
-        if (!allowed) throw transitionConflict(status, "This event is not allowed in the current trip state");
+        if (!allowed) throw transitionConflict(status, "A %s can't be recorded at this point of the trip.".formatted(kind));
+        return false;
     }
 
     private static ConflictException transitionConflict(TripStatus status, String reason) {
@@ -166,7 +197,7 @@ public class TripService {
             case DEPARTED, FLIGHT_DEPARTED -> { job.setTripStatus(TripStatus.DEPARTED); job.setStage(JobStage.TRIP); if (job.getDepartedAt() == null) job.setDepartedAt(at); }
             case HELD -> { job.setTripStatus(TripStatus.HELD); job.setStage(JobStage.TRIP); }
             case LEFT_STOP, CLEARED_BORDER -> { if (job.getTripStatus() == TripStatus.HELD) job.setTripStatus(TripStatus.DEPARTED); }
-            case FLIGHT_LANDED -> { job.setTripStatus(TripStatus.ARRIVED); job.setStage(JobStage.TRIP); }
+            case FLIGHT_LANDED -> job.setStage(JobStage.TRIP);
             case ARRIVED_AT_STOP -> {
                 if (stop != null && stop.getKind() == RouteStopKind.DELIVERY) job.setTripStatus(TripStatus.ARRIVED);
             }

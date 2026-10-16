@@ -20,20 +20,23 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
     @Query("select j from TransportJob j where j.code = :code")
     Optional<TransportJob> findByCodeForUpdate(@Param("code") String code);
 
+    /** Origin and destination are optional on a request, so they are left-joined: a job without them still lists. */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
-                j.code, j.tripStatus, j.request.originPlace.name, j.request.destinationPlace.name,
-                (select max(r.occurredAt) from TripRecord r where r.job.id = j.id))
-            from TransportJob j where j.request.club.id = :clubId
+                j.code, j.tripStatus, o.name, d.name,
+                (select max(r.occurredAt) from TripRecord r where r.job = j))
+            from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
+            where rq.club.id = :clubId
             """,
             countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
     Page<TripSummaryResponse> findAllByClubId(@Param("clubId") UUID clubId, Pageable pageable);
 
+    /** Origin and destination are optional on a request, so they are left-joined: a job without them still lists. */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
-                j.code, j.tripStatus, j.request.originPlace.name, j.request.destinationPlace.name,
-                (select max(r.occurredAt) from TripRecord r where r.job.id = j.id))
-            from TransportJob j
+                j.code, j.tripStatus, o.name, d.name,
+                (select max(r.occurredAt) from TripRecord r where r.job = j))
+            from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                               com.equifreight.entity.enums.JobStage.TRIP,
                               com.equifreight.entity.enums.JobStage.HANDOVER)
