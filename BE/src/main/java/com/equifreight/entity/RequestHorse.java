@@ -47,6 +47,10 @@ public class RequestHorse {
     @Column(nullable = false, length = 20)
     private StallType requiredStall;
 
+    /** A mare travelling with a foal at foot, on this trip. */
+    @Column(nullable = false)
+    private boolean withFoal;
+
     @Getter
     @Setter
     @NoArgsConstructor

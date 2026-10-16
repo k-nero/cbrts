@@ -21,8 +21,8 @@ import java.util.List;
 @Table(name = "transport_requests")
 public class TransportRequest extends BaseEntity {
 
-    /** REQ-2026-0193. */
-    @Column(nullable = false, unique = true, length = 14)
+    /** REQ-2026-0193. Issued at submission; null for a draft. */
+    @Column(unique = true, length = 14)
     private String code;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -67,12 +67,19 @@ public class TransportRequest extends BaseEntity {
     @JoinColumn(name = "destination_place_id")
     private Place destinationPlace;
 
-    /** Resolved from the places. */
+    /** What the customer typed when it matches no place ("Singapore"); never set with the place. */
+    @Column(length = 160)
+    private String originText;
+
+    @Column(length = 160)
+    private String destinationText;
+
+    /** Resolved from the places' cities and the mode; null means a route we don't run (yet). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "corridor_id")
     private Corridor corridor;
 
-    @Column(nullable = false)
+    /** Required once submitted. */
     private LocalDate departureDate;
 
     /** 0 or 3 ("My dates can move by ±3 days"). */
