@@ -31,9 +31,12 @@ public class ClearanceController {
         this.clearanceService = clearanceService;
     }
 
+    /** Open dossiers (not yet departed), newest first; q matches the job code or the club name. */
     @GetMapping("/jobs")
-    public ResponseEntity<List<JobSummaryResponse>> getActiveJobs() {
-        return ResponseEntity.ok(clearanceService.getActiveJobs());
+    public Page<JobSummaryResponse> getActiveJobs(
+            @RequestParam(value = "q", required = false) String q,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return clearanceService.getActiveJobs(q, pageable);
     }
 
     @GetMapping("/jobs/{jobId}/checklist")

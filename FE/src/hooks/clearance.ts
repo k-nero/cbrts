@@ -11,15 +11,17 @@ import type {
 } from '@/interfaces';
 
 /**
- * Active jobs list query for staff job picker dropdown (Finding 10 / AGENTS.md).
+ * Open dossiers for the specialist's job picker, searched on the server by job code or club.
+ * Returns the first page (20); typing narrows it.
  */
-export const useClearanceJobs = () => {
+export const useClearanceJobs = (q: string) => {
   return useQuery({
-    queryKey: queryKeys.clearance.jobs(),
+    queryKey: queryKeys.clearance.jobs(q),
     queryFn: async (): Promise<JobSummary[]> => {
-      const res = await clearanceApi.getActiveJobs();
-      return res.data;
+      const res = await clearanceApi.getActiveJobs(q);
+      return res.data.content;
     },
+    placeholderData: (previous) => previous,
   });
 };
 
@@ -37,7 +39,12 @@ export const usePendingReviews = () => {
       if (Array.isArray(raw)) {
         return raw;
       }
-      if (raw && typeof raw === 'object' && 'content' in raw && Array.isArray((raw as { content: unknown }).content)) {
+      if (
+        raw &&
+        typeof raw === 'object' &&
+        'content' in raw &&
+        Array.isArray((raw as { content: unknown }).content)
+      ) {
         return (raw as { content: DocumentVersion[] }).content;
       }
       return [];
@@ -102,8 +109,13 @@ export const useReviewDocument = (jobId?: string | null) => {
 export const useUploadDocumentVersion = (jobId?: string | null) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ checklistItemId, data }: { checklistItemId: string; data: DocumentUploadRequest }) =>
-      clearanceApi.uploadDocumentVersion(checklistItemId, data),
+    mutationFn: ({
+      checklistItemId,
+      data,
+    }: {
+      checklistItemId: string;
+      data: DocumentUploadRequest;
+    }) => clearanceApi.uploadDocumentVersion(checklistItemId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.pendingReviews() });
       if (jobId) {

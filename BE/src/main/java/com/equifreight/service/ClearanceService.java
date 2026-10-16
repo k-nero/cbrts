@@ -14,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -86,20 +89,17 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** List active transport jobs for clearance staff dropdown selection. */
+    /** Jobs whose dossier is still open (not departed) for the specialist's job picker, searchable by code or club. */
     @Transactional(readOnly = true)
-    public List<JobSummaryResponse> getActiveJobs() {
-        return transportJobRepository.findAll().stream()
+    public Page<JobSummaryResponse> getActiveJobs(String q, Pageable pageable) {
+        return transportJobRepository.findOpenDossiers(q == null ? "" : q.strip(), pageable)
                 .map(job -> JobSummaryResponse.builder()
                         .id(job.getId())
                         .code(job.getCode())
                         .dossierStatus(job.getDossierStatus())
                         .stage(job.getStage())
-                        .clubName(job.getRequest() != null && job.getRequest().getClub() != null
-                                ? job.getRequest().getClub().getName()
-                                : null)
-                        .build())
-                .toList();
+                        .clubName(job.getRequest().getClub().getName())
+                        .build());
     }
 
     /** Customer document upload: enforces that the checklist item belongs to the customer's club job (US-F2-03). */
@@ -263,77 +263,28 @@ public class ClearanceService {
      * Gate is CLEARANCE_READY only if:
      * 1. All mandatory items are CLEARED with GREEN validity.
      * 2. All required quarantine periods are completed.
-     * 3. All authority submissions are ISSUED (no refused, pending, or info-requested submissions).
+     * 3. The latest submission to each authority for each kind is ISSUED. A refusal that was
+     *    re-filed and then issued no longer blocks; an earlier issue that was later refused does.
+     * The dossier status is derived here and nowhere else, so filing, info requests and reviews
+     * all go through the same departure guard.
      */
     @Transactional
     public ClearanceStatusResponse evaluateClearanceGate(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
-        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
-        List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(jobId);
-        List<AuthoritySubmission> submissions = authoritySubmissionRepository.findByJobId(jobId);
-
-        List<String> outstandingIssues = new ArrayList<>();
-        int totalMandatory = 0;
-        int clearedMandatory = 0;
-
-        for (ChecklistItem item : items) {
-            boolean isMandatory = item.getRegulationRule() == null || item.getRegulationRule().isMandatory();
-            if (isMandatory) {
-                totalMandatory++;
-                if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
-                    clearedMandatory++;
-                } else {
-                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
-                    String horseInfo = item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
-                    outstandingIssues.add(String.format("%s%s not cleared (Status: %s, Validity: %s)",
-                            docName, horseInfo, item.getStatus(), item.getValidity()));
-                }
-            }
-        }
-
-        boolean allQuarantinesCompleted = true;
-        int completedQuarantines = 0;
-        for (QuarantinePeriod q : quarantines) {
-            if (q.getCompletedAt() != null) {
-                completedQuarantines++;
-            } else {
-                allQuarantinesCompleted = false;
-                outstandingIssues.add(String.format("Quarantine period pending (starts %s, ends %s)",
-                        q.getStartsOn(), q.getEndsOn()));
-            }
-        }
-
-        boolean hasRefusedSubmissions = false;
-        boolean hasPendingSubmissions = false;
-        boolean hasAdditionalInfoSubmissions = false;
-
-        for (AuthoritySubmission s : submissions) {
-            String authName = s.getAuthority() != null ? s.getAuthority().getName() : "Authority";
-            if (s.getStatus() == SubmissionStatus.REFUSED) {
-                hasRefusedSubmissions = true;
-                outstandingIssues.add(String.format("Authority submission %s refused by %s", s.getKind(), authName));
-            } else if (s.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
-                hasAdditionalInfoSubmissions = true;
-                outstandingIssues.add(String.format("Additional info requested by %s for %s", authName, s.getKind()));
-            } else if (s.getStatus() == SubmissionStatus.READY_TO_FILE || s.getStatus() == SubmissionStatus.FILED) {
-                hasPendingSubmissions = true;
-                outstandingIssues.add(String.format("Authority submission %s pending with %s (%s)", s.getKind(), authName, s.getStatus()));
-            }
-        }
+        GateAssessment gate = assess(job);
 
         // If the trip has already departed, never modify the dossier state or clearance gate (Finding 2).
         if (job.getDepartedAt() != null) {
-            return buildStatusResponse(job, items, quarantines, totalMandatory, clearedMandatory, allQuarantinesCompleted, outstandingIssues);
+            return gate.toResponse(job);
         }
 
-        boolean allSubmissionsIssued = !hasRefusedSubmissions && !hasPendingSubmissions && !hasAdditionalInfoSubmissions;
-        boolean ready = (totalMandatory > 0 && clearedMandatory == totalMandatory)
-                && allQuarantinesCompleted
-                && allSubmissionsIssued;
-
         DossierStatus previousStatus = job.getDossierStatus();
+        DossierStatus targetStatus = gate.ready() ? DossierStatus.CLEARANCE_READY
+                : gate.hasAdditionalInfo() ? DossierStatus.ADDITIONAL_INFO_REQUIRED
+                : gate.hasPending() ? DossierStatus.SUBMITTED_TO_AUTHORITY
+                : DossierStatus.OPEN;
 
-        if (ready) {
+        if (targetStatus == DossierStatus.CLEARANCE_READY) {
             job.setDossierStatus(DossierStatus.CLEARANCE_READY);
             if (job.getClearanceReadyAt() == null) {
                 job.setClearanceReadyAt(Instant.now());
@@ -355,112 +306,133 @@ public class ClearanceService {
                         previousStatus != null ? previousStatus.name() : "OPEN",
                         "CLEARANCE_READY");
             }
-        } else {
-            DossierStatus targetStatus;
-            if (hasAdditionalInfoSubmissions) {
-                targetStatus = DossierStatus.ADDITIONAL_INFO_REQUIRED;
-            } else if (hasPendingSubmissions) {
-                targetStatus = DossierStatus.SUBMITTED_TO_AUTHORITY;
-            } else {
-                targetStatus = DossierStatus.OPEN;
-            }
+        } else if (previousStatus != targetStatus) {
+            job.setDossierStatus(targetStatus);
+            job.setClearanceReadyAt(null);
+            transportJobRepository.save(job);
 
-            if (job.getDossierStatus() != targetStatus) {
-                DossierStatus oldStatus = job.getDossierStatus();
-                job.setDossierStatus(targetStatus);
-                job.setClearanceReadyAt(null);
-                transportJobRepository.save(job);
-
-                auditService.recordDecision(
-                        null,
-                        "CLEARANCE_GATE_BLOCKED",
-                        String.format("Clearance dossier for job %s set to %s.", job.getCode(), targetStatus),
-                        "TRANSPORT_JOB",
-                        job.getId(),
-                        job.getCode(),
-                        String.join("; ", outstandingIssues),
-                        oldStatus != null ? oldStatus.name() : "OPEN",
-                        targetStatus.name());
-            }
+            auditService.recordDecision(
+                    null,
+                    "CLEARANCE_GATE_BLOCKED",
+                    String.format("Clearance dossier for job %s set to %s.", job.getCode(), targetStatus),
+                    "TRANSPORT_JOB",
+                    job.getId(),
+                    job.getCode(),
+                    String.join("; ", gate.outstandingIssues()),
+                    previousStatus != null ? previousStatus.name() : "OPEN",
+                    targetStatus.name());
         }
 
-        return buildStatusResponse(job, items, quarantines, totalMandatory, clearedMandatory, allQuarantinesCompleted, outstandingIssues);
+        return gate.toResponse(job);
     }
 
     /** Retrieve clearance gate status without mutating state. */
     @Transactional(readOnly = true)
     public ClearanceStatusResponse getClearanceStatus(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
-        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
-        List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(jobId);
-        List<AuthoritySubmission> submissions = authoritySubmissionRepository.findByJobId(jobId);
+        return assess(job).toResponse(job);
+    }
+
+    /** What the gate sees for a job right now; shared by the evaluating and the read-only path. */
+    private GateAssessment assess(TransportJob job) {
+        List<ChecklistItem> items = checklistItemRepository.findByJobId(job.getId());
+        List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(job.getId());
+        List<AuthoritySubmission> submissions = latestPerAuthorityAndKind(authoritySubmissionRepository.findByJobId(job.getId()));
 
         List<String> outstandingIssues = new ArrayList<>();
         int totalMandatory = 0;
         int clearedMandatory = 0;
-
         for (ChecklistItem item : items) {
             boolean isMandatory = item.getRegulationRule() == null || item.getRegulationRule().isMandatory();
-            if (isMandatory) {
-                totalMandatory++;
-                if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
-                    clearedMandatory++;
-                } else {
-                    String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
-                    String horseInfo = item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
-                    outstandingIssues.add(String.format("%s%s: %s (Validity: %s)",
-                            docName, horseInfo, item.getStatus(), item.getValidity()));
-                }
+            if (!isMandatory) {
+                continue;
+            }
+            totalMandatory++;
+            if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
+                clearedMandatory++;
+            } else {
+                String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
+                String horseInfo = item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
+                outstandingIssues.add(String.format("%s%s not cleared (Status: %s, Validity: %s)",
+                        docName, horseInfo, item.getStatus(), item.getValidity()));
             }
         }
 
-        boolean allQuarantinesCompleted = true;
         int completedQuarantines = 0;
         for (QuarantinePeriod q : quarantines) {
             if (q.getCompletedAt() != null) {
                 completedQuarantines++;
             } else {
-                allQuarantinesCompleted = false;
-                outstandingIssues.add(String.format("Quarantine pending: %s to %s", q.getStartsOn(), q.getEndsOn()));
+                outstandingIssues.add(String.format("Quarantine period pending (starts %s, ends %s)",
+                        q.getStartsOn(), q.getEndsOn()));
             }
         }
 
+        boolean hasRefused = false;
+        boolean hasPending = false;
+        boolean hasAdditionalInfo = false;
         for (AuthoritySubmission s : submissions) {
             String authName = s.getAuthority() != null ? s.getAuthority().getName() : "Authority";
-            if (s.getStatus() == SubmissionStatus.REFUSED) {
-                outstandingIssues.add(String.format("Submission %s refused by %s", s.getKind(), authName));
-            } else if (s.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
-                outstandingIssues.add(String.format("Additional info requested by %s for %s", authName, s.getKind()));
-            } else if (s.getStatus() == SubmissionStatus.READY_TO_FILE || s.getStatus() == SubmissionStatus.FILED) {
-                outstandingIssues.add(String.format("Submission %s pending with %s (%s)", s.getKind(), authName, s.getStatus()));
+            switch (s.getStatus()) {
+                case REFUSED -> {
+                    hasRefused = true;
+                    outstandingIssues.add(String.format("Authority submission %s refused by %s", s.getKind(), authName));
+                }
+                case ADDITIONAL_INFO -> {
+                    hasAdditionalInfo = true;
+                    outstandingIssues.add(String.format("Additional info requested by %s for %s", authName, s.getKind()));
+                }
+                case READY_TO_FILE, FILED -> {
+                    hasPending = true;
+                    outstandingIssues.add(String.format("Authority submission %s pending with %s (%s)", s.getKind(), authName, s.getStatus()));
+                }
+                case ISSUED -> { }
             }
         }
 
-        return buildStatusResponse(job, items, quarantines, totalMandatory, clearedMandatory, allQuarantinesCompleted, outstandingIssues);
+        boolean allQuarantinesCompleted = completedQuarantines == quarantines.size();
+        boolean ready = totalMandatory > 0 && clearedMandatory == totalMandatory
+                && allQuarantinesCompleted && !hasRefused && !hasPending && !hasAdditionalInfo;
+        return new GateAssessment(items.size(), totalMandatory, clearedMandatory, quarantines.size(), completedQuarantines,
+                ready, hasPending, hasAdditionalInfo, outstandingIssues);
     }
 
-    private ClearanceStatusResponse buildStatusResponse(
-            TransportJob job,
-            List<ChecklistItem> items,
-            List<QuarantinePeriod> quarantines,
-            int totalMandatory,
-            int clearedMandatory,
-            boolean allQuarantinesCompleted,
-            List<String> outstandingIssues) {
-        return ClearanceStatusResponse.builder()
-                .jobId(job.getId())
-                .jobCode(job.getCode())
-                .dossierStatus(job.getDossierStatus())
-                .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
-                .clearanceReadyAt(job.getClearanceReadyAt())
-                .totalChecklistItems(items.size())
-                .mandatoryItems(totalMandatory)
-                .clearedMandatoryItems(clearedMandatory)
-                .totalQuarantines(quarantines.size())
-                .completedQuarantines((int) quarantines.stream().filter(q -> q.getCompletedAt() != null).count())
-                .allQuarantinesCompleted(allQuarantinesCompleted)
-                .outstandingIssues(outstandingIssues)
-                .build();
+    /** Only the most recent submission to an authority for a kind counts; earlier ones are history. */
+    private static List<AuthoritySubmission> latestPerAuthorityAndKind(List<AuthoritySubmission> submissions) {
+        Map<String, AuthoritySubmission> latest = new LinkedHashMap<>();
+        Comparator<AuthoritySubmission> byTime = Comparator.comparing(ClearanceService::submittedAt,
+                Comparator.nullsFirst(Comparator.naturalOrder()));
+        for (AuthoritySubmission s : submissions) {
+            String key = (s.getAuthority() != null ? s.getAuthority().getId() : null) + "|" + s.getKind();
+            latest.merge(key, s, (a, b) -> byTime.compare(a, b) >= 0 ? a : b);
+        }
+        return new ArrayList<>(latest.values());
+    }
+
+    private static Instant submittedAt(AuthoritySubmission s) {
+        return s.getFiledAt() != null ? s.getFiledAt() : s.getCreatedAt();
+    }
+
+    private record GateAssessment(int totalItems, int mandatoryItems, int clearedMandatoryItems,
+                                  int totalQuarantines, int completedQuarantines,
+                                  boolean ready, boolean hasPending, boolean hasAdditionalInfo,
+                                  List<String> outstandingIssues) {
+        ClearanceStatusResponse toResponse(TransportJob job) {
+            return ClearanceStatusResponse.builder()
+                    .jobId(job.getId())
+                    .jobCode(job.getCode())
+                    .dossierStatus(job.getDossierStatus())
+                    .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
+                    .clearanceReadyAt(job.getClearanceReadyAt())
+                    .totalChecklistItems(totalItems)
+                    .mandatoryItems(mandatoryItems)
+                    .clearedMandatoryItems(clearedMandatoryItems)
+                    .totalQuarantines(totalQuarantines)
+                    .completedQuarantines(completedQuarantines)
+                    .allQuarantinesCompleted(completedQuarantines == totalQuarantines)
+                    .outstandingIssues(outstandingIssues)
+                    .build();
+        }
     }
 
     private void assertClubOwnsJob(TransportJob job, User user) {

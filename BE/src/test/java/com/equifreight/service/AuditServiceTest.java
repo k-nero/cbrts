@@ -3,7 +3,7 @@ package com.equifreight.service;
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.User;
 import com.equifreight.repository.AuditLogRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,12 +24,12 @@ class AuditServiceTest {
     private AuditLogRepository auditLogRepository;
 
     private AuditService auditService;
-    private ObjectMapper objectMapper;
+    private JsonMapper jsonMapper;
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
-        auditService = new AuditService(auditLogRepository, objectMapper);
+        jsonMapper = JsonMapper.builder().build();
+        auditService = new AuditService(auditLogRepository, jsonMapper);
     }
 
     @Test

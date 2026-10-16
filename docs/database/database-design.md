@@ -498,6 +498,8 @@ erDiagram
   USERS ||--o{ TRIP_RECORDS : records
   TRIP_RECORDS ||--o{ CONDITION_LOGS : "checks horses"
   HORSES ||--o{ CONDITION_LOGS : "condition of"
+  CONDITION_LOGS ||--o{ CONDITION_LOG_FILES : "attaches photos"
+  FILES ||--o{ CONDITION_LOG_FILES : stores
   TRANSPORT_JOBS ||--o| HANDOVERS : "ends with"
 ```
 
@@ -518,6 +520,8 @@ erDiagram
 Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
 
 **`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
+
+**`condition_log_files`**: `(condition_log_id, file_id)`, the photos attached to one horse's condition entry. A file can be attached once; links are append-only and follow the same ownership checks as other job files.
 
 **`handovers`**: one per job
 
