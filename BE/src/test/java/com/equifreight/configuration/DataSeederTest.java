@@ -5,7 +5,7 @@ import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.repository.ClubRepository;
-import com.equifreight.repository.CountryRepository;
+import com.equifreight.repository.*;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.HorseSizeClassRepository;
 import com.equifreight.repository.RoleRepository;
@@ -42,8 +42,14 @@ class DataSeederTest {
         ClubRepository clubs = mock(ClubRepository.class);
         HorseSizeClassRepository sizeClasses = mock(HorseSizeClassRepository.class);
         horses = mock(HorseRepository.class);
-        seeder = new DataSeeder(roles, users, clubs, mock(CountryRepository.class), horses, sizeClasses,
-                mock(PasswordEncoder.class), "changeme123!");
+        seeder = new DataSeeder(roles, users, mock(PasswordEncoder.class), "changeme123!",
+                mock(CountryRepository.class), mock(PlaceRepository.class), mock(BorderCrossingRepository.class),
+                mock(CorridorRepository.class), clubs, sizeClasses, horses, mock(VehicleRepository.class),
+                mock(VehicleStallRepository.class), mock(RateCatalogVersionRepository.class),
+                mock(TransportRequestRepository.class), mock(QuotationRepository.class),
+                mock(TransportJobRepository.class), mock(LoadPlanRepository.class), mock(LoadPlanStallRepository.class),
+                mock(RoutePlanRepository.class), mock(RouteStopRepository.class), mock(RouteLegRepository.class),
+                mock(CrewAssignmentRepository.class), mock(CodeCounterRepository.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

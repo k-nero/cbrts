@@ -94,7 +94,7 @@ Where to look elsewhere:
 - **Packages** live under `com.equifreight`: `controller` (with `controller/admin` for staff admin), `service`, `repository`, `entity` (`entity/enums`), `model` (request and response DTOs per area), `exception`, `configuration`, `job`.
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V13` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V16` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Logging.** Use Lombok `@Log4j2`, not slf4j `LoggerFactory`.
 - **Injection.** Use constructor injection.
 - **Errors.** Throw the exceptions in `exception/` (`BusinessException`, `ConflictException`, `ResourceNotFoundException`, `UnauthorizedException`). `ControllerAdvise` turns them into `ApiError`. Use the one that matches: not signed in or not allowed is `UnauthorizedException`, not `BusinessException`. Error messages name the rule, the value found and the fix, e.g. "The earliest departure is 17 Oct 2026."
