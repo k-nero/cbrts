@@ -1,4 +1,4 @@
-﻿package com.equifreight.repository;
+package com.equifreight.repository;
 
 import com.equifreight.entity.StoredFile;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -19,10 +18,8 @@ import java.util.UUID;
 @Repository
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
 
-    Optional<StoredFile> findByStorageKey(String storageKey);
-
     /** True when the file is a document version or a filing result on a job requested by {@code clubId}. */
-    @Query(value = "
+    @Query(value = """
             select exists (
                 select 1
                 from (select ci.job_id
@@ -34,11 +31,11 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                 join transport_jobs tj on tj.id = j.job_id
                 join transport_requests tr on tr.id = tj.request_id
                 where tr.club_id = :clubId)
-            ", nativeQuery = true)
-    boolean isOnClubJob(@Param(fileId) UUID fileId, @Param(clubId) UUID clubId);
+            """, nativeQuery = true)
+    boolean isOnClubJob(@Param("fileId") UUID fileId, @Param("clubId") UUID clubId);
 
     /** True when the file is attached to any job {@code userId} is crewing. */
-    @Query(value = "
+    @Query(value = """
             select exists (
                 select 1
                 from (select ci.job_id
@@ -54,19 +51,19 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
                 join crew_assignments ca on ca.job_id = j.job_id
                 where ca.user_id = :userId)
-            ", nativeQuery = true)
-    boolean isOnCrewJob(@Param(fileId) UUID fileId, @Param(userId) UUID userId);
+            """, nativeQuery = true)
+    boolean isOnCrewJob(@Param("fileId") UUID fileId, @Param("userId") UUID userId);
 
     /** True when anything already points at the file, so it can't be attached again. */
-    @Query(value = "
+    @Query(value = """
             select exists (select 1 from document_versions where file_id = :fileId)
                 or exists (select 1 from incident_files where file_id = :fileId)
                 or exists (select 1 from authority_submissions where result_file_id = :fileId)
-            ", nativeQuery = true)
-    boolean isAttached(@Param(fileId) UUID fileId);
+            """, nativeQuery = true)
+    boolean isAttached(@Param("fileId") UUID fileId);
 
     /** Uploads created before {@code cutoff} that nothing points at, oldest first. */
-    @Query(value = "
+    @Query(value = """
             select f.* from files f
             where f.created_at < :cutoff
               and not exists (select 1 from document_versions dv where dv.file_id = f.id)
@@ -74,11 +71,11 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
               and not exists (select 1 from authority_submissions s where s.result_file_id = f.id)
             order by f.created_at
             limit :limit
-            ", nativeQuery = true)
-    List<StoredFile> findOrphans(@Param(cutoff) Instant cutoff, @Param(limit) int limit);
+            """, nativeQuery = true)
+    List<StoredFile> findOrphans(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
 
     /** Deletes the row right away, so a foreign key still pointing at it fails here rather than at commit. */
     @Modifying
-    @Query(delete from StoredFile f where f.id = :id)
-    int deleteNow(@Param(id) UUID id);
+    @Query("delete from StoredFile f where f.id = :id")
+    int deleteNow(@Param("id") UUID id);
 }
