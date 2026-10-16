@@ -212,7 +212,7 @@ export interface RegulationCatalog {
   activeVersion?: RegulationVersion;
 }
 
-export interface JobSummary {
+export interface ClearanceJobSummary {
   id: string;
   code: string;
   dossierStatus: DossierStatus;

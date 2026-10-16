@@ -8,9 +8,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, CrewAssignment.Key> {
+    List<CrewAssignment> findByJobId(UUID jobId);
+    void deleteByJobId(UUID jobId);
+
     /** The escort's upcoming and active trips (US-F4-01): closed jobs drop off the list. */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
@@ -27,4 +31,19 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
 
     boolean existsByJob_IdAndUser_Id(UUID jobId, UUID userId);
 
+    @Query("""
+            select c from CrewAssignment c join c.job j
+            where c.user.id = :userId
+              and j.id <> :jobId
+              and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+              and j.plannedDepartureAt is not null
+              and j.plannedArrivalAt is not null
+              and j.plannedDepartureAt < :jobEnd
+              and j.plannedArrivalAt > :jobStart
+            """)
+    List<CrewAssignment> findOverlappingAssignments(
+            @Param("userId") UUID userId,
+            @Param("jobId") UUID jobId,
+            @Param("jobStart") java.time.Instant jobStart,
+            @Param("jobEnd") java.time.Instant jobEnd);
 }
