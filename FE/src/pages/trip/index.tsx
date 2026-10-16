@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Button, Checkbox, Input, Select, Spin, Upload, message } from 'antd';
+import { Input, Select, Spin, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
-import type { AxiosError } from 'axios';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import { Chip, Panel, TimelineStop } from '@/components/ui';
+import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
+import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
@@ -43,14 +43,11 @@ const datetimeLocal = () => {
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 16);
 };
-const errorMessage = (error: unknown) => {
-  const response = (error as AxiosError<{ message?: string; error?: string }>).response?.data;
-  return (
-    response?.message ??
-    response?.error ??
-    (error instanceof Error ? error.message : 'Could not save the trip update.')
-  );
-};
+const errorMessage = (error: unknown) =>
+  apiErrorMessage(error, 'The trip update could not be saved.');
+/** Status in words (DESIGN.md: a tone plus a word, never a raw enum). */
+const sentence = (value: string) =>
+  value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ');
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
 const kindTone = (kind: TripRecordKind) =>
@@ -92,7 +89,7 @@ function TripRecords({ trip }: { trip: TripView }) {
               {record.conditions.map((condition) => (
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <strong className="type-body-m">{condition.horseName}</strong>
+                    <strong className="type-h4">{condition.horseName}</strong>
                     <Chip
                       tone={
                         condition.condition === HorseConditionEnum.CONCERN
@@ -102,7 +99,7 @@ function TripRecords({ trip }: { trip: TripView }) {
                             : 'ok'
                       }
                     >
-                      {condition.condition}
+                      {sentence(condition.condition)}
                     </Chip>
                   </div>
                   <p className="type-body-s mb-0 mt-1 text-ink-2">
@@ -141,7 +138,7 @@ function TripDetails({ trip }: { trip: TripView }) {
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-3">
         <Panel title="Trip status">
-          <div className="type-h3">{trip.tripStatus.replaceAll('_', ' ')}</div>
+          <div className="type-h3">{sentence(trip.tripStatus)}</div>
           <p className="type-body-s mb-0 mt-2 text-ink-3">
             Last update:{' '}
             {lastRecord
@@ -214,7 +211,7 @@ function TripDetails({ trip }: { trip: TripView }) {
         <div className="divide-y divide-line">
           {trip.horses.map((horse) => (
             <div key={horse.id} className="flex justify-between gap-2 py-3">
-              <strong className="type-body-m">{horse.name}</strong>
+              <strong className="type-h4">{horse.name}</strong>
               <span className="type-body-s text-ink-3">{horse.stall ?? 'Stall not assigned'}</span>
             </div>
           ))}
@@ -381,12 +378,9 @@ function TripWorkspace({
         </div>
       )}
       {summariesQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          message="Could not load trips"
-          description={errorMessage(summariesQuery.error)}
-        />
+        <Callout tone="bad" title="The trips could not be loaded">
+          {apiErrorMessage(summariesQuery.error, 'Refresh the page to try again.')}
+        </Callout>
       )}
       {summariesQuery.data && summariesQuery.data.totalPages === 0 && (
         <Panel>
@@ -411,13 +405,21 @@ function TripWorkspace({
             />
             {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
               <div className="flex items-center gap-2">
-                <Button disabled={summariesQuery.data.first} onClick={() => pageChange(page - 1)}>
+                <Button
+                  size="sm"
+                  disabled={summariesQuery.data.first}
+                  onClick={() => pageChange(page - 1)}
+                >
                   Previous
                 </Button>
                 <span className="type-body-s text-ink-3">
                   Page {page + 1} of {summariesQuery.data.totalPages}
                 </span>
-                <Button disabled={summariesQuery.data.last} onClick={() => pageChange(page + 1)}>
+                <Button
+                  size="sm"
+                  disabled={summariesQuery.data.last}
+                  onClick={() => pageChange(page + 1)}
+                >
                   Next
                 </Button>
               </div>
@@ -428,7 +430,7 @@ function TripWorkspace({
               title={selectedSummary.jobCode}
               extra={
                 <Chip tone={statusTone(selectedSummary.tripStatus)}>
-                  {selectedSummary.tripStatus.replaceAll('_', ' ')}
+                  {sentence(selectedSummary.tripStatus)}
                 </Chip>
               }
             >
@@ -445,20 +447,15 @@ function TripWorkspace({
             </div>
           )}
           {detailQuery.isError && (
-            <Alert
-              type="error"
-              showIcon
-              message="Could not load trip details"
-              description={errorMessage(detailQuery.error)}
-            />
+            <Callout tone="bad" title="This trip could not be loaded">
+              {apiErrorMessage(detailQuery.error, 'Refresh the page to try again.')}
+            </Callout>
           )}
           {audience === 'customer' && trip && (
-            <Alert
-              type="info"
-              showIcon
-              message="Progress follows recorded checkpoints"
-              description="Trip progress refreshes automatically when the escort or coordinator records an update."
-            />
+            <Callout tone="info" title="Progress follows recorded checkpoints">
+              You see the last checkpoint the escort or coordinator recorded, with its time. It
+              refreshes on its own.
+            </Callout>
           )}
           {editable && trip && (
             <Panel
@@ -469,12 +466,9 @@ function TripWorkspace({
               }
             >
               {!trip.clearanceReady && (
-                <Alert
-                  className="mb-4"
-                  type="warning"
-                  showIcon
-                  message="Departure is locked until clearance is ready."
-                />
+                <Callout className="mb-4" tone="bad" title="Departure locked">
+                  Departure can be recorded once the transport specialist clears the dossier.
+                </Callout>
               )}
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="type-body-s flex flex-col gap-2">
@@ -521,19 +515,18 @@ function TripWorkspace({
                     return (
                       <section key={horse.id} className="grid gap-3 py-4 md:grid-cols-2">
                         <div>
-                          <strong className="type-body-m">{horse.name}</strong>
+                          <strong className="type-h4">{horse.name}</strong>
                           <p className="type-body-s m-0 text-ink-3">
                             {horse.stall ?? 'Stall not assigned'}
                           </p>
                         </div>
                         <Checkbox
+                          label="I checked this horse"
                           checked={observation.checked}
                           onChange={(event) =>
                             updateObservation(horse.id, { checked: event.target.checked })
                           }
-                        >
-                          Log this horse's condition
-                        </Checkbox>
+                        />
                         <Select
                           aria-label={`${horse.name} condition`}
                           allowClear
@@ -544,7 +537,7 @@ function TripWorkspace({
                           }
                           options={conditions.map((condition) => ({
                             value: condition,
-                            label: condition,
+                            label: sentence(condition),
                           }))}
                         />
                         <div className="grid grid-cols-2 gap-3">
@@ -592,30 +585,35 @@ function TripWorkspace({
                             updateObservation(horse.id, { photos: fileList })
                           }
                         >
-                          <Button>Attach condition photos</Button>
+                          <Button type="button" size="sm" leadingIcon="upload">
+                            Attach photos
+                          </Button>
                         </Upload>
                       </section>
                     );
                   })}
                 </div>
               )}
+              {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
               <div className="mt-4 flex flex-wrap justify-end gap-2">
                 <Button
-                  loading={mutation.isPending}
                   disabled={
-                    (kind === TripRecordKindEnum.DEPARTED ||
+                    mutation.isPending ||
+                    ((kind === TripRecordKindEnum.DEPARTED ||
                       kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                    !trip.clearanceReady
+                      !trip.clearanceReady)
                   }
                   onClick={saveCheckpoint}
                 >
-                  Save checkpoint
+                  {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
                 </Button>
                 {audience === 'escort' && (
                   <Button
-                    type="primary"
-                    loading={mutation.isPending}
-                    disabled={!trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)}
+                    variant="primary"
+                    disabled={
+                      mutation.isPending ||
+                      !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
+                    }
                     onClick={saveConditions}
                   >
                     Save checked horse conditions
