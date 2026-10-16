@@ -5,6 +5,7 @@ import type {
   JobListParams,
   JobSummary,
   LoadPlan,
+  MoveHorse,
   PagedResponse,
   RoutePlan,
 } from '@/interfaces';
@@ -28,10 +29,8 @@ export const jobApi = {
       .put<LoadPlan>(`/staff/jobs/${jobId}/load-plan/vehicle`, null, { params: { vehicleId } })
       .then((r) => r.data),
 
-  assignStall: (jobId: string, vehicleStallId: string, horseId?: string | null) =>
-    client
-      .post<LoadPlan>(`/staff/jobs/${jobId}/load-plan/assign`, { vehicleStallId, horseId })
-      .then((r) => r.data),
+  moveHorse: (jobId: string, move: MoveHorse) =>
+    client.post<LoadPlan>(`/staff/jobs/${jobId}/load-plan/move`, move).then((r) => r.data),
 
   autoArrange: (jobId: string) =>
     client.post<LoadPlan>(`/staff/jobs/${jobId}/load-plan/auto-arrange`).then((r) => r.data),
