@@ -97,9 +97,16 @@ Where to look elsewhere:
 - **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V13` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Logging.** Use Lombok `@Log4j2`, not slf4j `LoggerFactory`.
 - **Injection.** Use constructor injection.
-- **Errors.** Throw the exceptions in `exception/` (`BusinessException`, `ConflictException`, `ResourceNotFoundException`, `UnauthorizedException`). `ControllerAdvise` turns them into `ApiError`. Error messages name the rule, the value found and the fix, e.g. "The earliest departure is 17 Oct 2026."
+- **Errors.** Throw the exceptions in `exception/` (`BusinessException`, `ConflictException`, `ResourceNotFoundException`, `UnauthorizedException`). `ControllerAdvise` turns them into `ApiError`. Use the one that matches: not signed in or not allowed is `UnauthorizedException`, not `BusinessException`. Error messages name the rule, the value found and the fix, e.g. "The earliest departure is 17 Oct 2026."
 - **APIs** live under `/api/v1/...`. Staff admin endpoints live under `/api/v1/admin/**`, and role access is enforced in `ApplicationConfiguration`.
-- **Lists** take a Spring `Pageable` (page size 20). Sortable fields must be real entity fields, because joined or derived DTO columns fail at runtime.
+- **Lists** take a Spring `Pageable` (page size 20) and return a `Page`, including inboxes and queues. Sortable fields must be real entity fields, because joined or derived DTO columns fail at runtime.
+- **Permissions are exactly what the story and `PRODUCT.md` say.** If a story says "only the transport specialist reviews", no other role may, not even the logistics manager "for convenience". Declare role checks once, with `@PreAuthorize` on the controller method or in `ApplicationConfiguration`, not with hand-rolled role loops in services.
+- **Records belong to someone.** Customer endpoints (`/api/v1/customer/**`) only read or change records of the signed-in user's club; check ownership in the service and answer 404 for anyone else's record. Never trust an id in the path to belong to the caller.
+- **Mirror the database's rules.** When `database-design.md` puts a rule in a check constraint or trigger (append-only versions, one review decision, required reasons), the service enforces the same rule first, with a clear message. Never write code that relies on the database to reject it, and never contradict it.
+- **Validate, then write.** Check every rule before saving anything; don't save a change and throw afterwards.
+- **Audit every decision.** Each state change a person makes (approve, reject, issue, publish, record a payment, override) writes an `audit_log` row in the same transaction, with the action code, a one-line summary and the entity code (BR-F1-08).
+- **Dates are local calendar days.** Business rules that count days (validity windows, lead time, due dates, "in 5 days") work on dates in the business time zone, `Asia/Ho_Chi_Minh`, never UTC: a 06:00 departure on 18 Oct is still 17 Oct in UTC. Keep one shared constant for the zone instead of scattering `ZoneOffset.UTC`.
+- **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
 - **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`.
 
@@ -118,6 +125,10 @@ Where to look elsewhere:
   - Tokens live in `src/index.css`: `@theme` is Dark, `[data-theme='light']` is Light. Light is the default theme.
   - `constant/color.ts` mirrors the tokens for AntD.
   - The `/design-system` route shows every component variant; use it to check visuals.
+- **Data fetching** goes through TanStack Query hooks in `hooks/<domain>.ts` (`useQuery` and `useMutation`, invalidating the affected queries on success), never `useState` plus `useEffect` calling an API from a page. Pages own no server data state of their own.
+- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed request shows an error state or the server's `ApiError` message, never an empty list that looks like success. Every list has a loading, an empty and an error state.
+- **Styling uses the tokens.** Text uses the `type-*` utilities and colours use the token classes from `index.css`; no arbitrary values such as `text-[13px]`, `p-[7px]` or hex colours. Import design-system components from `@/components/ui`, not from their individual files.
+- **Real inputs.** A file is chosen with a file picker and uploaded, never pasted as a file id; a date uses a date field, and a choice from a fixed set uses a select or option cards.
 - **Checks.** Run `bun run typecheck`, `bun run format` and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
 
 ## Design rules (when building UI)
@@ -142,6 +153,7 @@ Where to look elsewhere:
 
 ## Git and GitHub workflow
 
+- **Work from a story.** Every PR names the stories it implements (`Closes #36`) and keeps their acceptance criteria as a checklist in the description, each one ticked or explained. Keep a PR to one story or a few closely related ones, so it can be reviewed; split a whole epic into several PRs.
 - **Flow:** issue, then branch, then PR. Branch from `main` with a type prefix: `feat/`, `fix/`, `style/`, `chore/`, `docs/`, `design/`. Never commit straight to `main`; check `git branch --show-current` before you commit or push.
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
@@ -155,6 +167,10 @@ Where to look elsewhere:
 - Don't show a single price before a quotation exists, or let a customer quote a route that is not in the catalog.
 - Don't overwrite a document, quotation, invoice, payment or catalog version. Create a new version or a correcting entry.
 - Don't weaken a legality block into a warning.
+- Don't give a role a permission its story doesn't, or let a customer reach another club's records.
+- Don't save first and validate after, or skip the audit entry for a decision.
+- Don't count calendar days in UTC.
+- Don't fetch data in a page with `useEffect`, hard-code ids or mock data, or hide a failed request.
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
