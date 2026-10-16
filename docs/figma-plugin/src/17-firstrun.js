@@ -12,12 +12,22 @@ function newCustomer(s) {
   setP(s.children[s.children.length - 1], { 'As of': '26 Sep 2026' });
   return s;
 }
+/* the first horse before it exists: an empty stall nameplate on a dashed band, the card the club is about to make */
+function ghostHorse(w) {
+  var g = VV({ name: 'Your first nameplate', gap: 10, w: w });
+  var band = F({ name: 'Coat', w: w, h: 148, radius: 12, fill: 'surface/muted', stroke: 'border/strong', dash: [4, 4] });
+  var plate = inst(C.nameplate);
+  setP(plate, { Name: 'Your first horse', Subtitle: 'Breed · sex' });
+  band.appendChild(plate); plate.x = 20; plate.y = 148 - 20 - plate.height;
+  addAll(g, [band, Tx('Each horse gets a brass nameplate on its coat colour, and every request starts from it.', 'Body/S', 'text/tertiary', { fill: true })]);
+  return g;
+}
 function scrFirstRequests() {
   var w = panel('Welcome', { gap: 20, pad: 28 });
   var h = VV({ name: 'Head', gap: 6 });
   addAll(h, [Tx('Start with your horses', 'Display/M'), Tx('Every request is built from your horses’ profiles, so we ask for them once and reuse them on every move.', 'Body/M', 'text/secondary', { fill: true })]);
   add(w, fillW(h));
-  [['Add your horses', 'Name, microchip, size and temperament. About 3 minutes each.'], ['Request transport', 'Pick horses, service, route and dates. You see an indicative range straight away.'], ['We review and quote', 'Within 1 business day you get an itemised quotation, valid for 7 days.']].forEach(function (s, i) {
+  [['Add your horses', 'Name, microchip, size and temperament. About 3 minutes each.'], ['Request transport', 'Pick the horses, then the route and dates, then the service. You see an indicative range as soon as the route is set.'], ['We review and quote', 'Within 1 business day you get an itemised quotation, valid for 7 days.']].forEach(function (s, i) {
     var row = H({ name: s[0], gap: 14, cross: 'MIN' });
     var n = H({ name: 'N', w: 28, h: 28, radius: 999, stroke: i === 0 ? 'text/primary' : 'border/strong', main: 'CENTER', cross: 'CENTER' });
     add(n, Tx(String(i + 1), 'Mono/Caption', i === 0 ? 'text/primary' : 'text/tertiary'));
@@ -29,6 +39,12 @@ function scrFirstRequests() {
   var acts = H({ name: 'Actions', gap: 12, pad: [4, 0, 0, 0] });
   addAll(acts, [btn('Primary', 'MD', 'Add your first horse', { lead: 'plus' }), btn('Secondary', 'MD', 'See how a request works')]);
   add(w, acts);
+  /* the steps on the left, the nameplate they lead to on the right */
+  var welcome = panel('Welcome', { gap: 0, pad: 0 });
+  var wr = H({ name: 'Row', gap: 32, pad: 28, cross: 'MIN' });
+  w.name = 'Steps'; w.fills = []; w.strokes = []; w.paddingLeft = w.paddingRight = w.paddingTop = w.paddingBottom = 0;
+  addAll(wr, [fillW(w), ghostHorse(272)]);
+  add(welcome, fillW(wr));
   var ready = panel('Have these ready', { gap: 12 });
   add(ready, Tx('Have these ready', 'Heading/H4'));
   [['Each horse’s passport', 'For the microchip number and date of birth.'], ['Height and weight', 'Height sets the stall width; weight sets the load.'], ['A declared value', 'Used for insurance if you insure through us.'], ['Handling needs', 'Nervous loaders, box stall only, a climate stall, a foal at foot.']].forEach(function (r) {
@@ -42,7 +58,7 @@ function scrFirstRequests() {
   var eb = VV({ name: 'Empty', gap: 6, pad: [40, 24, 44, 24], cross: 'CENTER' });
   addAll(eb, [Tx('Your requests appear here', 'Heading/H4', 'text/secondary', { align: 'CENTER' }), Tx('Sorted by what needs you first, with the stage each one is at.', 'Body/S', 'text/tertiary', { align: 'CENTER' })]);
   add(empty, fillW(eb));
-  return newCustomer(screen('First run · My requests', 'My requests', [pageHead('My requests', '0 requests · Đà Lạt Highland Stables'), split(w, ready, SIDE.narrow), empty], { gap: 28 }));
+  return newCustomer(screen('First run · My requests', 'My requests', [pageHead('My requests', '0 requests · Đà Lạt Highland Stables'), split(welcome, ready, SIDE.narrow), empty], { gap: 28 }));
 }
 function fieldRow(fields) {
   var r = H({ name: 'Fields', gap: 16, cross: 'MIN' });
@@ -71,7 +87,8 @@ function scrAddHorse() {
   addAll(size, [chip('Neutral', 'Size M · 32 in', { noDot: true }), Tx('Worked out from 16.0 hh. It decides the stall width and the air position.', 'Body/S', 'text/secondary', { fill: true })]);
   add(form, fillW(formSection('Size and weight', null, [fieldRow([['Text', 'Default', 'Height', '16.0 hh', null], ['Text', 'Default', 'Weight', '505 kg', null]]), size])));
   var ticks = H({ name: 'Needs', gap: 24, cross: 'CENTER' });
-  addAll(ticks, [tick('Climate-controlled stall', false), tick('Box stall only', false), tick('Mare with foal at foot', false)]);
+  /* "Mare with foal at foot" joins these only when Sex is Mare */
+  addAll(ticks, [tick('Climate-controlled stall', false), tick('Box stall only', false)]);
   var notes = noteField('Handling notes', 'Anything the grooms should know: how he loads, what settles him.', 'Shown to the escort and the fleet coordinator.', true);
   add(form, fillW(formSection('Temperament and needs', null, [svcOptions([
     ['Selected', 'Calm', 'Loads with a standard team.', 'Standard stall', null],
@@ -82,6 +99,14 @@ function scrAddHorse() {
   borderSide(foot, 'border/default', 'top');
   addAll(foot, [btn('Ghost', 'MD', 'Cancel'), btn('Primary', 'MD', 'Save horse', { lead: 'check' })]);
   add(form, fillW(foot));
+  /* the horse card as it will appear, built from the form as it is typed */
+  var preview = VV({ name: 'Preview', gap: 12 });
+  var card = horseCard({ name: 'Langbiang Star', coat: 'Bay', sub: 'Thoroughbred · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.0 hh', weight: '505 kg', size: 'M · 32', chip: '250 259 600 441 087', value: '$95,000', notes: 'No handling notes yet.', ready: 'No trips yet', pct: 0 });
+  setP(card, { 'Readiness label': 'Documents · per trip' });
+  card.findAll(function (n) { return n.name === 'Actions' || n.name === 'Divider'; }).forEach(function (n) { n.visible = false; });
+  var ph = VV({ name: 'Head', gap: 2 });
+  addAll(ph, [Tx('How he’ll appear', 'Heading/H4'), Tx('On My horses and in every request. It updates as you type.', 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(preview, [fillW(ph), fillW(card)]);
   var why = panel('Why we ask', { gap: 14 });
   add(why, Tx('Why we ask', 'Heading/H4'));
   [['Identity', 'Border posts read the microchip and match it to the passport.'], ['Size and weight', 'Height sets the stall width and the air position; weight sets the trailer’s load.'], ['Temperament', 'Decides the stall type and who stands next to whom.']].forEach(function (r) {
@@ -92,6 +117,6 @@ function scrAddHorse() {
   });
   var later = panel('Documents come later', { gap: 6 });
   addAll(later, [Tx('Documents come later', 'Heading/H4'), Tx('We ask for the passport, tests and certificates per trip, checked against your travel dates. Nothing to upload now.', 'Body/S', 'text/secondary', { fill: true })]);
-  return newCustomer(screen('First run · Add a horse', 'My horses', [pageHead('Add a horse', 'Your first horse. You can add more after saving.'), split(form, column([why, later]), SIDE.narrow)], { gap: 28 }));
+  return newCustomer(screen('First run · Add a horse', 'My horses', [pageHead('Add a horse', 'Your first horse. You can add more after saving.'), split(form, column([preview, why, later]), SIDE.narrow)], { gap: 28 }));
 }
 async function eFirstRun() { return insertChainCall([scrFirstRequests, scrAddHorse], 'Request · 4 Review'); }

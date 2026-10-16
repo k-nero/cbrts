@@ -2,16 +2,13 @@
 
 SWP391 project. Racing clubs request road or air transport for their horses across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
 
-The earlier coursework (`prj301/`, and the SWP391 parking management system in `swp391/`) lives on the `archive/prj301-swp391` branch.
-
 ## Layout
 
 | Folder | What it is |
 |---|---|
 | `BE/` | Spring Boot 4 REST API (Java 25, Gradle, PostgreSQL, Flyway, Spring Security with JWT, SpringDoc) |
 | `FE/` | React 19 single-page app (Rsbuild, Ant Design 6, Tailwind 4, React Router 7, TanStack Query, React Hook Form with Zod). Layout: `apis/` + `hooks/` per domain, `router/route.config.ts` for pages and roles, `components/form` and `components/Table` as the base kits |
-| `docs/` | The core-flows spec and quotation builder (`.docx`), the diagrams, and the Figma design generator (`docs/figma-plugin/`) |
-| `requirement.txt` | The course requirement (Vietnamese) |
+| `docs/` | The course requirement (`requirement.txt`), the core-flows spec and quotation builder (`.docx`), the diagrams, and the Figma design generator (`docs/figma-plugin/`) |
 
 ## Roles
 
@@ -25,9 +22,24 @@ The earlier coursework (`prj301/`, and the SWP391 parking management system in `
 
 ## Running
 
+### Docker
+
+```bash
+cp .env.example .env   # then set DB_PASSWORD and JWT_SECRET
+docker compose up -d --build
+```
+
+This starts PostgreSQL, the API and the web app. Open `http://localhost:3000`. nginx serves the SPA and proxies `/api` and Swagger UI (`/swagger-ui.html`) to the backend. The API is also published on `http://localhost:8080`, and Postgres on `localhost:5433`.
+
+The backend image runs on a JRE with two ahead-of-time steps that cut startup time:
+- **Spring AOT:** `processAot` generates the bean-definition code at build time, and the app runs with `-Dspring.aot.enabled=true`. Beans are fixed at build time, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
+- **JDK AOT cache:** the build starts the app once against a throwaway Postgres and records `app.aot`, which the container loads with `-XX:AOTCache`. The cache is rebuilt with every image build, so nothing needs regenerating by hand.
+
+### Local development
+
 Prerequisites: JDK 25, PostgreSQL, and [Bun](https://bun.sh).
 
-### Backend
+#### Backend
 
 ```bash
 createdb cbrtsdb
@@ -49,7 +61,7 @@ On first start, `DataSeeder` creates the five roles and one account per role. Ea
 | `khoi.do@equifreight.vn` | Fleet & route coordinator |
 | `minh.tran@equifreight.vn` | Escort |
 
-### Frontend
+#### Frontend
 
 ```bash
 cd FE

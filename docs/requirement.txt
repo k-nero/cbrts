@@ -1,0 +1,53 @@
+Cross-Border Racehorse Transport System
+
+ACTORS
+- Logistics Manager
+- Transport Specialist
+- Fleet & Route Coordinator
+- Vehicle Driver / Escort
+- Customer
+
+RESPONSIBILITIES
+
+Logistics Manager
+ + Receive and approve domestic and international racehorse transport orders.
+ + Draw up the overall plan for each shipment (choose the vehicle, airline, route and transit points).
+ + Assign tasks to the Transport Specialist, the Coordinator and the Driver/Escort.
+ + Handle and approve route changes or extra costs that arise in emergencies.
+ + View reports on revenue, operating costs and trip-completion performance (on-time delivery).
+
+Transport Specialist (paperwork & quarantine)
+ + Maintain the catalog of health, quarantine and customs regulations for each country and border crossing.
+ + Create and store a digital transport dossier for each horse (vaccination certificate, horse passport, export/import permits).
+ + Track the approval progress of dossiers with the authorities (Ministry of Agriculture, Customs, quarantine agencies).
+ + Notify customers and guide them to supply any missing legal documents before the departure date.
+
+Fleet & Route Coordinator
+ + Manage the list of specialized transport equipment (horse trucks, aircraft holds, transport stalls).
+ + Build the optimal travel route, setting the rest stops, quarantine stations and refuelling stops.
+ + Update manually, or track, the trip's progress leg by leg (Departed, Arrived at stop, Cleared customs, Delivered).
+ + Adjust the schedule and send alerts when traffic incidents, bad weather or border congestion occur.
+
+Vehicle Driver / Escort
+ + View the trip schedule, the horses in their charge and the assigned rest stops.
+ + Manually report the trip status at each checkpoint (Departed, Arrived at stop, Customs clearance completed).
+ + Keep a log of each horse's condition throughout the trip (Stable health, Off feed, Stressed, Climate change) with text and photos.
+ + Send emergency incident reports (vehicle breakdown, prolonged traffic jam, horse medical incident) to the operations center.
+
+Customer (racing club / horse owner)
+ + Create a racehorse transport booking request (origin/destination, time, number of horses, special requirements).
+ + Upload the horses' background papers and medical records as the transport provider requires.
+ + Follow the trip's location and leg-by-leg status updates in real time.
+ + Get notified when the horses have cleared customs or arrived safely at the handover point.
+
+FLOWS
+
+Required
+ Flow 1: Transport Request Creation & Approval
+ Flow 2: Legal Documents & Quarantine Clearance Management
+ Flow 3: Route Planning & Vehicle Dispatch
+ Flow 4: Status Updates & Trip Log
+
+Optional
+ Flow 5: Incident Handling & Emergency Rerouting
+ Flow 6: Trip Handover & Acceptance
