@@ -25,15 +25,28 @@ export const fileApi = {
     return res.data;
   },
 
+  /**
+   * Opens the file in a new tab. The tab is opened synchronously, inside the click, because popup
+   * blockers drop a window.open that comes after an await; it is pointed at the file once the
+   * authenticated download finishes, and closed again if the download fails.
+   */
   viewFile: async (fileId: string): Promise<void> => {
-    const res = await client.get<Blob>(`/files/${fileId}/content`, {
-      params: { inline: true },
-      responseType: 'blob',
-    });
-    const blobUrl = URL.createObjectURL(res.data);
-    const win = window.open(blobUrl, '_blank');
-    if (win) {
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    const win = window.open('', '_blank');
+    try {
+      const res = await client.get<Blob>(`/files/${fileId}/content`, {
+        params: { inline: true },
+        responseType: 'blob',
+      });
+      const blobUrl = URL.createObjectURL(res.data);
+      if (win) {
+        win.location.href = blobUrl;
+      } else {
+        window.location.assign(blobUrl);
+      }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (error) {
+      win?.close();
+      throw error;
     }
   },
 

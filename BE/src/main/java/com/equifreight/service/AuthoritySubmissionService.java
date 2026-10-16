@@ -2,7 +2,6 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
@@ -140,9 +139,6 @@ public class AuthoritySubmissionService {
 
         AuthoritySubmission saved = submissionRepository.save(submission);
 
-        job.setDossierStatus(DossierStatus.SUBMITTED_TO_AUTHORITY);
-        transportJobRepository.save(job);
-
         // Audit log (BR-F1-08)
         auditService.recordDecision(
                 specialist,
@@ -156,6 +152,8 @@ public class AuthoritySubmissionService {
                 null,
                 "FILED");
 
+        // The gate derives SUBMITTED_TO_AUTHORITY from the open filing, and leaves a departed job alone.
+        clearanceService.evaluateClearanceGate(job.getId());
         return ClearanceMapper.toSubmissionResponse(saved);
     }
 
@@ -183,9 +181,8 @@ public class AuthoritySubmissionService {
                 submission.setResultFile(resultFile);
             }
         } else if (request.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
+            // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
-            job.setDossierStatus(DossierStatus.ADDITIONAL_INFO_REQUIRED);
-            transportJobRepository.save(job);
 
             if (job.getRequest() != null && job.getRequest().getCreatedBy() != null) {
                 notificationService.sendNotification(

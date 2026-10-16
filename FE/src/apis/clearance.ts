@@ -11,6 +11,7 @@ import type {
   DocumentUploadRequest,
   DocumentVersion,
   JobSummary,
+  PagedResponse,
   QuarantinePeriod,
   RegulationCatalog,
   RegulationVersion,
@@ -20,8 +21,10 @@ import type {
 
 export const clearanceApi = {
   // Jobs
-  getActiveJobs: () =>
-    client.get<JobSummary[]>('/staff/clearance/jobs'),
+  getActiveJobs: (q: string) =>
+    client.get<PagedResponse<JobSummary>>('/staff/clearance/jobs', {
+      params: { q: q || undefined, size: 20 },
+    }),
 
   // Checklist & Clearance Gate
   getChecklist: (jobId: string) =>
@@ -34,8 +37,7 @@ export const clearanceApi = {
     client.post<ClearanceStatus>(`/staff/clearance/jobs/${jobId}/evaluate-gate`),
 
   // Document Versions & Specialist Review
-  getPendingReviews: () =>
-    client.get<DocumentVersion[]>('/staff/clearance/pending-reviews'),
+  getPendingReviews: () => client.get<DocumentVersion[]>('/staff/clearance/pending-reviews'),
 
   uploadDocumentVersion: (checklistItemId: string, data: DocumentUploadRequest) =>
     client.post<ChecklistItem>(`/staff/clearance/checklist/${checklistItemId}/versions`, data),
@@ -67,14 +69,12 @@ export const clearanceApi = {
     client.post<QuarantinePeriod>(`/staff/clearance/quarantines/${quarantineId}/complete`),
 
   // Regulations
-  getRegulationCatalogs: () =>
-    client.get<RegulationCatalog[]>('/staff/regulations/catalogs'),
+  getRegulationCatalogs: () => client.get<RegulationCatalog[]>('/staff/regulations/catalogs'),
 
   getRegulationVersionDetails: (versionId: string) =>
     client.get<RegulationVersion>(`/staff/regulations/versions/${versionId}`),
 
-  getDocumentTypes: () =>
-    client.get<DocumentType[]>('/staff/regulations/document-types'),
+  getDocumentTypes: () => client.get<DocumentType[]>('/staff/regulations/document-types'),
 
   publishRegulationVersion: (versionId: string) =>
     client.post<RegulationVersion>(`/staff/regulations/versions/${versionId}/publish`),

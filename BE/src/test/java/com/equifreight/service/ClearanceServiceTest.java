@@ -303,4 +303,76 @@ class ClearanceServiceTest {
         verify(transportJobRepository, never()).save(any());
         verify(auditService, never()).recordDecision(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("evaluateClearanceGate passes when a refused filing was re-filed and issued (latest per authority and kind)")
+    void evaluateClearanceGateCountsOnlyTheLatestSubmission() {
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+        Authority customs = authority("Cambodia customs");
+
+        stubGate(List.of(
+                submission(customs, SubmissionStatus.REFUSED, Instant.parse("2026-10-01T02:00:00Z")),
+                submission(customs, SubmissionStatus.ISSUED, Instant.parse("2026-10-03T02:00:00Z"))));
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertTrue(resp.isClearanceReady());
+        assertEquals(DossierStatus.CLEARANCE_READY, job.getDossierStatus());
+    }
+
+    @Test
+    @DisplayName("evaluateClearanceGate blocks when the latest filing was refused after an earlier one was issued")
+    void evaluateClearanceGateBlocksWhenTheLatestSubmissionIsRefused() {
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+        Authority customs = authority("Cambodia customs");
+
+        stubGate(List.of(
+                submission(customs, SubmissionStatus.ISSUED, Instant.parse("2026-10-01T02:00:00Z")),
+                submission(customs, SubmissionStatus.REFUSED, Instant.parse("2026-10-03T02:00:00Z"))));
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertFalse(resp.isClearanceReady());
+        assertEquals(DossierStatus.OPEN, job.getDossierStatus());
+    }
+
+    @Test
+    @DisplayName("evaluateClearanceGate derives ADDITIONAL_INFO_REQUIRED from an open info request")
+    void evaluateClearanceGateSetsAdditionalInfoRequired() {
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+
+        stubGate(List.of(submission(authority("DAH Vietnam"), SubmissionStatus.ADDITIONAL_INFO, Instant.parse("2026-10-02T02:00:00Z"))));
+
+        clearanceService.evaluateClearanceGate(job.getId());
+
+        assertEquals(DossierStatus.ADDITIONAL_INFO_REQUIRED, job.getDossierStatus());
+        assertNull(job.getClearanceReadyAt());
+    }
+
+    private void stubGate(List<AuthoritySubmission> submissions) {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
+        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(submissions);
+    }
+
+    private static Authority authority(String name) {
+        Authority authority = new Authority();
+        authority.setId(UUID.randomUUID());
+        authority.setName(name);
+        return authority;
+    }
+
+    private static AuthoritySubmission submission(Authority authority, SubmissionStatus status, Instant filedAt) {
+        AuthoritySubmission submission = new AuthoritySubmission();
+        submission.setId(UUID.randomUUID());
+        submission.setAuthority(authority);
+        submission.setKind(SubmissionKind.IMPORT_PERMIT);
+        submission.setStatus(status);
+        submission.setFiledAt(filedAt);
+        return submission;
+    }
 }

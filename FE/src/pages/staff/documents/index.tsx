@@ -1,14 +1,20 @@
 import { useState, type ChangeEvent, type FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Alert, Empty, Input, Modal, Select, Spin } from 'antd';
+import { Empty, Input, Modal, Select, Spin, message } from 'antd';
 import PageHeader from '@/components/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Callout } from '@/components/ui/Callout';
-import { Chip } from '@/components/ui/Chip';
-import { ClearanceGate } from '@/components/ui/ClearanceGate';
-import { DocumentRow, type DocumentStatus } from '@/components/ui/DocumentRow';
-import { StatTile } from '@/components/ui/StatTile';
+import {
+  Button,
+  Callout,
+  Chip,
+  ClearanceGate,
+  DocumentRow,
+  Radio,
+  StatTile,
+  Tabs,
+  type DocumentStatus,
+} from '@/components/ui';
 import { fileApi } from '@/apis/file';
+import { apiErrorMessage } from '@/lib/utils';
 import {
   useClearanceJobs,
   useClearanceStatus,
@@ -32,7 +38,9 @@ const DocumentsPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialJobId = searchParams.get('jobId');
 
-  const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>(initialJobId ? 'checklist' : 'pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>(
+    initialJobId ? 'checklist' : 'pending',
+  );
   const [selectedJobId, setSelectedJobId] = useState<string | null>(initialJobId);
 
   // Review modal state
@@ -52,8 +60,16 @@ const DocumentsPage: FC = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const [messageApi, messageHolder] = message.useMessage();
+  const viewFile = (fileId: string) => {
+    fileApi.viewFile(fileId).catch((err: unknown) => {
+      void messageApi.error(apiErrorMessage(err, 'The file could not be opened.'));
+    });
+  };
+
   // Queries (TanStack Query, zero useEffect)
-  const { data: jobs = [], isLoading: jobsLoading } = useClearanceJobs();
+  const [jobSearch, setJobSearch] = useState('');
+  const { data: jobs = [], isFetching: jobsLoading } = useClearanceJobs(jobSearch);
 
   const {
     data: pendingReviews = [],
@@ -69,10 +85,7 @@ const DocumentsPage: FC = () => {
     refetch: refetchChecklist,
   } = useJobChecklist(selectedJobId);
 
-  const {
-    data: statusData,
-    refetch: refetchStatus,
-  } = useClearanceStatus(selectedJobId);
+  const { data: statusData, refetch: refetchStatus } = useClearanceStatus(selectedJobId);
 
   // Mutations
   const reviewMutation = useReviewDocument(selectedJobId);
@@ -99,7 +112,9 @@ const DocumentsPage: FC = () => {
   const handleReviewSubmit = async () => {
     if (!selectedVersion) return;
     if (reviewDecision === 'REJECTED' && !rejectReason.trim()) {
-      setReviewError('A reason is strictly required when rejecting a document (BR-F2-07).');
+      setReviewError(
+        'Add the reason the customer will read before rejecting this document (BR-F2-07).',
+      );
       return;
     }
     setReviewError(null);
@@ -114,8 +129,7 @@ const DocumentsPage: FC = () => {
       setReviewModalOpen(false);
       setSelectedVersion(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to submit review decision.';
-      setReviewError(msg);
+      setReviewError(apiErrorMessage(err, 'The review decision could not be saved.'));
     }
   };
 
@@ -138,11 +152,11 @@ const DocumentsPage: FC = () => {
   const handleUploadSubmit = async () => {
     if (!selectedChecklistItem) return;
     if (!uploadFile) {
-      setUploadError('Please choose a file to upload.');
+      setUploadError('Choose the document file to upload.');
       return;
     }
     if (!issuedOn.trim() || !validUntil.trim()) {
-      setUploadError('Issue date and expiry date are strictly required (US-F2-03, US-F2-09).');
+      setUploadError('Enter the issue date and the valid-until date printed on the document.');
       return;
     }
     setUploadError(null);
@@ -164,8 +178,7 @@ const DocumentsPage: FC = () => {
       setUploadModalOpen(false);
       setSelectedChecklistItem(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to upload document version.';
-      setUploadError(msg);
+      setUploadError(apiErrorMessage(err, 'The document could not be uploaded.'));
     } finally {
       setUploadingFile(false);
     }
@@ -182,9 +195,10 @@ const DocumentsPage: FC = () => {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
+      {messageHolder}
       <PageHeader
-        title="Clearance & Document Management"
-        summary="Transport Specialist dossier review, document validity verification, and clearance gate evaluation."
+        title="Documents"
+        summary="Documents waiting for your check, and each job's checklist against its clearance gate."
         right={
           <div className="flex items-center gap-2">
             <Button
@@ -204,50 +218,30 @@ const DocumentsPage: FC = () => {
         }
       />
 
-      {/* Navigation tabs */}
-      <div className="flex border-b border-line gap-4">
-        <button
-          type="button"
-          onClick={() => setActiveTab('pending')}
-          className={`pb-3 type-label-m flex items-center gap-2 border-b-2 font-medium transition-colors ${
-            activeTab === 'pending'
-              ? 'border-ink text-ink font-semibold'
-              : 'border-transparent text-ink-3 hover:text-ink-2'
-          }`}
-        >
-          <span>Pending Reviews</span>
-          {pendingReviews.length > 0 && (
-            <Chip tone="warn">
-              {pendingReviews.length}
-            </Chip>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('checklist')}
-          className={`pb-3 type-label-m flex items-center gap-2 border-b-2 font-medium transition-colors ${
-            activeTab === 'checklist'
-              ? 'border-ink text-ink font-semibold'
-              : 'border-transparent text-ink-3 hover:text-ink-2'
-          }`}
-        >
-          <span>Job Dossier & Clearance Gate</span>
-        </button>
-      </div>
+      <Tabs
+        label="Documents views"
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { key: 'pending', label: 'Waiting for review', count: pendingReviews.length },
+          { key: 'checklist', label: 'Job checklist and gate' },
+        ]}
+      />
 
       {/* Tab 1: Pending Reviews */}
       {activeTab === 'pending' && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="type-h3 text-ink">Review Inbox</h2>
+              <h2 className="type-h3 text-ink">Review inbox</h2>
               <p className="type-body-s text-ink-3">
-                Exclusively reviewed by Transport Specialist. Approvals are blocked if document validity is RED.
+                Only the transport specialist reviews documents. A document checked as RED can't be
+                approved.
               </p>
             </div>
             <span className="type-caption text-ink-3">
-              {pendingReviews.length} {pendingReviews.length === 1 ? 'document' : 'documents'} pending review
+              {pendingReviews.length} {pendingReviews.length === 1 ? 'document' : 'documents'}{' '}
+              pending review
             </span>
           </div>
 
@@ -258,18 +252,15 @@ const DocumentsPage: FC = () => {
           )}
 
           {pendingError && (
-            <Alert
-              type="error"
-              message="Failed to load pending reviews"
-              description="Please ensure you have Transport Specialist role and a valid session."
-              showIcon
-            />
+            <Callout tone="bad" title="The review inbox could not be loaded">
+              Refresh the page. If it keeps failing, sign in again.
+            </Callout>
           )}
 
           {!pendingLoading && !pendingError && pendingReviews.length === 0 && (
             <div className="rounded-lg border border-line bg-card p-12 text-center">
               <Empty
-                description="No pending reviews at this time. All documents are up to date."
+                description="Nothing is waiting for your review."
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             </div>
@@ -281,9 +272,9 @@ const DocumentsPage: FC = () => {
                 <div key={v.id} className="p-4 flex items-center justify-between gap-4">
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="type-label-m text-ink font-medium">{v.fileName}</span>
+                      <span className="type-label-m text-ink">{v.fileName}</span>
                       <Chip tone="info">v{v.versionNo}</Chip>
-                      <Chip tone="warn">PENDING REVIEW</Chip>
+                      <Chip tone="warn">Waiting for review</Chip>
                     </div>
                     <div className="type-body-s text-ink-3 flex items-center gap-3">
                       {v.uploadedByName && <span>Uploaded by: {v.uploadedByName}</span>}
@@ -293,18 +284,10 @@ const DocumentsPage: FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void fileApi.viewFile(v.fileId)}
-                    >
-                      View File
+                    <Button variant="secondary" size="sm" onClick={() => viewFile(v.fileId)}>
+                      View file
                     </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => openReviewModal(v)}
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => openReviewModal(v)}>
                       Review
                     </Button>
                   </div>
@@ -318,30 +301,26 @@ const DocumentsPage: FC = () => {
       {/* Tab 2: Job Clearance Checklist & Gate */}
       {activeTab === 'checklist' && (
         <div className="flex flex-col gap-6">
-          {/* Job Selection Dropdown (Finding 10: No hardcoded IDs) */}
+          {/* Job picker: open dossiers, searched on the server by code or club */}
           <div className="flex items-center gap-4 p-4 rounded-lg border border-line bg-card">
-            <span className="type-label-s text-ink-2 shrink-0 font-medium">Select Transport Job:</span>
+            <span className="type-label-s text-ink-2 shrink-0">Job</span>
             <Select
               showSearch
-              placeholder="Choose a job from the active shipments..."
+              placeholder="Search by job code or club"
               value={selectedJobId || undefined}
               onChange={(val) => handleSelectJob(val ?? null)}
+              onSearch={setJobSearch}
               loading={jobsLoading}
-              className="min-w-[320px] max-w-md"
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+              className="w-full max-w-md"
+              filterOption={false}
+              notFoundContent={jobsLoading ? <Spin size="small" /> : 'No open dossier matches'}
               options={jobs.map((j) => ({
                 value: j.id,
-                label: `${j.code} ${j.clubName ? '· ' + j.clubName : ''} (${j.dossierStatus})`,
+                label: `${j.code}${j.clubName ? ' · ' + j.clubName : ''}`,
               }))}
             />
             {selectedJobId && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleSelectJob(null)}
-              >
+              <Button variant="secondary" size="sm" onClick={() => handleSelectJob(null)}>
                 Clear
               </Button>
             )}
@@ -350,7 +329,7 @@ const DocumentsPage: FC = () => {
           {!selectedJobId && (
             <div className="rounded-lg border border-line bg-card p-12 text-center">
               <Empty
-                description="Please select a transport job from the dropdown above to view its checklist and clearance gate."
+                description="Choose a job to see its checklist and clearance gate."
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             </div>
@@ -375,8 +354,8 @@ const DocumentsPage: FC = () => {
                   }
                 >
                   {statusData.clearanceReady
-                    ? 'All mandatory documents are GREEN, approved, and quarantines/permits are fulfilled.'
-                    : `${statusData.clearedMandatoryItems}/${statusData.mandatoryItems} mandatory documents cleared. ${statusData.outstandingIssues.length} outstanding issues.`}
+                    ? 'Every mandatory document is approved and GREEN, quarantines are complete and every permit is issued.'
+                    : `${statusData.clearedMandatoryItems} of ${statusData.mandatoryItems} mandatory documents cleared · ${statusData.outstandingIssues.length} outstanding.`}
                 </ClearanceGate>
               )}
 
@@ -385,22 +364,25 @@ const DocumentsPage: FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <StatTile
                     tone="neutral"
-                    label="Total Items"
+                    label="Checklist items"
                     value={statusData.totalChecklistItems}
                   />
                   <StatTile
                     tone="ok"
-                    label="Cleared Items"
+                    label="Mandatory cleared"
                     value={statusData.clearedMandatoryItems}
                   />
                   <StatTile
                     tone="warn"
-                    label="Mandatory Remaining"
-                    value={Math.max(0, statusData.mandatoryItems - statusData.clearedMandatoryItems)}
+                    label="Mandatory remaining"
+                    value={Math.max(
+                      0,
+                      statusData.mandatoryItems - statusData.clearedMandatoryItems,
+                    )}
                   />
                   <StatTile
                     tone={statusData.outstandingIssues.length > 0 ? 'bad' : 'ok'}
-                    label="Outstanding Issues"
+                    label="Outstanding"
                     value={statusData.outstandingIssues.length}
                   />
                 </div>
@@ -408,10 +390,7 @@ const DocumentsPage: FC = () => {
 
               {/* Outstanding issues callout */}
               {statusData && statusData.outstandingIssues.length > 0 && (
-                <Callout
-                  tone="bad"
-                  title="Outstanding Clearance Blockers"
-                >
+                <Callout tone="bad" title="What holds departure">
                   <ul className="list-disc list-inside space-y-1 mt-1 text-ink-2">
                     {statusData.outstandingIssues.map((issue, idx) => (
                       <li key={idx}>{issue}</li>
@@ -423,7 +402,7 @@ const DocumentsPage: FC = () => {
               {/* Checklist table */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="type-h3 text-ink">Job Document Checklist</h3>
+                  <h3 className="type-h3 text-ink">Checklist</h3>
                   <span className="type-caption text-ink-3">
                     {checklist.length} items configured
                   </span>
@@ -436,12 +415,9 @@ const DocumentsPage: FC = () => {
                 )}
 
                 {checklistError && (
-                  <Alert
-                    type="error"
-                    message="Failed to load job checklist"
-                    description="Please verify your session and permissions."
-                    showIcon
-                  />
+                  <Callout tone="bad" title="The checklist could not be loaded">
+                    Refresh the page. If it keeps failing, sign in again.
+                  </Callout>
                 )}
 
                 {!checklistLoading && !checklistError && checklist.length === 0 && (
@@ -461,7 +437,9 @@ const DocumentsPage: FC = () => {
                           <div className="flex items-center gap-2">
                             <span>{item.documentTypeName || item.documentTypeCode}</span>
                             {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
-                            {item.horseName && <span className="text-xs text-ink-3">({item.horseName})</span>}
+                            {item.horseName && (
+                              <span className="font-display text-ink-3">{item.horseName}</span>
+                            )}
                           </div>
                         }
                         rule={item.ruleDescription || 'Standard validity validation'}
@@ -481,7 +459,7 @@ const DocumentsPage: FC = () => {
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => void fileApi.viewFile(item.currentVersion!.fileId)}
+                                onClick={() => viewFile(item.currentVersion!.fileId)}
                               >
                                 View
                               </Button>
@@ -508,7 +486,7 @@ const DocumentsPage: FC = () => {
       {/* Review Modal */}
       <Modal
         open={reviewModalOpen}
-        title={`Review Document: ${selectedVersion?.fileName ?? ''}`}
+        title={`Review ${selectedVersion?.fileName ?? 'document'}`}
         onCancel={() => setReviewModalOpen(false)}
         footer={[
           <Button
@@ -526,49 +504,45 @@ const DocumentsPage: FC = () => {
             disabled={reviewMutation.isPending}
             onClick={handleReviewSubmit}
           >
-            {reviewMutation.isPending ? 'Submitting...' : 'Confirm Decision'}
+            {reviewMutation.isPending
+              ? 'Saving…'
+              : reviewDecision === 'REJECTED'
+                ? 'Reject document'
+                : 'Approve document'}
           </Button>,
         ]}
       >
         <div className="flex flex-col gap-4 py-3">
-          {reviewError && (
-            <Alert type="error" message={reviewError} showIcon />
-          )}
+          {reviewError && <Callout tone="bad" title={reviewError} />}
 
           <div className="type-body-s text-ink-2">
-            Please select your review decision. Note that documents with RED validity cannot be approved.
+            A document checked as RED can't be approved. A rejection sends the item back to the
+            customer with your reason.
           </div>
 
           <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="decision"
-                checked={reviewDecision === 'APPROVED'}
-                onChange={() => setReviewDecision('APPROVED')}
-              />
-              <span className="type-label-m text-ink">Approve Document</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="decision"
-                checked={reviewDecision === 'REJECTED'}
-                onChange={() => setReviewDecision('REJECTED')}
-              />
-              <span className="type-label-m text-ink">Reject Document</span>
-            </label>
+            <Radio
+              name="decision"
+              label="Approve"
+              checked={reviewDecision === 'APPROVED'}
+              onChange={() => setReviewDecision('APPROVED')}
+            />
+            <Radio
+              name="decision"
+              label="Reject"
+              checked={reviewDecision === 'REJECTED'}
+              onChange={() => setReviewDecision('REJECTED')}
+            />
           </div>
 
           {reviewDecision === 'REJECTED' && (
             <div className="flex flex-col gap-1.5">
               <label className="type-label-s text-ink">
-                Rejection Reason <span className="text-bad">*</span>
+                Reason the customer will read <span className="text-bad">*</span>
               </label>
               <Input.TextArea
                 rows={3}
-                placeholder="Provide explicit reason why this document version was rejected..."
+                placeholder="What is wrong with this document and what to send instead"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
               />
@@ -580,7 +554,7 @@ const DocumentsPage: FC = () => {
       {/* Upload Modal */}
       <Modal
         open={uploadModalOpen}
-        title={`Upload New Version: ${selectedChecklistItem?.documentTypeName ?? ''}`}
+        title={`Upload a new version · ${selectedChecklistItem?.documentTypeName ?? ''}`}
         onCancel={() => setUploadModalOpen(false)}
         footer={[
           <Button
@@ -598,24 +572,22 @@ const DocumentsPage: FC = () => {
             disabled={uploadingFile || uploadMutation.isPending}
             onClick={handleUploadSubmit}
           >
-            {uploadingFile || uploadMutation.isPending ? 'Uploading...' : 'Upload & Evaluate'}
+            {uploadingFile || uploadMutation.isPending ? 'Uploading…' : 'Upload and check'}
           </Button>,
         ]}
       >
         <div className="flex flex-col gap-4 py-3">
-          {uploadError && (
-            <Alert type="error" message={uploadError} showIcon />
-          )}
+          {uploadError && <Callout tone="bad" title={uploadError} />}
 
           <div className="flex flex-col gap-1.5">
             <label className="type-label-s text-ink">
-              Choose File (PDF, PNG, JPG) <span className="text-bad">*</span>
+              File (PDF, JPEG, PNG or HEIC, up to 25 MB) <span className="text-bad">*</span>
             </label>
             <input
               type="file"
               onChange={handleFileChange}
-              accept=".pdf,.png,.jpg,.jpeg"
-              className="border border-line rounded p-2 text-sm"
+              accept=".pdf,.png,.jpg,.jpeg,.heic,.heif"
+              className="type-body-s rounded border border-line p-2"
             />
             {uploadFile && (
               <span className="type-caption text-ink-3">
@@ -627,7 +599,7 @@ const DocumentsPage: FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="type-label-s text-ink">
-                Issued Date <span className="text-bad">*</span>
+                Issued on <span className="text-bad">*</span>
               </label>
               <Input
                 type="date"
@@ -639,7 +611,7 @@ const DocumentsPage: FC = () => {
 
             <div className="flex flex-col gap-1.5">
               <label className="type-label-s text-ink">
-                Valid Until <span className="text-bad">*</span>
+                Valid until <span className="text-bad">*</span>
               </label>
               <Input
                 type="date"
@@ -651,7 +623,7 @@ const DocumentsPage: FC = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="type-label-s text-ink">Issuing Authority / Laboratory</label>
+            <label className="type-label-s text-ink">Issuer (authority or laboratory)</label>
             <Input
               placeholder="e.g. DAH Vietnam, USDA APHIS"
               value={issuer}
