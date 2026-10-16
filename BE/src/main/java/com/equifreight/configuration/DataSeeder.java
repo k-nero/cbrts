@@ -70,6 +70,7 @@ public class DataSeeder implements ApplicationRunner {
     private final RouteStopRepository routeStopRepository;
     private final RouteLegRepository routeLegRepository;
     private final CrewAssignmentRepository crewAssignmentRepository;
+    private final CodeCounterRepository codeCounterRepository;
 
     public DataSeeder(RoleRepository roleRepository,
                       UserRepository userRepository,
@@ -93,7 +94,8 @@ public class DataSeeder implements ApplicationRunner {
                       RoutePlanRepository routePlanRepository,
                       RouteStopRepository routeStopRepository,
                       RouteLegRepository routeLegRepository,
-                      CrewAssignmentRepository crewAssignmentRepository) {
+                      CrewAssignmentRepository crewAssignmentRepository,
+                      CodeCounterRepository codeCounterRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -117,6 +119,7 @@ public class DataSeeder implements ApplicationRunner {
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
         this.crewAssignmentRepository = crewAssignmentRepository;
+        this.codeCounterRepository = codeCounterRepository;
     }
 
     @Override
@@ -247,6 +250,10 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private void seedDemoJobs() {
+        advanceCodeCounter(CodePrefix.REQ, (short) 2026, 193);
+        advanceCodeCounter(CodePrefix.Q, (short) 2026, 188);
+        advanceCodeCounter(CodePrefix.CBRT, (short) 2026, 41);
+
         if (transportJobRepository.findByCode("CBRT-2026-041").isPresent()) {
             return;
         }
@@ -461,5 +468,19 @@ public class DataSeeder implements ApplicationRunner {
         ca.getId().setJobId(job.getId());
         ca.getId().setUserId(user.getId());
         crewAssignmentRepository.save(ca);
+    }
+
+    private void advanceCodeCounter(CodePrefix prefix, short year, int value) {
+        CodeCounter.Key key = new CodeCounter.Key(prefix, year);
+        CodeCounter counter = codeCounterRepository.findById(key).orElseGet(() -> {
+            CodeCounter c = new CodeCounter();
+            c.setId(key);
+            c.setLastValue(0);
+            return c;
+        });
+        if (counter.getLastValue() < value) {
+            counter.setLastValue(value);
+            codeCounterRepository.save(counter);
+        }
     }
 }

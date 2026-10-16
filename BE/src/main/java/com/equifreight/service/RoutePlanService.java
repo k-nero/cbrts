@@ -28,7 +28,8 @@ public class RoutePlanService {
     private final PlaceRepository placeRepository;
     private final BorderCrossingRepository borderCrossingRepository;
     private final VehicleRepository vehicleRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final ClearanceService clearanceService;
+    private final AuditService auditService;
 
     public RoutePlanService(RoutePlanRepository routePlanRepository,
                             RouteStopRepository routeStopRepository,
@@ -38,7 +39,8 @@ public class RoutePlanService {
                             PlaceRepository placeRepository,
                             BorderCrossingRepository borderCrossingRepository,
                             VehicleRepository vehicleRepository,
-                            AuditLogRepository auditLogRepository) {
+                            ClearanceService clearanceService,
+                            AuditService auditService) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
@@ -47,7 +49,8 @@ public class RoutePlanService {
         this.placeRepository = placeRepository;
         this.borderCrossingRepository = borderCrossingRepository;
         this.vehicleRepository = vehicleRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.clearanceService = clearanceService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -192,6 +195,10 @@ public class RoutePlanService {
             throw new BusinessException("Route plan does not belong to job " + jobId);
         }
 
+        if (job.getDepartedAt() != null) {
+            throw new BusinessException("Cannot change route plan after job has departed");
+        }
+
         if (plan.getStops().size() < 2) {
             throw new BusinessException("A route plan must contain at least 2 stops (pickup and delivery)");
         }
@@ -228,22 +235,35 @@ public class RoutePlanService {
         }
         RoutePlan saved = routePlanRepository.save(plan);
 
-        // Update planned departure on job
+        // Update planned departure and arrival on job
         Optional<RouteStop> pickup = plan.getStops().stream()
                 .filter(s -> s.getKind() == RouteStopKind.PICKUP)
                 .findFirst();
         pickup.ifPresent(p -> job.setPlannedDepartureAt(p.getPlannedAt()));
+
+        Optional<RouteStop> delivery = plan.getStops().stream()
+                .filter(s -> s.getKind() == RouteStopKind.DELIVERY)
+                .findFirst();
+        delivery.ifPresent(d -> job.setPlannedArrivalAt(d.getPlannedAt()));
+
+        // Invalidate prior sign-off when route plan changes
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
         transportJobRepository.save(job);
 
-        // Audit log
-        AuditLog audit = new AuditLog();
-        audit.setActor(currentUser);
-        audit.setActorLabel(currentUser != null ? currentUser.getFirstName() + " " + currentUser.getLastName() : "System");
-        audit.setChannel(Channel.WEB);
-        audit.setAction("CONFIRM_ROUTE_PLAN");
-        audit.setSummary("Confirmed route plan v" + plan.getVersionNo() + " for job " + job.getCode());
-        audit.setEntityCode(job.getCode());
-        auditLogRepository.save(audit);
+        // Re-evaluate document validity and clearance gate
+        clearanceService.recheckJobDocuments(job.getId());
+
+        auditService.recordDecision(
+                currentUser,
+                "CONFIRM_ROUTE_PLAN",
+                "Confirmed route plan v" + saved.getVersionNo() + " for job " + job.getCode(),
+                "ROUTE_PLAN",
+                saved.getId(),
+                job.getCode(),
+                changeReason,
+                currentConfirmed.map(c -> "v" + c.getVersionNo()).orElse(null),
+                "v" + saved.getVersionNo());
 
         log.info("Confirmed route plan v{} for job {}", plan.getVersionNo(), job.getCode());
         return toResponse(saved);

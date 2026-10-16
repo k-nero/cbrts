@@ -26,6 +26,28 @@ export const useLoadPlan = (jobId: string) => {
   });
 };
 
+export const useCreateLoadPlan = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vehicleId?: string) => jobApi.createLoadPlan(jobId, vehicleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job', jobId, 'load-plan'] });
+    },
+  });
+};
+
+export const useChangeLoadPlanVehicle = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vehicleId: string) => jobApi.changeLoadPlanVehicle(jobId, vehicleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job', jobId, 'load-plan'] });
+    },
+  });
+};
+
 export const useAssignStall = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({

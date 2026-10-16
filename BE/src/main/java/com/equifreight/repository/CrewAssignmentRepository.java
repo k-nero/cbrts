@@ -30,4 +30,20 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
     Page<TripSummaryResponse> findTripSummariesByUserId(@Param("userId") UUID userId, Pageable pageable);
 
     boolean existsByJob_IdAndUser_Id(UUID jobId, UUID userId);
+
+    @Query("""
+            select c from CrewAssignment c join c.job j
+            where c.user.id = :userId
+              and j.id <> :jobId
+              and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+              and j.plannedDepartureAt is not null
+              and j.plannedArrivalAt is not null
+              and j.plannedDepartureAt < :jobEnd
+              and j.plannedArrivalAt > :jobStart
+            """)
+    List<CrewAssignment> findOverlappingAssignments(
+            @Param("userId") UUID userId,
+            @Param("jobId") UUID jobId,
+            @Param("jobStart") java.time.Instant jobStart,
+            @Param("jobEnd") java.time.Instant jobEnd);
 }

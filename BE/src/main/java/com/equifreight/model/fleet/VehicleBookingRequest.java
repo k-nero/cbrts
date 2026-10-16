@@ -1,5 +1,6 @@
 package com.equifreight.model.fleet;
 
+import com.equifreight.entity.enums.BookingKind;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,9 +16,8 @@ public class VehicleBookingRequest {
 
     private UUID jobId;
 
-    /** JOB, MAINTENANCE, HOLD */
     @NotNull
-    private String kind;
+    private BookingKind kind;
 
     @NotNull
     private Instant startsAt;

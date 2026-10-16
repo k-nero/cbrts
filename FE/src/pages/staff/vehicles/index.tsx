@@ -11,7 +11,7 @@ import type { StallSide, StallType, Vehicle, VehicleKind, VehicleStatus } from '
 export default function VehiclesPage() {
   const { data, isLoading } = useVehicles();
   const createVehicleMutation = useCreateVehicle();
-  const updateVehicleMutation = useUpdateVehicle('');
+  const updateVehicleMutation = useUpdateVehicle();
   const bookVehicleMutation = useBookVehicle();
 
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -102,7 +102,8 @@ export default function VehiclesPage() {
   const handleToggleStatus = (v: Vehicle) => {
     const nextStatus: VehicleStatus = v.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE';
     updateVehicleMutation.mutate({
-      status: nextStatus,
+      id: v.id,
+      body: { status: nextStatus },
     });
   };
 

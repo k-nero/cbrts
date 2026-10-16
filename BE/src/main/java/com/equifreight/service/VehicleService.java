@@ -8,6 +8,7 @@ import com.equifreight.entity.enums.BookingKind;
 import com.equifreight.entity.enums.StallSide;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.VehicleStatus;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.fleet.*;
@@ -118,8 +119,19 @@ public class VehicleService {
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.getVehicleId()));
 
+        if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
+            throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus() + " and cannot be booked");
+        }
+
         if (!request.getStartsAt().isBefore(request.getEndsAt())) {
             throw new ConflictException("INVALID_PERIOD", "Booking start time must be before end time");
+        }
+
+        if (request.getKind() == BookingKind.JOB && request.getJobId() == null) {
+            throw new BusinessException("A JOB booking requires a valid jobId");
+        }
+        if (request.getKind() != BookingKind.JOB && request.getJobId() != null) {
+            throw new BusinessException("A " + request.getKind() + " booking cannot have a jobId");
         }
 
         // BR-F3-04: No double booking. Check overlapping bookings for this vehicle.
@@ -136,23 +148,21 @@ public class VehicleService {
                     .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.getJobId()));
         }
 
-        BookingKind bookingKind;
-        try {
-            bookingKind = BookingKind.valueOf(request.getKind().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            bookingKind = BookingKind.JOB;
-        }
-
         VehicleBooking booking = new VehicleBooking();
         booking.setVehicle(vehicle);
         booking.setJob(job);
-        booking.setKind(bookingKind);
+        booking.setKind(request.getKind());
         booking.setStartsAt(request.getStartsAt());
         booking.setEndsAt(request.getEndsAt());
 
-        VehicleBooking saved = vehicleBookingRepository.save(booking);
-        log.info("Booked vehicle {} for {} from {} to {}", vehicle.getCode(), request.getKind(), request.getStartsAt(), request.getEndsAt());
-        return toBookingResponse(saved);
+        try {
+            VehicleBooking saved = vehicleBookingRepository.save(booking);
+            log.info("Booked vehicle {} for {} from {} to {}", vehicle.getCode(), request.getKind(), request.getStartsAt(), request.getEndsAt());
+            return toBookingResponse(saved);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + vehicle.getCode() + " is already booked between "
+                    + request.getStartsAt() + " and " + request.getEndsAt());
+        }
     }
 
     @Transactional(readOnly = true)

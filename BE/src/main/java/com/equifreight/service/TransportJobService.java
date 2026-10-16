@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.Channel;
+import com.equifreight.entity.enums.CrewRole;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.LoadPlanStatus;
@@ -19,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +37,9 @@ public class TransportJobService {
     private final CrewAssignmentService crewAssignmentService;
     private final LoadPlanRepository loadPlanRepository;
     private final RoutePlanRepository routePlanRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final CrewAssignmentRepository crewAssignmentRepository;
+    private final ClearanceService clearanceService;
+    private final AuditService auditService;
 
     public TransportJobService(TransportJobRepository transportJobRepository,
                                LoadPlanService loadPlanService,
@@ -43,14 +47,18 @@ public class TransportJobService {
                                CrewAssignmentService crewAssignmentService,
                                LoadPlanRepository loadPlanRepository,
                                RoutePlanRepository routePlanRepository,
-                               AuditLogRepository auditLogRepository) {
+                               CrewAssignmentRepository crewAssignmentRepository,
+                               ClearanceService clearanceService,
+                               AuditService auditService) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
         this.crewAssignmentService = crewAssignmentService;
         this.loadPlanRepository = loadPlanRepository;
         this.routePlanRepository = routePlanRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.crewAssignmentRepository = crewAssignmentRepository;
+        this.clearanceService = clearanceService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -96,7 +104,7 @@ public class TransportJobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + id));
 
         List<JobHorseResponse> horses = getJobHorses(job);
-        LoadPlanResponse loadPlan = loadPlanService.getOrCreateLoadPlan(job.getId());
+        LoadPlanResponse loadPlan = loadPlanService.getActiveLoadPlan(job.getId()).orElse(null);
 
         RoutePlanResponse routePlan = null;
         try {
@@ -107,11 +115,18 @@ public class TransportJobService {
 
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
 
-        boolean isClear = job.getDossierStatus() == DossierStatus.CLEARANCE_READY && job.getClearanceReadyAt() != null;
+        com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(job.getId());
+        boolean isClear = gate.isClearanceReady();
         String gateState = isClear ? "Clear" : "Locked";
-        String gateSummary = isClear
-                ? "Dossier cleared. Vehicle and trip departure may proceed."
-                : "Clearance gate is locked. 9 items are outstanding before departure can be recorded.";
+        String gateSummary;
+        if (isClear) {
+            gateSummary = "Dossier cleared. Vehicle and trip departure may proceed.";
+        } else if (gate.getOutstandingIssues().isEmpty()) {
+            gateSummary = "Clearance gate is locked. Documents are awaiting clearance.";
+        } else {
+            gateSummary = String.format("Clearance gate is locked. %d items are outstanding before departure can be recorded.",
+                    gate.getOutstandingIssues().size());
+        }
 
         return JobDetailResponse.builder()
                 .id(job.getId())
@@ -141,9 +156,23 @@ public class TransportJobService {
         TransportJob job = transportJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
+        // Role check: Only the Logistics Manager may sign off the trip plan (US-F3-08, AGENTS.md)
+        boolean isManager = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().stream()
+                .anyMatch(r -> "LOGISTICS_MANAGER".equalsIgnoreCase(r.getName()) || "ROLE_LOGISTICS_MANAGER".equalsIgnoreCase(r.getName()));
+        if (!isManager) {
+            throw new com.equifreight.exception.UnauthorizedException("Only the Logistics Manager can sign off a trip plan");
+        }
+
+        // Clearance gate check: departure gate must be CLEAR (US-F3-08)
+        com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(jobId);
+        if (!gate.isClearanceReady()) {
+            throw new BusinessException("Cannot sign off trip plan: clearance gate is locked ("
+                    + gate.getOutstandingIssues().size() + " items outstanding)");
+        }
+
         // Validate load plan confirmed
-        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findByJobIdAndStatus(jobId, LoadPlanStatus.CONFIRMED);
-        if (loadPlanOpt.isEmpty()) {
+        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId);
+        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
             throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
         }
 
@@ -153,23 +182,43 @@ public class TransportJobService {
             throw new BusinessException("Cannot sign off trip plan: Route plan is not confirmed yet");
         }
 
-        // Validate crew assigned
-        List<CrewMemberResponse> crew = crewAssignmentService.getCrew(jobId);
-        if (crew.isEmpty()) {
+        // Validate crew assigned: driver and groom ratio
+        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByJobId(jobId);
+        if (crewAssignments.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: No crew assigned to this job");
         }
+        boolean hasDriver = crewAssignments.stream().anyMatch(c -> c.getCrewRole() == CrewRole.DRIVER);
+        if (!hasDriver) {
+            throw new BusinessException("Cannot sign off trip plan: At least one DRIVER must be assigned");
+        }
+        int horseCount = job.getRequest() != null && job.getRequest().getHorses() != null ? job.getRequest().getHorses().size() : 0;
+        int reqGrooms = (int) Math.ceil(horseCount / 3.0);
+        long groomCount = crewAssignments.stream()
+                .filter(c -> c.getCrewRole() == CrewRole.GROOM || c.getCrewRole() == CrewRole.FLYING_GROOM)
+                .count();
+        if (groomCount < reqGrooms) {
+            throw new BusinessException("Cannot sign off trip plan: Requires " + reqGrooms + " groom(s), found " + groomCount);
+        }
 
-        // Audit log
-        AuditLog audit = new AuditLog();
-        audit.setActor(currentUser);
-        audit.setActorLabel(currentUser != null ? currentUser.getFirstName() + " " + currentUser.getLastName() : "System");
-        audit.setChannel(Channel.WEB);
-        audit.setAction("SIGN_OFF_TRIP_PLAN");
-        audit.setSummary("Signed off overall trip plan (route, load, crew) for job " + job.getCode());
-        audit.setEntityCode(job.getCode());
-        auditLogRepository.save(audit);
+        job.setSignedOffAt(Instant.now());
+        job.setSignedOffBy(currentUser);
+        if (job.getStage() == JobStage.DOCUMENTS || job.getStage() == JobStage.CLEARANCE) {
+            job.setStage(JobStage.TRIP);
+        }
+        transportJobRepository.save(job);
 
-        log.info("Manager / Coordinator signed off trip plan for job {}", job.getCode());
+        auditService.recordDecision(
+                currentUser,
+                "SIGN_OFF_TRIP_PLAN",
+                "Logistics manager signed off trip plan for job " + job.getCode(),
+                "TRANSPORT_JOB",
+                job.getId(),
+                job.getCode(),
+                null,
+                "PLANNING",
+                "TRIP");
+
+        log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);
     }
 
@@ -205,7 +254,7 @@ public class TransportJobService {
                 return job.getRequest().getCorridor().getOriginCity();
             }
         }
-        return "Ho Chi Minh City";
+        return "Not set";
     }
 
     private String getDestinationCity(TransportJob job) {
@@ -217,21 +266,46 @@ public class TransportJobService {
                 return job.getRequest().getCorridor().getDestinationCity();
             }
         }
-        return "Phnom Penh";
+        return "Not set";
     }
 
     private String getBlockingReason(TransportJob job) {
         if (job.getDossierStatus() != DossierStatus.CLEARANCE_READY) {
             return "Departure locked · clearance pending";
         }
+        if (job.getSignedOffAt() == null) {
+            return "Sign-off pending";
+        }
         return null;
     }
 
     private String getNextStepOwner(TransportJob job) {
-        if (job.getStage() == JobStage.DOCUMENTS || job.getStage() == JobStage.CLEARANCE) {
-            return "Lan, transport specialist";
+        if (job.getStage() == JobStage.CLOSED) {
+            return "Closed";
         }
-        return "Khôi, fleet & route coordinator";
+        if (job.getStage() == JobStage.DOCUMENTS || job.getDossierStatus() != DossierStatus.CLEARANCE_READY) {
+            return "Transport specialist";
+        }
+        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId());
+        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
+            return "Fleet & route coordinator";
+        }
+        Optional<RoutePlan> routePlanOpt = routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED);
+        if (routePlanOpt.isEmpty()) {
+            return "Fleet & route coordinator";
+        }
+        List<CrewAssignment> crew = crewAssignmentRepository.findByJobId(job.getId());
+        if (crew.isEmpty() || crew.stream().noneMatch(c -> c.getCrewRole() == CrewRole.DRIVER)) {
+            return "Fleet & route coordinator";
+        }
+        if (job.getSignedOffAt() == null) {
+            return "Logistics manager";
+        }
+        if (job.getStage() == JobStage.TRIP) {
+            Optional<CrewAssignment> driver = crew.stream().filter(c -> c.getCrewRole() == CrewRole.DRIVER).findFirst();
+            return driver.map(d -> "Driver: " + d.getUser().getFirstName() + " " + d.getUser().getLastName()).orElse("Driver");
+        }
+        return "Logistics manager";
     }
 
     private List<JobHorseResponse> getJobHorses(TransportJob job) {

@@ -13,9 +13,12 @@ import {
 import {
   useAssignStall,
   useAutoArrange,
+  useChangeLoadPlanVehicle,
   useConfirmLoadPlan,
+  useCreateLoadPlan,
   useSignOffTripPlan,
 } from '@/hooks/useJob';
+import { useActiveVehicles } from '@/hooks/useVehicle';
 import type { JobDetail, JobHorse, LoadPlanStall } from '@/interfaces';
 
 interface Props {
@@ -25,16 +28,64 @@ interface Props {
 export function LoadPlanTab({ job }: Props) {
   const loadPlan = job.loadPlan;
   const [selectedHorse, setSelectedHorse] = useState<JobHorse | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
+  const { data: activeVehicles, isLoading: loadingVehicles } = useActiveVehicles();
+  const createLoadPlanMutation = useCreateLoadPlan(job.id);
+  const changeVehicleMutation = useChangeLoadPlanVehicle(job.id);
   const assignStallMutation = useAssignStall(job.id);
   const autoArrangeMutation = useAutoArrange(job.id);
   const confirmMutation = useConfirmLoadPlan(job.id);
   const signOffMutation = useSignOffTripPlan(job.id);
 
   if (!loadPlan) {
+    const defaultVehicle = activeVehicles?.[0];
+    const vehicleToUse = selectedVehicleId || defaultVehicle?.id;
+
     return (
-      <div className="p-8 text-center">
-        <p className="type-body-s text-ink-3">No load plan available.</p>
+      <div className="flex flex-col items-center justify-center p-12">
+        <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-line bg-card p-8 text-center shadow-xs">
+          <div className="flex size-14 items-center justify-center rounded-full bg-muted text-ink-2">
+            <Icon name="truck" size={26} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <h3 className="type-h3 text-ink">No load plan created yet</h3>
+            <p className="type-body-s text-ink-3">
+              Select an active vehicle to start load planning and stall arrangement for this job.
+            </p>
+          </div>
+
+          {loadingVehicles ? (
+            <span className="type-body-s text-ink-3">Loading fleet vehicles...</span>
+          ) : (
+            <div className="flex w-full flex-col gap-4">
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="type-label-s text-ink">Assigned vehicle</label>
+                <select
+                  value={vehicleToUse || ''}
+                  onChange={(e) => setSelectedVehicleId(e.target.value)}
+                  className="focus-ring h-10 w-full rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                >
+                  {activeVehicles?.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.code} · {v.kind} ({v.stalls?.length || v.stallCount || 0} stalls)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Button
+                variant="primary"
+                size="md"
+                disabled={!vehicleToUse || createLoadPlanMutation.isPending}
+                onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
+              >
+                {createLoadPlanMutation.isPending ? 'Creating load plan...' : 'Create load plan'}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

@@ -8,11 +8,11 @@ import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 
 const TABS = [
-  { id: 'load-plan', label: 'Load plan', owner: 'Khôi, fleet & route coordinator' },
-  { id: 'route', label: 'Route', owner: 'Khôi, fleet & route coordinator' },
-  { id: 'clearance', label: 'Clearance', owner: 'Lan, transport specialist' },
-  { id: 'authorities', label: 'Authorities', owner: 'Lan, transport specialist' },
-  { id: 'trip', label: 'Trip', owner: 'Minh, driver' },
+  { id: 'load-plan', label: 'Load plan', owner: 'Fleet & route coordinator' },
+  { id: 'route', label: 'Route', owner: 'Fleet & route coordinator' },
+  { id: 'clearance', label: 'Clearance', owner: 'Transport specialist' },
+  { id: 'authorities', label: 'Authorities', owner: 'Transport specialist' },
+  { id: 'trip', label: 'Trip', owner: 'Escort (driver / groom)' },
 ] as const;
 
 const STAGE_MAP: Record<
@@ -154,7 +154,8 @@ export default function JobDetailPage() {
         <div className="rounded-lg border border-line bg-card p-8 text-center">
           <h4 className="type-h4 text-ink">Clearance Checklist</h4>
           <p className="type-body-s text-ink-3 mt-1">
-            Owned by Lan, transport specialist. 9 items outstanding before clearance gate unlocks.
+            Owned by transport specialist.{' '}
+            {job.clearanceGateSummary || 'Clearance documents and permits'}.
           </p>
         </div>
       )}
@@ -162,7 +163,7 @@ export default function JobDetailPage() {
         <div className="rounded-lg border border-line bg-card p-8 text-center">
           <h4 className="type-h4 text-ink">Authority Filings</h4>
           <p className="type-body-s text-ink-3 mt-1">
-            Owned by Lan, transport specialist. Export health certificates and import permits.
+            Owned by transport specialist. Export health certificates and import permits.
           </p>
         </div>
       )}
@@ -170,7 +171,7 @@ export default function JobDetailPage() {
         <div className="rounded-lg border border-line bg-card p-8 text-center">
           <h4 className="type-h4 text-ink">Trip Journey Log</h4>
           <p className="type-body-s text-ink-3 mt-1">
-            Recorded by Minh, driver. Checkpoints and condition checks from the cab tablet.
+            Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
           </p>
         </div>
       )}

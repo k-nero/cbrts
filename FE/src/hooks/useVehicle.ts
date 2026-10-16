@@ -35,11 +35,12 @@ export const useCreateVehicle = () => {
   });
 };
 
-export const useUpdateVehicle = (id: string) => {
+export const useUpdateVehicle = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: UpdateVehicleInput) => vehicleApi.update(id, body),
-    onSuccess: () => {
+    mutationFn: ({ id, body }: { id: string; body: UpdateVehicleInput }) =>
+      vehicleApi.update(id, body),
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
     },

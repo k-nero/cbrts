@@ -3,6 +3,7 @@ package com.equifreight.service;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
@@ -24,7 +25,8 @@ public class LoadPlanService {
     private final VehicleRepository vehicleRepository;
     private final VehicleStallRepository vehicleStallRepository;
     private final HorseRepository horseRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final VehicleBookingRepository vehicleBookingRepository;
+    private final AuditService auditService;
 
     public LoadPlanService(LoadPlanRepository loadPlanRepository,
                            LoadPlanStallRepository loadPlanStallRepository,
@@ -32,31 +34,53 @@ public class LoadPlanService {
                            VehicleRepository vehicleRepository,
                            VehicleStallRepository vehicleStallRepository,
                            HorseRepository horseRepository,
-                           AuditLogRepository auditLogRepository) {
+                           VehicleBookingRepository vehicleBookingRepository,
+                           AuditService auditService) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.transportJobRepository = transportJobRepository;
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.horseRepository = horseRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.vehicleBookingRepository = vehicleBookingRepository;
+        this.auditService = auditService;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LoadPlanResponse> getActiveLoadPlan(UUID jobId) {
+        return loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)
+                .map(this::buildResponse);
     }
 
     @Transactional
-    public LoadPlanResponse getOrCreateLoadPlan(UUID jobId) {
+    public LoadPlanResponse createLoadPlan(UUID jobId, UUID vehicleId) {
         TransportJob job = transportJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        Optional<LoadPlan> existing = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId);
-        LoadPlan plan;
-        if (existing.isPresent()) {
-            plan = existing.get();
+        Vehicle vehicle;
+        if (vehicleId != null) {
+            vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
         } else {
-            // Find default vehicle or first active vehicle
-            Vehicle vehicle = vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
+            vehicle = vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
                     .findFirst()
                     .orElseThrow(() -> new BusinessException("No active vehicles available to create load plan"));
+        }
 
+        if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
+            throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus() + " and cannot be used for load plan");
+        }
+
+        Optional<LoadPlan> existingDraft = loadPlanRepository.findByJobIdAndStatus(jobId, LoadPlanStatus.DRAFT);
+        LoadPlan plan;
+        if (existingDraft.isPresent()) {
+            plan = existingDraft.get();
+            if (!plan.getVehicle().getId().equals(vehicle.getId())) {
+                loadPlanStallRepository.deleteAll(loadPlanStallRepository.findByLoadPlanId(plan.getId()));
+                plan.setVehicle(vehicle);
+                plan = loadPlanRepository.save(plan);
+            }
+        } else {
             plan = new LoadPlan();
             plan.setJob(job);
             plan.setVehicle(vehicle);
@@ -65,6 +89,11 @@ public class LoadPlanService {
         }
 
         return buildResponse(plan);
+    }
+
+    @Transactional
+    public LoadPlanResponse changeLoadPlanVehicle(UUID jobId, UUID vehicleId) {
+        return createLoadPlan(jobId, vehicleId);
     }
 
     @Transactional
@@ -88,6 +117,13 @@ public class LoadPlanService {
 
         // If assigning a horse, remove horse from previous stall if any, then insert
         if (horseId != null) {
+            boolean horseOnJob = plan.getJob().getRequest() != null &&
+                    plan.getJob().getRequest().getHorses() != null &&
+                    plan.getJob().getRequest().getHorses().stream().anyMatch(rh -> rh.getHorse().getId().equals(horseId));
+            if (!horseOnJob) {
+                throw new ResourceNotFoundException("Horse " + horseId + " is not assigned to this job");
+            }
+
             loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horseId);
 
             Horse horse = horseRepository.findById(horseId)
@@ -99,6 +135,11 @@ public class LoadPlanService {
             lps.setHorse(horse);
             loadPlanStallRepository.save(lps);
         }
+
+        // Invalidate prior sign-off when load plan changes
+        plan.getJob().setSignedOffAt(null);
+        plan.getJob().setSignedOffBy(null);
+        transportJobRepository.save(plan.getJob());
 
         return buildResponse(plan);
     }
@@ -143,6 +184,11 @@ public class LoadPlanService {
             loadPlanStallRepository.save(lps);
         }
 
+        // Invalidate prior sign-off when load plan changes
+        plan.getJob().setSignedOffAt(null);
+        plan.getJob().setSignedOffBy(null);
+        transportJobRepository.save(plan.getJob());
+
         return buildResponse(plan);
     }
 
@@ -150,6 +196,11 @@ public class LoadPlanService {
     public LoadPlanResponse confirmLoadPlan(UUID jobId, User currentUser) {
         LoadPlan plan = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
+
+        if (plan.getVehicle().getStatus() != VehicleStatus.ACTIVE) {
+            throw new BusinessException("Vehicle " + plan.getVehicle().getCode() + " is currently in "
+                    + plan.getVehicle().getStatus() + " and cannot be confirmed for load plan");
+        }
 
         LoadPlanResponse state = buildResponse(plan);
 
@@ -161,22 +212,57 @@ public class LoadPlanService {
             throw new BusinessException("Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first (" + state.getConflicts().get(0).getDescription() + ")");
         }
 
+        // Determine travel interval for booking
+        TransportJob job = plan.getJob();
+        Instant startsAt = job.getPlannedDepartureAt() != null ? job.getPlannedDepartureAt() : (job.getWindowStart() != null ? job.getWindowStart() : Instant.now());
+        Instant endsAt = job.getPlannedArrivalAt() != null ? job.getPlannedArrivalAt() : (job.getWindowEnd() != null ? job.getWindowEnd() : startsAt.plus(java.time.Duration.ofDays(2)));
+
+        // Check overlapping bookings excluding this job
+        List<VehicleBooking> overlaps = vehicleBookingRepository.findOverlappingBookings(
+                plan.getVehicle().getId(), startsAt, endsAt, null).stream()
+                .filter(b -> b.getJob() == null || !b.getJob().getId().equals(job.getId()))
+                .toList();
+        if (!overlaps.isEmpty()) {
+            throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + plan.getVehicle().getCode() + " is already booked between " + startsAt + " and " + endsAt);
+        }
+
+        // Create or update vehicle booking
+        List<VehicleBooking> jobBookings = vehicleBookingRepository.findByJobId(job.getId());
+        VehicleBooking booking = jobBookings.isEmpty() ? new VehicleBooking() : jobBookings.get(0);
+        booking.setVehicle(plan.getVehicle());
+        booking.setJob(job);
+        booking.setKind(com.equifreight.entity.enums.BookingKind.JOB);
+        booking.setStartsAt(startsAt);
+        booking.setEndsAt(endsAt);
+
+        try {
+            vehicleBookingRepository.save(booking);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + plan.getVehicle().getCode() + " is already booked for this interval");
+        }
+
         plan.setStatus(LoadPlanStatus.CONFIRMED);
         plan.setConfirmedBy(currentUser);
         plan.setConfirmedAt(Instant.now());
         loadPlanRepository.save(plan);
 
-        // Audit log
-        AuditLog audit = new AuditLog();
-        audit.setActor(currentUser);
-        audit.setActorLabel(currentUser != null ? currentUser.getFirstName() + " " + currentUser.getLastName() : "System");
-        audit.setChannel(Channel.WEB);
-        audit.setAction("CONFIRM_LOAD_PLAN");
-        audit.setSummary("Confirmed load plan for job " + plan.getJob().getCode() + " on vehicle " + plan.getVehicle().getCode());
-        audit.setEntityCode(plan.getJob().getCode());
-        auditLogRepository.save(audit);
+        // Invalidate prior sign-off when load plan is re-confirmed
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
+        transportJobRepository.save(job);
 
-        log.info("Confirmed load plan for job {}", plan.getJob().getCode());
+        auditService.recordDecision(
+                currentUser,
+                "CONFIRM_LOAD_PLAN",
+                "Confirmed load plan for job " + job.getCode() + " on vehicle " + plan.getVehicle().getCode(),
+                "LOAD_PLAN",
+                plan.getId(),
+                job.getCode(),
+                null,
+                null,
+                "CONFIRMED");
+
+        log.info("Confirmed load plan for job {}", job.getCode());
         return buildResponse(plan);
     }
 

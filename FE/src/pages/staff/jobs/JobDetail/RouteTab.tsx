@@ -120,9 +120,8 @@ export function RouteTab({ job }: Props) {
         {!isGateClear ? (
           <>
             <Callout tone="bad" title="Departure can’t be recorded yet">
-              9 items are outstanding: 4 uploads from the customer, 4 export health certificates and
-              the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure
-              opens when the gate is clear.
+              {job.clearanceGateSummary ||
+                'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
             </Callout>
             <div>
               <Button variant="primary" size="md" disabled leadingIcon="lock">

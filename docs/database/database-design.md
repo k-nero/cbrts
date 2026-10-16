@@ -387,6 +387,7 @@ erDiagram
 | `trip_status` | varchar(12) | `NOT_STARTED`, `DEPARTED`, `HELD`, `ARRIVED`, `DELIVERED`. |
 | `planned_departure_at`, `planned_arrival_at` | timestamptz | Changing them re-evaluates every checklist item (Flow 2, B8). |
 | `window_start`, `window_end` | timestamptz | Copied from the request; the route is planned backwards from `window_end`. |
+| `signed_off_at`, `signed_off_by` | | Logistics manager only (US-F3-08); released to crew. |
 | `departed_at`, `delivered_at`, `closed_at` | timestamptz | |
 
 Checks:

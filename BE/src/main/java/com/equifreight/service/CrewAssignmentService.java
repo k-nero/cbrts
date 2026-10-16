@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,16 +30,16 @@ public class CrewAssignmentService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final TransportJobRepository transportJobRepository;
     private final UserRepository userRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditService auditService;
 
     public CrewAssignmentService(CrewAssignmentRepository crewAssignmentRepository,
                                  TransportJobRepository transportJobRepository,
                                  UserRepository userRepository,
-                                 AuditLogRepository auditLogRepository) {
+                                 AuditService auditService) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +53,19 @@ public class CrewAssignmentService {
     public List<CrewMemberResponse> assignCrew(UUID jobId, AssignCrewRequest request, User currentUser) {
         TransportJob job = transportJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
+        // Stage guard: cannot modify crew during trip or after departure
+        if (job.getStage() == com.equifreight.entity.enums.JobStage.TRIP || job.getDepartedAt() != null) {
+            throw new BusinessException("Cannot modify crew assignments after departure or during trip");
+        }
+
+        // Duplicate check
+        Set<UUID> seenUserIds = new HashSet<>();
+        for (AssignCrewRequest.CrewItem item : request.getCrew()) {
+            if (!seenUserIds.add(item.getUserId())) {
+                throw new BusinessException("Duplicate crew member in assignment: " + item.getUserId());
+            }
+        }
 
         int horseCount = 0;
         if (job.getRequest() != null && job.getRequest().getHorses() != null) {
@@ -67,12 +82,37 @@ public class CrewAssignmentService {
             throw new BusinessException("At least " + requiredGrooms + " groom(s) required for " + horseCount + " horses (1 per 3 horses, rounded up). Found " + groomCount);
         }
 
-        crewAssignmentRepository.deleteByJobId(jobId);
+        // Compute job travel window for overlap detection
+        java.time.Instant startsAt = job.getPlannedDepartureAt() != null ? job.getPlannedDepartureAt() : (job.getWindowStart() != null ? job.getWindowStart() : java.time.Instant.now());
+        java.time.Instant endsAt = job.getPlannedArrivalAt() != null ? job.getPlannedArrivalAt() : (job.getWindowEnd() != null ? job.getWindowEnd() : startsAt.plus(java.time.Duration.ofDays(2)));
 
         List<CrewAssignment> assignments = new ArrayList<>();
         for (AssignCrewRequest.CrewItem item : request.getCrew()) {
             User user = userRepository.findById(item.getUserId())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.getUserId()));
+
+            // Role check: User must have ESCORT role
+            boolean isEscort = user.getRoles() != null && user.getRoles().stream()
+                    .anyMatch(r -> "ESCORT".equalsIgnoreCase(r.getName()) || "ROLE_ESCORT".equalsIgnoreCase(r.getName()));
+            if (!isEscort) {
+                throw new BusinessException("User " + user.getEmail() + " does not have the ESCORT role");
+            }
+
+            // Escort kind matching check if kind is set
+            if (user.getEscortKind() != null) {
+                if (item.getCrewRole() == CrewRole.DRIVER && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.GROOM) {
+                    throw new BusinessException("User " + user.getEmail() + " is registered as a GROOM and cannot be assigned as a DRIVER");
+                }
+                if ((item.getCrewRole() == CrewRole.GROOM || item.getCrewRole() == CrewRole.FLYING_GROOM) && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.DRIVER) {
+                    throw new BusinessException("User " + user.getEmail() + " is registered as a DRIVER and cannot be assigned as a GROOM");
+                }
+            }
+
+            // Overlapping jobs check (US-F3-06)
+            List<CrewAssignment> overlaps = crewAssignmentRepository.findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt);
+            if (!overlaps.isEmpty()) {
+                throw new com.equifreight.exception.ConflictException("CREW_OVERLAP", "Crew member " + user.getFirstName() + " " + user.getLastName() + " is already assigned to another overlapping trip");
+            }
 
             CrewAssignment ca = new CrewAssignment();
             ca.setJob(job);
@@ -80,11 +120,30 @@ public class CrewAssignmentService {
             ca.setCrewRole(item.getCrewRole());
             ca.getId().setJobId(job.getId());
             ca.getId().setUserId(user.getId());
-            assignments.add(crewAssignmentRepository.save(ca));
+            assignments.add(ca);
         }
 
-        log.info("Assigned {} crew members to job {}", assignments.size(), job.getCode());
-        return assignments.stream().map(this::toResponse).toList();
+        crewAssignmentRepository.deleteByJobId(jobId);
+        List<CrewAssignment> saved = crewAssignmentRepository.saveAll(assignments);
+
+        // Invalidate prior sign-off when crew changes
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
+        transportJobRepository.save(job);
+
+        auditService.recordDecision(
+                currentUser,
+                "ASSIGN_CREW",
+                "Assigned " + saved.size() + " crew members to job " + job.getCode(),
+                "TRANSPORT_JOB",
+                job.getId(),
+                job.getCode(),
+                null,
+                null,
+                "CREW_ASSIGNED");
+
+        log.info("Assigned {} crew members to job {}", saved.size(), job.getCode());
+        return saved.stream().map(this::toResponse).toList();
     }
 
     private CrewMemberResponse toResponse(CrewAssignment ca) {

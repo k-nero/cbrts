@@ -54,10 +54,26 @@ public class StaffJobController {
         return transportJobService.getJobDetail(id);
     }
 
-    /** US-F3-05: Load plan - view current draft or confirmed plan. */
+    /** US-F3-05: Load plan - view current draft or confirmed plan (null if not yet created). */
     @GetMapping("/{jobId}/load-plan")
     public LoadPlanResponse getLoadPlan(@PathVariable UUID jobId) {
-        return loadPlanService.getOrCreateLoadPlan(jobId);
+        return loadPlanService.getActiveLoadPlan(jobId).orElse(null);
+    }
+
+    /** US-F3-05: Load plan - explicitly create load plan with selected vehicle. */
+    @PostMapping("/{jobId}/load-plan")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public LoadPlanResponse createLoadPlan(@PathVariable UUID jobId,
+                                           @RequestParam(value = "vehicleId", required = false) UUID vehicleId) {
+        return loadPlanService.createLoadPlan(jobId, vehicleId);
+    }
+
+    /** US-F3-05: Load plan - change vehicle for draft load plan. */
+    @PutMapping("/{jobId}/load-plan/vehicle")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public LoadPlanResponse changeVehicle(@PathVariable UUID jobId,
+                                          @RequestParam("vehicleId") UUID vehicleId) {
+        return loadPlanService.changeLoadPlanVehicle(jobId, vehicleId);
     }
 
     /** US-F3-05: Load plan - assign or unassign a horse to a stall. */
@@ -121,9 +137,9 @@ public class StaffJobController {
         return crewAssignmentService.assignCrew(jobId, request, user);
     }
 
-    /** US-F3-08: Manager signs off trip plan (route, load, crew). */
+    /** US-F3-08: Manager signs off trip plan (route, load, crew). Strictly LOGISTICS_MANAGER. */
     @PostMapping("/{jobId}/sign-off")
-    @PreAuthorize("hasAnyRole('LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public JobDetailResponse signOff(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return transportJobService.signOffTripPlan(jobId, user);
     }

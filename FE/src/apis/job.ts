@@ -18,6 +18,16 @@ export const jobApi = {
   getLoadPlan: (jobId: string) =>
     client.get<LoadPlan>(`/staff/jobs/${jobId}/load-plan`).then((r) => r.data),
 
+  createLoadPlan: (jobId: string, vehicleId?: string) =>
+    client
+      .post<LoadPlan>(`/staff/jobs/${jobId}/load-plan`, null, { params: { vehicleId } })
+      .then((r) => r.data),
+
+  changeLoadPlanVehicle: (jobId: string, vehicleId: string) =>
+    client
+      .put<LoadPlan>(`/staff/jobs/${jobId}/load-plan/vehicle`, null, { params: { vehicleId } })
+      .then((r) => r.data),
+
   assignStall: (jobId: string, vehicleStallId: string, horseId?: string | null) =>
     client
       .post<LoadPlan>(`/staff/jobs/${jobId}/load-plan/assign`, { vehicleStallId, horseId })
