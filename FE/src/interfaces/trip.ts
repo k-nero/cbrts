@@ -1,0 +1,10 @@
+export type TripRecordKind = 'LOADED' | 'DEPARTED' | 'ARRIVED_AT_STOP' | 'CLEARED_BORDER' | 'HELD' | 'LEFT_STOP' | 'CONDITION_CHECK' | 'ACCEPTED_BY_AIRLINE' | 'FLIGHT_DEPARTED' | 'FLIGHT_LANDED' | 'RELEASED_BY_AIRLINE' | 'DELIVERED' | 'HANDED_OVER' | 'NOTE';
+export type HorseCondition = 'SOUND' | 'WATCH' | 'CONCERN';
+
+export interface TripPhoto { id: string; fileName: string; contentType: string; contentUrl: string }
+export interface TripCondition { horseId: string; horseName: string; condition: HorseCondition; drinking: boolean | null; eating: boolean | null; note: string | null; photos: TripPhoto[] }
+export interface TripRecord { id: string; routeStopId: string | null; checkpointName: string | null; kind: TripRecordKind; occurredAt: string; receivedAt: string; clientRef: string; recordedBy: string | null; channel: 'WEB' | 'CAB_TABLET' | 'SYSTEM'; text: string | null; conditions: TripCondition[] }
+export interface TripStop { id: string; sequence: number; kind: string; name: string; plannedAt: string | null; plannedStayMin: number | null; details: string | null; latestStatus: TripRecordKind | null; latestOccurredAt: string | null; latestNote: string | null; latestRecordedBy: string | null }
+export interface TripHorse { id: string; name: string; stall: string | null }
+export interface TripView { jobCode: string; tripStatus: 'NOT_STARTED' | 'DEPARTED' | 'HELD' | 'ARRIVED' | 'DELIVERED'; clearanceReady: boolean; plannedDepartureAt: string | null; plannedArrivalAt: string | null; arrivalWindowStart: string | null; arrivalWindowEnd: string | null; origin: string | null; destination: string | null; vehicleCode: string | null; stops: TripStop[]; horses: TripHorse[]; records: TripRecord[] }
+export interface TripRecordInput { routeStopId: string | null; kind: TripRecordKind; occurredAt: string; clientRef: string; text?: string; conditions?: Array<{ horseId: string; condition: HorseCondition; drinking: boolean | null; eating: boolean | null; note?: string; photoFileIds?: string[] }> }

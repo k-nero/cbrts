@@ -44,6 +44,13 @@ export const routesConfig = [
     name: 'my-requests',
   },
   {
+    path: '/tracking',
+    roles: ['CUSTOMER'],
+    type: 'authenticated',
+    breadcrumb: 'Trip tracking',
+    name: 'tracking',
+  },
+  {
     path: '/staff',
     roles: [LM, TS, FRC],
     type: 'authenticated',

@@ -10,6 +10,7 @@ import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import UsersPage from '@/pages/staff/users';
+import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: '/home', element: <CustomerHomePage /> },
           { path: '/horses', element: todo('My horses') },
           { path: '/requests', element: todo('My requests') },
+          { path: '/tracking', element: <CustomerTripPage /> },
         ],
       },
       {
@@ -50,7 +52,7 @@ export const router = createBrowserRouter([
           </AuthenticateLayout>
         ),
         children: [
-          { path: 'jobs', element: todo('Jobs') },
+          { path: 'jobs', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
@@ -65,7 +67,7 @@ export const router = createBrowserRouter([
           { path: 'vehicles', element: todo('Vehicles') },
         ],
       },
-      { path: '/escort', element: todo('Cab surface') },
+      { path: '/escort', element: <EscortTripPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
