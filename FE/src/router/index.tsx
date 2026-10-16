@@ -9,7 +9,11 @@ import CustomerHomePage from '@/pages/customer/home';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import FleetCalendarPage from '@/pages/staff/fleet-calendar';
+import JobsPage from '@/pages/staff/jobs';
+import JobDetailPage from '@/pages/staff/jobs/JobDetail';
 import UsersPage from '@/pages/staff/users';
+import VehiclesPage from '@/pages/staff/vehicles';
 
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
@@ -50,7 +54,8 @@ export const router = createBrowserRouter([
           </AuthenticateLayout>
         ),
         children: [
-          { path: 'jobs', element: todo('Jobs') },
+          { path: 'jobs', element: <JobsPage /> },
+          { path: 'jobs/:id', element: <JobDetailPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
@@ -61,8 +66,8 @@ export const router = createBrowserRouter([
           { path: 'customer-notes', element: todo('Customer notes') },
           { path: 'regulations', element: todo('Regulations') },
           { path: 'rates', element: todo('Rates') },
-          { path: 'fleet-calendar', element: todo('Fleet calendar') },
-          { path: 'vehicles', element: todo('Vehicles') },
+          { path: 'fleet-calendar', element: <FleetCalendarPage /> },
+          { path: 'vehicles', element: <VehiclesPage /> },
         ],
       },
       { path: '/escort', element: todo('Cab surface') },

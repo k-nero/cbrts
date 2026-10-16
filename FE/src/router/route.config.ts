@@ -52,6 +52,13 @@ export const routesConfig = [
     children: [
       { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
       {
+        path: '/jobs/:id',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Job workspace',
+        name: 'job-detail',
+      },
+      {
         path: '/overview',
         roles: [LM],
         type: 'authenticated',
