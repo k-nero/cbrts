@@ -69,22 +69,22 @@ const RequestSubmittedPage: FC = () => {
                   left: 'Waiting for you',
                   date: returnedAt ? `Returned ${formatDate(returnedAt)}` : '',
                 }}
-                action={
-                  <Button
-                    variant="primary"
-                    trailingIcon="arrow-right"
-                    onClick={() =>
-                      router.push(router.paths.get('request-edit', { pathParams: [request.id] }))
-                    }
-                  >
-                    Update your request
-                  </Button>
-                }
               />
+              <div className="flex items-center gap-4 border-t border-line px-5 py-4">
+                <Button
+                  variant="primary"
+                  trailingIcon="arrow-right"
+                  onClick={() =>
+                    router.push(router.paths.get('request-edit', { pathParams: [request.id] }))
+                  }
+                >
+                  Update your request
+                </Button>
+                <span className="type-body-s text-ink-3">
+                  Your request number stays the same; your changes go back as version {latest + 1}.
+                </span>
+              </div>
             </Panel>
-            <p className="type-body-s m-0 text-ink-3">
-              Your request number stays the same; your changes go back as version {latest + 1}.
-            </p>
           </div>
           <div className="flex flex-col gap-6">
             {pass({ tone: 'warn', label: 'Needs your answer' })}
