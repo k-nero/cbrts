@@ -6,6 +6,7 @@ import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
 import DesignSystemPage from '@/pages/design-system';
 import ForbiddenPage from '@/pages/ForbiddenPage';
 import CustomerHomePage from '@/pages/customer/home';
+import AddHorsePage from '@/pages/customer/horses/new';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -45,6 +46,9 @@ export const router = createBrowserRouter([
         children: [
           { path: '/home', element: <CustomerHomePage /> },
           { path: '/horses', element: todo('My horses') },
+          { path: '/horses/new', element: <AddHorsePage /> },
+          { path: '/horses/:id', element: todo('Horse profile') },
+          { path: '/horses/:id/edit', element: todo('Edit horse') },
           { path: '/requests', element: todo('My requests') },
           { path: '/tracking', element: <CustomerTripPage /> },
         ],
