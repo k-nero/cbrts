@@ -16,6 +16,7 @@ import {
   formatDay,
   type PlaceOption,
   roadRuns,
+  routePlanLine,
   routeSentence,
   routeStops,
   windowLength,
@@ -186,8 +187,7 @@ const RouteStep: FC<StepProps> = ({
                 <RouteStrip stops={routeStops(route)} />
               </div>
               <p className="type-body-s m-0 text-ink-3">
-                {routeSentence(route)} The fleet coordinator plans the exact road and stops after
-                approval.
+                {routeSentence(route)} {routePlanLine(route)}
                 {alsoByLine(routes, route)}
               </p>
             </div>

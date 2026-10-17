@@ -17,6 +17,7 @@ import {
   retiredRefusals,
   reviewRows,
   roadRuns,
+  routePlanLine,
   routeSentence,
   routeStops,
   revealSelector,
@@ -409,6 +410,16 @@ describe('route words', () => {
   test('borders summary', () => {
     expect(bordersSummary(hcmBkk)).toBe('2 · Mộc Bài, Poipet');
     expect(bordersSummary(hcmHan)).toBe('None · domestic');
+    expect(bordersSummary(sgnHkg)).toBe('None · by air');
+  });
+
+  test('after approval: the road and stops, or the flight and its transfers', () => {
+    expect(routePlanLine(hcmBkk)).toBe(
+      'The fleet coordinator plans the exact road and stops after approval.',
+    );
+    expect(routePlanLine(sgnHkg)).toBe(
+      'The fleet coordinator books the flight and the road transfers at both ends after approval.',
+    );
   });
 
   test('road runs unless the only corridors are by air', () => {

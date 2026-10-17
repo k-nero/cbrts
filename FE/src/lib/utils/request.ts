@@ -345,11 +345,19 @@ export const routeStops = (
 
 const shortCrossing = (name: string): string => name.split(' – ')[0];
 
-/** "2 · Mộc Bài, Poipet", "None · domestic". */
+/** "2 · Mộc Bài, Poipet", "None · domestic", or "None · by air": a flight has no border post. */
 export const bordersSummary = (r: Route): string =>
-  r.crossings.length === 0
-    ? 'None · domestic'
-    : `${r.crossings.length} · ${r.crossings.map((c) => shortCrossing(c.name)).join(', ')}`;
+  r.crossings.length > 0
+    ? `${r.crossings.length} · ${r.crossings.map((c) => shortCrossing(c.name)).join(', ')}`
+    : r.mode === 'AIR'
+      ? 'None · by air'
+      : 'None · domestic';
+
+/** What the fleet coordinator works out once the move is approved. */
+export const routePlanLine = (r: Route): string =>
+  r.mode === 'AIR'
+    ? 'The fleet coordinator books the flight and the road transfers at both ends after approval.'
+    : 'The fleet coordinator plans the exact road and stops after approval.';
 
 /** "Mộc Bài – Bavet and Poipet – Aranyaprathet". */
 const listOf = (items: string[]): string =>
