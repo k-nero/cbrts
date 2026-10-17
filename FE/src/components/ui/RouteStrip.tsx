@@ -3,7 +3,7 @@ import type { FC, ReactNode } from 'react';
 import { Icon } from './Icon';
 import { cx } from './tone';
 
-export type RouteStopState = 'done' | 'current' | 'upcoming';
+export type RouteStopState = 'done' | 'current' | 'held' | 'upcoming';
 
 export type RouteStripStop = {
   name: ReactNode;
@@ -35,6 +35,7 @@ const Marker: FC<{ state: RouteStopState }> = ({ state }) => (
         'block rounded-full',
         state === 'done' && 'size-3.5 bg-ok',
         state === 'current' && 'size-5 border-2 border-info bg-info-soft',
+        state === 'held' && 'size-5 border-2 border-bad bg-bad-soft',
         state === 'upcoming' && 'size-3.5 border-2 border-line-strong bg-canvas',
       )}
     />
@@ -72,7 +73,7 @@ export const RouteStrip: FC<Props> = ({ stops, gate, className }) => (
         <li key={i} className="contents">
           <span
             className="flex w-[132px] shrink-0 flex-col items-center gap-1.5 text-center"
-            aria-current={s.state === 'current' ? 'step' : undefined}
+            aria-current={s.state === 'current' || s.state === 'held' ? 'step' : undefined}
           >
             <Marker state={s.state} />
             <span
@@ -82,7 +83,7 @@ export const RouteStrip: FC<Props> = ({ stops, gate, className }) => (
             </span>
             <span className="type-mono-label text-ink-3">{s.kind}</span>
             <span
-              className={cx('type-caption', s.state === 'current' ? 'text-info' : 'text-ink-3')}
+              className={cx('type-caption', s.state === 'held' ? 'text-bad' : s.state === 'current' ? 'text-info' : 'text-ink-3')}
             >
               {s.time}
             </span>

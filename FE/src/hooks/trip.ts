@@ -8,7 +8,7 @@ export const useTrips = (audience: 'escort' | 'staff' | 'customer', page: number
 
 export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string) => useQuery({
   queryKey: ['trip', audience, code], queryFn: () => tripApi.get(audience, code), enabled: Boolean(code),
-  refetchInterval: audience === 'customer' ? 15_000 : false,
+  refetchInterval: 15_000,
 });
 
 export const useTripRecord = (audience: 'escort' | 'staff', code: string) => {
