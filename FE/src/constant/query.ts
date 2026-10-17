@@ -6,6 +6,11 @@ export const queryKeys = {
   me: () => ['me'] as const,
   roles: () => ['admin', 'roles'] as const,
   customerHome: () => ['customer', 'home'] as const,
+  audit: {
+    all: () => ['admin-audit-log'] as const,
+    actors: () => ['admin-audit-log', 'actors'] as const,
+    actions: () => ['admin-audit-log', 'actions'] as const,
+  },
   clearance: {
     all: () => ['clearance'] as const,
     jobs: (q = '') => ['clearance', 'jobs', 'list', q] as const,

@@ -40,7 +40,9 @@ type Props = {
 
 /**
  * One trailer or air-stall position (DESIGN.md, Stall tile). The type is a colour and a label;
- * dashed means "a place something can go"; a conflict names its rule in words.
+ * dashed means "a place something can go"; a conflict names its rule in words. At least 128 px
+ * tall, it grows to fit a long conflict (several broken rules) and fills its grid cell, so both
+ * stalls in a row keep one height.
  */
 export const StallTile: FC<Props> = ({
   type,
@@ -55,7 +57,7 @@ export const StallTile: FC<Props> = ({
 }) => {
   const t = TYPE[type];
   const classes = cx(
-    'flex h-32 w-full flex-col gap-2.5 rounded-md p-3.5 text-left',
+    'flex h-full min-h-32 w-full flex-col gap-2.5 rounded-md p-3.5 text-left',
     state === 'empty' && cx('border border-dashed', t.border),
     state === 'target' && 'border border-dashed border-gold bg-gold-soft',
     state === 'occupied' && cx('border-[1.5px] bg-raised', t.border),
@@ -81,8 +83,8 @@ export const StallTile: FC<Props> = ({
         </span>
       )}
       {state === 'conflict' && issue && (
-        <span className="flex items-center gap-1.5 text-bad">
-          <Icon name="alert" size={14} />
+        <span className="flex items-start gap-1.5 text-bad">
+          <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
           <span className="type-body-s">{issue}</span>
         </span>
       )}

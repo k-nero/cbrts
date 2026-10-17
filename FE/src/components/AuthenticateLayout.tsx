@@ -14,8 +14,7 @@ import ThemeToggle from './ThemeToggle';
 import { COLOR_BG_CANVAS, COLOR_BG_SUNKEN, COLOR_BORDER, ZINDEX_MENU } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
 import { ROLE_LABEL } from '@/interfaces';
-import { useCustomRouter } from '@/router/route.hook';
-import { primaryRole, primaryRoleHome, useAuthStore } from '@/stores/authStore';
+import { primaryRole, useAuthStore } from '@/stores/authStore';
 
 const USER_BUTTON = [
   'flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md border-0',
@@ -64,7 +63,6 @@ const SideUser: FC = () => {
 
 const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
   const { pathname } = useLocation();
-  const router = useCustomRouter();
   const roles = useAuthStore((state) => state.roles);
   const role = primaryRole(roles);
 
@@ -118,7 +116,7 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
       >
         <Flex vertical gap={20} style={{ height: '100%', padding: '20px 16px 16px' }}>
           <Flex vertical gap={10}>
-            <Brand onClick={() => router.push(primaryRoleHome(roles))} />
+            <Brand />
             {role && <span className={ROLE_TAG}>{ROLE_LABEL[role]}</span>}
           </Flex>
           <div style={{ flex: 1, overflowY: 'auto' }}>{menu}</div>
