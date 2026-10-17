@@ -53,7 +53,7 @@ const Header: React.FC = () => {
       }}
     >
       <Flex align="center" justify="space-between" style={{ height: '100%' }}>
-        <Brand onClick={() => router.push(router.paths.get('customer-home'))} />
+        <Brand />
         <nav className="flex items-center gap-1" aria-label="Main">
           {NAV.map(([name, label, end]) => (
             <NavItem key={name} to={router.paths.get(name)} end={end}>

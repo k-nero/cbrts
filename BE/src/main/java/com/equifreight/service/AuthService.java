@@ -1,12 +1,21 @@
 package com.equifreight.service;
 
+import com.equifreight.entity.Club;
+import com.equifreight.entity.Country;
 import com.equifreight.entity.RefreshToken;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.RoleName;
+import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.auth.LoginRequest;
+import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
+import com.equifreight.repository.ClubRepository;
+import com.equifreight.repository.CountryRepository;
 import com.equifreight.repository.RefreshTokenRepository;
+import com.equifreight.repository.RoleRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.configuration.JwtConfiguration;
 import lombok.extern.log4j.Log4j2;
@@ -20,7 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,15 +39,24 @@ import java.util.UUID;
 public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final ClubRepository clubRepository;
+    private final CountryRepository countryRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
 
     AuthService(UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            ClubRepository clubRepository,
+            CountryRepository countryRepository,
+            RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             JwtEncoder jwtEncoder) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.clubRepository = clubRepository;
+        this.countryRepository = countryRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
     }
@@ -57,6 +77,48 @@ public class AuthService {
             throw new UnauthorizedException("Email or password doesn't match.");
         }
         return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+    }
+
+    /**
+     * Self sign-up for racing clubs and horse owners: creates the club and its one customer
+     * account (the email doubles as the club's booking email) and signs it in. Staff accounts
+     * only come by invite, so the role is always CUSTOMER whatever the caller sends.
+     */
+    @Transactional
+    public TokenResponse register(RegisterRequest request) {
+        String email = request.getEmail().trim();
+        if (userRepository.getByEmail(email) != null) {
+            throw new ConflictException("EMAIL_IN_USE",
+                    "An account already uses this email. Sign in, or reset your password.");
+        }
+        Country country = countryRepository.findById(request.getCountryCode())
+                .orElseThrow(() -> new BusinessException("We don't serve that country yet."));
+        Role customer = roleRepository.findByName(RoleName.CUSTOMER)
+                .orElseThrow(() -> new IllegalStateException("The CUSTOMER role is not seeded."));
+
+        Club club = new Club();
+        club.setName(request.getClubName().trim());
+        club.setBookingEmail(email);
+        club.setPhone(blankToNull(request.getPhone()));
+        club.setCountry(country);
+        club = clubRepository.save(club);
+
+        User user = new User();
+        user.setEmail(email);
+        user.setFirstName(request.getFirstName().trim());
+        user.setLastName(request.getLastName().trim());
+        user.setPhone(blankToNull(request.getPhone()));
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setClub(club);
+        user.setRoles(new HashSet<>(Set.of(customer)));
+        user = userRepository.save(user);
+
+        log.info("Club account created for {} ({})", club.getName(), email);
+        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Transactional
