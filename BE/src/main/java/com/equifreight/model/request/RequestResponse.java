@@ -47,4 +47,10 @@ public class RequestResponse {
     private RouteResponse route;
     private LeadTimeResponse leadTime;
     private List<Blocker> blockers;
+    /** The logistics manager's note while the request is INFO_REQUIRED (US-F1-04). */
+    private String infoRequiredNote;
+    /** Every submitted version, oldest first; empty for a draft. */
+    private List<RevisionSummaryResponse> revisions;
+    /** The customer's club; set on staff views only. */
+    private String club;
 }

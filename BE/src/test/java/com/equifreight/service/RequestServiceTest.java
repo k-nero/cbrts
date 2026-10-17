@@ -27,6 +27,9 @@ import com.equifreight.model.request.RequestHorseResponse;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.entity.AuditLog;
+import com.equifreight.model.request.Blocker;
+import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
@@ -60,6 +63,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -81,6 +87,7 @@ class RequestServiceTest {
     ClubService clubs;
     CodeService codes;
     AuditService audit;
+    AuditLogRepository auditLogs;
     RequestService service;
     User user;
     Club club;
@@ -101,7 +108,8 @@ class RequestServiceTest {
         clubs = mock(ClubService.class);
         codes = mock(CodeService.class);
         audit = mock(AuditService.class);
-        service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit,
+        auditLogs = mock(AuditLogRepository.class);
+        service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit, auditLogs,
                 JsonMapper.builder().build(), Clock.fixed(NOW, BusinessTime.ZONE));
 
         club = new Club();
@@ -496,6 +504,70 @@ class RequestServiceTest {
     }
 
     /** Spec R-07: submitting a draft. */
+    // --- an INFO_REQUIRED request (US-F1-04) ----------------------------------------------------------
+
+    @Test
+    void anInfoRequiredRequestCanBeSaved() {
+        TransportRequest r = infoRequired();
+
+        RequestResponse response = service.update(user, r.getId(), body(shadowfax));
+
+        verify(requests).saveAndFlush(r);
+        assertThat(response.getStatus()).isEqualTo(RequestStatus.INFO_REQUIRED);
+    }
+
+    @Test
+    void aSubmittedRequestStillCantBeEdited() {
+        TransportRequest r = submitted();
+
+        assertThatThrownBy(() -> service.update(user, r.getId(), body(shadowfax)))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+    }
+
+    @Test
+    void anInfoRequiredRequestComesBackWithItsBlockers() {
+        TransportRequest r = infoRequired();
+
+        RequestResponse response = service.get(user, r.getId());
+
+        assertThat(response.getBlockers()).extracting(Blocker::getCode).contains("ORIGIN_MISSING");
+    }
+
+    @Test
+    void anInfoRequiredRequestCantBeDiscarded() {
+        TransportRequest r = infoRequired();
+
+        assertThatThrownBy(() -> service.delete(user, r.getId()))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+        verify(requests, never()).delete(any());
+    }
+
+    @Test
+    void theResponseListsRevisionsAndTheNote() {
+        TransportRequest r = infoRequired();
+        Instant returned = Instant.parse("2026-09-28T02:41:00Z");
+        when(auditLogs.findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+                "TRANSPORT_REQUEST", r.getId(), "REQUEST_INFO_REQUIRED")).thenReturn(List.of(auditAt(returned)));
+
+        RequestResponse response = service.get(user, r.getId());
+
+        assertThat(response.getInfoRequiredNote()).isEqualTo("Which stable?");
+        assertThat(response.getRevisions()).singleElement().satisfies(v -> {
+            assertThat(v.getRevisionNo()).isEqualTo((short) 1);
+            assertThat(v.getNote()).isEqualTo("Which stable?");
+            assertThat(v.getReturnedAt()).isEqualTo(returned);
+        });
+    }
+
+    @Test
+    void aDraftHasNoRevisions() {
+        TransportRequest r = draft(shadowfax);
+
+        assertThat(service.get(user, r.getId()).getRevisions()).isEmpty();
+    }
+
     @Nested
     class Submit {
 
@@ -516,6 +588,52 @@ class RequestServiceTest {
             when(routes.resolve(any(), any(), any(), any(), any()))
                     .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
             when(codes.next(CodePrefix.REQ, 2026)).thenReturn("REQ-2026-0193");
+        }
+
+        @Test
+        void resubmittingKeepsTheCodeAndAppendsVersion2() {
+            Instant first = Instant.parse("2026-09-20T02:00:00Z");
+            backToTheCustomer(first);
+
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(response.getCode()).isEqualTo("REQ-2026-0195");
+            verify(codes, never()).next(any(), anyInt());
+            assertThat(draft.getSubmittedAt()).isEqualTo(first);
+            assertThat(draft.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
+            assertThat(draft.getInfoRequiredNote()).isNull();
+            ArgumentCaptor<RequestRevision> captor = ArgumentCaptor.forClass(RequestRevision.class);
+            verify(revisions).save(captor.capture());
+            assertThat(captor.getValue().getRevisionNo()).isEqualTo((short) 2);
+            assertThat(captor.getValue().getNote()).isNull();
+            assertThat(captor.getValue().getSubmittedAt()).isEqualTo(NOW);
+            verify(audit).recordDecision(eq(user), eq("REQUEST_RESUBMITTED"),
+                    startsWith("Sent version 2 with 2 horses: "), eq("TRANSPORT_REQUEST"), eq(draft.getId()),
+                    eq("REQ-2026-0195"), isNull(), eq("{\"status\":\"INFO_REQUIRED\"}"),
+                    eq("{\"status\":\"SUBMITTED\"}"));
+        }
+
+        @Test
+        void aBlockedResubmitWritesNothing() {
+            backToTheCustomer(Instant.parse("2026-09-20T02:00:00Z"));
+            draft.setDepartureDate(null);
+
+            assertThatThrownBy(() -> service.submit(user, draft.getId()))
+                    .isInstanceOf(ConflictException.class)
+                    .extracting("code").isEqualTo("SUBMISSION_BLOCKED");
+            verify(revisions, never()).save(any());
+            verify(codes, never()).next(any(), anyInt());
+            verifyNoInteractions(audit);
+            assertThat(draft.getStatus()).isEqualTo(RequestStatus.INFO_REQUIRED);
+        }
+
+        void backToTheCustomer(Instant firstSubmitted) {
+            draft.setStatus(RequestStatus.INFO_REQUIRED);
+            draft.setCode("REQ-2026-0195");
+            draft.setSubmittedAt(firstSubmitted);
+            draft.setInfoRequiredNote("Which stable?");
+            when(revisions.findByRequestIdOrderByRevisionNoAsc(draft.getId()))
+                    .thenReturn(List.of(revision(draft, 1, "Which stable?")));
         }
 
         @Test
@@ -636,7 +754,7 @@ class RequestServiceTest {
 
         @Test
         void theCodeYearIsTakenInBusinessTime() {
-            service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit,
+            service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit, auditLogs,
                     JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE));
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
@@ -704,6 +822,34 @@ class RequestServiceTest {
         when(requests.findForUpdate(r.getId(), CLUB_ID)).thenReturn(Optional.of(r));
         when(requests.findByIdAndClubId(r.getId(), CLUB_ID)).thenReturn(Optional.of(r));
         return r;
+    }
+
+    TransportRequest infoRequired() {
+        TransportRequest r = draft(shadowfax);
+        r.setStatus(RequestStatus.INFO_REQUIRED);
+        r.setCode("REQ-2026-0195");
+        r.setSubmittedAt(Instant.parse("2026-09-20T02:00:00Z"));
+        r.setInfoRequiredNote("Which stable?");
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId()))
+                .thenReturn(List.of(revision(r, 1, "Which stable?")));
+        return r;
+    }
+
+    static RequestRevision revision(TransportRequest r, int no, String note) {
+        RequestRevision revision = new RequestRevision();
+        revision.setId(UUID.randomUUID());
+        revision.setRequest(r);
+        revision.setRevisionNo((short) no);
+        revision.setPayload("{}");
+        revision.setSubmittedAt(Instant.parse("2026-09-20T02:00:00Z"));
+        revision.setNote(note);
+        return revision;
+    }
+
+    static AuditLog auditAt(Instant at) {
+        AuditLog log = new AuditLog();
+        log.setOccurredAt(at);
+        return log;
     }
 
     TransportRequest submitted() {
