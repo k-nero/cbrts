@@ -14,7 +14,9 @@ import { useCustomRouter } from '@/router/route.hook';
 const NotFound: FC<{ onBack: () => void }> = ({ onBack }) => (
   <div className="flex flex-col items-start gap-3 pt-[46px]">
     <h1 className="type-display-m m-0 text-ink">We couldn’t find this request</h1>
-    <p className="type-body-m m-0 text-ink-2">This request doesn&apos;t exist or isn&apos;t yours to review.</p>
+    <p className="type-body-m m-0 text-ink-2">
+      This request doesn&apos;t exist or isn&apos;t yours to review.
+    </p>
     <Button onClick={onBack}>Back to Requests</Button>
   </div>
 );
@@ -32,8 +34,7 @@ const RequestReviewPage: FC = () => {
   const open = (target: string) =>
     router.push(router.paths.get('request-review', { pathParams: [target] }));
 
-  if (!review)
-    return <RequestLoadState query={query} notFound={<NotFound onBack={toList} />} />;
+  if (!review) return <RequestLoadState query={query} notFound={<NotFound onBack={toList} />} />;
 
   const { request, queue } = review;
   const from = request.route?.fromCity ?? request.origin?.city ?? '—';

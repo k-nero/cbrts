@@ -669,7 +669,12 @@ describe('versions of a returned request', () => {
   test('a version line says when it was sent and when it came back', () => {
     expect(versionLine(v1)).toBe('v1 · Submitted 26 Sep · returned 28 Sep');
     expect(
-      versionLine({ revisionNo: 2, submittedAt: '2026-09-30T04:00:00Z', note: null, returnedAt: null }),
+      versionLine({
+        revisionNo: 2,
+        submittedAt: '2026-09-30T04:00:00Z',
+        note: null,
+        returnedAt: null,
+      }),
     ).toBe('v2 · Submitted 30 Sep');
   });
 
@@ -679,7 +684,11 @@ describe('versions of a returned request', () => {
   });
 
   test('the saved line says where the changes go', () => {
-    expect(savedLine(draft({ updatedAt: '2026-10-18T03:00:00Z' }))).toBe('Draft saved 18 Oct 2026.');
-    expect(savedLine(returned)).toBe('Changes saved 18 Oct 2026. Send them as version 2 from Review.');
+    expect(savedLine(draft({ updatedAt: '2026-10-18T03:00:00Z' }))).toBe(
+      'Draft saved 18 Oct 2026.',
+    );
+    expect(savedLine(returned)).toBe(
+      'Changes saved 18 Oct 2026. Send them as version 2 from Review.',
+    );
   });
 });

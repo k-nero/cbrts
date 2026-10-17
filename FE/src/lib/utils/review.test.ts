@@ -92,13 +92,21 @@ describe('the review page', () => {
 
   test('the header names the club, the horses, the service and the departure', () => {
     const r = {
-      ...sent({ horses: [{ name: 'Nightfall' }, { name: 'Shadowfax' }] as TransportRequest['horses'] }),
+      ...sent({
+        horses: [{ name: 'Nightfall' }, { name: 'Shadowfax' }] as TransportRequest['horses'],
+      }),
       club: 'Saigon Turf Club',
     } as TransportRequest & { club: string };
     expect(reviewSummary(r)).toBe(
       'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d',
     );
-    const air = { ...r, mode: 'AIR', trailer: null, airClass: 'BUSINESS', dateFlexDays: 0 } as typeof r;
+    const air = {
+      ...r,
+      mode: 'AIR',
+      trailer: null,
+      airClass: 'BUSINESS',
+      dateFlexDays: 0,
+    } as typeof r;
     expect(reviewSummary(air)).toBe(
       'Saigon Turf Club · 2 horses · air, business class · departs 30 Oct 2026',
     );
@@ -110,14 +118,22 @@ describe('the review page', () => {
   });
 
   test('a version sent before this slice still compares', () => {
-    const old = { code: 'REQ-2026-0195', horses: [], departureDate: '2026-10-30' } as Partial<TransportRequest>;
+    const old = {
+      code: 'REQ-2026-0195',
+      horses: [],
+      departureDate: '2026-10-30',
+    } as Partial<TransportRequest>;
     expect(() => changedRows(old, sent())).not.toThrow();
     expect(changedRows(old, { ...old })).toEqual([]);
   });
 
   test('the note counts after trimming, up to 500', () => {
     expect(noteState('  ')).toEqual({ length: 0, ok: false, count: '0 / 500' });
-    expect(noteState(` ${'x'.repeat(500)} `)).toEqual({ length: 500, ok: true, count: '500 / 500' });
+    expect(noteState(` ${'x'.repeat(500)} `)).toEqual({
+      length: 500,
+      ok: true,
+      count: '500 / 500',
+    });
     expect(noteState('x'.repeat(501))).toEqual({ length: 501, ok: false, count: '501 / 500' });
   });
 });

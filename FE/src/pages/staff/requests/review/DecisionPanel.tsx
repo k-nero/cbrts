@@ -85,7 +85,10 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
       else router.push(router.paths.get('requests'), { force: true });
     } catch (error) {
       const data = (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data;
-      const sentence = apiErrorMessage(error, "The request wasn't returned. Check your connection and try again.");
+      const sentence = apiErrorMessage(
+        error,
+        "The request wasn't returned. Check your connection and try again.",
+      );
       if (data?.error === 'NOTE_REQUIRED' || data?.error === 'NOTE_TOO_LONG') {
         methods.setError('note', { message: sentence });
       } else {
