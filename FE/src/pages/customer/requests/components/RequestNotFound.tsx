@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { Skeleton } from 'antd';
 import type { AxiosError } from 'axios';
 
@@ -24,7 +24,10 @@ export const RequestNotFound: FC = () => {
 type LoadQuery = { isPending: boolean; error: unknown; refetch: () => unknown };
 
 /** Loading, not found or failed: what a request page shows until its request arrives. */
-export const RequestLoadState: FC<{ query: LoadQuery }> = ({ query }) => {
+export const RequestLoadState: FC<{ query: LoadQuery; notFound?: ReactNode }> = ({
+  query,
+  notFound,
+}) => {
   if (query.isPending) {
     return (
       <div className="flex flex-col gap-6 pt-[46px]" aria-busy>
@@ -36,7 +39,8 @@ export const RequestLoadState: FC<{ query: LoadQuery }> = ({ query }) => {
       </div>
     );
   }
-  if ((query.error as AxiosError | null)?.response?.status === 404) return <RequestNotFound />;
+  if ((query.error as AxiosError | null)?.response?.status === 404)
+    return <>{notFound ?? <RequestNotFound />}</>;
   return (
     <div className="pt-[46px]">
       <Callout
