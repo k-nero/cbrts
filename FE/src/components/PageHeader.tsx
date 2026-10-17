@@ -1,7 +1,7 @@
 import { FC, ReactNode } from 'react';
 import { Flex } from 'antd';
 
-import { Button, Icon } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { COLOR_BORDER } from '@/constant/color';
 
 const TITLE = 'm-0 font-display text-[44px] leading-[50px] font-normal tracking-[-0.01em] text-ink';
@@ -28,8 +28,7 @@ const PageHeader: FC<Props> = ({ title, summary, right, reserveBack, back, banne
   <Flex vertical gap={16}>
     {back && (
       <div className="flex h-[46px] items-end">
-        <Button variant="ghost" size="sm" onClick={back.onClick}>
-          <Icon name="arrow-left" size={16} />
+        <Button variant="ghost" size="sm" leadingIcon="arrow-left" onClick={back.onClick}>
           {back.label}
         </Button>
       </div>
