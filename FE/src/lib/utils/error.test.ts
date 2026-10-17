@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { apiErrorView } from './error';
+import { apiErrorView, formRefusal } from './error';
 
 const FALLBACK = 'Something went wrong. Try again.';
 const refused = (status: number, data: object) => ({ response: { status, data } });
@@ -48,5 +48,37 @@ describe('apiErrorView', () => {
   test('noApiErrorBodyGivesTheFallback', () => {
     const view = apiErrorView(new Error('Network Error'), {}, FALLBACK);
     expect(view).toEqual({ fields: {}, form: FALLBACK });
+  });
+});
+
+describe('formRefusal', () => {
+  test('theFirstShownFieldIsFocused', () => {
+    expect(
+      formRefusal({ fields: { name: 'Taken.', microchip: 'Registered.' }, form: null }, [
+        'name',
+        'microchip',
+      ]),
+    ).toEqual({ fields: { name: 'Taken.', microchip: 'Registered.' }, form: null, focus: 'name' });
+  });
+
+  test('aFieldTheFormDoesNotShowGoesToTheFormMessage', () => {
+    expect(
+      formRefusal(
+        { fields: { microchip: 'must not be blank', weightKg: 'Too heavy.' }, form: null },
+        ['weightKg'],
+      ),
+    ).toEqual({
+      fields: { weightKg: 'Too heavy.' },
+      form: 'microchip: must not be blank',
+      focus: 'weightKg',
+    });
+  });
+
+  test('aFormMessageHasNoFocus', () => {
+    expect(formRefusal({ fields: {}, form: 'In use.' }, ['name'])).toEqual({
+      fields: {},
+      form: 'In use.',
+      focus: null,
+    });
   });
 });

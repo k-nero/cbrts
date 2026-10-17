@@ -40,3 +40,23 @@ export const apiErrorView = (
   if (field) return { fields: { [field]: data.message }, form: null };
   return { fields: {}, form: data.message };
 };
+
+/**
+ * A refusal laid out for a form that shows only `shownFields`: messages for fields it doesn't show
+ * (a locked identity, say) join the form-level message, so nothing is lost; `focus` is the first shown
+ * field with a message, so the form can bring it into view.
+ */
+export const formRefusal = (
+  view: { fields: Record<string, string>; form: string | null },
+  shownFields: string[],
+): { fields: Record<string, string>; form: string | null; focus: string | null } => {
+  const fields: Record<string, string> = {};
+  const unshown: string[] = [];
+  for (const [field, message] of Object.entries(view.fields)) {
+    if (shownFields.includes(field)) fields[field] = message;
+    else unshown.push(`${field}: ${message}`);
+  }
+  const form = [view.form, ...unshown].filter(Boolean).join('; ') || null;
+  const focus = shownFields.find((field) => field in fields) ?? null;
+  return { fields, form, focus };
+};

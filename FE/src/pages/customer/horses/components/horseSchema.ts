@@ -27,19 +27,24 @@ const blankToNull = (value: string | null | undefined): string | null => {
  * The add/edit form's rules, mirroring the API (slice 1, H-01 to H-05) so most mistakes show before
  * saving. `today` is YYYY-MM-DD in Asia/Ho_Chi_Minh, for "not after today".
  */
-export const makeHorseSchema = (today: string) =>
-  z.object({
+export const makeHorseSchema = (today: string, options: { locked?: boolean } = {}) => {
+  const base = z.object({
     name: z
       .string()
       .trim()
       .min(1, { error: "Enter the horse's name." })
       .max(80, { error: 'A name has at most 80 characters.' }),
     microchip: z.string().superRefine((value, ctx) => {
-      const digits = value.replace(/\s/g, '');
-      if (!new RegExp(`^\\d{${MICROCHIP_DIGITS}}$`).test(digits)) {
+      const chip = value.replace(/\s/g, '');
+      if (/[^0-9]/.test(chip)) {
         ctx.addIssue({
           code: 'custom',
-          message: `A microchip has ${MICROCHIP_DIGITS} digits; ${digits.length} were entered.`,
+          message: `A microchip is digits only; ${chip} has letters or symbols.`,
+        });
+      } else if (chip.length !== MICROCHIP_DIGITS) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `A microchip has ${MICROCHIP_DIGITS} digits; ${chip.length} were entered.`,
         });
       }
     }),
@@ -76,14 +81,26 @@ export const makeHorseSchema = (today: string) =>
         error: 'A declared value has at most 2 decimals.',
       }),
   });
+  if (!options.locked) return base;
+  // A locked identity is neither shown nor sent from the form (the stored values are), so it isn't
+  // checked: a legacy horse without a microchip must still be editable.
+  return base.extend({
+    name: z.string().nullish(),
+    microchip: z.string().nullish(),
+    sex: z.preprocess(optionValue, z.enum(HorseSexEnum).nullish()),
+    breed: z.string().nullish(),
+    dateOfBirth: z.string().nullish(),
+    coat: z.preprocess(optionValue, z.enum(HorseCoatEnum).nullish()),
+  }) as unknown as typeof base;
+};
 
 /** The parsed form: what the resolver hands to submit, and what the tests build. */
 export type HorseFormValues = z.output<ReturnType<typeof makeHorseSchema>>;
 
 /** The API body: strings trimmed, the microchip without its spaces, blanks as null. */
 export const toHorseInput = (values: HorseFormValues): HorseInput => ({
-  name: values.name.trim(),
-  microchip: values.microchip.replace(/\s/g, ''),
+  name: (values.name ?? '').trim(),
+  microchip: (values.microchip ?? '').replace(/\s/g, ''),
   passportNo: values.passportNo.trim(),
   sex: values.sex,
   breed: blankToNull(values.breed),

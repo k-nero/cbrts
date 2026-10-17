@@ -57,6 +57,23 @@ describe('horseSchema', () => {
     );
   });
 
+  test('aMicrochipWithLettersOrSymbolsSaysSo', () => {
+    expect(messageOn({ microchip: '25025960012345O' }, 'microchip')).toBe(
+      'A microchip is digits only; 25025960012345O has letters or symbols.',
+    );
+    expect(messageOn({ microchip: '250-259-600-123-456' }, 'microchip')).toBe(
+      'A microchip is digits only; 250-259-600-123-456 has letters or symbols.',
+    );
+  });
+
+  test('aLockedHorseSkipsTheIdentityRules', () => {
+    const locked = makeHorseSchema(TODAY, { locked: true });
+    expect(
+      locked.safeParse({ ...NIGHTFALL, name: '', microchip: '', sex: undefined, dateOfBirth: null })
+        .success,
+    ).toBe(true);
+  });
+
   test('schemaAcceptsWholeAndTrailingZeroHeights', () => {
     expect(messageOn({ heightHh: 16 }, 'heightHh')).toBeUndefined();
     expect(messageOn({ heightHh: Number('16.20') }, 'heightHh')).toBeUndefined();

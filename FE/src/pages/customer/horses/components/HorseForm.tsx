@@ -18,7 +18,7 @@ import {
   type Temperament,
   TemperamentEnum,
 } from '@/interfaces';
-import { apiErrorView, formatHeight, ict, sexLabel, sizeClassFor } from '@/lib/utils';
+import { apiErrorView, formatHeight, formRefusal, ict, sexLabel, sizeClassFor } from '@/lib/utils';
 
 type Option = { label: string; value: string };
 
@@ -69,8 +69,22 @@ const TEMPERAMENT_CARDS: {
 const FIELDS_BY_CODE = {
   HORSE_NAME_TAKEN: 'name',
   MICROCHIP_REGISTERED: 'microchip',
+  INVALID_MICROCHIP: 'microchip',
   INVALID_HEIGHT: 'heightHh',
+  INVALID_DATE_OF_BIRTH: 'dateOfBirth',
 };
+
+/** The fields in the order the form shows them; a locked horse doesn't show the first six. */
+const IDENTITY_FIELDS = ['name', 'microchip', 'passportNo', 'sex', 'breed', 'dateOfBirth', 'coat'];
+const OTHER_FIELDS = [
+  'heightHh',
+  'weightKg',
+  'temperament',
+  'requiredStall',
+  'handlingNotes',
+  'declaredValue',
+];
+const LOCKED_HIDDEN = new Set(['name', 'microchip', 'sex', 'breed', 'dateOfBirth', 'coat']);
 
 const EMPTY: HorseFormShape = {
   name: '',
@@ -216,35 +230,58 @@ const HorseForm: FC<Props> = ({
   afterForm,
 }) => {
   const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
-  const schema = useMemo(() => makeHorseSchema(today), [today]);
   const locked = horse?.identityLocked === true;
+  const schema = useMemo(() => makeHorseSchema(today, { locked }), [today, locked]);
+  const shownFields = [...IDENTITY_FIELDS, ...OTHER_FIELDS].filter(
+    (field) => !locked || !LOCKED_HIDDEN.has(field),
+  );
   const methods = useFormCustom<HorseFormShape, unknown, HorseFormValues>({
     resolver: zodResolver(schema) as unknown as Resolver<HorseFormShape, unknown, HorseFormValues>,
     defaultValues: horse ? toShape(fromHorse(horse)) : EMPTY,
   });
 
-  const submit = methods.handleSubmit(async (values) => {
-    const input = toHorseInput(values);
-    if (locked && horse) {
-      Object.assign(input, {
-        name: horse.name,
-        microchip: horse.microchip ?? '',
-        sex: horse.sex,
-        breed: horse.breed,
-        dateOfBirth: horse.dateOfBirth,
-        coat: horse.coat,
-      });
-    }
-    try {
-      onSaved(await onSubmit(input));
-    } catch (error) {
-      const view = apiErrorView(error, FIELDS_BY_CODE, 'Something went wrong. Try again.');
-      Object.entries(view.fields).forEach(([field, message]) =>
-        methods.setError(field as keyof HorseFormShape, { message }),
-      );
-      if (view.form) methods.setError('form_error', { message: view.form });
-    }
-  });
+  // Save sits at the foot of a long form, and the kit's inputs give React Hook Form no focusable ref:
+  // after any refusal, bring the first field error (or the form-level alert at the top) into view.
+  const revealRefusal = (formLevel: boolean) =>
+    requestAnimationFrame(() => {
+      const field = document.querySelector('.ant-form-item-has-error');
+      if (field && !formLevel) field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+  const submit = methods.handleSubmit(
+    async (values) => {
+      const input = toHorseInput(values);
+      if (locked && horse) {
+        Object.assign(input, {
+          name: horse.name,
+          microchip: horse.microchip ?? '',
+          sex: horse.sex,
+          breed: horse.breed,
+          dateOfBirth: horse.dateOfBirth,
+          coat: horse.coat,
+        });
+      }
+      try {
+        onSaved(await onSubmit(input));
+      } catch (error) {
+        const refusal = formRefusal(
+          apiErrorView(error, FIELDS_BY_CODE, 'Something went wrong. Try again.'),
+          shownFields,
+        );
+        Object.entries(refusal.fields).forEach(([field, message]) =>
+          methods.setError(
+            field as keyof HorseFormShape,
+            { message },
+            { shouldFocus: field === refusal.focus },
+          ),
+        );
+        if (refusal.form) methods.setError('form_error', { message: refusal.form });
+        revealRefusal(refusal.form !== null && refusal.focus === null);
+      }
+    },
+    () => revealRefusal(false),
+  );
 
   return (
     <FormWrapper
