@@ -1,10 +1,5 @@
 export type ChecklistStatus =
-  | 'NOT_ISSUED'
-  | 'AWAITING_UPLOAD'
-  | 'IN_REVIEW'
-  | 'CLEARED'
-  | 'REJECTED'
-  | 'WITH_AUTHORITY';
+  'NOT_ISSUED' | 'AWAITING_UPLOAD' | 'IN_REVIEW' | 'CLEARED' | 'REJECTED' | 'WITH_AUTHORITY';
 
 export type Validity = 'GREEN' | 'AMBER' | 'RED';
 export type DocumentReview = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -12,25 +7,14 @@ export type ChecklistHolder = 'CUSTOMER' | 'SPECIALIST' | 'AUTHORITY';
 export type DocumentScope = 'PER_HORSE' | 'PER_SHIPMENT' | 'PER_CROSSING';
 export type DocumentProvider = 'CUSTOMER' | 'AUTHORITY';
 export type RegulationRuleKind =
-  | 'WINDOW_BEFORE_DEPARTURE'
-  | 'VALID_THROUGH_ARRIVAL_PLUS'
-  | 'BOOSTER_WINDOW'
-  | 'PRESENCE_ONLY';
+  'WINDOW_BEFORE_DEPARTURE' | 'VALID_THROUGH_ARRIVAL_PLUS' | 'BOOSTER_WINDOW' | 'PRESENCE_ONLY';
 
 export type DossierStatus =
-  | 'OPEN'
-  | 'SUBMITTED_TO_AUTHORITY'
-  | 'ADDITIONAL_INFO_REQUIRED'
-  | 'CLEARANCE_READY';
+  'OPEN' | 'SUBMITTED_TO_AUTHORITY' | 'ADDITIONAL_INFO_REQUIRED' | 'CLEARANCE_READY';
 
 export type AuthorityKind = 'VETERINARY' | 'CUSTOMS' | 'QUARANTINE';
 export type SubmissionKind = 'EXPORT_HEALTH_CERTS' | 'IMPORT_PERMIT' | 'CUSTOMS_DOSSIER';
-export type SubmissionStatus =
-  | 'READY_TO_FILE'
-  | 'FILED'
-  | 'ADDITIONAL_INFO'
-  | 'ISSUED'
-  | 'REFUSED';
+export type SubmissionStatus = 'READY_TO_FILE' | 'FILED' | 'ADDITIONAL_INFO' | 'ISSUED' | 'REFUSED';
 
 export interface DocumentVersion {
   id: string;
