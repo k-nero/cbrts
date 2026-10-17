@@ -69,4 +69,10 @@ public class TransportJob extends BaseEntity {
     private Instant deliveredAt;
 
     private Instant closedAt;
+
+    private Instant signedOffAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "signed_off_by")
+    private User signedOffBy;
 }

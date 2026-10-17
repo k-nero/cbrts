@@ -326,6 +326,32 @@ public class ClearanceService {
         return gate.toResponse(job);
     }
 
+    /**
+     * Re-evaluates every document checklist item for the job against the job's planned schedule
+     * (US-F3-03, US-F2-10, AGENTS.md).
+     * Refuses changes after departure.
+     */
+    @Transactional
+    public void recheckJobDocuments(UUID jobId) {
+        TransportJob job = findJobOrThrow(jobId);
+        if (job.getDepartedAt() != null) {
+            throw new BusinessException("Cannot recheck documents after job has departed");
+        }
+        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
+        for (ChecklistItem item : items) {
+            if (item.getCurrentVersion() != null) {
+                ValidityEngine.Result result = validityEngine.evaluate(item, item.getCurrentVersion(), job);
+                item.setValidity(result.validity());
+                item.setValidityNote(result.note());
+                if (result.validity() == Validity.RED && item.getStatus() == ChecklistStatus.CLEARED) {
+                    item.setStatus(ChecklistStatus.IN_REVIEW);
+                }
+                checklistItemRepository.save(item);
+            }
+        }
+        evaluateClearanceGate(jobId);
+    }
+
     /** Retrieve clearance gate status without mutating state. */
     @Transactional(readOnly = true)
     public ClearanceStatusResponse getClearanceStatus(UUID jobId) {

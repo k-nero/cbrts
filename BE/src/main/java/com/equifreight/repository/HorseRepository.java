@@ -11,7 +11,9 @@ import java.util.UUID;
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, UUID> {
 
-    Optional<Horse> findByMicrochip(String microchip);
-
     List<Horse> findByClubId(UUID clubId);
+
+    Optional<Horse> findByName(String name);
+
+    Optional<Horse> findByMicrochip(String microchip);
 }
