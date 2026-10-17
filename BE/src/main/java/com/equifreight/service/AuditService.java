@@ -45,7 +45,7 @@ public class AuditService {
         log.setOccurredAt(Instant.now());
         log.setActor(actor);
         log.setActorLabel(actor != null
-                ? actor.getFirstName() + " " + actor.getLastName()
+                ? actor.displayName()
                 : "System");
         log.setActorRole(actor != null && actor.getRoles() != null && !actor.getRoles().isEmpty()
                 ? actor.getRoles().iterator().next().getName()
