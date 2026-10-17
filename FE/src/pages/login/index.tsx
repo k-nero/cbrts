@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
+import type { AxiosError } from 'axios';
 import { z } from 'zod';
 
 import signInPhoto from '@/assets/photos/draft-signin-grey-window.jpg';
@@ -17,6 +18,7 @@ import { SubmitButton } from '@/components/form/SubmitButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Button, PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
+import type { ApiError } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
@@ -52,9 +54,11 @@ const LoginPage = () => {
       await login.mutateAsync(values);
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
       router.replace(from ?? primaryRoleHome(useAuthStore.getState().roles), { force: true });
-    } catch {
-      // Never say whether the email has an account (DESIGN.md, Access).
-      methods.setError('form_error', { message: 'Email or password doesn’t match.' });
+    } catch (error) {
+      // Never say whether the email has an account (DESIGN.md, Access): the server says the same
+      // for both, and only names a removed account once its password matched.
+      const message = (error as AxiosError<Partial<ApiError>>).response?.data?.message;
+      methods.setError('form_error', { message: message ?? 'Email or password doesn’t match.' });
     }
   });
 

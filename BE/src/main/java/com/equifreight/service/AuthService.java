@@ -6,6 +6,7 @@ import com.equifreight.entity.RefreshToken;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RoleName;
+import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.UnauthorizedException;
@@ -76,6 +77,8 @@ public class AuthService {
             log.info("Sign-in failed for {} from {}", request.getEmail(), ipAddress);
             throw new UnauthorizedException("Email or password doesn't match.");
         }
+        // Checked after the password, so only the account's holder learns it was removed.
+        requireNotRemoved(user);
         return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
@@ -117,6 +120,17 @@ public class AuthService {
         return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
+    /** A removed staff account is disabled, never deleted; it can't sign in or refresh a session. */
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            log.info("Sign-in refused for removed account {}", user.getEmail());
+            throw new UnauthorizedException(REMOVED_MESSAGE);
+        }
+    }
+
+    static final String REMOVED_MESSAGE =
+            "This account was removed. Ask your logistics manager if you need access again.";
+
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -133,6 +147,7 @@ public class AuthService {
 
         // Rotation: a refresh token is good for one use.
         User user = refreshToken.getUser();
+        requireNotRemoved(user);
         refreshTokenRepository.delete(refreshToken);
         return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
     }

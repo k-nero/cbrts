@@ -59,8 +59,9 @@ export const useCustomRouter = () => {
         },
       ) => {
         let path = configPaths.find((p) => p.routeName === routeName)?.path ?? '';
+        // Fills "{id}" and React Router's ":id" placeholders alike ("/jobs/:id").
         for (const param of options?.pathParams ?? []) {
-          path = path.replace(/{(.*?)}/, String(param));
+          path = path.replace(/\{(.*?)}|:[^/]+/, String(param));
         }
         const query = Object.entries(options?.queryParams ?? {}).filter(([, v]) => v !== undefined);
         const search = new URLSearchParams(query.map(([k, v]) => [k, String(v)])).toString();
@@ -71,7 +72,7 @@ export const useCustomRouter = () => {
 
   const checkCurrentPathMatch = useCallback(
     (routeName: RouteName) => {
-      const pattern = paths.get(routeName).replace(/\{[^}]+}/g, '[^/]+');
+      const pattern = paths.get(routeName).replace(/\{[^}]+}|:[^/]+/g, '[^/]+');
       return new RegExp(`^${pattern}$`).test(pathname);
     },
     [pathname, paths],
