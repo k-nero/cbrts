@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  blockerFieldErrors,
   bordersSummary,
   EMPTY_WIZARD,
   endpointLabel,
@@ -15,6 +16,7 @@ import {
   reviewRows,
   routeSentence,
   routeStops,
+  revealSelector,
   serviceLine,
   shownBlockers,
   stepOfBlocker,
@@ -290,6 +292,25 @@ describe('which saved blockers a step shows', () => {
   });
 });
 
+describe('where standing blockers and refusals are shown', () => {
+  test('field errors: each on its form field, except what the step says elsewhere', () => {
+    expect(
+      blockerFieldErrors([
+        { code: 'LEAD_TIME_TOO_SHORT', field: 'departureDate', message: 'Too soon.' },
+        { code: 'PLACE_NOT_CHOSEN', field: 'origin', message: 'Choose a place.' },
+        { code: 'WINDOW_BEFORE_DEPARTURE', field: 'windowStart', message: 'Before.' },
+        { code: 'ROUTE_NOT_RUN', field: 'destination', message: 'Not run.' },
+        { code: 'MODE_MISSING', field: 'mode', message: 'Choose road or air.' },
+      ]),
+    ).toEqual({ departureDate: 'Too soon.', origin: 'Choose a place.', arriveOn: 'Before.' });
+  });
+
+  test('a refusal for the whole step is brought into view at its callout', () => {
+    expect(revealSelector(true)).toBe('[data-refusal]');
+    expect(revealSelector(false)).toBe('.ant-form-item-has-error, [data-refusal]');
+  });
+});
+
 describe('labels', () => {
   test('window length', () => {
     expect(windowLength('08:00', '12:00')).toBe('A 4-hour window.');
@@ -389,7 +410,7 @@ describe('route words', () => {
 
 describe('the draft pass', () => {
   test('before anything is set, each row says its step', () => {
-    expect(passRows(EMPTY_WIZARD, undefined, null, false)).toEqual([
+    expect(passRows(EMPTY_WIZARD, [], null, false)).toEqual([
       { label: 'Departs', value: null, step: 2 },
       { label: 'Arrival', value: null, step: 2 },
       { label: 'Borders', value: null, step: 2 },
@@ -397,21 +418,19 @@ describe('the draft pass', () => {
     ]);
   });
 
-  test('a too-soon saved date is bad while the date is unchanged', () => {
-    const saved = draft({
-      departureDate: '2026-10-05',
-      blockers: [blocker('LEAD_TIME_TOO_SHORT', 'departureDate')],
-    });
+  test('a too-soon date is bad on the pass only while its blocker stands', () => {
+    const live = [blocker('LEAD_TIME_TOO_SHORT', 'departureDate')];
     const values = { ...EMPTY_WIZARD, departureDate: '2026-10-05' };
-    expect(passRows(values, saved, hcmBkk, false)[0]).toEqual({
+    expect(passRows(values, live, hcmBkk, false)[0]).toEqual({
       label: 'Departs',
       value: '5 Oct · too soon',
       mono: true,
       tone: 'bad',
     });
-    expect(passRows({ ...values, departureDate: '2026-11-30' }, saved, hcmBkk, false)[0]).toEqual({
+    // The places changed (to a domestic route, say): the blocker no longer stands.
+    expect(passRows(values, [], hcmHan, false)[0]).toEqual({
       label: 'Departs',
-      value: '30 Nov 2026',
+      value: '5 Oct 2026',
       mono: true,
     });
   });
@@ -424,7 +443,7 @@ describe('the draft pass', () => {
       mode: 'ROAD' as const,
       trailer: 'SHARED' as const,
     };
-    expect(passRows(values, undefined, hcmBkk, false).map((r) => r.value)).toEqual([
+    expect(passRows(values, [], hcmBkk, false).map((r) => r.value)).toEqual([
       '30 Oct 2026 · ±3 d',
       'Any time on the day',
       '2 · Mộc Bài, Poipet',
@@ -442,20 +461,15 @@ describe('the draft pass', () => {
         windowFrom: time('08:00'),
         windowUntil: time('12:00'),
       },
-      undefined,
+      [],
       hcmBkk,
       false,
     );
     expect(win[1]).toEqual({ label: 'Arrival', value: '31 Oct · 08:00–12:00', mono: true });
     expect(win[3].value).toBe('Road · private trailer');
-    const air = passRows(
-      { ...EMPTY_WIZARD, mode: 'AIR', airClass: 'BUSINESS' },
-      undefined,
-      sgnHkg,
-      false,
-    );
+    const air = passRows({ ...EMPTY_WIZARD, mode: 'AIR', airClass: 'BUSINESS' }, [], sgnHkg, false);
     expect(air[3].value).toBe('Air · business class');
-    expect(passRows(EMPTY_WIZARD, undefined, null, true)[2]).toEqual({
+    expect(passRows(EMPTY_WIZARD, [], null, true)[2]).toEqual({
       label: 'Borders',
       value: 'Not run yet',
       tone: 'warn',

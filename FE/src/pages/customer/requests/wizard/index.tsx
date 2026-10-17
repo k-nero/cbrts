@@ -26,7 +26,9 @@ import {
   formRefusal,
   fromRequest,
   holdsStep,
+  blockerFieldErrors,
   liveBlockers,
+  revealSelector,
   shownBlockers,
   STEP_FIELDS,
   stepOfBlocker,
@@ -72,25 +74,22 @@ const FIELDS_BY_CODE: Record<string, string> = {
   MODE_OPTIONS: 'mode',
 };
 const SHOWN_FIELDS = Object.values(STEP_FIELDS).flat() as string[];
-/** A saved blocker's field on the form: the window's start is checked on its day. */
-const FORM_FIELD: Record<string, keyof WizardValues> = {
-  origin: 'origin',
-  destination: 'destination',
-  departureDate: 'departureDate',
-  windowStart: 'arriveOn',
-  mode: 'mode',
-};
 
 const errorCode = (error: unknown): string | undefined =>
   (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data?.error;
 
-/** The kit's inputs give React Hook Form no focusable ref: bring the first error into view instead. */
-const revealRefusal = (formLevel: boolean) =>
-  requestAnimationFrame(() => {
-    const field = document.querySelector('.ant-form-item-has-error, [data-refusal]');
-    if (field && !formLevel) field.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    else window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+/**
+ * The kit's inputs give React Hook Form no focusable ref: bring the refusal into view instead, a
+ * step-level one at its callout above the footer. Two frames, so the callout has rendered.
+ */
+const revealRefusal = (stepLevel: boolean) =>
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const target = document.querySelector(revealSelector(stepLevel));
+      if (target) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }),
+  );
 
 const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> = ({
   saved,
@@ -101,6 +100,8 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   const horsesQuery = useWizardHorses();
   const [refusal, setRefusal] = useState<string | null>(null);
   const [attempted, setAttempted] = useState<FieldStep[]>([]);
+  /** Counts saves: a save's form reset clears every error, so the blockers go back on after it. */
+  const [saves, setSaves] = useState(0);
   const methods = useFormCustom<WizardValues>({
     resolver: zodResolver(wizardSchema) as unknown as Resolver<WizardValues>,
     defaultValues: saved ? fromRequest(saved) : EMPTY_WIZARD,
@@ -126,21 +127,21 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   const valuesKey = JSON.stringify(values);
   useEffect(() => setRefusal(null), [valuesKey]);
 
-  // A saved blocker sits on its field while it stands, in the server's sentence.
-  const liveKey = live.map((b) => `${b.code}:${b.field}`).join('|');
+  // A standing blocker sits on its field, in the server's sentence; re-applied after every save,
+  // because the save's reset clears errors even when the blockers didn't change.
+  const fieldErrors = blockerFieldErrors(live);
+  const fieldKey = JSON.stringify(fieldErrors);
   const shownOnFields = useRef<(keyof WizardValues)[]>([]);
   useEffect(() => {
     methods.clearErrors(shownOnFields.current);
     shownOnFields.current = [];
-    for (const b of live) {
-      const field = FORM_FIELD[b.field];
-      if (!field || b.field === 'mode') continue;
-      methods.setError(field, { type: 'server', message: b.message });
+    for (const [field, message] of Object.entries(fieldErrors) as [keyof WizardValues, string][]) {
+      methods.setError(field, { type: 'server', message });
       shownOnFields.current.push(field);
     }
-    // `live` is rebuilt every render; its key says when it changed.
+    // `fieldErrors` is rebuilt every render; its key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveKey, methods]);
+  }, [fieldKey, saves, methods]);
 
   const index = WIZARD_STEPS.indexOf(step);
   const goTo = (target: WizardStep, id = saved?.id, replace = false) => {
@@ -162,6 +163,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
         input: toDraftInput(methods.getValues()),
       });
       methods.reset(fromRequest(response));
+      setSaves((n) => n + 1);
       return response;
     } catch (error) {
       if (errorCode(error) === 'REQUEST_NOT_DRAFT' && saved) {
@@ -244,7 +246,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
         <RequestPass
           className="sticky top-6"
           values={values}
-          saved={saved}
+          live={live}
           route={route}
           notRun={notRun}
           horses={horsesQuery.data ?? []}

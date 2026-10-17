@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 
 import { COAT_SWATCH, cx, DraftPass, type Tone } from '@/components/ui';
-import type { Horse, Route, TransportRequest } from '@/interfaces';
+import type { Blocker, Horse, Route } from '@/interfaces';
 import { coatOf, passRows, type WizardValues } from '@/lib/utils';
 
 /** The picked horses as overlapping coat swatches with the count, as on the pass. */
@@ -30,7 +30,8 @@ export const DRAFT_SUB =
 
 type Props = {
   values: WizardValues;
-  saved: TransportRequest | undefined;
+  /** The standing blockers ("too soon" on the pass); none once submitted. */
+  live: Blocker[];
   route: Route | null;
   notRun: boolean;
   horses: Horse[];
@@ -42,7 +43,7 @@ type Props = {
 /** The request's pass (spec §4): the wizard's side column, and the confirmation's. */
 export const RequestPass: FC<Props> = ({
   values,
-  saved,
+  live,
   route,
   notRun,
   horses,
@@ -64,7 +65,7 @@ export const RequestPass: FC<Props> = ({
         ids.length
           ? { label: 'Horses', value: <HorseSwatches ids={ids} horses={horses} /> }
           : { label: 'Horses', value: null, step: 1 },
-        ...passRows(values, saved, route, notRun),
+        ...passRows(values, live, route, notRun),
       ]}
       rangeSub={
         notRun && from && to

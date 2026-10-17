@@ -56,7 +56,7 @@ const RequestSubmittedPage: FC = () => {
         </div>
         <RequestPass
           values={fromRequest(request)}
-          saved={request}
+          live={[]}
           route={request.route}
           notRun={false}
           horses={horses.data ?? []}

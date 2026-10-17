@@ -223,6 +223,34 @@ const MISSING = new Set([
 export const shownBlockers = (live: Blocker[], attempted: FieldStep[]): Blocker[] =>
   live.filter((b) => !MISSING.has(b.code) || attempted.includes(stepOfBlocker(b)));
 
+/** A standing blocker's field on the form; the window's start is checked on its day. */
+const FORM_FIELD: Record<string, keyof WizardValues> = {
+  origin: 'origin',
+  destination: 'destination',
+  departureDate: 'departureDate',
+  windowStart: 'arriveOn',
+};
+
+/**
+ * The standing blockers to put on form fields, in the server's sentences. A route we don't run is
+ * said by the To helper and its callout instead (DESIGN.md, Say it once); mode, trailer, class and
+ * insurance blockers sit under their option groups.
+ */
+export const blockerFieldErrors = (
+  live: Blocker[],
+): Partial<Record<keyof WizardValues, string>> => {
+  const errors: Partial<Record<keyof WizardValues, string>> = {};
+  for (const b of live) {
+    const field = FORM_FIELD[b.field];
+    if (field && b.code !== 'ROUTE_NOT_RUN' && !errors[field]) errors[field] = b.message;
+  }
+  return errors;
+};
+
+/** Where to bring a refusal into view: a step-level one at its callout, a field one at the field. */
+export const revealSelector = (stepLevel: boolean): string =>
+  stepLevel ? '[data-refusal]' : '.ant-form-item-has-error, [data-refusal]';
+
 const minutesOf = (hhmm: string): number => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
@@ -340,19 +368,16 @@ const effectiveService = (v: WizardValues) =>
 
 /**
  * The pass's rows after Horses (DESIGN.md, Draft pass): the values as typed, the borders from the live
- * route, and "too soon" from the saved draft while its date is still the one on the form.
+ * route, and "too soon" while that blocker still stands (`live`: a change of date or places retires it).
  */
 export const passRows = (
   v: WizardValues,
-  saved: TransportRequest | undefined,
+  live: Blocker[],
   route: Route | null,
   notRun: boolean,
 ): PassRow[] => {
   const day = v.departureDate;
-  const tooSoon =
-    day !== null &&
-    saved?.departureDate === day &&
-    (saved.blockers ?? []).some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
+  const tooSoon = day !== null && live.some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
   const flex = v.flexible && v.arrivalMode === 'ANY_TIME' ? ' · ±3 d' : '';
   const departs: PassRow = !day
     ? { label: 'Departs', value: null, step: 2 }
