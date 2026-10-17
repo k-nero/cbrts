@@ -121,8 +121,7 @@ class RequestReviewServiceTest {
 
     @Test
     void onlyARequestInReviewCanBeReturned() {
-        for (RequestStatus status : new RequestStatus[] {RequestStatus.DRAFT, RequestStatus.INFO_REQUIRED,
-                RequestStatus.QUOTED}) {
+        for (RequestStatus status : new RequestStatus[] {RequestStatus.INFO_REQUIRED, RequestStatus.QUOTED}) {
             TransportRequest r = inReview(status);
             assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), NOTE))
                     .isInstanceOf(ConflictException.class)
@@ -131,6 +130,34 @@ class RequestReviewServiceTest {
         TransportRequest waiting = inReview(RequestStatus.INFO_REQUIRED);
         assertThatThrownBy(() -> service.returnForInformation(manager, waiting.getId(), NOTE))
                 .hasMessage("This request isn't waiting for review; it is waiting for the customer's answer.");
+        verifyNoInteractions(audit, notifications);
+    }
+
+    @Test
+    void aNoteOfOnlyNonBreakingSpacesIsRefused() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+
+        assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), "\u00a0\u2007\ufeff "))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo("NOTE_REQUIRED");
+    }
+
+    @Test
+    void aTrailingNonBreakingSpaceIsNotCounted() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+
+        service.returnForInformation(manager, r.getId(), "x".repeat(500) + "\u00a0");
+
+        assertThat(r.getInfoRequiredNote()).isEqualTo("x".repeat(500));
+    }
+
+    @Test
+    void aDraftIsNotForStaffToSee() {
+        TransportRequest draft = inReview(RequestStatus.DRAFT);
+
+        assertThatThrownBy(() -> service.view(draft.getId())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.returnForInformation(manager, draft.getId(), NOTE))
+                .isInstanceOf(ResourceNotFoundException.class);
         verifyNoInteractions(audit, notifications);
     }
 

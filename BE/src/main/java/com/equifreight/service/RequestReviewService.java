@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * The logistics manager's side of Flow 1 before pricing (US-F1-03, US-F1-04): the queue of requests waiting
@@ -47,6 +48,8 @@ public class RequestReviewService {
     /** request_revisions.note is varchar(500); transport_requests.info_required_note holds 1000. */
     static final int NOTE_MAX = 500;
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
+    /** Leading and trailing white space as the browser's trim() sees it, NBSP and BOM included. */
+    private static final Pattern EDGE_SPACE = Pattern.compile("^[\\s\\p{Z}\\x{FEFF}]+|[\\s\\p{Z}\\x{FEFF}]+$");
     private static final int AUDIT_SUMMARY_MAX = 500;
     private static final List<RequestStatus> IN_REVIEW = List.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW);
     private static final Map<RequestStatus, String> STATUS_WORDS = Map.of(
@@ -109,7 +112,9 @@ public class RequestReviewService {
     /** The Request review page: the request, its checks, every version, its history and its queue place. */
     @Transactional(readOnly = true)
     public RequestReviewResponse view(UUID id) {
-        TransportRequest request = requests.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Request", id));
+        TransportRequest request = requests.findById(id)
+                .filter(r -> r.getStatus() != RequestStatus.DRAFT)
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
         return viewOf(request);
     }
 
@@ -176,7 +181,7 @@ public class RequestReviewService {
 
     @Transactional
     public RequestReviewResponse returnForInformation(User manager, UUID id, String rawNote) {
-        String note = rawNote == null ? "" : rawNote.trim();
+        String note = rawNote == null ? "" : EDGE_SPACE.matcher(rawNote).replaceAll("");
         if (note.isEmpty()) {
             throw new BusinessException("NOTE_REQUIRED", "Write a note to the customer: say what is missing.");
         }
@@ -184,7 +189,9 @@ public class RequestReviewService {
             throw new BusinessException("NOTE_TOO_LONG",
                     "The note is " + note.length() + " characters; keep it to " + NOTE_MAX + ".");
         }
+        // A draft stays the club's own until it is sent.
         TransportRequest request = requests.findByIdForUpdate(id)
+                .filter(r -> r.getStatus() != RequestStatus.DRAFT)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
         RequestStatus before = request.getStatus();
         if (!IN_REVIEW.contains(before)) {

@@ -91,6 +91,40 @@ class ReviewChecksTest {
     }
 
     @Test
+    void oneDayIsSingular() {
+        CheckResponse check = ReviewChecks.leadTime(road(List.of("VN"), List.of(), false, 1),
+                LocalDate.of(2026, 9, 27), LocalDate.of(2026, 9, 29), TODAY);
+
+        assertThat(check.getSub()).isEqualTo("Departs in 1 day.");
+        assertThat(ReviewChecks.leadTime(road(List.of("VN"), List.of(), false, 1), LocalDate.of(2026, 9, 28),
+                LocalDate.of(2026, 9, 29), TODAY).getEvidence())
+                .startsWith("Submitted 1 day before departure;");
+    }
+
+    @Test
+    void aDepartureTodayOrPastSaysSo() {
+        RouteResponse route = road(List.of("VN"), List.of(), false, 3);
+
+        assertThat(ReviewChecks.leadTime(route, LocalDate.of(2026, 9, 20), TODAY, TODAY).getSub())
+                .isEqualTo("Departs today.");
+        assertThat(ReviewChecks.leadTime(route, LocalDate.of(2026, 9, 20), LocalDate.of(2026, 9, 26), TODAY)
+                .getSub()).isEqualTo("Departed 2 days ago.");
+    }
+
+    @Test
+    void aServedRouteWithoutPublishedRulesHasNoLeadTimeYet() {
+        RouteResponse served = RouteResponse.builder().mode(TransportMode.ROAD).countries(List.of("VN", "LA"))
+                .crossings(List.of()).crossBorder(true).build();
+
+        CheckResponse check = ReviewChecks.leadTime(served, LocalDate.of(2026, 9, 26), LocalDate.of(2026, 10, 30),
+                TODAY);
+
+        assertThat(check.getState()).isEqualTo("BAD");
+        assertThat(check.getWord()).isEqualTo("Unknown");
+        assertThat(check.getEvidence()).isEqualTo("No published regulations for this route yet.");
+    }
+
+    @Test
     void noLeadTimeWithoutARoute() {
         CheckResponse check = ReviewChecks.leadTime(null, LocalDate.of(2026, 9, 26), LocalDate.of(2026, 10, 30),
                 TODAY);
