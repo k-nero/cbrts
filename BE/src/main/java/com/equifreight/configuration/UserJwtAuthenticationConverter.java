@@ -2,6 +2,7 @@ package com.equifreight.configuration;
 
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.convert.converter.Converter;
@@ -33,6 +34,10 @@ public class UserJwtAuthenticationConverter implements Converter<Jwt, AbstractAu
         // An unknown account is an authentication failure (401), so the client returns to sign-in.
         User user = userRepository.findByEmailWithRoles(jwt.getSubject())
                 .orElseThrow(() -> new InvalidBearerTokenException("The token's account no longer exists."));
+        // A removed account is disabled, not deleted; its tokens stop working at once.
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new InvalidBearerTokenException("The token's account was removed.");
+        }
         List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                 .map(Role::getName)
                 .map(name -> new SimpleGrantedAuthority("ROLE_" + name))

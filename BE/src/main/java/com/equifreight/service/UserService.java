@@ -3,12 +3,14 @@ package com.equifreight.service;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RoleName;
+import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
 import com.equifreight.model.user.UserMapper;
 import com.equifreight.model.user.UserResponse;
+import com.equifreight.repository.RefreshTokenRepository;
 import com.equifreight.repository.RoleRepository;
 import com.equifreight.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -35,23 +37,30 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final JsonMapper jsonMapper;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     private static final String ENTITY_TYPE = "USER";
 
     public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-                       AuditService auditService, JsonMapper jsonMapper) {
+                       AuditService auditService, JsonMapper jsonMapper,
+                       RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.jsonMapper = jsonMapper;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    /** q matches email, name or phone; roleName (optional) narrows to accounts holding that role. */
+    /**
+     * q matches email, name or phone; roleName (optional) narrows to accounts holding that role.
+     * Removed (DISABLED) accounts are left out: they stay only so their past records keep a name.
+     */
     @Transactional(readOnly = true)
     public Page<UserResponse> search(String q, String roleName, Pageable pageable) {
         Specification<User> spec = (root, cq, cb) -> {
             var predicates = new ArrayList<Predicate>();
+            predicates.add(cb.notEqual(root.get("status"), UserStatus.DISABLED));
             if (roleName != null && !roleName.isBlank()) {
                 // A user with several roles would otherwise appear once per role row.
                 if (cq != null) {
@@ -104,6 +113,7 @@ public class UserService {
     @Transactional
     public UserResponse update(UUID id, UpdateUserRequest request, User actor) {
         User user = findOrThrow(id);
+        requireNotRemoved(user);
         Set<Role> roles = request.getRoles() != null && !request.getRoles().isEmpty()
                 ? resolveRoles(request.getRoles())
                 : user.getRoles();
@@ -130,15 +140,28 @@ public class UserService {
         return UserMapper.toResponse(saved);
     }
 
-    /** Removes a staff account. The audit row keeps who it was, because the account itself is gone. */
+    /**
+     * Removes a staff account: it is disabled, not deleted, because jobs, trip records and the audit
+     * log still point at it. The person can't sign in or refresh a session from now on.
+     */
     @Transactional
     public void delete(UUID id, User actor) {
         User user = findOrThrow(id);
+        requireNotRemoved(user);
+        String before = snapshot(user);
+        user.setStatus(UserStatus.DISABLED);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUser(user);
         auditService.recordDecision(actor, "USER_REMOVED",
                 "Removed %s (%s)".formatted(user.displayName(), roleList(user.getRoles())),
                 ENTITY_TYPE, user.getId(), user.getStaffCode(), null,
-                snapshot(user), null);
-        userRepository.delete(user);
+                before, snapshot(user));
+    }
+
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BusinessException("%s's account was removed, so it can't be changed.".formatted(user.displayName()));
+        }
     }
 
     /** "transport specialist", "fleet & route coordinator and escort". */
@@ -155,13 +178,14 @@ public class UserService {
         return roles.stream().map(Role::getName).sorted().toList();
     }
 
-    /** The audited fields as JSON: name, email, phone, and role names (never the password). */
+    /** The audited fields as JSON: name, email, phone, role names and status (never the password). */
     private String snapshot(User user) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("name", user.displayName());
         fields.put("email", user.getEmail());
         fields.put("phone", user.getPhone());
         fields.put("roles", roleNames(user.getRoles()));
+        fields.put("status", user.getStatus() == null ? null : user.getStatus().name());
         return jsonMapper.writeValueAsString(fields);
     }
 

@@ -3,9 +3,11 @@ package com.equifreight.service;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RoleName;
+import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
+import com.equifreight.repository.RefreshTokenRepository;
 import com.equifreight.repository.RoleRepository;
 import com.equifreight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +15,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +44,8 @@ class UserServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuditService auditService;
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
 
     private UserService service;
     private User yen;
@@ -50,7 +53,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         service = new UserService(userRepository, roleRepository, passwordEncoder, auditService,
-                JsonMapper.builder().build());
+                JsonMapper.builder().build(), refreshTokenRepository);
         yen = user("Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER);
     }
 
@@ -142,18 +145,40 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Removing staff writes USER_REMOVED with who it was, before the account is deleted")
-    void removalIsAuditedBeforeDelete() {
+    @DisplayName("Removing staff disables the account, ends their sessions and writes USER_REMOVED")
+    void removalDisablesAndIsAudited() {
         User minh = user("Văn Minh", "Trần", RoleName.ESCORT);
         minh.setStaffCode("EF-011");
         when(userRepository.findById(minh.getId())).thenReturn(Optional.of(minh));
 
         service.delete(minh.getId(), yen);
 
-        InOrder order = inOrder(auditService, userRepository);
-        order.verify(auditService).recordDecision(eq(yen), eq("USER_REMOVED"), eq("Removed Trần Văn Minh (escort)"),
-                eq("USER"), eq(minh.getId()), eq("EF-011"), isNull(), anyString(), isNull());
-        order.verify(userRepository).delete(minh);
+        assertEquals(UserStatus.DISABLED, minh.getStatus());
+        verify(userRepository).save(minh);
+        verify(userRepository, never()).delete(any(User.class));
+        verify(refreshTokenRepository).deleteByUser(minh);
+        ArgumentCaptor<String> before = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> after = ArgumentCaptor.forClass(String.class);
+        verify(auditService).recordDecision(eq(yen), eq("USER_REMOVED"), eq("Removed Trần Văn Minh (escort)"),
+                eq("USER"), eq(minh.getId()), eq("EF-011"), isNull(), before.capture(), after.capture());
+        assertTrue(before.getValue().contains("\"status\":\"ACTIVE\""), before.getValue());
+        assertTrue(after.getValue().contains("\"status\":\"DISABLED\""), after.getValue());
+    }
+
+    @Test
+    @DisplayName("A removed account can't be removed again or changed")
+    void removedAccountIsRefused() {
+        User minh = user("Văn Minh", "Trần", RoleName.ESCORT);
+        minh.setStatus(UserStatus.DISABLED);
+        when(userRepository.findById(minh.getId())).thenReturn(Optional.of(minh));
+
+        var e = assertThrows(BusinessException.class, () -> service.delete(minh.getId(), yen));
+        assertThrows(BusinessException.class,
+                () -> service.update(minh.getId(), updateRequest("Văn Minh", "Trần", null), yen));
+
+        assertTrue(e.getMessage().contains("Trần Văn Minh"), e.getMessage());
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(auditService, refreshTokenRepository);
     }
 
     @Test

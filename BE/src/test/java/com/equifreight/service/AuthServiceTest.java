@@ -6,8 +6,11 @@ import com.equifreight.entity.RefreshToken;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RoleName;
+import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.UnauthorizedException;
+import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
 import com.equifreight.repository.ClubRepository;
@@ -137,5 +140,72 @@ class AuthServiceTest {
 
         assertThrows(BusinessException.class, () -> service.register(r));
         verify(clubs, never()).save(any());
+    }
+
+    private User staff(UserStatus status) {
+        User u = new User();
+        u.setId(UUID.randomUUID());
+        u.setEmail("minh.tran@equifreight.vn");
+        u.setPassword("hashed");
+        u.setStatus(status);
+        Role escort = new Role();
+        escort.setName(RoleName.ESCORT);
+        u.getRoles().add(escort);
+        when(users.getByEmail("minh.tran@equifreight.vn")).thenReturn(u);
+        when(passwordEncoder.matches("right", "hashed")).thenReturn(true);
+        return u;
+    }
+
+    private static LoginRequest login(String password) {
+        LoginRequest r = new LoginRequest();
+        r.setEmail("minh.tran@equifreight.vn");
+        r.setPassword(password);
+        return r;
+    }
+
+    @Test
+    @DisplayName("A removed (disabled) account can't sign in, and is told so once the password matches")
+    void removedAccountCannotSignIn() {
+        staff(UserStatus.DISABLED);
+
+        var e = assertThrows(UnauthorizedException.class, () -> service.login(login("right"), "127.0.0.1"));
+
+        assertEquals(AuthService.REMOVED_MESSAGE, e.getMessage());
+        verify(refreshTokens, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A wrong password on a removed account gets the usual answer, revealing nothing")
+    void removedAccountWithWrongPasswordRevealsNothing() {
+        staff(UserStatus.DISABLED);
+
+        var e = assertThrows(UnauthorizedException.class, () -> service.login(login("wrong"), "127.0.0.1"));
+
+        assertEquals("Email or password doesn't match.", e.getMessage());
+    }
+
+    @Test
+    @DisplayName("An active account signs in")
+    void activeAccountSignsIn() {
+        staff(UserStatus.ACTIVE);
+
+        TokenResponse tokens = service.login(login("right"), "127.0.0.1");
+
+        assertEquals("access", tokens.getAccessToken());
+    }
+
+    @Test
+    @DisplayName("A removed account can't refresh its session")
+    void removedAccountCannotRefresh() {
+        RefreshToken token = new RefreshToken();
+        token.setToken("t");
+        token.setUser(staff(UserStatus.DISABLED));
+        token.setExpiryDate(Instant.now().plusSeconds(3600));
+        when(refreshTokens.findByToken("t")).thenReturn(Optional.of(token));
+
+        var e = assertThrows(UnauthorizedException.class, () -> service.refreshToken("t"));
+
+        assertEquals(AuthService.REMOVED_MESSAGE, e.getMessage());
+        verify(refreshTokens, never()).save(any());
     }
 }
