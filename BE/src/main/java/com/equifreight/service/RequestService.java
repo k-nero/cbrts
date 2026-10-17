@@ -127,7 +127,8 @@ public class RequestService {
         request.setCreatedBy(user);
         request.setStatus(RequestStatus.DRAFT);
         RouteResolution resolution = write(request, draft);
-        return toResponse(requests.save(request), resolution);
+        // Flushed, so the answer carries the created and updated times the insert or update writes.
+        return toResponse(requests.saveAndFlush(request), resolution);
     }
 
     @Transactional
@@ -138,7 +139,7 @@ public class RequestService {
                 .collect(Collectors.toSet());
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
-        return toResponse(requests.save(request), resolution);
+        return toResponse(requests.saveAndFlush(request), resolution);
     }
 
     /**

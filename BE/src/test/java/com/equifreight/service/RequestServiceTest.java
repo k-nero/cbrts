@@ -127,13 +127,15 @@ class RequestServiceTest {
         when(places.findById(chaoPhraya.getId())).thenReturn(Optional.of(chaoPhraya));
 
         when(routes.resolve(any(), any(), any(), any(), any())).thenReturn(RouteResolution.none());
-        when(requests.save(any(TransportRequest.class))).thenAnswer(inv -> {
+        org.mockito.stubbing.Answer<TransportRequest> withId = inv -> {
             TransportRequest r = inv.getArgument(0);
             if (r.getId() == null) {
                 r.setId(UUID.randomUUID());
             }
             return r;
-        });
+        };
+        when(requests.save(any(TransportRequest.class))).thenAnswer(withId);
+        when(requests.saveAndFlush(any(TransportRequest.class))).thenAnswer(withId);
     }
 
     @Test
@@ -157,6 +159,23 @@ class RequestServiceTest {
     }
 
     @Test
+    void createAnswersWithTheTimestampsItsSaveWrote() {
+        Instant written = Instant.parse("2026-10-18T03:00:00Z");
+        when(requests.saveAndFlush(any(TransportRequest.class))).thenAnswer(inv -> {
+            TransportRequest r = inv.getArgument(0);
+            r.setId(UUID.randomUUID());
+            r.setCreatedAt(written);
+            r.setUpdatedAt(written);
+            return r;
+        });
+
+        RequestResponse response = service.create(user, body(shadowfax));
+
+        assertThat(response.getCreatedAt()).isEqualTo(written);
+        assertThat(response.getUpdatedAt()).isEqualTo(written);
+    }
+
+    @Test
     void anotherClubsHorseAnswers404() {
         UUID stranger = UUID.randomUUID();
         RequestDraftRequest body = new RequestDraftRequest();
@@ -165,7 +184,7 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Horse not found: " + stranger);
-        verify(requests, never()).save(any());
+        verify(requests, never()).saveAndFlush(any());
     }
 
     @Test
@@ -194,7 +213,7 @@ class RequestServiceTest {
         RequestResponse response = service.update(user, draft.getId(), body(silverBell));
 
         assertThat(response.getHorses()).singleElement().satisfies(h -> assertThat(h.isArchived()).isTrue());
-        verify(requests).save(draft);
+        verify(requests).saveAndFlush(draft);
     }
 
     @Test
@@ -632,7 +651,7 @@ class RequestServiceTest {
 
     TransportRequest savedRequest() {
         org.mockito.ArgumentCaptor<TransportRequest> captor = org.mockito.ArgumentCaptor.forClass(TransportRequest.class);
-        verify(requests, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        verify(requests, org.mockito.Mockito.atLeastOnce()).saveAndFlush(captor.capture());
         return captor.getValue();
     }
 
