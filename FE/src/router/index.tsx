@@ -10,8 +10,8 @@ import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import DocumentsPage from '@/pages/staff/documents';
+import AuthoritiesPage from '@/pages/staff/authorities';
 import UsersPage from '@/pages/staff/users';
-import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
@@ -42,7 +42,6 @@ export const router = createBrowserRouter([
           { path: '/home', element: <CustomerHomePage /> },
           { path: '/horses', element: todo('My horses') },
           { path: '/requests', element: todo('My requests') },
-          { path: '/tracking', element: <CustomerTripPage /> },
         ],
       },
       {
@@ -54,14 +53,13 @@ export const router = createBrowserRouter([
         ),
         children: [
           { path: 'jobs', element: todo('Jobs') },
-          { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: todo('Audit log') },
           { path: 'documents', element: <DocumentsPage /> },
-          { path: 'authorities', element: todo('Authorities') },
+          { path: 'authorities', element: <AuthoritiesPage /> },
           { path: 'customer-notes', element: todo('Customer notes') },
           { path: 'regulations', element: todo('Regulations') },
           { path: 'rates', element: todo('Rates') },
@@ -69,7 +67,7 @@ export const router = createBrowserRouter([
           { path: 'vehicles', element: todo('Vehicles') },
         ],
       },
-      { path: '/escort', element: <EscortTripPage /> },
+      { path: '/escort', element: todo('Cab surface') },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
