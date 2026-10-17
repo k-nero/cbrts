@@ -16,6 +16,7 @@ import {
   routeSentence,
   routeStops,
   serviceLine,
+  shownBlockers,
   stepOfBlocker,
   toDraftInput,
   windowLength,
@@ -262,6 +263,22 @@ describe('steps and blockers', () => {
     ];
     expect(liveBlockers(saved, ['destination']).map((b) => b.code)).toEqual(['MODE_MISSING']);
     expect(liveBlockers(saved, []).length).toBe(2);
+  });
+});
+
+describe('which saved blockers a step shows', () => {
+  const saved = [
+    blocker('DESTINATION_MISSING', 'destination'),
+    blocker('LEAD_TIME_TOO_SHORT', 'departureDate'),
+    blocker('MODE_MISSING', 'mode'),
+  ];
+
+  test('a missing value waits until its step was tried; a wrong one shows at once', () => {
+    expect(shownBlockers(saved, []).map((b) => b.code)).toEqual(['LEAD_TIME_TOO_SHORT']);
+    expect(shownBlockers(saved, ['route']).map((b) => b.code)).toEqual([
+      'DESTINATION_MISSING',
+      'LEAD_TIME_TOO_SHORT',
+    ]);
   });
 });
 

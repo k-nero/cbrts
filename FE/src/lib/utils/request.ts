@@ -204,6 +204,25 @@ export const liveBlockers = (blockers: Blocker[], changed: (keyof WizardValues)[
   return blockers.filter((b) => !dirtySteps.has(stepOfBlocker(b)));
 };
 
+/** Blockers that only say a value is still empty: not worth saying before the step was tried. */
+const MISSING = new Set([
+  'NO_HORSES',
+  'ORIGIN_MISSING',
+  'DESTINATION_MISSING',
+  'DEPARTURE_MISSING',
+  'MODE_MISSING',
+  'TRAILER_MISSING',
+  'AIR_CLASS_MISSING',
+  'INSURANCE_MISSING',
+]);
+
+/**
+ * What a step shows of the standing blockers: a wrong value (too soon, not run) at once, an empty
+ * one only after the customer pressed Continue on its step.
+ */
+export const shownBlockers = (live: Blocker[], attempted: FieldStep[]): Blocker[] =>
+  live.filter((b) => !MISSING.has(b.code) || attempted.includes(stepOfBlocker(b)));
+
 const minutesOf = (hhmm: string): number => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;

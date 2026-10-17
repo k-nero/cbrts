@@ -1,4 +1,4 @@
-import { type FC, useEffect, useState } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import { type Resolver, useFormState, useWatch } from 'react-hook-form';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,7 @@ import type { AxiosError } from 'axios';
 import { RequestLoadState } from '../components/RequestNotFound';
 
 import HorsesStep from './HorsesStep';
+import RouteStep from './RouteStep';
 import { wizardSchema } from './wizardSchema';
 
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -24,11 +25,13 @@ import {
   fromRequest,
   holdsStep,
   liveBlockers,
+  shownBlockers,
   passRows,
   STEP_FIELDS,
   stepOfBlocker,
   toDraftInput,
   WIZARD_STEPS,
+  type FieldStep,
   type WizardStep,
   type WizardValues,
 } from '@/lib/utils';
@@ -120,6 +123,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   const save = useSaveRequest();
   const horsesQuery = useWizardHorses();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState<FieldStep[]>([]);
   const methods = useFormCustom<WizardValues>({
     resolver: zodResolver(wizardSchema) as unknown as Resolver<WizardValues>,
     defaultValues: saved ? fromRequest(saved) : EMPTY_WIZARD,
@@ -127,7 +131,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   const values = useWatch({ control: methods.control }) as WizardValues;
   const { dirtyFields } = useFormState({ control: methods.control });
   const changed = Object.keys(dirtyFields) as (keyof WizardValues)[];
-  const live = liveBlockers(saved?.blockers ?? [], changed);
+  const live = shownBlockers(liveBlockers(saved?.blockers ?? [], changed), attempted);
 
   const placeId = (o: WizardValues['origin']) => (o && !o.__isNew__ ? o.value : null);
   const routesQuery = useRoutes(placeId(values.origin), placeId(values.destination));
@@ -147,13 +151,15 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
 
   // A saved blocker sits on its field while it stands, in the server's sentence.
   const liveKey = live.map((b) => `${b.code}:${b.field}`).join('|');
+  const shownOnFields = useRef<(keyof WizardValues)[]>([]);
   useEffect(() => {
-    for (const field of Object.values(FORM_FIELD)) {
-      if (methods.getFieldState(field).error?.type === 'server') methods.clearErrors(field);
-    }
+    methods.clearErrors(shownOnFields.current);
+    shownOnFields.current = [];
     for (const b of live) {
       const field = FORM_FIELD[b.field];
-      if (field && b.field !== 'mode') methods.setError(field, { type: 'server', message: b.message });
+      if (!field || b.field === 'mode') continue;
+      methods.setError(field, { type: 'server', message: b.message });
+      shownOnFields.current.push(field);
     }
     // `live` is rebuilt every render; its key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +210,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
       revealRefusal(false);
       return;
     }
+    setAttempted((done) => (done.includes(step) ? done : [...done, step]));
     if (!(await methods.trigger(STEP_FIELDS[step]))) {
       revealRefusal(false);
       return;
@@ -251,7 +258,10 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-6">
           {step === 'horses' && <HorsesStep {...props} query={horsesQuery} />}
-          {step !== 'horses' && <p className="type-body-m text-ink-2">Coming next.</p>}
+          {step === 'route' && <RouteStep {...props} />}
+          {(step === 'service' || step === 'review') && (
+            <p className="type-body-m text-ink-2">Coming next.</p>
+          )}
         </div>
         <DraftPass
           className="sticky top-6"
