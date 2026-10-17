@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  alsoByLine,
   blockerFieldErrors,
   bordersSummary,
   EMPTY_WIZARD,
@@ -13,7 +14,9 @@ import {
   passRows,
   pickableHorses,
   requestStatusChip,
+  retiredRefusals,
   reviewRows,
+  roadRuns,
   routeSentence,
   routeStops,
   revealSelector,
@@ -22,6 +25,7 @@ import {
   stepOfBlocker,
   toDraftInput,
   windowLength,
+  type WizardValues,
 } from './request';
 
 import {
@@ -406,6 +410,21 @@ describe('route words', () => {
     expect(bordersSummary(hcmBkk)).toBe('2 · Mộc Bài, Poipet');
     expect(bordersSummary(hcmHan)).toBe('None · domestic');
   });
+
+  test('road runs unless the only corridors are by air', () => {
+    expect(roadRuns([])).toBe(true);
+    expect(roadRuns([hcmBkk])).toBe(true);
+    expect(roadRuns([hcmBkk, sgnHkg])).toBe(true);
+    expect(roadRuns([sgnHkg])).toBe(false);
+  });
+
+  test('the other mode is named after the route shown', () => {
+    const byAir = route({ mode: 'AIR', corridorId: 'c-air' });
+    expect(alsoByLine([hcmBkk, byAir], hcmBkk)).toBe(' Also by air: choose on step 3.');
+    expect(alsoByLine([hcmBkk, byAir], byAir)).toBe(' Also by road: choose on step 3.');
+    expect(alsoByLine([hcmBkk], hcmBkk)).toBe('');
+    expect(alsoByLine([], null)).toBe('');
+  });
 });
 
 describe('the draft pass', () => {
@@ -528,6 +547,58 @@ describe('review', () => {
     expect(v.Service).toBe('Road · shared load');
     const direct = reviewRows({ ...full, route: hcmHan }).find((r) => r.label === 'Route');
     expect(direct?.value).toBe('Chao Phraya Racing Stables, Bangkok · direct');
+  });
+});
+
+describe('which field refusals a change retires', () => {
+  const sent: WizardValues = {
+    ...EMPTY_WIZARD,
+    origin: { value: 'p1', label: 'Stable, Bangkok', city: 'Bangkok' },
+    destination: { value: 'p1', label: 'Stable, Bangkok', city: 'Bangkok' },
+    departureDate: '2026-11-20',
+    arrivalMode: 'WINDOW',
+    arriveOn: '2026-11-21',
+    windowFrom: time('08:00'),
+    windowUntil: time('09:00'),
+    mode: 'ROAD',
+    trailer: 'PRIVATE',
+  };
+
+  test('nothing changed keeps every refusal', () => {
+    expect(retiredRefusals(['destination', 'arriveOn', 'mode'], sent, { ...sent })).toEqual([]);
+  });
+
+  test('the same place goes when either end changes', () => {
+    const other = { value: 'p2', label: 'Stable, Kuala Lumpur', city: 'Kuala Lumpur' };
+    expect(retiredRefusals(['destination'], sent, { ...sent, origin: other })).toEqual([
+      'destination',
+    ]);
+    expect(retiredRefusals(['destination'], sent, { ...sent, destination: other })).toEqual([
+      'destination',
+    ]);
+  });
+
+  test('a window refusal goes with any window value, not with another step', () => {
+    expect(retiredRefusals(['arriveOn'], sent, { ...sent, windowUntil: time('12:00') })).toEqual([
+      'arriveOn',
+    ]);
+    expect(retiredRefusals(['arriveOn'], sent, { ...sent, flexible: true })).toEqual(['arriveOn']);
+    expect(retiredRefusals(['arriveOn'], sent, { ...sent, vetEscort: true })).toEqual([]);
+  });
+
+  test('dates and mode options go with their own inputs', () => {
+    expect(retiredRefusals(['departureDate'], sent, { ...sent, flexible: true })).toEqual([
+      'departureDate',
+    ]);
+    expect(retiredRefusals(['mode'], sent, { ...sent, trailer: null })).toEqual(['mode']);
+    expect(retiredRefusals(['mode'], sent, { ...sent, airClass: 'ECONOMY' })).toEqual(['mode']);
+    expect(retiredRefusals(['mode'], sent, { ...sent, insurance: 'OWN_POLICY' })).toEqual([]);
+  });
+
+  test('any other field refusal goes when its own field changes', () => {
+    expect(
+      retiredRefusals(['specialInstructions'], sent, { ...sent, specialInstructions: 'Hay' }),
+    ).toEqual(['specialInstructions']);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { FC, ReactNode } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
+import { components, type InputProps } from 'react-select';
 
 import { Group, StepRefusal } from './parts';
 
@@ -11,8 +12,10 @@ import { searchPlaces } from '@/apis/request';
 import { useOriginRoutes } from '@/hooks/request';
 import type { Route } from '@/interfaces';
 import {
+  alsoByLine,
   formatDay,
   type PlaceOption,
+  roadRuns,
   routeSentence,
   routeStops,
   windowLength,
@@ -50,6 +53,11 @@ const typedCity = async (text: string): Promise<PlaceChoice> => ({
   __isNew__: true,
 });
 
+/** The search box stops at the server's 160 characters for a typed city. */
+const CappedInput = (props: InputProps<PlaceChoice, false>) => (
+  <components.Input {...props} maxLength={160} />
+);
+
 const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }): ReactNode =>
   context === 'menu' && o.country ? (
     <span className="flex flex-col">
@@ -59,6 +67,17 @@ const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }):
   ) : (
     o.label
   );
+
+/** What From and To share: search the places, or keep a typed city. */
+const PLACE_PROPS = {
+  loadOptions: loadPlaces,
+  asyncCreateOption: typedCity,
+  formatCreateLabel: (text: string) => `Use “${text}”`,
+  formatOptionLabel: placeLabel,
+  components: { Input: CappedInput },
+  cacheOptions: true,
+  placeholder: 'A place or a city',
+};
 
 /** "Bangkok → Kuala Lumpur by road · ~1,450 km · 1 border crossing". */
 const alternativeLine = (r: Route) => {
@@ -97,7 +116,7 @@ const RouteStep: FC<StepProps> = ({
 
   const fromCity = origin?.city ?? null;
   const toCity = destination?.city ?? null;
-  const roadRuns = routes.length === 0 || routes.some((r) => r.mode === 'ROAD');
+  const windowRuns = roadRuns(routes);
   const tooSoon = live.some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
   const earliest = saved?.leadTime?.earliestDeparture ?? null;
 
@@ -122,26 +141,14 @@ const RouteStep: FC<StepProps> = ({
           name="origin"
           label="From"
           component="async-creatable-select"
-          componentProps={{
-            loadOptions: loadPlaces,
-            asyncCreateOption: typedCity,
-            formatCreateLabel: (text: string) => `Use “${text}”`,
-            formatOptionLabel: placeLabel,
-            cacheOptions: true,
-            placeholder: 'A place or a city',
-          }}
+          componentProps={PLACE_PROPS}
         />
         <FormField
           name="destination"
           label="To"
           component="async-creatable-select"
           componentProps={{
-            loadOptions: loadPlaces,
-            asyncCreateOption: typedCity,
-            formatCreateLabel: (text: string) => `Use “${text}”`,
-            formatOptionLabel: placeLabel,
-            cacheOptions: true,
-            placeholder: 'A place or a city',
+            ...PLACE_PROPS,
             instruction: notRun ? 'Outside the region we run.' : undefined,
           }}
         />
@@ -181,7 +188,7 @@ const RouteStep: FC<StepProps> = ({
               <p className="type-body-s m-0 text-ink-3">
                 {routeSentence(route)} The fleet coordinator plans the exact road and stops after
                 approval.
-                {routes.length > 1 && ' Also by air: choose on step 3.'}
+                {alsoByLine(routes, route)}
               </p>
             </div>
           )}
@@ -226,11 +233,11 @@ const RouteStep: FC<StepProps> = ({
                 value="WINDOW"
                 icon="calendar"
                 selected={arrivalMode === 'WINDOW'}
-                disabled={!roadRuns}
+                disabled={!windowRuns}
                 onChange={() => set('arrivalMode', 'WINDOW')}
                 title="Within a window"
                 description="You choose a window of at least 3 hours. We use a private trailer so the departure is yours."
-                meta={roadRuns ? undefined : 'Road moves only'}
+                meta={windowRuns ? undefined : 'Road moves only'}
               />
             </div>
             {arrivalMode === 'WINDOW' ? (

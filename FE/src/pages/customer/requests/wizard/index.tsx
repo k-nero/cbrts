@@ -28,7 +28,9 @@ import {
   holdsStep,
   blockerFieldErrors,
   liveBlockers,
+  retiredRefusals,
   revealSelector,
+  roadRuns,
   shownBlockers,
   STEP_FIELDS,
   stepOfBlocker,
@@ -123,9 +125,32 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
     (routesQuery.isSuccess && routes.length === 0) ||
     live.some((b) => b.code === 'ROUTE_NOT_RUN' && b.field === 'destination');
 
-  // A refusal is about the values that were sent: any change retires it, as FormWrapper does.
+  /** The fields a refused save put its sentence on, and the values it sent. */
+  const refused = useRef<{ fields: (keyof WizardValues)[]; sent: WizardValues } | null>(null);
+  /** A step move in flight: a second click queued behind the first sends nothing. */
+  const moving = useRef(false);
+
+  // A refusal is about the values that were sent: any change retires the step's, as FormWrapper
+  // does, and a change to the values a field refusal was about retires that one.
   const valuesKey = JSON.stringify(values);
-  useEffect(() => setRefusal(null), [valuesKey]);
+  useEffect(() => {
+    setRefusal(null);
+    if (!refused.current) return;
+    const { fields, sent } = refused.current;
+    const retired = retiredRefusals(fields, sent, values);
+    if (retired.length === 0) return;
+    methods.clearErrors(retired);
+    refused.current.fields = fields.filter((f) => !retired.includes(f));
+    // `values` is rebuilt every render; its key says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valuesKey]);
+
+  // A window needs road: when the pair runs only by air, the arrival goes back to any time, so
+  // Service doesn't open with both mode cards disabled.
+  const strandedWindow = values.arrivalMode === 'WINDOW' && !roadRuns(routes);
+  useEffect(() => {
+    if (strandedWindow) methods.setValue('arrivalMode', 'ANY_TIME', { shouldDirty: true });
+  }, [strandedWindow, methods]);
 
   // A standing blocker sits on its field, in the server's sentence; re-applied after every save,
   // because the save's reset clears errors even when the blockers didn't change.
@@ -157,6 +182,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   /** PUT (or POST) the whole form; the answer becomes the form's new baseline. */
   const persist = async (): Promise<TransportRequest | null> => {
     setRefusal(null);
+    refused.current = null;
     try {
       const response = await save.mutateAsync({
         id: saved?.id,
@@ -183,13 +209,28 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
       Object.entries(view.fields).forEach(([field, message]) =>
         methods.setError(field as keyof WizardValues, { message }),
       );
+      refused.current = {
+        fields: Object.keys(view.fields) as (keyof WizardValues)[],
+        sent: JSON.parse(JSON.stringify(methods.getValues())) as WizardValues,
+      };
       setRefusal(view.form);
       revealRefusal(view.form !== null && view.focus === null);
       return null;
     }
   };
 
-  const onContinue = async () => {
+  /** Runs one step move at a time. */
+  const once = (move: () => Promise<void>) => async () => {
+    if (moving.current) return;
+    moving.current = true;
+    try {
+      await move();
+    } finally {
+      moving.current = false;
+    }
+  };
+
+  const onContinue = once(async () => {
     if (step === 'review') return;
     if (step === 'horses' && !saved && methods.getValues('horses').length === 0) {
       setRefusal('Pick at least one horse.');
@@ -211,13 +252,13 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
     }
     if (holds) revealRefusal(false);
     else goTo(WIZARD_STEPS[index + 1]);
-  };
+  });
 
-  const onBack = async () => {
+  const onBack = once(async () => {
     if (index === 0) return;
     if (methods.formState.isDirty && !(await persist())) return;
     goTo(WIZARD_STEPS[index - 1]);
-  };
+  });
 
   const props: StepProps = {
     saved,

@@ -22,8 +22,6 @@ type Props = {
   from: string | null;
   to: string | null;
   mode?: 'road' | 'air';
-  /** The Horses row's value: coat swatches and a count. */
-  horses?: ReactNode;
   rows: DraftPassRow[];
   stubLabel?: string;
   /** Null shows an em dash: there is no range before pricing. */
@@ -61,7 +59,6 @@ export const DraftPass: FC<Props> = ({
   from,
   to,
   mode = 'road',
-  horses,
   rows,
   stubLabel = 'Indicative range',
   range = null,
@@ -70,7 +67,6 @@ export const DraftPass: FC<Props> = ({
 }) => {
   const set = Boolean(from && to);
   const line = cx('h-px flex-1', set ? 'bg-line-strong' : 'bg-line');
-  const all: DraftPassRow[] = horses ? [{ label: 'Horses', value: horses }, ...rows] : rows;
   return (
     <section
       aria-label="Your move"
@@ -100,7 +96,7 @@ export const DraftPass: FC<Props> = ({
           <End city={set ? to : null} placeholder="To" align="end" />
         </div>
         <dl className="m-0 flex flex-col">
-          {all.map((r) => (
+          {rows.map((r) => (
             <div
               key={r.label}
               className="flex items-center justify-between gap-4 border-t border-line py-2.5"

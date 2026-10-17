@@ -247,6 +247,30 @@ export const blockerFieldErrors = (
   return errors;
 };
 
+/**
+ * The values a refusal shown on a field was about: SAME_PLACE and PLACE_OR_TEXT on To, DATE_FLEX on
+ * the departure, ARRIVAL_WINDOW on the window's day and MODE_OPTIONS on Mode. Each list stays on its
+ * own step, like the standing blockers; any other field refusal is about its field alone.
+ */
+const REFUSAL_INPUTS: Partial<Record<keyof WizardValues, (keyof WizardValues)[]>> = {
+  destination: ['origin', 'destination'],
+  departureDate: ['departureDate', 'flexible'],
+  arriveOn: ['arrivalMode', 'arriveOn', 'windowFrom', 'windowUntil', 'flexible'],
+  mode: ['mode', 'trailer', 'airClass'],
+};
+
+/** The field refusals to retire: those whose values changed since the save that was refused. */
+export const retiredRefusals = (
+  refused: (keyof WizardValues)[],
+  sent: WizardValues,
+  now: WizardValues,
+): (keyof WizardValues)[] =>
+  refused.filter((field) =>
+    (REFUSAL_INPUTS[field] ?? [field]).some(
+      (input) => JSON.stringify(sent[input]) !== JSON.stringify(now[input]),
+    ),
+  );
+
 /** Where to bring a refusal into view: a step-level one at its callout, a field one at the field. */
 export const revealSelector = (stepLevel: boolean): string =>
   stepLevel ? '[data-refusal]' : '.ant-form-item-has-error, [data-refusal]';
@@ -293,6 +317,16 @@ export const routeSentence = (r: Route): string => {
         ? `by road with ${plural(r.crossings.length, 'border crossing')}`
         : `by road within ${COUNTRY_NAME[country] ?? (country || 'one country')}`;
   return `About ${km(r.distanceKm)} km ${how}, worked out from your route.`;
+};
+
+/** Whether a road move is possible: the corridors aren't known yet, or one of them is by road. */
+export const roadRuns = (routes: Route[]): boolean =>
+  routes.length === 0 || routes.some((r) => r.mode === 'ROAD');
+
+/** " Also by air: choose on step 3." when the pair runs by the mode the route shown isn't. */
+export const alsoByLine = (routes: Route[], shown: Route | null): string => {
+  const other = shown && routes.find((r) => r.mode !== shown.mode);
+  return other ? ` Also by ${other.mode === 'AIR' ? 'air' : 'road'}: choose on step 3.` : '';
 };
 
 /** The route strip's planned stops: the pickup city, each border in travel order, the destination. */

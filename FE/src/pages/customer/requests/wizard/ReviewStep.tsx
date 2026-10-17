@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 
 import { RequestSummary } from '../components/RequestSummary';
@@ -24,14 +24,21 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
   const submit = useSubmitRequest();
   const query = useRequest(saved?.id);
   const [refusal, setRefusal] = useState<{ title: string; details: string[] } | null>(null);
+  /** A submit in flight: a second click queued behind the first sends nothing. */
+  const submitting = useRef(false);
   if (!saved) return null;
 
   const blockers = saved.blockers ?? [];
   const lead = saved.leadTime;
+  // A replace, so Back from the confirmation doesn't land on the draft's review again.
   const toConfirmation = () =>
-    router.push(router.paths.get('request-submitted', { pathParams: [saved.id] }), { force: true });
+    router.replace(router.paths.get('request-submitted', { pathParams: [saved.id] }), {
+      force: true,
+    });
 
   const onSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
     setRefusal(null);
     try {
       await submit.mutateAsync(saved.id);
@@ -39,15 +46,19 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
     } catch (error) {
       const data = (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data;
       if (data?.error === 'REQUEST_NOT_DRAFT') return toConfirmation();
-      if (data?.error === 'SUBMISSION_BLOCKED') void query.refetch();
+      const blocked = data?.error === 'SUBMISSION_BLOCKED';
+      // The refetched draft lists its blockers under "Before you can submit": say them once.
+      if (blocked) void query.refetch();
       setRefusal({
         title: apiErrorMessage(
           error,
           "Your request wasn't submitted. Check your connection and try again.",
         ),
-        details: data?.details ?? [],
+        details: blocked ? [] : (data?.details ?? []),
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      submitting.current = false;
     }
   };
 
