@@ -44,8 +44,8 @@ const ArchiveHorseModal: FC<{ horse: Horse; open: boolean; onClose: () => void }
     <BaseModal open={open} onCancel={close} title={`Archive ${horse.name}?`}>
       <div className="flex flex-col gap-4">
         <p className="type-body-m m-0 text-ink-2">
-          {horse.name} leaves My horses and can’t be put on new requests. {capitalise(possessive)} past
-          requests keep {object}.
+          {horse.name} leaves My horses and can’t be put on new requests. {capitalise(possessive)}{' '}
+          past requests keep {object}.
         </p>
         {refusal && (
           <Callout tone="bad" title={`${horse.name} can’t be archived yet`}>

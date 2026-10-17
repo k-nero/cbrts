@@ -27,7 +27,12 @@ describe('horseCardProps', () => {
     expect(props.coat).toBe('grey');
     expect(props.name).toBe('Shadowfax');
     expect(props.subtitle).toBe('Andalusian · Gelding');
-    expect(props.facts).toEqual({ age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32' });
+    expect(props.facts).toEqual({
+      age: '7 y',
+      height: '16.2 hh',
+      weight: '510 kg',
+      size: 'M · 32',
+    });
     expect(props.microchip).toBe('250 259 600 123 456');
     expect(props.declaredValue).toBe('$85,000');
     expect(props.notes).toBe('Loads best in a quiet yard.');

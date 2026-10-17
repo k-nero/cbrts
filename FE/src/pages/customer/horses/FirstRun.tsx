@@ -22,7 +22,11 @@ const READY: [string, string][] = [
 const GhostHorse: FC = () => (
   <div className="flex w-[272px] shrink-0 flex-col gap-2.5">
     <div className="relative h-[148px] rounded-lg border border-dashed border-line-strong bg-muted">
-      <Nameplate name="Your first horse" subtitle="Breed · sex" className="absolute bottom-5 left-5" />
+      <Nameplate
+        name="Your first horse"
+        subtitle="Breed · sex"
+        className="absolute bottom-5 left-5"
+      />
     </div>
     <p className="type-body-s m-0 text-ink-3">
       Each horse gets a brass nameplate on its coat colour, and every request starts from it.
@@ -39,8 +43,8 @@ const FirstRun: FC<{ onAdd: () => void }> = ({ onAdd }) => (
           <div className="flex flex-col gap-1.5">
             <h2 className="type-display-m m-0 text-ink">Start with your horses</h2>
             <p className="type-body-m m-0 text-ink-2">
-              Every request is built from your horses’ profiles, so we ask for them once and reuse them on
-              every move.
+              Every request is built from your horses’ profiles, so we ask for them once and reuse
+              them on every move.
             </p>
           </div>
           <ol className="m-0 flex list-none flex-col gap-4 p-0">
@@ -74,7 +78,10 @@ const FirstRun: FC<{ onAdd: () => void }> = ({ onAdd }) => (
     <Panel title="Have these ready">
       <div className="flex flex-col">
         {READY.map(([title, line]) => (
-          <div key={title} className="flex flex-col gap-0.5 border-t border-line pt-2.5 pb-2.5 first:border-t-0">
+          <div
+            key={title}
+            className="flex flex-col gap-0.5 border-t border-line pt-2.5 pb-2.5 first:border-t-0"
+          >
             <span className="type-label-s text-ink">{title}</span>
             <span className="type-body-s text-ink-3">{line}</span>
           </div>

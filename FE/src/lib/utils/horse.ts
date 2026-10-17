@@ -81,7 +81,8 @@ export const sexLabel = (sex: HorseSex | null | undefined): string => (sex ? SEX
 export const pronouns = (
   sex: HorseSex | null | undefined,
 ): { subject: string; object: string; possessive: string } => {
-  if (sex === 'MARE' || sex === 'FILLY') return { subject: 'she', object: 'her', possessive: 'her' };
+  if (sex === 'MARE' || sex === 'FILLY')
+    return { subject: 'she', object: 'her', possessive: 'her' };
   if (sex) return { subject: 'he', object: 'him', possessive: 'his' };
   return { subject: 'the horse', object: 'the horse', possessive: "the horse's" };
 };

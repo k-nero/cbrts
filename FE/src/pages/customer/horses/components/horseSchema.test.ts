@@ -49,7 +49,9 @@ describe('horseSchema', () => {
     expect(messageOn({ dateOfBirth: '2026-10-18' }, 'dateOfBirth')).toBe(
       'The date of birth 18 Oct 2026 is after today.',
     );
-    expect(messageOn({ declaredValue: 0 }, 'declaredValue')).toBe('Enter a declared value above $0.');
+    expect(messageOn({ declaredValue: 0 }, 'declaredValue')).toBe(
+      'Enter a declared value above $0.',
+    );
     expect(messageOn({ declaredValue: 1.005 }, 'declaredValue')).toBe(
       'A declared value has at most 2 decimals.',
     );
@@ -95,7 +97,14 @@ describe('horseSchema', () => {
       identityLocked: true,
     };
     const input = toHorseInput(fromHorse(nightfall));
-    expect([input.name, input.microchip, input.sex, input.breed, input.dateOfBirth, input.coat]).toEqual([
+    expect([
+      input.name,
+      input.microchip,
+      input.sex,
+      input.breed,
+      input.dateOfBirth,
+      input.coat,
+    ]).toEqual([
       nightfall.name,
       nightfall.microchip,
       nightfall.sex,

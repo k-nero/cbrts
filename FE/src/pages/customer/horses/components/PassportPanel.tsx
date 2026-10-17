@@ -27,7 +27,10 @@ const PassportPanel: FC<{ horse: Horse }> = ({ horse }) => (
           value: formatDay(horse.dateOfBirth),
           mono: true,
         },
-        { label: 'Coat', value: horse.coat ? horse.coat.charAt(0) + horse.coat.slice(1).toLowerCase() : '—' },
+        {
+          label: 'Coat',
+          value: horse.coat ? horse.coat.charAt(0) + horse.coat.slice(1).toLowerCase() : '—',
+        },
       ]}
     />
     <p className="type-body-s m-0 text-ink-3">

@@ -48,7 +48,8 @@ const MyHorsesPage: FC = () => {
 
   const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
   const toAdd = () => router.push(router.paths.get('horse-new'));
-  const toProfile = (id: string) => router.push(router.paths.get('horse-profile', { pathParams: [id] }));
+  const toProfile = (id: string) =>
+    router.push(router.paths.get('horse-profile', { pathParams: [id] }));
   const toEdit = (id: string) => router.push(router.paths.get('horse-edit', { pathParams: [id] }));
 
   const n = activeCount.data;
@@ -96,7 +97,9 @@ const MyHorsesPage: FC = () => {
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <p className="type-body-m m-0 text-ink-2">No active horses. Add one, or see the Archived tab.</p>
+          <p className="type-body-m m-0 text-ink-2">
+            No active horses. Add one, or see the Archived tab.
+          </p>
           <div className="grid grid-cols-3 gap-6">
             <AddHorseCard onClick={toAdd} />
           </div>

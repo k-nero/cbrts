@@ -19,7 +19,13 @@ import {
 /** What a horse card shows: a saved horse, or the Add form's values as they are typed. */
 export type HorseCardSource = Pick<
   Horse,
-  'name' | 'breed' | 'dateOfBirth' | 'microchip' | 'valueCurrency' | 'handlingNotes' | 'requiredStall'
+  | 'name'
+  | 'breed'
+  | 'dateOfBirth'
+  | 'microchip'
+  | 'valueCurrency'
+  | 'handlingNotes'
+  | 'requiredStall'
 > & {
   coat: Horse['coat'] | undefined;
   sex: Horse['sex'] | null | undefined;
@@ -39,7 +45,9 @@ const subtitleOf = (breed: string | null, sex: HorseCardSource['sex']): string =
   [breed?.trim(), sexLabel(sex)].filter(Boolean).join(' · ');
 
 /** The temperament and stall chips (DESIGN.md, Nameplate and Horse Card), or nothing. */
-export const horseChips = (source: Pick<HorseCardSource, 'temperament' | 'requiredStall'>): ReactNode => {
+export const horseChips = (
+  source: Pick<HorseCardSource, 'temperament' | 'requiredStall'>,
+): ReactNode => {
   const chips = [temperamentChip(source.temperament), stallChip(source.requiredStall)].filter(
     (c) => c !== null,
   );

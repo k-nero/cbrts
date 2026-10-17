@@ -19,7 +19,8 @@ const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
   const { data: classes } = useSizeClasses();
   const sex = (values.sex?.value ?? null) as HorseSex | null;
   const { subject } = pronouns(sex);
-  const heading = subject === 'the horse' ? 'How the horse will appear' : `How ${subject}’ll appear`;
+  const heading =
+    subject === 'the horse' ? 'How the horse will appear' : `How ${subject}’ll appear`;
   const card = horseCardProps(
     {
       name: values.name ?? '',
@@ -43,7 +44,9 @@ const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
         <h4 className="type-h4 m-0 text-ink">{heading}</h4>
-        <p className="type-body-s m-0 text-ink-3">On My horses and in every request. It updates as you type.</p>
+        <p className="type-body-s m-0 text-ink-3">
+          On My horses and in every request. It updates as you type.
+        </p>
       </div>
       <HorseCard {...card} />
     </section>
@@ -78,7 +81,9 @@ const AddHorsePage: FC = () => {
         onSaved={(horse) => {
           message.success(`${horse.name} is saved.`);
           // Saved, so there is nothing unsaved to ask about.
-          router.push(router.paths.get('horse-profile', { pathParams: [horse.id] }), { force: true });
+          router.push(router.paths.get('horse-profile', { pathParams: [horse.id] }), {
+            force: true,
+          });
         }}
         side={(values) => (
           <>

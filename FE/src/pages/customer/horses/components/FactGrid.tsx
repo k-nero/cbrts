@@ -11,7 +11,9 @@ export const FactGrid: FC<{ facts: Fact[] }> = ({ facts }) => (
     {facts.map((fact) => (
       <div key={fact.label} className="flex flex-col gap-0.5 border-t border-line py-2.5">
         <dt className="type-body-s text-ink-3">{fact.label}</dt>
-        <dd className={cx('m-0 text-ink', fact.mono ? 'type-data' : 'type-label-s')}>{fact.value}</dd>
+        <dd className={cx('m-0 text-ink', fact.mono ? 'type-data' : 'type-label-s')}>
+          {fact.value}
+        </dd>
       </div>
     ))}
   </dl>

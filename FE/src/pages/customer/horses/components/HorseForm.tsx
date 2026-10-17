@@ -28,7 +28,10 @@ export type HorseFormShape = Omit<HorseFormValues, 'sex' | 'coat'> & {
   coat: Option | null;
 };
 
-const SEX_OPTIONS: Option[] = Object.values(HorseSexEnum).map((s) => ({ label: sexLabel(s), value: s }));
+const SEX_OPTIONS: Option[] = Object.values(HorseSexEnum).map((s) => ({
+  label: sexLabel(s),
+  value: s,
+}));
 const COAT_OPTIONS: Option[] = Object.values(HorseCoatEnum).map((c) => ({
   label: c.charAt(0) + c.slice(1).toLowerCase(),
   value: c,
@@ -36,10 +39,30 @@ const COAT_OPTIONS: Option[] = Object.values(HorseCoatEnum).map((c) => ({
 const optionFor = (options: Option[], value: string | null | undefined) =>
   options.find((o) => o.value === value) ?? null;
 
-const TEMPERAMENT_CARDS: { value: Temperament; title: string; description: string; meta: string }[] = [
-  { value: TemperamentEnum.CALM, title: 'Calm', description: 'Loads with a standard team.', meta: 'Standard stall' },
-  { value: TemperamentEnum.NERVOUS, title: 'Nervous', description: 'Loaded slowly, away from the ramp.', meta: 'Quiet position' },
-  { value: TemperamentEnum.AGGRESSIVE, title: 'Aggressive', description: 'Experienced handlers only.', meta: 'Box stall' },
+const TEMPERAMENT_CARDS: {
+  value: Temperament;
+  title: string;
+  description: string;
+  meta: string;
+}[] = [
+  {
+    value: TemperamentEnum.CALM,
+    title: 'Calm',
+    description: 'Loads with a standard team.',
+    meta: 'Standard stall',
+  },
+  {
+    value: TemperamentEnum.NERVOUS,
+    title: 'Nervous',
+    description: 'Loaded slowly, away from the ramp.',
+    meta: 'Quiet position',
+  },
+  {
+    value: TemperamentEnum.AGGRESSIVE,
+    title: 'Aggressive',
+    description: 'Experienced handlers only.',
+    meta: 'Box stall',
+  },
 ];
 
 /** Where the API's refusals land (spec §3.5). */
@@ -78,7 +101,9 @@ const Section: FC<{ title: string; sub?: string; first?: boolean; children: Reac
   first,
   children,
 }) => (
-  <section className={first ? 'flex flex-col gap-3.5' : 'flex flex-col gap-3.5 border-t border-line pt-5'}>
+  <section
+    className={first ? 'flex flex-col gap-3.5' : 'flex flex-col gap-3.5 border-t border-line pt-5'}
+  >
     <div className="flex flex-col gap-0.5">
       <h4 className="type-h4 m-0 text-ink">{title}</h4>
       {sub && <p className="type-body-s m-0 text-ink-3">{sub}</p>}
@@ -101,7 +126,8 @@ const SizeLine: FC = () => {
             Size {size.code} · {size.widthIn} in
           </Chip>
           <span className="type-body-s text-ink-2">
-            Worked out from {formatHeight(heightHh)}. It decides the stall width and the air position.
+            Worked out from {formatHeight(heightHh)}. It decides the stall width and the air
+            position.
           </span>
         </>
       ) : (
@@ -233,75 +259,107 @@ const HorseForm: FC<Props> = ({
       {({ FormField }) => (
         <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
           <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-5 rounded-lg border border-line bg-card p-7">
-            {!locked && (
-              <Section first title="Identity" sub="As on the passport. We check these against it when you request transport.">
+            <div className="flex flex-col gap-5 rounded-lg border border-line bg-card p-7">
+              {!locked && (
+                <Section
+                  first
+                  title="Identity"
+                  sub="As on the passport. We check these against it when you request transport."
+                >
+                  <Flex gap={16}>
+                    <FormField
+                      name="name"
+                      label="Name"
+                      component="text"
+                      componentProps={{ isRequired: true }}
+                    />
+                    <FormField
+                      name="microchip"
+                      label="Microchip"
+                      component="text"
+                      componentProps={{
+                        isRequired: true,
+                        instruction: 'From the passport: 15 digits. Borders check it.',
+                      }}
+                    />
+                  </Flex>
+                  <Flex gap={16}>
+                    <FormField
+                      name="passportNo"
+                      label="Passport number"
+                      component="text"
+                      componentProps={{ isRequired: true }}
+                    />
+                    <FormField
+                      name="sex"
+                      label="Sex"
+                      component="select"
+                      componentProps={{ isRequired: true, options: SEX_OPTIONS }}
+                    />
+                  </Flex>
+                  <Flex gap={16}>
+                    <FormField name="breed" label="Breed" component="text" />
+                    <FormField name="dateOfBirth" label="Date of birth" component="datepicker" />
+                    <FormField
+                      name="coat"
+                      label="Coat"
+                      component="select"
+                      componentProps={{ options: COAT_OPTIONS }}
+                    />
+                  </Flex>
+                </Section>
+              )}
+              <Section first={locked} title="Size and weight">
                 <Flex gap={16}>
-                  <FormField name="name" label="Name" component="text" componentProps={{ isRequired: true }} />
                   <FormField
-                    name="microchip"
-                    label="Microchip"
-                    component="text"
-                    componentProps={{ isRequired: true, instruction: 'From the passport: 15 digits. Borders check it.' }}
+                    name="heightHh"
+                    label="Height (hh)"
+                    component="number"
+                    componentProps={{
+                      isRequired: true,
+                      instruction: 'Hands, e.g. 16.2',
+                      step: 0.1,
+                      precision: 1,
+                    }}
+                  />
+                  <FormField
+                    name="weightKg"
+                    label="Weight (kg)"
+                    component="number"
+                    componentProps={{ step: 1 }}
                   />
                 </Flex>
-                <Flex gap={16}>
-                  <FormField name="passportNo" label="Passport number" component="text" componentProps={{ isRequired: true }} />
-                  <FormField
-                    name="sex"
-                    label="Sex"
-                    component="select"
-                    componentProps={{ isRequired: true, options: SEX_OPTIONS }}
-                  />
-                </Flex>
-                <Flex gap={16}>
-                  <FormField name="breed" label="Breed" component="text" />
-                  <FormField name="dateOfBirth" label="Date of birth" component="datepicker" />
-                  <FormField name="coat" label="Coat" component="select" componentProps={{ options: COAT_OPTIONS }} />
-                </Flex>
+                <SizeLine />
               </Section>
-            )}
-            <Section first={locked} title="Size and weight">
-              <Flex gap={16}>
+              <Section title="Temperament and needs">
+                <TemperamentCards />
+                <StallTicks />
                 <FormField
-                  name="heightHh"
-                  label="Height (hh)"
-                  component="number"
-                  componentProps={{ isRequired: true, instruction: 'Hands, e.g. 16.2', step: 0.1, precision: 1 }}
+                  name="handlingNotes"
+                  label="Handling notes"
+                  component="textarea"
+                  componentProps={{ instruction: 'Shown to the escort and the fleet coordinator.' }}
                 />
-                <FormField name="weightKg" label="Weight (kg)" component="number" componentProps={{ step: 1 }} />
+              </Section>
+              <Section title="Declared value">
+                <FormField
+                  name="declaredValue"
+                  label="Declared value (USD)"
+                  component="number"
+                  componentProps={{
+                    isRequired: true,
+                    instruction: 'Used for insurance if you insure through us (1.5%).',
+                    min: 0,
+                    step: 1000,
+                  }}
+                />
+              </Section>
+              <Flex justify="end" gap={8} className="border-t border-line pt-5">
+                <CancelButton label="Cancel" />
+                <SubmitButton type="primary" label={submitLabel} />
               </Flex>
-              <SizeLine />
-            </Section>
-            <Section title="Temperament and needs">
-              <TemperamentCards />
-              <StallTicks />
-              <FormField
-                name="handlingNotes"
-                label="Handling notes"
-                component="textarea"
-                componentProps={{ instruction: 'Shown to the escort and the fleet coordinator.' }}
-              />
-            </Section>
-            <Section title="Declared value">
-              <FormField
-                name="declaredValue"
-                label="Declared value (USD)"
-                component="number"
-                componentProps={{
-                  isRequired: true,
-                  instruction: 'Used for insurance if you insure through us (1.5%).',
-                  min: 0,
-                  step: 1000,
-                }}
-              />
-            </Section>
-            <Flex justify="end" gap={8} className="border-t border-line pt-5">
-              <CancelButton label="Cancel" />
-              <SubmitButton type="primary" label={submitLabel} />
-            </Flex>
-          </div>
-          {afterForm}
+            </div>
+            {afterForm}
           </div>
           {side && (
             <div className="flex flex-col gap-6">

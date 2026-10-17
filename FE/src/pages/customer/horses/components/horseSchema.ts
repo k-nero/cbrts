@@ -14,7 +14,9 @@ const MICROCHIP_DIGITS = 15;
 
 /** The kit's SelectField keeps the chosen option ({ label, value }); the API wants the value. */
 const optionValue = (value: unknown): unknown =>
-  value && typeof value === 'object' && 'value' in value ? (value as { value: unknown }).value : value;
+  value && typeof value === 'object' && 'value' in value
+    ? (value as { value: unknown }).value
+    : value;
 
 const blankToNull = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim() ?? '';
@@ -52,8 +54,7 @@ export const makeHorseSchema = (today: string) =>
       .string()
       .nullish()
       .refine((value) => !value || value <= today, {
-        error: (issue) =>
-          `The date of birth ${formatDay(String(issue.input))} is after today.`,
+        error: (issue) => `The date of birth ${formatDay(String(issue.input))} is after today.`,
       }),
     coat: z.preprocess(optionValue, z.enum(HorseCoatEnum).nullish()),
     heightHh: z.number({ error: "Enter the horse's height." }).superRefine((value, ctx) => {

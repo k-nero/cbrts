@@ -44,7 +44,9 @@ export const HorseNotFound: FC = () => {
   return (
     <div className="flex flex-col items-start gap-3 pt-[46px]">
       <h1 className="type-display-m m-0 text-ink">We couldn’t find this horse</h1>
-      <p className="type-body-m m-0 text-ink-2">It may have been removed, or it belongs to another club.</p>
+      <p className="type-body-m m-0 text-ink-2">
+        It may have been removed, or it belongs to another club.
+      </p>
       <Button onClick={() => router.push(router.paths.get('my-horses'))}>Back to My horses</Button>
     </div>
   );
@@ -101,7 +103,9 @@ const HorseProfilePage: FC = () => {
           ) : (
             <Button
               leadingIcon="pencil"
-              onClick={() => router.push(router.paths.get('horse-edit', { pathParams: [horse.id] }))}
+              onClick={() =>
+                router.push(router.paths.get('horse-edit', { pathParams: [horse.id] }))
+              }
             >
               Edit profile
             </Button>
@@ -125,7 +129,9 @@ const HorseProfilePage: FC = () => {
               {horse.handlingNotes && (
                 <p className="type-body-s m-0 text-ink-2">Handling notes: {horse.handlingNotes}</p>
               )}
-              <p className="type-body-s m-0 text-ink-3">Read by the load plan and by every quotation.</p>
+              <p className="type-body-s m-0 text-ink-3">
+                Read by the load plan and by every quotation.
+              </p>
             </div>
           </Panel>
           <DocumentsComeLater />

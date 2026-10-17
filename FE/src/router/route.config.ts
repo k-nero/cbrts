@@ -36,7 +36,13 @@ export const routesConfig = [
     breadcrumb: 'My horses',
     name: 'my-horses',
     children: [
-      { path: '/new', roles: ['*'], type: 'authenticated', breadcrumb: 'Add a horse', name: 'horse-new' },
+      {
+        path: '/new',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Add a horse',
+        name: 'horse-new',
+      },
       {
         path: '/{id}',
         roles: ['*'],
@@ -44,7 +50,13 @@ export const routesConfig = [
         breadcrumb: 'Profile',
         name: 'horse-profile',
         children: [
-          { path: '/edit', roles: ['*'], type: 'authenticated', breadcrumb: 'Edit', name: 'horse-edit' },
+          {
+            path: '/edit',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Edit',
+            name: 'horse-edit',
+          },
         ],
       },
     ],
@@ -71,7 +83,13 @@ export const routesConfig = [
     name: 'staff',
     children: [
       { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
-      { path: '/trips', roles: [FRC], type: 'authenticated', breadcrumb: 'Trip progress', name: 'staff-trips' },
+      {
+        path: '/trips',
+        roles: [FRC],
+        type: 'authenticated',
+        breadcrumb: 'Trip progress',
+        name: 'staff-trips',
+      },
       {
         path: '/jobs/:id',
         roles: ['*'],

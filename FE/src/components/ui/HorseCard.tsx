@@ -55,10 +55,7 @@ export const CoatBand: FC<{
   height?: number;
   className?: string;
 }> = ({ coat, name, subtitle, height = 148, className }) => (
-  <div
-    className={cx('relative overflow-hidden', COAT_SWATCH[coat], className)}
-    style={{ height }}
-  >
+  <div className={cx('relative overflow-hidden', COAT_SWATCH[coat], className)} style={{ height }}>
     <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45" />
     <span className="type-mono-label absolute top-[18px] right-5 text-white/80">
       {COAT_LABEL[coat]}

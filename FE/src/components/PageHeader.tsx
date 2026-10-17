@@ -47,7 +47,9 @@ const PageHeader: FC<Props> = ({ title, summary, right, reserveBack, back, banne
     >
       <Flex vertical gap={8}>
         {title && <h1 className={TITLE}>{title}</h1>}
-        {summary && <div className="m-0 max-w-[640px] text-[15px] leading-6 text-ink-2">{summary}</div>}
+        {summary && (
+          <div className="m-0 max-w-[640px] text-[15px] leading-6 text-ink-2">{summary}</div>
+        )}
       </Flex>
       {right && (
         <Flex gap={8} align="center">
