@@ -29,9 +29,16 @@ const summaryOf = (h: CustomerHome) => {
 const CustomerHomePage: FC = () => {
   const router = useCustomRouter();
   const { data: home, isPending, isError, refetch } = useCustomerHome();
-  const toRequests = () => router.push(router.paths.get('my-requests'));
-  const toHorses = () => router.push(router.paths.get('my-horses'));
+  const toRequests = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    router.push(router.paths.get('my-requests'));
+  };
+  const toHorses = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    router.push(router.paths.get('my-horses'));
+  };
   const handleOpenMove = (m: MoveEntry) => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     router.push(`${router.paths.get('my-requests')}?code=${encodeURIComponent(m.requestCode)}`);
   };
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, type FC, type ChangeEvent } from 'react';
+import { useState, useMemo, useEffect, type FC, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Modal, message, Alert, Input } from 'antd';
 import PageHeader from '@/components/PageHeader';
@@ -25,6 +25,10 @@ const STAGES = ['Request', 'Quotation', 'Approval', 'Documents', 'Clearance', 'T
 export const MyRequestsPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCode = searchParams.get('code');
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [selectedCode]);
 
   const { data: home, isPending } = useCustomerHome();
 
@@ -134,7 +138,10 @@ export const MyRequestsPage: FC = () => {
             variant="ghost"
             size="sm"
             leadingIcon="arrow-left"
-            onClick={() => setSearchParams({})}
+            onClick={() => {
+              window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+              setSearchParams({});
+            }}
             className="text-ink-secondary hover:text-ink"
           >
             My requests
@@ -574,7 +581,10 @@ export const MyRequestsPage: FC = () => {
                 return (
                   <tr
                     key={m.requestCode}
-                    onClick={() => setSearchParams({ code: m.requestCode })}
+                    onClick={() => {
+                      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                      setSearchParams({ code: m.requestCode });
+                    }}
                     className="group cursor-pointer transition-colors hover:bg-sunken/60"
                   >
                     {/* Request / Reference */}
