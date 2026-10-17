@@ -1,5 +1,5 @@
 import { formatDay } from './horse';
-import { ict } from './time';
+import { formatDate, ict } from './time';
 
 import type { Tone } from '@/components/ui/tone';
 import type {
@@ -11,6 +11,7 @@ import type {
   RequestDraftInput,
   RequestHorse,
   RequestStatus,
+  RevisionSummary,
   Route,
   ServiceClass,
   TrailerType,
@@ -562,3 +563,26 @@ export const pickableHorses = (
     if (!shown.has(h.horseId)) rows.push({ id: h.horseId, horse: null, draft: h });
   return rows;
 };
+
+/** A customer may change a draft, and a request returned for information (US-F1-04). */
+export const editable = (status: RequestStatus): boolean =>
+  status === 'DRAFT' || status === 'INFO_REQUIRED';
+
+/** The latest submitted version; 0 for a draft. */
+export const latestRevision = (r: TransportRequest): number =>
+  r.revisions.reduce((n, v) => Math.max(n, v.revisionNo), 0);
+
+/** "v1 · Submitted 26 Sep · returned 28 Sep", or "v2 · Submitted 30 Sep". */
+export const versionLine = (v: RevisionSummary): string =>
+  `v${v.revisionNo} · Submitted ${ict(v.submittedAt).format('D MMM')}` +
+  (v.returnedAt ? ` · returned ${ict(v.returnedAt).format('D MMM')}` : '');
+
+/** Review's primary: "Submit request", or "Send version 2" for a returned request. */
+export const submitLabel = (r: TransportRequest): string =>
+  r.status === 'INFO_REQUIRED' ? `Send version ${latestRevision(r) + 1}` : 'Submit request';
+
+/** The wizard header's first sentence. */
+export const savedLine = (r: TransportRequest): string =>
+  r.status === 'INFO_REQUIRED'
+    ? `Changes saved ${formatDate(r.updatedAt)}. Send them as version ${latestRevision(r) + 1} from Review.`
+    : `Draft saved ${formatDate(r.updatedAt)}.`;

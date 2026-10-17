@@ -136,6 +136,18 @@ export interface TransportRequest {
   route: Route | null;
   leadTime: LeadTime | null;
   blockers: Blocker[] | null;
+  /** The logistics manager's note while the request is INFO_REQUIRED (US-F1-04). */
+  infoRequiredNote: string | null;
+  /** Every submitted version, oldest first; empty for a draft. */
+  revisions: RevisionSummary[];
+}
+
+/** One submitted version of a request; `returnedAt` is set when it came back for information. */
+export interface RevisionSummary {
+  revisionNo: number;
+  submittedAt: string;
+  note: string | null;
+  returnedAt: string | null;
 }
 
 /** A row of the club's requests (GET /customer/requests). */
