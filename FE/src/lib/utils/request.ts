@@ -27,8 +27,11 @@ export type WizardStep = 'horses' | 'route' | 'service' | 'review';
 export type FieldStep = Exclude<WizardStep, 'review'>;
 export const WIZARD_STEPS: WizardStep[] = ['horses', 'route', 'service', 'review'];
 
-/** A From/To choice: a place (`value` is its id), or a typed city (react-select creatable's `__isNew__`). */
-export type PlaceOption = { value: string; label: string; __isNew__?: boolean };
+/**
+ * A From/To choice: a place (`value` is its id), or a typed city (react-select creatable's
+ * `__isNew__`). `city` names the end on the draft pass.
+ */
+export type PlaceOption = { value: string; label: string; city?: string; __isNew__?: boolean };
 /** A time of day, `value` HH:mm. */
 export type TimeOption = { value: string; label: string };
 
@@ -82,8 +85,8 @@ export const endpointLabel = (e: Endpoint): string =>
 
 const toOption = (e: Endpoint | null): PlaceOption | null => {
   if (!e) return null;
-  if (e.placeId) return { value: e.placeId, label: endpointLabel(e) };
-  return e.text ? { value: e.text, label: e.text, __isNew__: true } : null;
+  if (e.placeId) return { value: e.placeId, label: endpointLabel(e), city: e.city ?? undefined };
+  return e.text ? { value: e.text, label: e.text, city: e.text, __isNew__: true } : null;
 };
 
 const asTime = (iso: string | null): TimeOption | null => {

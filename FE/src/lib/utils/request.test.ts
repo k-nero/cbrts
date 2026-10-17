@@ -169,6 +169,7 @@ describe('fromRequest', () => {
     expect(fromRequest(r).destination).toEqual({
       value: 'Singapore',
       label: 'Singapore',
+      city: 'Singapore',
       __isNew__: true,
     });
     expect(toDraftInput(fromRequest(r)).destinationText).toBe('Singapore');
@@ -220,6 +221,7 @@ describe('fromRequest', () => {
     expect(fromRequest(r).origin).toEqual({
       value: 'p1',
       label: 'Phú Thọ training centre, Ho Chi Minh City',
+      city: 'Ho Chi Minh City',
     });
   });
 });
