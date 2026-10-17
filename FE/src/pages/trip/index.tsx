@@ -4,6 +4,7 @@ import type { UploadFile } from 'antd';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
+import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
@@ -250,6 +251,7 @@ function TripWorkspace({
   summary: string;
   editable?: boolean;
 }) {
+  const { logout } = useAuth();
   const [page, setPage] = useState(0);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
@@ -371,7 +373,17 @@ function TripWorkspace({
   return (
     <div className="flex flex-col gap-6">
       {contextHolder}
-      <PageHeader title={title} summary={summary} />
+      <PageHeader
+        title={title}
+        summary={summary}
+        right={
+          audience === 'escort' ? (
+            <Button variant="secondary" onClick={logout}>
+              Sign out
+            </Button>
+          ) : undefined
+        }
+      />
       {summariesQuery.isPending && (
         <div className="py-12 text-center">
           <Spin />
