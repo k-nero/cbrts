@@ -443,8 +443,8 @@ const DesignSystemPage: FC = () => {
                 state="conflict"
                 stall="Stall 4"
                 horse="Copper King"
-                meta="Stallion · 545 kg"
-                issue="Needs a box stall"
+                meta="Stallion · 545 kg · Aggressive"
+                issue="Needs a box stall (stallion or aggressive horse); Stallion stands beside a mare"
               />
               <StallTile
                 type="climate"

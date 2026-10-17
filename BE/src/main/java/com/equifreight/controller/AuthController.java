@@ -1,6 +1,8 @@
 package com.equifreight.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RefreshTokenRequest;
+import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
 import com.equifreight.service.AuthService;
 
@@ -28,6 +31,12 @@ public class AuthController {
     public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest request,
             HttpServletRequest servletRequest) {
         return ResponseEntity.ok(authService.login(request, clientIp(servletRequest)));
+    }
+
+    /** Creates a club and its customer account, and signs it in. */
+    @PostMapping("/register")
+    public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
     private static String clientIp(HttpServletRequest request) {
