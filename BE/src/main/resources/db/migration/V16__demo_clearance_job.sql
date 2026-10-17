@@ -1,4 +1,4 @@
--- V15__demo_clearance_job.sql: Demo data for Flow 2 clearance testing (CBRT-2026-041).
+-- V16__demo_clearance_job.sql: Demo data for Flow 2 clearance testing (CBRT-2026-041).
 
 do $$
 declare

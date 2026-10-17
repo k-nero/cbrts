@@ -16,4 +16,8 @@ export const queryKeys = {
     submissions: (jobId: string) => ['clearance', 'jobs', jobId, 'submissions'] as const,
     quarantines: (jobId: string) => ['clearance', 'jobs', jobId, 'quarantines'] as const,
   },
+  customerNotes: {
+    all: () => ['customer-notes'] as const,
+    detail: (id: string) => ['customer-notes', id] as const,
+  },
 } as const;

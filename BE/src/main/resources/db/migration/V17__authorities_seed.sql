@@ -1,4 +1,4 @@
--- V16__authorities_seed.sql: Seed authorities and quarantine places for Flow 2 testing
+-- V17__authorities_seed.sql: Seed authorities, places, and initial authority submissions
 
 insert into authorities (id, name, country_code, kind, sla_days) values
     ('b0000000-0000-0000-0000-000000000001', 'Regional Animal Health Office No. VI (RAHO6)', 'VN', 'VETERINARY', 5),
@@ -9,9 +9,9 @@ insert into authorities (id, name, country_code, kind, sla_days) values
 on conflict do nothing;
 
 insert into places (id, name, kind, city, country_code, address) values
-    ('a1000000-0000-0000-0000-000000000001', 'Phú Thọ Pre-Export Quarantine Station', 'QUARANTINE', 'Ho Chi Minh City', 'VN', 'District 11, HCMC'),
-    ('a1000000-0000-0000-0000-000000000002', 'Svay Rieng Border Quarantine Station', 'QUARANTINE', 'Svay Rieng', 'KH', 'National Road 1, Svay Rieng'),
-    ('a1000000-0000-0000-0000-000000000003', 'Phnom Penh Equestrian Quarantine Facility', 'QUARANTINE', 'Phnom Penh', 'KH', 'Dangkao, Phnom Penh')
+    ('ea000000-0000-0000-0000-000000000001', 'Phú Thọ Pre-Export Quarantine Station', 'QUARANTINE', 'Ho Chi Minh City', 'VN', 'District 11, HCMC'),
+    ('ea000000-0000-0000-0000-000000000002', 'Svay Rieng Border Quarantine Station', 'QUARANTINE', 'Svay Rieng', 'KH', 'National Road 1, Svay Rieng'),
+    ('ea000000-0000-0000-0000-000000000003', 'Phnom Penh Equestrian Quarantine Facility', 'QUARANTINE', 'Phnom Penh', 'KH', 'Dangkao, Phnom Penh')
 on conflict do nothing;
 
 do $$
@@ -19,6 +19,7 @@ declare
     v_job_id uuid := 'a0000000-0000-0000-0000-000000000041';
     v_auth_raho6 uuid := 'b0000000-0000-0000-0000-000000000001';
     v_auth_customs uuid := 'b0000000-0000-0000-0000-000000000002';
+    v_place_phutho uuid := 'ea000000-0000-0000-0000-000000000001';
     v_yen_id uuid;
 begin
     select id into v_yen_id from users where email = 'yen.vu@equifreight.vn';
@@ -36,7 +37,7 @@ begin
 
         if not exists (select 1 from quarantine_periods where job_id = v_job_id) then
             insert into quarantine_periods (id, job_id, place_id, starts_on, ends_on)
-            values (gen_random_uuid(), v_job_id, 'a1000000-0000-0000-0000-000000000001', (now() - interval '7 days')::date, (now() - interval '1 days')::date);
+            values (gen_random_uuid(), v_job_id, v_place_phutho, (now() - interval '7 days')::date, (now() - interval '1 days')::date);
         end if;
     end if;
 end $$;
