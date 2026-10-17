@@ -19,7 +19,7 @@ import java.util.UUID;
 
 /** A transport request. {@code leadTime} and {@code blockers} are only worked out for a draft. */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RequestResponse {

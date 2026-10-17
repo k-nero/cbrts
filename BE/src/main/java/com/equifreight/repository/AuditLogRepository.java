@@ -17,6 +17,9 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
 
     Page<AuditLog> findByEntityTypeOrderByOccurredAtDesc(String entityType, Pageable pageable);
 
+    /** One entity's history, newest first (the Request review page). */
+    List<AuditLog> findByEntityTypeAndEntityIdOrderByOccurredAtDesc(String entityType, UUID entityId);
+
     /** One entity's rows of one action, oldest first (when each return for information happened). */
     List<AuditLog> findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(String entityType, UUID entityId,
                                                                        String action);

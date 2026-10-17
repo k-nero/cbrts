@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
@@ -9,16 +10,23 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.review.QueueRowResponse;
+import com.equifreight.model.review.RequestReviewResponse;
+import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,6 +80,7 @@ class RequestReviewServiceTest {
         clubAccount.setId(UUID.randomUUID());
         clubAccount.setClub(club);
         when(users.findByClubId(club.getId())).thenReturn(List.of(clubAccount));
+        when(routes.resolve(any(), any(), any(), any(), any())).thenReturn(RouteResolution.none());
     }
 
     // --- returning a request for information (US-F1-04) ---------------------------------------------------
@@ -178,7 +187,122 @@ class RequestReviewServiceTest {
                 any(), any(), any(), any(), any(), any());
     }
 
+    // --- the queue and the review view (US-F1-03) ---------------------------------------------------------
+
+    @Test
+    void theQueueMapsRows() {
+        Instant older = Instant.parse("2026-09-25T02:00:00Z");
+        Instant newer = Instant.parse("2026-09-27T02:00:00Z");
+        when(requests.findQueue(any(), any())).thenReturn(new PageImpl<>(List.of(
+                row("REQ-2026-0190", "Hanoi Riding Club", older, 2),
+                row("REQ-2026-0193", "Saigon Turf Club", newer, 1))));
+
+        Page<QueueRowResponse> page = service.queue(PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(QueueRowResponse::getCode)
+                .containsExactly("REQ-2026-0190", "REQ-2026-0193");
+        QueueRowResponse first = page.getContent().getFirst();
+        assertThat(first.getClub()).isEqualTo("Hanoi Riding Club");
+        assertThat(first.getHorseCount()).isEqualTo(2);
+        assertThat(first.getWaitingSince()).isEqualTo(older);
+        assertThat(first.getRevisionNo()).isEqualTo((short) 2);
+        assertThat(first.getDateFlexDays()).isEqualTo(3);
+    }
+
+    @Test
+    void theViewHasChecksRevisionsHistoryAndPosition() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        when(requests.findQueueIds(any())).thenReturn(List.of(a, r.getId(), b));
+        RequestRevision v1 = revision(r, 1, "Which stable?");
+        v1.setPayload("{\"code\":\"REQ-2026-0193\",\"departureDate\":\"2026-10-30\"}");
+        RequestRevision v2 = revision(r, 2, null);
+        v2.setPayload("{\"code\":\"REQ-2026-0193\",\"departureDate\":\"2026-11-02\"}");
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of(v1, v2));
+        AuditLog submitted = audit("Submitted with 1 horse: Shadowfax.", "Saigon Turf Club");
+        when(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("TRANSPORT_REQUEST", r.getId()))
+                .thenReturn(List.of(submitted));
+
+        RequestReviewResponse view = service.view(r.getId());
+
+        assertThat(view.getQueue().getPosition()).isEqualTo(2);
+        assertThat(view.getQueue().getTotal()).isEqualTo(3);
+        assertThat(view.getQueue().getPreviousId()).isEqualTo(a);
+        assertThat(view.getQueue().getNextId()).isEqualTo(b);
+        assertThat(view.getRevisions()).hasSize(2);
+        assertThat(view.getRevisions().getFirst().getNote()).isEqualTo("Which stable?");
+        assertThat(view.getRevisions().get(1).getPayload().get("departureDate").asString()).isEqualTo("2026-11-02");
+        assertThat(view.getHistory()).singleElement().satisfies(h -> {
+            assertThat(h.getSummary()).isEqualTo("Submitted with 1 horse: Shadowfax.");
+            assertThat(h.getActorLabel()).isEqualTo("Saigon Turf Club");
+        });
+        assertThat(view.getChecks()).extracting("key").containsExactly("ROUTE_SERVED", "LEAD_TIME");
+        assertThat(view.getRequest().getClub()).isEqualTo("Saigon Turf Club");
+    }
+
+    @Test
+    void aRequestOutOfTheQueueHasNoPosition() {
+        TransportRequest r = inReview(RequestStatus.INFO_REQUIRED);
+
+        assertThat(service.view(r.getId()).getQueue()).isNull();
+    }
+
+    @Test
+    void anUnknownRequestHasNoView() {
+        UUID unknown = UUID.randomUUID();
+        when(requests.findById(unknown)).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> service.view(unknown)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void returningAnswersTheView() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+
+        RequestReviewResponse view = service.returnForInformation(manager, r.getId(), NOTE);
+
+        assertThat(view.getRequest().getStatus()).isEqualTo(RequestStatus.INFO_REQUIRED);
+        assertThat(view.getQueue()).isNull();
+    }
+
+    @Test
+    void anOldPayloadPassesThrough() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+        RequestRevision v1 = revision(r, 1, null);
+        v1.setPayload("{\"id\":\"x\",\"code\":\"REQ-2026-0195\",\"horses\":[]}");
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of(v1));
+
+        RequestReviewResponse view = service.view(r.getId());
+
+        assertThat(view.getRevisions().getFirst().getPayload().get("code").asString()).isEqualTo("REQ-2026-0195");
+    }
+
     // --- helpers ------------------------------------------------------------------------------------------
+
+    static TransportRequestRepository.QueueRow row(String code, String club, Instant waitingSince, int revisionNo) {
+        return new TransportRequestRepository.QueueRow() {
+            public UUID getId() { return UUID.randomUUID(); }
+            public String getCode() { return code; }
+            public String getClub() { return club; }
+            public String getFromCity() { return "Ho Chi Minh City"; }
+            public String getToCity() { return "Bangkok"; }
+            public TransportMode getMode() { return TransportMode.ROAD; }
+            public Number getHorseCount() { return 2L; }
+            public LocalDate getDepartureDate() { return LocalDate.of(2026, 10, 30); }
+            public Number getDateFlexDays() { return (short) 3; }
+            public Instant getWaitingSince() { return waitingSince; }
+            public Number getRevisionNo() { return (short) revisionNo; }
+        };
+    }
+
+    static AuditLog audit(String summary, String actorLabel) {
+        AuditLog log = new AuditLog();
+        log.setOccurredAt(Instant.parse("2026-09-26T02:14:00Z"));
+        log.setSummary(summary);
+        log.setActorLabel(actorLabel);
+        return log;
+    }
 
     TransportRequest inReview(RequestStatus status) {
         TransportRequest r = new TransportRequest();
