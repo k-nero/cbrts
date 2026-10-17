@@ -30,12 +30,12 @@ Two root files carry the product and design context:
 
 These are product decisions, not suggestions. Enforce them on the backend; the frontend only mirrors them.
 
-- **Codes.** Requests `REQ-YYYY-NNNN`, quotations `Q-YYYY-NNNN`, jobs `CBRT-YYYY-NNN`, invoices `INV-YYYY-NNNN`, staff `EF-NNN`. They are unique, never reused, and issued from `code_counters`. A customer's REQ code stays the same from submission to handover.
+- **Codes.** Requests `REQ-YYYY-NNNN`, quotations `Q-YYYY-NNNN`, jobs `CBRT-YYYY-NNN`, invoices `INV-YYYY-NNNN`, staff `EF-NNN`. They are unique, never reused, and issued from `code_counters`; seed data that writes a code directly also advances its counter, so a real code never collides with it. A customer's REQ code stays the same from submission to handover.
 - **Request lifecycle.** The flow is `DRAFT → SUBMITTED → UNDER_REVIEW → INFO_REQUIRED / REJECTED / QUOTED → CUSTOMER_ACCEPTED / EXPIRED → APPROVED`, with `CANCELLED` possible. Only the logistics manager approves or rejects.
 - **Lead time.** 21 days for cross-border moves, 3 days for domestic ones. Quotations are valid for 7 days. Price and horse list lock at `APPROVED`.
 - **Estimates are ranges.** Before a quotation exists the customer sees an indicative range, never a single price. It is never acceptable as a price. The range shown at submission is kept only to compare the quotation against.
 - **Routes come from the catalog.** Only a corridor in the catalog (with its border crossings and rates) can be estimated or quoted. A request without a corridor can exist only as a `DRAFT`; the customer is told it is a route we don't run.
-- **Documents are checked against the job's travel dates, not today.** Each document type has a machine-evaluable validity rule that returns GREEN, AMBER or RED. The rule re-runs whenever the dates, the catalog or the horse list change.
+- **Documents are checked against the job's travel dates, not today.** Each document type has a machine-evaluable validity rule that returns GREEN, AMBER or RED. The rule re-runs whenever the dates, the catalog or the horse list change: code that changes a job's planned departure or arrival calls `ClearanceService.recheckJobDocuments`.
 - **Clearance is a hard gate.** Departure cannot be recorded until the dossier is `CLEARANCE_READY`. Anything that makes a move illegal is a block with the reason stated, never a warning to click past.
 - **Nothing is overwritten.** Documents, quotations, route plans and catalogs are versioned. A re-upload is a new version, the regulation catalog is pinned to the job, and the rate catalog is pinned to the quotation.
 - **Quotations.** Quotations are built from the rate catalog in a fixed calculation order. Space is priced by stall width, not headcount. Grooms are one per three horses, rounded up. Insurance is a percentage of declared value. Every figure traces to a catalog line, a quantity and a basis.
@@ -80,12 +80,15 @@ Where to look in the frontend (`FE/src/`):
 - **Row actions:** `components/buttons` (`EditButton`, `DeleteButton`).
 - **Staff menu:** `components/menu/StaffMenu`.
 - **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
-- **Helpers:** `lib/utils` (time, number, file, path, rbac) and `constant/`. Check them before writing a formatter or date helper.
+- **Helpers:** `lib/utils` (time, number, file, path, rbac, error) and `constant/`. Check them before writing a formatter or date helper.
 - **Page templates:** `pages/staff/users` (a list with an add/edit modal) and `pages/customer/home` (a composed customer page).
 
 Where to look elsewhere:
 
-- **Backend (`BE/`):** follow the controller → service → repository → DTO shape of `controller/admin/UserController` and `service/UserService`. Reuse `BaseEntity`, the exceptions in `exception/` and `ApiError`; don't add a new error format or response wrapper.
+- **Backend (`BE/`):** follow the controller → service → repository → DTO shape of `controller/admin/UserController` and `service/UserService`. Reuse `BaseEntity`, the exceptions in `exception/` and `ApiError`; don't add a new error format or response wrapper. Shared services own cross-cutting work:
+  - `AuditService.recordDecision` writes audit rows; never build an `AuditLog` by hand.
+  - `FileService.requireAttachable` checks an upload before a record points at it (the caller's own file, not attached anywhere yet); never look a file up with `StoredFileRepository.findById` to attach it.
+  - `ClearanceService.evaluateClearanceGate` derives the dossier status, and `ClearanceService.recheckJobDocuments` re-runs validity after a date change.
 - **Database:** new tables and columns follow `docs/database/database-design.md` and the naming of the existing migrations.
 - **Figma generator:** reuse the helpers in `docs/figma-plugin/src/` (`panel`, `chip`, `btn`, `input`, `tbl`, `tableBlock`, `pageHeader`, `draftPass`, `jobMap` and the rest) instead of drawing from scratch. A design change that needs a new pattern also gets its rule in `DESIGN.md`.
 
@@ -94,9 +97,10 @@ Where to look elsewhere:
 - **Packages** live under `com.equifreight`: `controller` (with `controller/admin` for staff admin), `service`, `repository`, `entity` (`entity/enums`), `model` (request and response DTOs per area), `exception`, `configuration`, `job`.
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V14` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V15` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Logging.** Use Lombok `@Log4j2`, not slf4j `LoggerFactory`.
 - **Injection.** Use constructor injection.
+- **JSON is Jackson 3.** Spring Boot 4 registers `tools.jackson.databind.json.JsonMapper`; inject that. Jackson 2's `com.fasterxml.jackson.databind.ObjectMapper` is on the classpath through other libraries, so code that injects it compiles and passes mocked tests, but the application fails to start.
 - **Errors.** Throw the exceptions in `exception/` (`BusinessException`, `ConflictException`, `ResourceNotFoundException`, `UnauthorizedException`). `ControllerAdvise` turns them into `ApiError`. Use the one that matches: not signed in or not allowed is `UnauthorizedException`, not `BusinessException`. Error messages name the rule, the value found and the fix, e.g. "The earliest departure is 17 Oct 2026."
 - **APIs** live under `/api/v1/...`. Staff admin endpoints live under `/api/v1/admin/**`, and role access is enforced in `ApplicationConfiguration`.
 - **Lists** take a Spring `Pageable` (page size 20) and return a `Page`, including inboxes and queues. Sortable fields must be real entity fields, because joined or derived DTO columns fail at runtime.
@@ -104,11 +108,20 @@ Where to look elsewhere:
 - **Records belong to someone.** Customer endpoints (`/api/v1/customer/**`) only read or change records of the signed-in user's club; check ownership in the service and answer 404 for anyone else's record. Never trust an id in the path to belong to the caller.
 - **Mirror the database's rules.** When `database-design.md` puts a rule in a check constraint or trigger (append-only versions, one review decision, required reasons), the service enforces the same rule first, with a clear message. Never write code that relies on the database to reject it, and never contradict it.
 - **Validate, then write.** Check every rule before saving anything; don't save a change and throw afterwards.
-- **Audit every decision.** Each state change a person makes (approve, reject, issue, publish, record a payment, override) writes an `audit_log` row in the same transaction, with the action code, a one-line summary and the entity code (BR-F1-08).
+- **One writer per status.** Each derived status has one place that sets it, and everything else asks that place to re-evaluate instead of writing the column:
+  - `transport_jobs.dossier_status` and `clearance_ready_at`: only `ClearanceService.evaluateClearanceGate`, which also leaves a departed job alone.
+  - The job stage moves to `TRIP` only when the departure is recorded (`TripService`), never at planning or sign-off.
+  - A change to a plan that was signed off (route, load or crew) clears the sign-off.
+- **Transactions.**
+  - A read-only transaction (`@Transactional(readOnly = true)`) and a `GET` endpoint never create data; a missing record is created by an explicit `POST`.
+  - Hibernate flushes inserts before deletes. To replace rows covered by a unique constraint in one transaction, delete them with a bulk `@Modifying @Query` (it runs at once), not `deleteAll(entities)` or a derived `deleteBy…`.
+  - To turn a constraint violation into a 409, write with `saveAndFlush` inside the `try`; a plain `save` flushes later, outside it, and the client gets a 500.
+- **Missing dates are refused, not guessed.** When a rule needs a date that isn't set yet (a booking or an overlap check needs the planned departure and arrival), refuse with what to do first ("confirm the route plan first"); never fall back to `now()` or "now plus two days".
+- **Audit every decision.** Each state change a person makes (approve, reject, issue, publish, record a payment, override, assign, confirm, sign off) writes an `audit_log` row in the same transaction, through `AuditService.recordDecision`, with the action code, a one-line summary, the entity type, id and code (BR-F1-08).
 - **Dates are local calendar days.** Business rules that count days (validity windows, lead time, due dates, "in 5 days") work on dates in the business time zone, `Asia/Ho_Chi_Minh`, never UTC: a 06:00 departure on 18 Oct is still 17 Oct in UTC. Keep one shared constant for the zone instead of scattering `ZoneOffset.UTC`.
 - **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
-- **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`.
+- **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
 
 ## Frontend conventions (`FE/`)
 
@@ -126,9 +139,11 @@ Where to look elsewhere:
   - `constant/color.ts` mirrors the tokens for AntD.
   - The `/design-system` route shows every component variant; use it to check visuals.
 - **Data fetching** goes through TanStack Query hooks in `hooks/<domain>.ts` (`useQuery` and `useMutation`, invalidating the affected queries on success), never `useState` plus `useEffect` calling an API from a page. Pages own no server data state of their own.
-- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed request shows an error state or the server's `ApiError` message, never an empty list that looks like success. Every list has a loading, an empty and an error state.
+- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed request shows an error state or the server's `ApiError` message (`apiErrorMessage` from `lib/utils`), never an empty list or Axios's generic "Request failed with status code 400". Every list has a loading, an empty and an error state.
 - **Styling uses the tokens.** Text uses the `type-*` utilities and colours use the token classes from `index.css`; no arbitrary values such as `text-[13px]`, `p-[7px]` or hex colours. Import design-system components from `@/components/ui`, not from their individual files.
 - **Real inputs.** A file is chosen with a file picker and uploaded, never pasted as a file id; a date uses a date field, and a choice from a fixed set uses a select or option cards.
+- **Files from the API need the token.** Never link to `/api/...` with `<a href>` or `<img src>`: the browser sends no access token and gets 401. Show a stored file with `useFileBlobUrl` (`hooks/file.ts`) and open one with `fileApi.viewFile`, which opens the tab inside the click (a `window.open` after an `await` is dropped by popup blockers).
+- **Retries are idempotent.** When an endpoint takes a client reference (`clientRef`), create it once per user action, keep it until the request succeeds, and send the same one on retry; a new one per attempt records the action twice.
 - **Checks.** Run `bun run typecheck`, `bun run format` and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
 
 ## Design rules (when building UI)
@@ -154,11 +169,11 @@ Where to look elsewhere:
 
 ## Git and GitHub workflow
 
-- **Work from a story.** Every PR names the stories it implements (`Closes #36`) and keeps their acceptance criteria as a checklist in the description, each one ticked or explained. Keep a PR to one story or a few closely related ones, so it can be reviewed; split a whole epic into several PRs.
+- **Work from a story.** Every PR names the stories it implements and keeps their acceptance criteria as a checklist in the description, each one ticked or explained. Write `Closes #36` only when every criterion of #36 is met, because GitHub closes the issue on merge; otherwise write `Part of #36` and list what is still open. Keep a PR to one story or a few closely related ones, so it can be reviewed; split a whole epic into several PRs.
 - **Flow:** issue, then branch, then PR. Branch from `main` with a type prefix: `feat/`, `fix/`, `style/`, `chore/`, `docs/`, `design/`. Never commit straight to `main`; check `git branch --show-current` before you commit or push.
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
-- **No CI build or test gate.** A green check does not mean it compiles. Before opening or approving a PR, run `./gradlew test` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`.
+- **No CI build or test gate.** A green check does not mean it compiles. Before opening or approving a PR, run `./gradlew test` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
 - **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only. Never paste them into an AI chat either.
 
 ## Don't
@@ -170,8 +185,11 @@ Where to look elsewhere:
 - Don't weaken a legality block into a warning.
 - Don't give a role a permission its story doesn't, or let a customer reach another club's records.
 - Don't save first and validate after, or skip the audit entry for a decision.
+- Don't write a status another service owns (the dossier status, the trip stage), or create data from a `GET` or a read-only transaction.
+- Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
+- Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.
-- Don't fetch data in a page with `useEffect`, hard-code ids or mock data, or hide a failed request.
+- Don't fetch data in a page with `useEffect`, hard-code ids or mock data, hide a failed request, or link to `/api/...` files directly.
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
