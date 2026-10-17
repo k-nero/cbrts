@@ -75,7 +75,10 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
           media={
             <span
               aria-hidden
-              className={cx('size-12 rounded-full', COAT_SWATCH[coatOf(horse?.coat ?? null)])}
+              className={cx(
+                'size-12 rounded-full border border-line-strong',
+                COAT_SWATCH[coatOf(horse?.coat ?? null)],
+              )}
             />
           }
           title={horse?.name ?? draft?.name}
