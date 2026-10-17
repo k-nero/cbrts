@@ -15,14 +15,14 @@ import { wizardSchema } from './wizardSchema';
 
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import PageHeader from '@/components/PageHeader';
-import { Steps } from '@/components/ui';
+import { Callout, Steps } from '@/components/ui';
 import { useRequest, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/request';
 import type { ApiError, Blocker, Horse, Route, TransportRequest } from '@/interfaces';
 import {
   apiErrorView,
+  editable,
   EMPTY_WIZARD,
   firstOpenStep,
-  formatDate,
   formRefusal,
   fromRequest,
   holdsStep,
@@ -30,6 +30,7 @@ import {
   liveBlockers,
   retiredRefusals,
   revealSelector,
+  savedLine,
   roadRuns,
   shownBlockers,
   STEP_FIELDS,
@@ -311,7 +312,7 @@ const RequestWizardPage: FC = () => {
   const saved = query.data;
 
   if (id && !saved) return <RequestLoadState query={query} />;
-  if (saved && saved.status !== 'DRAFT')
+  if (saved && !editable(saved.status))
     return (
       <Navigate to={router.paths.get('request-submitted', { pathParams: [saved.id] })} replace />
     );
@@ -328,8 +329,13 @@ const RequestWizardPage: FC = () => {
       <PageHeader
         back={{ label: 'My requests', onClick: () => router.push(router.paths.get('my-requests')) }}
         title="Request transport"
-        summary={`${saved ? `Draft saved ${formatDate(saved.updatedAt)}. ` : ''}Your move fills in on the right as you go; the binding price comes as an itemised quotation.`}
+        summary={`${saved ? `${savedLine(saved)} ` : ''}Your move fills in on the right as you go; the binding price comes as an itemised quotation.`}
       />
+      {saved?.status === 'INFO_REQUIRED' && saved.infoRequiredNote && (
+        <Callout tone="warn" title="The logistics manager asked:">
+          {saved.infoRequiredNote}
+        </Callout>
+      )}
       <Steps steps={STEP_LABELS} current={WIZARD_STEPS.indexOf(step)} />
       <WizardForm key={saved?.id ?? 'new'} saved={saved} step={step} />
     </div>

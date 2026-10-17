@@ -8,7 +8,7 @@ import type { StepProps } from '.';
 import { Button, Callout, Panel } from '@/components/ui';
 import { useRequest, useSubmitRequest } from '@/hooks/request';
 import type { ApiError } from '@/interfaces';
-import { apiErrorMessage, reviewRows, stepOfBlocker, WIZARD_STEPS } from '@/lib/utils';
+import { apiErrorMessage, reviewRows, stepOfBlocker, submitLabel, WIZARD_STEPS } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 const NEXT: [string, string][] = [
@@ -134,7 +134,7 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
           disabled={blockers.length > 0 || submit.isPending}
           onClick={() => void onSubmit()}
         >
-          Submit request
+          {submitLabel(saved)}
         </Button>
       </div>
     </>
