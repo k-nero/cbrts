@@ -465,7 +465,9 @@ export const pickableHorses = (
   onDraft: RequestHorse[],
 ): { id: string; horse: Horse | null; draft: RequestHorse | null }[] => {
   const byId = new Map(onDraft.map((h) => [h.horseId, h]));
-  const rows = active.map((h) => ({ id: h.id, horse: h, draft: byId.get(h.id) ?? null }));
+  const rows: { id: string; horse: Horse | null; draft: RequestHorse | null }[] = active.map(
+    (h) => ({ id: h.id, horse: h, draft: byId.get(h.id) ?? null }),
+  );
   const shown = new Set(active.map((h) => h.id));
   for (const h of onDraft)
     if (!shown.has(h.horseId)) rows.push({ id: h.horseId, horse: null, draft: h });
