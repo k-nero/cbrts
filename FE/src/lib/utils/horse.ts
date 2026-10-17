@@ -28,6 +28,15 @@ export const ageOf = (dateOfBirth: string | null | undefined, today: string): st
   return years === null ? DASH : `${years} y`;
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "14 Apr 2022" for a calendar day (YYYY-MM-DD), read as written: no time zone can shift it. */
+export const formatDay = (day: string | null | undefined): string => {
+  if (!day) return DASH;
+  const [y, m, d] = day.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
 /** "16.2 hh". */
 export const formatHeight = (heightHh: number | null | undefined): string =>
   heightHh === null || heightHh === undefined ? DASH : `${heightHh.toFixed(1)} hh`;

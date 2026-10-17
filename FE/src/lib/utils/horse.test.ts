@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   ageOf,
   coatOf,
+  formatDay,
   formatHeight,
   formatMicrochip,
   formatSize,
@@ -67,6 +68,11 @@ describe('formats', () => {
     expect(ageOf('2019-05-10', '2026-10-17')).toBe('7 y');
     expect(ageOf('2019-05-10', '2026-05-09')).toBe('6 y');
     expect(ageOf(null, '2026-10-17')).toBe('—');
+  });
+
+  test('aCalendarDayIsFormattedWithoutTimeZoneShift', () => {
+    expect(formatDay('2022-04-14')).toBe('14 Apr 2022');
+    expect(formatDay(null)).toBe('—');
   });
 
   test('formatsReadLikeTheFrames', () => {

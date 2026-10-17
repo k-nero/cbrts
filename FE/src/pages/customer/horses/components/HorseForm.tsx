@@ -170,6 +170,8 @@ type Props = {
   onSaved: (horse: Horse) => void;
   /** The side column, from the values as they are typed. */
   side?: (values: HorseFormShape) => ReactNode;
+  /** Under the form card, e.g. the locked passport panel on Edit. */
+  afterForm?: ReactNode;
 };
 
 /**
@@ -177,7 +179,16 @@ type Props = {
  * When the horse's identity is locked, the six passport fields leave the form and are sent back as
  * they were (the API refuses any change to them).
  */
-const HorseForm: FC<Props> = ({ horse, submitLabel, isSaving, onSubmit, onCancel, onSaved, side }) => {
+const HorseForm: FC<Props> = ({
+  horse,
+  submitLabel,
+  isSaving,
+  onSubmit,
+  onCancel,
+  onSaved,
+  side,
+  afterForm,
+}) => {
   const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
   const schema = useMemo(() => makeHorseSchema(today), [today]);
   const locked = horse?.identityLocked === true;
@@ -221,6 +232,7 @@ const HorseForm: FC<Props> = ({ horse, submitLabel, isSaving, onSubmit, onCancel
     >
       {({ FormField }) => (
         <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
+          <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-5 rounded-lg border border-line bg-card p-7">
             {!locked && (
               <Section first title="Identity" sub="As on the passport. We check these against it when you request transport.">
@@ -288,6 +300,8 @@ const HorseForm: FC<Props> = ({ horse, submitLabel, isSaving, onSubmit, onCancel
               <CancelButton label="Cancel" />
               <SubmitButton type="primary" label={submitLabel} />
             </Flex>
+          </div>
+          {afterForm}
           </div>
           {side && (
             <div className="flex flex-col gap-6">

@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { z } from 'zod';
 
 import {
@@ -9,7 +8,7 @@ import {
   StallTypeEnum,
   TemperamentEnum,
 } from '@/interfaces';
-import { heightProblem } from '@/lib/utils';
+import { formatDay, heightProblem } from '@/lib/utils';
 
 const MICROCHIP_DIGITS = 15;
 
@@ -54,7 +53,7 @@ export const makeHorseSchema = (today: string) =>
       .nullish()
       .refine((value) => !value || value <= today, {
         error: (issue) =>
-          `The date of birth ${dayjs(String(issue.input)).format('D MMM YYYY')} is after today.`,
+          `The date of birth ${formatDay(String(issue.input))} is after today.`,
       }),
     coat: z.preprocess(optionValue, z.enum(HorseCoatEnum).nullish()),
     heightHh: z.number({ error: "Enter the horse's height." }).superRefine((value, ctx) => {
