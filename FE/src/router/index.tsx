@@ -20,6 +20,8 @@ import DocumentsPage from '@/pages/staff/documents';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import RequestsPage from '@/pages/staff/requests';
+import RequestReviewPage from '@/pages/staff/requests/review';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
@@ -76,7 +78,8 @@ export const router = createBrowserRouter([
           { path: 'jobs/:id', element: <JobDetailPage /> },
           { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
-          { path: 'requests', element: todo('Requests') },
+          { path: 'requests', element: <RequestsPage /> },
+          { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: todo('Audit log') },
