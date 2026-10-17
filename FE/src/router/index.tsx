@@ -9,6 +9,7 @@ import CustomerHomePage from '@/pages/customer/home';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       { path: '/forbidden', element: <ForbiddenPage /> },
       { path: '/design-system', element: <DesignSystemPage /> },
       { path: '/', element: <LandingPage /> },
