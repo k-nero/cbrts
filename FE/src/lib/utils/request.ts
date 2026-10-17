@@ -377,16 +377,16 @@ export type PassRow = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "5 Oct", from YYYY-MM-DD without shifting the day. */
-const shortDay = (day: string): string => {
+export const shortDay = (day: string): string => {
   const [, m, d] = day.split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
 };
 
-const TRAILER_WORDS: Record<TrailerType, string> = {
+export const TRAILER_WORDS: Record<TrailerType, string> = {
   SHARED: 'shared load',
   PRIVATE: 'private trailer',
 };
-const CLASS_WORDS: Record<ServiceClass, string> = {
+export const CLASS_WORDS: Record<ServiceClass, string> = {
   ECONOMY: 'economy class',
   BUSINESS: 'business class',
   FIRST: 'first class',
