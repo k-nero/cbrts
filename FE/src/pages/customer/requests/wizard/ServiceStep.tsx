@@ -7,13 +7,7 @@ import type { StepProps } from '.';
 
 import { Button, Checkbox, Icon, OptionCard, Panel } from '@/components/ui';
 import type { RequestHorse, Route, ServiceClass } from '@/interfaces';
-import {
-  formatValue,
-  groomsFor,
-  pronouns,
-  serviceLine,
-  type WizardValues,
-} from '@/lib/utils';
+import { formatValue, groomsFor, pronouns, serviceLine, type WizardValues } from '@/lib/utils';
 
 const CLASSES: { value: ServiceClass; title: string }[] = [
   { value: 'ECONOMY', title: 'Economy' },
@@ -27,7 +21,9 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 const roadLine = (r: Route | undefined) => {
   if (!r) return 'Door to door by trailer.';
   const km = r.distanceKm === null ? '' : ` · ~${r.distanceKm.toLocaleString('en-US')} km`;
-  const borders = r.crossings.length ? plural(r.crossings.length, 'border crossing') : 'no border crossing';
+  const borders = r.crossings.length
+    ? plural(r.crossings.length, 'border crossing')
+    : 'no border crossing';
   return `Door to door by trailer${km} · ${borders}.`;
 };
 
@@ -113,8 +109,7 @@ const ServiceStep: FC<StepProps> = ({
   const horses = saved?.horses ?? [];
   const declared = horses.reduce((sum, h) => sum + (h.declaredValue ?? 0), 0);
 
-  const errorOf = (field: string) =>
-    live.find((b) => b.field === field)?.message ?? undefined;
+  const errorOf = (field: string) => live.find((b) => b.field === field)?.message ?? undefined;
   const modeError = errorOf('mode') ?? (errors.mode?.message as string | undefined);
 
   const airReason = window

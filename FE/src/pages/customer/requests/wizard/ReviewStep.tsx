@@ -41,7 +41,10 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
       if (data?.error === 'REQUEST_NOT_DRAFT') return toConfirmation();
       if (data?.error === 'SUBMISSION_BLOCKED') void query.refetch();
       setRefusal({
-        title: apiErrorMessage(error, "Your request wasn't submitted. Check your connection and try again."),
+        title: apiErrorMessage(
+          error,
+          "Your request wasn't submitted. Check your connection and try again.",
+        ),
         details: data?.details ?? [],
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,7 +84,10 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
             {blockers.map((b) => {
               const step = stepOfBlocker(b);
               return (
-                <li key={`${b.code}:${b.message}`} className="flex items-center justify-between gap-4">
+                <li
+                  key={`${b.code}:${b.message}`}
+                  className="flex items-center justify-between gap-4"
+                >
                   <span>{b.message}</span>
                   <Button size="sm" variant="ghost" onClick={() => goTo(step)}>
                     Go to step {WIZARD_STEPS.indexOf(step) + 1}

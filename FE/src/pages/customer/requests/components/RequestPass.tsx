@@ -67,7 +67,9 @@ export const RequestPass: FC<Props> = ({
         ...passRows(values, saved, route, notRun),
       ]}
       rangeSub={
-        notRun && from && to ? `No range: we don't run ${from} → ${to} yet.` : (rangeSub ?? DRAFT_SUB)
+        notRun && from && to
+          ? `No range: we don't run ${from} → ${to} yet.`
+          : (rangeSub ?? DRAFT_SUB)
       }
     />
   );

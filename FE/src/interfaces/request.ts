@@ -22,10 +22,17 @@ export type ArrivalMode = (typeof ArrivalModeEnum)[keyof typeof ArrivalModeEnum]
 export const TrailerTypeEnum = { SHARED: 'SHARED', PRIVATE: 'PRIVATE' } as const;
 export type TrailerType = (typeof TrailerTypeEnum)[keyof typeof TrailerTypeEnum];
 
-export const ServiceClassEnum = { ECONOMY: 'ECONOMY', BUSINESS: 'BUSINESS', FIRST: 'FIRST' } as const;
+export const ServiceClassEnum = {
+  ECONOMY: 'ECONOMY',
+  BUSINESS: 'BUSINESS',
+  FIRST: 'FIRST',
+} as const;
 export type ServiceClass = (typeof ServiceClassEnum)[keyof typeof ServiceClassEnum];
 
-export const InsuranceOptionEnum = { OWN_POLICY: 'OWN_POLICY', EQUIFREIGHT: 'EQUIFREIGHT' } as const;
+export const InsuranceOptionEnum = {
+  OWN_POLICY: 'OWN_POLICY',
+  EQUIFREIGHT: 'EQUIFREIGHT',
+} as const;
 export type InsuranceOption = (typeof InsuranceOptionEnum)[keyof typeof InsuranceOptionEnum];
 
 /** A pickup or delivery point (GET /customer/places). Welfare stops are left out. */

@@ -64,7 +64,9 @@ const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }):
 const alternativeLine = (r: Route) => {
   const crossings = r.crossings.length;
   const borders =
-    crossings === 0 ? 'no border crossing' : `${crossings} border crossing${crossings === 1 ? '' : 's'}`;
+    crossings === 0
+      ? 'no border crossing'
+      : `${crossings} border crossing${crossings === 1 ? '' : 's'}`;
   const km = r.distanceKm === null ? '' : ` · ~${r.distanceKm.toLocaleString('en-US')} km`;
   return `${r.fromCity} → ${r.toCity} by ${r.mode === 'AIR' ? 'air' : 'road'}${km} · ${borders}`;
 };
@@ -104,7 +106,6 @@ const RouteStep: FC<StepProps> = ({
     const match = places.find((p) => p.city?.toLowerCase() === r.toCity.toLowerCase());
     if (match) set('destination', match);
   };
-
 
   return (
     <>
@@ -148,7 +149,10 @@ const RouteStep: FC<StepProps> = ({
 
       {notRun ? (
         <>
-          <Callout tone="warn" title={`We don’t run ${fromCity ?? 'this'} → ${toCity ?? 'route'} yet`}>
+          <Callout
+            tone="warn"
+            title={`We don’t run ${fromCity ?? 'this'} → ${toCity ?? 'route'} yet`}
+          >
             We move horses by road within Vietnam, Cambodia, Thailand, Laos and Malaysia, and by air
             through Hong Kong. There is no estimate or quotation for this route.
           </Callout>
@@ -251,7 +255,9 @@ const RouteStep: FC<StepProps> = ({
                     componentProps={{
                       options: TIMES,
                       instruction:
-                        windowFrom && windowUntil && windowMinutes(windowFrom.value, windowUntil.value) > 0
+                        windowFrom &&
+                        windowUntil &&
+                        windowMinutes(windowFrom.value, windowUntil.value) > 0
                           ? windowLength(windowFrom.value, windowUntil.value)
                           : undefined,
                     }}

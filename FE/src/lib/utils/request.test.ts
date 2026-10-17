@@ -111,7 +111,12 @@ describe('toDraftInput', () => {
         windowFrom: time('08:00'),
         windowUntil: time('12:00'),
       }),
-    ).toMatchObject({ arrivalMode: 'ANY_TIME', dateFlexDays: 3, windowStart: null, windowEnd: null });
+    ).toMatchObject({
+      arrivalMode: 'ANY_TIME',
+      dateFlexDays: 3,
+      windowStart: null,
+      windowEnd: null,
+    });
     expect(toDraftInput(EMPTY_WIZARD).dateFlexDays).toBe(0);
   });
 
@@ -246,7 +251,10 @@ describe('steps and blockers', () => {
     expect(
       firstOpenStep(
         draft({
-          blockers: [blocker('MODE_MISSING', 'mode'), blocker('DEPARTURE_MISSING', 'departureDate')],
+          blockers: [
+            blocker('MODE_MISSING', 'mode'),
+            blocker('DEPARTURE_MISSING', 'departureDate'),
+          ],
         }),
       ),
     ).toBe('route');
@@ -289,9 +297,9 @@ describe('labels', () => {
   });
 
   test('endpoint label', () => {
-    expect(
-      endpointLabel(place('p', 'Phú Thọ training centre', 'Ho Chi Minh City', 'VN')),
-    ).toBe('Phú Thọ training centre, Ho Chi Minh City');
+    expect(endpointLabel(place('p', 'Phú Thọ training centre', 'Ho Chi Minh City', 'VN'))).toBe(
+      'Phú Thọ training centre, Ho Chi Minh City',
+    );
     expect(endpointLabel(typed('Singapore'))).toBe('Singapore');
   });
 });
@@ -440,7 +448,12 @@ describe('the draft pass', () => {
     );
     expect(win[1]).toEqual({ label: 'Arrival', value: '31 Oct · 08:00–12:00', mono: true });
     expect(win[3].value).toBe('Road · private trailer');
-    const air = passRows({ ...EMPTY_WIZARD, mode: 'AIR', airClass: 'BUSINESS' }, undefined, sgnHkg, false);
+    const air = passRows(
+      { ...EMPTY_WIZARD, mode: 'AIR', airClass: 'BUSINESS' },
+      undefined,
+      sgnHkg,
+      false,
+    );
     expect(air[3].value).toBe('Air · business class');
     expect(passRows(EMPTY_WIZARD, undefined, null, true)[2]).toEqual({
       label: 'Borders',

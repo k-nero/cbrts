@@ -107,7 +107,8 @@ const MyRequestsPage: FC = () => {
     [router],
   );
 
-  const count = total === undefined ? 'Requests' : `${total} ${total === 1 ? 'request' : 'requests'}`;
+  const count =
+    total === undefined ? 'Requests' : `${total} ${total === 1 ? 'request' : 'requests'}`;
 
   return (
     <div className="flex flex-col gap-7">
@@ -115,9 +116,7 @@ const MyRequestsPage: FC = () => {
         reserveBack
         title="My requests"
         summary={
-          total === undefined
-            ? undefined
-            : `${count}${me?.clubName ? ` · ${me.clubName}` : ''}.`
+          total === undefined ? undefined : `${count}${me?.clubName ? ` · ${me.clubName}` : ''}.`
         }
         right={
           !empty && (

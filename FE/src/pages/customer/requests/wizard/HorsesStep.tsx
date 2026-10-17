@@ -43,7 +43,9 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
   const toggle = (id: string) =>
     setValue(
       'horses',
-      isPicked(id) ? picked.filter((h) => h.horseId !== id) : [...picked, { horseId: id, withFoal: false }],
+      isPicked(id)
+        ? picked.filter((h) => h.horseId !== id)
+        : [...picked, { horseId: id, withFoal: false }],
       { shouldDirty: true },
     );
   const setFoal = (id: string, withFoal: boolean) =>

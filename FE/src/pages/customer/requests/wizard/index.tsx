@@ -145,7 +145,10 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   const index = WIZARD_STEPS.indexOf(step);
   const goTo = (target: WizardStep, id = saved?.id, replace = false) => {
     if (!id) return;
-    const href = router.paths.get('request-edit', { pathParams: [id], queryParams: { step: target } });
+    const href = router.paths.get('request-edit', {
+      pathParams: [id],
+      queryParams: { step: target },
+    });
     if (replace) router.replace(href, { force: true });
     else router.push(href, { force: true });
   };
@@ -168,7 +171,11 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
         return null;
       }
       const view = formRefusal(
-        apiErrorView(error, FIELDS_BY_CODE, "Your draft wasn't saved. Check your connection and try again."),
+        apiErrorView(
+          error,
+          FIELDS_BY_CODE,
+          "Your draft wasn't saved. Check your connection and try again.",
+        ),
         SHOWN_FIELDS,
       );
       Object.entries(view.fields).forEach(([field, message]) =>
