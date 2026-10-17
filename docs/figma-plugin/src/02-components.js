@@ -362,7 +362,7 @@ var STALL = {
   Climate: { tok: 'stall/climate', icon: 'snowflake' }
 };
 function buildStall(parent) {
-  var b = docBlock(parent, 'Stall tile', 'One trailer or air-stall position. Type is shown by colour and label; Conflict names the broken rule in words. Target is the drop state while a horse is selected. Properties: Stall, Horse, Meta, Issue.');
+  var b = docBlock(parent, 'Stall tile', 'One trailer or air-stall position. Type is shown by colour and label; Conflict names the broken rule in words. Target is the drop state: under a dragged horse it says what the drop does (place, swap, or send the occupant back to the list); while a horse is selected every empty stall shows it. Properties: Stall, Horse, Meta, Issue.');
   var comps = [];
   Object.keys(STALL).forEach(function (type) {
     ['Empty', 'Occupied', 'Conflict', 'Target'].forEach(function (st) {
@@ -411,7 +411,7 @@ function stallI(type, state, n, o) {
 
 /* ---------- Load item ---------- */
 function buildLoadItem(parent) {
-  var b = docBlock(parent, 'Load item', 'A horse waiting to be placed on the load plan. Drag it, or select it and choose a stall (keyboard path).');
+  var b = docBlock(parent, 'Load item', 'A horse waiting to be placed on the load plan. Drag it, or select it and choose a stall (keyboard path). While dragging, a compact Selected copy rides just past the cursor so the stall below stays readable.');
   var comps = ['Default', 'Selected'].map(function (st) {
     var sel = st === 'Selected';
     var c = VV({ component: true, name: 'State=' + st, gap: 8, pad: [14, 16, 14, 16], w: 300, radius: 8, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'accent/default' : 'border/default', sw: sel ? 1.5 : 1 });
