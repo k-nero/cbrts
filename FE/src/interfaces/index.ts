@@ -7,3 +7,4 @@ export * from './trip';
 export * from './job';
 export * from './vehicle';
 export * from './horse';
+export * from './request';

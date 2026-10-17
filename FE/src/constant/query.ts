@@ -12,6 +12,15 @@ export const queryKeys = {
     sizeClasses: () => ['horses', 'size-classes'] as const,
     count: (archived: boolean) => ['horses', 'count', archived] as const,
   },
+  requests: {
+    all: () => ['requests'] as const,
+    /** The list pages (useCrudResource keys them [resource, 'page', params]). */
+    pages: () => ['requests', 'page'] as const,
+    one: (id: string) => ['requests', id] as const,
+    routes: (from: string, to: string | null) => ['routes', from, to] as const,
+    /** Under 'horses', so a horse saved or archived refreshes the pick cards. */
+    wizardHorses: () => ['horses', 'wizard'] as const,
+  },
   clearance: {
     all: () => ['clearance'] as const,
     jobs: (q = '') => ['clearance', 'jobs', 'list', q] as const,
