@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.User;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,4 +23,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     /** The customer's club; empty for staff and for a customer not yet linked to one. */
     @Query("select u.club from User u where u.id = :userId")
     Optional<Club> findClubByUserId(@Param("userId") UUID userId);
+
+    /** The club's account (one per club), to notify it of a request's progress. */
+    List<User> findByClubId(UUID clubId);
 }

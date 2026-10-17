@@ -32,6 +32,11 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
     @Query("select r from TransportRequest r where r.id = :id and r.club.id = :clubId")
     Optional<TransportRequest> findForUpdate(@Param("id") UUID id, @Param("clubId") UUID clubId);
 
+    /** Staff read any club's request; the same row lock as {@link #findForUpdate}. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from TransportRequest r where r.id = :id")
+    Optional<TransportRequest> findByIdForUpdate(@Param("id") UUID id);
+
     Page<TransportRequest> findByClubId(UUID clubId, Pageable pageable);
 
     Page<TransportRequest> findByClubIdAndStatus(UUID clubId, RequestStatus status, Pageable pageable);
