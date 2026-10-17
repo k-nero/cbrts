@@ -1,11 +1,17 @@
+import { formatDay } from './horse';
 import { ict } from './time';
 
+import type { Tone } from '@/components/ui/tone';
 import type {
   ArrivalMode,
   Blocker,
   Endpoint,
+  Horse,
   InsuranceOption,
   RequestDraftInput,
+  RequestHorse,
+  RequestStatus,
+  Route,
   ServiceClass,
   TrailerType,
   TransportMode,
@@ -210,4 +216,258 @@ export const windowLength = (from: string, until: string): string => {
   const hours = Math.floor(minutes / 60);
   const half = minutes % 60 >= 30 ? '½' : '';
   return `A ${hours}${half}-hour window.`;
+};
+
+/* ---------- the route ---------- */
+
+/** The countries we run, for "within Vietnam"; a route answers country codes only. */
+const COUNTRY_NAME: Record<string, string> = {
+  VN: 'Vietnam',
+  KH: 'Cambodia',
+  TH: 'Thailand',
+  LA: 'Laos',
+  MY: 'Malaysia',
+  HK: 'Hong Kong',
+};
+
+const km = (n: number | null): string => (n === null ? '' : n.toLocaleString('en-US'));
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** "About 960 km by road with 2 border crossings, worked out from your route." */
+export const routeSentence = (r: Route): string => {
+  const country = r.countries?.[0] ?? '';
+  const how =
+    r.mode === 'AIR'
+      ? 'by air'
+      : r.crossings.length > 0
+        ? `by road with ${plural(r.crossings.length, 'border crossing')}`
+        : `by road within ${COUNTRY_NAME[country] ?? (country || 'one country')}`;
+  return `About ${km(r.distanceKm)} km ${how}, worked out from your route.`;
+};
+
+/** The route strip's planned stops: the pickup city, each border in travel order, the destination. */
+export const routeStops = (
+  r: Route,
+): { name: string; kind: string; time: string; state: 'upcoming' }[] => [
+  { name: r.fromCity, kind: 'Pickup', time: '', state: 'upcoming' },
+  ...r.crossings.map((c, i) => ({
+    name: c.name,
+    kind: `Border ${i + 1}`,
+    time: '',
+    state: 'upcoming' as const,
+  })),
+  { name: r.toCity, kind: `~${km(r.distanceKm)} km`, time: '', state: 'upcoming' },
+];
+
+const shortCrossing = (name: string): string => name.split(' – ')[0];
+
+/** "2 · Mộc Bài, Poipet", "None · domestic". */
+export const bordersSummary = (r: Route): string =>
+  r.crossings.length === 0
+    ? 'None · domestic'
+    : `${r.crossings.length} · ${r.crossings.map((c) => shortCrossing(c.name)).join(', ')}`;
+
+/** "Mộc Bài – Bavet and Poipet – Aranyaprathet". */
+const listOf = (items: string[]): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
+/* ---------- the draft pass ---------- */
+
+export type PassRow = {
+  label: string;
+  /** Null: no step has set it yet ("Set on step N"). */
+  value: string | null;
+  step?: 2 | 3;
+  mono?: boolean;
+  tone?: 'bad' | 'warn';
+};
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "5 Oct", from YYYY-MM-DD without shifting the day. */
+const shortDay = (day: string): string => {
+  const [, m, d] = day.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]}`;
+};
+
+const TRAILER_WORDS: Record<TrailerType, string> = {
+  SHARED: 'shared load',
+  PRIVATE: 'private trailer',
+};
+const CLASS_WORDS: Record<ServiceClass, string> = {
+  ECONOMY: 'economy class',
+  BUSINESS: 'business class',
+  FIRST: 'first class',
+};
+
+/** "Road · shared load", "Air · business class". */
+const serviceWords = (
+  mode: TransportMode | null,
+  trailer: TrailerType | null,
+  airClass: ServiceClass | null,
+): string | null => {
+  if (mode === 'ROAD') return trailer ? `Road · ${TRAILER_WORDS[trailer]}` : 'Road';
+  if (mode === 'AIR') return airClass ? `Air · ${CLASS_WORDS[airClass]}` : 'Air';
+  return null;
+};
+
+/** A window always books road and a private trailer (toDraftInput sends them). */
+const effectiveService = (v: WizardValues) =>
+  v.arrivalMode === 'WINDOW'
+    ? serviceWords('ROAD', 'PRIVATE', null)
+    : serviceWords(v.mode, v.trailer, v.airClass);
+
+/**
+ * The pass's rows after Horses (DESIGN.md, Draft pass): the values as typed, the borders from the live
+ * route, and "too soon" from the saved draft while its date is still the one on the form.
+ */
+export const passRows = (
+  v: WizardValues,
+  saved: TransportRequest | undefined,
+  route: Route | null,
+  notRun: boolean,
+): PassRow[] => {
+  const day = v.departureDate;
+  const tooSoon =
+    day !== null &&
+    saved?.departureDate === day &&
+    (saved.blockers ?? []).some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
+  const flex = v.flexible && v.arrivalMode === 'ANY_TIME' ? ' · ±3 d' : '';
+  const departs: PassRow = !day
+    ? { label: 'Departs', value: null, step: 2 }
+    : tooSoon
+      ? { label: 'Departs', value: `${shortDay(day)} · too soon`, mono: true, tone: 'bad' }
+      : { label: 'Departs', value: `${formatDay(day)}${flex}`, mono: true };
+
+  let arrival: PassRow = { label: 'Arrival', value: null, step: 2 };
+  if (v.arrivalMode === 'WINDOW') {
+    if (v.arriveOn && v.windowFrom && v.windowUntil)
+      arrival = {
+        label: 'Arrival',
+        value: `${shortDay(v.arriveOn)} · ${v.windowFrom.value}–${v.windowUntil.value}`,
+        mono: true,
+      };
+  } else if (day) {
+    arrival = { label: 'Arrival', value: 'Any time on the day' };
+  }
+
+  const borders: PassRow = notRun
+    ? { label: 'Borders', value: 'Not run yet', tone: 'warn' }
+    : route
+      ? { label: 'Borders', value: bordersSummary(route) }
+      : { label: 'Borders', value: null, step: 2 };
+
+  const service = effectiveService(v);
+  return [
+    departs,
+    arrival,
+    borders,
+    service ? { label: 'Service', value: service } : { label: 'Service', value: null, step: 3 },
+  ];
+};
+
+/** "Road · shared load · 1 climate stall · your own insurance", for the Service step's footer. */
+export const serviceLine = (v: WizardValues, horses: RequestHorse[]): string => {
+  const climate = horses.filter((h) => h.requiredStall === 'CLIMATE').length;
+  const box = horses.filter((h) => h.requiredStall === 'BOX').length;
+  const insurance =
+    v.insurance === 'OWN_POLICY'
+      ? 'your own insurance'
+      : v.insurance === 'EQUIFREIGHT'
+        ? 'insured through EquiFreight'
+        : null;
+  return [
+    effectiveService(v),
+    climate ? plural(climate, 'climate stall') : null,
+    box ? plural(box, 'box stall') : null,
+    insurance,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+};
+
+/* ---------- review ---------- */
+
+export type ReviewRow = { label: string; value: string; step: FieldStep; mono?: boolean };
+
+const INSURANCE_WORDS: Record<InsuranceOption, string> = {
+  OWN_POLICY: 'Your own policy · upload it with your documents once the job is approved',
+  EQUIFREIGHT: 'Through EquiFreight, on the quotation as its own line',
+};
+
+/** What the customer is sending, in the wizard's order (DESIGN.md, Request summary). */
+export const reviewRows = (r: TransportRequest): ReviewRow[] => {
+  const dash = '—';
+  const via = r.route
+    ? r.route.crossings.length
+      ? `via ${listOf(r.route.crossings.map((c) => c.name))}`
+      : 'direct'
+    : null;
+  const destination = r.destination ? endpointLabel(r.destination) : dash;
+  const arrival =
+    r.arrivalMode === 'WINDOW' && r.windowStart && r.windowEnd
+      ? `${ict(r.windowStart).format('D MMM YYYY')}, ${ict(r.windowStart).format('HH:mm')}–${ict(r.windowEnd).format('HH:mm')}`
+      : 'Any time on the day';
+  const horses = r.horses.map((h) => (h.withFoal ? `${h.name} (with foal)` : h.name)).join(', ');
+  const flex = r.dateFlexDays === 3 ? ' · ±3 days' : '';
+  const vet = r.vetEscort ? ' · veterinary escort' : '';
+  return [
+    { label: 'Horses', value: horses || dash, step: 'horses' },
+    { label: 'Pickup', value: r.origin ? endpointLabel(r.origin) : dash, step: 'route' },
+    { label: 'Route', value: via ? `${destination} · ${via}` : destination, step: 'route' },
+    {
+      label: 'Departure',
+      value: r.departureDate ? `${formatDay(r.departureDate)}${flex}` : dash,
+      step: 'route',
+      mono: true,
+    },
+    { label: 'Arrival', value: arrival, step: 'route' },
+    { label: 'Instructions', value: r.specialInstructions ?? 'None', step: 'route' },
+    {
+      label: 'Service',
+      value: `${serviceWords(r.mode, r.trailer, r.airClass) ?? dash}${vet}`,
+      step: 'service',
+    },
+    {
+      label: 'Insurance',
+      value: r.insurance ? INSURANCE_WORDS[r.insurance] : dash,
+      step: 'service',
+    },
+  ];
+};
+
+/* ---------- small rules ---------- */
+
+/** One groom per three horses, rounded up (AGENTS.md, Quotations). */
+export const groomsFor = (count: number): number => Math.ceil(count / 3);
+
+const STATUS: Record<RequestStatus, { label: string; tone: Tone }> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  SUBMITTED: { label: 'Submitted', tone: 'info' },
+  UNDER_REVIEW: { label: 'Under review', tone: 'info' },
+  INFO_REQUIRED: { label: 'Info required', tone: 'warn' },
+  QUOTED: { label: 'Quoted', tone: 'info' },
+  CUSTOMER_ACCEPTED: { label: 'Accepted', tone: 'ok' },
+  APPROVED: { label: 'Approved', tone: 'ok' },
+  REJECTED: { label: 'Rejected', tone: 'bad' },
+  EXPIRED: { label: 'Expired', tone: 'neutral' },
+  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
+};
+
+/** A request's status in words and a tone. */
+export const requestStatusChip = (s: RequestStatus): { label: string; tone: Tone } => STATUS[s];
+
+/**
+ * The pick cards: every active horse, then any horse already on the draft that is no longer active
+ * (archived since), so the customer can see it and untick it.
+ */
+export const pickableHorses = (
+  active: Horse[],
+  onDraft: RequestHorse[],
+): { id: string; horse: Horse | null; draft: RequestHorse | null }[] => {
+  const byId = new Map(onDraft.map((h) => [h.horseId, h]));
+  const rows = active.map((h) => ({ id: h.id, horse: h, draft: byId.get(h.id) ?? null }));
+  const shown = new Set(active.map((h) => h.id));
+  for (const h of onDraft)
+    if (!shown.has(h.horseId)) rows.push({ id: h.horseId, horse: null, draft: h });
+  return rows;
 };
