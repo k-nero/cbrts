@@ -5,19 +5,21 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { AxiosError } from 'axios';
 
 import { RequestLoadState } from '../components/RequestNotFound';
+import { RequestPass } from '../components/RequestPass';
 
 import HorsesStep from './HorsesStep';
+import ReviewStep from './ReviewStep';
 import RouteStep from './RouteStep';
+import ServiceStep from './ServiceStep';
 import { wizardSchema } from './wizardSchema';
 
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import PageHeader from '@/components/PageHeader';
-import { COAT_SWATCH, cx, DraftPass, Steps } from '@/components/ui';
+import { Steps } from '@/components/ui';
 import { useRequest, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/request';
 import type { ApiError, Blocker, Horse, Route, TransportRequest } from '@/interfaces';
 import {
   apiErrorView,
-  coatOf,
   EMPTY_WIZARD,
   firstOpenStep,
   formatDate,
@@ -26,7 +28,6 @@ import {
   holdsStep,
   liveBlockers,
   shownBlockers,
-  passRows,
   STEP_FIELDS,
   stepOfBlocker,
   toDraftInput,
@@ -80,9 +81,6 @@ const FORM_FIELD: Record<string, keyof WizardValues> = {
   mode: 'mode',
 };
 
-const DRAFT_SUB =
-  'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.';
-
 const errorCode = (error: unknown): string | undefined =>
   (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data?.error;
 
@@ -93,27 +91,6 @@ const revealRefusal = (formLevel: boolean) =>
     if (field && !formLevel) field.scrollIntoView({ block: 'center', behavior: 'smooth' });
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   });
-
-/** The picked horses as overlapping coat swatches with the count, for the pass. */
-const HorseSwatches: FC<{ ids: string[]; horses: Horse[] }> = ({ ids, horses }) => (
-  <span className="flex items-center gap-2">
-    <span className="flex -space-x-1.5">
-      {ids.slice(0, 6).map((id) => {
-        const coat = coatOf(horses.find((h) => h.id === id)?.coat ?? null);
-        return (
-          <span
-            key={id}
-            aria-hidden
-            className={cx('size-4 rounded-full border-2 border-card', COAT_SWATCH[coat])}
-          />
-        );
-      })}
-    </span>
-    <span className="type-data text-ink">
-      {ids.length} {ids.length === 1 ? 'horse' : 'horses'}
-    </span>
-  </span>
-);
 
 const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> = ({
   saved,
@@ -248,38 +225,26 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
     goTo: (target) => goTo(target),
   };
 
-  const city = (o: WizardValues['origin']) => o?.city ?? null;
-  const from = route?.fromCity ?? city(values.origin);
-  const to = route?.toCity ?? city(values.destination);
-  const ids = values.horses.map((h) => h.horseId);
-
   return (
     <FormWrapper methods={methods} isSubmitting={save.isPending} layout="vertical">
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-6">
           {step === 'horses' && <HorsesStep {...props} query={horsesQuery} />}
           {step === 'route' && <RouteStep {...props} />}
-          {(step === 'service' || step === 'review') && (
-            <p className="type-body-m text-ink-2">Coming next.</p>
-          )}
+          {step === 'service' && <ServiceStep {...props} />}
+          {step === 'review' && <ReviewStep {...props} />}
         </div>
-        <DraftPass
+        <RequestPass
           className="sticky top-6"
-          from={from}
-          to={to}
-          mode={values.mode === 'AIR' && values.arrivalMode !== 'WINDOW' ? 'air' : 'road'}
-          rows={[
-            ids.length
-              ? { label: 'Horses', value: <HorseSwatches ids={ids} horses={horsesQuery.data ?? []} /> }
-              : { label: 'Horses', value: null, step: 1 },
-            ...passRows(values, saved, route, notRun),
-          ]}
+          values={values}
+          saved={saved}
+          route={route}
+          notRun={notRun}
+          horses={horsesQuery.data ?? []}
           rangeSub={
-            notRun && from && to
-              ? `No range: we don't run ${from} → ${to} yet.`
-              : step === 'review'
-                ? 'Not a quote. Once you approve the quotation, this becomes your travel pass.'
-                : DRAFT_SUB
+            step === 'review'
+              ? 'Not a quote. Once you approve the quotation, this becomes your travel pass.'
+              : undefined
           }
         />
       </div>

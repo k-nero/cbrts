@@ -4,6 +4,8 @@ import { Skeleton } from 'antd';
 
 import { horseChips } from '../../horses/components/horseCardProps';
 
+import { StepRefusal } from './parts';
+
 import type { StepProps } from '.';
 
 import { Button, Callout, Checkbox, Chip, COAT_SWATCH, cx, OptionCard } from '@/components/ui';
@@ -26,25 +28,6 @@ const subtitle = (horse: Horse, today: string) =>
   [horse.breed?.trim(), sexLabel(horse.sex), ageOf(horse.dateOfBirth, today)]
     .filter(Boolean)
     .join(' · ');
-
-/** One or several sentences from the server, said once above the footer. */
-export const StepRefusal: FC<{ messages: string[]; title?: string }> = ({ messages, title }) => {
-  if (messages.length === 0) return null;
-  const [first, ...rest] = messages;
-  return (
-    <div data-refusal>
-      <Callout tone="bad" title={rest.length && title ? title : first}>
-        {rest.length > 0 && (
-          <ul className="m-0 flex list-disc flex-col gap-1 pl-5">
-            {(title ? messages : rest).map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-        )}
-      </Callout>
-    </div>
-  );
-};
 
 type Props = StepProps & { query: ReturnType<typeof useWizardHorses> };
 

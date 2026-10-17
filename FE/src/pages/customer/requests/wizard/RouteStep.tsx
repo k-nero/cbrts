@@ -1,7 +1,7 @@
 import type { FC, ReactNode } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { StepRefusal } from './HorsesStep';
+import { Group, StepRefusal } from './parts';
 
 import type { StepProps } from '.';
 
@@ -59,20 +59,6 @@ const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }):
   ) : (
     o.label
   );
-
-const Group: FC<{ title: string; sub?: string; children: ReactNode }> = ({
-  title,
-  sub,
-  children,
-}) => (
-  <div className="flex flex-col gap-3">
-    <div className="flex flex-col gap-0.5">
-      <h3 className="type-h4 m-0 text-ink">{title}</h3>
-      {sub && <p className="type-body-s m-0 text-ink-3">{sub}</p>}
-    </div>
-    {children}
-  </div>
-);
 
 /** "Bangkok → Kuala Lumpur by road · ~1,450 km · 1 border crossing". */
 const alternativeLine = (r: Route) => {
