@@ -11,6 +11,7 @@ const FRC = 'FLEET_COORDINATOR';
  */
 export const routesConfig = [
   { path: '/login', roles: ['*'], type: 'unauthenticated', breadcrumb: '', name: 'login' },
+  { path: '/register', roles: ['*'], type: 'unauthenticated', breadcrumb: '', name: 'register' },
   { path: '/forbidden', roles: ['*'], type: 'public', breadcrumb: '', name: 'forbidden' },
   {
     path: '/design-system',
@@ -19,8 +20,8 @@ export const routesConfig = [
     breadcrumb: 'Design system',
     name: 'design-system',
   },
-  // The public landing page. The guard matches by path segment, so "/" has no config check;
-  // the page itself sends a signed-in visitor to their own home.
+  // The public landing page, open to everyone: the brand links here from every shell. The guard
+  // matches by path segment, so "/" has no config check.
   { path: '/', roles: ['*'], type: 'public', breadcrumb: '', name: 'landing' },
   {
     path: '/home',
@@ -58,7 +59,13 @@ export const routesConfig = [
     name: 'staff',
     children: [
       { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
-      { path: '/trips', roles: [FRC], type: 'authenticated', breadcrumb: 'Trip progress', name: 'staff-trips' },
+      {
+        path: '/trips',
+        roles: [FRC],
+        type: 'authenticated',
+        breadcrumb: 'Trip progress',
+        name: 'staff-trips',
+      },
       {
         path: '/jobs/:id',
         roles: ['*'],
