@@ -67,6 +67,38 @@ export const routesConfig = [
     type: 'authenticated',
     breadcrumb: 'My requests',
     name: 'my-requests',
+    children: [
+      {
+        path: '/new',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Request transport',
+        name: 'request-new',
+      },
+      {
+        path: '/{id}',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Request',
+        name: 'request',
+        children: [
+          {
+            path: '/edit',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Edit',
+            name: 'request-edit',
+          },
+          {
+            path: '/submitted',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Submitted',
+            name: 'request-submitted',
+          },
+        ],
+      },
+    ],
   },
   {
     path: '/tracking',
