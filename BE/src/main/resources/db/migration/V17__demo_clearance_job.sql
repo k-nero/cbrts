@@ -15,12 +15,39 @@ declare
     v_doc_ownership uuid;
     v_doc_insurance uuid;
 begin
-    -- 1. Find Yen (LOGISTICS_MANAGER) and Customer
-    select id into v_user_yen from users where email = 'yen.vu@equifreight.vn';
-    select id into v_user_customer from users where email = 'bookings@saigonturf.vn';
+    -- 1. Ensure roles and users exist (Yen and Customer)
+    insert into roles (id, name, description)
+    values ('a0000000-0000-0000-0000-000000000002', 'LOGISTICS_MANAGER', 'Reviews requests, issues quotations, owns escalations')
+    on conflict (name) do nothing;
 
-    if v_user_yen is null or v_user_customer is null then
-        return;
+    insert into roles (id, name, description)
+    values ('a0000000-0000-0000-0000-000000000001', 'CUSTOMER', 'Racing club or horse owner')
+    on conflict (name) do nothing;
+
+    select id into v_user_yen from users where email = 'yen.vu@equifreight.vn';
+    if v_user_yen is null then
+        v_user_yen := 'a0000000-0000-0000-0000-000000000012';
+        insert into users (id, email, first_name, last_name, staff_code, password, status)
+        values (v_user_yen, 'yen.vu@equifreight.vn', 'Hải Yến', 'Vũ', 'EF-001', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        on conflict (email) do update set email = excluded.email
+        returning id into v_user_yen;
+
+        insert into user_roles (user_id, role_id)
+        select v_user_yen, id from roles where name = 'LOGISTICS_MANAGER'
+        on conflict do nothing;
+    end if;
+
+    select id into v_user_customer from users where email = 'bookings@saigonturf.vn';
+    if v_user_customer is null then
+        v_user_customer := 'a0000000-0000-0000-0000-000000000011';
+        insert into users (id, email, first_name, last_name, password, status)
+        values (v_user_customer, 'bookings@saigonturf.vn', 'Saigon Turf', 'Club', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        on conflict (email) do update set email = excluded.email
+        returning id into v_user_customer;
+
+        insert into user_roles (user_id, role_id)
+        select v_user_customer, id from roles where name = 'CUSTOMER'
+        on conflict do nothing;
     end if;
 
     -- 2. Insert Saigon Turf Club if not exists

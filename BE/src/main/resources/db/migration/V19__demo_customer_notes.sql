@@ -11,11 +11,40 @@ declare
     v_job_041 uuid := 'a0000000-0000-0000-0000-000000000041';
     v_check_item uuid;
 begin
-    select id into v_user_customer from users where email = 'bookings@saigonturf.vn';
-    select id into v_user_lan from users where email = 'lan.nguyen@equifreight.vn';
+    -- Ensure roles exist
+    insert into roles (id, name, description)
+    values ('a0000000-0000-0000-0000-000000000001', 'CUSTOMER', 'Racing club or horse owner')
+    on conflict (name) do nothing;
 
+    insert into roles (id, name, description)
+    values ('a0000000-0000-0000-0000-000000000003', 'TRANSPORT_SPECIALIST', 'Checks documents, files with authorities, keeps the catalogs')
+    on conflict (name) do nothing;
+
+    -- Ensure demo customer and specialist exist
+    select id into v_user_customer from users where email = 'bookings@saigonturf.vn';
     if v_user_customer is null then
-        select id into v_user_customer from users limit 1;
+        v_user_customer := 'a0000000-0000-0000-0000-000000000011';
+        insert into users (id, email, first_name, last_name, password, status)
+        values (v_user_customer, 'bookings@saigonturf.vn', 'Saigon Turf', 'Club', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        on conflict (email) do update set email = excluded.email
+        returning id into v_user_customer;
+
+        insert into user_roles (user_id, role_id)
+        select v_user_customer, id from roles where name = 'CUSTOMER'
+        on conflict do nothing;
+    end if;
+
+    select id into v_user_lan from users where email = 'lan.nguyen@equifreight.vn';
+    if v_user_lan is null then
+        v_user_lan := 'a0000000-0000-0000-0000-000000000013';
+        insert into users (id, email, first_name, last_name, staff_code, password, status)
+        values (v_user_lan, 'lan.nguyen@equifreight.vn', 'Thị Lan', 'Nguyễn', 'EF-002', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        on conflict (email) do update set email = excluded.email
+        returning id into v_user_lan;
+
+        insert into user_roles (user_id, role_id)
+        select v_user_lan, id from roles where name = 'TRANSPORT_SPECIALIST'
+        on conflict do nothing;
     end if;
 
     -- Ensure clubs exist
