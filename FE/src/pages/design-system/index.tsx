@@ -14,6 +14,7 @@ import {
   ClearanceGate,
   Deadline,
   DocumentRow,
+  DraftPass,
   EstimateCard,
   FactCell,
   HorseCard,
@@ -205,17 +206,23 @@ const DesignSystemPage: FC = () => {
           </div>
           <div className="grid grid-cols-3 gap-4">
             {[
-              ['nightfall', 'Nightfall', 'Thoroughbred · Mare · 7 y'],
-              ['shadowfax', 'Shadowfax', 'Andalusian · Gelding · 9 y'],
-            ].map(([k, t, d]) => (
+              ['nightfall', 'Nightfall', 'Thoroughbred · Mare · 7 y', 'bg-coat-black'],
+              ['shadowfax', 'Shadowfax', 'Andalusian · Gelding · 9 y', 'bg-coat-grey'],
+            ].map(([k, t, d, coat]) => (
               <OptionCard
                 key={k}
                 type="checkbox"
                 selected={horses.includes(k)}
                 onChange={() => toggleHorse(k)}
+                media={<span aria-hidden className={`size-12 rounded-full ${coat}`} />}
                 title={t}
                 description={d}
-              />
+                meta={<span className="type-caption">M · 32 in · 510 kg</span>}
+              >
+                <span className="flex flex-wrap gap-2">
+                  <Chip tone="ok">Calm</Chip>
+                </span>
+              </OptionCard>
             ))}
           </div>
         </Section>
@@ -392,6 +399,14 @@ const DesignSystemPage: FC = () => {
               tags={<Chip tone="bad">Needs a box</Chip>}
               facts={{ age: '5 y', height: '16.3 hh', weight: '545 kg', size: 'L · 48' }}
             />
+            <HorseCard
+              coat="other"
+              name="Silver Bell"
+              subtitle="Lipizzan · Mare"
+              status={<Chip tone="neutral">Archived · 3 Oct 2026</Chip>}
+              tags={<Chip tone="ok">Calm</Chip>}
+              facts={{ age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32' }}
+            />
           </div>
         </Section>
 
@@ -530,6 +545,48 @@ const DesignSystemPage: FC = () => {
                   Send reminder
                 </Button>
               }
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Draft pass"
+          description="The request drawn as the pass it becomes once approved. It fills in as the wizard's steps are done; a value no step has set says which step sets it, and the stub never shows a single price."
+        >
+          <div className="grid grid-cols-3 items-start gap-6">
+            <DraftPass
+              from={null}
+              to={null}
+              rows={[
+                { label: 'Departs', value: null, step: 2 },
+                { label: 'Arrival', value: null, step: 2 },
+                { label: 'Borders', value: null, step: 2 },
+                { label: 'Service', value: null, step: 3 },
+              ]}
+              rangeSub="Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days."
+            />
+            <DraftPass
+              from="Bangkok"
+              to="Singapore"
+              rows={[
+                { label: 'Departs', value: null, step: 2 },
+                { label: 'Arrival', value: null, step: 2 },
+                { label: 'Borders', value: 'Not run yet', tone: 'warn' },
+                { label: 'Service', value: null, step: 3 },
+              ]}
+              rangeSub="No range: we don't run Bangkok → Singapore yet."
+            />
+            <DraftPass
+              chip={{ tone: 'neutral', label: 'Submitted' }}
+              from="Ho Chi Minh City"
+              to="Bangkok"
+              rows={[
+                { label: 'Departs', value: '30 Oct 2026 · ±3 d', mono: true },
+                { label: 'Arrival', value: 'Any time on the day' },
+                { label: 'Borders', value: '2 · Mộc Bài, Poipet' },
+                { label: 'Service', value: 'Road · shared load' },
+              ]}
+              rangeSub="Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days."
             />
           </div>
         </Section>

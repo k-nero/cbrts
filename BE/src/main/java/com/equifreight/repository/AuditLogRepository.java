@@ -11,9 +11,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for append-only audit log records (BR-F1-08 / AGENTS.md).
- */
+/** The append-only audit log (BR-F1-08). The same shape as on feat/flow-2-clearance, so the two merge. */
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSpecificationExecutor<AuditLog> {
 

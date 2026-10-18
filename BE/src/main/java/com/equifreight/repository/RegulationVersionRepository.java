@@ -11,17 +11,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** The same methods as on feat/flow-2-clearance, so the two branches keep one copy. */
 @Repository
 public interface RegulationVersionRepository
         extends JpaRepository<RegulationVersion, UUID>, JpaSpecificationExecutor<RegulationVersion> {
 
     /**
-     * Lấy tất cả phiên bản quy định của 1 quốc gia (theo catalog).
+     * Every version of one country's catalog.
      */
     List<RegulationVersion> findByCatalogId(UUID catalogId);
 
     /**
-     * Tìm các phiên bản theo trạng thái (PUBLISHED, DRAFT, RETIRED).
+     * A catalog's versions in one status, newest version first.
      */
     @Query(
             "SELECT rv FROM RegulationVersion rv WHERE rv.catalog.id = :catalogId AND rv.status = :status ORDER BY rv.versionNo DESC")
@@ -29,7 +30,7 @@ public interface RegulationVersionRepository
             @Param("catalogId") UUID catalogId, @Param("status") CatalogStatus status);
 
     /**
-     * Tìm phiên bản DRAFT duy nhất (tối đa 1) của 1 catalog.
+     * The one draft of a catalog (at most one).
      */
     Optional<RegulationVersion> findByCatalogIdAndStatus(UUID catalogId, CatalogStatus status);
 }

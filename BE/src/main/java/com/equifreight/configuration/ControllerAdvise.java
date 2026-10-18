@@ -5,6 +5,7 @@ import com.equifreight.model.common.ApiError;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,7 +46,7 @@ public class ControllerAdvise {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(ConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiError.of(HttpStatus.CONFLICT.value(), ex.getCode(), ex.getMessage()));
+                .body(ApiError.of(HttpStatus.CONFLICT.value(), ex.getCode(), ex.getMessage(), ex.getDetails()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -145,10 +146,28 @@ public class ControllerAdvise {
                         "These results can't be sorted by " + ex.getPropertyName() + "."));
     }
 
+    // A write the database refused (a unique, foreign-key or check constraint) that no service turned into its own
+    // ConflictException. The exception's message holds the SQL statement and the failing row's values, so it stays
+    // in the log and the client gets a generic 409.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation", ex);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(
+                        HttpStatus.CONFLICT.value(),
+                        "DATA_CONFLICT",
+                        "This change conflicts with existing data. Reload and try again."));
+    }
+
+    // Anything else is our bug. Its message can carry SQL, ids or stack details, so the client gets a fixed text
+    // and the full exception goes to the log.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiError.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", ex.getMessage()));
+                .body(ApiError.of(
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "Internal Server Error",
+                        "Something went wrong on our side. Try again, and tell us if it keeps happening."));
     }
 }

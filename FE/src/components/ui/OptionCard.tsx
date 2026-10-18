@@ -14,6 +14,8 @@ type Props = {
   onChange?: (selected: boolean, event: ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   icon?: IconName;
+  /** In place of the icon: a 48 px coat swatch on a horse pick card. */
+  media?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   /**
@@ -21,6 +23,8 @@ type Props = {
    * answers a note. On a disabled card it names why and the nearest alternative (warn tone).
    */
   meta?: ReactNode;
+  /** Under the meta: a horse's chips, or a note on what picking it changes. */
+  children?: ReactNode;
   className?: string;
 };
 
@@ -36,9 +40,11 @@ export const OptionCard: FC<Props> = ({
   onChange,
   disabled,
   icon,
+  media,
   title,
   description,
   meta,
+  children,
   className,
 }) => (
   <label
@@ -63,7 +69,9 @@ export const OptionCard: FC<Props> = ({
       className="sr-only"
     />
     <span className="flex items-center justify-between">
-      {icon ? (
+      {media ? (
+        media
+      ) : icon ? (
         <span className="grid size-9 place-items-center rounded-md bg-muted text-ink-2">
           <Icon name={icon} size={20} />
         </span>
@@ -77,5 +85,6 @@ export const OptionCard: FC<Props> = ({
     {meta && (
       <span className={cx('type-label-s', disabled ? 'text-warn' : 'text-ink-2')}>{meta}</span>
     )}
+    {children}
   </label>
 );

@@ -5,7 +5,8 @@ import { Nameplate } from './Nameplate';
 import { Progress } from './Progress';
 import { cx } from './tone';
 
-export type Coat = 'grey' | 'black' | 'chestnut' | 'bay';
+/** `other` is the neutral band for a coat outside the four (OTHER) or none given. */
+export type Coat = 'grey' | 'black' | 'chestnut' | 'bay' | 'other';
 
 /** The coat as a fill: the horse card band, and the 12 px swatch in horse lists. */
 export const COAT_SWATCH: Record<Coat, string> = {
@@ -13,6 +14,7 @@ export const COAT_SWATCH: Record<Coat, string> = {
   black: 'bg-coat-black',
   chestnut: 'bg-coat-chestnut',
   bay: 'bg-coat-bay',
+  other: 'bg-muted',
 };
 
 type Props = {
@@ -28,19 +30,36 @@ type Props = {
   notes?: ReactNode;
   /** Documents cleared for the active job. */
   readiness?: { label: ReactNode; cleared: number; total: number };
+  /** A state chip above the tags, e.g. "Archived · 3 Oct 2026". */
+  status?: ReactNode;
   actions?: ReactNode;
   className?: string;
 };
 
-/** The coat band with its brass nameplate on top (148 px), shared by the horse card and profile header. */
-export const CoatBand: FC<{ coat: Coat; name: ReactNode; subtitle?: ReactNode }> = ({
-  coat,
-  name,
-  subtitle,
-}) => (
-  <div className={cx('relative h-[148px] overflow-hidden', COAT_SWATCH[coat])}>
+const COAT_LABEL: Record<Coat, string> = {
+  grey: 'grey',
+  black: 'black',
+  chestnut: 'chestnut',
+  bay: 'bay',
+  other: 'other',
+};
+
+/**
+ * The coat band with its brass nameplate on top, shared by the horse card (148 px) and the profile
+ * header (132 px, rounded).
+ */
+export const CoatBand: FC<{
+  coat: Coat;
+  name: ReactNode;
+  subtitle?: ReactNode;
+  height?: number;
+  className?: string;
+}> = ({ coat, name, subtitle, height = 148, className }) => (
+  <div className={cx('relative overflow-hidden', COAT_SWATCH[coat], className)} style={{ height }}>
     <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45" />
-    <span className="type-mono-label absolute top-[18px] right-5 text-white/80">{coat}</span>
+    <span className="type-mono-label absolute top-[18px] right-5 text-white/80">
+      {COAT_LABEL[coat]}
+    </span>
     <Nameplate name={name} subtitle={subtitle} className="absolute bottom-5 left-5" />
   </div>
 );
@@ -56,6 +75,7 @@ export const HorseCard: FC<Props> = ({
   declaredValue,
   notes,
   readiness,
+  status,
   actions,
   className,
 }) => (
@@ -64,6 +84,7 @@ export const HorseCard: FC<Props> = ({
   >
     <CoatBand coat={coat} name={name} subtitle={subtitle} />
     <div className="flex flex-col gap-4 p-5">
+      {status && <div className="flex">{status}</div>}
       {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}
       <div className="grid grid-cols-4 gap-1">
         <FactCell label="Age" value={facts.age} />

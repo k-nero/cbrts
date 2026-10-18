@@ -1,6 +1,7 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.Horse;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,11 @@ public interface HorseRepository extends JpaRepository<Horse, UUID>, JpaSpecific
      * Archived horses count too: the seeder leaves a club that has ever had horses alone.
      */
     boolean existsByClubId(UUID clubId);
+
+    /**
+     * The club's horses among these ids; another club's horse is never found.
+     */
+    List<Horse> findByClubIdAndIdIn(UUID clubId, Collection<UUID> ids);
 
     /**
      * Microchips are unique across every club.

@@ -97,7 +97,7 @@ Where to look elsewhere:
 - **Packages** live under `com.equifreight`: `controller` (with `controller/admin` for staff admin), `service`, `repository`, `entity` (`entity/enums`), `model` (request and response DTOs per area), `exception`, `configuration`, `job`.
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V15` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V18` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
   - It ratchets from `origin/main`: only the Java files your branch changes are checked and formatted, so run `git fetch origin` first if your `origin/main` is old.
   - It never touches `src/main/resources/db/migration`. If you use IntelliJ's Reformat Code on a directory, exclude `db/migration` (or reformat only the files you changed), because Flyway checksums every merged migration and even a whitespace change makes validation fail on databases that already ran it.
