@@ -32,7 +32,7 @@ import java.util.UUID;
 public final class QuotePricer {
 
     /** One air stall position is 96 inches wide. */
-    static final int POSITION_WIDTH_IN = 96;
+    public static final int POSITION_WIDTH_IN = 96;
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final Set<String> BREAK_GROUPS = Set.of("A", "C", "G");
