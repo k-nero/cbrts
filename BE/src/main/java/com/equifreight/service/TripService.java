@@ -78,14 +78,6 @@ public class TripService {
         return new ConflictException("TRIP_STATE_CONFLICT", "%s Current trip status: %s.".formatted(reason, status));
     }
 
-    private static String stopName(RouteStop stop) {
-        return stop.getBorderCrossing() != null
-                ? stop.getBorderCrossing().getName()
-                : stop.getPlace() == null
-                        ? stop.getKind().name()
-                        : stop.getPlace().getName();
-    }
-
     @Transactional(readOnly = true)
     public Page<TripSummaryResponse> escortTrips(User user, Pageable pageable) {
         return crew.findTripSummariesByUserId(user.getId(), pageable);
@@ -141,7 +133,7 @@ public class TripService {
             if (!existing.get().getJob().getId().equals(job.getId()))
                 throw new ConflictException(
                         "TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
-            return mapRecord(existing.get());
+            return TripMapper.toRecordResponse(existing.get());
         }
         boolean late = validateTransition(job, request.kind(), request.occurredAt());
         boolean hasConditions =
@@ -207,7 +199,7 @@ public class TripService {
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) updateJobStatus(job, request.kind(), request.occurredAt(), stop);
         writeAudit(saved, user, channel, stop);
-        return mapRecord(saved);
+        return TripMapper.toRecordResponse(saved);
     }
 
     /**
@@ -332,7 +324,10 @@ public class TripService {
         entry.setDeviceRecordedAt(record.getOccurredAt());
         entry.setAction("TRIP_RECORD_RECORDED");
         entry.setSummary("Recorded %s for %s%s"
-                .formatted(record.getKind(), record.getJob().getCode(), stop == null ? "" : " at " + stopName(stop)));
+                .formatted(
+                        record.getKind(),
+                        record.getJob().getCode(),
+                        stop == null ? "" : " at " + TripMapper.stopName(stop)));
         entry.setEntityType("TRIP_RECORD");
         entry.setEntityId(record.getId());
         entry.setEntityCode(record.getJob().getCode());
@@ -350,101 +345,25 @@ public class TripService {
         List<TripStopResponse> stops = routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(
                         job.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
-                        .map(s -> {
-                            TripRecord r = latest.get(s.getId());
-                            return new TripStopResponse(
-                                    s.getId(),
-                                    s.getSeq(),
-                                    s.getKind().name(),
-                                    stopName(s),
-                                    s.getPlannedAt(),
-                                    s.getPlannedStayMin(),
-                                    s.getDetails(),
-                                    r == null ? null : r.getKind(),
-                                    r == null ? null : r.getOccurredAt(),
-                                    r == null ? null : r.getText(),
-                                    r == null || r.getRecordedBy() == null
-                                            ? null
-                                            : (r.getRecordedBy().getFirstName() + " "
-                                                            + r.getRecordedBy().getLastName())
-                                                    .strip());
-                        })
+                        .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
                         .toList())
                 .orElse(List.of());
         LoadPlan load = loads.findTopByJob_IdAndStatusOrderByConfirmedAtDesc(job.getId(), LoadPlanStatus.CONFIRMED)
                 .orElse(null);
-        Map<UUID, String> stalls = new HashMap<>();
-        if (load != null)
-            load.getStalls()
-                    .forEach(s -> stalls.put(
-                            s.getHorse().getId(),
-                            "Stall %d · %s"
-                                    .formatted(
-                                            s.getVehicleStall().getPositionNo(),
-                                            s.getVehicleStall()
-                                                    .getStallType()
-                                                    .name()
-                                                    .toLowerCase(Locale.ROOT))));
+        Map<UUID, LoadPlanStall> stalls = new HashMap<>();
+        if (load != null) load.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s));
         List<TripHorseResponse> horses = requestHorses
                 .findByRequest_Id(job.getRequest().getId())
                 .stream()
-                .map(rh -> new TripHorseResponse(
-                        rh.getHorse().getId(),
-                        rh.getHorse().getName(),
-                        stalls.get(rh.getHorse().getId())))
+                .map(rh -> TripMapper.toHorseResponse(
+                        rh.getHorse(), stalls.get(rh.getHorse().getId())))
                 .toList();
-        return new TripViewResponse(
-                job.getCode(),
-                job.getTripStatus(),
-                job.getDossierStatus() == DossierStatus.CLEARANCE_READY,
-                job.getPlannedDepartureAt(),
-                job.getPlannedArrivalAt(),
-                job.getWindowStart(),
-                job.getWindowEnd(),
-                job.getRequest().getOriginPlace() == null
-                        ? null
-                        : job.getRequest().getOriginPlace().getName(),
-                job.getRequest().getDestinationPlace() == null
-                        ? null
-                        : job.getRequest().getDestinationPlace().getName(),
+        return TripMapper.toViewResponse(
+                job,
                 load == null ? null : load.getVehicle().getCode(),
                 stops,
                 horses,
-                tripRecords.stream().map(this::mapRecord).toList());
-    }
-
-    private TripRecordResponse mapRecord(TripRecord record) {
-        return new TripRecordResponse(
-                record.getId(),
-                record.getRouteStop() == null ? null : record.getRouteStop().getId(),
-                record.getRouteStop() == null ? null : stopName(record.getRouteStop()),
-                record.getKind(),
-                record.getOccurredAt(),
-                record.getReceivedAt(),
-                record.getClientRef(),
-                record.getRecordedBy() == null
-                        ? null
-                        : (record.getRecordedBy().getFirstName() + " "
-                                        + record.getRecordedBy().getLastName())
-                                .strip(),
-                record.getChannel(),
-                record.getText(),
-                record.getConditionLogs().stream()
-                        .map(log -> new TripConditionResponse(
-                                log.getHorse().getId(),
-                                log.getHorse().getName(),
-                                log.getCondition(),
-                                log.getDrinking(),
-                                log.getEating(),
-                                log.getNote(),
-                                log.getFiles().stream()
-                                        .map(file -> new TripPhotoResponse(
-                                                file.getId(),
-                                                file.getFileName(),
-                                                file.getContentType(),
-                                                "/api/v1/files/" + file.getId() + "/content?inline=true"))
-                                        .toList()))
-                        .toList());
+                tripRecords.stream().map(TripMapper::toRecordResponse).toList());
     }
 
     private TransportJob job(String code) {

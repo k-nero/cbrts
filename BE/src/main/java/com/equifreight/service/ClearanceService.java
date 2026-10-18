@@ -117,13 +117,7 @@ public class ClearanceService {
     public Page<JobSummaryResponse> getActiveJobs(String q, Pageable pageable) {
         return transportJobRepository
                 .findOpenDossiers(q == null ? "" : q.strip(), pageable)
-                .map(job -> JobSummaryResponse.builder()
-                        .id(job.getId())
-                        .code(job.getCode())
-                        .dossierStatus(job.getDossierStatus())
-                        .stage(job.getStage())
-                        .clubName(job.getRequest().getClub().getName())
-                        .build());
+                .map(ClearanceMapper::toJobSummaryResponse);
     }
 
     /**
@@ -522,20 +516,14 @@ public class ClearanceService {
             boolean hasAdditionalInfo,
             List<String> outstandingIssues) {
         ClearanceStatusResponse toResponse(TransportJob job) {
-            return ClearanceStatusResponse.builder()
-                    .jobId(job.getId())
-                    .jobCode(job.getCode())
-                    .dossierStatus(job.getDossierStatus())
-                    .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
-                    .clearanceReadyAt(job.getClearanceReadyAt())
-                    .totalChecklistItems(totalItems)
-                    .mandatoryItems(mandatoryItems)
-                    .clearedMandatoryItems(clearedMandatoryItems)
-                    .totalQuarantines(totalQuarantines)
-                    .completedQuarantines(completedQuarantines)
-                    .allQuarantinesCompleted(completedQuarantines == totalQuarantines)
-                    .outstandingIssues(outstandingIssues)
-                    .build();
+            return ClearanceMapper.toStatusResponse(
+                    job,
+                    totalItems,
+                    mandatoryItems,
+                    clearedMandatoryItems,
+                    totalQuarantines,
+                    completedQuarantines,
+                    outstandingIssues);
         }
     }
 }

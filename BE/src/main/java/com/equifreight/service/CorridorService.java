@@ -5,6 +5,7 @@ import com.equifreight.entity.User;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.route.CorridorResponse;
+import com.equifreight.model.route.RouteMapper;
 import com.equifreight.repository.CorridorRepository;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -34,7 +35,7 @@ public class CorridorService {
 
     @Transactional(readOnly = true)
     public Page<CorridorResponse> list(Pageable pageable) {
-        return corridors.findAll(pageable).map(CorridorResponse::of);
+        return corridors.findAll(pageable).map(RouteMapper::toCorridorResponse);
     }
 
     /** Sets the route's flex days and writes the decision to the audit log; the same value changes nothing. */
@@ -49,7 +50,7 @@ public class CorridorService {
         }
         int before = corridor.getDateFlexDays();
         if (before == days) {
-            return CorridorResponse.of(corridor);
+            return RouteMapper.toCorridorResponse(corridor);
         }
         corridor.setDateFlexDays((short) days);
         Corridor saved = corridors.save(corridor);
@@ -63,7 +64,7 @@ public class CorridorService {
                 null,
                 "{\"dateFlexDays\":" + before + "}",
                 "{\"dateFlexDays\":" + days + "}");
-        return CorridorResponse.of(saved);
+        return RouteMapper.toCorridorResponse(saved);
     }
 
     /** "±3 days", "±1 day", "fixed dates only". */
