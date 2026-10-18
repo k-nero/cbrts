@@ -25,6 +25,10 @@ public class RouteResponse {
     private String fromCity;
     private String toCity;
     private Integer distanceKm;
+
+    /** How far flexible dates can move on this route (#115): the wizard's "±N days". */
+    private Integer dateFlexDays;
+
     private List<CrossingResponse> crossings;
     private List<String> countries;
     private Boolean crossBorder;

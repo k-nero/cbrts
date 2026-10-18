@@ -115,6 +115,22 @@ class LeadTimePolicyTest {
                                 + "the earliest departure is 20 Oct 2026.");
     }
 
+    @Test
+    void fixedDatesHaveNoFlexWhateverTheRoute() {
+        assertThat(LeadTimePolicy.flexDaysFor(0, 5)).isZero();
+    }
+
+    @Test
+    void flexibleDatesTakeTheRoutesFlexDays() {
+        assertThat(LeadTimePolicy.flexDaysFor(3, 5)).isEqualTo(5);
+        assertThat(LeadTimePolicy.flexDaysFor(3, 0)).isZero();
+    }
+
+    @Test
+    void beforeARouteIsKnownTheAskedFlexStandsIn() {
+        assertThat(LeadTimePolicy.flexDaysFor(3, null)).isEqualTo(3);
+    }
+
     private static RegulationVersion version(int crossBorder, int domestic) {
         RegulationVersion v = new RegulationVersion();
         v.setLeadTimeDays((short) crossBorder);

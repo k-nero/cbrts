@@ -261,6 +261,35 @@ class SubmissionCheckTest {
     }
 
     @Test
+    void flexibleDatesUseTheRoutesFlexDays() {
+        resolution = resolvedWithFlex(21, 5);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 20));
+
+        assertThat(messages())
+                .containsExactly("Cross-border moves need 21 days for document clearance. "
+                        + "With dates that can move by ±5 days, the earliest departure is 22 Oct 2026.");
+    }
+
+    @Test
+    void flexibleDatesPassOnTheRoutesMovedEarliestDate() {
+        resolution = resolvedWithFlex(21, 5);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        assertThat(blockers()).isEmpty();
+    }
+
+    @Test
+    void aRouteOnFixedDatesOnlyChecksFlexibleDatesAsFixed() {
+        resolution = resolvedWithFlex(21, 0);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 17));
+
+        assertThat(blockers()).isEmpty();
+    }
+
+    @Test
     void serviceChoicesBlockUntilMade() {
         request.setTrailer(null);
         request.setInsurance(null);
@@ -320,6 +349,25 @@ class SubmissionCheckTest {
         request.setTrailer(TrailerType.PRIVATE);
         request.setWindowStart(start);
         request.setWindowEnd(start.plusSeconds(4 * 3600));
+    }
+
+    /** A cross-border route of `leadTimeDays` whose flexible dates can move `flexDays` (#115). */
+    private RouteResolution resolvedWithFlex(int leadTimeDays, int flexDays) {
+        Corridor corridor = new Corridor();
+        corridor.setCode("RD HCM → BKK");
+        corridor.setMode(TransportMode.ROAD);
+        corridor.setDateFlexDays((short) flexDays);
+        RouteResponse route = RouteResponse.builder()
+                .code("RD HCM → BKK")
+                .mode(TransportMode.ROAD)
+                .fromCity("Ho Chi Minh City")
+                .toCity("Bangkok")
+                .crossBorder(true)
+                .leadTimeDays(leadTimeDays)
+                .dateFlexDays(flexDays)
+                .earliestDeparture(TODAY.plusDays(leadTimeDays))
+                .build();
+        return new RouteResolution(corridor, route, Set.of(TransportMode.ROAD), null, false, false);
     }
 
     private RouteResolution resolved(int leadTimeDays, boolean crossBorder) {

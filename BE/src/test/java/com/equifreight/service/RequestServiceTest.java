@@ -346,13 +346,35 @@ class RequestServiceTest {
     }
 
     @Test
-    void flexIsZeroOrThree() {
-        RequestDraftRequest two = body();
-        two.setDateFlexDays(2);
-        assertRefused(two, "DATE_FLEX", "Dates can move by 0 or 3 days; 2 was given.");
+    void flexIsZeroToSevenDays() {
+        RequestDraftRequest eight = body();
+        eight.setDateFlexDays(8);
+        assertRefused(eight, "DATE_FLEX", "Dates can move by 0 to 7 days; 8 was given.");
+        RequestDraftRequest negative = body();
+        negative.setDateFlexDays(-1);
+        assertRefused(negative, "DATE_FLEX", "Dates can move by 0 to 7 days; -1 was given.");
 
         service.create(user, body());
         assertThat(savedRequest().getDateFlexDays()).isZero();
+    }
+
+    @Test
+    void aFlexibleDraftTakesItsRoutesFlexDays() {
+        Corridor hcmBkk = new Corridor();
+        hcmBkk.setCode("RD HCM → BKK");
+        hcmBkk.setDateFlexDays((short) 5);
+        when(routes.resolve(phuTho, null, chaoPhraya, null, TransportMode.ROAD))
+                .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
+        RequestDraftRequest body = body(shadowfax);
+        body.setOriginPlaceId(phuTho.getId());
+        body.setDestinationPlaceId(chaoPhraya.getId());
+        body.setMode(TransportMode.ROAD);
+        body.setDateFlexDays(3);
+
+        RequestResponse response = service.create(user, body);
+
+        assertThat(savedRequest().getDateFlexDays()).isEqualTo((short) 5);
+        assertThat(response.getDateFlexDays()).isEqualTo(5);
     }
 
     @Test
@@ -608,6 +630,36 @@ class RequestServiceTest {
                             "REQ-2026-0193",
                             null,
                             null);
+        }
+
+        @Test
+        void submitCopiesTheRoutesCurrentFlexDays() {
+            draft.setDateFlexDays((short) 3);
+            hcmBkk.setDateFlexDays((short) 5);
+
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(draft.getDateFlexDays()).isEqualTo((short) 5);
+            assertThat(response.getDateFlexDays()).isEqualTo(5);
+            verify(audit)
+                    .recordSystem(
+                            "LEAD_TIME_CHECKED",
+                            "Lead time checked: 34 days before departure, 21 required, plus 5 for dates that can move by ±5 days.",
+                            "TRANSPORT_REQUEST",
+                            draft.getId(),
+                            "REQ-2026-0193",
+                            null,
+                            null);
+        }
+
+        @Test
+        void aRouteOnFixedDatesOnlyMakesTheRequestFixed() {
+            draft.setDateFlexDays((short) 3);
+            hcmBkk.setDateFlexDays((short) 0);
+
+            service.submit(user, draft.getId());
+
+            assertThat(draft.getDateFlexDays()).isZero();
         }
 
         @Test
