@@ -28,6 +28,8 @@ public class RouteResponse {
     private Integer distanceKm;
     private List<CrossingResponse> crossings;
     private List<String> countries;
+    /** The same countries by name, in travel order ("Vietnam", "Cambodia"). */
+    private List<String> countryNames;
     private Boolean crossBorder;
     private Integer leadTimeDays;
     private LocalDate earliestDeparture;

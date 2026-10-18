@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The feasibility checks the review page can work out today (spec §4.4): is the route still one we run, and
@@ -19,18 +18,14 @@ import java.util.Map;
  */
 public final class ReviewChecks {
 
-    /** The countries we move horses between; the route answers codes only. */
-    private static final Map<String, String> COUNTRY = Map.of(
-            "VN", "Vietnam", "KH", "Cambodia", "TH", "Thailand", "LA", "Laos", "MY", "Malaysia", "HK", "Hong Kong");
-
     private ReviewChecks() {}
 
     public static CheckResponse routeServed(RouteResponse route) {
         if (route == null) {
             return check("ROUTE_SERVED", false, "Not served", "This route is no longer in the catalog.", null);
         }
-        List<String> names = route.getCountries() == null ? List.of()
-                : route.getCountries().stream().map(c -> COUNTRY.getOrDefault(c, c)).toList();
+        List<String> names = route.getCountryNames() != null ? route.getCountryNames()
+                : route.getCountries() != null ? route.getCountries() : List.of();
         String path = String.join(" → ", names);
         String evidence;
         if (route.getMode() == TransportMode.AIR) {

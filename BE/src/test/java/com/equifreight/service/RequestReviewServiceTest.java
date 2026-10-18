@@ -162,6 +162,41 @@ class RequestReviewServiceTest {
     }
 
     @Test
+    void aRequestWithNoVersionIsRefusedNotHalfReturned() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), NOTE))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This request has no submitted version to return. Ask an administrator to check it.")
+                .extracting("code").isEqualTo("REQUEST_HAS_NO_VERSION");
+        assertThat(r.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
+        verify(requests, never()).save(any());
+        verifyNoInteractions(audit, notifications);
+    }
+
+    @Test
+    void theViewCountsLeadTimeFromTheLatestVersionInBusinessTime() {
+        TransportRequest r = inReview(RequestStatus.SUBMITTED);
+        r.setDepartureDate(LocalDate.of(2026, 10, 30));
+        RequestRevision v2 = revision(r, 2, null);
+        v2.setSubmittedAt(Instant.parse("2026-09-26T18:30:00Z"));
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of(revision(r, 1, "Which?"), v2));
+        when(routes.resolve(any(), any(), any(), any(), any())).thenReturn(new RouteResolution(null,
+                com.equifreight.model.route.RouteResponse.builder().mode(TransportMode.ROAD)
+                        .countries(List.of("VN", "TH")).countryNames(List.of("Vietnam", "Thailand"))
+                        .crossings(List.of()).crossBorder(true).leadTimeDays(21).build(),
+                java.util.Set.of(TransportMode.ROAD), null, false, false));
+
+        RequestReviewResponse view = service.view(r.getId());
+
+        assertThat(view.getChecks().get(1).getState()).isEqualTo("OK");
+        assertThat(view.getChecks().get(1).getEvidence())
+                .isEqualTo("Submitted 33 days before departure; 21 required for a cross-border move.");
+        assertThat(view.getChecks().get(1).getSub()).isEqualTo("Departs in 32 days.");
+    }
+
+    @Test
     void anUnknownRequestAnswers404() {
         UUID unknown = UUID.randomUUID();
         when(requests.findByIdForUpdate(unknown)).thenReturn(Optional.empty());
@@ -342,6 +377,9 @@ class RequestReviewServiceTest {
         }
         when(requests.findByIdForUpdate(r.getId())).thenReturn(Optional.of(r));
         when(requests.findById(r.getId())).thenReturn(Optional.of(r));
+        if (status != RequestStatus.DRAFT) {
+            when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of(revision(r, 1, null)));
+        }
         return r;
     }
 }

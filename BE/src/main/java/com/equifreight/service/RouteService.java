@@ -168,7 +168,7 @@ public class RouteService {
         }
         put(countries, destination.getCountry());
         List<String> codes = List.copyOf(countries.keySet());
-        route.countries(codes).crossBorder(codes.size() > 1);
+        route.countries(codes).countryNames(List.copyOf(countries.values())).crossBorder(codes.size() > 1);
 
         Map<String, RegulationVersion> published = new HashMap<>();
         for (String code : codes) {

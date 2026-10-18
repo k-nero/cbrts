@@ -72,8 +72,6 @@ public class RequestService {
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     /** The audit action of a return for information (US-F1-04); RequestReviewService writes it. */
     static final String INFO_REQUIRED_ACTION = "REQUEST_INFO_REQUIRED";
-    /** audit_log.summary is varchar(500). */
-    private static final int AUDIT_SUMMARY_MAX = 500;
 
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
@@ -217,7 +215,7 @@ public class RequestService {
     static String horsesSummary(String lead, List<String> names) {
         String head = lead + names.size() + (names.size() == 1 ? " horse: " : " horses: ");
         String all = head + String.join(", ", names) + ".";
-        if (all.length() <= AUDIT_SUMMARY_MAX) {
+        if (all.length() <= AuditText.MAX) {
             return all;
         }
         StringBuilder listed = new StringBuilder();
@@ -225,7 +223,7 @@ public class RequestService {
         for (String name : names) {
             String next = (shown == 0 ? "" : ", ") + name;
             String tail = " and " + (names.size() - shown - 1) + " more.";
-            if (head.length() + listed.length() + next.length() + tail.length() > AUDIT_SUMMARY_MAX) {
+            if (head.length() + listed.length() + next.length() + tail.length() > AuditText.MAX) {
                 break;
             }
             listed.append(next);

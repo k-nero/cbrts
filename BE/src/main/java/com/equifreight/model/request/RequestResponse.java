@@ -17,7 +17,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** A transport request. {@code leadTime} and {@code blockers} are only worked out for a draft. */
+/**
+ * A transport request. {@code leadTime} and {@code blockers} are worked out while the customer may still change
+ * it: a draft, or a request returned for information.
+ */
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor

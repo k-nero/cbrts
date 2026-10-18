@@ -18,7 +18,8 @@ class ReviewChecksTest {
     static final LocalDate TODAY = LocalDate.of(2026, 9, 28);
 
     static RouteResponse road(List<String> countries, List<String> crossings, boolean crossBorder, int leadTime) {
-        return RouteResponse.builder().mode(TransportMode.ROAD).countries(countries).crossBorder(crossBorder)
+        return RouteResponse.builder().mode(TransportMode.ROAD).countries(countries)
+                .countryNames(countries.stream().map(ReviewChecksTest::name).toList()).crossBorder(crossBorder)
                 .crossings(crossings.stream().map(n -> CrossingResponse.builder().name(n).build()).toList())
                 .leadTimeDays(leadTime).build();
     }
@@ -38,6 +39,7 @@ class ReviewChecksTest {
     @Test
     void anAirRouteIsServedByAir() {
         RouteResponse air = RouteResponse.builder().mode(TransportMode.AIR).countries(List.of("VN", "HK"))
+                .countryNames(List.of("Vietnam", "Hong Kong"))
                 .crossings(List.of()).crossBorder(true).leadTimeDays(21).build();
 
         assertThat(ReviewChecks.routeServed(air).getEvidence()).isEqualTo("Vietnam → Hong Kong by air.");
@@ -47,6 +49,25 @@ class ReviewChecksTest {
     void aDomesticRoadRouteSaysWithin() {
         assertThat(ReviewChecks.routeServed(road(List.of("VN"), List.of(), false, 3)).getEvidence())
                 .isEqualTo("Within Vietnam by road.");
+    }
+
+    @Test
+    void aRouteWithoutNamesFallsBackToItsCodes() {
+        RouteResponse bare = RouteResponse.builder().mode(TransportMode.ROAD).countries(List.of("VN", "KH"))
+                .crossings(List.of(CrossingResponse.builder().name("Mộc Bài – Bavet").build())).build();
+
+        assertThat(ReviewChecks.routeServed(bare).getEvidence()).isEqualTo("VN → KH via Mộc Bài – Bavet.");
+    }
+
+    static String name(String code) {
+        return switch (code) {
+            case "VN" -> "Vietnam";
+            case "KH" -> "Cambodia";
+            case "TH" -> "Thailand";
+            case "LA" -> "Laos";
+            case "MY" -> "Malaysia";
+            default -> "Hong Kong";
+        };
     }
 
     @Test

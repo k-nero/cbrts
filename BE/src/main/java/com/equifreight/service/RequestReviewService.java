@@ -23,6 +23,7 @@ import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ import java.util.regex.Pattern;
  * for review, the review view, and returning a request to the customer with a note. Every decision writes
  * an audit row in the same transaction (BR-F1-08).
  */
+@Log4j2
 @Service
 public class RequestReviewService {
 
@@ -50,7 +52,6 @@ public class RequestReviewService {
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     /** Leading and trailing white space as the browser's trim() sees it, NBSP and BOM included. */
     private static final Pattern EDGE_SPACE = Pattern.compile("^[\\s\\p{Z}\\x{FEFF}]+|[\\s\\p{Z}\\x{FEFF}]+$");
-    private static final int AUDIT_SUMMARY_MAX = 500;
     private static final List<RequestStatus> IN_REVIEW = List.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW);
     private static final Map<RequestStatus, String> STATUS_WORDS = Map.of(
             RequestStatus.DRAFT, "a draft",
@@ -87,10 +88,6 @@ public class RequestReviewService {
         this.clock = clock;
     }
 
-    /**
-     * R-F1-04: the request goes back to its club with the note, which is kept on the request and on the
-     * version it was about, so both versions stay readable after the customer sends the next one.
-     */
     /** US-F1-03: the requests waiting for review, oldest first, 20 to a page. */
     @Transactional(readOnly = true)
     public Page<QueueRowResponse> queue(Pageable pageable) {
@@ -179,6 +176,10 @@ public class RequestReviewService {
                 .build();
     }
 
+    /**
+     * R-F1-04: the request goes back to its club with the note, which is kept on the request and on the
+     * version it was about, so both versions stay readable after the customer sends the next one.
+     */
     @Transactional
     public RequestReviewResponse returnForInformation(User manager, UUID id, String rawNote) {
         String note = rawNote == null ? "" : EDGE_SPACE.matcher(rawNote).replaceAll("");
@@ -199,17 +200,22 @@ public class RequestReviewService {
                     "This request isn't waiting for review; it is " + STATUS_WORDS.get(before) + ".");
         }
 
+        List<RequestRevision> all = revisions.findByRequestIdOrderByRevisionNoAsc(request.getId());
+        if (all.isEmpty()) {
+            // Every submission writes a version; without one the return couldn't keep its note with it.
+            log.error("Request {} is {} but has no submitted version", request.getCode(), before);
+            throw new ConflictException("REQUEST_HAS_NO_VERSION",
+                    "This request has no submitted version to return. Ask an administrator to check it.");
+        }
+
         request.setStatus(RequestStatus.INFO_REQUIRED);
         request.setInfoRequiredNote(note);
         requests.save(request);
-        List<RequestRevision> all = revisions.findByRequestIdOrderByRevisionNoAsc(request.getId());
-        if (!all.isEmpty()) {
-            RequestRevision latest = all.getLast();
-            latest.setNote(note);
-            revisions.save(latest);
-        }
+        RequestRevision latest = all.getLast();
+        latest.setNote(note);
+        revisions.save(latest);
 
-        audit.recordDecision(manager, RequestService.INFO_REQUIRED_ACTION, fit("Returned with a note: " + note),
+        audit.recordDecision(manager, RequestService.INFO_REQUIRED_ACTION, AuditText.fit("Returned with a note: " + note),
                 ENTITY_TYPE, request.getId(), request.getCode(), note, "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"INFO_REQUIRED\"}");
         for (User account : users.findByClubId(request.getClub().getId())) {
@@ -219,8 +225,4 @@ public class RequestReviewService {
         return viewOf(request);
     }
 
-    /** audit_log.summary is varchar(500): a longer line ends in "…". */
-    private static String fit(String summary) {
-        return summary.length() <= AUDIT_SUMMARY_MAX ? summary : summary.substring(0, AUDIT_SUMMARY_MAX - 1) + "…";
-    }
 }

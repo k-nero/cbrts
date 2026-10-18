@@ -90,6 +90,7 @@ class RouteServiceTest {
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "VN", "KH"),
                         org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "KH", "TH"));
         assertThat(route.getCountries()).containsExactly("VN", "KH", "TH");
+        assertThat(route.getCountryNames()).containsExactly("Vietnam", "Cambodia", "Thailand");
         assertThat(route.getCrossBorder()).isTrue();
         assertThat(route.getLeadTimeDays()).isEqualTo(21);
         assertThat(route.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));

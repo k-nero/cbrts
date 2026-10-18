@@ -611,6 +611,8 @@ class RequestServiceTest {
                     startsWith("Sent version 2 with 2 horses: "), eq("TRANSPORT_REQUEST"), eq(draft.getId()),
                     eq("REQ-2026-0195"), isNull(), eq("{\"status\":\"INFO_REQUIRED\"}"),
                     eq("{\"status\":\"SUBMITTED\"}"));
+            verify(audit).recordSystem(eq("LEAD_TIME_CHECKED"), startsWith("Lead time checked: "),
+                    eq("TRANSPORT_REQUEST"), eq(draft.getId()), eq("REQ-2026-0195"), isNull(), isNull());
         }
 
         @Test
