@@ -69,6 +69,13 @@ public class QuotationLine extends BaseEntity {
     private RateLine rateLine;
 
     /**
+     * Set instead of rateLine on the air stall line, which is priced from a service class.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rate_service_class_id")
+    private RateServiceClass rateServiceClass;
+
+    /**
      * For per-horse lines (isolation for Nightfall).
      */
     @ManyToOne(fetch = FetchType.LAZY)
