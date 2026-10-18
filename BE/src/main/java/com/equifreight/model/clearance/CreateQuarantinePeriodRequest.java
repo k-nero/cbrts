@@ -13,7 +13,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateQuarantinePeriodRequest {
 
-    /** null means the whole load/shipment. */
+    /**
+     * null means the whole load/shipment.
+     */
     private UUID horseId;
 
     @NotNull(message = "Place ID (trạm kiểm dịch) is required")

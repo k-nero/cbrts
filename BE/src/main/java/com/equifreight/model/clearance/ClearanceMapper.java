@@ -8,7 +8,8 @@ import java.util.UUID;
 
 public final class ClearanceMapper {
 
-    private ClearanceMapper() {}
+    private ClearanceMapper() {
+    }
 
     public static DocumentVersionResponse toVersionResponse(DocumentVersion version) {
         if (version == null) {
@@ -73,30 +74,30 @@ public final class ClearanceMapper {
 
         if (item.getDocumentType() != null) {
             builder.documentTypeId(item.getDocumentType().getId())
-                   .documentTypeCode(item.getDocumentType().getCode())
-                   .documentTypeName(item.getDocumentType().getName())
-                   .documentScope(item.getDocumentType().getScope())
-                   .providedBy(item.getDocumentType().getProvidedBy());
+                    .documentTypeCode(item.getDocumentType().getCode())
+                    .documentTypeName(item.getDocumentType().getName())
+                    .documentScope(item.getDocumentType().getScope())
+                    .providedBy(item.getDocumentType().getProvidedBy());
         }
 
         if (item.getRegulationRule() != null) {
             builder.regulationRuleId(item.getRegulationRule().getId())
-                   .ruleKind(item.getRegulationRule().getRuleKind())
-                   .mandatory(item.getRegulationRule().isMandatory())
-                   .minDays(item.getRegulationRule().getMinDays())
-                   .maxDays(item.getRegulationRule().getMaxDays())
-                   .ruleDescription(item.getRegulationRule().getDescription());
+                    .ruleKind(item.getRegulationRule().getRuleKind())
+                    .mandatory(item.getRegulationRule().isMandatory())
+                    .minDays(item.getRegulationRule().getMinDays())
+                    .maxDays(item.getRegulationRule().getMaxDays())
+                    .ruleDescription(item.getRegulationRule().getDescription());
         }
 
         if (item.getHorse() != null) {
             builder.horseId(item.getHorse().getId())
-                   .horseName(item.getHorse().getName())
-                   .horseMicrochip(item.getHorse().getMicrochip());
+                    .horseName(item.getHorse().getName())
+                    .horseMicrochip(item.getHorse().getMicrochip());
         }
 
         if (item.getBorderCrossing() != null) {
             builder.borderCrossingId(item.getBorderCrossing().getId())
-                   .borderCrossingName(item.getBorderCrossing().getName());
+                    .borderCrossingName(item.getBorderCrossing().getName());
         }
 
         return builder.build();
@@ -136,9 +137,9 @@ public final class ClearanceMapper {
                 .status(rv.getStatus())
                 .publishedAt(rv.getPublishedAt())
                 .publishedByName(pubName)
-                .leadTimeDays((short) rv.getLeadTimeDays())
-                .quarantineMinDays((short) rv.getQuarantineMinDays())
-                .arrivalBufferDays((short) rv.getArrivalBufferDays())
+                .leadTimeDays(rv.getLeadTimeDays())
+                .quarantineMinDays(rv.getQuarantineMinDays())
+                .arrivalBufferDays(rv.getArrivalBufferDays())
                 .rules(java.util.List.of())
                 .build();
     }

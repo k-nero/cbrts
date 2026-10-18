@@ -1,10 +1,10 @@
 package com.equifreight.job;
 
+import com.equifreight.repository.RefreshTokenRepository;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import com.equifreight.repository.RefreshTokenRepository;
 
 import java.time.Instant;
 

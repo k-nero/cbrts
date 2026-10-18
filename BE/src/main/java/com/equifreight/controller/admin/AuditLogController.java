@@ -49,19 +49,25 @@ public class AuditLogController {
         return auditLogService.search(new AuditLogFilter(q, actor, action, from, to), pageable);
     }
 
-    /** The people with entries, for the Person filter. */
+    /**
+     * The people with entries, for the Person filter.
+     */
     @GetMapping("/actors")
     public List<AuditActorOption> actors() {
         return auditLogService.actors();
     }
 
-    /** The action codes recorded so far, for the Action filter. */
+    /**
+     * The action codes recorded so far, for the Action filter.
+     */
     @GetMapping("/actions")
     public List<String> actions() {
         return auditLogService.actions();
     }
 
-    /** The filtered entries, newest first, as CSV. */
+    /**
+     * The filtered entries, newest first, as CSV.
+     */
     @GetMapping("/export")
     public ResponseEntity<byte[]> export(
             @RequestParam(value = "q", required = false) String q,

@@ -1,9 +1,13 @@
 package com.equifreight.configuration;
 
+import com.equifreight.exception.*;
+import com.equifreight.model.common.ApiError;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,14 +16,9 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
-import com.equifreight.exception.BusinessException;
-import com.equifreight.exception.ConflictException;
-import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.exception.StorageException;
-import com.equifreight.exception.UnauthorizedException;
-import com.equifreight.model.common.ApiError;
 
 import java.util.List;
 
@@ -104,6 +103,33 @@ public class ControllerAdvise {
     public ResponseEntity<ApiError> handleAuth(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiError.of(HttpStatus.UNAUTHORIZED.value(), "Unauthorized", ex.getMessage()));
+    }
+
+    // A body that isn't JSON, or a value of the wrong type (an unknown enum, a bad date): the client's
+    // mistake, so 400, without echoing the parser's internals.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiError.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
+                        "The request body isn't valid: check each field's type and allowed values."));
+    }
+
+    // A path or query value of the wrong type, e.g. an id that isn't a UUID.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String type = ex.getRequiredType() == null ? "value" : ex.getRequiredType().getSimpleName();
+        return ResponseEntity.badRequest()
+                .body(ApiError.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
+                        ex.getName() + " must be a valid " + type + "; " + ex.getValue() + " was given."));
+    }
+
+    // A page sorted by a field the results don't have (?sort=foo): the client's mistake, so 400, without
+    // naming the entity behind the endpoint.
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiError> handleUnknownSort(PropertyReferenceException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiError.of(HttpStatus.BAD_REQUEST.value(), "INVALID_SORT",
+                        "These results can't be sorted by " + ex.getPropertyName() + "."));
     }
 
     @ExceptionHandler(Exception.class)

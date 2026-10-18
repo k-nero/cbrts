@@ -30,16 +30,6 @@ import java.nio.file.Path;
 @EnableConfigurationProperties(StorageProperties.class)
 public class StorageConfiguration {
 
-    @Bean(destroyMethod = "close")
-    public FileStorage fileStorage(StorageProperties properties) {
-        if (properties.type() == StorageProperties.Type.LOCAL) {
-            Path dir = Path.of(properties.local().dir()).toAbsolutePath().normalize();
-            log.info("Storing uploaded files under {} (local storage, not for production)", dir);
-            return new LocalFileStorage(dir);
-        }
-        return new S3FileStorage(s3Client(properties.s3()), properties.s3().bucket());
-    }
-
     private static S3Client s3Client(StorageProperties.S3 s3) {
         S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(s3.region()))
@@ -54,5 +44,15 @@ public class StorageConfiguration {
             builder.credentialsProvider(DefaultCredentialsProvider.builder().build());
         }
         return builder.build();
+    }
+
+    @Bean(destroyMethod = "close")
+    public FileStorage fileStorage(StorageProperties properties) {
+        if (properties.type() == StorageProperties.Type.LOCAL) {
+            Path dir = Path.of(properties.local().dir()).toAbsolutePath().normalize();
+            log.info("Storing uploaded files under {} (local storage, not for production)", dir);
+            return new LocalFileStorage(dir);
+        }
+        return new S3FileStorage(s3Client(properties.s3()), properties.s3().bucket());
     }
 }

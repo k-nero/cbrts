@@ -22,24 +22,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class UserService {
+    private static final String ENTITY_TYPE = "USER";
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final JsonMapper jsonMapper;
     private final RefreshTokenRepository refreshTokenRepository;
-
-    private static final String ENTITY_TYPE = "USER";
 
     public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
                        AuditService auditService, JsonMapper jsonMapper,
@@ -50,6 +43,28 @@ public class UserService {
         this.auditService = auditService;
         this.jsonMapper = jsonMapper;
         this.refreshTokenRepository = refreshTokenRepository;
+    }
+
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BusinessException("%s's account was removed, so it can't be changed.".formatted(user.displayName()));
+        }
+    }
+
+    /**
+     * "transport specialist", "fleet & route coordinator and escort".
+     */
+    private static String roleList(Set<Role> roles) {
+        List<String> labels = roleNames(roles).stream().map(n -> RoleName.label(n).toLowerCase()).toList();
+        if (labels.isEmpty()) {
+            return "no role";
+        }
+        return labels.size() == 1 ? labels.getFirst()
+                : String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
+    }
+
+    private static List<String> roleNames(Set<Role> roles) {
+        return roles.stream().map(Role::getName).sorted().toList();
     }
 
     /**
@@ -87,7 +102,9 @@ public class UserService {
         return UserMapper.toResponse(findOrThrow(id));
     }
 
-    /** Invites a staff account; the actor is the signed-in logistics manager (audited, BR-F1-08). */
+    /**
+     * Invites a staff account; the actor is the signed-in logistics manager (audited, BR-F1-08).
+     */
     @Transactional
     public UserResponse create(CreateUserRequest request, User actor) {
         if (userRepository.getByEmail(request.getEmail()) != null) {
@@ -109,7 +126,9 @@ public class UserService {
         return UserMapper.toResponse(saved);
     }
 
-    /** Changes a staff account's name, phone or roles; writes one audit row with what changed. */
+    /**
+     * Changes a staff account's name, phone or roles; writes one audit row with what changed.
+     */
     @Transactional
     public UserResponse update(UUID id, UpdateUserRequest request, User actor) {
         User user = findOrThrow(id);
@@ -158,27 +177,9 @@ public class UserService {
                 before, snapshot(user));
     }
 
-    private static void requireNotRemoved(User user) {
-        if (user.getStatus() == UserStatus.DISABLED) {
-            throw new BusinessException("%s's account was removed, so it can't be changed.".formatted(user.displayName()));
-        }
-    }
-
-    /** "transport specialist", "fleet & route coordinator and escort". */
-    private static String roleList(Set<Role> roles) {
-        List<String> labels = roleNames(roles).stream().map(n -> RoleName.label(n).toLowerCase()).toList();
-        if (labels.isEmpty()) {
-            return "no role";
-        }
-        return labels.size() == 1 ? labels.getFirst()
-                : String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
-    }
-
-    private static List<String> roleNames(Set<Role> roles) {
-        return roles.stream().map(Role::getName).sorted().toList();
-    }
-
-    /** The audited fields as JSON: name, email, phone, role names and status (never the password). */
+    /**
+     * The audited fields as JSON: name, email, phone, role names and status (never the password).
+     */
     private String snapshot(User user) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("name", user.displayName());

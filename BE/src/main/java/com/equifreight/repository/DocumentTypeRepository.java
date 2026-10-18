@@ -12,7 +12,9 @@ import java.util.UUID;
 public interface DocumentTypeRepository extends JpaRepository<DocumentType, UUID>,
         JpaSpecificationExecutor<DocumentType> {
 
-    /** Tìm loại giấy tờ theo mã (VD: "EQUINE_PASSPORT", "EIA_TEST"). */
+    /**
+     * Tìm loại giấy tờ theo mã (VD: "EQUINE_PASSPORT", "EIA_TEST").
+     */
     Optional<DocumentType> findByCode(String code);
 
     boolean existsByCode(String code);

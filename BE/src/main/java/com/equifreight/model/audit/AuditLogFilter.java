@@ -9,6 +9,8 @@ import java.time.LocalDate;
  */
 public record AuditLogFilter(String q, String actor, String action, LocalDate from, LocalDate to) {
 
-    /** The Person filter value for entries no account made (the system, someone not signed in). */
+    /**
+     * The Person filter value for entries no account made (the system, someone not signed in).
+     */
     public static final String SYSTEM_ACTOR = "SYSTEM";
 }

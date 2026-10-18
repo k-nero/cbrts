@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("app.storage")
 public record StorageProperties(Type type, S3 s3, Local local) {
 
-    public enum Type { S3, LOCAL }
+    public enum Type {S3, LOCAL}
 
     /**
      * Any S3-compatible service.
@@ -25,8 +25,12 @@ public record StorageProperties(Type type, S3 s3, Local local) {
      * @param pathStyle {@code endpoint/bucket/key} URLs instead of {@code bucket.endpoint/key}
      */
     public record S3(String endpoint, String region, String bucket, String accessKey, String secretKey,
-                     boolean pathStyle) {}
+                     boolean pathStyle) {
+    }
 
-    /** @param dir directory the files are written under; relative paths are against the working directory */
-    public record Local(String dir) {}
+    /**
+     * @param dir directory the files are written under; relative paths are against the working directory
+     */
+    public record Local(String dir) {
+    }
 }

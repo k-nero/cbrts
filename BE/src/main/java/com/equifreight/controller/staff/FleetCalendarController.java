@@ -22,7 +22,9 @@ public class FleetCalendarController {
         this.vehicleService = vehicleService;
     }
 
-    /** US-F3-07: Fleet calendar - schedule and bookings. */
+    /**
+     * US-F3-07: Fleet calendar - schedule and bookings.
+     */
     @GetMapping
     public List<VehicleBookingResponse> getCalendar(
             @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,

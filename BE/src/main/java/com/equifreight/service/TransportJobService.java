@@ -1,18 +1,15 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.Channel;
-import com.equifreight.entity.enums.CrewRole;
-import com.equifreight.entity.enums.DossierStatus;
-import com.equifreight.entity.enums.JobStage;
-import com.equifreight.entity.enums.LoadPlanStatus;
-import com.equifreight.entity.enums.RoutePlanStatus;
-import com.equifreight.entity.enums.TripStatus;
+import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
-import com.equifreight.repository.*;
+import com.equifreight.repository.CrewAssignmentRepository;
+import com.equifreight.repository.LoadPlanRepository;
+import com.equifreight.repository.RoutePlanRepository;
+import com.equifreight.repository.TransportJobRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
@@ -22,11 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Log4j2
@@ -73,7 +66,8 @@ public class TransportJobService {
 
             if (filter != null && !filter.isBlank()) {
                 switch (filter.toUpperCase()) {
-                    case "BLOCKED" -> predicates.add(cb.notEqual(root.get("dossierStatus"), DossierStatus.CLEARANCE_READY));
+                    case "BLOCKED" ->
+                            predicates.add(cb.notEqual(root.get("dossierStatus"), DossierStatus.CLEARANCE_READY));
                     case "IN_TRANSIT" -> predicates.add(cb.or(
                             cb.equal(root.get("stage"), JobStage.TRIP),
                             cb.equal(root.get("tripStatus"), TripStatus.DEPARTED)

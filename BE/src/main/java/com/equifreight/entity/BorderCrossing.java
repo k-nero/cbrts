@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** "Mộc Bài – Bavet", "Poipet – Aranyaprathet". */
+/**
+ * "Mộc Bài – Bavet", "Poipet – Aranyaprathet".
+ */
 @Setter
 @Getter
 @Entity

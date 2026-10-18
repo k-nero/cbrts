@@ -2,16 +2,14 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RegulationRole;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.io.Serializable;
 import java.util.UUID;
 
-/** The regulation versions a job's checklist was built from (BR-F2-01). */
+/**
+ * The regulation versions a job's checklist was built from (BR-F2-01).
+ */
 @Setter
 @Getter
 @Entity

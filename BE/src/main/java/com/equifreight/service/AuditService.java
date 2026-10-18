@@ -21,7 +21,9 @@ import java.util.UUID;
 public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
-    /** Spring Boot 4 auto-configures Jackson 3's JsonMapper; there is no Jackson 2 ObjectMapper bean. */
+    /**
+     * Spring Boot 4 auto-configures Jackson 3's JsonMapper; there is no Jackson 2 ObjectMapper bean.
+     */
     private final JsonMapper jsonMapper;
 
     public AuditService(AuditLogRepository auditLogRepository, JsonMapper jsonMapper) {

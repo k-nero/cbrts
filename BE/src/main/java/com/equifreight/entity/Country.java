@@ -1,12 +1,17 @@
 package com.equifreight.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** The one table keyed by a natural code (ISO 3166-1 alpha-2). Seeded by V2. */
+/**
+ * The one table keyed by a natural code (ISO 3166-1 alpha-2). Seeded by V2.
+ */
 @Setter
 @Getter
 @Entity

@@ -10,27 +10,31 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.web.PageableDefault;
 
 @RestController
 public class TripController {
     private final TripService trips;
 
-    public TripController(TripService trips) { this.trips = trips; }
+    public TripController(TripService trips) {
+        this.trips = trips;
+    }
 
     @GetMapping("/api/v1/escort/trips")
     @PreAuthorize("hasRole('ESCORT')")
     public Page<TripSummaryResponse> escortTrips(@AuthenticationPrincipal User user,
-                                                  @PageableDefault(size = 20, sort = "job.plannedDepartureAt", direction = Sort.Direction.DESC) Pageable pageable) {
+                                                 @PageableDefault(size = 20, sort = "job.plannedDepartureAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return trips.escortTrips(user, pageable);
     }
 
     @GetMapping("/api/v1/escort/trips/{jobCode}")
     @PreAuthorize("hasRole('ESCORT')")
-    public TripViewResponse escortTrip(@PathVariable String jobCode, @AuthenticationPrincipal User user) { return trips.escortTrip(jobCode, user); }
+    public TripViewResponse escortTrip(@PathVariable String jobCode, @AuthenticationPrincipal User user) {
+        return trips.escortTrip(jobCode, user);
+    }
 
     @PostMapping("/api/v1/escort/trips/{jobCode}/records")
     @PreAuthorize("hasRole('ESCORT')")
@@ -47,7 +51,9 @@ public class TripController {
 
     @GetMapping("/api/v1/staff/trips/{jobCode}")
     @PreAuthorize("hasRole('FLEET_COORDINATOR')")
-    public TripViewResponse coordinatorTrip(@PathVariable String jobCode) { return trips.coordinatorTrip(jobCode); }
+    public TripViewResponse coordinatorTrip(@PathVariable String jobCode) {
+        return trips.coordinatorTrip(jobCode);
+    }
 
     @PostMapping("/api/v1/staff/trips/{jobCode}/records")
     @PreAuthorize("hasRole('FLEET_COORDINATOR')")
@@ -59,7 +65,7 @@ public class TripController {
     @GetMapping("/api/v1/customer/trips")
     @PreAuthorize("hasRole('CUSTOMER')")
     public Page<TripSummaryResponse> customerTrips(@AuthenticationPrincipal User user,
-                                                @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+                                                   @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return trips.customerTrips(user, pageable);
     }
 
