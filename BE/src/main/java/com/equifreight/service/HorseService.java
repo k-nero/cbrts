@@ -21,7 +21,6 @@ import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -48,7 +47,6 @@ public class HorseService {
             RequestStatus.CUSTOMER_ACCEPTED));
 
     private static final String DEFAULT_CURRENCY = "USD";
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
     private final HorseRepository horses;
     private final HorseSizeClassRepository sizeClasses;
@@ -168,7 +166,8 @@ public class HorseService {
     private static void requireDateOfBirthNotAfterToday(LocalDate dateOfBirth) {
         if (dateOfBirth != null && dateOfBirth.isAfter(LocalDate.now(BusinessTime.ZONE))) {
             throw new BusinessException(
-                    "INVALID_DATE_OF_BIRTH", "The date of birth " + DAY.format(dateOfBirth) + " is after today.");
+                    "INVALID_DATE_OF_BIRTH",
+                    "The date of birth " + BusinessTime.DAY.format(dateOfBirth) + " is after today.");
         }
     }
 

@@ -21,9 +21,9 @@ import lombok.Setter;
 public class TransportRequest extends BaseEntity {
 
     /**
-     * REQ-2026-0193.
+     * REQ-2026-0193. Issued at submission; null for a draft.
      */
-    @Column(nullable = false, unique = true, length = 14)
+    @Column(unique = true, length = 14)
     private String code;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -75,13 +75,22 @@ public class TransportRequest extends BaseEntity {
     private Place destinationPlace;
 
     /**
-     * Resolved from the places.
+     * What the customer typed when it matches no place ("Singapore"); never set with the place.
+     */
+    @Column(length = 160)
+    private String originText;
+
+    @Column(length = 160)
+    private String destinationText;
+
+    /**
+     * Resolved from the places' cities and the mode; null means a route we don't run (yet).
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "corridor_id")
     private Corridor corridor;
 
-    @Column(nullable = false)
+    /** Required once submitted. */
     private LocalDate departureDate;
 
     /**

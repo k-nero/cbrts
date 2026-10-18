@@ -242,7 +242,7 @@ erDiagram
 | Table | Columns | Rules |
 |---|---|---|
 | `regulation_catalogs` | `country_code` unique, `name` | "Cambodia import". |
-| `regulation_versions` | `catalog_id`, `version_no`, `status` (`DRAFT`, `PUBLISHED`, `RETIRED`), `published_at`, `published_by`, `lead_time_days` (21 cross-border, 3 domestic), `quarantine_min_days` (7), `arrival_buffer_days` (2) | Unique `(catalog_id, version_no)`. Immutable once published. |
+| `regulation_versions` | `catalog_id`, `version_no`, `status` (`DRAFT`, `PUBLISHED`, `RETIRED`), `published_at`, `published_by`, `lead_time_days` (the cross-border lead time into this country: 21, Laos 30 in the demo), `domestic_lead_time_days` (a move within the country: 3), `quarantine_min_days` (7), `arrival_buffer_days` (2) | Unique `(catalog_id, version_no)`. Immutable once published. |
 | `document_types` | `code` unique, `name`, `scope`, `provided_by` | `scope`: `PER_HORSE`, `PER_SHIPMENT`, `PER_CROSSING`. `provided_by`: `CUSTOMER`, `AUTHORITY`. Codes: `EQUINE_PASSPORT`, `INFLUENZA_VACCINATION`, `EIA_TEST`, `EXPORT_HEALTH_CERT`, `PROOF_OF_OWNERSHIP`, `IMPORT_PERMIT`, `TRANSIT_INSURANCE`, `CUSTOMS_VALUE_DECLARATION`. |
 | `regulation_rules` | `version_id`, `document_type_id`, `mandatory`, `rule_kind`, `min_days`, `max_days`, `description` | `rule_kind`: `WINDOW_BEFORE_DEPARTURE` (EIA sampled within 60 days), `VALID_THROUGH_ARRIVAL_PLUS` (passport valid through arrival + 2 days), `BOOSTER_WINDOW` (influenza 7–180 days before), `PRESENCE_ONLY`. Unique `(version_id, document_type_id)`. |
 
@@ -269,7 +269,7 @@ erDiagram
 
 | Column | Type | Rule |
 |---|---|---|
-| `code` | varchar(14) unique | `REQ-2026-0193`. |
+| `code` | varchar(14) unique | `REQ-2026-0193`. Issued at submission from `code_counters`; null for a draft. |
 | `club_id` | → `clubs` not null | |
 | `created_by` | → `users` | |
 | `status` | varchar(20) | `DRAFT`, `SUBMITTED`, `UNDER_REVIEW`, `INFO_REQUIRED`, `QUOTED`, `CUSTOMER_ACCEPTED`, `APPROVED`, `REJECTED`, `EXPIRED`, `CANCELLED` (Flow 1 state machine). |
@@ -279,9 +279,9 @@ erDiagram
 | `insurance` | varchar(20) | `OWN_POLICY`, `EQUIFREIGHT`. |
 | `vet_escort` | boolean default false | Added automatically from 8 horses or when a declared value is over the threshold (application rule). |
 | `origin_place_id`, `destination_place_id` | → `places` | Null while a draft names a city we don't run. |
-| `origin_text`, `destination_text` | varchar(160) | What the customer typed when it matches no place ("Singapore"). Kept so the logistics manager sees the ask. |
+| `origin_text`, `destination_text` | varchar(160) | What the customer typed when it matches no place ("Singapore"). Kept so the logistics manager sees the ask. Never set together with the place of the same end (check). |
 | `corridor_id` | → `corridors` | Resolved from the places. Null means the route is not one we run. |
-| `departure_date` | date not null | |
+| `departure_date` | date | Required once submitted. |
 | `date_flex_days` | smallint default 0 | 0 or 3 ("My dates can move by ±3 days"). |
 | `arrival_mode` | varchar(10) default 'ANY_TIME' | `ANY_TIME`, `WINDOW`. |
 | `window_start`, `window_end` | timestamptz | The arrival window. |
@@ -297,12 +297,15 @@ Checks (the arrival-window rule):
 - `(arrival_mode = 'ANY_TIME' and window_start is null and window_end is null) or (arrival_mode = 'WINDOW' and mode = 'ROAD' and trailer = 'PRIVATE' and date_flex_days = 0 and window_end - window_start >= interval '3 hours')`
 - `(mode = 'ROAD' and air_class is null) or (mode = 'AIR' and trailer is null)`
 
-Check (routes we run): `status = 'DRAFT' or corridor_id is not null`. A route outside the catalog can be saved as a draft and asked about (a `notes` row with topic `ROUTE`), never submitted or quoted.
+Check (routes we run): `submitted_at is null or (corridor_id is not null and departure_date is not null)`. A route outside the catalog can be saved as a draft and asked about (a `notes` row with topic `ROUTE`), never submitted or quoted. It is keyed on submission rather than `status = 'DRAFT'` so it stays true if a never-submitted draft is ever cancelled.
+
+Checks (submission): `(code is null) = (submitted_at is null)`, and `status in ('DRAFT', 'CANCELLED') or submitted_at is not null`.
 
 The 3 hours in the check mirrors `ARRIVAL_WINDOW_MIN_HOURS`. If the catalog value changes, the check moves to the application.
 
 **`request_horses`**: primary key `(request_id, horse_id)`.
-- Snapshot columns so later edits to the horse don't change a request: `declared_value`, `sex`, `size_class_code`, `required_stall`.
+- Snapshot columns so later edits to the horse don't change a request: `declared_value`, `sex`, `size_class_code`, `required_stall`. Written on every draft save and refreshed at submission.
+- `with_foal boolean not null default false`: a mare travelling with a foal at foot, on this trip. Check `not with_foal or sex = 'MARE'`.
 - Once the request is `APPROVED`, the horse list is locked (BR-F1-06; application rule plus a trigger that refuses inserts and deletes).
 
 **`request_revisions`**: `request_id`, `revision_no`, `payload jsonb`, `submitted_at`, `note`. Unique `(request_id, revision_no)`. It keeps both versions visible after an `INFO_REQUIRED` round.
@@ -660,7 +663,7 @@ Indexes: `(occurred_at desc)`, `(entity_code, occurred_at desc)`, `(actor_id, oc
 
 | Rule | Enforced by |
 |---|---|
-| BR-F1-01 lead time (21 / 3 days) | Application, from the pinned regulation version; express override columns on the request. |
+| BR-F1-01 lead time (21 / 3 days) | Application, from the newest published regulation version of the destination and every transit country (`lead_time_days`), or the country's `domestic_lead_time_days`; express override columns on the request. |
 | BR-F1-02 one route and one window per request | Structure: route and window are columns of the request, not of each horse. |
 | BR-F1-03 quotation valid 7 days | `valid_until`; a scheduled job sets `EXPIRED`. |
 | BR-F1-04 only the logistics manager approves or rejects | Application (role check); `approved_by` must hold that role (trigger). |

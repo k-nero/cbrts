@@ -133,6 +133,7 @@ public class DataSeeder implements ApplicationRunner {
     private final RouteLegRepository routeLegRepository;
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final CodeCounterRepository codeCounterRepository;
+    private final CatalogSeeder catalogSeeder;
 
     public DataSeeder(
             RoleRepository roleRepository,
@@ -158,7 +159,8 @@ public class DataSeeder implements ApplicationRunner {
             RouteStopRepository routeStopRepository,
             RouteLegRepository routeLegRepository,
             CrewAssignmentRepository crewAssignmentRepository,
-            CodeCounterRepository codeCounterRepository) {
+            CodeCounterRepository codeCounterRepository,
+            CatalogSeeder catalogSeeder) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -183,6 +185,7 @@ public class DataSeeder implements ApplicationRunner {
         this.routeLegRepository = routeLegRepository;
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.codeCounterRepository = codeCounterRepository;
+        this.catalogSeeder = catalogSeeder;
     }
 
     @Override
@@ -191,6 +194,9 @@ public class DataSeeder implements ApplicationRunner {
         seedRolesAndUsers();
         seedHorses(seedClub());
         seedPlacesAndCorridors();
+        // After the accounts (the regulation versions name their publisher) and after Flow 3's corridors,
+        // so a route it already seeded is reused rather than duplicated.
+        catalogSeeder.seed();
         seedVehicles();
         seedDemoJobs();
     }
@@ -455,6 +461,8 @@ public class DataSeeder implements ApplicationRunner {
         req.setClub(club);
         req.setCreatedBy(customer);
         req.setStatus(RequestStatus.SUBMITTED);
+        // V17: a request has a code exactly when it was submitted (the frames' 26 Sep 09:14).
+        req.setSubmittedAt(Instant.parse("2026-09-26T02:14:00Z"));
         req.setMode(TransportMode.ROAD);
         req.setTrailer(TrailerType.PRIVATE);
         req.setOriginPlace(placeRepository.findByName("Phú Thọ training centre").orElse(null));

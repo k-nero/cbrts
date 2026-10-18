@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import com.equifreight.entity.Horse;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.model.common.ApiError;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.core.PropertyPath;
 import org.springframework.data.core.PropertyReferenceException;
@@ -34,5 +36,26 @@ class ControllerAdviseTest {
         ResponseEntity<ApiError> response = advice.handleUnknownSort(unknownSort("foo"));
 
         assertThat(response.getBody().getMessage()).doesNotContain("Horse").doesNotContain("No property");
+    }
+
+    /** A 409 can carry every reason it was refused (spec R-07, SUBMISSION_BLOCKED). */
+    @Test
+    void aConflictsDetailsReachTheApiError() {
+        ResponseEntity<ApiError> response = advice.handleConflict(new ConflictException(
+                "SUBMISSION_BLOCKED",
+                "This request can't be submitted yet.",
+                List.of("Add at least one horse.", "Choose road or air.")));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getError()).isEqualTo("SUBMISSION_BLOCKED");
+        assertThat(response.getBody().getMessage()).isEqualTo("This request can't be submitted yet.");
+        assertThat(response.getBody().getDetails()).containsExactly("Add at least one horse.", "Choose road or air.");
+    }
+
+    @Test
+    void aConflictWithoutDetailsHasNone() {
+        ResponseEntity<ApiError> response = advice.handleConflict(new ConflictException("HORSE_ARCHIVED", "Archived."));
+
+        assertThat(response.getBody().getDetails()).isNull();
     }
 }
