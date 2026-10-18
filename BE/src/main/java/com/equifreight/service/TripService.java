@@ -209,7 +209,7 @@ public class TripService {
 
     private void writeAudit(TripRecord record, User user, Channel channel, RouteStop stop) {
         AuditLog entry = new AuditLog(); entry.setOccurredAt(Instant.now()); entry.setActor(user);
-        entry.setActorLabel((user.getFirstName() + " " + user.getLastName()).strip());
+        entry.setActorLabel(user.displayName());
         entry.setActorRole(user.getRoles().stream().map(Role::getName).findFirst().orElse(null));
         entry.setChannel(channel); entry.setDeviceRecordedAt(record.getOccurredAt()); entry.setAction("TRIP_RECORD_RECORDED");
         entry.setSummary("Recorded %s for %s%s".formatted(record.getKind(), record.getJob().getCode(), stop == null ? "" : " at " + stopName(stop)));

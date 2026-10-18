@@ -92,6 +92,20 @@ export interface LoadPlan {
   conflicts: LoadPlanConflict[];
 }
 
+/**
+ * One drag or click on the load plan, with what the coordinator's screen showed. The server
+ * refuses it (409, LOAD_PLAN_STALE) when someone else changed those stalls in the meantime.
+ */
+export interface MoveHorse {
+  horseId: string;
+  /** The stall the horse was in; null when it was waiting to load. */
+  fromStallId: string | null;
+  /** The stall to put it in; null to take it off the vehicle. */
+  toStallId: string | null;
+  /** The horse seen in the target stall; null when it looked empty. Set means swap. */
+  expectedOccupantId: string | null;
+}
+
 export interface FlightInfo {
   id?: string;
   airline: string;

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { authApi } from '@/apis/auth';
+import { authApi, type RegisterRequest } from '@/apis/auth';
 import { queryKeys } from '@/constant/query';
 import type { User } from '@/interfaces';
 import { selectAccessToken, useAuthStore } from '@/stores/authStore';
@@ -35,6 +35,15 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       authApi.login(email, password),
+    onSuccess: (tokens) => setSession(tokens),
+  });
+}
+
+/** Create a club account; the new account is signed in straight away. */
+export function useRegister() {
+  const setSession = useAuthStore((s) => s.setSession);
+  return useMutation({
+    mutationFn: (body: RegisterRequest) => authApi.register(body),
     onSuccess: (tokens) => setSession(tokens),
   });
 }

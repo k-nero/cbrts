@@ -8,6 +8,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,7 +99,7 @@ public class LoadPlanService {
 
     @Transactional
     public LoadPlanResponse assignStall(UUID jobId, UUID vehicleStallId, UUID horseId) {
-        LoadPlan plan = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)
+        LoadPlan plan = loadPlanRepository.findLatestByJobIdForUpdate(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
 
         if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
@@ -147,9 +148,105 @@ public class LoadPlanService {
         return buildResponse(plan);
     }
 
+    /**
+     * Move, swap or unload one horse (US-F3-05, drag and drop). The request states what the
+     * coordinator's screen showed: where the horse was and who stood in the target stall. Both are
+     * checked under the plan's row lock, so when two people change the same plan at once the second
+     * change is refused with 409 instead of silently undoing the first.
+     */
+    @Transactional
+    public LoadPlanResponse moveHorse(UUID jobId, MoveHorseRequest request) {
+        LoadPlan plan = loadPlanRepository.findLatestByJobIdForUpdate(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
+
+        if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
+            throw new BusinessException("Cannot modify a CONFIRMED load plan. Create a new revision if needed.");
+        }
+        if (request.getToStallId() == null && request.getExpectedOccupantId() != null) {
+            throw new BusinessException("A horse taken off the vehicle has no stall to swap with; leave the expected occupant empty");
+        }
+
+        Horse horse = getJobHorses(plan.getJob()).stream()
+                .filter(h -> h.getId().equals(request.getHorseId()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Horse " + request.getHorseId() + " is not assigned to this job"));
+
+        VehicleStall toStall = null;
+        if (request.getToStallId() != null) {
+            toStall = vehicleStallRepository.findById(request.getToStallId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.getToStallId()));
+            if (!toStall.getVehicle().getId().equals(plan.getVehicle().getId())) {
+                throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
+            }
+        }
+
+        // Precondition 1: the horse is where the coordinator saw it.
+        Optional<LoadPlanStall> current = loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
+        UUID currentStallId = current.map(a -> a.getVehicleStall().getId()).orElse(null);
+        if (!Objects.equals(currentStallId, request.getFromStallId())) {
+            throw new ConflictException("LOAD_PLAN_STALE", horse.getName() + " is now "
+                    + current.map(a -> "in stall " + a.getVehicleStall().getPositionNo()).orElse("waiting to load")
+                    + ", not where your screen showed it. Someone else changed the load plan; check the refreshed plan and try again.");
+        }
+
+        // Precondition 2: the target stall holds who the coordinator saw there.
+        Horse occupant = null;
+        if (toStall != null) {
+            occupant = loadPlanStallRepository.findByLoadPlanIdAndVehicleStallId(plan.getId(), toStall.getId())
+                    .map(LoadPlanStall::getHorse)
+                    .orElse(null);
+            UUID occupantId = occupant != null ? occupant.getId() : null;
+            if (!Objects.equals(occupantId, request.getExpectedOccupantId())) {
+                throw new ConflictException("LOAD_PLAN_STALE", "Stall " + toStall.getPositionNo() + " "
+                        + (occupant != null ? "now holds " + occupant.getName() : "is now empty")
+                        + ", not what your screen showed. Someone else changed the load plan; check the refreshed plan and try again.");
+            }
+        }
+
+        // Dropped where it already is: nothing to change.
+        if (Objects.equals(request.getToStallId(), currentStallId)) {
+            return buildResponse(plan);
+        }
+
+        // Free both positions first (bulk deletes run before the inserts below).
+        loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
+        if (toStall != null) {
+            loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(plan.getId(), toStall.getId());
+        }
+
+        try {
+            if (toStall != null) {
+                place(plan, toStall, horse);
+            }
+            // A swap: the occupant takes the moved horse's old stall, or waits to load when it came from the list.
+            if (occupant != null && current.isPresent()) {
+                place(plan, current.get().getVehicleStall(), occupant);
+            }
+            loadPlanStallRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            // The unique constraints are the backstop for a writer that skipped the plan lock.
+            throw new ConflictException("LOAD_PLAN_STALE", "Someone else changed the load plan at the same moment; check the refreshed plan and try again.");
+        }
+
+        // Invalidate prior sign-off when load plan changes
+        plan.getJob().setSignedOffAt(null);
+        plan.getJob().setSignedOffBy(null);
+        transportJobRepository.save(plan.getJob());
+
+        return buildResponse(plan);
+    }
+
+    private void place(LoadPlan plan, VehicleStall stall, Horse horse) {
+        LoadPlanStall lps = new LoadPlanStall();
+        lps.setLoadPlan(plan);
+        lps.setVehicleStall(stall);
+        lps.setHorse(horse);
+        loadPlanStallRepository.save(lps);
+    }
+
     @Transactional
     public LoadPlanResponse autoArrange(UUID jobId) {
-        LoadPlan plan = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)
+        LoadPlan plan = loadPlanRepository.findLatestByJobIdForUpdate(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
 
         if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
@@ -196,7 +293,7 @@ public class LoadPlanService {
 
     @Transactional
     public LoadPlanResponse confirmLoadPlan(UUID jobId, User currentUser) {
-        LoadPlan plan = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)
+        LoadPlan plan = loadPlanRepository.findLatestByJobIdForUpdate(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
 
         if (plan.getVehicle().getStatus() != VehicleStatus.ACTIVE) {

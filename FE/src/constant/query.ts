@@ -30,6 +30,11 @@ export const queryKeys = {
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
   },
+  audit: {
+    all: () => ['admin-audit-log'] as const,
+    actors: () => ['admin-audit-log', 'actors'] as const,
+    actions: () => ['admin-audit-log', 'actions'] as const,
+  },
   clearance: {
     all: () => ['clearance'] as const,
     jobs: (q = '') => ['clearance', 'jobs', 'list', q] as const,

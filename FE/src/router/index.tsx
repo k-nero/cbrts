@@ -16,10 +16,12 @@ import RequestWizardPage from '@/pages/customer/requests/wizard';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import AuditLogPage from '@/pages/staff/audit-log';
 import RequestsPage from '@/pages/staff/requests';
 import RequestReviewPage from '@/pages/staff/requests/review';
 import UsersPage from '@/pages/staff/users';
@@ -43,6 +45,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       { path: '/forbidden', element: <ForbiddenPage /> },
       { path: '/design-system', element: <DesignSystemPage /> },
       { path: '/', element: <LandingPage /> },
@@ -82,7 +85,7 @@ export const router = createBrowserRouter([
           { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
-          { path: 'audit-log', element: todo('Audit log') },
+          { path: 'audit-log', element: <AuditLogPage /> },
           { path: 'documents', element: <DocumentsPage /> },
           { path: 'authorities', element: todo('Authorities') },
           { path: 'customer-notes', element: todo('Customer notes') },

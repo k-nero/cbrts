@@ -11,6 +11,7 @@ const FRC = 'FLEET_COORDINATOR';
  */
 export const routesConfig = [
   { path: '/login', roles: ['*'], type: 'unauthenticated', breadcrumb: '', name: 'login' },
+  { path: '/register', roles: ['*'], type: 'unauthenticated', breadcrumb: '', name: 'register' },
   { path: '/forbidden', roles: ['*'], type: 'public', breadcrumb: '', name: 'forbidden' },
   {
     path: '/design-system',
@@ -19,8 +20,8 @@ export const routesConfig = [
     breadcrumb: 'Design system',
     name: 'design-system',
   },
-  // The public landing page. The guard matches by path segment, so "/" has no config check;
-  // the page itself sends a signed-in visitor to their own home.
+  // The public landing page, open to everyone: the brand links here from every shell. The guard
+  // matches by path segment, so "/" has no config check.
   { path: '/', roles: ['*'], type: 'public', breadcrumb: '', name: 'landing' },
   {
     path: '/home',
@@ -167,8 +168,9 @@ export const routesConfig = [
         name: 'users',
       },
       {
+        // Every staff role may open it; other roles see why it's kept to the logistics manager.
         path: '/audit-log',
-        roles: [LM],
+        roles: [LM, TS, FRC],
         type: 'authenticated',
         breadcrumb: 'Audit log',
         name: 'audit-log',
