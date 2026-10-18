@@ -19,4 +19,5 @@ public record TripRecordResponse(
         Channel channel,
         String text,
         List<TripConditionResponse> conditions
-) {}
+) {
+}

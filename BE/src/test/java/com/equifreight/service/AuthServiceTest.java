@@ -1,10 +1,6 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Club;
-import com.equifreight.entity.Country;
-import com.equifreight.entity.RefreshToken;
-import com.equifreight.entity.Role;
-import com.equifreight.entity.User;
+import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
@@ -13,11 +9,7 @@ import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
-import com.equifreight.repository.ClubRepository;
-import com.equifreight.repository.CountryRepository;
-import com.equifreight.repository.RefreshTokenRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,27 +31,51 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AuthServiceTest {
 
-    @Mock private UserRepository users;
-    @Mock private RefreshTokenRepository refreshTokens;
-    @Mock private ClubRepository clubs;
-    @Mock private CountryRepository countries;
-    @Mock private RoleRepository roles;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private JwtEncoder jwtEncoder;
+    @Mock
+    private UserRepository users;
+    @Mock
+    private RefreshTokenRepository refreshTokens;
+    @Mock
+    private ClubRepository clubs;
+    @Mock
+    private CountryRepository countries;
+    @Mock
+    private RoleRepository roles;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @Mock
+    private JwtEncoder jwtEncoder;
 
     @InjectMocks
     private AuthService service;
 
     private Country vietnam;
     private Role customer;
+
+    private static RegisterRequest request() {
+        RegisterRequest r = new RegisterRequest();
+        r.setClubName("  Đà Lạt Highland Stables ");
+        r.setCountryCode("VN");
+        r.setFirstName("Minh Đức");
+        r.setLastName("Phạm");
+        r.setEmail(" duc@dalathighland.vn ");
+        r.setPhone("");
+        r.setPassword("correct-horse-battery");
+        return r;
+    }
+
+    private static LoginRequest login(String password) {
+        LoginRequest r = new LoginRequest();
+        r.setEmail("minh.tran@equifreight.vn");
+        r.setPassword(password);
+        return r;
+    }
 
     @BeforeEach
     void setUp() {
@@ -82,18 +98,6 @@ class AuthServiceTest {
         Jwt jwt = Jwt.withTokenValue("access").header("alg", "HS256").subject("x")
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
         when(jwtEncoder.encode(any(JwtEncoderParameters.class))).thenReturn(jwt);
-    }
-
-    private static RegisterRequest request() {
-        RegisterRequest r = new RegisterRequest();
-        r.setClubName("  Đà Lạt Highland Stables ");
-        r.setCountryCode("VN");
-        r.setFirstName("Minh Đức");
-        r.setLastName("Phạm");
-        r.setEmail(" duc@dalathighland.vn ");
-        r.setPhone("");
-        r.setPassword("correct-horse-battery");
-        return r;
     }
 
     @Test
@@ -154,13 +158,6 @@ class AuthServiceTest {
         when(users.getByEmail("minh.tran@equifreight.vn")).thenReturn(u);
         when(passwordEncoder.matches("right", "hashed")).thenReturn(true);
         return u;
-    }
-
-    private static LoginRequest login(String password) {
-        LoginRequest r = new LoginRequest();
-        r.setEmail("minh.tran@equifreight.vn");
-        r.setPassword(password);
-        return r;
     }
 
     @Test

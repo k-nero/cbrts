@@ -9,7 +9,9 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** Recorded by hand by staff, like authority steps. Online card payment is not designed. */
+/**
+ * Recorded by hand by staff, like authority steps. Online card payment is not designed.
+ */
 @Setter
 @Getter
 @Entity

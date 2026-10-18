@@ -26,13 +26,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Users & roles changes are decisions, so each writes one audit row (US-00-06, BR-F1-08). */
+/**
+ * Users & roles changes are decisions, so each writes one audit row (US-00-06, BR-F1-08).
+ */
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
@@ -49,6 +48,46 @@ class UserServiceTest {
 
     private UserService service;
     private User yen;
+
+    private static CreateUserRequest createRequest(String email, String roleName) {
+        CreateUserRequest request = new CreateUserRequest();
+        request.setEmail(email);
+        request.setPassword("changeme123!");
+        request.setFirstName("Anh Thư");
+        request.setLastName("Bùi");
+        request.setRoles(Set.of(roleName));
+        return request;
+    }
+
+    private static UpdateUserRequest updateRequest(String firstName, String lastName, String roleName) {
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setFirstName(firstName);
+        request.setLastName(lastName);
+        request.setRoles(roleName == null ? null : Set.of(roleName));
+        return request;
+    }
+
+    private static User user(String firstName, String lastName, String roleName) {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(firstName.toLowerCase().replace(" ", ".") + "@equifreight.vn");
+        user.setRoles(new HashSet<>(Set.of(role(roleName))));
+        return user;
+    }
+
+    private static Role role(String name) {
+        Role role = new Role();
+        role.setId(UUID.randomUUID());
+        role.setName(name);
+        return role;
+    }
+
+    private static User withId(User user) {
+        user.setId(UUID.randomUUID());
+        return user;
+    }
 
     @BeforeEach
     void setUp() {
@@ -186,45 +225,5 @@ class UserServiceTest {
     void roleLabels() {
         assertEquals("Fleet & route coordinator", RoleName.label(RoleName.FLEET_COORDINATOR));
         assertEquals("Logistics manager", RoleName.label(RoleName.LOGISTICS_MANAGER));
-    }
-
-    private static CreateUserRequest createRequest(String email, String roleName) {
-        CreateUserRequest request = new CreateUserRequest();
-        request.setEmail(email);
-        request.setPassword("changeme123!");
-        request.setFirstName("Anh Thư");
-        request.setLastName("Bùi");
-        request.setRoles(Set.of(roleName));
-        return request;
-    }
-
-    private static UpdateUserRequest updateRequest(String firstName, String lastName, String roleName) {
-        UpdateUserRequest request = new UpdateUserRequest();
-        request.setFirstName(firstName);
-        request.setLastName(lastName);
-        request.setRoles(roleName == null ? null : Set.of(roleName));
-        return request;
-    }
-
-    private static User user(String firstName, String lastName, String roleName) {
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
-        user.setEmail(firstName.toLowerCase().replace(" ", ".") + "@equifreight.vn");
-        user.setRoles(new HashSet<>(Set.of(role(roleName))));
-        return user;
-    }
-
-    private static Role role(String name) {
-        Role role = new Role();
-        role.setId(UUID.randomUUID());
-        role.setName(name);
-        return role;
-    }
-
-    private static User withId(User user) {
-        user.setId(UUID.randomUUID());
-        return user;
     }
 }

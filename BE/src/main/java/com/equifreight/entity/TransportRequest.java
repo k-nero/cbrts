@@ -21,7 +21,9 @@ import java.util.List;
 @Table(name = "transport_requests")
 public class TransportRequest extends BaseEntity {
 
-    /** REQ-2026-0193. Issued at submission; null for a draft. */
+    /**
+     * REQ-2026-0193. Issued at submission; null for a draft.
+     */
     @Column(unique = true, length = 14)
     private String code;
 
@@ -41,12 +43,16 @@ public class TransportRequest extends BaseEntity {
     @Column(length = 10)
     private TransportMode mode;
 
-    /** Road only. */
+    /**
+     * Road only.
+     */
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private TrailerType trailer;
 
-    /** Air only. */
+    /**
+     * Air only.
+     */
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private ServiceClass airClass;
@@ -55,7 +61,9 @@ public class TransportRequest extends BaseEntity {
     @Column(length = 20)
     private InsuranceOption insurance;
 
-    /** Added automatically from 8 horses or above the high-value threshold (application rule). */
+    /**
+     * Added automatically from 8 horses or above the high-value threshold (application rule).
+     */
     @Column(nullable = false)
     private boolean vetEscort;
 
@@ -67,14 +75,18 @@ public class TransportRequest extends BaseEntity {
     @JoinColumn(name = "destination_place_id")
     private Place destinationPlace;
 
-    /** What the customer typed when it matches no place ("Singapore"); never set with the place. */
+    /**
+     * What the customer typed when it matches no place ("Singapore"); never set with the place.
+     */
     @Column(length = 160)
     private String originText;
 
     @Column(length = 160)
     private String destinationText;
 
-    /** Resolved from the places' cities and the mode; null means a route we don't run (yet). */
+    /**
+     * Resolved from the places' cities and the mode; null means a route we don't run (yet).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "corridor_id")
     private Corridor corridor;
@@ -82,7 +94,9 @@ public class TransportRequest extends BaseEntity {
     /** Required once submitted. */
     private LocalDate departureDate;
 
-    /** 0 or 3 ("My dates can move by ±3 days"). */
+    /**
+     * 0 or 3 ("My dates can move by ±3 days").
+     */
     @Column(nullable = false)
     private short dateFlexDays;
 
@@ -97,7 +111,9 @@ public class TransportRequest extends BaseEntity {
     @Column(length = 500)
     private String specialInstructions;
 
-    /** The range shown at submission, kept so a quotation can be compared with it ("Inside your range"). */
+    /**
+     * The range shown at submission, kept so a quotation can be compared with it ("Inside your range").
+     */
     @Column(precision = 14, scale = 2)
     private BigDecimal estimateLow;
 
@@ -106,7 +122,9 @@ public class TransportRequest extends BaseEntity {
 
     private Instant submittedAt;
 
-    /** Express override of the lead time (BR-F1-01). */
+    /**
+     * Express override of the lead time (BR-F1-01).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lead_time_override_by")
     private User leadTimeOverrideBy;
@@ -116,21 +134,29 @@ public class TransportRequest extends BaseEntity {
     @Column(length = 500)
     private String leadTimeOverrideReason;
 
-    /** Required when REJECTED. */
+    /**
+     * Required when REJECTED.
+     */
     @Column(length = 500)
     private String rejectReason;
 
-    /** Required when INFO_REQUIRED. */
+    /**
+     * Required when INFO_REQUIRED.
+     */
     @Column(length = 1000)
     private String infoRequiredNote;
 
     private Instant cancelledAt;
 
-    /** The fee band at the time of cancelling (BR-F1-07). */
+    /**
+     * The fee band at the time of cancelling (BR-F1-07).
+     */
     @Column(precision = 5, scale = 2)
     private BigDecimal cancellationFeePct;
 
-    /** Locked once the request is APPROVED (BR-F1-06, trigger). */
+    /**
+     * Locked once the request is APPROVED (BR-F1-06, trigger).
+     */
     @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RequestHorse> horses = new ArrayList<>();
 }

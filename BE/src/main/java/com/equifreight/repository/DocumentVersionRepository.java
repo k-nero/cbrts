@@ -21,14 +21,20 @@ import java.util.UUID;
 public interface DocumentVersionRepository extends JpaRepository<DocumentVersion, UUID>,
         JpaSpecificationExecutor<DocumentVersion> {
 
-    /** Find all document versions of a checklist item ordered by version descending. */
+    /**
+     * Find all document versions of a checklist item ordered by version descending.
+     */
     List<DocumentVersion> findByChecklistItemIdOrderByVersionNoDesc(UUID checklistItemId);
 
-    /** Find the maximum version number for a checklist item. */
+    /**
+     * Find the maximum version number for a checklist item.
+     */
     @Query("SELECT MAX(dv.versionNo) FROM DocumentVersion dv WHERE dv.checklistItem.id = :checklistItemId")
     Optional<Short> findMaxVersionNoByChecklistItemId(@Param("checklistItemId") UUID checklistItemId);
 
-    /** Pending reviews for the Transport Specialist inbox with pagination. */
+    /**
+     * Pending reviews for the Transport Specialist inbox with pagination.
+     */
     @Query(value = """
             SELECT dv FROM DocumentVersion dv
             JOIN FETCH dv.checklistItem ci
@@ -39,7 +45,9 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
             countQuery = "SELECT count(dv) FROM DocumentVersion dv WHERE dv.review = :review")
     Page<DocumentVersion> findAllByReview(@Param("review") DocumentReview review, Pageable pageable);
 
-    /** Unpaginated pending reviews list. */
+    /**
+     * Unpaginated pending reviews list.
+     */
     @Query("""
             SELECT dv FROM DocumentVersion dv
             JOIN FETCH dv.checklistItem ci

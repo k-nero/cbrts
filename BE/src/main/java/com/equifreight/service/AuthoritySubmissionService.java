@@ -2,7 +2,6 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -63,7 +62,9 @@ public class AuthoritySubmissionService {
         this.notificationService = notificationService;
     }
 
-    /** List all recognized authorities (Veterinary, Customs, Quarantine). */
+    /**
+     * List all recognized authorities (Veterinary, Customs, Quarantine).
+     */
     @Transactional(readOnly = true)
     public List<AuthorityResponse> listAuthorities(String countryCode, com.equifreight.entity.enums.AuthorityKind kind) {
         return authorityRepository.findAll().stream()
@@ -73,6 +74,7 @@ public class AuthoritySubmissionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<AuthoritySubmissionResponse> getSubmissionsByJob(UUID jobId) {
         return listSubmissionsByJob(jobId);
     }
@@ -88,7 +90,9 @@ public class AuthoritySubmissionService {
                 .toList();
     }
 
-    /** List all authority submissions filed for a transport job. */
+    /**
+     * List all authority submissions filed for a transport job.
+     */
     @Transactional(readOnly = true)
     public List<AuthoritySubmissionResponse> listSubmissionsByJob(UUID jobId) {
         findJobOrThrow(jobId);
@@ -157,7 +161,9 @@ public class AuthoritySubmissionService {
         return ClearanceMapper.toSubmissionResponse(saved);
     }
 
-    /** Update an authority submission outcome (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED). */
+    /**
+     * Update an authority submission outcome (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED).
+     */
     @Transactional
     public AuthoritySubmissionResponse updateSubmission(UUID submissionId, UpdateAuthoritySubmissionRequest request, User specialist) {
         AuthoritySubmission submission = submissionRepository.findById(submissionId)
@@ -215,7 +221,9 @@ public class AuthoritySubmissionService {
         return ClearanceMapper.toSubmissionResponse(updated);
     }
 
-    /** List quarantine periods scheduled or completed for a job. */
+    /**
+     * List quarantine periods scheduled or completed for a job.
+     */
     @Transactional(readOnly = true)
     public List<QuarantinePeriodResponse> listQuarantines(UUID jobId) {
         findJobOrThrow(jobId);
@@ -224,7 +232,9 @@ public class AuthoritySubmissionService {
                 .toList();
     }
 
-    /** Schedule a new quarantine period for a horse or the entire job shipment. */
+    /**
+     * Schedule a new quarantine period for a horse or the entire job shipment.
+     */
     @Transactional
     public QuarantinePeriodResponse createQuarantine(UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
@@ -265,7 +275,9 @@ public class AuthoritySubmissionService {
         return ClearanceMapper.toQuarantineResponse(saved);
     }
 
-    /** Confirm quarantine completion by supervising vet / transport specialist. */
+    /**
+     * Confirm quarantine completion by supervising vet / transport specialist.
+     */
     @Transactional
     public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist) {
         QuarantinePeriod quarantine = quarantinePeriodRepository.findById(quarantineId)

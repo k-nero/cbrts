@@ -14,10 +14,14 @@ import java.util.UUID;
 public interface QuarantinePeriodRepository extends JpaRepository<QuarantinePeriod, UUID>,
         JpaSpecificationExecutor<QuarantinePeriod> {
 
-    /** Lấy tất cả đợt cách ly của 1 chuyến vận chuyển. */
+    /**
+     * Lấy tất cả đợt cách ly của 1 chuyến vận chuyển.
+     */
     List<QuarantinePeriod> findByJobId(UUID jobId);
 
-    /** Lấy đợt cách ly theo từng con ngựa trong 1 job. */
+    /**
+     * Lấy đợt cách ly theo từng con ngựa trong 1 job.
+     */
     List<QuarantinePeriod> findByJobIdAndHorseId(UUID jobId, UUID horseId);
 
     /**
@@ -29,6 +33,8 @@ public interface QuarantinePeriodRepository extends JpaRepository<QuarantinePeri
             """)
     boolean areAllQuarantinesCompleted(@Param("jobId") UUID jobId);
 
-    /** Lấy các đợt cách ly theo địa điểm (trạm kiểm dịch). */
+    /**
+     * Lấy các đợt cách ly theo địa điểm (trạm kiểm dịch).
+     */
     List<QuarantinePeriod> findByPlaceId(UUID placeId);
 }

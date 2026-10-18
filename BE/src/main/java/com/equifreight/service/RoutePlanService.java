@@ -1,7 +1,6 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TransportMode;

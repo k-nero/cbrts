@@ -19,4 +19,5 @@ public record TripViewResponse(
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
         List<TripRecordResponse> records
-) {}
+) {
+}

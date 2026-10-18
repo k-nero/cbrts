@@ -7,7 +7,9 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Create a club account: the club, the person who signs in for it, and their password. */
+/**
+ * Create a club account: the club, the person who signs in for it, and their password.
+ */
 @Getter
 @Setter
 public class RegisterRequest {
@@ -15,7 +17,9 @@ public class RegisterRequest {
     @Size(max = 160)
     private String clubName;
 
-    /** ISO 3166-1 alpha-2, one of the countries EquiFreight serves. */
+    /**
+     * ISO 3166-1 alpha-2, one of the countries EquiFreight serves.
+     */
     @NotBlank
     @Pattern(regexp = "[A-Z]{2}")
     private String countryCode;

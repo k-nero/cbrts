@@ -3,17 +3,15 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it. */
+/**
+ * A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it.
+ */
 @Setter
 @Getter
 @Entity

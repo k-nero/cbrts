@@ -4,12 +4,7 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
-import com.equifreight.repository.ClubRepository;
 import com.equifreight.repository.*;
-import com.equifreight.repository.HorseRepository;
-import com.equifreight.repository.HorseSizeClassRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationArguments;
@@ -22,11 +17,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class DataSeederTest {
 
@@ -34,6 +25,13 @@ class DataSeederTest {
 
     private HorseRepository horses;
     private DataSeeder seeder;
+
+    private static HorseSizeClass sizeClass(String code, String minHeightHh) {
+        HorseSizeClass sizeClass = new HorseSizeClass();
+        sizeClass.setCode(code);
+        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
+        return sizeClass;
+    }
 
     @BeforeEach
     void setUp() {
@@ -81,12 +79,5 @@ class DataSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         verify(horses, times(4)).save(any());
-    }
-
-    private static HorseSizeClass sizeClass(String code, String minHeightHh) {
-        HorseSizeClass sizeClass = new HorseSizeClass();
-        sizeClass.setCode(code);
-        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
-        return sizeClass;
     }
 }

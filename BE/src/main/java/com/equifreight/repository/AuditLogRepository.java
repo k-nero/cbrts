@@ -20,7 +20,9 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
 
     Page<AuditLog> findByEntityTypeOrderByOccurredAtDesc(String entityType, Pageable pageable);
 
-    /** Everyone with an account who has entries, once each; a renamed person shows one of their stored labels. */
+    /**
+     * Everyone with an account who has entries, once each; a renamed person shows one of their stored labels.
+     */
     @Query("""
             select new com.equifreight.model.audit.AuditActorOption(a.actor.id, max(a.actorLabel), max(a.actorRole))
             from AuditLog a

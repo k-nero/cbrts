@@ -8,7 +8,9 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 
-/** "RD HCM → PNH", "AIR PNH → HKG". A request works out its border crossings from here. */
+/**
+ * "RD HCM → PNH", "AIR PNH → HKG". A request works out its border crossings from here.
+ */
 @Setter
 @Getter
 @Entity
