@@ -127,8 +127,9 @@ export const routesConfig = [
         name: 'users',
       },
       {
+        // Every staff role may open it; other roles see why it's kept to the logistics manager.
         path: '/audit-log',
-        roles: [LM],
+        roles: [LM, TS, FRC],
         type: 'authenticated',
         breadcrumb: 'Audit log',
         name: 'audit-log',

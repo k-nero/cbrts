@@ -12,6 +12,11 @@ export const queryKeys = {
     sizeClasses: () => ['horses', 'size-classes'] as const,
     count: (archived: boolean) => ['horses', 'count', archived] as const,
   },
+  audit: {
+    all: () => ['admin-audit-log'] as const,
+    actors: () => ['admin-audit-log', 'actors'] as const,
+    actions: () => ['admin-audit-log', 'actions'] as const,
+  },
   clearance: {
     all: () => ['clearance'] as const,
     jobs: (q = '') => ['clearance', 'jobs', 'list', q] as const,

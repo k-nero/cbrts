@@ -18,6 +18,7 @@ import DocumentsPage from '@/pages/staff/documents';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import AuditLogPage from '@/pages/staff/audit-log';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
@@ -75,7 +76,7 @@ export const router = createBrowserRouter([
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
-          { path: 'audit-log', element: todo('Audit log') },
+          { path: 'audit-log', element: <AuditLogPage /> },
           { path: 'documents', element: <DocumentsPage /> },
           { path: 'authorities', element: todo('Authorities') },
           { path: 'customer-notes', element: todo('Customer notes') },

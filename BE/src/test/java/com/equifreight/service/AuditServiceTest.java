@@ -63,6 +63,21 @@ class AuditServiceTest {
     }
 
     @Test
+    @DisplayName("The actor label puts the family name first, as the audit log shows names")
+    void actorLabelIsFamilyNameFirst() {
+        User yen = new User();
+        yen.setId(UUID.randomUUID());
+        yen.setFirstName("Hải Yến");
+        yen.setLastName("Vũ");
+
+        auditService.recordDecision(yen, "USER_INVITED", "Invited", "USER", UUID.randomUUID(), null, null, null, null);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("Vũ Hải Yến", captor.getValue().getActorLabel());
+    }
+
+    @Test
     @DisplayName("recordDecision preserves already valid JSON objects")
     void recordDecisionPreservesValidJson() {
         auditService.recordDecision(
