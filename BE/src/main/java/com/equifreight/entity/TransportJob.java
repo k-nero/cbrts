@@ -4,10 +4,9 @@ import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.TripStatus;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.Instant;
 
 /**
  * Exactly one job per approved request (BR-F1-05). The DB refuses a departure before the dossier is

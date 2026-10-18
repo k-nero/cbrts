@@ -36,8 +36,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest request,
-                                               HttpServletRequest servletRequest) {
+    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         return ResponseEntity.ok(authService.login(request, clientIp(servletRequest)));
     }
 

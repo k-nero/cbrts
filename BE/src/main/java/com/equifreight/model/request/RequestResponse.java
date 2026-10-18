@@ -7,15 +7,14 @@ import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.route.RouteResponse;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /** A transport request. {@code leadTime} and {@code blockers} are only worked out for a draft. */
 @Getter
@@ -26,6 +25,7 @@ public class RequestResponse {
     private UUID id;
     /** Null until submitted. */
     private String code;
+
     private RequestStatus status;
     private Instant createdAt;
     private Instant updatedAt;

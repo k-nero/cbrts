@@ -2,14 +2,13 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.*;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * A customer's transport request (Flow 1). One route and one arrival window per request (BR-F1-02); the arrival

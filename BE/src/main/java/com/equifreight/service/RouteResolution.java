@@ -3,7 +3,6 @@ package com.equifreight.service;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.route.RouteResponse;
-
 import java.util.Set;
 
 /**
@@ -16,9 +15,13 @@ import java.util.Set;
  * @param originTypedCityServed      the origin is typed text naming a city some place is in
  * @param destinationTypedCityServed the same for the destination
  */
-public record RouteResolution(Corridor corridor, RouteResponse route, Set<TransportMode> modesRun,
-                              String catalogMissingFor, boolean originTypedCityServed,
-                              boolean destinationTypedCityServed) {
+public record RouteResolution(
+        Corridor corridor,
+        RouteResponse route,
+        Set<TransportMode> modesRun,
+        String catalogMissingFor,
+        boolean originTypedCityServed,
+        boolean destinationTypedCityServed) {
 
     public static RouteResolution none() {
         return new RouteResolution(null, null, Set.of(), null, false, false);

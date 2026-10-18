@@ -6,15 +6,14 @@ import com.equifreight.model.horse.HorseResponse;
 import com.equifreight.model.horse.SizeClassResponse;
 import com.equifreight.service.HorseService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * My horses (US-F1-00, #12): the signed-in club's horse registry. ApplicationConfiguration limits
@@ -51,8 +50,8 @@ public class HorseController {
     }
 
     @PutMapping("/horses/{id}")
-    public HorseResponse update(@AuthenticationPrincipal User user, @PathVariable UUID id,
-                                @Valid @RequestBody HorseRequest request) {
+    public HorseResponse update(
+            @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody HorseRequest request) {
         return horseService.update(user, id, request);
     }
 

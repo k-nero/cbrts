@@ -3,7 +3,6 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.RegulationVersion;
 import com.equifreight.model.request.LeadTimeResponse;
-
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

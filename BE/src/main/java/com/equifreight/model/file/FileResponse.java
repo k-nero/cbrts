@@ -1,9 +1,8 @@
 package com.equifreight.model.file;
 
-import lombok.*;
-
 import java.time.Instant;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
@@ -17,6 +16,7 @@ public class FileResponse {
      * Detected from the file's bytes on upload, not taken from the browser.
      */
     private String contentType;
+
     private long sizeBytes;
     private String sha256;
     private UUID uploadedById;

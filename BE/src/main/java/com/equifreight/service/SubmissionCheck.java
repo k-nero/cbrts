@@ -11,7 +11,6 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.LeadTimeResponse;
 import com.equifreight.model.route.RouteResponse;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -76,17 +75,26 @@ public final class SubmissionCheck {
             Horse horse = rh.getHorse();
             List<String> labels = List.copyOf(missing(horse).values());
             if (!labels.isEmpty()) {
-                blockers.add(new Blocker("HORSE_INCOMPLETE", "horses", horse.getName() + "'s profile is missing "
-                        + join(labels) + ". Add " + (labels.size() == 1 ? "it" : "them") + " on the horse's profile."));
+                blockers.add(new Blocker(
+                        "HORSE_INCOMPLETE",
+                        "horses",
+                        horse.getName() + "'s profile is missing " + join(labels) + ". Add "
+                                + (labels.size() == 1 ? "it" : "them") + " on the horse's profile."));
             }
             if (horse.getArchivedAt() != null) {
-                blockers.add(new Blocker("HORSE_ARCHIVED", "horses",
+                blockers.add(new Blocker(
+                        "HORSE_ARCHIVED",
+                        "horses",
                         horse.getName() + " is archived. Remove the horse from this request to submit it."));
             }
             if (rh.isWithFoal() && horse.getSex() != HorseSex.MARE) {
-                blockers.add(new Blocker("FOAL_NOT_A_MARE", "horses", horse.getName() + " is recorded as a "
-                        + horse.getSex().name().toLowerCase(Locale.ROOT) + ", so can't travel with a foal at foot. "
-                        + "Untick the foal, or correct the horse's sex on the profile."));
+                blockers.add(new Blocker(
+                        "FOAL_NOT_A_MARE",
+                        "horses",
+                        horse.getName() + " is recorded as a "
+                                + horse.getSex().name().toLowerCase(Locale.ROOT)
+                                + ", so can't travel with a foal at foot. "
+                                + "Untick the foal, or correct the horse's sex on the profile."));
             }
         }
     }
@@ -110,12 +118,14 @@ public final class SubmissionCheck {
     }
 
     private static Blocker placeNotChosen(String field, String city) {
-        return new Blocker("PLACE_NOT_CHOSEN", field,
+        return new Blocker(
+                "PLACE_NOT_CHOSEN",
+                field,
                 "Choose a place in " + city + " from the list; a typed city can't be routed.");
     }
 
-    private static void route(TransportRequest request, RouteResolution resolution, boolean placeNotChosen,
-                              List<Blocker> blockers) {
+    private static void route(
+            TransportRequest request, RouteResolution resolution, boolean placeNotChosen, List<Blocker> blockers) {
         boolean bothEnds = isSet(request.getOriginPlace(), request.getOriginText())
                 && isSet(request.getDestinationPlace(), request.getDestinationText());
         if (!bothEnds || placeNotChosen || resolution.corridor() != null) {
@@ -128,14 +138,16 @@ public final class SubmissionCheck {
             blockers.add(new Blocker("ROUTE_NOT_RUN", "destination", "We don't run " + route + "."));
         } else if (mode != null) {
             TransportMode other = mode == TransportMode.AIR ? TransportMode.ROAD : TransportMode.AIR;
-            blockers.add(new Blocker("ROUTE_NOT_RUN", "mode", "We don't run " + route + " by " + label(mode)
-                    + ". Choose " + label(other) + "."));
+            blockers.add(new Blocker(
+                    "ROUTE_NOT_RUN",
+                    "mode",
+                    "We don't run " + route + " by " + label(mode) + ". Choose " + label(other) + "."));
         }
         // No mode yet and more than one mode run: the mode blocker asks for it.
     }
 
-    private static void departure(TransportRequest request, RouteResolution resolution, LocalDate today,
-                                  List<Blocker> blockers) {
+    private static void departure(
+            TransportRequest request, RouteResolution resolution, LocalDate today, List<Blocker> blockers) {
         LocalDate departure = request.getDepartureDate();
         if (departure == null) {
             blockers.add(new Blocker("DEPARTURE_MISSING", "departureDate", "Choose a departure date."));
@@ -146,8 +158,12 @@ public final class SubmissionCheck {
             return;
         }
         if (resolution.catalogMissingFor() != null) {
-            blockers.add(new Blocker("CATALOG_INCOMPLETE", "departureDate", resolution.catalogMissingFor()
-                    + " has no published regulation catalog, so the lead time can't be checked. Contact EquiFreight."));
+            blockers.add(
+                    new Blocker(
+                            "CATALOG_INCOMPLETE",
+                            "departureDate",
+                            resolution.catalogMissingFor()
+                                    + " has no published regulation catalog, so the lead time can't be checked. Contact EquiFreight."));
             return;
         }
         if (route.getLeadTimeDays() == null) {
@@ -156,9 +172,14 @@ public final class SubmissionCheck {
         int flex = request.getDateFlexDays();
         LeadTimeResponse leadTime = LeadTimePolicy.assess(route.getLeadTimeDays(), flex, today, departure);
         if (!leadTime.isMet()) {
-            blockers.add(new Blocker("LEAD_TIME_TOO_SHORT", "departureDate", LeadTimePolicy.tooSoonMessage(
-                    Boolean.TRUE.equals(route.getCrossBorder()), leadTime.getRequiredDays(), flex,
-                    leadTime.getEarliestDeparture())));
+            blockers.add(new Blocker(
+                    "LEAD_TIME_TOO_SHORT",
+                    "departureDate",
+                    LeadTimePolicy.tooSoonMessage(
+                            Boolean.TRUE.equals(route.getCrossBorder()),
+                            leadTime.getRequiredDays(),
+                            flex,
+                            leadTime.getEarliestDeparture())));
         }
     }
 
@@ -171,21 +192,25 @@ public final class SubmissionCheck {
             blockers.add(new Blocker("AIR_CLASS_MISSING", "airClass", "Choose Economy, Business or First."));
         }
         if (request.getInsurance() == null) {
-            blockers.add(new Blocker("INSURANCE_MISSING", "insurance",
-                    "Choose your own policy or EquiFreight's insurance."));
+            blockers.add(new Blocker(
+                    "INSURANCE_MISSING", "insurance", "Choose your own policy or EquiFreight's insurance."));
         }
     }
 
     private static void window(TransportRequest request, List<Blocker> blockers) {
-        if (request.getArrivalMode() != ArrivalMode.WINDOW || request.getWindowStart() == null
+        if (request.getArrivalMode() != ArrivalMode.WINDOW
+                || request.getWindowStart() == null
                 || request.getDepartureDate() == null) {
             return;
         }
         LocalDate starts = request.getWindowStart().atZone(BusinessTime.ZONE).toLocalDate();
         if (starts.isBefore(request.getDepartureDate())) {
-            blockers.add(new Blocker("WINDOW_BEFORE_DEPARTURE", "windowStart", "The arrival window starts on "
-                    + BusinessTime.SHORT_DAY.format(starts) + ", before the "
-                    + BusinessTime.SHORT_DAY.format(request.getDepartureDate()) + " departure."));
+            blockers.add(new Blocker(
+                    "WINDOW_BEFORE_DEPARTURE",
+                    "windowStart",
+                    "The arrival window starts on "
+                            + BusinessTime.SHORT_DAY.format(starts) + ", before the "
+                            + BusinessTime.SHORT_DAY.format(request.getDepartureDate()) + " departure."));
         }
     }
 

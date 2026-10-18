@@ -6,15 +6,14 @@ import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.repository.AuditLogRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Writes the audit trail (BR-F1-08): one row per decision, in the caller's transaction. The class and
@@ -43,8 +42,16 @@ public class AuditService {
      * staff with their own name; the label is kept even if the account is renamed later.
      */
     @Transactional
-    public AuditLog recordDecision(User actor, String action, String summary, String entityType, UUID entityId,
-                                   String entityCode, String reason, String before, String after) {
+    public AuditLog recordDecision(
+            User actor,
+            String action,
+            String summary,
+            String entityType,
+            UUID entityId,
+            String entityCode,
+            String reason,
+            String before,
+            String after) {
         AuditLog log = base(action, summary, entityType, entityId, entityCode, before, after);
         log.setActor(actor);
         log.setActorLabel(actor == null ? SYSTEM : labelOf(actor));
@@ -56,8 +63,14 @@ public class AuditService {
 
     /** A check or change the system made on its own ("Lead time checked: …"). */
     @Transactional
-    public AuditLog recordSystem(String action, String summary, String entityType, UUID entityId,
-                                 String entityCode, String before, String after) {
+    public AuditLog recordSystem(
+            String action,
+            String summary,
+            String entityType,
+            UUID entityId,
+            String entityCode,
+            String before,
+            String after) {
         AuditLog log = base(action, summary, entityType, entityId, entityCode, before, after);
         log.setActorLabel(SYSTEM);
         log.setActorRole(SYSTEM_ROLE);
@@ -65,8 +78,14 @@ public class AuditService {
         return logs.save(log);
     }
 
-    private AuditLog base(String action, String summary, String entityType, UUID entityId, String entityCode,
-                          String before, String after) {
+    private AuditLog base(
+            String action,
+            String summary,
+            String entityType,
+            UUID entityId,
+            String entityCode,
+            String before,
+            String after) {
         AuditLog log = new AuditLog();
         log.setOccurredAt(Instant.now(clock));
         log.setAction(action);
@@ -84,7 +103,10 @@ public class AuditService {
     }
 
     private static String roleOf(User actor) {
-        return actor.getRoles().stream().map(Role::getName).min(Comparator.naturalOrder()).orElse(null);
+        return actor.getRoles().stream()
+                .map(Role::getName)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     /** JSON is kept as given; a bare value such as "DRAFT" becomes {"status":"DRAFT"} for the jsonb column. */

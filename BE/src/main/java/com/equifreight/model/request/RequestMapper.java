@@ -6,7 +6,6 @@ import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.model.route.RouteResponse;
 import com.equifreight.service.SubmissionCheck;
-
 import java.util.Comparator;
 import java.util.List;
 
@@ -14,8 +13,8 @@ public final class RequestMapper {
 
     private RequestMapper() {}
 
-    public static RequestResponse toResponse(TransportRequest r, RouteResponse route, LeadTimeResponse leadTime,
-                                             List<Blocker> blockers) {
+    public static RequestResponse toResponse(
+            TransportRequest r, RouteResponse route, LeadTimeResponse leadTime, List<Blocker> blockers) {
         return RequestResponse.builder()
                 .id(r.getId())
                 .code(r.getCode())

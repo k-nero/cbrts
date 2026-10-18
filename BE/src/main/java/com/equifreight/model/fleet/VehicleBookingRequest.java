@@ -2,11 +2,10 @@ package com.equifreight.model.fleet;
 
 import com.equifreight.entity.enums.BookingKind;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter

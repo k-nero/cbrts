@@ -1,5 +1,11 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
@@ -8,22 +14,15 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.repository.AuditLogRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.json.JsonMapper;
 
 /** One audit line per decision, in the same transaction (BR-F1-08). */
 class AuditServiceTest {
@@ -50,9 +49,16 @@ class AuditServiceTest {
         club.setName("Saigon Turf Club");
         when(clubs.findClub(customer)).thenReturn(Optional.of(club));
 
-        service.recordDecision(customer, "REQUEST_SUBMITTED", "Submitted with 1 horse: Nightfall.",
-                "TRANSPORT_REQUEST", REQUEST_ID, "REQ-2026-0193", null,
-                "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
+        service.recordDecision(
+                customer,
+                "REQUEST_SUBMITTED",
+                "Submitted with 1 horse: Nightfall.",
+                "TRANSPORT_REQUEST",
+                REQUEST_ID,
+                "REQ-2026-0193",
+                null,
+                "{\"status\":\"DRAFT\"}",
+                "{\"status\":\"SUBMITTED\"}");
 
         AuditLog log = saved();
         assertThat(log.getActor()).isSameAs(customer);
@@ -75,8 +81,16 @@ class AuditServiceTest {
         User manager = user("Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER);
         when(clubs.findClub(manager)).thenReturn(Optional.empty());
 
-        service.recordDecision(manager, "REQUEST_REJECTED", "Rejected.", "TRANSPORT_REQUEST", REQUEST_ID,
-                "REQ-2026-0193", "No capacity", null, null);
+        service.recordDecision(
+                manager,
+                "REQUEST_REJECTED",
+                "Rejected.",
+                "TRANSPORT_REQUEST",
+                REQUEST_ID,
+                "REQ-2026-0193",
+                "No capacity",
+                null,
+                null);
 
         AuditLog log = saved();
         assertThat(log.getActorLabel()).isEqualTo("Vũ Hải Yến");
@@ -86,8 +100,14 @@ class AuditServiceTest {
 
     @Test
     void theSystemHasNoActor() {
-        service.recordSystem("LEAD_TIME_CHECKED", "Lead time checked: 34 days before departure, 21 required.",
-                "TRANSPORT_REQUEST", REQUEST_ID, "REQ-2026-0193", null, null);
+        service.recordSystem(
+                "LEAD_TIME_CHECKED",
+                "Lead time checked: 34 days before departure, 21 required.",
+                "TRANSPORT_REQUEST",
+                REQUEST_ID,
+                "REQ-2026-0193",
+                null,
+                null);
 
         AuditLog log = saved();
         assertThat(log.getActor()).isNull();
@@ -111,8 +131,16 @@ class AuditServiceTest {
         User lan = user("Lan", "Nguyen", RoleName.TRANSPORT_SPECIALIST);
         when(clubs.findClub(lan)).thenReturn(Optional.empty());
 
-        service.recordDecision(lan, "DOCUMENT_APPROVED", "Approved passport", "DOCUMENT_VERSION", REQUEST_ID,
-                "CBRT-2026-001", null, "PENDING", "APPROVED");
+        service.recordDecision(
+                lan,
+                "DOCUMENT_APPROVED",
+                "Approved passport",
+                "DOCUMENT_VERSION",
+                REQUEST_ID,
+                "CBRT-2026-001",
+                null,
+                "PENDING",
+                "APPROVED");
 
         AuditLog log = saved();
         assertThat(log.getBefore()).isEqualTo("{\"status\":\"PENDING\"}");
@@ -121,8 +149,16 @@ class AuditServiceTest {
 
     @Test
     void validJsonIsKeptAsGiven() {
-        service.recordDecision(null, "CATALOG_PUBLISHED", "Published catalog", "REGULATION_VERSION", REQUEST_ID,
-                "CAT-1", null, "{\"version\":1}", "{\"version\":2}");
+        service.recordDecision(
+                null,
+                "CATALOG_PUBLISHED",
+                "Published catalog",
+                "REGULATION_VERSION",
+                REQUEST_ID,
+                "CAT-1",
+                null,
+                "{\"version\":1}",
+                "{\"version\":2}");
 
         AuditLog log = saved();
         assertThat(log.getActorLabel()).isEqualTo("System");

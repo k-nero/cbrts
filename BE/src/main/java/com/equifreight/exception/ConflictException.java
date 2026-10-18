@@ -1,8 +1,7 @@
 package com.equifreight.exception;
 
-import lombok.Getter;
-
 import java.util.List;
+import lombok.Getter;
 
 /**
  * Maps to HTTP 409. Used for state conflicts: a duplicate code, or an action the record's

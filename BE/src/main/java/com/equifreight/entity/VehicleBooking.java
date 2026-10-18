@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.BookingKind;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.Instant;
 
 /**
  * The fleet calendar. Overlapping bookings of one vehicle are refused by an exclusion constraint.

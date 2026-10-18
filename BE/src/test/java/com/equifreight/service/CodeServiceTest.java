@@ -1,14 +1,14 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.enums.CodePrefix;
-import com.equifreight.repository.CodeCounterRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.repository.CodeCounterRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /** Human codes are issued from code_counters and formatted per prefix. */
 class CodeServiceTest {

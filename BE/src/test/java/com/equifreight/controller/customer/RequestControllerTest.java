@@ -1,19 +1,5 @@
 package com.equifreight.controller.customer;
 
-import com.equifreight.configuration.ControllerAdvise;
-import com.equifreight.service.RequestService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import com.equifreight.exception.ConflictException;
-
-import java.util.List;
-import java.util.UUID;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -21,6 +7,18 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.equifreight.configuration.ControllerAdvise;
+import com.equifreight.exception.ConflictException;
+import com.equifreight.service.RequestService;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /** A malformed request body answers 400 with an ApiError, never a 500. */
 class RequestControllerTest {
@@ -49,8 +47,11 @@ class RequestControllerTest {
     @Test
     void aBlockedSubmitListsEveryBlockerInDetails() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.submit(any(), eq(id))).thenThrow(new ConflictException("SUBMISSION_BLOCKED",
-                "This request can't be submitted yet.", List.of("Add at least one horse.", "Choose road or air.")));
+        when(service.submit(any(), eq(id)))
+                .thenThrow(new ConflictException(
+                        "SUBMISSION_BLOCKED",
+                        "This request can't be submitted yet.",
+                        List.of("Add at least one horse.", "Choose road or air.")));
 
         mvc.perform(post("/api/v1/customer/requests/" + id + "/submit"))
                 .andExpect(status().isConflict())

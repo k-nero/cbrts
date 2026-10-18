@@ -1,5 +1,16 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Corridor;
@@ -8,9 +19,11 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
+import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
+import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.RequestStatus;
@@ -31,18 +44,6 @@ import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.entity.RequestRevision;
-import com.equifreight.entity.enums.CodePrefix;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -55,17 +56,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Spec R-01 to R-05, R-08 and R-09: building and editing a draft request. */
 class RequestServiceTest {
@@ -101,8 +100,17 @@ class RequestServiceTest {
         clubs = mock(ClubService.class);
         codes = mock(CodeService.class);
         audit = mock(AuditService.class);
-        service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit,
-                JsonMapper.builder().build(), Clock.fixed(NOW, BusinessTime.ZONE));
+        service = new RequestService(
+                requests,
+                horses,
+                places,
+                revisions,
+                routes,
+                clubs,
+                codes,
+                audit,
+                JsonMapper.builder().build(),
+                Clock.fixed(NOW, BusinessTime.ZONE));
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -148,12 +156,15 @@ class RequestServiceTest {
         assertThat(saved.getCreatedBy()).isSameAs(user);
         assertThat(saved.getCode()).isNull();
         RequestHorse snapshot = saved.getHorses().stream()
-                .filter(rh -> rh.getHorse() == nightfall).findFirst().orElseThrow();
+                .filter(rh -> rh.getHorse() == nightfall)
+                .findFirst()
+                .orElseThrow();
         assertThat(snapshot.getDeclaredValue()).isEqualByComparingTo("240000");
         assertThat(snapshot.getSex()).isEqualTo(HorseSex.MARE);
         assertThat(snapshot.getSizeClassCode()).isEqualTo("M");
         assertThat(snapshot.getRequiredStall()).isEqualTo(StallType.CLIMATE);
-        assertThat(response.getHorses()).extracting(RequestHorseResponse::getName)
+        assertThat(response.getHorses())
+                .extracting(RequestHorseResponse::getName)
                 .containsExactly("Nightfall", "Shadowfax");
         assertThat(response.getStatus()).isEqualTo(RequestStatus.DRAFT);
     }
@@ -192,7 +203,8 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body(shadowfax, shadowfax)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Shadowfax is on the request twice.")
-                .extracting("code").isEqualTo("HORSE_LISTED_TWICE");
+                .extracting("code")
+                .isEqualTo("HORSE_LISTED_TWICE");
     }
 
     @Test
@@ -202,7 +214,8 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body(silverBell)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Silver Bell is archived and can't be added to a request.")
-                .extracting("code").isEqualTo("HORSE_ARCHIVED");
+                .extracting("code")
+                .isEqualTo("HORSE_ARCHIVED");
     }
 
     @Test
@@ -212,7 +225,9 @@ class RequestServiceTest {
 
         RequestResponse response = service.update(user, draft.getId(), body(silverBell));
 
-        assertThat(response.getHorses()).singleElement().satisfies(h -> assertThat(h.isArchived()).isTrue());
+        assertThat(response.getHorses())
+                .singleElement()
+                .satisfies(h -> assertThat(h.isArchived()).isTrue());
         verify(requests).saveAndFlush(draft);
     }
 
@@ -223,7 +238,8 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, gelding))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Only a mare can travel with a foal at foot; Shadowfax is a gelding.")
-                .extracting("code").isEqualTo("FOAL_NOT_A_MARE");
+                .extracting("code")
+                .isEqualTo("FOAL_NOT_A_MARE");
 
         RequestDraftRequest mare = new RequestDraftRequest();
         mare.setHorses(List.of(input(nightfall.getId(), true)));
@@ -237,9 +253,11 @@ class RequestServiceTest {
 
         RequestResponse response = service.update(user, draft.getId(), body(nightfall, copperKing));
 
-        assertThat(draft.getHorses()).extracting(rh -> rh.getHorse().getName())
+        assertThat(draft.getHorses())
+                .extracting(rh -> rh.getHorse().getName())
                 .containsExactlyInAnyOrder("Nightfall", "Copper King");
-        assertThat(response.getHorses()).extracting(RequestHorseResponse::getName)
+        assertThat(response.getHorses())
+                .extracting(RequestHorseResponse::getName)
                 .containsExactly("Copper King", "Nightfall");
     }
 
@@ -321,7 +339,9 @@ class RequestServiceTest {
         RequestDraftRequest body = body();
         body.setOriginPlaceId(welfare.getId());
 
-        assertRefused(body, "PLACE_NOT_AN_END",
+        assertRefused(
+                body,
+                "PLACE_NOT_AN_END",
                 "Svay Rieng welfare stop is a stop on the way, not a pickup or delivery point.");
     }
 
@@ -368,7 +388,9 @@ class RequestServiceTest {
 
     @Test
     void aWindowIsAtLeastThreeHours() {
-        assertRefused(window("08:00", "10:30"), "ARRIVAL_WINDOW",
+        assertRefused(
+                window("08:00", "10:30"),
+                "ARRIVAL_WINDOW",
                 "An arrival window is at least 3 hours; 08:00–10:30 is shorter.");
 
         service.create(user, window("08:00", "11:00"));
@@ -403,8 +425,8 @@ class RequestServiceTest {
     @Test
     void aDraftCarriesItsLeadTime() {
         when(routes.resolve(any(), any(), any(), any(), any()))
-                .thenReturn(new RouteResolution(new Corridor(), route(21), Set.of(TransportMode.ROAD), null, false,
-                        false));
+                .thenReturn(
+                        new RouteResolution(new Corridor(), route(21), Set.of(TransportMode.ROAD), null, false, false));
         RequestDraftRequest body = body(shadowfax);
         body.setDepartureDate(LocalDate.of(2026, 10, 30));
 
@@ -423,7 +445,8 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.update(user, submitted.getId(), body()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("REQ-2026-0001 was submitted on 17 Oct 2026 and can't be edited here.")
-                .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+                .extracting("code")
+                .isEqualTo("REQUEST_NOT_DRAFT");
         verify(requests).findForUpdate(submitted.getId(), CLUB_ID);
     }
 
@@ -433,7 +456,8 @@ class RequestServiceTest {
 
         assertThatThrownBy(() -> service.delete(user, submitted.getId()))
                 .isInstanceOf(ConflictException.class)
-                .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+                .extracting("code")
+                .isEqualTo("REQUEST_NOT_DRAFT");
         verify(requests, never()).delete(any());
     }
 
@@ -485,14 +509,17 @@ class RequestServiceTest {
         when(requests.findByClubId(CLUB_ID, pageable)).thenReturn(new PageImpl<>(List.of(first, second)));
         when(requests.findByClubIdAndStatus(CLUB_ID, RequestStatus.DRAFT, pageable))
                 .thenReturn(new PageImpl<>(List.of(second)));
-        when(requests.countHorses(anyCollection())).thenReturn(List.of(
-                count(first.getId(), 2), count(second.getId(), 1)));
+        when(requests.countHorses(anyCollection()))
+                .thenReturn(List.of(count(first.getId(), 2), count(second.getId(), 1)));
 
         Page<RequestSummaryResponse> page = service.list(user, null, pageable);
 
-        assertThat(page.getContent()).extracting(RequestSummaryResponse::getHorseCount).containsExactly(2L, 1L);
+        assertThat(page.getContent())
+                .extracting(RequestSummaryResponse::getHorseCount)
+                .containsExactly(2L, 1L);
         assertThat(service.list(user, RequestStatus.DRAFT, pageable).getContent())
-                .extracting(RequestSummaryResponse::getId).containsExactly(second.getId());
+                .extracting(RequestSummaryResponse::getId)
+                .containsExactly(second.getId());
     }
 
     /** Spec R-07: submitting a draft. */
@@ -536,7 +563,9 @@ class RequestServiceTest {
 
             service.submit(user, draft.getId());
 
-            assertThat(draft.getHorses()).filteredOn(rh -> rh.getHorse() == nightfall).singleElement()
+            assertThat(draft.getHorses())
+                    .filteredOn(rh -> rh.getHorse() == nightfall)
+                    .singleElement()
                     .satisfies(rh -> assertThat(rh.getDeclaredValue()).isEqualByComparingTo("250000"));
         }
 
@@ -550,7 +579,8 @@ class RequestServiceTest {
             assertThat(revision.getRequest()).isSameAs(draft);
             assertThat(revision.getRevisionNo()).isEqualTo((short) 1);
             assertThat(revision.getSubmittedAt()).isEqualTo(NOW);
-            assertThat(revision.getPayload()).contains("\"code\":\"REQ-2026-0193\"")
+            assertThat(revision.getPayload())
+                    .contains("\"code\":\"REQ-2026-0193\"")
                     .contains("\"status\":\"SUBMITTED\"");
         }
 
@@ -558,12 +588,26 @@ class RequestServiceTest {
         void submitWritesTheTwoAuditRows() {
             service.submit(user, draft.getId());
 
-            verify(audit).recordDecision(user, "REQUEST_SUBMITTED", "Submitted with 2 horses: Nightfall, Shadowfax.",
-                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null,
-                    "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
-            verify(audit).recordSystem("LEAD_TIME_CHECKED",
-                    "Lead time checked: 34 days before departure, 21 required.",
-                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+            verify(audit)
+                    .recordDecision(
+                            user,
+                            "REQUEST_SUBMITTED",
+                            "Submitted with 2 horses: Nightfall, Shadowfax.",
+                            "TRANSPORT_REQUEST",
+                            draft.getId(),
+                            "REQ-2026-0193",
+                            null,
+                            "{\"status\":\"DRAFT\"}",
+                            "{\"status\":\"SUBMITTED\"}");
+            verify(audit)
+                    .recordSystem(
+                            "LEAD_TIME_CHECKED",
+                            "Lead time checked: 34 days before departure, 21 required.",
+                            "TRANSPORT_REQUEST",
+                            draft.getId(),
+                            "REQ-2026-0193",
+                            null,
+                            null);
         }
 
         @Test
@@ -572,17 +616,25 @@ class RequestServiceTest {
 
             service.submit(user, draft.getId());
 
-            verify(audit).recordSystem("LEAD_TIME_CHECKED",
-                    "Lead time checked: 34 days before departure, 21 required, plus 3 for dates that can move by ±3 days.",
-                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+            verify(audit)
+                    .recordSystem(
+                            "LEAD_TIME_CHECKED",
+                            "Lead time checked: 34 days before departure, 21 required, plus 3 for dates that can move by ±3 days.",
+                            "TRANSPORT_REQUEST",
+                            draft.getId(),
+                            "REQ-2026-0193",
+                            null,
+                            null);
         }
 
         @Test
         void aLongHorseListIsCappedInTheAuditSummary() {
             draft.getHorses().clear();
             for (int i = 1; i <= 40; i++) {
-                Horse h = horse(String.format("Horse %02d of the Saigon Turf Club long-distance string", i),
-                        HorseSex.GELDING, "50000");
+                Horse h = horse(
+                        String.format("Horse %02d of the Saigon Turf Club long-distance string", i),
+                        HorseSex.GELDING,
+                        "50000");
                 RequestHorse rh = new RequestHorse();
                 rh.setRequest(draft);
                 rh.setHorse(h);
@@ -592,9 +644,19 @@ class RequestServiceTest {
             service.submit(user, draft.getId());
 
             ArgumentCaptor<String> summary = ArgumentCaptor.forClass(String.class);
-            verify(audit).recordDecision(eq(user), eq("REQUEST_SUBMITTED"), summary.capture(),
-                    any(), any(), any(), any(), any(), any());
-            assertThat(summary.getValue()).hasSizeLessThanOrEqualTo(500)
+            verify(audit)
+                    .recordDecision(
+                            eq(user),
+                            eq("REQUEST_SUBMITTED"),
+                            summary.capture(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
+            assertThat(summary.getValue())
+                    .hasSizeLessThanOrEqualTo(500)
                     .startsWith("Submitted with 40 horses: Horse 01 of the Saigon Turf Club long-distance string, ")
                     .matches(".* and \\d+ more\\.$");
         }
@@ -605,8 +667,17 @@ class RequestServiceTest {
 
             service.submit(user, draft.getId());
 
-            verify(audit).recordDecision(eq(user), eq("REQUEST_SUBMITTED"), eq("Submitted with 1 horse: Nightfall."),
-                    any(), any(), any(), any(), any(), any());
+            verify(audit)
+                    .recordDecision(
+                            eq(user),
+                            eq("REQUEST_SUBMITTED"),
+                            eq("Submitted with 1 horse: Nightfall."),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -634,7 +705,8 @@ class RequestServiceTest {
 
             assertThatThrownBy(() -> service.submit(user, submitted.getId()))
                     .isInstanceOf(ConflictException.class)
-                    .extracting("code").isEqualTo("REQUEST_NOT_DRAFT");
+                    .extracting("code")
+                    .isEqualTo("REQUEST_NOT_DRAFT");
         }
 
         @Test
@@ -647,7 +719,15 @@ class RequestServiceTest {
 
         @Test
         void theCodeYearIsTakenInBusinessTime() {
-            service = new RequestService(requests, horses, places, revisions, routes, clubs, codes, audit,
+            service = new RequestService(
+                    requests,
+                    horses,
+                    places,
+                    revisions,
+                    routes,
+                    clubs,
+                    codes,
+                    audit,
                     JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE));
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
@@ -661,7 +741,8 @@ class RequestServiceTest {
     // --- helpers -------------------------------------------------------------------------------------------
 
     TransportRequest savedRequest() {
-        org.mockito.ArgumentCaptor<TransportRequest> captor = org.mockito.ArgumentCaptor.forClass(TransportRequest.class);
+        org.mockito.ArgumentCaptor<TransportRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(TransportRequest.class);
         verify(requests, org.mockito.Mockito.atLeastOnce()).saveAndFlush(captor.capture());
         return captor.getValue();
     }
@@ -670,12 +751,14 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(message)
-                .extracting("code").isEqualTo(code);
+                .extracting("code")
+                .isEqualTo(code);
     }
 
     RequestDraftRequest body(Horse... list) {
         RequestDraftRequest body = new RequestDraftRequest();
-        body.setHorses(new ArrayList<>(Arrays.stream(list).map(h -> input(h.getId(), false)).toList()));
+        body.setHorses(new ArrayList<>(
+                Arrays.stream(list).map(h -> input(h.getId(), false)).toList()));
         return body;
     }
 
@@ -726,9 +809,14 @@ class RequestServiceTest {
     }
 
     static RouteResponse route(int leadTimeDays) {
-        return RouteResponse.builder().code("RD HCM → BKK").mode(TransportMode.ROAD)
-                .fromCity("Ho Chi Minh City").toCity("Bangkok").crossBorder(true)
-                .leadTimeDays(leadTimeDays).earliestDeparture(LocalDate.of(2026, 9, 26).plusDays(leadTimeDays))
+        return RouteResponse.builder()
+                .code("RD HCM → BKK")
+                .mode(TransportMode.ROAD)
+                .fromCity("Ho Chi Minh City")
+                .toCity("Bangkok")
+                .crossBorder(true)
+                .leadTimeDays(leadTimeDays)
+                .earliestDeparture(LocalDate.of(2026, 9, 26).plusDays(leadTimeDays))
                 .build();
     }
 

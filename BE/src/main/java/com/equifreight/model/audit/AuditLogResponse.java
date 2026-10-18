@@ -1,10 +1,9 @@
 package com.equifreight.model.audit;
 
 import com.equifreight.entity.enums.Channel;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
 
 /**
  * One audit log entry as the logistics manager reads it (US-00-06). {@code before} and
@@ -27,6 +26,4 @@ public record AuditLogResponse(
         JsonNode before,
         JsonNode after,
         String reason,
-        UUID jobId
-) {
-}
+        UUID jobId) {}

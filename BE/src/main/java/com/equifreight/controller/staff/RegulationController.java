@@ -5,12 +5,11 @@ import com.equifreight.model.clearance.DocumentTypeResponse;
 import com.equifreight.model.clearance.RegulationCatalogResponse;
 import com.equifreight.model.clearance.RegulationVersionResponse;
 import com.equifreight.service.RegulationService;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Staff controller managing country regulation catalogs, document types, and rule definitions (AGENTS.md).
@@ -58,9 +57,7 @@ public class RegulationController {
      */
     @PostMapping("/versions/{versionId}/publish")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
-    public RegulationVersionResponse publishVersion(
-            @PathVariable UUID versionId,
-            @AuthenticationPrincipal User user) {
+    public RegulationVersionResponse publishVersion(@PathVariable UUID versionId, @AuthenticationPrincipal User user) {
         return regulationService.publishVersion(versionId, user);
     }
 }

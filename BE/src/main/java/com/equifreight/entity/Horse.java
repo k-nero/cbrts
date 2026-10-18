@@ -5,14 +5,13 @@ import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
 
 /**
  * Archived, never deleted, because past jobs refer to it.

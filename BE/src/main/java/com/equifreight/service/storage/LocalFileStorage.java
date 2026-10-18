@@ -1,13 +1,12 @@
 package com.equifreight.service.storage;
 
 import com.equifreight.exception.StorageException;
-import org.springframework.core.io.InputStreamSource;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import org.springframework.core.io.InputStreamSource;
 
 /**
  * {@link FileStorage} in a directory, for running without Docker and for tests. Keys map to paths

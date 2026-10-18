@@ -1,5 +1,8 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
+
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
@@ -17,9 +20,6 @@ import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.route.RouteResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,9 +27,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.groups.Tuple.tuple;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /** Spec §5.2: what stops a draft from being submitted, with the exact codes, fields and messages. */
 class SubmissionCheckTest {
@@ -66,7 +65,8 @@ class SubmissionCheckTest {
     void noHorsesBlocks() {
         request.getHorses().clear();
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
                 .containsExactly(tuple("NO_HORSES", "horses", "Add at least one horse."));
     }
 
@@ -77,8 +77,10 @@ class SubmissionCheckTest {
         copperKing.setWeightKg(null);
         add(copperKing);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getMessage)
-                .containsExactly(tuple("HORSE_INCOMPLETE",
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getMessage)
+                .containsExactly(tuple(
+                        "HORSE_INCOMPLETE",
                         "Copper King's profile is missing date of birth and weight. Add them on the horse's profile."));
     }
 
@@ -86,8 +88,8 @@ class SubmissionCheckTest {
     void oneMissingFieldSaysIt() {
         request.getHorses().getFirst().getHorse().setPassportNo(null);
 
-        assertThat(messages()).containsExactly(
-                "Shadowfax's profile is missing passport number. Add it on the horse's profile.");
+        assertThat(messages())
+                .containsExactly("Shadowfax's profile is missing passport number. Add it on the horse's profile.");
     }
 
     @Test
@@ -97,9 +99,15 @@ class SubmissionCheckTest {
         silverBell.setWeightKg(null);
         silverBell.setArchivedAt(Instant.parse("2026-09-25T00:00:00Z"));
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getMessage).containsExactly(
-                tuple("HORSE_INCOMPLETE", "Silver Bell's profile is missing weight. Add it on the horse's profile."),
-                tuple("HORSE_ARCHIVED", "Silver Bell is archived. Remove the horse from this request to submit it."));
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getMessage)
+                .containsExactly(
+                        tuple(
+                                "HORSE_INCOMPLETE",
+                                "Silver Bell's profile is missing weight. Add it on the horse's profile."),
+                        tuple(
+                                "HORSE_ARCHIVED",
+                                "Silver Bell is archived. Remove the horse from this request to submit it."));
     }
 
     @Test
@@ -108,9 +116,14 @@ class SubmissionCheckTest {
         shadowfax.setSex(HorseSex.MARE);
         shadowfax.setWithFoal(true);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("FOAL_NOT_A_MARE", "horses", "Shadowfax is recorded as a gelding, so can't "
-                        + "travel with a foal at foot. Untick the foal, or correct the horse's sex on the profile."));
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(
+                        tuple(
+                                "FOAL_NOT_A_MARE",
+                                "horses",
+                                "Shadowfax is recorded as a gelding, so can't "
+                                        + "travel with a foal at foot. Untick the foal, or correct the horse's sex on the profile."));
     }
 
     @Test
@@ -120,10 +133,12 @@ class SubmissionCheckTest {
         request.setDepartureDate(null);
         resolution = RouteResolution.none();
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage).containsExactly(
-                tuple("ORIGIN_MISSING", "origin", "Choose where the horses are collected."),
-                tuple("DESTINATION_MISSING", "destination", "Choose where the horses are going."),
-                tuple("DEPARTURE_MISSING", "departureDate", "Choose a departure date."));
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(
+                        tuple("ORIGIN_MISSING", "origin", "Choose where the horses are collected."),
+                        tuple("DESTINATION_MISSING", "destination", "Choose where the horses are going."),
+                        tuple("DEPARTURE_MISSING", "departureDate", "Choose a departure date."));
     }
 
     @Test
@@ -132,8 +147,11 @@ class SubmissionCheckTest {
         request.setDestinationText("Bangkok");
         resolution = new RouteResolution(null, null, Set.of(), null, false, true);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("PLACE_NOT_CHOSEN", "destination",
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(tuple(
+                        "PLACE_NOT_CHOSEN",
+                        "destination",
                         "Choose a place in Bangkok from the list; a typed city can't be routed."));
     }
 
@@ -144,7 +162,8 @@ class SubmissionCheckTest {
         request.setDestinationText("Singapore");
         resolution = RouteResolution.none();
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
                 .containsExactly(tuple("ROUTE_NOT_RUN", "destination", "We don't run Bangkok → Singapore."));
     }
 
@@ -162,9 +181,10 @@ class SubmissionCheckTest {
         request.setAirClass(ServiceClass.BUSINESS);
         resolution = new RouteResolution(null, null, Set.of(TransportMode.ROAD), null, false, false);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("ROUTE_NOT_RUN", "mode",
-                        "We don't run Ho Chi Minh City → Bangkok by air. Choose road."));
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(
+                        tuple("ROUTE_NOT_RUN", "mode", "We don't run Ho Chi Minh City → Bangkok by air. Choose road."));
     }
 
     @Test
@@ -173,17 +193,21 @@ class SubmissionCheckTest {
         request.setTrailer(null);
         resolution = new RouteResolution(null, null, Set.of(TransportMode.ROAD, TransportMode.AIR), null, false, false);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
                 .containsExactly(tuple("MODE_MISSING", "mode", "Choose road or air."));
     }
 
     @Test
     void aMissingCatalogBlocksTheLeadTimeCheck() {
-        resolution = new RouteResolution(resolution.corridor(), route(null, true), Set.of(TransportMode.ROAD),
-                "Laos", false, false);
+        resolution = new RouteResolution(
+                resolution.corridor(), route(null, true), Set.of(TransportMode.ROAD), "Laos", false, false);
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("CATALOG_INCOMPLETE", "departureDate",
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(tuple(
+                        "CATALOG_INCOMPLETE",
+                        "departureDate",
                         "Laos has no published regulation catalog, so the lead time can't be checked. "
                                 + "Contact EquiFreight."));
     }
@@ -192,8 +216,11 @@ class SubmissionCheckTest {
     void aDepartureInsideTheLeadTimeBlocks() {
         request.setDepartureDate(LocalDate.of(2026, 10, 5));
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("LEAD_TIME_TOO_SHORT", "departureDate",
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(tuple(
+                        "LEAD_TIME_TOO_SHORT",
+                        "departureDate",
                         "Cross-border moves need 21 days for document clearance. "
                                 + "The earliest departure is 17 Oct 2026."));
     }
@@ -203,8 +230,9 @@ class SubmissionCheckTest {
         resolution = resolved(3, false);
         request.setDepartureDate(LocalDate.of(2026, 9, 28));
 
-        assertThat(messages()).containsExactly(
-                "Moves within one country need 3 days' notice. The earliest departure is 29 Sep 2026.");
+        assertThat(messages())
+                .containsExactly(
+                        "Moves within one country need 3 days' notice. The earliest departure is 29 Sep 2026.");
     }
 
     @Test
@@ -219,8 +247,9 @@ class SubmissionCheckTest {
         request.setDateFlexDays((short) 3);
         request.setDepartureDate(LocalDate.of(2026, 10, 17));
 
-        assertThat(messages()).containsExactly("Cross-border moves need 21 days for document clearance. "
-                + "With dates that can move by ±3 days, the earliest departure is 20 Oct 2026.");
+        assertThat(messages())
+                .containsExactly("Cross-border moves need 21 days for document clearance. "
+                        + "With dates that can move by ±3 days, the earliest departure is 20 Oct 2026.");
     }
 
     @Test
@@ -235,15 +264,18 @@ class SubmissionCheckTest {
     void serviceChoicesBlockUntilMade() {
         request.setTrailer(null);
         request.setInsurance(null);
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage).containsExactly(
-                tuple("TRAILER_MISSING", "trailer", "Choose a shared or private trailer."),
-                tuple("INSURANCE_MISSING", "insurance", "Choose your own policy or EquiFreight's insurance."));
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(
+                        tuple("TRAILER_MISSING", "trailer", "Choose a shared or private trailer."),
+                        tuple("INSURANCE_MISSING", "insurance", "Choose your own policy or EquiFreight's insurance."));
 
         request.setMode(TransportMode.AIR);
         request.setInsurance(InsuranceOption.EQUIFREIGHT);
-        resolution = new RouteResolution(resolution.corridor(), resolution.route(), Set.of(TransportMode.AIR), null,
-                false, false);
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+        resolution = new RouteResolution(
+                resolution.corridor(), resolution.route(), Set.of(TransportMode.AIR), null, false, false);
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
                 .containsExactly(tuple("AIR_CLASS_MISSING", "airClass", "Choose Economy, Business or First."));
     }
 
@@ -251,8 +283,11 @@ class SubmissionCheckTest {
     void aWindowBeforeTheDepartureDayBlocks() {
         window(OffsetDateTime.parse("2026-10-29T08:00:00+07:00").toInstant());
 
-        assertThat(blockers()).extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
-                .containsExactly(tuple("WINDOW_BEFORE_DEPARTURE", "windowStart",
+        assertThat(blockers())
+                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .containsExactly(tuple(
+                        "WINDOW_BEFORE_DEPARTURE",
+                        "windowStart",
                         "The arrival window starts on 29 Oct, before the 30 Oct departure."));
     }
 
@@ -291,13 +326,17 @@ class SubmissionCheckTest {
         Corridor corridor = new Corridor();
         corridor.setCode("RD HCM → BKK");
         corridor.setMode(TransportMode.ROAD);
-        return new RouteResolution(corridor, route(leadTimeDays, crossBorder), Set.of(TransportMode.ROAD), null,
-                false, false);
+        return new RouteResolution(
+                corridor, route(leadTimeDays, crossBorder), Set.of(TransportMode.ROAD), null, false, false);
     }
 
     private static RouteResponse route(Integer leadTimeDays, boolean crossBorder) {
-        return RouteResponse.builder().code("RD HCM → BKK").mode(TransportMode.ROAD)
-                .fromCity("Ho Chi Minh City").toCity("Bangkok").crossBorder(crossBorder)
+        return RouteResponse.builder()
+                .code("RD HCM → BKK")
+                .mode(TransportMode.ROAD)
+                .fromCity("Ho Chi Minh City")
+                .toCity("Bangkok")
+                .crossBorder(crossBorder)
                 .leadTimeDays(leadTimeDays)
                 .earliestDeparture(leadTimeDays == null ? null : TODAY.plusDays(leadTimeDays))
                 .build();
