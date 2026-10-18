@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CrewRole;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * Grooms = ⌈horses ÷ 3⌉ is checked by the application.

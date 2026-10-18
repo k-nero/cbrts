@@ -14,6 +14,7 @@ import com.equifreight.repository.RefreshTokenRepository;
 import com.equifreight.repository.RoleRepository;
 import com.equifreight.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
+import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,8 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.util.*;
 
 @Service
 public class UserService {
@@ -34,9 +33,13 @@ public class UserService {
     private final JsonMapper jsonMapper;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-                       AuditService auditService, JsonMapper jsonMapper,
-                       RefreshTokenRepository refreshTokenRepository) {
+    public UserService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            AuditService auditService,
+            JsonMapper jsonMapper,
+            RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -47,7 +50,8 @@ public class UserService {
 
     private static void requireNotRemoved(User user) {
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new BusinessException("%s's account was removed, so it can't be changed.".formatted(user.displayName()));
+            throw new BusinessException(
+                    "%s's account was removed, so it can't be changed.".formatted(user.displayName()));
         }
     }
 
@@ -55,11 +59,14 @@ public class UserService {
      * "transport specialist", "fleet & route coordinator and escort".
      */
     private static String roleList(Set<Role> roles) {
-        List<String> labels = roleNames(roles).stream().map(n -> RoleName.label(n).toLowerCase()).toList();
+        List<String> labels = roleNames(roles).stream()
+                .map(n -> RoleName.label(n).toLowerCase())
+                .toList();
         if (labels.isEmpty()) {
             return "no role";
         }
-        return labels.size() == 1 ? labels.getFirst()
+        return labels.size() == 1
+                ? labels.getFirst()
                 : String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
     }
 
@@ -89,8 +96,7 @@ public class UserService {
                         cb.like(cb.lower(root.get("email")), like),
                         cb.like(cb.lower(root.get("firstName")), like),
                         cb.like(cb.lower(root.get("lastName")), like),
-                        cb.like(cb.lower(root.get("phone")), like)
-                ));
+                        cb.like(cb.lower(root.get("phone")), like)));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -119,10 +125,16 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRoles(roles);
         User saved = userRepository.save(user);
-        auditService.recordDecision(actor, "USER_INVITED",
+        auditService.recordDecision(
+                actor,
+                "USER_INVITED",
                 "Invited %s as %s".formatted(saved.displayName(), roleList(saved.getRoles())),
-                ENTITY_TYPE, saved.getId(), saved.getStaffCode(), null,
-                null, snapshot(saved));
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getStaffCode(),
+                null,
+                null,
+                snapshot(saved));
         return UserMapper.toResponse(saved);
     }
 
@@ -153,8 +165,16 @@ public class UserService {
             if (!oldName.equals(name)) {
                 summary += " (was " + oldName + ")";
             }
-            auditService.recordDecision(actor, "USER_UPDATED", summary,
-                    ENTITY_TYPE, saved.getId(), saved.getStaffCode(), null, before, after);
+            auditService.recordDecision(
+                    actor,
+                    "USER_UPDATED",
+                    summary,
+                    ENTITY_TYPE,
+                    saved.getId(),
+                    saved.getStaffCode(),
+                    null,
+                    before,
+                    after);
         }
         return UserMapper.toResponse(saved);
     }
@@ -171,10 +191,16 @@ public class UserService {
         user.setStatus(UserStatus.DISABLED);
         userRepository.save(user);
         refreshTokenRepository.deleteByUser(user);
-        auditService.recordDecision(actor, "USER_REMOVED",
+        auditService.recordDecision(
+                actor,
+                "USER_REMOVED",
                 "Removed %s (%s)".formatted(user.displayName(), roleList(user.getRoles())),
-                ENTITY_TYPE, user.getId(), user.getStaffCode(), null,
-                before, snapshot(user));
+                ENTITY_TYPE,
+                user.getId(),
+                user.getStaffCode(),
+                null,
+                before,
+                snapshot(user));
     }
 
     /**
@@ -197,8 +223,8 @@ public class UserService {
     private Set<Role> resolveRoles(Set<String> roleNames) {
         Set<Role> roles = new HashSet<>();
         for (String name : roleNames) {
-            roles.add(roleRepository.findByName(name)
-                    .orElseThrow(() -> new BusinessException("Unknown role: " + name)));
+            roles.add(
+                    roleRepository.findByName(name).orElseThrow(() -> new BusinessException("Unknown role: " + name)));
         }
         return roles;
     }

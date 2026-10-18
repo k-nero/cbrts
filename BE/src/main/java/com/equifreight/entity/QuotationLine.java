@@ -4,14 +4,13 @@ import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.LineSource;
 import com.equifreight.entity.enums.RateBasis;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
-
-import java.math.BigDecimal;
 
 /**
  * A priced line of a quotation. Quantities are derived from the request, never typed.

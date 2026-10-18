@@ -1,9 +1,17 @@
 package com.equifreight.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.StoredFile;
 import com.equifreight.exception.StorageException;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.LocalFileStorage;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,15 +20,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.nio.file.Path;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
 
 class OrphanFileCleanupJobTest {
 
@@ -80,7 +79,7 @@ class OrphanFileCleanupJobTest {
         StoredFile file = new StoredFile();
         file.setId(UUID.randomUUID());
         file.setStorageKey("files/2026/10/" + UUID.randomUUID());
-        storage.put(file.getStorageKey(), new ByteArrayResource(new byte[]{1}), 1, "application/pdf");
+        storage.put(file.getStorageKey(), new ByteArrayResource(new byte[] {1}), 1, "application/pdf");
         return file;
     }
 }

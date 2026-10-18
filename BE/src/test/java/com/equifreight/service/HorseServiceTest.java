@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
@@ -16,6 +21,10 @@ import com.equifreight.model.horse.HorseResponse;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.HorseSizeClassRepository;
 import com.equifreight.repository.RequestHorseRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -24,16 +33,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class HorseServiceTest {
 
@@ -120,7 +119,8 @@ class HorseServiceTest {
         when(clubs.requireClub(user)).thenReturn(club);
         when(sizeClasses.findAllByOrderByMinHeightHhAsc()).thenReturn(CLASSES);
         when(horses.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(any(), anyString())).thenReturn(Optional.empty());
+        when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(any(), anyString()))
+                .thenReturn(Optional.empty());
         when(horses.findByMicrochip(anyString())).thenReturn(Optional.empty());
         when(requestHorses.findHorseIdsOnSubmittedRequests(any())).thenReturn(Set.of());
     }
@@ -150,7 +150,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.create(user, shortChip))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; 25025960022331 has 14.")
-                .extracting("code").isEqualTo("INVALID_MICROCHIP");
+                .extracting("code")
+                .isEqualTo("INVALID_MICROCHIP");
 
         HorseRequest letters = nightfallRequest();
         letters.setMicrochip("25025960022331X");
@@ -167,7 +168,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; ２５０２５９６００２２３３１１ has letters or symbols.")
-                .extracting("code").isEqualTo("INVALID_MICROCHIP");
+                .extracting("code")
+                .isEqualTo("INVALID_MICROCHIP");
     }
 
     @Test
@@ -192,7 +194,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Saigon Turf Club already has an active horse named Nightfall.")
-                .extracting("code").isEqualTo("HORSE_NAME_TAKEN");
+                .extracting("code")
+                .isEqualTo("HORSE_NAME_TAKEN");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -209,7 +212,8 @@ class HorseServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Microchip 250259600223311 is already registered. Check it against the passport, "
                         + "or contact us if the horse changed owners.")
-                .extracting("code").isEqualTo("MICROCHIP_REGISTERED");
+                .extracting("code")
+                .isEqualTo("MICROCHIP_REGISTERED");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -221,7 +225,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("The date of birth 1 Jan 2999 is after today.")
-                .extracting("code").isEqualTo("INVALID_DATE_OF_BIRTH");
+                .extracting("code")
+                .isEqualTo("INVALID_DATE_OF_BIRTH");
     }
 
     @Test
@@ -251,7 +256,8 @@ class HorseServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Another horse with this name or microchip was saved at the same moment. "
                         + "Reload your horses and try again.")
-                .extracting("code").isEqualTo("HORSE_DUPLICATE");
+                .extracting("code")
+                .isEqualTo("HORSE_DUPLICATE");
     }
 
     @Test
@@ -283,8 +289,9 @@ class HorseServiceTest {
         List<HorseResponse> page = service.list(user, null, false, pageable).getContent();
 
         assertThat(page).extracting(HorseResponse::isIdentityLocked).containsExactly(true, false);
-        verify(requestHorses, times(1)).findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
-                ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
+        verify(requestHorses, times(1))
+                .findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
+                        ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
     }
 
     @Test
@@ -310,7 +317,8 @@ class HorseServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Name and sex can't be changed: Nightfall travelled on REQ-2026-0193. "
                         + "Ask the transport specialist to correct them against her passport.")
-                .extracting("code").isEqualTo("HORSE_IDENTITY_LOCKED");
+                .extracting("code")
+                .isEqualTo("HORSE_IDENTITY_LOCKED");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -380,7 +388,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), requestFrom(nightfall)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Nightfall is archived. Archived horses can't be edited.")
-                .extracting("code").isEqualTo("HORSE_ARCHIVED");
+                .extracting("code")
+                .isEqualTo("HORSE_ARCHIVED");
     }
 
     @Test
@@ -404,7 +413,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.archive(user, nightfall.getId()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Nightfall is on REQ-2026-0193, which is in review. Archive her after it ends.")
-                .extracting("code").isEqualTo("HORSE_IN_USE");
+                .extracting("code")
+                .isEqualTo("HORSE_IN_USE");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -426,9 +436,16 @@ class HorseServiceTest {
 
         service.archive(user, nightfall.getId());
 
-        verify(requestHorses).findActiveUses(eq(nightfall.getId()), argThat((Collection<RequestStatus> statuses) ->
-                Set.copyOf(statuses).equals(EnumSet.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW,
-                        RequestStatus.INFO_REQUIRED, RequestStatus.QUOTED, RequestStatus.CUSTOMER_ACCEPTED))));
+        verify(requestHorses)
+                .findActiveUses(
+                        eq(nightfall.getId()),
+                        argThat((Collection<RequestStatus> statuses) -> Set.copyOf(statuses)
+                                .equals(EnumSet.of(
+                                        RequestStatus.SUBMITTED,
+                                        RequestStatus.UNDER_REVIEW,
+                                        RequestStatus.INFO_REQUIRED,
+                                        RequestStatus.QUOTED,
+                                        RequestStatus.CUSTOMER_ACCEPTED))));
     }
 
     @Test

@@ -2,12 +2,10 @@ package com.equifreight.model.user;
 
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
-
 import java.util.List;
 
 public final class UserMapper {
-    private UserMapper() {
-    }
+    private UserMapper() {}
 
     public static UserResponse toResponse(User user) {
         List<String> roles = user.getRoles() == null

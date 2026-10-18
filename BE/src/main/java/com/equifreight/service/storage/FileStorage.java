@@ -1,8 +1,7 @@
 package com.equifreight.service.storage;
 
-import org.springframework.core.io.InputStreamSource;
-
 import java.io.InputStream;
+import org.springframework.core.io.InputStreamSource;
 
 /**
  * Holds the bytes of uploaded files, addressed by {@code files.storage_key}. The metadata (name, type,
@@ -33,6 +32,5 @@ public interface FileStorage extends AutoCloseable {
      * Releases connections, if the store holds any. Called when the application shuts down.
      */
     @Override
-    default void close() {
-    }
+    default void close() {}
 }

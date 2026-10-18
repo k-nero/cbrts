@@ -2,11 +2,10 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RatePolicyKey;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * One value per key and catalog version (fuel %, deposit %, quote validity days, …).

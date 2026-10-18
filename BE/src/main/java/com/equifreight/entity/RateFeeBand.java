@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.FeeBandKind;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.math.BigDecimal;
 
 /**
  * Cancellation fee % or short-notice price multiplier, by days before departure.

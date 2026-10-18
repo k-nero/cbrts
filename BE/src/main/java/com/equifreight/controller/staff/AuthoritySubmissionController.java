@@ -5,12 +5,11 @@ import com.equifreight.entity.enums.AuthorityKind;
 import com.equifreight.model.clearance.*;
 import com.equifreight.service.AuthoritySubmissionService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Controller for regulatory authority filings and quarantine management (AGENTS.md).
@@ -32,8 +31,7 @@ public class AuthoritySubmissionController {
     @GetMapping("/authorities")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<AuthorityResponse> listAuthorities(
-            @RequestParam(required = false) String countryCode,
-            @RequestParam(required = false) AuthorityKind kind) {
+            @RequestParam(required = false) String countryCode, @RequestParam(required = false) AuthorityKind kind) {
         return submissionService.listAuthorities(countryCode, kind);
     }
 
@@ -97,8 +95,7 @@ public class AuthoritySubmissionController {
     @PostMapping("/quarantines/{quarantineId}/complete")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public QuarantinePeriodResponse completeQuarantine(
-            @PathVariable UUID quarantineId,
-            @AuthenticationPrincipal User user) {
+            @PathVariable UUID quarantineId, @AuthenticationPrincipal User user) {
         return submissionService.completeQuarantine(quarantineId, user);
     }
 }

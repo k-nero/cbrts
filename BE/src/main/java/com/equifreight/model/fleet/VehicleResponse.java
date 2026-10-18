@@ -2,12 +2,11 @@ package com.equifreight.model.fleet;
 
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
+import java.util.List;
+import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.List;
-import java.util.UUID;
 
 @Getter
 @Setter

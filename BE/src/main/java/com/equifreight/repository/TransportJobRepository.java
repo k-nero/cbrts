@@ -5,6 +5,10 @@ import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.model.trip.TripSummaryResponse;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,14 +18,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 @Repository
-public interface TransportJobRepository extends JpaRepository<TransportJob, UUID>,
-        JpaSpecificationExecutor<TransportJob> {
+public interface TransportJobRepository
+        extends JpaRepository<TransportJob, UUID>, JpaSpecificationExecutor<TransportJob> {
 
     Optional<TransportJob> findByCode(String code);
 
@@ -40,14 +39,12 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
             select j from TransportJob j join fetch j.request r join fetch r.club c
             where j.departedAt is null
               and (:q = '' or lower(j.code) like lower(concat('%', :q, '%')) or lower(c.name) like lower(concat('%', :q, '%')))
-            """,
-            countQuery = """
+            """, countQuery = """
                     select count(j) from TransportJob j join j.request r join r.club c
                     where j.departedAt is null
                       and (:q = '' or lower(j.code) like lower(concat('%', :q, '%')) or lower(c.name) like lower(concat('%', :q, '%')))
                     """)
     Page<TransportJob> findOpenDossiers(@Param("q") String q, Pageable pageable);
-
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from TransportJob j where j.code = :code")
@@ -62,8 +59,7 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
                 (select max(r.occurredAt) from TripRecord r where r.job = j))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where rq.club.id = :clubId
-            """,
-            countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
+            """, countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
     Page<TripSummaryResponse> findAllByClubId(@Param("clubId") UUID clubId, Pageable pageable);
 
     /**
@@ -77,8 +73,7 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
             where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                               com.equifreight.entity.enums.JobStage.TRIP,
                               com.equifreight.entity.enums.JobStage.HANDOVER)
-            """,
-            countQuery = """
+            """, countQuery = """
                     select count(j) from TransportJob j
                     where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                                       com.equifreight.entity.enums.JobStage.TRIP,
