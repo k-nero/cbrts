@@ -83,12 +83,12 @@ class FileServiceTest {
         FileResponse response =
                 service.upload(new MockMultipartFile("file", "coggins.pdf", "application/pdf", PDF), customer);
 
-        assertThat(response.getContentType()).isEqualTo("application/pdf");
-        assertThat(response.getSizeBytes()).isEqualTo(PDF.length);
-        assertThat(response.getSha256())
+        assertThat(response.contentType()).isEqualTo("application/pdf");
+        assertThat(response.sizeBytes()).isEqualTo(PDF.length);
+        assertThat(response.sha256())
                 .isEqualTo(HexFormat.of()
                         .formatHex(MessageDigest.getInstance("SHA-256").digest(PDF)));
-        assertThat(response.getUploadedById()).isEqualTo(customer.getId());
+        assertThat(response.uploadedById()).isEqualTo(customer.getId());
         assertThat(storedKeys()).hasSize(1);
         String key = storedKeys().getFirst();
         assertThat(key).matches("files/\\d{4}/\\d{2}/[0-9a-f-]{36}");
@@ -100,7 +100,7 @@ class FileServiceTest {
         FileResponse response = service.upload(
                 new MockMultipartFile("file", "photo.pdf", "application/pdf", PNG), user(RoleName.ESCORT));
 
-        assertThat(response.getContentType()).isEqualTo("image/png");
+        assertThat(response.contentType()).isEqualTo("image/png");
     }
 
     @Test
@@ -154,7 +154,7 @@ class FileServiceTest {
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));
 
         assertThat(service.get(file.getId(), user(RoleName.TRANSPORT_SPECIALIST))
-                        .getId())
+                        .id())
                 .isEqualTo(file.getId());
     }
 
@@ -163,7 +163,7 @@ class FileServiceTest {
         User escort = user(RoleName.ESCORT);
         StoredFile file = fileUploadedBy(escort);
 
-        assertThat(service.get(file.getId(), escort).getId()).isEqualTo(file.getId());
+        assertThat(service.get(file.getId(), escort).id()).isEqualTo(file.getId());
     }
 
     @Test
@@ -172,7 +172,7 @@ class FileServiceTest {
         StoredFile file = fileUploadedBy(user(RoleName.TRANSPORT_SPECIALIST));
         when(repository.isOnClubJob(file.getId(), customer.getClub().getId())).thenReturn(true);
 
-        assertThat(service.get(file.getId(), customer).getId()).isEqualTo(file.getId());
+        assertThat(service.get(file.getId(), customer).id()).isEqualTo(file.getId());
     }
 
     @Test
@@ -189,7 +189,7 @@ class FileServiceTest {
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));
         when(repository.isOnCrewJob(file.getId(), escort.getId())).thenReturn(true);
 
-        assertThat(service.get(file.getId(), escort).getId()).isEqualTo(file.getId());
+        assertThat(service.get(file.getId(), escort).id()).isEqualTo(file.getId());
     }
 
     // ---------- attaching ----------

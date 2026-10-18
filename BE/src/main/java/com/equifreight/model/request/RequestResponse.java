@@ -11,40 +11,32 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 /** A transport request. {@code leadTime} and {@code blockers} are only worked out for a draft. */
-@Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class RequestResponse {
-    private UUID id;
-    /** Null until submitted. */
-    private String code;
-
-    private RequestStatus status;
-    private Instant createdAt;
-    private Instant updatedAt;
-    private Instant submittedAt;
-    private List<RequestHorseResponse> horses;
-    private EndpointResponse origin;
-    private EndpointResponse destination;
-    private LocalDate departureDate;
-    private int dateFlexDays;
-    private ArrivalMode arrivalMode;
-    private Instant windowStart;
-    private Instant windowEnd;
-    private String specialInstructions;
-    private TransportMode mode;
-    private TrailerType trailer;
-    private ServiceClass airClass;
-    private InsuranceOption insurance;
-    private boolean vetEscort;
-    private RouteResponse route;
-    private LeadTimeResponse leadTime;
-    private List<Blocker> blockers;
-}
+public record RequestResponse(
+        UUID id,
+        /** Null until submitted. */
+        String code,
+        RequestStatus status,
+        Instant createdAt,
+        Instant updatedAt,
+        Instant submittedAt,
+        List<RequestHorseResponse> horses,
+        EndpointResponse origin,
+        EndpointResponse destination,
+        LocalDate departureDate,
+        int dateFlexDays,
+        ArrivalMode arrivalMode,
+        Instant windowStart,
+        Instant windowEnd,
+        String specialInstructions,
+        TransportMode mode,
+        TrailerType trailer,
+        ServiceClass airClass,
+        InsuranceOption insurance,
+        boolean vetEscort,
+        RouteResponse route,
+        LeadTimeResponse leadTime,
+        List<Blocker> blockers) {}

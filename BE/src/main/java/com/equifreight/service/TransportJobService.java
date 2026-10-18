@@ -113,17 +113,17 @@ public class TransportJobService {
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
 
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(job.getId());
-        boolean isClear = gate.isClearanceReady();
+        boolean isClear = gate.clearanceReady();
         String gateState = isClear ? "Clear" : "Locked";
         String gateSummary;
         if (isClear) {
             gateSummary = "Dossier cleared. Vehicle and trip departure may proceed.";
-        } else if (gate.getOutstandingIssues().isEmpty()) {
+        } else if (gate.outstandingIssues().isEmpty()) {
             gateSummary = "Clearance gate is locked. Documents are awaiting clearance.";
         } else {
             gateSummary = String.format(
                     "Clearance gate is locked. %d items are outstanding before departure can be recorded.",
-                    gate.getOutstandingIssues().size());
+                    gate.outstandingIssues().size());
         }
 
         return JobDetailResponse.builder()
@@ -162,9 +162,9 @@ public class TransportJobService {
 
         // Clearance gate check: departure gate must be CLEAR (US-F3-08)
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(jobId);
-        if (!gate.isClearanceReady()) {
+        if (!gate.clearanceReady()) {
             throw new BusinessException("Cannot sign off trip plan: clearance gate is locked ("
-                    + gate.getOutstandingIssues().size() + " items outstanding)");
+                    + gate.outstandingIssues().size() + " items outstanding)");
         }
 
         // Validate load plan confirmed
@@ -243,7 +243,7 @@ public class TransportJobService {
 
     private JobSummaryResponse toSummaryResponse(TransportJob job) {
         List<JobHorseResponse> horses = getJobHorses(job);
-        List<String> horseNames = horses.stream().map(JobHorseResponse::getName).toList();
+        List<String> horseNames = horses.stream().map(JobHorseResponse::name).toList();
 
         return JobSummaryResponse.builder()
                 .id(job.getId())

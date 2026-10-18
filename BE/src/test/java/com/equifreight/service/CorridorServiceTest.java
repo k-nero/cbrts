@@ -56,7 +56,7 @@ class CorridorServiceTest {
     void settingTheFlexDaysSavesAndAuditsTheChange() {
         CorridorResponse response = service.setDateFlexDays(khoi, ID, 5);
 
-        assertThat(response.getDateFlexDays()).isEqualTo(5);
+        assertThat(response.dateFlexDays()).isEqualTo(5);
         assertThat(hcmPnh.getDateFlexDays()).isEqualTo((short) 5);
         verify(audit)
                 .recordDecision(

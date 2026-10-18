@@ -69,26 +69,26 @@ public class VehicleService {
 
     @Transactional
     public VehicleResponse create(CreateVehicleRequest request) {
-        if (vehicleRepository.existsByCode(request.getCode())) {
-            throw new ConflictException("DUPLICATE_CODE", "Vehicle with code " + request.getCode() + " already exists");
+        if (vehicleRepository.existsByCode(request.code())) {
+            throw new ConflictException("DUPLICATE_CODE", "Vehicle with code " + request.code() + " already exists");
         }
 
         Vehicle vehicle = new Vehicle();
-        vehicle.setCode(request.getCode());
-        vehicle.setKind(request.getKind());
-        vehicle.setPayloadKg(request.getPayloadKg());
+        vehicle.setCode(request.code());
+        vehicle.setKind(request.kind());
+        vehicle.setPayloadKg(request.payloadKg());
         vehicle.setStatus(VehicleStatus.ACTIVE);
 
         List<VehicleStall> stalls = new ArrayList<>();
-        if (request.getStalls() != null && !request.getStalls().isEmpty()) {
-            for (CreateVehicleStallRequest sReq : request.getStalls()) {
+        if (request.stalls() != null && !request.stalls().isEmpty()) {
+            for (CreateVehicleStallRequest sReq : request.stalls()) {
                 VehicleStall stall = new VehicleStall();
                 stall.setVehicle(vehicle);
-                stall.setPositionNo(sReq.getPositionNo());
-                stall.setStallType(sReq.getStallType() != null ? sReq.getStallType() : StallType.STANDARD);
-                stall.setRowNo(sReq.getRowNo());
-                stall.setSide(sReq.getSide() != null ? sReq.getSide() : StallSide.LEFT);
-                stall.setNearRamp(sReq.isNearRamp());
+                stall.setPositionNo(sReq.positionNo());
+                stall.setStallType(sReq.stallType() != null ? sReq.stallType() : StallType.STANDARD);
+                stall.setRowNo(sReq.rowNo());
+                stall.setSide(sReq.side() != null ? sReq.side() : StallSide.LEFT);
+                stall.setNearRamp(sReq.nearRamp());
                 stalls.add(stall);
             }
         }
@@ -105,11 +105,11 @@ public class VehicleService {
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
 
-        if (request.getPayloadKg() != null && request.getPayloadKg() > 0) {
-            vehicle.setPayloadKg(request.getPayloadKg());
+        if (request.payloadKg() != null && request.payloadKg() > 0) {
+            vehicle.setPayloadKg(request.payloadKg());
         }
-        if (request.getStatus() != null) {
-            vehicle.setStatus(request.getStatus());
+        if (request.status() != null) {
+            vehicle.setStatus(request.status());
         }
 
         return toResponse(vehicleRepository.save(vehicle));
@@ -118,48 +118,48 @@ public class VehicleService {
     @Transactional
     public VehicleBookingResponse bookVehicle(VehicleBookingRequest request) {
         Vehicle vehicle = vehicleRepository
-                .findById(request.getVehicleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.getVehicleId()));
+                .findById(request.vehicleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.vehicleId()));
 
         if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
             throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus()
                     + " and cannot be booked");
         }
 
-        if (!request.getStartsAt().isBefore(request.getEndsAt())) {
+        if (!request.startsAt().isBefore(request.endsAt())) {
             throw new ConflictException("INVALID_PERIOD", "Booking start time must be before end time");
         }
 
-        if (request.getKind() == BookingKind.JOB && request.getJobId() == null) {
+        if (request.kind() == BookingKind.JOB && request.jobId() == null) {
             throw new BusinessException("A JOB booking requires a valid jobId");
         }
-        if (request.getKind() != BookingKind.JOB && request.getJobId() != null) {
-            throw new BusinessException("A " + request.getKind() + " booking cannot have a jobId");
+        if (request.kind() != BookingKind.JOB && request.jobId() != null) {
+            throw new BusinessException("A " + request.kind() + " booking cannot have a jobId");
         }
 
         // BR-F3-04: No double booking. Check overlapping bookings for this vehicle.
         List<VehicleBooking> overlaps = vehicleBookingRepository.findOverlappingBookings(
-                vehicle.getId(), request.getStartsAt(), request.getEndsAt(), null);
+                vehicle.getId(), request.startsAt(), request.endsAt(), null);
         if (!overlaps.isEmpty()) {
             throw new ConflictException(
                     "DOUBLE_BOOKING",
-                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.getStartsAt() + " and "
-                            + request.getEndsAt());
+                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.startsAt() + " and "
+                            + request.endsAt());
         }
 
         TransportJob job = null;
-        if (request.getJobId() != null) {
+        if (request.jobId() != null) {
             job = transportJobRepository
-                    .findById(request.getJobId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.getJobId()));
+                    .findById(request.jobId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.jobId()));
         }
 
         VehicleBooking booking = new VehicleBooking();
         booking.setVehicle(vehicle);
         booking.setJob(job);
-        booking.setKind(request.getKind());
-        booking.setStartsAt(request.getStartsAt());
-        booking.setEndsAt(request.getEndsAt());
+        booking.setKind(request.kind());
+        booking.setStartsAt(request.startsAt());
+        booking.setEndsAt(request.endsAt());
 
         try {
             // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
@@ -167,15 +167,15 @@ public class VehicleService {
             log.info(
                     "Booked vehicle {} for {} from {} to {}",
                     vehicle.getCode(),
-                    request.getKind(),
-                    request.getStartsAt(),
-                    request.getEndsAt());
+                    request.kind(),
+                    request.startsAt(),
+                    request.endsAt());
             return toBookingResponse(saved);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new ConflictException(
                     "DOUBLE_BOOKING",
-                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.getStartsAt() + " and "
-                            + request.getEndsAt());
+                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.startsAt() + " and "
+                            + request.endsAt());
         }
     }
 

@@ -27,15 +27,15 @@ class ControllerAdviseTest {
         ResponseEntity<ApiError> response = advice.handleUnknownSort(unknownSort("foo"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().getError()).isEqualTo("INVALID_SORT");
-        assertThat(response.getBody().getMessage()).isEqualTo("These results can't be sorted by foo.");
+        assertThat(response.getBody().error()).isEqualTo("INVALID_SORT");
+        assertThat(response.getBody().message()).isEqualTo("These results can't be sorted by foo.");
     }
 
     @Test
     void theMessageDoesNotNameTheEntity() {
         ResponseEntity<ApiError> response = advice.handleUnknownSort(unknownSort("foo"));
 
-        assertThat(response.getBody().getMessage()).doesNotContain("Horse").doesNotContain("No property");
+        assertThat(response.getBody().message()).doesNotContain("Horse").doesNotContain("No property");
     }
 
     /** A 409 can carry every reason it was refused (spec R-07, SUBMISSION_BLOCKED). */
@@ -47,15 +47,15 @@ class ControllerAdviseTest {
                 List.of("Add at least one horse.", "Choose road or air.")));
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(response.getBody().getError()).isEqualTo("SUBMISSION_BLOCKED");
-        assertThat(response.getBody().getMessage()).isEqualTo("This request can't be submitted yet.");
-        assertThat(response.getBody().getDetails()).containsExactly("Add at least one horse.", "Choose road or air.");
+        assertThat(response.getBody().error()).isEqualTo("SUBMISSION_BLOCKED");
+        assertThat(response.getBody().message()).isEqualTo("This request can't be submitted yet.");
+        assertThat(response.getBody().details()).containsExactly("Add at least one horse.", "Choose road or air.");
     }
 
     @Test
     void aConflictWithoutDetailsHasNone() {
         ResponseEntity<ApiError> response = advice.handleConflict(new ConflictException("HORSE_ARCHIVED", "Archived."));
 
-        assertThat(response.getBody().getDetails()).isNull();
+        assertThat(response.getBody().details()).isNull();
     }
 }

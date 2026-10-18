@@ -148,7 +148,7 @@ public class ClearanceService {
         ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
 
         // Require that the file exists, belongs to the caller, and is not already attached (PR #79)
-        StoredFile file = fileService.requireAttachable(request.getFileId(), uploader);
+        StoredFile file = fileService.requireAttachable(request.fileId(), uploader);
 
         short nextVersionNo = (short) (documentVersionRepository
                         .findMaxVersionNoByChecklistItemId(checklistItemId)
@@ -159,10 +159,10 @@ public class ClearanceService {
         candidate.setChecklistItem(item);
         candidate.setVersionNo(nextVersionNo);
         candidate.setFile(file);
-        candidate.setIssuedOn(request.getIssuedOn());
-        candidate.setSampledOn(request.getSampledOn());
-        candidate.setValidUntil(request.getValidUntil());
-        candidate.setIssuer(request.getIssuer());
+        candidate.setIssuedOn(request.issuedOn());
+        candidate.setSampledOn(request.sampledOn());
+        candidate.setValidUntil(request.validUntil());
+        candidate.setIssuer(request.issuer());
         candidate.setUploadedBy(uploader);
         candidate.setUploadedAt(Instant.now());
         candidate.setReview(DocumentReview.PENDING);
@@ -214,7 +214,7 @@ public class ClearanceService {
     @Transactional
     public DocumentVersionResponse reviewDocument(
             UUID documentVersionId, ReviewDocumentRequest request, User reviewer) {
-        if (request.getReview() == null || request.getReview() == DocumentReview.PENDING) {
+        if (request.review() == null || request.review() == DocumentReview.PENDING) {
             throw new BusinessException(
                     "INVALID_REVIEW_DECISION", "A review decision must be either APPROVED or REJECTED");
         }
@@ -238,13 +238,13 @@ public class ClearanceService {
             throw new ConflictException("VERSION_SUPERSEDED", "Only the current version of a document can be reviewed");
         }
 
-        if (request.getReview() == DocumentReview.REJECTED) {
-            if (request.getRejectReason() == null || request.getRejectReason().isBlank()) {
+        if (request.review() == DocumentReview.REJECTED) {
+            if (request.rejectReason() == null || request.rejectReason().isBlank()) {
                 throw new BusinessException(
                         "REJECT_REASON_REQUIRED",
                         "A reason must be provided when rejecting a document version (BR-F2-07)");
             }
-        } else if (request.getReview() == DocumentReview.APPROVED) {
+        } else if (request.review() == DocumentReview.APPROVED) {
             ValidityEngine.Result valResult = validityEngine.evaluate(item, version, item.getJob());
             if (valResult.validity() == Validity.RED) {
                 throw new BusinessException(
@@ -253,13 +253,13 @@ public class ClearanceService {
         }
 
         // Apply changes to version
-        version.setReview(request.getReview());
+        version.setReview(request.review());
         version.setReviewedBy(reviewer);
         version.setReviewedAt(Instant.now());
-        version.setRejectReason(request.getRejectReason());
+        version.setRejectReason(request.rejectReason());
         DocumentVersion updatedVersion = documentVersionRepository.save(version);
 
-        if (request.getReview() == DocumentReview.APPROVED) {
+        if (request.review() == DocumentReview.APPROVED) {
             item.setStatus(ChecklistStatus.CLEARED);
             item.setHolder(null);
         } else {
@@ -271,10 +271,10 @@ public class ClearanceService {
         // Record audit
         String jobCode = item.getJob() != null ? item.getJob().getCode() : "JOB";
         String docName = item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
-        String action = request.getReview() == DocumentReview.APPROVED ? "DOCUMENT_APPROVED" : "DOCUMENT_REJECTED";
+        String action = request.review() == DocumentReview.APPROVED ? "DOCUMENT_APPROVED" : "DOCUMENT_REJECTED";
         String summary = String.format(
                 "%s %s v%d for job %s.",
-                request.getReview() == DocumentReview.APPROVED ? "Approved" : "Rejected",
+                request.review() == DocumentReview.APPROVED ? "Approved" : "Rejected",
                 docName,
                 version.getVersionNo(),
                 jobCode);
@@ -286,9 +286,9 @@ public class ClearanceService {
                 "DOCUMENT_VERSION",
                 version.getId(),
                 jobCode,
-                request.getRejectReason(),
+                request.rejectReason(),
                 "PENDING",
-                request.getReview().name());
+                request.review().name());
 
         // Re-evaluate clearance gate
         if (item.getJob() != null) {

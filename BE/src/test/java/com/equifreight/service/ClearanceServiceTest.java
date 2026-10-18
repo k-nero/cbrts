@@ -123,9 +123,10 @@ class ClearanceServiceTest {
         documentVersion.setReview(DocumentReview.APPROVED);
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
 
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.REJECTED);
-        req.setRejectReason("Sample is blurred");
+        ReviewDocumentRequest req = ReviewDocumentRequest.builder()
+                .review(DocumentReview.REJECTED)
+                .rejectReason("Sample is blurred")
+                .build();
 
         assertThrows(
                 ConflictException.class,
@@ -143,8 +144,8 @@ class ClearanceServiceTest {
 
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
 
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.APPROVED);
+        ReviewDocumentRequest req =
+                ReviewDocumentRequest.builder().review(DocumentReview.APPROVED).build();
 
         ConflictException ex = assertThrows(
                 ConflictException.class,
@@ -156,8 +157,8 @@ class ClearanceServiceTest {
     @Test
     @DisplayName("reviewDocument rejects invalid review decisions like PENDING (Finding 6)")
     void reviewDocumentThrowsWhenReviewDecisionIsPending() {
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.PENDING);
+        ReviewDocumentRequest req =
+                ReviewDocumentRequest.builder().review(DocumentReview.PENDING).build();
 
         assertThrows(
                 BusinessException.class,
@@ -170,9 +171,10 @@ class ClearanceServiceTest {
     void reviewDocumentThrowsWhenRejectionReasonMissing() {
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
 
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.REJECTED);
-        req.setRejectReason("   ");
+        ReviewDocumentRequest req = ReviewDocumentRequest.builder()
+                .review(DocumentReview.REJECTED)
+                .rejectReason("   ")
+                .build();
 
         assertThrows(
                 BusinessException.class,
@@ -187,8 +189,8 @@ class ClearanceServiceTest {
         when(validityEngine.evaluate(any(), any(), any()))
                 .thenReturn(new ValidityEngine.Result(Validity.RED, "Sampling date expired 65 days before departure."));
 
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.APPROVED);
+        ReviewDocumentRequest req =
+                ReviewDocumentRequest.builder().review(DocumentReview.APPROVED).build();
 
         BusinessException ex = assertThrows(
                 BusinessException.class,
@@ -208,8 +210,8 @@ class ClearanceServiceTest {
         when(validityEngine.evaluate(any(), any(), any()))
                 .thenReturn(new ValidityEngine.Result(Validity.GREEN, "Valid document."));
 
-        ReviewDocumentRequest req = new ReviewDocumentRequest();
-        req.setReview(DocumentReview.APPROVED);
+        ReviewDocumentRequest req =
+                ReviewDocumentRequest.builder().review(DocumentReview.APPROVED).build();
 
         clearanceService.reviewDocument(documentVersion.getId(), req, specialistUser);
 
@@ -271,8 +273,8 @@ class ClearanceServiceTest {
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
-        assertTrue(resp.isClearanceReady());
-        assertEquals(DossierStatus.CLEARANCE_READY, resp.getDossierStatus());
+        assertTrue(resp.clearanceReady());
+        assertEquals(DossierStatus.CLEARANCE_READY, resp.dossierStatus());
         assertEquals(JobStage.CLEARANCE, job.getStage());
         assertNotNull(job.getClearanceReadyAt());
 
@@ -311,9 +313,9 @@ class ClearanceServiceTest {
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
-        assertFalse(resp.isClearanceReady());
-        assertNotEquals(DossierStatus.CLEARANCE_READY, resp.getDossierStatus());
-        assertTrue(resp.getOutstandingIssues().stream().anyMatch(i -> i.contains("refused by Customs Department")));
+        assertFalse(resp.clearanceReady());
+        assertNotEquals(DossierStatus.CLEARANCE_READY, resp.dossierStatus());
+        assertTrue(resp.outstandingIssues().stream().anyMatch(i -> i.contains("refused by Customs Department")));
     }
 
     @Test
@@ -349,7 +351,7 @@ class ClearanceServiceTest {
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
-        assertTrue(resp.isClearanceReady());
+        assertTrue(resp.clearanceReady());
         assertEquals(DossierStatus.CLEARANCE_READY, job.getDossierStatus());
     }
 
@@ -366,7 +368,7 @@ class ClearanceServiceTest {
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
-        assertFalse(resp.isClearanceReady());
+        assertFalse(resp.clearanceReady());
         assertEquals(DossierStatus.OPEN, job.getDossierStatus());
     }
 

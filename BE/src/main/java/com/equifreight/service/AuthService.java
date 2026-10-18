@@ -78,11 +78,11 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest request, String ipAddress) {
-        User user = userRepository.getByEmail(request.getEmail());
+        User user = userRepository.getByEmail(request.email());
         // One message for an unknown email and a wrong password, so sign-in never reveals
         // whether an address has an account.
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.info("Sign-in failed for {} from {}", request.getEmail(), ipAddress);
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            log.info("Sign-in failed for {} from {}", request.email(), ipAddress);
             throw new UnauthorizedException("Email or password doesn't match.");
         }
         // Checked after the password, so only the account's holder learns it was removed.
@@ -98,31 +98,31 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse register(RegisterRequest request) {
-        String email = request.getEmail().trim();
+        String email = request.email().trim();
         if (userRepository.getByEmail(email) != null) {
             throw new ConflictException(
                     "EMAIL_IN_USE", "An account already uses this email. Sign in, or reset your password.");
         }
         Country country = countryRepository
-                .findById(request.getCountryCode())
+                .findById(request.countryCode())
                 .orElseThrow(() -> new BusinessException("We don't serve that country yet."));
         Role customer = roleRepository
                 .findByName(RoleName.CUSTOMER)
                 .orElseThrow(() -> new IllegalStateException("The CUSTOMER role is not seeded."));
 
         Club club = new Club();
-        club.setName(request.getClubName().trim());
+        club.setName(request.clubName().trim());
         club.setBookingEmail(email);
-        club.setPhone(blankToNull(request.getPhone()));
+        club.setPhone(blankToNull(request.phone()));
         club.setCountry(country);
         club = clubRepository.save(club);
 
         User user = new User();
         user.setEmail(email);
-        user.setFirstName(request.getFirstName().trim());
-        user.setLastName(request.getLastName().trim());
-        user.setPhone(blankToNull(request.getPhone()));
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.firstName().trim());
+        user.setLastName(request.lastName().trim());
+        user.setPhone(blankToNull(request.phone()));
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setClub(club);
         user.setRoles(new HashSet<>(Set.of(customer)));
         user = userRepository.save(user);

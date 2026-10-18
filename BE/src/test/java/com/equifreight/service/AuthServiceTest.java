@@ -64,21 +64,23 @@ class AuthServiceTest {
     private Role customer;
 
     private static RegisterRequest request() {
-        RegisterRequest r = new RegisterRequest();
-        r.setClubName("  Đà Lạt Highland Stables ");
-        r.setCountryCode("VN");
-        r.setFirstName("Minh Đức");
-        r.setLastName("Phạm");
-        r.setEmail(" duc@dalathighland.vn ");
-        r.setPhone("");
-        r.setPassword("correct-horse-battery");
+        RegisterRequest r = RegisterRequest.builder()
+                .clubName("  Đà Lạt Highland Stables ")
+                .countryCode("VN")
+                .firstName("Minh Đức")
+                .lastName("Phạm")
+                .email(" duc@dalathighland.vn ")
+                .phone("")
+                .password("correct-horse-battery")
+                .build();
         return r;
     }
 
     private static LoginRequest login(String password) {
-        LoginRequest r = new LoginRequest();
-        r.setEmail("minh.tran@equifreight.vn");
-        r.setPassword(password);
+        LoginRequest r = LoginRequest.builder()
+                .email("minh.tran@equifreight.vn")
+                .password(password)
+                .build();
         return r;
     }
 
@@ -129,8 +131,8 @@ class AuthServiceTest {
         assertEquals("duc@dalathighland.vn", club.getBookingEmail());
         assertSame(vietnam, club.getCountry());
 
-        assertEquals("access", tokens.getAccessToken());
-        assertNotNull(tokens.getRefreshToken());
+        assertEquals("access", tokens.accessToken());
+        assertNotNull(tokens.refreshToken());
     }
 
     @Test
@@ -147,8 +149,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("register refuses a country EquiFreight doesn't serve")
     void registerRefusesUnknownCountry() {
-        RegisterRequest r = request();
-        r.setCountryCode("FR");
+        RegisterRequest r = request().toBuilder().countryCode("FR").build();
         when(countries.findById("FR")).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> service.register(r));
@@ -197,7 +198,7 @@ class AuthServiceTest {
 
         TokenResponse tokens = service.login(login("right"), "127.0.0.1");
 
-        assertEquals("access", tokens.getAccessToken());
+        assertEquals("access", tokens.accessToken());
     }
 
     @Test

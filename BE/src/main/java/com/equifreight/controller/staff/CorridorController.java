@@ -44,6 +44,6 @@ public class CorridorController {
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public CorridorResponse setDateFlex(
             @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody DateFlexRequest request) {
-        return corridorService.setDateFlexDays(user, id, request.getDateFlexDays());
+        return corridorService.setDateFlexDays(user, id, request.dateFlexDays());
     }
 }

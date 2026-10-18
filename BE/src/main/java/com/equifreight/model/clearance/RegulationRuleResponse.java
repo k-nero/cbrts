@@ -2,19 +2,14 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.RegulationRuleKind;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class RegulationRuleResponse {
-    private UUID id;
-    private DocumentTypeResponse documentType;
-    private boolean mandatory;
-    private RegulationRuleKind ruleKind;
-    private Short minDays;
-    private Short maxDays;
-    private String description;
-}
+public record RegulationRuleResponse(
+        UUID id,
+        DocumentTypeResponse documentType,
+        boolean mandatory,
+        RegulationRuleKind ruleKind,
+        Short minDays,
+        Short maxDays,
+        String description) {}

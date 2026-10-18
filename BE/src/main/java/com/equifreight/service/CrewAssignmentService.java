@@ -56,9 +56,9 @@ public class CrewAssignmentService {
 
         // Duplicate check
         Set<UUID> seenUserIds = new HashSet<>();
-        for (AssignCrewRequest.CrewItem item : request.getCrew()) {
-            if (!seenUserIds.add(item.getUserId())) {
-                throw new BusinessException("Duplicate crew member in assignment: " + item.getUserId());
+        for (AssignCrewRequest.CrewItem item : request.crew()) {
+            if (!seenUserIds.add(item.userId())) {
+                throw new BusinessException("Duplicate crew member in assignment: " + item.userId());
             }
         }
 
@@ -69,8 +69,8 @@ public class CrewAssignmentService {
 
         // BR: Grooms = ⌈horses ÷ 3⌉
         int requiredGrooms = (int) Math.ceil(horseCount / 3.0);
-        long groomCount = request.getCrew().stream()
-                .filter(c -> c.getCrewRole() == CrewRole.GROOM || c.getCrewRole() == CrewRole.FLYING_GROOM)
+        long groomCount = request.crew().stream()
+                .filter(c -> c.crewRole() == CrewRole.GROOM || c.crewRole() == CrewRole.FLYING_GROOM)
                 .count();
 
         if (groomCount < requiredGrooms) {
@@ -85,10 +85,10 @@ public class CrewAssignmentService {
         boolean datesKnown = startsAt != null && endsAt != null;
 
         List<CrewAssignment> assignments = new ArrayList<>();
-        for (AssignCrewRequest.CrewItem item : request.getCrew()) {
+        for (AssignCrewRequest.CrewItem item : request.crew()) {
             User user = userRepository
-                    .findById(item.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.getUserId()));
+                    .findById(item.userId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.userId()));
 
             // Role check: User must have ESCORT role
             boolean isEscort = user.getRoles() != null
@@ -101,12 +101,12 @@ public class CrewAssignmentService {
 
             // Escort kind matching check if kind is set
             if (user.getEscortKind() != null) {
-                if (item.getCrewRole() == CrewRole.DRIVER
+                if (item.crewRole() == CrewRole.DRIVER
                         && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.GROOM) {
                     throw new BusinessException(
                             "User " + user.getEmail() + " is registered as a GROOM and cannot be assigned as a DRIVER");
                 }
-                if ((item.getCrewRole() == CrewRole.GROOM || item.getCrewRole() == CrewRole.FLYING_GROOM)
+                if ((item.crewRole() == CrewRole.GROOM || item.crewRole() == CrewRole.FLYING_GROOM)
                         && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.DRIVER) {
                     throw new BusinessException(
                             "User " + user.getEmail() + " is registered as a DRIVER and cannot be assigned as a GROOM");
@@ -127,7 +127,7 @@ public class CrewAssignmentService {
             CrewAssignment ca = new CrewAssignment();
             ca.setJob(job);
             ca.setUser(user);
-            ca.setCrewRole(item.getCrewRole());
+            ca.setCrewRole(item.crewRole());
             ca.getId().setJobId(job.getId());
             ca.getId().setUserId(user.getId());
             assignments.add(ca);

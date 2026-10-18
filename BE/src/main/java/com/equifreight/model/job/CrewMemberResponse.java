@@ -3,16 +3,6 @@ package com.equifreight.model.job;
 import com.equifreight.entity.enums.CrewRole;
 import java.util.UUID;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Builder
-public class CrewMemberResponse {
-    private UUID userId;
-    private String name;
-    private String staffCode;
-    private String email;
-    private CrewRole crewRole;
-}
+public record CrewMemberResponse(UUID userId, String name, String staffCode, String email, CrewRole crewRole) {}

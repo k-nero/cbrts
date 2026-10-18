@@ -3,7 +3,9 @@ package com.equifreight.model.trip;
 import com.equifreight.entity.enums.TripStatus;
 import java.time.Instant;
 import java.util.List;
+import lombok.Builder;
 
+@Builder
 public record TripViewResponse(
         String jobCode,
         TripStatus tripStatus,
