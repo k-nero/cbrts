@@ -1,5 +1,8 @@
 package com.equifreight.configuration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
+
 import com.equifreight.entity.Horse;
 import com.equifreight.model.common.ApiError;
 import org.junit.jupiter.api.Test;
@@ -7,9 +10,6 @@ import org.springframework.data.core.PropertyPath;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class ControllerAdviseTest {
 

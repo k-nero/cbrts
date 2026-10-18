@@ -1,9 +1,8 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.RegulationRuleKind;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter

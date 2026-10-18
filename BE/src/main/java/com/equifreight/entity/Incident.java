@@ -4,14 +4,13 @@ import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * Every incident has one owner, the logistics manager. A customer report is answered within 2 hours.
@@ -93,7 +92,6 @@ public class Incident extends BaseEntity {
     @JoinTable(
             name = "incident_files",
             joinColumns = @JoinColumn(name = "incident_id"),
-            inverseJoinColumns = @JoinColumn(name = "file_id")
-    )
+            inverseJoinColumns = @JoinColumn(name = "file_id"))
     private Set<StoredFile> files = new HashSet<>();
 }

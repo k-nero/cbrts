@@ -4,15 +4,14 @@ import com.equifreight.entity.StoredFile;
 import com.equifreight.exception.StorageException;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.FileStorage;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
 
 /**
  * Files are uploaded before they're attached, so an upload whose form was abandoned stays behind
@@ -34,8 +33,10 @@ public class OrphanFileCleanupJob {
     private final FileStorage fileStorage;
     private final TransactionTemplate transactionTemplate;
 
-    public OrphanFileCleanupJob(StoredFileRepository storedFileRepository, FileStorage fileStorage,
-                                TransactionTemplate transactionTemplate) {
+    public OrphanFileCleanupJob(
+            StoredFileRepository storedFileRepository,
+            FileStorage fileStorage,
+            TransactionTemplate transactionTemplate) {
         this.storedFileRepository = storedFileRepository;
         this.fileStorage = fileStorage;
         this.transactionTemplate = transactionTemplate;
@@ -46,7 +47,8 @@ public class OrphanFileCleanupJob {
      */
     @Scheduled(cron = "0 30 3 * * *")
     public void removeOrphans() {
-        List<StoredFile> orphans = storedFileRepository.findOrphans(Instant.now().minus(GRACE), BATCH);
+        List<StoredFile> orphans =
+                storedFileRepository.findOrphans(Instant.now().minus(GRACE), BATCH);
         int removed = 0;
         for (StoredFile file : orphans) {
             if (remove(file)) {

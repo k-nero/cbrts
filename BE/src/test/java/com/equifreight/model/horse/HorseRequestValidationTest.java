@@ -1,18 +1,17 @@
 package com.equifreight.model.horse;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.equifreight.entity.enums.HorseSex;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.math.BigDecimal;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.math.BigDecimal;
-import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * H-01: name, sex, height, microchip, passport number and declared value are required.

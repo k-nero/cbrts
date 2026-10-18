@@ -10,16 +10,6 @@ import com.equifreight.model.audit.AuditLogResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.TransportJobRepository;
 import jakarta.persistence.criteria.Predicate;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,6 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads the audit log for the logistics manager (US-00-06). Entries are written by
@@ -56,9 +55,10 @@ public class AuditLogService {
     private final TransportJobRepository transportJobRepository;
     private final JsonMapper jsonMapper;
 
-    public AuditLogService(AuditLogRepository auditLogRepository,
-                           TransportJobRepository transportJobRepository,
-                           JsonMapper jsonMapper) {
+    public AuditLogService(
+            AuditLogRepository auditLogRepository,
+            TransportJobRepository transportJobRepository,
+            JsonMapper jsonMapper) {
         this.auditLogRepository = auditLogRepository;
         this.transportJobRepository = transportJobRepository;
         this.jsonMapper = jsonMapper;
@@ -72,12 +72,15 @@ public class AuditLogService {
         Sort.Direction direction = Sort.Direction.DESC;
         for (Sort.Order order : pageable.getSort()) {
             if (!SORT_FIELD.equals(order.getProperty())) {
-                throw new BusinessException("The audit log sorts by time only (%s); '%s' can't be sorted. Search or filter by it instead."
-                        .formatted(SORT_FIELD, order.getProperty()));
+                throw new BusinessException(
+                        "The audit log sorts by time only (%s); '%s' can't be sorted. Search or filter by it instead."
+                                .formatted(SORT_FIELD, order.getProperty()));
             }
             direction = order.getDirection();
         }
-        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+        return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
                 Sort.by(direction, SORT_FIELD).and(Sort.by(direction, "id")));
     }
 
@@ -90,9 +93,11 @@ public class AuditLogService {
      */
     static Specification<AuditLog> toSpecification(AuditLogFilter filter) {
         if (filter.from() != null && filter.to() != null && filter.from().isAfter(filter.to())) {
-            throw new BusinessException("The date range starts on %s, after it ends on %s. Pick a start on or before the end."
-                    .formatted(DAY.format(filter.from().atStartOfDay(AppConstants.BUSINESS_ZONE)),
-                            DAY.format(filter.to().atStartOfDay(AppConstants.BUSINESS_ZONE))));
+            throw new BusinessException(
+                    "The date range starts on %s, after it ends on %s. Pick a start on or before the end."
+                            .formatted(
+                                    DAY.format(filter.from().atStartOfDay(AppConstants.BUSINESS_ZONE)),
+                                    DAY.format(filter.to().atStartOfDay(AppConstants.BUSINESS_ZONE))));
         }
         UUID actorId = actorId(filter.actor());
         Instant fromInstant = filter.from() == null ? null : dayStart(filter.from());
@@ -139,8 +144,8 @@ public class AuditLogService {
         try {
             return UUID.fromString(actor);
         } catch (IllegalArgumentException e) {
-            throw new BusinessException("The person filter takes a user id or %s; got '%s'."
-                    .formatted(AuditLogFilter.SYSTEM_ACTOR, actor));
+            throw new BusinessException(
+                    "The person filter takes a user id or %s; got '%s'.".formatted(AuditLogFilter.SYSTEM_ACTOR, actor));
         }
     }
 
@@ -181,14 +186,16 @@ public class AuditLogService {
         Specification<AuditLog> spec = toSpecification(filter);
         long count = auditLogRepository.count(spec);
         if (count > EXPORT_LIMIT) {
-            throw new BusinessException("An export holds at most %,d entries; these filters match %,d. Narrow the dates or pick a person or an action, then export again."
-                    .formatted(EXPORT_LIMIT, count));
+            throw new BusinessException(
+                    "An export holds at most %,d entries; these filters match %,d. Narrow the dates or pick a person or an action, then export again."
+                            .formatted(EXPORT_LIMIT, count));
         }
         List<AuditLog> logs = auditLogRepository.findAll(spec, sortNewestFirst());
         StringBuilder csv = new StringBuilder("﻿");
         csv.append("When (ICT),Who,Role,Action,Summary,On,From,Recorded on device (ICT),Reason,Entry\n");
         for (AuditLog log : logs) {
-            csv.append(String.join(",",
+            csv.append(String.join(
+                    ",",
                     cell(CSV_TIME.format(log.getOccurredAt())),
                     cell(log.getActorLabel()),
                     cell(log.getActorRole()),

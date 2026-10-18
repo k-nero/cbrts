@@ -2,9 +2,8 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.JobStage;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 /**
  * Lightweight job summary for staff job selection and overview.

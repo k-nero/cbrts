@@ -2,12 +2,11 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RoutePlanStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * A version of a job's route: stops joined by legs. Re-planning (Flow 5) confirms a new version and marks the old

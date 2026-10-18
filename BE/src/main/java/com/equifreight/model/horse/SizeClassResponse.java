@@ -1,8 +1,7 @@
 package com.equifreight.model.horse;
 
-import lombok.*;
-
 import java.math.BigDecimal;
+import lombok.*;
 
 @Getter
 @Setter

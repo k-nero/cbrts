@@ -2,12 +2,11 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CatalogStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * Immutable once published; a job pins the versions its checklist was built from (BR-F2-01).

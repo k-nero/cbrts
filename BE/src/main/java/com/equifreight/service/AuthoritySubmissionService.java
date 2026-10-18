@@ -8,15 +8,14 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service managing veterinary, customs, and quarantine authority submissions and quarantine tracks (AGENTS.md).
@@ -66,9 +65,12 @@ public class AuthoritySubmissionService {
      * List all recognized authorities (Veterinary, Customs, Quarantine).
      */
     @Transactional(readOnly = true)
-    public List<AuthorityResponse> listAuthorities(String countryCode, com.equifreight.entity.enums.AuthorityKind kind) {
+    public List<AuthorityResponse> listAuthorities(
+            String countryCode, com.equifreight.entity.enums.AuthorityKind kind) {
         return authorityRepository.findAll().stream()
-                .filter(a -> countryCode == null || countryCode.isBlank() || a.getCountry().getCode().equalsIgnoreCase(countryCode.trim()))
+                .filter(a -> countryCode == null
+                        || countryCode.isBlank()
+                        || a.getCountry().getCode().equalsIgnoreCase(countryCode.trim()))
                 .filter(a -> kind == null || a.getKind() == kind)
                 .map(ClearanceMapper::toAuthorityResponse)
                 .toList();
@@ -106,9 +108,11 @@ public class AuthoritySubmissionService {
      * Validates that all associated checklist items strictly belong to the specified job.
      */
     @Transactional
-    public AuthoritySubmissionResponse createSubmission(UUID jobId, CreateAuthoritySubmissionRequest request, User specialist) {
+    public AuthoritySubmissionResponse createSubmission(
+            UUID jobId, CreateAuthoritySubmissionRequest request, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
-        Authority authority = authorityRepository.findById(request.getAuthorityId())
+        Authority authority = authorityRepository
+                .findById(request.getAuthorityId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Authority", request.getAuthorityId()));
 
         AuthoritySubmission submission = new AuthoritySubmission();
@@ -127,13 +131,16 @@ public class AuthoritySubmissionService {
             submission.setExpectedBy(LocalDate.now(AppConstants.BUSINESS_ZONE).plusDays(authority.getSlaDays()));
         }
 
-        if (request.getChecklistItemIds() != null && !request.getChecklistItemIds().isEmpty()) {
+        if (request.getChecklistItemIds() != null
+                && !request.getChecklistItemIds().isEmpty()) {
             Set<ChecklistItem> items = new HashSet<>();
             for (UUID cid : request.getChecklistItemIds()) {
-                ChecklistItem ci = checklistItemRepository.findById(cid)
+                ChecklistItem ci = checklistItemRepository
+                        .findById(cid)
                         .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", cid));
                 if (!ci.getJob().getId().equals(job.getId())) {
-                    throw new ConflictException("CHECKLIST_ITEM_MISMATCH",
+                    throw new ConflictException(
+                            "CHECKLIST_ITEM_MISMATCH",
                             "Checklist item " + cid + " does not belong to job " + job.getId());
                 }
                 items.add(ci);
@@ -147,8 +154,8 @@ public class AuthoritySubmissionService {
         auditService.recordDecision(
                 specialist,
                 "AUTHORITY_SUBMISSION_CREATED",
-                String.format("Filed %s submission to %s for job %s.",
-                        request.getKind(), authority.getName(), job.getCode()),
+                String.format(
+                        "Filed %s submission to %s for job %s.", request.getKind(), authority.getName(), job.getCode()),
                 "AUTHORITY_SUBMISSION",
                 saved.getId(),
                 job.getCode(),
@@ -165,8 +172,10 @@ public class AuthoritySubmissionService {
      * Update an authority submission outcome (FILED -> ADDITIONAL_INFO -> ISSUED / REFUSED).
      */
     @Transactional
-    public AuthoritySubmissionResponse updateSubmission(UUID submissionId, UpdateAuthoritySubmissionRequest request, User specialist) {
-        AuthoritySubmission submission = submissionRepository.findById(submissionId)
+    public AuthoritySubmissionResponse updateSubmission(
+            UUID submissionId, UpdateAuthoritySubmissionRequest request, User specialist) {
+        AuthoritySubmission submission = submissionRepository
+                .findById(submissionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("AuthoritySubmission", submissionId));
 
         SubmissionStatus prevStatus = submission.getStatus();
@@ -194,11 +203,11 @@ public class AuthoritySubmissionService {
                 notificationService.sendNotification(
                         job.getRequest().getCreatedBy(),
                         "ADDITIONAL_INFO_REQUIRED",
-                        "Additional information requested by " + submission.getAuthority().getName(),
+                        "Additional information requested by "
+                                + submission.getAuthority().getName(),
                         "Authority requested additional documentation for submission " + submission.getKind(),
                         "AuthoritySubmission",
-                        submission.getId()
-                );
+                        submission.getId());
             }
         }
 
@@ -236,14 +245,17 @@ public class AuthoritySubmissionService {
      * Schedule a new quarantine period for a horse or the entire job shipment.
      */
     @Transactional
-    public QuarantinePeriodResponse createQuarantine(UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
+    public QuarantinePeriodResponse createQuarantine(
+            UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
-        Place place = placeRepository.findById(request.getPlaceId())
+        Place place = placeRepository
+                .findById(request.getPlaceId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Place", request.getPlaceId()));
 
         Horse horse = null;
         if (request.getHorseId() != null) {
-            horse = horseRepository.findById(request.getHorseId())
+            horse = horseRepository
+                    .findById(request.getHorseId())
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.getHorseId()));
         }
 
@@ -280,7 +292,8 @@ public class AuthoritySubmissionService {
      */
     @Transactional
     public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist) {
-        QuarantinePeriod quarantine = quarantinePeriodRepository.findById(quarantineId)
+        QuarantinePeriod quarantine = quarantinePeriodRepository
+                .findById(quarantineId)
                 .orElseThrow(() -> ResourceNotFoundException.of("QuarantinePeriod", quarantineId));
 
         if (quarantine.getCompletedAt() != null) {
@@ -307,7 +320,8 @@ public class AuthoritySubmissionService {
     }
 
     private TransportJob findJobOrThrow(UUID jobId) {
-        return transportJobRepository.findById(jobId)
+        return transportJobRepository
+                .findById(jobId)
                 .orElseThrow(() -> ResourceNotFoundException.of("TransportJob", jobId));
     }
 }

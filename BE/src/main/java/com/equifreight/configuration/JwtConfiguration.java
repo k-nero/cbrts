@@ -1,16 +1,15 @@
 package com.equifreight.configuration;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 /**
  * Access tokens are HS256 JWTs signed with the shared {@code jwt.secret} (at least 32 bytes).
@@ -36,7 +35,8 @@ public class JwtConfiguration {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(ALGORITHM).build();
+        NimbusJwtDecoder decoder =
+                NimbusJwtDecoder.withSecretKey(key).macAlgorithm(ALGORITHM).build();
         // One server issues and checks the tokens, so no clock skew: expired means expired.
         decoder.setJwtValidator(new JwtTimestampValidator(Duration.ZERO));
         return decoder;

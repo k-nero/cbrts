@@ -1,13 +1,12 @@
 package com.equifreight.model.job;
 
 import com.equifreight.entity.enums.LoadPlanStatus;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter

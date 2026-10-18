@@ -2,14 +2,13 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.Channel;
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * One audit line, written in the same transaction as the change (BR-F1-08). Append-only (trigger).

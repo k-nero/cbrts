@@ -1,10 +1,9 @@
 package com.equifreight.model.clearance;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
-
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter

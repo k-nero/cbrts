@@ -4,11 +4,10 @@ import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.Validity;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * One required document of a job: per horse × document type, or per shipment, or per border crossing.

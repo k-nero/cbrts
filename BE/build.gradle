@@ -5,6 +5,8 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
     // processAot: generates bean-definition code at build time; used at runtime with -Dspring.aot.enabled=true
     id 'org.springframework.boot.aot' version '4.1.1'
+    // Format check that runs the same from any IDE: ./gradlew spotlessApply, ./gradlew spotlessCheck
+    id 'com.diffplug.spotless' version '8.10.4'
 }
 
 group = 'com.equifreight'
@@ -55,4 +57,22 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+spotless {
+    // Only files changed since origin/main are checked and formatted, so #108's reformat isn't repeated repo-wide.
+    ratchetFrom 'origin/main'
+    // ./gradlew check (and build) runs spotlessCheck.
+    enforceCheck true
+
+    // Java sources only. Never format src/main/resources/db/migration: Flyway checksums merged migrations,
+    // so even a whitespace change fails validation on databases that already ran them.
+    java {
+        target 'src/**/*.java'
+        // Palantir style: 4-space indent, 120 columns, close to IntelliJ's default Java style.
+        palantirJavaFormat('2.102.0')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }

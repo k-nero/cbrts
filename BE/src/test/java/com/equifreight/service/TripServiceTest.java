@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
@@ -7,6 +12,12 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.repository.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,41 +28,39 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TripServiceTest {
 
     private static final Instant NOW = Instant.now();
+
     @Mock
     private TransportJobRepository jobs;
+
     @Mock
     private CrewAssignmentRepository crew;
+
     @Mock
     private TripRecordRepository records;
+
     @Mock
     private RoutePlanRepository routes;
+
     @Mock
     private LoadPlanRepository loads;
+
     @Mock
     private RequestHorseRepository requestHorses;
+
     @Mock
     private FileService files;
+
     @Mock
     private AuditLogRepository audit;
+
     @InjectMocks
     private TripService service;
+
     private User coordinator;
     private TransportJob job;
     private Horse shadowfax;
@@ -103,7 +112,8 @@ class TripServiceTest {
         when(jobs.findByCodeForUpdate(job.getCode())).thenReturn(Optional.of(job));
         when(records.findByClientRef(any())).thenReturn(Optional.empty());
         when(records.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection())).thenReturn(Optional.empty());
+        when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -140,8 +150,10 @@ class TripServiceTest {
     void conditionCheckIsAllowedAtLoading() {
         stubHorses();
 
-        service.addCoordinatorRecord(job.getCode(), coordinator, request(TripRecordKind.CONDITION_CHECK, NOW,
-                List.of(condition(shadowfax, List.of()))));
+        service.addCoordinatorRecord(
+                job.getCode(),
+                coordinator,
+                request(TripRecordKind.CONDITION_CHECK, NOW, List.of(condition(shadowfax, List.of()))));
 
         verify(records).save(any());
         assertEquals(TripStatus.NOT_STARTED, job.getTripStatus());
@@ -192,8 +204,8 @@ class TripServiceTest {
     @Test
     @DisplayName("A record dated in the future is refused")
     void futureRecordIsRefused() {
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> record(TripRecordKind.NOTE, NOW.plus(Duration.ofHours(1))));
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> record(TripRecordKind.NOTE, NOW.plus(Duration.ofHours(1))));
         assertEquals("TRIP_RECORD_IN_FUTURE", ex.getCode());
     }
 
@@ -213,8 +225,12 @@ class TripServiceTest {
         departed();
         stubHorses();
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.addCoordinatorRecord(job.getCode(), coordinator,
-                request(TripRecordKind.ARRIVED_AT_STOP, NOW, List.of(condition(shadowfax, List.of())))));
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(),
+                        coordinator,
+                        request(TripRecordKind.ARRIVED_AT_STOP, NOW, List.of(condition(shadowfax, List.of())))));
         assertEquals("CONDITION_CHECK_KIND_REQUIRED", ex.getCode());
     }
 
@@ -226,8 +242,15 @@ class TripServiceTest {
         UUID photo = UUID.randomUUID();
         when(files.requireAttachable(eq(photo), any())).thenReturn(new StoredFile());
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.addCoordinatorRecord(job.getCode(), coordinator,
-                request(TripRecordKind.CONDITION_CHECK, NOW, List.of(condition(shadowfax, List.of(photo)), condition(nightfall, List.of(photo))))));
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(),
+                        coordinator,
+                        request(
+                                TripRecordKind.CONDITION_CHECK,
+                                NOW,
+                                List.of(condition(shadowfax, List.of(photo)), condition(nightfall, List.of(photo))))));
         assertEquals("DUPLICATE_PHOTO", ex.getCode());
         verify(records, never()).save(any());
     }
@@ -246,7 +269,8 @@ class TripServiceTest {
         for (Horse horse : List.of(shadowfax, nightfall)) {
             RequestHorse rh = new RequestHorse();
             rh.setHorse(horse);
-            when(requestHorses.findByRequest_IdAndHorse_Id(job.getRequest().getId(), horse.getId())).thenReturn(Optional.of(rh));
+            when(requestHorses.findByRequest_IdAndHorse_Id(job.getRequest().getId(), horse.getId()))
+                    .thenReturn(Optional.of(rh));
         }
     }
 
