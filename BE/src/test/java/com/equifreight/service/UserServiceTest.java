@@ -53,20 +53,22 @@ class UserServiceTest {
     private User yen;
 
     private static CreateUserRequest createRequest(String email, String roleName) {
-        CreateUserRequest request = new CreateUserRequest();
-        request.setEmail(email);
-        request.setPassword("changeme123!");
-        request.setFirstName("Anh Thư");
-        request.setLastName("Bùi");
-        request.setRoles(Set.of(roleName));
+        CreateUserRequest request = CreateUserRequest.builder()
+                .email(email)
+                .password("changeme123!")
+                .firstName("Anh Thư")
+                .lastName("Bùi")
+                .roles(Set.of(roleName))
+                .build();
         return request;
     }
 
     private static UpdateUserRequest updateRequest(String firstName, String lastName, String roleName) {
-        UpdateUserRequest request = new UpdateUserRequest();
-        request.setFirstName(firstName);
-        request.setLastName(lastName);
-        request.setRoles(roleName == null ? null : Set.of(roleName));
+        UpdateUserRequest request = UpdateUserRequest.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .roles(roleName == null ? null : Set.of(roleName))
+                .build();
         return request;
     }
 

@@ -93,19 +93,19 @@ class RouteServiceTest {
 
         assertThat(resolution.corridor()).isSameAs(hcmBkk);
         RouteResponse route = resolution.route();
-        assertThat(route.getCode()).isEqualTo("RD HCM → BKK");
-        assertThat(route.getFromCity()).isEqualTo("Ho Chi Minh City");
-        assertThat(route.getToCity()).isEqualTo("Bangkok");
-        assertThat(route.getCrossings())
-                .extracting(CrossingResponse::getName, CrossingResponse::getFromCountry, CrossingResponse::getToCountry)
+        assertThat(route.code()).isEqualTo("RD HCM → BKK");
+        assertThat(route.fromCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(route.toCity()).isEqualTo("Bangkok");
+        assertThat(route.crossings())
+                .extracting(CrossingResponse::name, CrossingResponse::fromCountry, CrossingResponse::toCountry)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "VN", "KH"),
                         org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "KH", "TH"));
-        assertThat(route.getCountries()).containsExactly("VN", "KH", "TH");
-        assertThat(route.getCountryNames()).containsExactly("Vietnam", "Cambodia", "Thailand");
-        assertThat(route.getCrossBorder()).isTrue();
-        assertThat(route.getLeadTimeDays()).isEqualTo(21);
-        assertThat(route.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
+        assertThat(route.countries()).containsExactly("VN", "KH", "TH");
+        assertThat(route.countryNames()).containsExactly("Vietnam", "Cambodia", "Thailand");
+        assertThat(route.crossBorder()).isTrue();
+        assertThat(route.leadTimeDays()).isEqualTo(21);
+        assertThat(route.earliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
     }
 
     @Test
@@ -116,14 +116,14 @@ class RouteServiceTest {
         RouteResponse route = service.resolve(chaoPhraya, null, phuTho, null, TransportMode.ROAD)
                 .route();
 
-        assertThat(route.getFromCity()).isEqualTo("Bangkok");
-        assertThat(route.getToCity()).isEqualTo("Ho Chi Minh City");
-        assertThat(route.getCrossings())
-                .extracting(CrossingResponse::getName, CrossingResponse::getFromCountry, CrossingResponse::getToCountry)
+        assertThat(route.fromCity()).isEqualTo("Bangkok");
+        assertThat(route.toCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(route.crossings())
+                .extracting(CrossingResponse::name, CrossingResponse::fromCountry, CrossingResponse::toCountry)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "TH", "KH"),
                         org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "KH", "VN"));
-        assertThat(route.getCountries()).containsExactly("TH", "KH", "VN");
+        assertThat(route.countries()).containsExactly("TH", "KH", "VN");
     }
 
     @Test
@@ -135,8 +135,8 @@ class RouteServiceTest {
         RouteResponse route =
                 service.resolve(lowerCase, null, chaoPhraya, null, null).route();
 
-        assertThat(route.getCrossings().getFirst().getName()).isEqualTo("Mộc Bài – Bavet");
-        assertThat(route.getFromCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(route.crossings().getFirst().name()).isEqualTo("Mộc Bài – Bavet");
+        assertThat(route.fromCity()).isEqualTo("Ho Chi Minh City");
     }
 
     @Test
@@ -199,10 +199,10 @@ class RouteServiceTest {
 
         RouteResponse route = service.resolve(phuTho, null, socSon, null, null).route();
 
-        assertThat(route.getCountries()).containsExactly("VN");
-        assertThat(route.getCrossBorder()).isFalse();
-        assertThat(route.getLeadTimeDays()).isEqualTo(3);
-        assertThat(route.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 9, 29));
+        assertThat(route.countries()).containsExactly("VN");
+        assertThat(route.crossBorder()).isFalse();
+        assertThat(route.leadTimeDays()).isEqualTo(3);
+        assertThat(route.earliestDeparture()).isEqualTo(LocalDate.of(2026, 9, 29));
     }
 
     @Test
@@ -213,8 +213,8 @@ class RouteServiceTest {
         RouteResponse route =
                 service.resolve(socSon, null, vientiane, null, null).route();
 
-        assertThat(route.getLeadTimeDays()).isEqualTo(30);
-        assertThat(route.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 26));
+        assertThat(route.leadTimeDays()).isEqualTo(30);
+        assertThat(route.earliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 26));
     }
 
     @Test
@@ -227,8 +227,8 @@ class RouteServiceTest {
 
         RouteResolution resolution = service.resolve(socSon, null, vientiane, null, null);
 
-        assertThat(resolution.route().getLeadTimeDays()).isNull();
-        assertThat(resolution.route().getEarliestDeparture()).isNull();
+        assertThat(resolution.route().leadTimeDays()).isNull();
+        assertThat(resolution.route().earliestDeparture()).isNull();
         assertThat(resolution.catalogMissingFor()).isEqualTo("Laos");
     }
 
@@ -250,7 +250,7 @@ class RouteServiceTest {
         Corridor hanVte = corridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", cauTreo);
         when(corridors.findBetweenCities("Hanoi", "Vientiane")).thenReturn(List.of(hanVte));
 
-        assertThat(service.resolve(socSon, null, vientiane, null, null).route().getLeadTimeDays())
+        assertThat(service.resolve(socSon, null, vientiane, null, null).route().leadTimeDays())
                 .isEqualTo(30);
     }
 
@@ -276,16 +276,14 @@ class RouteServiceTest {
 
         List<RouteResponse> routes = service.routes(id, null);
 
-        assertThat(routes).extracting(RouteResponse::getFromCity).containsOnly("Bangkok");
-        assertThat(routes)
-                .extracting(RouteResponse::getToCity)
-                .containsExactly("Kuala Lumpur", "Vientiane", "Phnom Penh");
-        assertThat(routes.get(2).getCrossings().getFirst().getFromCountry()).isEqualTo("TH");
+        assertThat(routes).extracting(RouteResponse::fromCity).containsOnly("Bangkok");
+        assertThat(routes).extracting(RouteResponse::toCity).containsExactly("Kuala Lumpur", "Vientiane", "Phnom Penh");
+        assertThat(routes.get(2).crossings().getFirst().fromCountry()).isEqualTo("TH");
         assertThat(routes).allSatisfy(r -> {
-            assertThat(r.getCountries()).isNull();
-            assertThat(r.getCrossBorder()).isNull();
-            assertThat(r.getLeadTimeDays()).isNull();
-            assertThat(r.getEarliestDeparture()).isNull();
+            assertThat(r.countries()).isNull();
+            assertThat(r.crossBorder()).isNull();
+            assertThat(r.leadTimeDays()).isNull();
+            assertThat(r.earliestDeparture()).isNull();
         });
     }
 
@@ -303,7 +301,7 @@ class RouteServiceTest {
 
         assertThat(routes)
                 .singleElement()
-                .satisfies(r -> assertThat(r.getLeadTimeDays()).isEqualTo(21));
+                .satisfies(r -> assertThat(r.leadTimeDays()).isEqualTo(21));
     }
 
     @Test

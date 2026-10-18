@@ -5,7 +5,7 @@ import type { ItemType } from 'antd/es/menu/interface';
 
 import Brand from './Brand';
 import ThemeToggle from './ThemeToggle';
-import { NavItem } from './ui';
+import { Button, NavItem } from './ui';
 
 import { COLOR_BG_CANVAS, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
@@ -62,6 +62,13 @@ const Header: React.FC = () => {
           ))}
         </nav>
         <Flex align="center" gap={12}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => router.push(router.paths.get('request-new'))}
+          >
+            Request transport
+          </Button>
           <ThemeToggle />
           <Dropdown menu={{ items: userItems }} placement="bottomRight" trigger={['click']}>
             <button type="button" className={ACCOUNT_CHIP}>

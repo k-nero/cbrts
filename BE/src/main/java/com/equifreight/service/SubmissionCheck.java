@@ -166,20 +166,21 @@ public final class SubmissionCheck {
                                     + " has no published regulation catalog, so the lead time can't be checked. Contact EquiFreight."));
             return;
         }
-        if (route.getLeadTimeDays() == null) {
+        if (route.leadTimeDays() == null) {
             return;
         }
-        int flex = request.getDateFlexDays();
-        LeadTimeResponse leadTime = LeadTimePolicy.assess(route.getLeadTimeDays(), flex, today, departure);
-        if (!leadTime.isMet()) {
+        // A route's flex can change after a draft was saved; the draft is judged by the route's current value.
+        int flex = LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), route.dateFlexDays());
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(route.leadTimeDays(), flex, today, departure);
+        if (!leadTime.met()) {
             blockers.add(new Blocker(
                     "LEAD_TIME_TOO_SHORT",
                     "departureDate",
                     LeadTimePolicy.tooSoonMessage(
-                            Boolean.TRUE.equals(route.getCrossBorder()),
-                            leadTime.getRequiredDays(),
+                            Boolean.TRUE.equals(route.crossBorder()),
+                            leadTime.requiredDays(),
                             flex,
-                            leadTime.getEarliestDeparture())));
+                            leadTime.earliestDeparture())));
         }
     }
 

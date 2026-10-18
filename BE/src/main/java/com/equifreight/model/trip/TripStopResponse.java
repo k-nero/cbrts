@@ -3,7 +3,9 @@ package com.equifreight.model.trip;
 import com.equifreight.entity.enums.TripRecordKind;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record TripStopResponse(
         UUID id,
         short sequence,

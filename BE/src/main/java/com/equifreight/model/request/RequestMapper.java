@@ -4,7 +4,9 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.service.LeadTimePolicy;
 import com.equifreight.service.SubmissionCheck;
 import java.util.Comparator;
 import java.util.List;
@@ -38,7 +40,11 @@ public final class RequestMapper {
                 .origin(endpoint(r.getOriginPlace(), r.getOriginText()))
                 .destination(endpoint(r.getDestinationPlace(), r.getDestinationText()))
                 .departureDate(r.getDepartureDate())
-                .dateFlexDays(r.getDateFlexDays())
+                // A draft shows its route's current flex; a submitted request keeps the value copied at submission.
+                .dateFlexDays(
+                        r.getStatus() == RequestStatus.DRAFT && route != null
+                                ? LeadTimePolicy.flexDaysFor(r.getDateFlexDays(), route.dateFlexDays())
+                                : r.getDateFlexDays())
                 .arrivalMode(r.getArrivalMode())
                 .windowStart(r.getWindowStart())
                 .windowEnd(r.getWindowEnd())

@@ -7,7 +7,9 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record TripRecordRequest(
         UUID routeStopId,
         @NotNull TripRecordKind kind,

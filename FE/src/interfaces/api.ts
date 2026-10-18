@@ -17,8 +17,12 @@ export interface PagedResponse<T> {
 
 export interface ApiError {
   status: number;
+  /** The backend's error token: "Validation Failed", "Bad Request" or a code such as HORSE_NAME_TAKEN. */
+  error?: string;
   code?: string;
   message: string;
+  /** "field: message" lines of a 400 "Validation Failed", or every blocker of a 409 SUBMISSION_BLOCKED. */
+  details?: string[] | null;
   path?: string;
   timestamp?: string;
   /** Field-level validation errors keyed by field name */

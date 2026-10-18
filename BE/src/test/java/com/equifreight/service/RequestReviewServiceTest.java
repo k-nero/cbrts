@@ -357,7 +357,7 @@ class RequestReviewServiceTest {
             assertThat(h.getActorLabel()).isEqualTo("Saigon Turf Club");
         });
         assertThat(view.getChecks()).extracting("key").containsExactly("ROUTE_SERVED", "LEAD_TIME");
-        assertThat(view.getRequest().getClub()).isEqualTo("Saigon Turf Club");
+        assertThat(view.getRequest().club()).isEqualTo("Saigon Turf Club");
     }
 
     @Test
@@ -381,7 +381,7 @@ class RequestReviewServiceTest {
 
         RequestReviewResponse view = service.returnForInformation(manager, r.getId(), NOTE);
 
-        assertThat(view.getRequest().getStatus()).isEqualTo(RequestStatus.INFO_REQUIRED);
+        assertThat(view.getRequest().status()).isEqualTo(RequestStatus.INFO_REQUIRED);
         assertThat(view.getQueue()).isNull();
     }
 

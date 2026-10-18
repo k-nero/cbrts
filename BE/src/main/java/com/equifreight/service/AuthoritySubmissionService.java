@@ -112,29 +112,28 @@ public class AuthoritySubmissionService {
             UUID jobId, CreateAuthoritySubmissionRequest request, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
         Authority authority = authorityRepository
-                .findById(request.getAuthorityId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Authority", request.getAuthorityId()));
+                .findById(request.authorityId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Authority", request.authorityId()));
 
         AuthoritySubmission submission = new AuthoritySubmission();
         submission.setJob(job);
         submission.setAuthority(authority);
-        submission.setKind(request.getKind());
+        submission.setKind(request.kind());
         submission.setStatus(SubmissionStatus.FILED);
         submission.setFiledAt(Instant.now());
         submission.setFiledBy(specialist);
-        submission.setReferenceNo(request.getReferenceNo());
+        submission.setReferenceNo(request.referenceNo());
 
         // SLA deadline calculated using business calendar zone (Asia/Ho_Chi_Minh)
-        if (request.getExpectedBy() != null) {
-            submission.setExpectedBy(request.getExpectedBy());
+        if (request.expectedBy() != null) {
+            submission.setExpectedBy(request.expectedBy());
         } else if (authority.getSlaDays() != null) {
             submission.setExpectedBy(LocalDate.now(AppConstants.BUSINESS_ZONE).plusDays(authority.getSlaDays()));
         }
 
-        if (request.getChecklistItemIds() != null
-                && !request.getChecklistItemIds().isEmpty()) {
+        if (request.checklistItemIds() != null && !request.checklistItemIds().isEmpty()) {
             Set<ChecklistItem> items = new HashSet<>();
-            for (UUID cid : request.getChecklistItemIds()) {
+            for (UUID cid : request.checklistItemIds()) {
                 ChecklistItem ci = checklistItemRepository
                         .findById(cid)
                         .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", cid));
@@ -155,7 +154,7 @@ public class AuthoritySubmissionService {
                 specialist,
                 "AUTHORITY_SUBMISSION_CREATED",
                 String.format(
-                        "Filed %s submission to %s for job %s.", request.getKind(), authority.getName(), job.getCode()),
+                        "Filed %s submission to %s for job %s.", request.kind(), authority.getName(), job.getCode()),
                 "AUTHORITY_SUBMISSION",
                 saved.getId(),
                 job.getCode(),
@@ -179,23 +178,23 @@ public class AuthoritySubmissionService {
                 .orElseThrow(() -> ResourceNotFoundException.of("AuthoritySubmission", submissionId));
 
         SubmissionStatus prevStatus = submission.getStatus();
-        submission.setStatus(request.getStatus());
+        submission.setStatus(request.status());
 
-        if (request.getReferenceNo() != null) {
-            submission.setReferenceNo(request.getReferenceNo());
+        if (request.referenceNo() != null) {
+            submission.setReferenceNo(request.referenceNo());
         }
-        if (request.getExpectedBy() != null) {
-            submission.setExpectedBy(request.getExpectedBy());
+        if (request.expectedBy() != null) {
+            submission.setExpectedBy(request.expectedBy());
         }
 
-        if (request.getStatus() == SubmissionStatus.ISSUED) {
+        if (request.status() == SubmissionStatus.ISSUED) {
             submission.setIssuedAt(Instant.now());
-            if (request.getResultFileId() != null) {
+            if (request.resultFileId() != null) {
                 // Enforce attachability rules (PR #79)
-                StoredFile resultFile = fileService.requireAttachable(request.getResultFileId(), specialist);
+                StoredFile resultFile = fileService.requireAttachable(request.resultFileId(), specialist);
                 submission.setResultFile(resultFile);
             }
-        } else if (request.getStatus() == SubmissionStatus.ADDITIONAL_INFO) {
+        } else if (request.status() == SubmissionStatus.ADDITIONAL_INFO) {
             // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
 
@@ -218,13 +217,13 @@ public class AuthoritySubmissionService {
         auditService.recordDecision(
                 specialist,
                 "AUTHORITY_SUBMISSION_UPDATED",
-                String.format("Updated authority submission status to %s for job %s.", request.getStatus(), jobCode),
+                String.format("Updated authority submission status to %s for job %s.", request.status(), jobCode),
                 "AUTHORITY_SUBMISSION",
                 updated.getId(),
                 jobCode,
                 null,
                 prevStatus != null ? prevStatus.name() : "FILED",
-                request.getStatus().name());
+                request.status().name());
 
         clearanceService.evaluateClearanceGate(submission.getJob().getId());
         return ClearanceMapper.toSubmissionResponse(updated);
@@ -249,17 +248,17 @@ public class AuthoritySubmissionService {
             UUID jobId, CreateQuarantinePeriodRequest request, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
         Place place = placeRepository
-                .findById(request.getPlaceId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Place", request.getPlaceId()));
+                .findById(request.placeId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Place", request.placeId()));
 
         Horse horse = null;
-        if (request.getHorseId() != null) {
+        if (request.horseId() != null) {
             horse = horseRepository
-                    .findById(request.getHorseId())
-                    .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.getHorseId()));
+                    .findById(request.horseId())
+                    .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
 
-        if (request.getEndsOn().isBefore(request.getStartsOn())) {
+        if (request.endsOn().isBefore(request.startsOn())) {
             throw new BusinessException("Quarantine end date cannot precede start date.");
         }
 
@@ -267,8 +266,8 @@ public class AuthoritySubmissionService {
         quarantine.setJob(job);
         quarantine.setHorse(horse);
         quarantine.setPlace(place);
-        quarantine.setStartsOn(request.getStartsOn());
-        quarantine.setEndsOn(request.getEndsOn());
+        quarantine.setStartsOn(request.startsOn());
+        quarantine.setEndsOn(request.endsOn());
 
         QuarantinePeriod saved = quarantinePeriodRepository.save(quarantine);
 

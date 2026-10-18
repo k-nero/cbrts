@@ -167,16 +167,20 @@ public class RequestService {
         TransportRequest request = findEditableForUpdate(club, id);
         LocalDate today = LocalDate.now(clock);
         RouteResolution resolution = resolve(request);
+        // The route's flex is copied onto the request here (#115), before the lead time is checked with it; a later
+        // change to the corridor never moves a submitted request.
+        request.setDateFlexDays(
+                (short) LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), routeFlexDays(resolution)));
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         if (!blockers.isEmpty()) {
             throw new ConflictException(
                     "SUBMISSION_BLOCKED",
                     "This request can't be submitted yet.",
-                    blockers.stream().map(Blocker::getMessage).toList());
+                    blockers.stream().map(Blocker::message).toList());
         }
         // No blocker means a resolved corridor with a known lead time (ROUTE_NOT_RUN, CATALOG_INCOMPLETE).
         LeadTimeResponse leadTime = LeadTimePolicy.assess(
-                resolution.route().getLeadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
+                resolution.route().leadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
 
         boolean resubmission = request.getCode() != null;
         RequestStatus before = request.getStatus();
@@ -208,7 +212,7 @@ public class RequestService {
         revision.setSubmittedAt(now);
         revisions.save(revision);
 
-        List<String> names = response.getHorses().stream().map(h -> h.getName()).toList();
+        List<String> names = response.horses().stream().map(h -> h.name()).toList();
         audit.recordDecision(
                 user,
                 resubmission ? "REQUEST_RESUBMITTED" : "REQUEST_SUBMITTED",
@@ -236,8 +240,8 @@ public class RequestService {
 
     /** "Lead time checked: 24 days before departure, 21 required, plus 3 for dates that can move by ±3 days." */
     static String leadTimeSummary(LeadTimeResponse leadTime, int flexDays) {
-        return "Lead time checked: " + leadTime.getDaysBeforeDeparture() + " days before departure, "
-                + leadTime.getRequiredDays() + " required"
+        return "Lead time checked: " + leadTime.daysBeforeDeparture() + " days before departure, "
+                + leadTime.requiredDays() + " required"
                 + (flexDays == 0 ? "" : ", plus " + flexDays + " for dates that can move by ±" + flexDays + " days")
                 + ".";
     }
@@ -328,20 +332,20 @@ public class RequestService {
             boolean vetEscort) {}
 
     private Draft validate(Club club, RequestDraftRequest body, Set<UUID> alreadyOn) {
-        List<RequestHorseInput> inputs = body.getHorses() == null ? List.of() : body.getHorses();
+        List<RequestHorseInput> inputs = body.horses() == null ? List.of() : body.horses();
         Map<UUID, Horse> owned = horses
                 .findByClubIdAndIdIn(
                         club.getId(),
-                        inputs.stream().map(RequestHorseInput::getHorseId).collect(Collectors.toSet()))
+                        inputs.stream().map(RequestHorseInput::horseId).collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Horse::getId, Function.identity()));
         List<Horse> picked = new ArrayList<>();
         Map<UUID, Boolean> withFoal = new LinkedHashMap<>();
         Set<UUID> seen = new HashSet<>();
         for (RequestHorseInput input : inputs) {
-            Horse horse = owned.get(input.getHorseId());
+            Horse horse = owned.get(input.horseId());
             if (horse == null) {
-                throw ResourceNotFoundException.of("Horse", input.getHorseId());
+                throw ResourceNotFoundException.of("Horse", input.horseId());
             }
             if (!seen.add(horse.getId())) {
                 throw new BusinessException("HORSE_LISTED_TWICE", horse.getName() + " is on the request twice.");
@@ -350,7 +354,7 @@ public class RequestService {
                 throw new ConflictException(
                         "HORSE_ARCHIVED", horse.getName() + " is archived and can't be added to a request.");
             }
-            boolean foal = Boolean.TRUE.equals(input.getWithFoal());
+            boolean foal = Boolean.TRUE.equals(input.withFoal());
             if (foal && horse.getSex() != HorseSex.MARE) {
                 throw new BusinessException(
                         "FOAL_NOT_A_MARE",
@@ -361,34 +365,37 @@ public class RequestService {
             withFoal.put(horse.getId(), foal);
         }
 
-        String originText = clean(body.getOriginText());
-        String destinationText = clean(body.getDestinationText());
-        if (body.getOriginPlaceId() != null && originText != null) {
+        String originText = clean(body.originText());
+        String destinationText = clean(body.destinationText());
+        if (body.originPlaceId() != null && originText != null) {
             throw new BusinessException("PLACE_OR_TEXT", "Choose a place or type a city for the origin, not both.");
         }
-        if (body.getDestinationPlaceId() != null && destinationText != null) {
+        if (body.destinationPlaceId() != null && destinationText != null) {
             throw new BusinessException(
                     "PLACE_OR_TEXT", "Choose a place or type a city for the destination, not both.");
         }
-        Place origin = body.getOriginPlaceId() == null ? null : findEnd(body.getOriginPlaceId());
-        Place destination = body.getDestinationPlaceId() == null ? null : findEnd(body.getDestinationPlaceId());
+        Place origin = body.originPlaceId() == null ? null : findEnd(body.originPlaceId());
+        Place destination = body.destinationPlaceId() == null ? null : findEnd(body.destinationPlaceId());
         if (origin != null && destination != null && origin.getId().equals(destination.getId())) {
             throw new BusinessException("SAME_PLACE", "The horses can't be collected and delivered at the same place.");
         }
 
-        TransportMode mode = body.getMode();
+        TransportMode mode = body.mode();
         // Mirrors transport_requests_mode_options_check, which also refuses both without a mode.
-        if ((mode == TransportMode.ROAD && body.getAirClass() != null)
-                || (mode == TransportMode.AIR && body.getTrailer() != null)
-                || (body.getTrailer() != null && body.getAirClass() != null)) {
+        if ((mode == TransportMode.ROAD && body.airClass() != null)
+                || (mode == TransportMode.AIR && body.trailer() != null)
+                || (body.trailer() != null && body.airClass() != null)) {
             throw new BusinessException("MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
         }
-        int flex = body.getDateFlexDays() == null ? 0 : body.getDateFlexDays();
-        if (flex != 0 && flex != 3) {
-            throw new BusinessException("DATE_FLEX", "Dates can move by 0 or 3 days; " + flex + " was given.");
+        // 0 asks for fixed dates and anything above for flexible ones; the route then sets how far (#115).
+        int flex = body.dateFlexDays() == null ? 0 : body.dateFlexDays();
+        if (flex < 0 || flex > LeadTimePolicy.MAX_FLEX_DAYS) {
+            throw new BusinessException(
+                    "DATE_FLEX",
+                    "Dates can move by 0 to " + LeadTimePolicy.MAX_FLEX_DAYS + " days; " + flex + " was given.");
         }
-        ArrivalMode arrivalMode = body.getArrivalMode() == null ? ArrivalMode.ANY_TIME : body.getArrivalMode();
-        requireValidWindow(arrivalMode, mode, body.getTrailer(), flex, body.getWindowStart(), body.getWindowEnd());
+        ArrivalMode arrivalMode = body.arrivalMode() == null ? ArrivalMode.ANY_TIME : body.arrivalMode();
+        requireValidWindow(arrivalMode, mode, body.trailer(), flex, body.windowStart(), body.windowEnd());
 
         return new Draft(
                 picked,
@@ -397,17 +404,17 @@ public class RequestService {
                 originText,
                 destination,
                 destinationText,
-                body.getDepartureDate(),
+                body.departureDate(),
                 (short) flex,
                 arrivalMode,
-                toInstant(body.getWindowStart()),
-                toInstant(body.getWindowEnd()),
-                clean(body.getSpecialInstructions()),
+                toInstant(body.windowStart()),
+                toInstant(body.windowEnd()),
+                clean(body.specialInstructions()),
                 mode,
-                body.getTrailer(),
-                body.getAirClass(),
-                body.getInsurance(),
-                Boolean.TRUE.equals(body.getVetEscort()));
+                body.trailer(),
+                body.airClass(),
+                body.insurance(),
+                Boolean.TRUE.equals(body.vetEscort()));
     }
 
     /** R-04, the arrival-window check of the database, with the reason in words. */
@@ -479,7 +486,15 @@ public class RequestService {
         request.setVetEscort(draft.vetEscort());
         RouteResolution resolution = resolve(request);
         request.setCorridor(resolution.corridor());
+        request.setDateFlexDays((short) LeadTimePolicy.flexDaysFor(draft.dateFlexDays(), routeFlexDays(resolution)));
         return resolution;
+    }
+
+    /** How far flexible dates can move on the resolved route, or null without one. */
+    private static Integer routeFlexDays(RouteResolution resolution) {
+        return resolution.corridor() == null
+                ? null
+                : (int) resolution.corridor().getDateFlexDays();
     }
 
     /** The fields that price the horse, copied so a later edit of the horse doesn't change the request. */
@@ -512,11 +527,13 @@ public class RequestService {
         }
         LocalDate today = LocalDate.now(clock);
         RouteResponse route = resolution.route();
-        LeadTimeResponse leadTime =
-                route == null || route.getLeadTimeDays() == null || request.getDepartureDate() == null
-                        ? null
-                        : LeadTimePolicy.assess(
-                                route.getLeadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
+        LeadTimeResponse leadTime = route == null || route.leadTimeDays() == null || request.getDepartureDate() == null
+                ? null
+                : LeadTimePolicy.assess(
+                        route.leadTimeDays(),
+                        LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), route.dateFlexDays()),
+                        today,
+                        request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         return RequestMapper.toResponse(request, route, leadTime, blockers, revisionsOf(request));
     }

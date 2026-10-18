@@ -66,7 +66,7 @@ class SubmissionCheckTest {
         request.getHorses().clear();
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple("NO_HORSES", "horses", "Add at least one horse."));
     }
 
@@ -78,7 +78,7 @@ class SubmissionCheckTest {
         add(copperKing);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::message)
                 .containsExactly(tuple(
                         "HORSE_INCOMPLETE",
                         "Copper King's profile is missing date of birth and weight. Add them on the horse's profile."));
@@ -100,7 +100,7 @@ class SubmissionCheckTest {
         silverBell.setArchivedAt(Instant.parse("2026-09-25T00:00:00Z"));
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::message)
                 .containsExactly(
                         tuple(
                                 "HORSE_INCOMPLETE",
@@ -117,7 +117,7 @@ class SubmissionCheckTest {
         shadowfax.setWithFoal(true);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(
                         tuple(
                                 "FOAL_NOT_A_MARE",
@@ -134,7 +134,7 @@ class SubmissionCheckTest {
         resolution = RouteResolution.none();
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(
                         tuple("ORIGIN_MISSING", "origin", "Choose where the horses are collected."),
                         tuple("DESTINATION_MISSING", "destination", "Choose where the horses are going."),
@@ -148,7 +148,7 @@ class SubmissionCheckTest {
         resolution = new RouteResolution(null, null, Set.of(), null, false, true);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple(
                         "PLACE_NOT_CHOSEN",
                         "destination",
@@ -163,7 +163,7 @@ class SubmissionCheckTest {
         resolution = RouteResolution.none();
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple("ROUTE_NOT_RUN", "destination", "We don't run Bangkok → Singapore."));
     }
 
@@ -182,7 +182,7 @@ class SubmissionCheckTest {
         resolution = new RouteResolution(null, null, Set.of(TransportMode.ROAD), null, false, false);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(
                         tuple("ROUTE_NOT_RUN", "mode", "We don't run Ho Chi Minh City → Bangkok by air. Choose road."));
     }
@@ -194,7 +194,7 @@ class SubmissionCheckTest {
         resolution = new RouteResolution(null, null, Set.of(TransportMode.ROAD, TransportMode.AIR), null, false, false);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple("MODE_MISSING", "mode", "Choose road or air."));
     }
 
@@ -204,7 +204,7 @@ class SubmissionCheckTest {
                 resolution.corridor(), route(null, true), Set.of(TransportMode.ROAD), "Laos", false, false);
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple(
                         "CATALOG_INCOMPLETE",
                         "departureDate",
@@ -217,7 +217,7 @@ class SubmissionCheckTest {
         request.setDepartureDate(LocalDate.of(2026, 10, 5));
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple(
                         "LEAD_TIME_TOO_SHORT",
                         "departureDate",
@@ -261,11 +261,40 @@ class SubmissionCheckTest {
     }
 
     @Test
+    void flexibleDatesUseTheRoutesFlexDays() {
+        resolution = resolvedWithFlex(21, 5);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 20));
+
+        assertThat(messages())
+                .containsExactly("Cross-border moves need 21 days for document clearance. "
+                        + "With dates that can move by ±5 days, the earliest departure is 22 Oct 2026.");
+    }
+
+    @Test
+    void flexibleDatesPassOnTheRoutesMovedEarliestDate() {
+        resolution = resolvedWithFlex(21, 5);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        assertThat(blockers()).isEmpty();
+    }
+
+    @Test
+    void aRouteOnFixedDatesOnlyChecksFlexibleDatesAsFixed() {
+        resolution = resolvedWithFlex(21, 0);
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 17));
+
+        assertThat(blockers()).isEmpty();
+    }
+
+    @Test
     void serviceChoicesBlockUntilMade() {
         request.setTrailer(null);
         request.setInsurance(null);
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(
                         tuple("TRAILER_MISSING", "trailer", "Choose a shared or private trailer."),
                         tuple("INSURANCE_MISSING", "insurance", "Choose your own policy or EquiFreight's insurance."));
@@ -275,7 +304,7 @@ class SubmissionCheckTest {
         resolution = new RouteResolution(
                 resolution.corridor(), resolution.route(), Set.of(TransportMode.AIR), null, false, false);
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple("AIR_CLASS_MISSING", "airClass", "Choose Economy, Business or First."));
     }
 
@@ -284,7 +313,7 @@ class SubmissionCheckTest {
         window(OffsetDateTime.parse("2026-10-29T08:00:00+07:00").toInstant());
 
         assertThat(blockers())
-                .extracting(Blocker::getCode, Blocker::getField, Blocker::getMessage)
+                .extracting(Blocker::code, Blocker::field, Blocker::message)
                 .containsExactly(tuple(
                         "WINDOW_BEFORE_DEPARTURE",
                         "windowStart",
@@ -312,7 +341,7 @@ class SubmissionCheckTest {
     }
 
     private List<String> messages() {
-        return blockers().stream().map(Blocker::getMessage).toList();
+        return blockers().stream().map(Blocker::message).toList();
     }
 
     private void window(Instant start) {
@@ -320,6 +349,25 @@ class SubmissionCheckTest {
         request.setTrailer(TrailerType.PRIVATE);
         request.setWindowStart(start);
         request.setWindowEnd(start.plusSeconds(4 * 3600));
+    }
+
+    /** A cross-border route of `leadTimeDays` whose flexible dates can move `flexDays` (#115). */
+    private RouteResolution resolvedWithFlex(int leadTimeDays, int flexDays) {
+        Corridor corridor = new Corridor();
+        corridor.setCode("RD HCM → BKK");
+        corridor.setMode(TransportMode.ROAD);
+        corridor.setDateFlexDays((short) flexDays);
+        RouteResponse route = RouteResponse.builder()
+                .code("RD HCM → BKK")
+                .mode(TransportMode.ROAD)
+                .fromCity("Ho Chi Minh City")
+                .toCity("Bangkok")
+                .crossBorder(true)
+                .leadTimeDays(leadTimeDays)
+                .dateFlexDays(flexDays)
+                .earliestDeparture(TODAY.plusDays(leadTimeDays))
+                .build();
+        return new RouteResolution(corridor, route, Set.of(TransportMode.ROAD), null, false, false);
     }
 
     private RouteResolution resolved(int leadTimeDays, boolean crossBorder) {

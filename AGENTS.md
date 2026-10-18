@@ -96,8 +96,21 @@ Where to look elsewhere:
 
 - **Packages** live under `com.equifreight`: `controller` (with `controller/admin` for staff admin), `service`, `repository`, `entity` (`entity/enums`), `model` (request and response DTOs per area), `exception`, `configuration`, `job`.
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
+- **Models are records with `@Builder`.** Every request and response DTO in `model/` is a Java `record` annotated with Lombok `@Builder`; never a class with `@Getter`/`@Setter`/`@Data`. Build them with `X.builder()…build()` (or the canonical constructor for a short one), and read them with the record accessors (`x.name()`, not `x.getName()`).
+  - A default for a missing JSON field goes in the compact constructor (`stops = stops == null ? List.of() : stops;`); `@Builder.Default` and field initialisers don't work on records.
+  - Request records use wrapper types (`Short`, `Integer`, `Boolean`), never primitives: Jackson 3 refuses a body that leaves out a primitive record component with a 400. Give the wrapper its default in the compact constructor when the field is optional. Response records may use primitives.
+  - To change one field of an existing record, add `toBuilder = true` and use `x.toBuilder().field(v).build()`; never add a setter or a mutable wrapper.
+  - Validation annotations go on the components (`@NotBlank String name`); nested request parts are nested records.
+  - A record component is its JSON name: `boolean isOverdue` is sent as `isOverdue` (a Lombok getter made it `overdue`). Name components after the JSON the frontend reads.
+  - Mappers (`XMapper`) stay `final` classes with static methods; they are not models.
+- **Map in the model's mapper.** Turning an entity into a response belongs in its area's mapper in `model/<area>/` (`RoleMapper`, `ClearanceMapper`, `RequestMapper`, …), never in a service, controller or job.
+  - A mapper is a `final` class with a private constructor and `public static` methods named `toResponse`, `toSummary` or `to<Part>Response`. It reads only what it is given: no repositories, services or clock.
+  - Services and controllers call the mapper. They never build a response from entity fields with `X.builder()`, and response records carry no `of(Entity)` factory.
+  - Values a service works out, such as counts, conflicts, a lead-time check or a nested response from another area, are passed to the mapper as parameters. See `RequestMapper.toResponse(request, route, leadTime, blockers)`.
+  - Add the method to the area's existing mapper. A new area gets one `XMapper`; don't start a second one beside it.
+  - A response that comes from no entity, such as `TokenResponse` or `ApiError.of(...)`, can be built where it is made.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V17` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V18` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
   - It ratchets from `origin/main`: only the Java files your branch changes are checked and formatted, so run `git fetch origin` first if your `origin/main` is old.
   - It never touches `src/main/resources/db/migration`. If you use IntelliJ's Reformat Code on a directory, exclude `db/migration` (or reformat only the files you changed), because Flyway checksums every merged migration and even a whitespace change makes validation fail on databases that already ran it.

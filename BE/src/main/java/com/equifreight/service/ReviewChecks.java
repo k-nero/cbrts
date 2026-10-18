@@ -23,19 +23,19 @@ public final class ReviewChecks {
         if (route == null) {
             return check("ROUTE_SERVED", false, "Not served", "This route is no longer in the catalog.", null);
         }
-        List<String> names = route.getCountryNames() != null
-                ? route.getCountryNames()
-                : route.getCountries() != null ? route.getCountries() : List.of();
+        List<String> names = route.countryNames() != null
+                ? route.countryNames()
+                : route.countries() != null ? route.countries() : List.of();
         String path = String.join(" → ", names);
         String evidence;
-        if (route.getMode() == TransportMode.AIR) {
+        if (route.mode() == TransportMode.AIR) {
             evidence = path + " by air.";
         } else if (names.size() <= 1) {
             evidence = "Within " + path + " by road.";
         } else {
             evidence = path + " via "
-                    + listOf(route.getCrossings().stream()
-                            .map(CrossingResponse::getName)
+                    + listOf(route.crossings().stream()
+                            .map(CrossingResponse::name)
                             .toList()) + ".";
         }
         return check("ROUTE_SERVED", true, "Served", evidence, null);
@@ -47,22 +47,22 @@ public final class ReviewChecks {
         if (route == null) {
             return check("LEAD_TIME", false, "Unknown", "There is no lead time without a route we run.", null);
         }
-        if (route.getLeadTimeDays() == null) {
+        if (route.leadTimeDays() == null) {
             return check("LEAD_TIME", false, "Unknown", "No published regulations for this route yet.", null);
         }
-        int required = route.getLeadTimeDays();
+        int required = route.leadTimeDays();
         LeadTimeResponse lead = LeadTimePolicy.assess(required, submittedDay, departure);
-        String evidence = "Submitted " + days(lead.getDaysBeforeDeparture()) + " before departure; " + required
-                + " required for a " + (Boolean.FALSE.equals(route.getCrossBorder()) ? "domestic" : "cross-border")
+        String evidence = "Submitted " + days(lead.daysBeforeDeparture()) + " before departure; " + required
+                + " required for a " + (Boolean.FALSE.equals(route.crossBorder()) ? "domestic" : "cross-border")
                 + " move.";
-        if (!lead.isMet()) {
-            evidence += " The earliest departure is " + BusinessTime.DAY.format(lead.getEarliestDeparture()) + ".";
+        if (!lead.met()) {
+            evidence += " The earliest departure is " + BusinessTime.DAY.format(lead.earliestDeparture()) + ".";
         }
         long left = ChronoUnit.DAYS.between(today, departure);
         String sub = left > 0
                 ? "Departs in " + days(left) + "."
                 : left == 0 ? "Departs today." : "Departed " + days(-left) + " ago.";
-        return check("LEAD_TIME", lead.isMet(), lead.isMet() ? "Met" : "Too short", evidence, sub);
+        return check("LEAD_TIME", lead.met(), lead.met() ? "Met" : "Too short", evidence, sub);
     }
 
     /** The calendar day of a submission in Asia/Ho_Chi_Minh: 18:30 UTC is already the next day. */
