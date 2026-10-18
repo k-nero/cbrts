@@ -2,11 +2,10 @@ package com.equifreight.model.job;
 
 import com.equifreight.entity.enums.StallSide;
 import com.equifreight.entity.enums.StallType;
+import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.UUID;
 
 @Getter
 @Setter

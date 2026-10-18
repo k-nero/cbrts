@@ -1,7 +1,6 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.RequestRevision;
-
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;

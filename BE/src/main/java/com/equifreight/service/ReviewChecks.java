@@ -6,7 +6,6 @@ import com.equifreight.model.request.LeadTimeResponse;
 import com.equifreight.model.review.CheckResponse;
 import com.equifreight.model.route.CrossingResponse;
 import com.equifreight.model.route.RouteResponse;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -24,7 +23,8 @@ public final class ReviewChecks {
         if (route == null) {
             return check("ROUTE_SERVED", false, "Not served", "This route is no longer in the catalog.", null);
         }
-        List<String> names = route.getCountryNames() != null ? route.getCountryNames()
+        List<String> names = route.getCountryNames() != null
+                ? route.getCountryNames()
                 : route.getCountries() != null ? route.getCountries() : List.of();
         String path = String.join(" → ", names);
         String evidence;
@@ -33,15 +33,17 @@ public final class ReviewChecks {
         } else if (names.size() <= 1) {
             evidence = "Within " + path + " by road.";
         } else {
-            evidence = path + " via " + listOf(route.getCrossings().stream().map(CrossingResponse::getName).toList())
-                    + ".";
+            evidence = path + " via "
+                    + listOf(route.getCrossings().stream()
+                            .map(CrossingResponse::getName)
+                            .toList()) + ".";
         }
         return check("ROUTE_SERVED", true, "Served", evidence, null);
     }
 
     /** BR-F1-01, counted from the day the request was (last) submitted, in business time. */
-    public static CheckResponse leadTime(RouteResponse route, LocalDate submittedDay, LocalDate departure,
-                                         LocalDate today) {
+    public static CheckResponse leadTime(
+            RouteResponse route, LocalDate submittedDay, LocalDate departure, LocalDate today) {
         if (route == null) {
             return check("LEAD_TIME", false, "Unknown", "There is no lead time without a route we run.", null);
         }
@@ -57,8 +59,9 @@ public final class ReviewChecks {
             evidence += " The earliest departure is " + BusinessTime.DAY.format(lead.getEarliestDeparture()) + ".";
         }
         long left = ChronoUnit.DAYS.between(today, departure);
-        String sub = left > 0 ? "Departs in " + days(left) + "." : left == 0 ? "Departs today."
-                : "Departed " + days(-left) + " ago.";
+        String sub = left > 0
+                ? "Departs in " + days(left) + "."
+                : left == 0 ? "Departs today." : "Departed " + days(-left) + " ago.";
         return check("LEAD_TIME", lead.isMet(), lead.isMet() ? "Met" : "Too short", evidence, sub);
     }
 
@@ -68,7 +71,12 @@ public final class ReviewChecks {
     }
 
     private static CheckResponse check(String key, boolean ok, String word, String evidence, String sub) {
-        return CheckResponse.builder().key(key).state(ok ? "OK" : "BAD").word(word).evidence(evidence).sub(sub)
+        return CheckResponse.builder()
+                .key(key)
+                .state(ok ? "OK" : "BAD")
+                .word(word)
+                .evidence(evidence)
+                .sub(sub)
                 .build();
     }
 

@@ -2,12 +2,11 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.enums.RoutePlanStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RoutePlanRepository extends JpaRepository<RoutePlan, UUID> {

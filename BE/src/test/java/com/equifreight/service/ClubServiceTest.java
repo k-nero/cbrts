@@ -1,19 +1,18 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Club;
-import com.equifreight.entity.User;
-import com.equifreight.exception.UnauthorizedException;
-import com.equifreight.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import com.equifreight.entity.Club;
+import com.equifreight.entity.User;
+import com.equifreight.exception.UnauthorizedException;
+import com.equifreight.repository.UserRepository;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class ClubServiceTest {
 

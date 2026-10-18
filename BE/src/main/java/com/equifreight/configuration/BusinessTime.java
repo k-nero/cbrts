@@ -23,6 +23,5 @@ public final class BusinessTime {
      */
     public static final DateTimeFormatter SHORT_DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
-    private BusinessTime() {
-    }
+    private BusinessTime() {}
 }

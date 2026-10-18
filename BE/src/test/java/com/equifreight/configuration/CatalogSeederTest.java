@@ -1,5 +1,14 @@
 package com.equifreight.configuration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.equifreight.entity.BorderCrossing;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
@@ -15,30 +24,20 @@ import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RegulationCatalogRepository;
 import com.equifreight.repository.RegulationVersionRepository;
 import com.equifreight.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /** Spec §7: the demo places, crossings, corridors and regulation versions, seeded once. */
 class CatalogSeederTest {
 
-    private static final Map<String, String> NAMES = Map.of("VN", "Vietnam", "KH", "Cambodia", "TH", "Thailand",
-            "LA", "Laos", "MY", "Malaysia", "HK", "Hong Kong");
+    private static final Map<String, String> NAMES = Map.of(
+            "VN", "Vietnam", "KH", "Cambodia", "TH", "Thailand", "LA", "Laos", "MY", "Malaysia", "HK", "Hong Kong");
 
     private PlaceRepository places;
     private BorderCrossingRepository crossings;
@@ -93,20 +92,27 @@ class CatalogSeederTest {
         ArgumentCaptor<Corridor> corridor = ArgumentCaptor.forClass(Corridor.class);
         verify(corridors, times(9)).save(corridor.capture());
         Corridor hcmBkk = corridor.getAllValues().stream()
-                .filter(c -> c.getCode().equals("RD HCM → BKK")).findFirst().orElseThrow();
+                .filter(c -> c.getCode().equals("RD HCM → BKK"))
+                .findFirst()
+                .orElseThrow();
         assertThat(hcmBkk.getCrossings().stream()
-                .sorted(Comparator.comparingInt(cc -> cc.getId().getSeq()))
-                .map(cc -> cc.getId().getSeq() + " " + cc.getBorderCrossing().getName()))
+                        .sorted(Comparator.comparingInt(cc -> cc.getId().getSeq()))
+                        .map(cc -> cc.getId().getSeq() + " "
+                                + cc.getBorderCrossing().getName()))
                 .containsExactly("1 Mộc Bài – Bavet", "2 Poipet – Aranyaprathet");
         assertThat(hcmBkk.getDistanceKm()).isEqualTo(960);
 
         ArgumentCaptor<RegulationCatalog> catalog = ArgumentCaptor.forClass(RegulationCatalog.class);
         verify(catalogs, times(6)).save(catalog.capture());
-        assertThat(catalog.getAllValues()).extracting(RegulationCatalog::getName).contains("Laos import");
+        assertThat(catalog.getAllValues())
+                .extracting(RegulationCatalog::getName)
+                .contains("Laos import");
         ArgumentCaptor<RegulationVersion> version = ArgumentCaptor.forClass(RegulationVersion.class);
         verify(versions, times(6)).save(version.capture());
         RegulationVersion laos = version.getAllValues().stream()
-                .filter(v -> v.getCatalog().getCountry().getCode().equals("LA")).findFirst().orElseThrow();
+                .filter(v -> v.getCatalog().getCountry().getCode().equals("LA"))
+                .findFirst()
+                .orElseThrow();
         assertThat(laos.getVersionNo()).isEqualTo(3);
         assertThat(laos.getLeadTimeDays()).isEqualTo((short) 30);
         assertThat(laos.getDomesticLeadTimeDays()).isEqualTo((short) 3);
@@ -135,9 +141,12 @@ class CatalogSeederTest {
 
         ArgumentCaptor<Corridor> corridor = ArgumentCaptor.forClass(Corridor.class);
         verify(corridors, times(9)).save(corridor.capture());
-        assertThat(corridor.getAllValues()).extracting(Corridor::getCode).contains("RD HCM -> PNH")
+        assertThat(corridor.getAllValues())
+                .extracting(Corridor::getCode)
+                .contains("RD HCM -> PNH")
                 .doesNotContain("RD HCM → PNH");
-        assertThat(flow3.getCrossings()).singleElement()
+        assertThat(flow3.getCrossings())
+                .singleElement()
                 .satisfies(cc -> assertThat(cc.getBorderCrossing().getName()).isEqualTo("Mộc Bài – Bavet"));
     }
 

@@ -1,5 +1,12 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.BorderCrossing;
 import com.equifreight.entity.Corridor;
@@ -18,9 +25,6 @@ import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RegulationCatalogRepository;
 import com.equifreight.repository.RegulationVersionRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,20 +32,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /** Spec R-05 (corridor resolution) and R-06 (lead time from the published regulation versions). */
 class RouteServiceTest {
 
     private static final Map<String, Country> COUNTRIES = Map.of(
-            "VN", country("VN", "Vietnam"), "KH", country("KH", "Cambodia"), "TH", country("TH", "Thailand"),
-            "LA", country("LA", "Laos"), "MY", country("MY", "Malaysia"));
+            "VN",
+            country("VN", "Vietnam"),
+            "KH",
+            country("KH", "Cambodia"),
+            "TH",
+            country("TH", "Thailand"),
+            "LA",
+            country("LA", "Laos"),
+            "MY",
+            country("MY", "Malaysia"));
 
     private final Place phuTho = place("Phú Thọ training centre", "Ho Chi Minh City", "VN");
     private final Place socSon = place("Sóc Sơn quarantine station", "Hanoi", "VN");
@@ -65,7 +72,11 @@ class RouteServiceTest {
         places = mock(PlaceRepository.class);
         catalogs = mock(RegulationCatalogRepository.class);
         versions = mock(RegulationVersionRepository.class);
-        service = new RouteService(corridors, places, catalogs, versions,
+        service = new RouteService(
+                corridors,
+                places,
+                catalogs,
+                versions,
                 Clock.fixed(Instant.parse("2026-09-26T03:00:00Z"), BusinessTime.ZONE));
         publish("VN", 21);
         publish("KH", 21);
@@ -85,9 +96,10 @@ class RouteServiceTest {
         assertThat(route.getCode()).isEqualTo("RD HCM → BKK");
         assertThat(route.getFromCity()).isEqualTo("Ho Chi Minh City");
         assertThat(route.getToCity()).isEqualTo("Bangkok");
-        assertThat(route.getCrossings()).extracting(CrossingResponse::getName, CrossingResponse::getFromCountry,
-                        CrossingResponse::getToCountry)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "VN", "KH"),
+        assertThat(route.getCrossings())
+                .extracting(CrossingResponse::getName, CrossingResponse::getFromCountry, CrossingResponse::getToCountry)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "VN", "KH"),
                         org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "KH", "TH"));
         assertThat(route.getCountries()).containsExactly("VN", "KH", "TH");
         assertThat(route.getCountryNames()).containsExactly("Vietnam", "Cambodia", "Thailand");
@@ -101,13 +113,15 @@ class RouteServiceTest {
         Corridor hcmBkk = corridor("RD HCM → BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", mocBai, poipet);
         when(corridors.findBetweenCities("Bangkok", "Ho Chi Minh City")).thenReturn(List.of(hcmBkk));
 
-        RouteResponse route = service.resolve(chaoPhraya, null, phuTho, null, TransportMode.ROAD).route();
+        RouteResponse route = service.resolve(chaoPhraya, null, phuTho, null, TransportMode.ROAD)
+                .route();
 
         assertThat(route.getFromCity()).isEqualTo("Bangkok");
         assertThat(route.getToCity()).isEqualTo("Ho Chi Minh City");
-        assertThat(route.getCrossings()).extracting(CrossingResponse::getName, CrossingResponse::getFromCountry,
-                        CrossingResponse::getToCountry)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "TH", "KH"),
+        assertThat(route.getCrossings())
+                .extracting(CrossingResponse::getName, CrossingResponse::getFromCountry, CrossingResponse::getToCountry)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Poipet – Aranyaprathet", "TH", "KH"),
                         org.assertj.core.groups.Tuple.tuple("Mộc Bài – Bavet", "KH", "VN"));
         assertThat(route.getCountries()).containsExactly("TH", "KH", "VN");
     }
@@ -118,7 +132,8 @@ class RouteServiceTest {
         Corridor hcmBkk = corridor("RD HCM → BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", mocBai, poipet);
         when(corridors.findBetweenCities("ho chi minh city", "Bangkok")).thenReturn(List.of(hcmBkk));
 
-        RouteResponse route = service.resolve(lowerCase, null, chaoPhraya, null, null).route();
+        RouteResponse route =
+                service.resolve(lowerCase, null, chaoPhraya, null, null).route();
 
         assertThat(route.getCrossings().getFirst().getName()).isEqualTo("Mộc Bài – Bavet");
         assertThat(route.getFromCity()).isEqualTo("Ho Chi Minh City");
@@ -130,7 +145,9 @@ class RouteServiceTest {
         Corridor reverse = corridor("RD PNH → HCM", TransportMode.ROAD, "Phnom Penh", "Ho Chi Minh City", mocBai);
         when(corridors.findBetweenCities("Ho Chi Minh City", "Phnom Penh")).thenReturn(List.of(reverse, forward));
 
-        assertThat(service.resolve(phuTho, null, phnomPenh, null, TransportMode.ROAD).corridor()).isSameAs(forward);
+        assertThat(service.resolve(phuTho, null, phnomPenh, null, TransportMode.ROAD)
+                        .corridor())
+                .isSameAs(forward);
     }
 
     @Test
@@ -139,7 +156,9 @@ class RouteServiceTest {
         Corridor air = corridor("AIR PNH → BKK", TransportMode.AIR, "Phnom Penh", "Bangkok");
         when(corridors.findBetweenCities("Phnom Penh", "Bangkok")).thenReturn(List.of(air, road));
 
-        assertThat(service.resolve(phnomPenh, null, chaoPhraya, null, TransportMode.AIR).corridor()).isSameAs(air);
+        assertThat(service.resolve(phnomPenh, null, chaoPhraya, null, TransportMode.AIR)
+                        .corridor())
+                .isSameAs(air);
         RouteResolution noMode = service.resolve(phnomPenh, null, chaoPhraya, null, null);
         assertThat(noMode.corridor()).isNull();
         assertThat(noMode.route()).isNull();
@@ -159,8 +178,10 @@ class RouteServiceTest {
 
     @Test
     void aTypedCityNeverResolves() {
-        when(places.existsByCityIgnoreCaseAndKindNot("Bangkok", PlaceKind.WELFARE_STOP)).thenReturn(true);
-        when(places.existsByCityIgnoreCaseAndKindNot("Singapore", PlaceKind.WELFARE_STOP)).thenReturn(false);
+        when(places.existsByCityIgnoreCaseAndKindNot("Bangkok", PlaceKind.WELFARE_STOP))
+                .thenReturn(true);
+        when(places.existsByCityIgnoreCaseAndKindNot("Singapore", PlaceKind.WELFARE_STOP))
+                .thenReturn(false);
 
         RouteResolution resolution = service.resolve(null, "Bangkok", null, "Singapore", TransportMode.ROAD);
 
@@ -189,7 +210,8 @@ class RouteServiceTest {
         Corridor hanVte = corridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", cauTreo);
         when(corridors.findBetweenCities("Hanoi", "Vientiane")).thenReturn(List.of(hanVte));
 
-        RouteResponse route = service.resolve(socSon, null, vientiane, null, null).route();
+        RouteResponse route =
+                service.resolve(socSon, null, vientiane, null, null).route();
 
         assertThat(route.getLeadTimeDays()).isEqualTo(30);
         assertThat(route.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 26));
@@ -198,7 +220,8 @@ class RouteServiceTest {
     @Test
     void aCountryWithoutAPublishedVersionLeavesTheLeadTimeUnknown() {
         RegulationCatalog laos = catalogOf("LA");
-        when(versions.findByCatalogIdAndStatusOrdered(laos.getId(), CatalogStatus.PUBLISHED)).thenReturn(List.of());
+        when(versions.findByCatalogIdAndStatusOrdered(laos.getId(), CatalogStatus.PUBLISHED))
+                .thenReturn(List.of());
         Corridor hanVte = corridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", cauTreo);
         when(corridors.findBetweenCities("Hanoi", "Vientiane")).thenReturn(List.of(hanVte));
 
@@ -215,7 +238,8 @@ class RouteServiceTest {
         Corridor hanVte = corridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", cauTreo);
         when(corridors.findBetweenCities("Hanoi", "Vientiane")).thenReturn(List.of(hanVte));
 
-        assertThat(service.resolve(socSon, null, vientiane, null, null).catalogMissingFor()).isEqualTo("Laos");
+        assertThat(service.resolve(socSon, null, vientiane, null, null).catalogMissingFor())
+                .isEqualTo("Laos");
     }
 
     @Test
@@ -226,24 +250,35 @@ class RouteServiceTest {
         Corridor hanVte = corridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", cauTreo);
         when(corridors.findBetweenCities("Hanoi", "Vientiane")).thenReturn(List.of(hanVte));
 
-        assertThat(service.resolve(socSon, null, vientiane, null, null).route().getLeadTimeDays()).isEqualTo(30);
+        assertThat(service.resolve(socSon, null, vientiane, null, null).route().getLeadTimeDays())
+                .isEqualTo(30);
     }
 
     @Test
     void routesWithoutADestinationListTheOriginCitysCorridors() {
         UUID id = UUID.randomUUID();
         when(places.findById(id)).thenReturn(Optional.of(chaoPhraya));
-        when(corridors.findTouchingCity("Bangkok")).thenReturn(List.of(
-                corridor("RD BKK → KUL", TransportMode.ROAD, "Bangkok", "Kuala Lumpur",
-                        crossing("Sadao – Bukit Kayu Hitam", "TH", "MY")),
-                corridor("RD BKK → VTE", TransportMode.ROAD, "Bangkok", "Vientiane",
-                        crossing("Nong Khai – Vientiane", "TH", "LA")),
-                corridor("RD PNH → BKK", TransportMode.ROAD, "Phnom Penh", "Bangkok", poipet)));
+        when(corridors.findTouchingCity("Bangkok"))
+                .thenReturn(List.of(
+                        corridor(
+                                "RD BKK → KUL",
+                                TransportMode.ROAD,
+                                "Bangkok",
+                                "Kuala Lumpur",
+                                crossing("Sadao – Bukit Kayu Hitam", "TH", "MY")),
+                        corridor(
+                                "RD BKK → VTE",
+                                TransportMode.ROAD,
+                                "Bangkok",
+                                "Vientiane",
+                                crossing("Nong Khai – Vientiane", "TH", "LA")),
+                        corridor("RD PNH → BKK", TransportMode.ROAD, "Phnom Penh", "Bangkok", poipet)));
 
         List<RouteResponse> routes = service.routes(id, null);
 
         assertThat(routes).extracting(RouteResponse::getFromCity).containsOnly("Bangkok");
-        assertThat(routes).extracting(RouteResponse::getToCity)
+        assertThat(routes)
+                .extracting(RouteResponse::getToCity)
                 .containsExactly("Kuala Lumpur", "Vientiane", "Phnom Penh");
         assertThat(routes.get(2).getCrossings().getFirst().getFromCountry()).isEqualTo("TH");
         assertThat(routes).allSatisfy(r -> {
@@ -260,12 +295,15 @@ class RouteServiceTest {
         UUID to = UUID.randomUUID();
         when(places.findById(from)).thenReturn(Optional.of(phuTho));
         when(places.findById(to)).thenReturn(Optional.of(chaoPhraya));
-        when(corridors.findBetweenCities("Ho Chi Minh City", "Bangkok")).thenReturn(List.of(
-                corridor("RD HCM → BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", mocBai, poipet)));
+        when(corridors.findBetweenCities("Ho Chi Minh City", "Bangkok"))
+                .thenReturn(List.of(
+                        corridor("RD HCM → BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", mocBai, poipet)));
 
         List<RouteResponse> routes = service.routes(from, to);
 
-        assertThat(routes).singleElement().satisfies(r -> assertThat(r.getLeadTimeDays()).isEqualTo(21));
+        assertThat(routes)
+                .singleElement()
+                .satisfies(r -> assertThat(r.getLeadTimeDays()).isEqualTo(21));
     }
 
     @Test
@@ -326,8 +364,8 @@ class RouteServiceTest {
         return b;
     }
 
-    private static Corridor corridor(String code, TransportMode mode, String from, String to,
-                                     BorderCrossing... crossings) {
+    private static Corridor corridor(
+            String code, TransportMode mode, String from, String to, BorderCrossing... crossings) {
         Corridor c = new Corridor();
         c.setId(UUID.randomUUID());
         c.setCode(code);

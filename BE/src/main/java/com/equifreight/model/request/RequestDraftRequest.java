@@ -8,13 +8,12 @@ import com.equifreight.entity.enums.TransportMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * A draft request, sent whole on every save (PUT replaces every field). Every field is optional in a draft;

@@ -3,11 +3,10 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it.

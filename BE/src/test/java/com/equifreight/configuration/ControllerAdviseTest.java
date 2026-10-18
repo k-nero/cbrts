@@ -1,18 +1,17 @@
 package com.equifreight.configuration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
+
 import com.equifreight.entity.Horse;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.common.ApiError;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.core.PropertyPath;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class ControllerAdviseTest {
 
@@ -43,7 +42,8 @@ class ControllerAdviseTest {
     @Test
     void aConflictsDetailsReachTheApiError() {
         ResponseEntity<ApiError> response = advice.handleConflict(new ConflictException(
-                "SUBMISSION_BLOCKED", "This request can't be submitted yet.",
+                "SUBMISSION_BLOCKED",
+                "This request can't be submitted yet.",
                 List.of("Add at least one horse.", "Choose road or air.")));
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);

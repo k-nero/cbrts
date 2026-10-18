@@ -3,13 +3,12 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * The offline filing step the specialist records.
@@ -69,7 +68,6 @@ public class AuthoritySubmission extends BaseEntity {
     @JoinTable(
             name = "authority_submission_items",
             joinColumns = @JoinColumn(name = "submission_id"),
-            inverseJoinColumns = @JoinColumn(name = "checklist_item_id")
-    )
+            inverseJoinColumns = @JoinColumn(name = "checklist_item_id"))
     private Set<ChecklistItem> checklistItems = new HashSet<>();
 }

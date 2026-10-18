@@ -7,10 +7,10 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.RequestRevision;
-import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
+import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.PlaceKind;
@@ -27,20 +27,14 @@ import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestHorseInput;
 import com.equifreight.model.request.RequestMapper;
 import com.equifreight.model.request.RequestResponse;
-import com.equifreight.model.request.RevisionSummaryResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
+import com.equifreight.model.request.RevisionSummaryResponse;
 import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,6 +51,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A customer's transport requests (US-F1-01, US-F1-02). A draft is saved whole on every step and may be
@@ -68,6 +67,7 @@ public class RequestService {
 
     /** Mirrors transport_requests_arrival_window_check until the rate catalog's ARRIVAL_WINDOW_MIN_HOURS exists. */
     static final Duration MIN_ARRIVAL_WINDOW = Duration.ofHours(3);
+
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     /** The audit action of a return for information (US-F1-04); RequestReviewService writes it. */
@@ -85,10 +85,18 @@ public class RequestService {
     private final JsonMapper json;
     private final Clock clock;
 
-    public RequestService(TransportRequestRepository requests, HorseRepository horses, PlaceRepository places,
-                          RequestRevisionRepository revisions, RouteService routes, ClubService clubs,
-                          CodeService codes, AuditService audit, AuditLogRepository auditLogs, JsonMapper json,
-                          Clock clock) {
+    public RequestService(
+            TransportRequestRepository requests,
+            HorseRepository horses,
+            PlaceRepository places,
+            RequestRevisionRepository revisions,
+            RouteService routes,
+            ClubService clubs,
+            CodeService codes,
+            AuditService audit,
+            AuditLogRepository auditLogs,
+            JsonMapper json,
+            Clock clock) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -141,8 +149,8 @@ public class RequestService {
     public RequestResponse update(User user, UUID id, RequestDraftRequest body) {
         Club club = clubs.requireClub(user);
         TransportRequest request = findEditableForUpdate(club, id);
-        Set<UUID> alreadyOn = request.getHorses().stream().map(rh -> rh.getHorse().getId())
-                .collect(Collectors.toSet());
+        Set<UUID> alreadyOn =
+                request.getHorses().stream().map(rh -> rh.getHorse().getId()).collect(Collectors.toSet());
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
         return toResponse(requests.saveAndFlush(request), resolution);
@@ -161,17 +169,24 @@ public class RequestService {
         RouteResolution resolution = resolve(request);
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         if (!blockers.isEmpty()) {
-            throw new ConflictException("SUBMISSION_BLOCKED", "This request can't be submitted yet.",
+            throw new ConflictException(
+                    "SUBMISSION_BLOCKED",
+                    "This request can't be submitted yet.",
                     blockers.stream().map(Blocker::getMessage).toList());
         }
         // No blocker means a resolved corridor with a known lead time (ROUTE_NOT_RUN, CATALOG_INCOMPLETE).
-        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(),
-                request.getDateFlexDays(), today, request.getDepartureDate());
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(
+                resolution.route().getLeadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
 
         boolean resubmission = request.getCode() != null;
         RequestStatus before = request.getStatus();
-        short revisionNo = resubmission ? (short) (revisions.findByRequestIdOrderByRevisionNoAsc(request.getId())
-                .stream().mapToInt(RequestRevision::getRevisionNo).max().orElse(0) + 1) : 1;
+        short revisionNo = resubmission
+                ? (short) (revisions.findByRequestIdOrderByRevisionNoAsc(request.getId()).stream()
+                                .mapToInt(RequestRevision::getRevisionNo)
+                                .max()
+                                .orElse(0)
+                        + 1)
+                : 1;
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
@@ -194,12 +209,24 @@ public class RequestService {
         revisions.save(revision);
 
         List<String> names = response.getHorses().stream().map(h -> h.getName()).toList();
-        audit.recordDecision(user, resubmission ? "REQUEST_RESUBMITTED" : "REQUEST_SUBMITTED",
+        audit.recordDecision(
+                user,
+                resubmission ? "REQUEST_RESUBMITTED" : "REQUEST_SUBMITTED",
                 horsesSummary(resubmission ? "Sent version " + revisionNo + " with " : "Submitted with ", names),
-                ENTITY_TYPE, saved.getId(), code, null, "{\"status\":\"" + before + "\"}",
+                ENTITY_TYPE,
+                saved.getId(),
+                code,
+                null,
+                "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"SUBMITTED\"}");
-        audit.recordSystem("LEAD_TIME_CHECKED", leadTimeSummary(leadTime, request.getDateFlexDays()),
-                ENTITY_TYPE, saved.getId(), code, null, null);
+        audit.recordSystem(
+                "LEAD_TIME_CHECKED",
+                leadTimeSummary(leadTime, request.getDateFlexDays()),
+                ENTITY_TYPE,
+                saved.getId(),
+                code,
+                null,
+                null);
         return RequestMapper.toResponse(saved, resolution.route(), null, List.of(), revisionsOf(saved));
     }
 
@@ -273,25 +300,41 @@ public class RequestService {
         String message = request.getCode() == null || request.getSubmittedAt() == null
                 ? "This request is no longer a draft and can't be edited here."
                 : request.getCode() + " was submitted on "
-                + BusinessTime.DAY.format(request.getSubmittedAt().atZone(BusinessTime.ZONE))
-                + " and can't be edited here.";
+                        + BusinessTime.DAY.format(request.getSubmittedAt().atZone(BusinessTime.ZONE))
+                        + " and can't be edited here.";
         return new ConflictException("REQUEST_NOT_DRAFT", message);
     }
 
     // --- validate, then write -----------------------------------------------------------------------------
 
     /** The body, checked and normalised; nothing is written until every check has passed. */
-    private record Draft(List<Horse> horses, Map<UUID, Boolean> withFoal, Place origin, String originText,
-                         Place destination, String destinationText, LocalDate departureDate, short dateFlexDays,
-                         ArrivalMode arrivalMode, Instant windowStart, Instant windowEnd,
-                         String specialInstructions, TransportMode mode, TrailerType trailer, ServiceClass airClass,
-                         InsuranceOption insurance, boolean vetEscort) {}
+    private record Draft(
+            List<Horse> horses,
+            Map<UUID, Boolean> withFoal,
+            Place origin,
+            String originText,
+            Place destination,
+            String destinationText,
+            LocalDate departureDate,
+            short dateFlexDays,
+            ArrivalMode arrivalMode,
+            Instant windowStart,
+            Instant windowEnd,
+            String specialInstructions,
+            TransportMode mode,
+            TrailerType trailer,
+            ServiceClass airClass,
+            InsuranceOption insurance,
+            boolean vetEscort) {}
 
     private Draft validate(Club club, RequestDraftRequest body, Set<UUID> alreadyOn) {
         List<RequestHorseInput> inputs = body.getHorses() == null ? List.of() : body.getHorses();
-        Map<UUID, Horse> owned = horses.findByClubIdAndIdIn(club.getId(),
+        Map<UUID, Horse> owned = horses
+                .findByClubIdAndIdIn(
+                        club.getId(),
                         inputs.stream().map(RequestHorseInput::getHorseId).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(Horse::getId, Function.identity()));
+                .stream()
+                .collect(Collectors.toMap(Horse::getId, Function.identity()));
         List<Horse> picked = new ArrayList<>();
         Map<UUID, Boolean> withFoal = new LinkedHashMap<>();
         Set<UUID> seen = new HashSet<>();
@@ -304,13 +347,15 @@ public class RequestService {
                 throw new BusinessException("HORSE_LISTED_TWICE", horse.getName() + " is on the request twice.");
             }
             if (horse.getArchivedAt() != null && !alreadyOn.contains(horse.getId())) {
-                throw new ConflictException("HORSE_ARCHIVED",
-                        horse.getName() + " is archived and can't be added to a request.");
+                throw new ConflictException(
+                        "HORSE_ARCHIVED", horse.getName() + " is archived and can't be added to a request.");
             }
             boolean foal = Boolean.TRUE.equals(input.getWithFoal());
             if (foal && horse.getSex() != HorseSex.MARE) {
-                throw new BusinessException("FOAL_NOT_A_MARE", "Only a mare can travel with a foal at foot; "
-                        + horse.getName() + " is a " + horse.getSex().name().toLowerCase(Locale.ROOT) + ".");
+                throw new BusinessException(
+                        "FOAL_NOT_A_MARE",
+                        "Only a mare can travel with a foal at foot; " + horse.getName() + " is a "
+                                + horse.getSex().name().toLowerCase(Locale.ROOT) + ".");
             }
             picked.add(horse);
             withFoal.put(horse.getId(), foal);
@@ -322,8 +367,8 @@ public class RequestService {
             throw new BusinessException("PLACE_OR_TEXT", "Choose a place or type a city for the origin, not both.");
         }
         if (body.getDestinationPlaceId() != null && destinationText != null) {
-            throw new BusinessException("PLACE_OR_TEXT",
-                    "Choose a place or type a city for the destination, not both.");
+            throw new BusinessException(
+                    "PLACE_OR_TEXT", "Choose a place or type a city for the destination, not both.");
         }
         Place origin = body.getOriginPlaceId() == null ? null : findEnd(body.getOriginPlaceId());
         Place destination = body.getDestinationPlaceId() == null ? null : findEnd(body.getDestinationPlaceId());
@@ -345,15 +390,34 @@ public class RequestService {
         ArrivalMode arrivalMode = body.getArrivalMode() == null ? ArrivalMode.ANY_TIME : body.getArrivalMode();
         requireValidWindow(arrivalMode, mode, body.getTrailer(), flex, body.getWindowStart(), body.getWindowEnd());
 
-        return new Draft(picked, withFoal, origin, originText, destination, destinationText, body.getDepartureDate(),
-                (short) flex, arrivalMode, toInstant(body.getWindowStart()), toInstant(body.getWindowEnd()),
-                clean(body.getSpecialInstructions()), mode, body.getTrailer(), body.getAirClass(),
-                body.getInsurance(), Boolean.TRUE.equals(body.getVetEscort()));
+        return new Draft(
+                picked,
+                withFoal,
+                origin,
+                originText,
+                destination,
+                destinationText,
+                body.getDepartureDate(),
+                (short) flex,
+                arrivalMode,
+                toInstant(body.getWindowStart()),
+                toInstant(body.getWindowEnd()),
+                clean(body.getSpecialInstructions()),
+                mode,
+                body.getTrailer(),
+                body.getAirClass(),
+                body.getInsurance(),
+                Boolean.TRUE.equals(body.getVetEscort()));
     }
 
     /** R-04, the arrival-window check of the database, with the reason in words. */
-    private static void requireValidWindow(ArrivalMode arrivalMode, TransportMode mode, TrailerType trailer, int flex,
-                                           OffsetDateTime start, OffsetDateTime end) {
+    private static void requireValidWindow(
+            ArrivalMode arrivalMode,
+            TransportMode mode,
+            TrailerType trailer,
+            int flex,
+            OffsetDateTime start,
+            OffsetDateTime end) {
         if (arrivalMode == ArrivalMode.ANY_TIME) {
             if (start != null || end != null) {
                 throw new BusinessException("ARRIVAL_WINDOW", "Arrival any time on the day takes no window times.");
@@ -361,9 +425,11 @@ public class RequestService {
             return;
         }
         if (mode != TransportMode.ROAD || trailer != TrailerType.PRIVATE || flex != 0) {
-            throw new BusinessException("ARRIVAL_WINDOW", "An arrival window needs a road move with a private "
-                    + "trailer and fixed dates. Choose road and a private trailer, and untick ±3 days, or arrive "
-                    + "any time on the day.");
+            throw new BusinessException(
+                    "ARRIVAL_WINDOW",
+                    "An arrival window needs a road move with a private "
+                            + "trailer and fixed dates. Choose road and a private trailer, and untick ±3 days, or arrive "
+                            + "any time on the day.");
         }
         if (start == null || end == null) {
             throw new BusinessException("ARRIVAL_WINDOW", "An arrival window needs both a start and an end.");
@@ -372,9 +438,11 @@ public class RequestService {
             throw new BusinessException("ARRIVAL_WINDOW", "The arrival window ends before it starts.");
         }
         if (Duration.between(start, end).compareTo(MIN_ARRIVAL_WINDOW) < 0) {
-            throw new BusinessException("ARRIVAL_WINDOW", "An arrival window is at least 3 hours; "
-                    + TIME.format(start.atZoneSameInstant(BusinessTime.ZONE)) + "–"
-                    + TIME.format(end.atZoneSameInstant(BusinessTime.ZONE)) + " is shorter.");
+            throw new BusinessException(
+                    "ARRIVAL_WINDOW",
+                    "An arrival window is at least 3 hours; "
+                            + TIME.format(start.atZoneSameInstant(BusinessTime.ZONE)) + "–"
+                            + TIME.format(end.atZoneSameInstant(BusinessTime.ZONE)) + " is shorter.");
         }
     }
 
@@ -426,23 +494,29 @@ public class RequestService {
     // --- reading ------------------------------------------------------------------------------------------
 
     private RouteResolution resolve(TransportRequest request) {
-        return routes.resolve(request.getOriginPlace(), request.getOriginText(), request.getDestinationPlace(),
-                request.getDestinationText(), request.getMode());
+        return routes.resolve(
+                request.getOriginPlace(),
+                request.getOriginText(),
+                request.getDestinationPlace(),
+                request.getDestinationText(),
+                request.getMode());
     }
 
     /** A draft carries its route, lead time and blockers; a submitted request only its stored route. */
     private RequestResponse toResponse(TransportRequest request, RouteResolution resolution) {
         if (!editable(request.getStatus())) {
-            RouteResponse route = request.getCorridor() == null || request.getOriginPlace() == null ? null
+            RouteResponse route = request.getCorridor() == null || request.getOriginPlace() == null
+                    ? null
                     : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
             return RequestMapper.toResponse(request, route, null, List.of(), revisionsOf(request));
         }
         LocalDate today = LocalDate.now(clock);
         RouteResponse route = resolution.route();
-        LeadTimeResponse leadTime = route == null || route.getLeadTimeDays() == null
-                || request.getDepartureDate() == null ? null
-                : LeadTimePolicy.assess(route.getLeadTimeDays(), request.getDateFlexDays(), today,
-                        request.getDepartureDate());
+        LeadTimeResponse leadTime =
+                route == null || route.getLeadTimeDays() == null || request.getDepartureDate() == null
+                        ? null
+                        : LeadTimePolicy.assess(
+                                route.getLeadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         return RequestMapper.toResponse(request, route, leadTime, blockers, revisionsOf(request));
     }
@@ -453,23 +527,29 @@ public class RequestService {
             return List.of();
         }
         List<RequestRevision> all = revisions.findByRequestIdOrderByRevisionNoAsc(request.getId());
-        List<Instant> returns = auditLogs.findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(ENTITY_TYPE,
-                request.getId(), INFO_REQUIRED_ACTION).stream().map(AuditLog::getOccurredAt).toList();
+        List<Instant> returns = auditLogs
+                .findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+                        ENTITY_TYPE, request.getId(), INFO_REQUIRED_ACTION)
+                .stream()
+                .map(AuditLog::getOccurredAt)
+                .toList();
         Map<Short, Instant> returned = RevisionDates.returnedAt(all, returns);
-        return all.stream().map(v -> RevisionSummaryResponse.builder()
-                .revisionNo(v.getRevisionNo())
-                .submittedAt(v.getSubmittedAt())
-                .note(v.getNote())
-                .returnedAt(returned.get(v.getRevisionNo()))
-                .build()).toList();
+        return all.stream()
+                .map(v -> RevisionSummaryResponse.builder()
+                        .revisionNo(v.getRevisionNo())
+                        .submittedAt(v.getSubmittedAt())
+                        .note(v.getNote())
+                        .returnedAt(returned.get(v.getRevisionNo()))
+                        .build())
+                .toList();
     }
 
     /** A pickup or delivery point; a welfare stop is a stop on the way, not an end of the trip. */
     private Place findEnd(UUID id) {
         Place place = places.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Place", id));
         if (place.getKind() == PlaceKind.WELFARE_STOP) {
-            throw new BusinessException("PLACE_NOT_AN_END",
-                    place.getName() + " is a stop on the way, not a pickup or delivery point.");
+            throw new BusinessException(
+                    "PLACE_NOT_AN_END", place.getName() + " is a stop on the way, not a pickup or delivery point.");
         }
         return place;
     }
@@ -485,5 +565,4 @@ public class RequestService {
     private static Instant toInstant(OffsetDateTime time) {
         return time == null ? null : time.toInstant();
     }
-
 }

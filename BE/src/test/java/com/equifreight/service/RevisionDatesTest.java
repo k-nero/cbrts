@@ -1,15 +1,14 @@
 package com.equifreight.service;
 
+import static com.equifreight.service.RequestServiceTest.revision;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-
-import static com.equifreight.service.RequestServiceTest.revision;
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 /** Which version each return for information belongs to (US-F1-04). */
 class RevisionDatesTest {
@@ -20,20 +19,21 @@ class RevisionDatesTest {
 
     @Test
     void theKthReturnBelongsToTheKthVersionWithANote() {
-        List<RequestRevision> versions = List.of(revision(request, 1, "Which stable?"),
-                revision(request, 2, "Which date?"), revision(request, 3, null));
+        List<RequestRevision> versions = List.of(
+                revision(request, 1, "Which stable?"), revision(request, 2, "Which date?"), revision(request, 3, null));
 
-        assertThat(RevisionDates.returnedAt(versions, List.of(R1, R2)))
-                .isEqualTo(Map.of((short) 1, R1, (short) 2, R2));
+        assertThat(RevisionDates.returnedAt(versions, List.of(R1, R2))).isEqualTo(Map.of((short) 1, R1, (short) 2, R2));
     }
 
     @Test
     void aNoteWithoutItsReturnRowHasNoDate() {
-        assertThat(RevisionDates.returnedAt(List.of(revision(request, 1, "Which stable?")), List.of())).isEmpty();
+        assertThat(RevisionDates.returnedAt(List.of(revision(request, 1, "Which stable?")), List.of()))
+                .isEmpty();
     }
 
     @Test
     void aVersionNeverReturnedHasNoDate() {
-        assertThat(RevisionDates.returnedAt(List.of(revision(request, 1, null)), List.of(R1))).isEmpty();
+        assertThat(RevisionDates.returnedAt(List.of(revision(request, 1, null)), List.of(R1)))
+                .isEmpty();
     }
 }

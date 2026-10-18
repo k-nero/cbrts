@@ -1,15 +1,16 @@
 package com.equifreight.service;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
 
 /** audit_log.summary is varchar(500): a longer line is cut to fit, ending in "…". */
 class AuditTextTest {
 
     @Test
     void aShortLineIsKept() {
-        assertThat(AuditText.fit("Returned with a note: Which stable?")).isEqualTo("Returned with a note: Which stable?");
+        assertThat(AuditText.fit("Returned with a note: Which stable?"))
+                .isEqualTo("Returned with a note: Which stable?");
     }
 
     @Test
@@ -24,7 +25,8 @@ class AuditTextTest {
         String fitted = AuditText.fit("x".repeat(498) + "\uD83D\uDC0E" + "y".repeat(10));
 
         assertThat(fitted.length()).isLessThanOrEqualTo(AuditText.MAX);
-        assertThat(Character.isHighSurrogate(fitted.charAt(fitted.length() - 2))).isFalse();
+        assertThat(Character.isHighSurrogate(fitted.charAt(fitted.length() - 2)))
+                .isFalse();
         assertThat(fitted).endsWith("x…");
     }
 }

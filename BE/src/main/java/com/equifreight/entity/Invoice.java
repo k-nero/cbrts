@@ -3,14 +3,13 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * A deposit or final invoice for the accepted quotation, generated, never typed. An issued invoice is never edited:

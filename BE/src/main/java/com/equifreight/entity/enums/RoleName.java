@@ -11,8 +11,7 @@ public final class RoleName {
     public static final String FLEET_COORDINATOR = "FLEET_COORDINATOR";
     public static final String ESCORT = "ESCORT";
 
-    private RoleName() {
-    }
+    private RoleName() {}
 
     /**
      * The role as the UI writes it, e.g. "Fleet & route coordinator" (FE interfaces/enums.ts, ROLE_LABEL).

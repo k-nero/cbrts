@@ -1,11 +1,10 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * At least the pinned quarantine_min_days long (application rule, BR-F2-06).

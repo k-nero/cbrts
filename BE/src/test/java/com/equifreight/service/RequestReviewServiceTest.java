@@ -1,36 +1,5 @@
 package com.equifreight.service;
 
-import com.equifreight.configuration.BusinessTime;
-import com.equifreight.entity.AuditLog;
-import com.equifreight.entity.Club;
-import com.equifreight.entity.RequestRevision;
-import com.equifreight.entity.TransportRequest;
-import com.equifreight.entity.User;
-import com.equifreight.entity.enums.RequestStatus;
-import com.equifreight.exception.BusinessException;
-import com.equifreight.exception.ConflictException;
-import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.model.review.QueueRowResponse;
-import com.equifreight.model.review.RequestReviewResponse;
-import com.equifreight.entity.enums.TransportMode;
-import com.equifreight.repository.AuditLogRepository;
-import com.equifreight.repository.RequestRevisionRepository;
-import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import tools.jackson.databind.json.JsonMapper;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 import static com.equifreight.service.RequestServiceTest.revision;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,11 +10,42 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.AuditLog;
+import com.equifreight.entity.Club;
+import com.equifreight.entity.RequestRevision;
+import com.equifreight.entity.TransportRequest;
+import com.equifreight.entity.User;
+import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.entity.enums.TransportMode;
+import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.review.QueueRowResponse;
+import com.equifreight.model.review.RequestReviewResponse;
+import com.equifreight.repository.AuditLogRepository;
+import com.equifreight.repository.RequestRevisionRepository;
+import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.repository.UserRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import tools.jackson.databind.json.JsonMapper;
+
 /** US-F1-03 and US-F1-04: the logistics manager's review queue and returning a request for information. */
 class RequestReviewServiceTest {
 
     static final Instant NOW = Instant.parse("2026-09-28T02:41:00Z");
-    static final String NOTE = "Shadowfax and Nightfall will be in Phnom Penh from 18 Oct. Should we collect them there?";
+    static final String NOTE =
+            "Shadowfax and Nightfall will be in Phnom Penh from 18 Oct. Should we collect them there?";
 
     TransportRequestRepository requests;
     RequestRevisionRepository revisions;
@@ -68,8 +68,16 @@ class RequestReviewServiceTest {
         routes = mock(RouteService.class);
         audit = mock(AuditService.class);
         notifications = mock(NotificationService.class);
-        service = new RequestReviewService(requests, revisions, users, auditLogs, routes, audit, notifications,
-                JsonMapper.builder().build(), Clock.fixed(NOW, BusinessTime.ZONE));
+        service = new RequestReviewService(
+                requests,
+                revisions,
+                users,
+                auditLogs,
+                routes,
+                audit,
+                notifications,
+                JsonMapper.builder().build(),
+                Clock.fixed(NOW, BusinessTime.ZONE));
 
         manager = new User();
         manager.setId(UUID.randomUUID());
@@ -93,7 +101,8 @@ class RequestReviewServiceTest {
             assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), note))
                     .isInstanceOf(BusinessException.class)
                     .hasMessage("Write a note to the customer: say what is missing.")
-                    .extracting("code").isEqualTo("NOTE_REQUIRED");
+                    .extracting("code")
+                    .isEqualTo("NOTE_REQUIRED");
         }
         verify(requests, never()).save(any());
         verifyNoInteractions(audit, notifications);
@@ -115,7 +124,8 @@ class RequestReviewServiceTest {
         assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), "x".repeat(501)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("The note is 501 characters; keep it to 500.")
-                .extracting("code").isEqualTo("NOTE_TOO_LONG");
+                .extracting("code")
+                .isEqualTo("NOTE_TOO_LONG");
         assertThat(r.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
     }
 
@@ -125,7 +135,8 @@ class RequestReviewServiceTest {
             TransportRequest r = inReview(status);
             assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), NOTE))
                     .isInstanceOf(ConflictException.class)
-                    .extracting("code").isEqualTo("REQUEST_NOT_IN_REVIEW");
+                    .extracting("code")
+                    .isEqualTo("REQUEST_NOT_IN_REVIEW");
         }
         TransportRequest waiting = inReview(RequestStatus.INFO_REQUIRED);
         assertThatThrownBy(() -> service.returnForInformation(manager, waiting.getId(), NOTE))
@@ -139,7 +150,8 @@ class RequestReviewServiceTest {
 
         assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), "\u00a0\u2007\ufeff "))
                 .isInstanceOf(BusinessException.class)
-                .extracting("code").isEqualTo("NOTE_REQUIRED");
+                .extracting("code")
+                .isEqualTo("NOTE_REQUIRED");
     }
 
     @Test
@@ -169,7 +181,8 @@ class RequestReviewServiceTest {
         assertThatThrownBy(() -> service.returnForInformation(manager, r.getId(), NOTE))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("This request has no submitted version to return. Ask an administrator to check it.")
-                .extracting("code").isEqualTo("REQUEST_HAS_NO_VERSION");
+                .extracting("code")
+                .isEqualTo("REQUEST_HAS_NO_VERSION");
         assertThat(r.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
         verify(requests, never()).save(any());
         verifyNoInteractions(audit, notifications);
@@ -181,12 +194,23 @@ class RequestReviewServiceTest {
         r.setDepartureDate(LocalDate.of(2026, 10, 30));
         RequestRevision v2 = revision(r, 2, null);
         v2.setSubmittedAt(Instant.parse("2026-09-26T18:30:00Z"));
-        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId())).thenReturn(List.of(revision(r, 1, "Which?"), v2));
-        when(routes.resolve(any(), any(), any(), any(), any())).thenReturn(new RouteResolution(null,
-                com.equifreight.model.route.RouteResponse.builder().mode(TransportMode.ROAD)
-                        .countries(List.of("VN", "TH")).countryNames(List.of("Vietnam", "Thailand"))
-                        .crossings(List.of()).crossBorder(true).leadTimeDays(21).build(),
-                java.util.Set.of(TransportMode.ROAD), null, false, false));
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId()))
+                .thenReturn(List.of(revision(r, 1, "Which?"), v2));
+        when(routes.resolve(any(), any(), any(), any(), any()))
+                .thenReturn(new RouteResolution(
+                        null,
+                        com.equifreight.model.route.RouteResponse.builder()
+                                .mode(TransportMode.ROAD)
+                                .countries(List.of("VN", "TH"))
+                                .countryNames(List.of("Vietnam", "Thailand"))
+                                .crossings(List.of())
+                                .crossBorder(true)
+                                .leadTimeDays(21)
+                                .build(),
+                        java.util.Set.of(TransportMode.ROAD),
+                        null,
+                        false,
+                        false));
 
         RequestReviewResponse view = service.view(r.getId());
 
@@ -218,11 +242,25 @@ class RequestReviewServiceTest {
         assertThat(v1.getNote()).isEqualTo(NOTE);
         verify(revisions).save(v1);
         verify(requests).save(r);
-        verify(audit).recordDecision(manager, "REQUEST_INFO_REQUIRED", "Returned with a note: " + NOTE,
-                "TRANSPORT_REQUEST", r.getId(), "REQ-2026-0193", NOTE, "{\"status\":\"SUBMITTED\"}",
-                "{\"status\":\"INFO_REQUIRED\"}");
-        verify(notifications).sendNotification(clubAccount, "REQUEST_INFO_REQUIRED", "REQ-2026-0193 needs your answer",
-                NOTE, "TRANSPORT_REQUEST", r.getId());
+        verify(audit)
+                .recordDecision(
+                        manager,
+                        "REQUEST_INFO_REQUIRED",
+                        "Returned with a note: " + NOTE,
+                        "TRANSPORT_REQUEST",
+                        r.getId(),
+                        "REQ-2026-0193",
+                        NOTE,
+                        "{\"status\":\"SUBMITTED\"}",
+                        "{\"status\":\"INFO_REQUIRED\"}");
+        verify(notifications)
+                .sendNotification(
+                        clubAccount,
+                        "REQUEST_INFO_REQUIRED",
+                        "REQ-2026-0193 needs your answer",
+                        NOTE,
+                        "TRANSPORT_REQUEST",
+                        r.getId());
     }
 
     @Test
@@ -232,9 +270,17 @@ class RequestReviewServiceTest {
 
         service.returnForInformation(manager, r.getId(), NOTE);
 
-        verify(audit).recordDecision(manager, "REQUEST_INFO_REQUIRED", "Returned with a note: " + NOTE,
-                "TRANSPORT_REQUEST", r.getId(), "REQ-2026-0193", NOTE, "{\"status\":\"UNDER_REVIEW\"}",
-                "{\"status\":\"INFO_REQUIRED\"}");
+        verify(audit)
+                .recordDecision(
+                        manager,
+                        "REQUEST_INFO_REQUIRED",
+                        "Returned with a note: " + NOTE,
+                        "TRANSPORT_REQUEST",
+                        r.getId(),
+                        "REQ-2026-0193",
+                        NOTE,
+                        "{\"status\":\"UNDER_REVIEW\"}",
+                        "{\"status\":\"INFO_REQUIRED\"}");
     }
 
     @Test
@@ -244,9 +290,17 @@ class RequestReviewServiceTest {
 
         service.returnForInformation(manager, r.getId(), note);
 
-        verify(audit).recordDecision(any(), any(),
-                org.mockito.ArgumentMatchers.argThat(s -> s.length() <= 500 && s.endsWith("…")),
-                any(), any(), any(), any(), any(), any());
+        verify(audit)
+                .recordDecision(
+                        any(),
+                        any(),
+                        org.mockito.ArgumentMatchers.argThat(s -> s.length() <= 500 && s.endsWith("…")),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any());
     }
 
     // --- the queue and the review view (US-F1-03) ---------------------------------------------------------
@@ -255,13 +309,15 @@ class RequestReviewServiceTest {
     void theQueueMapsRows() {
         Instant older = Instant.parse("2026-09-25T02:00:00Z");
         Instant newer = Instant.parse("2026-09-27T02:00:00Z");
-        when(requests.findQueue(any(), any())).thenReturn(new PageImpl<>(List.of(
-                row("REQ-2026-0190", "Hanoi Riding Club", older, 2),
-                row("REQ-2026-0193", "Saigon Turf Club", newer, 1))));
+        when(requests.findQueue(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(
+                        row("REQ-2026-0190", "Hanoi Riding Club", older, 2),
+                        row("REQ-2026-0193", "Saigon Turf Club", newer, 1))));
 
         Page<QueueRowResponse> page = service.queue(PageRequest.of(0, 20));
 
-        assertThat(page.getContent()).extracting(QueueRowResponse::getCode)
+        assertThat(page.getContent())
+                .extracting(QueueRowResponse::getCode)
                 .containsExactly("REQ-2026-0190", "REQ-2026-0193");
         QueueRowResponse first = page.getContent().getFirst();
         assertThat(first.getClub()).isEqualTo("Hanoi Riding Club");
@@ -294,7 +350,8 @@ class RequestReviewServiceTest {
         assertThat(view.getQueue().getNextId()).isEqualTo(b);
         assertThat(view.getRevisions()).hasSize(2);
         assertThat(view.getRevisions().getFirst().getNote()).isEqualTo("Which stable?");
-        assertThat(view.getRevisions().get(1).getPayload().get("departureDate").asString()).isEqualTo("2026-11-02");
+        assertThat(view.getRevisions().get(1).getPayload().get("departureDate").asString())
+                .isEqualTo("2026-11-02");
         assertThat(view.getHistory()).singleElement().satisfies(h -> {
             assertThat(h.getSummary()).isEqualTo("Submitted with 1 horse: Shadowfax.");
             assertThat(h.getActorLabel()).isEqualTo("Saigon Turf Club");
@@ -337,24 +394,57 @@ class RequestReviewServiceTest {
 
         RequestReviewResponse view = service.view(r.getId());
 
-        assertThat(view.getRevisions().getFirst().getPayload().get("code").asString()).isEqualTo("REQ-2026-0195");
+        assertThat(view.getRevisions().getFirst().getPayload().get("code").asString())
+                .isEqualTo("REQ-2026-0195");
     }
 
     // --- helpers ------------------------------------------------------------------------------------------
 
     static TransportRequestRepository.QueueRow row(String code, String club, Instant waitingSince, int revisionNo) {
         return new TransportRequestRepository.QueueRow() {
-            public UUID getId() { return UUID.randomUUID(); }
-            public String getCode() { return code; }
-            public String getClub() { return club; }
-            public String getFromCity() { return "Ho Chi Minh City"; }
-            public String getToCity() { return "Bangkok"; }
-            public TransportMode getMode() { return TransportMode.ROAD; }
-            public Number getHorseCount() { return 2L; }
-            public LocalDate getDepartureDate() { return LocalDate.of(2026, 10, 30); }
-            public Number getDateFlexDays() { return (short) 3; }
-            public Instant getWaitingSince() { return waitingSince; }
-            public Number getRevisionNo() { return (short) revisionNo; }
+            public UUID getId() {
+                return UUID.randomUUID();
+            }
+
+            public String getCode() {
+                return code;
+            }
+
+            public String getClub() {
+                return club;
+            }
+
+            public String getFromCity() {
+                return "Ho Chi Minh City";
+            }
+
+            public String getToCity() {
+                return "Bangkok";
+            }
+
+            public TransportMode getMode() {
+                return TransportMode.ROAD;
+            }
+
+            public Number getHorseCount() {
+                return 2L;
+            }
+
+            public LocalDate getDepartureDate() {
+                return LocalDate.of(2026, 10, 30);
+            }
+
+            public Number getDateFlexDays() {
+                return (short) 3;
+            }
+
+            public Instant getWaitingSince() {
+                return waitingSince;
+            }
+
+            public Number getRevisionNo() {
+                return (short) revisionNo;
+            }
         };
     }
 

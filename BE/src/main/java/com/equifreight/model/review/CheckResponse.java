@@ -16,6 +16,7 @@ public class CheckResponse {
     private String key;
     /** OK or BAD. */
     private String state;
+
     private String word;
     private String evidence;
     private String sub;

@@ -1,15 +1,14 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.LoadPlanStall;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 @Repository
 public interface LoadPlanStallRepository extends JpaRepository<LoadPlanStall, UUID> {
@@ -27,7 +26,8 @@ public interface LoadPlanStallRepository extends JpaRepository<LoadPlanStall, UU
      */
     @Modifying(flushAutomatically = true)
     @Query("delete from LoadPlanStall s where s.loadPlan.id = :loadPlanId and s.vehicleStall.id = :vehicleStallId")
-    void deleteByLoadPlanIdAndVehicleStallId(@Param("loadPlanId") UUID loadPlanId, @Param("vehicleStallId") UUID vehicleStallId);
+    void deleteByLoadPlanIdAndVehicleStallId(
+            @Param("loadPlanId") UUID loadPlanId, @Param("vehicleStallId") UUID vehicleStallId);
 
     @Modifying(flushAutomatically = true)
     @Query("delete from LoadPlanStall s where s.loadPlan.id = :loadPlanId and s.horse.id = :horseId")

@@ -23,13 +23,6 @@ import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
-import lombok.extern.log4j.Log4j2;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -37,6 +30,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The logistics manager's side of Flow 1 before pricing (US-F1-03, US-F1-04): the queue of requests waiting
@@ -49,9 +48,11 @@ public class RequestReviewService {
 
     /** request_revisions.note is varchar(500); transport_requests.info_required_note holds 1000. */
     static final int NOTE_MAX = 500;
+
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     /** Leading and trailing white space as the browser's trim() sees it, NBSP and BOM included. */
     private static final Pattern EDGE_SPACE = Pattern.compile("^[\\s\\p{Z}\\x{FEFF}]+|[\\s\\p{Z}\\x{FEFF}]+$");
+
     private static final List<RequestStatus> IN_REVIEW = List.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW);
     private static final Map<RequestStatus, String> STATUS_WORDS = Map.of(
             RequestStatus.DRAFT, "a draft",
@@ -73,10 +74,16 @@ public class RequestReviewService {
     private final JsonMapper json;
     private final Clock clock;
 
-    public RequestReviewService(TransportRequestRepository requests, RequestRevisionRepository revisions,
-                                UserRepository users, AuditLogRepository auditLogs, RouteService routes,
-                                AuditService audit, NotificationService notifications, JsonMapper json,
-                                Clock clock) {
+    public RequestReviewService(
+            TransportRequestRepository requests,
+            RequestRevisionRepository revisions,
+            UserRepository users,
+            AuditLogRepository auditLogs,
+            RouteService routes,
+            AuditService audit,
+            NotificationService notifications,
+            JsonMapper json,
+            Clock clock) {
         this.requests = requests;
         this.revisions = revisions;
         this.users = users;
@@ -91,19 +98,29 @@ public class RequestReviewService {
     /** US-F1-03: the requests waiting for review, oldest first, 20 to a page. */
     @Transactional(readOnly = true)
     public Page<QueueRowResponse> queue(Pageable pageable) {
-        return requests.findQueue(IN_REVIEW, pageable).map(row -> QueueRowResponse.builder()
-                .id(row.getId())
-                .code(row.getCode())
-                .club(row.getClub())
-                .fromCity(row.getFromCity())
-                .toCity(row.getToCity())
-                .mode(row.getMode())
-                .horseCount(row.getHorseCount() == null ? 0 : row.getHorseCount().longValue())
-                .departureDate(row.getDepartureDate())
-                .dateFlexDays(row.getDateFlexDays() == null ? 0 : row.getDateFlexDays().intValue())
-                .waitingSince(row.getWaitingSince())
-                .revisionNo(row.getRevisionNo() == null ? 1 : row.getRevisionNo().shortValue())
-                .build());
+        return requests.findQueue(IN_REVIEW, pageable)
+                .map(row -> QueueRowResponse.builder()
+                        .id(row.getId())
+                        .code(row.getCode())
+                        .club(row.getClub())
+                        .fromCity(row.getFromCity())
+                        .toCity(row.getToCity())
+                        .mode(row.getMode())
+                        .horseCount(
+                                row.getHorseCount() == null
+                                        ? 0
+                                        : row.getHorseCount().longValue())
+                        .departureDate(row.getDepartureDate())
+                        .dateFlexDays(
+                                row.getDateFlexDays() == null
+                                        ? 0
+                                        : row.getDateFlexDays().intValue())
+                        .waitingSince(row.getWaitingSince())
+                        .revisionNo(
+                                row.getRevisionNo() == null
+                                        ? 1
+                                        : row.getRevisionNo().shortValue())
+                        .build());
     }
 
     /** The Request review page: the request, its checks, every version, its history and its queue place. */
@@ -117,45 +134,71 @@ public class RequestReviewService {
 
     private RequestReviewResponse viewOf(TransportRequest request) {
         List<RequestRevision> all = revisions.findByRequestIdOrderByRevisionNoAsc(request.getId());
-        List<Instant> returns = auditLogs.findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(ENTITY_TYPE,
-                request.getId(), RequestService.INFO_REQUIRED_ACTION).stream().map(AuditLog::getOccurredAt).toList();
+        List<Instant> returns = auditLogs
+                .findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+                        ENTITY_TYPE, request.getId(), RequestService.INFO_REQUIRED_ACTION)
+                .stream()
+                .map(AuditLog::getOccurredAt)
+                .toList();
         Map<Short, Instant> returned = RevisionDates.returnedAt(all, returns);
 
-        RouteResponse stored = request.getCorridor() == null || request.getOriginPlace() == null ? null
+        RouteResponse stored = request.getCorridor() == null || request.getOriginPlace() == null
+                ? null
                 : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
-        List<RevisionSummaryResponse> summaries = all.stream().map(v -> RevisionSummaryResponse.builder()
-                .revisionNo(v.getRevisionNo()).submittedAt(v.getSubmittedAt()).note(v.getNote())
-                .returnedAt(returned.get(v.getRevisionNo())).build()).toList();
-        RequestResponse response = RequestMapper.toResponse(request, stored, null, List.of(), summaries)
-                .toBuilder().club(request.getClub().getName()).build();
-
-        return RequestReviewResponse.builder()
-                .request(response)
-                .checks(checks(request, all))
-                .revisions(all.stream().map(v -> RevisionResponse.builder()
+        List<RevisionSummaryResponse> summaries = all.stream()
+                .map(v -> RevisionSummaryResponse.builder()
                         .revisionNo(v.getRevisionNo())
                         .submittedAt(v.getSubmittedAt())
                         .note(v.getNote())
                         .returnedAt(returned.get(v.getRevisionNo()))
-                        .payload(json.readTree(v.getPayload()))
-                        .build()).toList())
-                .history(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(ENTITY_TYPE, request.getId())
-                        .stream().map(a -> HistoryEntryResponse.builder().occurredAt(a.getOccurredAt())
-                                .summary(a.getSummary()).actorLabel(a.getActorLabel()).build()).toList())
+                        .build())
+                .toList();
+        RequestResponse response = RequestMapper.toResponse(request, stored, null, List.of(), summaries).toBuilder()
+                .club(request.getClub().getName())
+                .build();
+
+        return RequestReviewResponse.builder()
+                .request(response)
+                .checks(checks(request, all))
+                .revisions(all.stream()
+                        .map(v -> RevisionResponse.builder()
+                                .revisionNo(v.getRevisionNo())
+                                .submittedAt(v.getSubmittedAt())
+                                .note(v.getNote())
+                                .returnedAt(returned.get(v.getRevisionNo()))
+                                .payload(json.readTree(v.getPayload()))
+                                .build())
+                        .toList())
+                .history(
+                        auditLogs
+                                .findByEntityTypeAndEntityIdOrderByOccurredAtDesc(ENTITY_TYPE, request.getId())
+                                .stream()
+                                .map(a -> HistoryEntryResponse.builder()
+                                        .occurredAt(a.getOccurredAt())
+                                        .summary(a.getSummary())
+                                        .actorLabel(a.getActorLabel())
+                                        .build())
+                                .toList())
                 .queue(position(request))
                 .build();
     }
 
     /** Route served and lead time, worked out now, against the latest submission (spec §4.4). */
     private List<CheckResponse> checks(TransportRequest request, List<RequestRevision> all) {
-        RouteResponse current = routes.resolve(request.getOriginPlace(), request.getOriginText(),
-                request.getDestinationPlace(), request.getDestinationText(), request.getMode()).route();
-        Instant lastSubmitted = all.isEmpty() ? request.getSubmittedAt() : all.getLast().getSubmittedAt();
+        RouteResponse current = routes.resolve(
+                        request.getOriginPlace(),
+                        request.getOriginText(),
+                        request.getDestinationPlace(),
+                        request.getDestinationText(),
+                        request.getMode())
+                .route();
+        Instant lastSubmitted =
+                all.isEmpty() ? request.getSubmittedAt() : all.getLast().getSubmittedAt();
         LocalDate today = LocalDate.ofInstant(clock.instant(), BusinessTime.ZONE);
         CheckResponse lead = lastSubmitted == null || request.getDepartureDate() == null
                 ? ReviewChecks.leadTime(null, today, today, today)
-                : ReviewChecks.leadTime(current, ReviewChecks.submittedDay(lastSubmitted), request.getDepartureDate(),
-                today);
+                : ReviewChecks.leadTime(
+                        current, ReviewChecks.submittedDay(lastSubmitted), request.getDepartureDate(), today);
         return List.of(ReviewChecks.routeServed(current), lead);
     }
 
@@ -187,8 +230,8 @@ public class RequestReviewService {
             throw new BusinessException("NOTE_REQUIRED", "Write a note to the customer: say what is missing.");
         }
         if (note.length() > NOTE_MAX) {
-            throw new BusinessException("NOTE_TOO_LONG",
-                    "The note is " + note.length() + " characters; keep it to " + NOTE_MAX + ".");
+            throw new BusinessException(
+                    "NOTE_TOO_LONG", "The note is " + note.length() + " characters; keep it to " + NOTE_MAX + ".");
         }
         // A draft stays the club's own until it is sent.
         TransportRequest request = requests.findByIdForUpdate(id)
@@ -196,7 +239,8 @@ public class RequestReviewService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
         RequestStatus before = request.getStatus();
         if (!IN_REVIEW.contains(before)) {
-            throw new ConflictException("REQUEST_NOT_IN_REVIEW",
+            throw new ConflictException(
+                    "REQUEST_NOT_IN_REVIEW",
                     "This request isn't waiting for review; it is " + STATUS_WORDS.get(before) + ".");
         }
 
@@ -204,7 +248,8 @@ public class RequestReviewService {
         if (all.isEmpty()) {
             // Every submission writes a version; without one the return couldn't keep its note with it.
             log.error("Request {} is {} but has no submitted version", request.getCode(), before);
-            throw new ConflictException("REQUEST_HAS_NO_VERSION",
+            throw new ConflictException(
+                    "REQUEST_HAS_NO_VERSION",
                     "This request has no submitted version to return. Ask an administrator to check it.");
         }
 
@@ -215,14 +260,25 @@ public class RequestReviewService {
         latest.setNote(note);
         revisions.save(latest);
 
-        audit.recordDecision(manager, RequestService.INFO_REQUIRED_ACTION, AuditText.fit("Returned with a note: " + note),
-                ENTITY_TYPE, request.getId(), request.getCode(), note, "{\"status\":\"" + before + "\"}",
+        audit.recordDecision(
+                manager,
+                RequestService.INFO_REQUIRED_ACTION,
+                AuditText.fit("Returned with a note: " + note),
+                ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                note,
+                "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"INFO_REQUIRED\"}");
         for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(account, RequestService.INFO_REQUIRED_ACTION,
-                    request.getCode() + " needs your answer", note, ENTITY_TYPE, request.getId());
+            notifications.sendNotification(
+                    account,
+                    RequestService.INFO_REQUIRED_ACTION,
+                    request.getCode() + " needs your answer",
+                    note,
+                    ENTITY_TYPE,
+                    request.getId());
         }
         return viewOf(request);
     }
-
 }

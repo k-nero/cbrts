@@ -1,15 +1,13 @@
 package com.equifreight.model.review;
 
 import com.equifreight.entity.enums.TransportMode;
-
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.UUID;
 
 /** One row of the logistics manager's review queue (US-F1-03). */
 @Getter

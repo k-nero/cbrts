@@ -3,12 +3,11 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.NoteStatus;
 import com.equifreight.entity.enums.NoteTopic;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * A customer question about a request or job, routed by topic. Never a free chat.

@@ -11,6 +11,11 @@ import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
 import com.equifreight.repository.*;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,12 +25,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 @Service
 @Log4j2
@@ -39,19 +38,21 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+
     @Value("${jwt.expirationMs}")
     private long jwtExpirationMs;
 
     @Value("${refreshToken.expirationSeconds}")
     private int refreshTokenExpirationSeconds;
 
-    AuthService(UserRepository userRepository,
-                RefreshTokenRepository refreshTokenRepository,
-                ClubRepository clubRepository,
-                CountryRepository countryRepository,
-                RoleRepository roleRepository,
-                PasswordEncoder passwordEncoder,
-                JwtEncoder jwtEncoder) {
+    AuthService(
+            UserRepository userRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            ClubRepository clubRepository,
+            CountryRepository countryRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            JwtEncoder jwtEncoder) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.clubRepository = clubRepository;
@@ -86,7 +87,8 @@ public class AuthService {
         }
         // Checked after the password, so only the account's holder learns it was removed.
         requireNotRemoved(user);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     /**
@@ -98,12 +100,14 @@ public class AuthService {
     public TokenResponse register(RegisterRequest request) {
         String email = request.getEmail().trim();
         if (userRepository.getByEmail(email) != null) {
-            throw new ConflictException("EMAIL_IN_USE",
-                    "An account already uses this email. Sign in, or reset your password.");
+            throw new ConflictException(
+                    "EMAIL_IN_USE", "An account already uses this email. Sign in, or reset your password.");
         }
-        Country country = countryRepository.findById(request.getCountryCode())
+        Country country = countryRepository
+                .findById(request.getCountryCode())
                 .orElseThrow(() -> new BusinessException("We don't serve that country yet."));
-        Role customer = roleRepository.findByName(RoleName.CUSTOMER)
+        Role customer = roleRepository
+                .findByName(RoleName.CUSTOMER)
                 .orElseThrow(() -> new IllegalStateException("The CUSTOMER role is not seeded."));
 
         Club club = new Club();
@@ -124,12 +128,14 @@ public class AuthService {
         user = userRepository.save(user);
 
         log.info("Club account created for {} ({})", club.getName(), email);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     @Transactional
     public TokenResponse refreshToken(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByToken(token)
                 .orElseThrow(() -> new UnauthorizedException("Refresh token is not found."));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiryDate().isBefore(Instant.now())) {
@@ -141,7 +147,8 @@ public class AuthService {
         User user = refreshToken.getUser();
         requireNotRemoved(user);
         refreshTokenRepository.delete(refreshToken);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     /**
@@ -153,7 +160,8 @@ public class AuthService {
         if (token == null || token.isBlank()) {
             return;
         }
-        refreshTokenRepository.findByToken(token)
+        refreshTokenRepository
+                .findByToken(token)
                 .ifPresent(refreshToken -> refreshTokenRepository.deleteByUser(refreshToken.getUser()));
     }
 

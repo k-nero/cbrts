@@ -3,10 +3,9 @@ package com.equifreight.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.math.BigDecimal;
 
 /**
  * S, M, L, XL: the stall width one horse of the class takes. Seeded by V2; V16 adds the height bands

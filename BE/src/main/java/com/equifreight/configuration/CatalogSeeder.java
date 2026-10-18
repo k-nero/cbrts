@@ -17,15 +17,14 @@ import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RegulationCatalogRepository;
 import com.equifreight.repository.RegulationVersionRepository;
 import com.equifreight.repository.UserRepository;
-import lombok.extern.log4j.Log4j2;
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.stereotype.Component;
 
 /**
  * The demo route catalog (spec §7): pickup and delivery places, border crossings, the corridors we run and one
@@ -41,8 +40,8 @@ public class CatalogSeeder {
 
     private record DemoCrossing(String name, String from, String to) {}
 
-    private record DemoCorridor(String code, TransportMode mode, String from, String to, int km,
-                                List<String> crossings) {}
+    private record DemoCorridor(
+            String code, TransportMode mode, String from, String to, int km, List<String> crossings) {}
 
     private record DemoRegulation(String country, int versionNo, int leadTimeDays) {}
 
@@ -63,18 +62,38 @@ public class CatalogSeeder {
             new DemoCrossing("Cầu Treo – Nam Phao", "VN", "LA"));
 
     private static final List<DemoCorridor> CORRIDORS = List.of(
-            new DemoCorridor("RD HCM → PNH", TransportMode.ROAD, "Ho Chi Minh City", "Phnom Penh", 230,
+            new DemoCorridor(
+                    "RD HCM → PNH",
+                    TransportMode.ROAD,
+                    "Ho Chi Minh City",
+                    "Phnom Penh",
+                    230,
                     List.of("Mộc Bài – Bavet")),
-            new DemoCorridor("RD HCM → BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", 960,
+            new DemoCorridor(
+                    "RD HCM → BKK",
+                    TransportMode.ROAD,
+                    "Ho Chi Minh City",
+                    "Bangkok",
+                    960,
                     List.of("Mộc Bài – Bavet", "Poipet – Aranyaprathet")),
-            new DemoCorridor("RD PNH → BKK", TransportMode.ROAD, "Phnom Penh", "Bangkok", 660,
+            new DemoCorridor(
+                    "RD PNH → BKK",
+                    TransportMode.ROAD,
+                    "Phnom Penh",
+                    "Bangkok",
+                    660,
                     List.of("Poipet – Aranyaprathet")),
-            new DemoCorridor("RD BKK → VTE", TransportMode.ROAD, "Bangkok", "Vientiane", 640,
-                    List.of("Nong Khai – Vientiane")),
-            new DemoCorridor("RD BKK → KUL", TransportMode.ROAD, "Bangkok", "Kuala Lumpur", 1450,
+            new DemoCorridor(
+                    "RD BKK → VTE", TransportMode.ROAD, "Bangkok", "Vientiane", 640, List.of("Nong Khai – Vientiane")),
+            new DemoCorridor(
+                    "RD BKK → KUL",
+                    TransportMode.ROAD,
+                    "Bangkok",
+                    "Kuala Lumpur",
+                    1450,
                     List.of("Sadao – Bukit Kayu Hitam")),
-            new DemoCorridor("RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 780,
-                    List.of("Cầu Treo – Nam Phao")),
+            new DemoCorridor(
+                    "RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 780, List.of("Cầu Treo – Nam Phao")),
             new DemoCorridor("RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", 1700, List.of()),
             new DemoCorridor("AIR PNH → HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1550, List.of()),
             new DemoCorridor("AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of()));
@@ -92,7 +111,8 @@ public class CatalogSeeder {
     private static final short QUARANTINE_MIN_DAYS = 7;
     private static final short ARRIVAL_BUFFER_DAYS = 2;
     private static final String PUBLISHER = "lan.nguyen@equifreight.vn";
-    private static final Instant PUBLISHED_AT = LocalDate.of(2026, 9, 1).atStartOfDay(BusinessTime.ZONE).toInstant();
+    private static final Instant PUBLISHED_AT =
+            LocalDate.of(2026, 9, 1).atStartOfDay(BusinessTime.ZONE).toInstant();
 
     private final PlaceRepository places;
     private final BorderCrossingRepository crossings;
@@ -102,9 +122,14 @@ public class CatalogSeeder {
     private final RegulationVersionRepository versions;
     private final UserRepository users;
 
-    public CatalogSeeder(PlaceRepository places, BorderCrossingRepository crossings, CorridorRepository corridors,
-                         CountryRepository countries, RegulationCatalogRepository catalogs,
-                         RegulationVersionRepository versions, UserRepository users) {
+    public CatalogSeeder(
+            PlaceRepository places,
+            BorderCrossingRepository crossings,
+            CorridorRepository corridors,
+            CountryRepository countries,
+            RegulationCatalogRepository catalogs,
+            RegulationVersionRepository versions,
+            UserRepository users) {
         this.places = places;
         this.crossings = crossings;
         this.corridors = corridors;
@@ -149,7 +174,8 @@ public class CatalogSeeder {
             if (sameRoute.isEmpty()) {
                 corridors.save(corridor(demo, crossingsByName));
                 log.info("Seeded corridor {}", demo.code());
-            } else if (sameRoute.get().getCrossings().isEmpty() && !demo.crossings().isEmpty()) {
+            } else if (sameRoute.get().getCrossings().isEmpty()
+                    && !demo.crossings().isEmpty()) {
                 link(sameRoute.get(), demo, crossingsByName);
                 corridors.save(sameRoute.get());
                 log.info("Linked the crossings of corridor {}", sameRoute.get().getCode());

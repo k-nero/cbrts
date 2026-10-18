@@ -1,14 +1,13 @@
 package com.equifreight.model.route;
 
 import com.equifreight.entity.enums.TransportMode;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * A corridor we run, read in the direction of travel. Without a destination place (the alternatives on a
@@ -30,6 +29,7 @@ public class RouteResponse {
     private List<String> countries;
     /** The same countries by name, in travel order ("Vietnam", "Cambodia"). */
     private List<String> countryNames;
+
     private Boolean crossBorder;
     private Integer leadTimeDays;
     private LocalDate earliestDeparture;

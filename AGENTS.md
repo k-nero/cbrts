@@ -98,6 +98,10 @@ Where to look elsewhere:
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
 - **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V17` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
+  - It ratchets from `origin/main`: only the Java files your branch changes are checked and formatted, so run `git fetch origin` first if your `origin/main` is old.
+  - It never touches `src/main/resources/db/migration`. If you use IntelliJ's Reformat Code on a directory, exclude `db/migration` (or reformat only the files you changed), because Flyway checksums every merged migration and even a whitespace change makes validation fail on databases that already ran it.
+  - IntelliJ users can install the palantir-java-format plugin so Reformat Code matches Spotless. The root `.editorconfig` sets indent, line length and line endings for every editor.
 - **Logging.** Use Lombok `@Log4j2`, not slf4j `LoggerFactory`.
 - **Injection.** Use constructor injection.
 - **JSON is Jackson 3.** Spring Boot 4 registers `tools.jackson.databind.json.JsonMapper`; inject that. Jackson 2's `com.fasterxml.jackson.databind.ObjectMapper` is on the classpath through other libraries, so code that injects it compiles and passes mocked tests, but the application fails to start.
@@ -144,7 +148,7 @@ Where to look elsewhere:
 - **Real inputs.** A file is chosen with a file picker and uploaded, never pasted as a file id; a date uses a date field, and a choice from a fixed set uses a select or option cards.
 - **Files from the API need the token.** Never link to `/api/...` with `<a href>` or `<img src>`: the browser sends no access token and gets 401. Show a stored file with `useFileBlobUrl` (`hooks/file.ts`) and open one with `fileApi.viewFile`, which opens the tab inside the click (a `window.open` after an `await` is dropped by popup blockers).
 - **Retries are idempotent.** When an endpoint takes a client reference (`clientRef`), create it once per user action, keep it until the request succeeds, and send the same one on retry; a new one per attempt records the action twice.
-- **Checks.** Run `bun run typecheck`, `bun run format` and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
+- **Checks.** Run `bun run typecheck`, `bun run format` (or `bun run format:check` to verify without writing) and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
 
 ## Design rules (when building UI)
 
@@ -173,7 +177,7 @@ Where to look elsewhere:
 - **Flow:** issue, then branch, then PR. Branch from `main` with a type prefix: `feat/`, `fix/`, `style/`, `chore/`, `docs/`, `design/`. Never commit straight to `main`; check `git branch --show-current` before you commit or push.
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
-- **No CI build or test gate.** A green check does not mean it compiles. Before opening or approving a PR, run `./gradlew test` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
+- **CI runs format checks, typecheck and unit tests only.** `.github/workflows/checks.yml` runs `./gradlew spotlessCheck test` in `BE/`, and `bun run typecheck` and `bun run format:check` in `FE/`, on every pull request. A green check does not mean the app starts or the FE builds. Before opening or approving a PR, run `./gradlew check` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
 - **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only. Never paste them into an AI chat either.
 
 ## Don't

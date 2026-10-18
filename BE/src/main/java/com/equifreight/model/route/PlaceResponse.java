@@ -1,12 +1,11 @@
 package com.equifreight.model.route;
 
 import com.equifreight.entity.enums.PlaceKind;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.UUID;
 
 /** A pickup or delivery point the customer can choose. */
 @Getter

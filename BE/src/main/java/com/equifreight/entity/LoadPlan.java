@@ -2,12 +2,11 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.LoadPlanStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * Which horse stands in which stall. One CONFIRMED plan per job; confirming needs every horse placed and no

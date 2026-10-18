@@ -8,6 +8,8 @@ import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
 import com.equifreight.service.TransportJobService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -15,9 +17,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/staff/jobs")
@@ -28,10 +27,11 @@ public class StaffJobController {
     private final RoutePlanService routePlanService;
     private final CrewAssignmentService crewAssignmentService;
 
-    public StaffJobController(TransportJobService transportJobService,
-                              LoadPlanService loadPlanService,
-                              RoutePlanService routePlanService,
-                              CrewAssignmentService crewAssignmentService) {
+    public StaffJobController(
+            TransportJobService transportJobService,
+            LoadPlanService loadPlanService,
+            RoutePlanService routePlanService,
+            CrewAssignmentService crewAssignmentService) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -46,7 +46,8 @@ public class StaffJobController {
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "stage", required = false) JobStage stage,
             @RequestParam(value = "filter", required = false) String filter,
-            @PageableDefault(size = 20, sort = "plannedDepartureAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "plannedDepartureAt", direction = Sort.Direction.ASC)
+                    Pageable pageable) {
         return transportJobService.search(q, stage, filter, pageable);
     }
 
@@ -71,8 +72,8 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse createLoadPlan(@PathVariable UUID jobId,
-                                           @RequestParam(value = "vehicleId", required = false) UUID vehicleId) {
+    public LoadPlanResponse createLoadPlan(
+            @PathVariable UUID jobId, @RequestParam(value = "vehicleId", required = false) UUID vehicleId) {
         return loadPlanService.createLoadPlan(jobId, vehicleId);
     }
 
@@ -81,8 +82,7 @@ public class StaffJobController {
      */
     @PutMapping("/{jobId}/load-plan/vehicle")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse changeVehicle(@PathVariable UUID jobId,
-                                          @RequestParam("vehicleId") UUID vehicleId) {
+    public LoadPlanResponse changeVehicle(@PathVariable UUID jobId, @RequestParam("vehicleId") UUID vehicleId) {
         return loadPlanService.changeLoadPlanVehicle(jobId, vehicleId);
     }
 
@@ -136,9 +136,10 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/route-plans")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public RoutePlanResponse createRoutePlan(@PathVariable UUID jobId,
-                                             @Valid @RequestBody CreateRoutePlanRequest request,
-                                             @AuthenticationPrincipal User user) {
+    public RoutePlanResponse createRoutePlan(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody CreateRoutePlanRequest request,
+            @AuthenticationPrincipal User user) {
         return routePlanService.createOrUpdateDraft(jobId, request, user);
     }
 
@@ -147,10 +148,11 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/route-plans/{planId}/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public RoutePlanResponse confirmRoutePlan(@PathVariable UUID jobId,
-                                              @PathVariable UUID planId,
-                                              @RequestParam(value = "changeReason", required = false) String changeReason,
-                                              @AuthenticationPrincipal User user) {
+    public RoutePlanResponse confirmRoutePlan(
+            @PathVariable UUID jobId,
+            @PathVariable UUID planId,
+            @RequestParam(value = "changeReason", required = false) String changeReason,
+            @AuthenticationPrincipal User user) {
         return routePlanService.confirmRoutePlan(jobId, planId, changeReason, user);
     }
 
@@ -167,9 +169,10 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/crew")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public List<CrewMemberResponse> assignCrew(@PathVariable UUID jobId,
-                                               @Valid @RequestBody AssignCrewRequest request,
-                                               @AuthenticationPrincipal User user) {
+    public List<CrewMemberResponse> assignCrew(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody AssignCrewRequest request,
+            @AuthenticationPrincipal User user) {
         return crewAssignmentService.assignCrew(jobId, request, user);
     }
 

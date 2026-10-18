@@ -1,12 +1,11 @@
 package com.equifreight.model.request;
 
 import com.equifreight.entity.enums.PlaceKind;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.UUID;
 
 /** One end of a request: a catalog place, or the city the customer typed ({@code text}). */
 @Getter

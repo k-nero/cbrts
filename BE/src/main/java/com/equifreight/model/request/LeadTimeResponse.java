@@ -1,11 +1,10 @@
 package com.equifreight.model.request;
 
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
 
 /** The lead-time check of a draft's departure date (BR-F1-01). */
 @Getter

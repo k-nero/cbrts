@@ -1,10 +1,25 @@
 package com.equifreight.controller.staff;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.equifreight.configuration.ControllerAdvise;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.service.RequestReviewService;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -20,22 +35,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /** The logistics manager's request endpoints (US-F1-03, US-F1-04). */
 class StaffRequestControllerTest {
 
@@ -46,8 +45,8 @@ class StaffRequestControllerTest {
     void setUp() {
         service = mock(RequestReviewService.class);
         mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service))
-                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver(),
-                        new PageableHandlerMethodArgumentResolver())
+                .setCustomArgumentResolvers(
+                        new AuthenticationPrincipalArgumentResolver(), new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
                 .build();
     }
@@ -59,15 +58,15 @@ class StaffRequestControllerTest {
                 .toList();
 
         assertThat(handlers).hasSize(3);
-        assertThat(handlers).allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
-                .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
+        assertThat(handlers)
+                .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
+                        .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
     }
 
     @Test
     void returnPassesTheNote() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.returnForInformation(any(), eq(id), eq("Which stable?")))
-                .thenReturn(new RequestReviewResponse());
+        when(service.returnForInformation(any(), eq(id), eq("Which stable?"))).thenReturn(new RequestReviewResponse());
 
         mvc.perform(post("/api/v1/staff/requests/" + id + "/return")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,16 +80,19 @@ class StaffRequestControllerTest {
     void aRefusalAnswersItsCode() throws Exception {
         UUID id = UUID.randomUUID();
         when(service.returnForInformation(any(), eq(id), eq("")))
-                .thenThrow(new BusinessException("NOTE_REQUIRED", "Write a note to the customer: say what is missing."));
+                .thenThrow(
+                        new BusinessException("NOTE_REQUIRED", "Write a note to the customer: say what is missing."));
         when(service.returnForInformation(any(), eq(id), eq("late")))
                 .thenThrow(new ConflictException("REQUEST_NOT_IN_REVIEW", "This request isn't waiting for review."));
 
         mvc.perform(post("/api/v1/staff/requests/" + id + "/return")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"\"}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("NOTE_REQUIRED"));
         mvc.perform(post("/api/v1/staff/requests/" + id + "/return")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"late\"}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"late\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("REQUEST_NOT_IN_REVIEW"));
     }

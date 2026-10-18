@@ -2,14 +2,13 @@ package com.equifreight.model.request;
 
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 
 /** A horse on a request: the snapshot that prices it, and what its profile still lacks. */
 @Getter

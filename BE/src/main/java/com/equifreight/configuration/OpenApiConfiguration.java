@@ -16,11 +16,15 @@ public class OpenApiConfiguration {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
-                .components(new Components()
-                        .addSecuritySchemes(BEARER_SCHEME, new SecurityScheme()
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")
-                                .description("Login via POST /api/v1/auth/login, then paste the accessToken here.")));
+                .components(
+                        new Components()
+                                .addSecuritySchemes(
+                                        BEARER_SCHEME,
+                                        new SecurityScheme()
+                                                .type(SecurityScheme.Type.HTTP)
+                                                .scheme("bearer")
+                                                .bearerFormat("JWT")
+                                                .description(
+                                                        "Login via POST /api/v1/auth/login, then paste the accessToken here.")));
     }
 }

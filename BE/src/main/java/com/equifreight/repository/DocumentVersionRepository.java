@@ -2,6 +2,9 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.enums.DocumentReview;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,16 +13,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 /**
  * Repository for versioned document uploads attached to checklist items (append-only).
  */
 @Repository
-public interface DocumentVersionRepository extends JpaRepository<DocumentVersion, UUID>,
-        JpaSpecificationExecutor<DocumentVersion> {
+public interface DocumentVersionRepository
+        extends JpaRepository<DocumentVersion, UUID>, JpaSpecificationExecutor<DocumentVersion> {
 
     /**
      * Find all document versions of a checklist item ordered by version descending.
@@ -41,8 +40,7 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
             JOIN FETCH ci.job j
             WHERE dv.review = :review
             ORDER BY dv.uploadedAt ASC
-            """,
-            countQuery = "SELECT count(dv) FROM DocumentVersion dv WHERE dv.review = :review")
+            """, countQuery = "SELECT count(dv) FROM DocumentVersion dv WHERE dv.review = :review")
     Page<DocumentVersion> findAllByReview(@Param("review") DocumentReview review, Pageable pageable);
 
     /**

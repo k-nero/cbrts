@@ -5,13 +5,12 @@ import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -31,8 +30,10 @@ public class CreateRoutePlanRequest {
     @Setter
     public static class StopItem {
         private short seq;
+
         @NotNull
         private RouteStopKind kind;
+
         private UUID placeId;
         private UUID borderCrossingId;
         private Instant plannedAt;
@@ -46,8 +47,10 @@ public class CreateRoutePlanRequest {
         private short seq;
         private short fromStopSeq;
         private short toStopSeq;
+
         @NotNull
         private TransportMode mode;
+
         private UUID vehicleId;
         private Integer distanceKm;
         private Integer plannedMin;
