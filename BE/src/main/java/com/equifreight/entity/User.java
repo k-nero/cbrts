@@ -67,4 +67,9 @@ public class User extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<Role> roles = new HashSet<>();
+
+    /** "Vũ Hải Yến": family name first, as Users & roles and the audit log write names. */
+    public String displayName() {
+        return (lastName + " " + firstName).strip();
+    }
 }
