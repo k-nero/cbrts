@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RegulationRole;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * The regulation versions a job's checklist was built from (BR-F2-01).

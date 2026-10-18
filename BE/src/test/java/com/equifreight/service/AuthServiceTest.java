@@ -1,5 +1,9 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.UserStatus;
@@ -10,6 +14,9 @@ import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
 import com.equifreight.repository.*;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,30 +32,28 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AuthServiceTest {
 
     @Mock
     private UserRepository users;
+
     @Mock
     private RefreshTokenRepository refreshTokens;
+
     @Mock
     private ClubRepository clubs;
+
     @Mock
     private CountryRepository countries;
+
     @Mock
     private RoleRepository roles;
+
     @Mock
     private PasswordEncoder passwordEncoder;
+
     @Mock
     private JwtEncoder jwtEncoder;
 
@@ -95,8 +100,12 @@ class AuthServiceTest {
             return u;
         });
         when(refreshTokens.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
-        Jwt jwt = Jwt.withTokenValue("access").header("alg", "HS256").subject("x")
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        Jwt jwt = Jwt.withTokenValue("access")
+                .header("alg", "HS256")
+                .subject("x")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
         when(jwtEncoder.encode(any(JwtEncoderParameters.class))).thenReturn(jwt);
     }
 

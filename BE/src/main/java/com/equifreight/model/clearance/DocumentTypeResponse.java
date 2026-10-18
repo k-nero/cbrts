@@ -2,9 +2,8 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.DocumentProvider;
 import com.equifreight.entity.enums.DocumentScope;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter

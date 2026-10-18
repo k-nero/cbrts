@@ -2,11 +2,10 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.DocumentReview;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * An uploaded version of a checklist document. Append-only (BR-F2-05): a trigger allows only the one review

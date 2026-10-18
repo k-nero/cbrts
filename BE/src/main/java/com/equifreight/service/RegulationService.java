@@ -13,12 +13,11 @@ import com.equifreight.repository.DocumentTypeRepository;
 import com.equifreight.repository.RegulationCatalogRepository;
 import com.equifreight.repository.RegulationRuleRepository;
 import com.equifreight.repository.RegulationVersionRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service managing country health, quarantine, and customs regulation catalogs (AGENTS.md).
@@ -53,12 +52,13 @@ public class RegulationService {
     public List<RegulationCatalogResponse> listCatalogs() {
         return catalogRepository.findAll().stream()
                 .map(cat -> {
-                    List<RegulationVersion> published = versionRepository
-                            .findByCatalogIdAndStatusOrdered(cat.getId(), CatalogStatus.PUBLISHED);
+                    List<RegulationVersion> published =
+                            versionRepository.findByCatalogIdAndStatusOrdered(cat.getId(), CatalogStatus.PUBLISHED);
                     RegulationVersion active = published.isEmpty() ? null : published.get(0);
                     return RegulationCatalogResponse.builder()
                             .id(cat.getId())
-                            .countryCode(cat.getCountry() != null ? cat.getCountry().getCode() : null)
+                            .countryCode(
+                                    cat.getCountry() != null ? cat.getCountry().getCode() : null)
                             .name(cat.getName())
                             .activeVersion(active != null ? ClearanceMapper.toVersionResponse(active) : null)
                             .build();
@@ -71,7 +71,8 @@ public class RegulationService {
      */
     @Transactional(readOnly = true)
     public RegulationVersionResponse getVersionDetails(UUID versionId) {
-        RegulationVersion version = versionRepository.findById(versionId)
+        RegulationVersion version = versionRepository
+                .findById(versionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RegulationVersion", versionId));
 
         List<RegulationRuleResponse> rules = ruleRepository.findByVersionId(versionId).stream()
@@ -100,7 +101,8 @@ public class RegulationService {
     @Transactional
     public RegulationVersionResponse publishVersion(UUID versionId, User publisher) {
         assertSpecialist(publisher);
-        RegulationVersion version = versionRepository.findById(versionId)
+        RegulationVersion version = versionRepository
+                .findById(versionId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RegulationVersion", versionId));
 
         if (version.getStatus() != CatalogStatus.DRAFT) {
@@ -108,8 +110,8 @@ public class RegulationService {
         }
 
         // Retire previously published versions for this catalog
-        List<RegulationVersion> activeVersions = versionRepository
-                .findByCatalogIdAndStatusOrdered(version.getCatalog().getId(), CatalogStatus.PUBLISHED);
+        List<RegulationVersion> activeVersions = versionRepository.findByCatalogIdAndStatusOrdered(
+                version.getCatalog().getId(), CatalogStatus.PUBLISHED);
         for (RegulationVersion v : activeVersions) {
             v.setStatus(CatalogStatus.RETIRED);
             versionRepository.save(v);
@@ -141,9 +143,7 @@ public class RegulationService {
         if (user == null || user.getRoles() == null) {
             throw new UnauthorizedException("Authentication is required.");
         }
-        boolean hasPerm = user.getRoles().stream()
-                .map(Role::getName)
-                .anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
+        boolean hasPerm = user.getRoles().stream().map(Role::getName).anyMatch(RoleName.TRANSPORT_SPECIALIST::equals);
         if (!hasPerm) {
             throw new UnauthorizedException("Only Transport Specialists are authorized to manage regulation catalogs.");
         }

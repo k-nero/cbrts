@@ -16,17 +16,16 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import com.equifreight.repository.VehicleRepository;
 import com.equifreight.repository.VehicleStallRepository;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 @Log4j2
@@ -37,10 +36,11 @@ public class VehicleService {
     private final VehicleBookingRepository vehicleBookingRepository;
     private final TransportJobRepository transportJobRepository;
 
-    public VehicleService(VehicleRepository vehicleRepository,
-                          VehicleStallRepository vehicleStallRepository,
-                          VehicleBookingRepository vehicleBookingRepository,
-                          TransportJobRepository transportJobRepository) {
+    public VehicleService(
+            VehicleRepository vehicleRepository,
+            VehicleStallRepository vehicleStallRepository,
+            VehicleBookingRepository vehicleBookingRepository,
+            TransportJobRepository transportJobRepository) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
@@ -54,15 +54,15 @@ public class VehicleService {
 
     @Transactional(readOnly = true)
     public List<VehicleResponse> listAllActive() {
-        return vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE)
-                .stream()
+        return vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public VehicleResponse get(UUID id) {
-        Vehicle vehicle = vehicleRepository.findById(id)
+        Vehicle vehicle = vehicleRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
         return toResponse(vehicle);
     }
@@ -101,7 +101,8 @@ public class VehicleService {
 
     @Transactional
     public VehicleResponse update(UUID id, UpdateVehicleRequest request) {
-        Vehicle vehicle = vehicleRepository.findById(id)
+        Vehicle vehicle = vehicleRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
 
         if (request.getPayloadKg() != null && request.getPayloadKg() > 0) {
@@ -116,11 +117,13 @@ public class VehicleService {
 
     @Transactional
     public VehicleBookingResponse bookVehicle(VehicleBookingRequest request) {
-        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+        Vehicle vehicle = vehicleRepository
+                .findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.getVehicleId()));
 
         if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
-            throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus() + " and cannot be booked");
+            throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus()
+                    + " and cannot be booked");
         }
 
         if (!request.getStartsAt().isBefore(request.getEndsAt())) {
@@ -138,13 +141,16 @@ public class VehicleService {
         List<VehicleBooking> overlaps = vehicleBookingRepository.findOverlappingBookings(
                 vehicle.getId(), request.getStartsAt(), request.getEndsAt(), null);
         if (!overlaps.isEmpty()) {
-            throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + vehicle.getCode() + " is already booked between "
-                    + request.getStartsAt() + " and " + request.getEndsAt());
+            throw new ConflictException(
+                    "DOUBLE_BOOKING",
+                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.getStartsAt() + " and "
+                            + request.getEndsAt());
         }
 
         TransportJob job = null;
         if (request.getJobId() != null) {
-            job = transportJobRepository.findById(request.getJobId())
+            job = transportJobRepository
+                    .findById(request.getJobId())
                     .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.getJobId()));
         }
 
@@ -158,18 +164,24 @@ public class VehicleService {
         try {
             // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
             VehicleBooking saved = vehicleBookingRepository.saveAndFlush(booking);
-            log.info("Booked vehicle {} for {} from {} to {}", vehicle.getCode(), request.getKind(), request.getStartsAt(), request.getEndsAt());
+            log.info(
+                    "Booked vehicle {} for {} from {} to {}",
+                    vehicle.getCode(),
+                    request.getKind(),
+                    request.getStartsAt(),
+                    request.getEndsAt());
             return toBookingResponse(saved);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw new ConflictException("DOUBLE_BOOKING", "Vehicle " + vehicle.getCode() + " is already booked between "
-                    + request.getStartsAt() + " and " + request.getEndsAt());
+            throw new ConflictException(
+                    "DOUBLE_BOOKING",
+                    "Vehicle " + vehicle.getCode() + " is already booked between " + request.getStartsAt() + " and "
+                            + request.getEndsAt());
         }
     }
 
     @Transactional(readOnly = true)
     public List<VehicleBookingResponse> getFleetCalendar(Instant rangeStart, Instant rangeEnd) {
-        return vehicleBookingRepository.findInDateRange(rangeStart, rangeEnd)
-                .stream()
+        return vehicleBookingRepository.findInDateRange(rangeStart, rangeEnd).stream()
                 .map(this::toBookingResponse)
                 .toList();
     }

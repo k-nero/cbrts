@@ -2,9 +2,8 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CodePrefix;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
+import lombok.*;
 
 /**
  * Issues the human codes (REQ-, Q-, CBRT-, EF-, INV-). Read with a row lock (select … for update) inside the

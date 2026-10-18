@@ -2,11 +2,10 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.HandoverOutcome;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.math.BigDecimal;
 import java.time.Instant;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * One per job. The late-arrival penalty is credited as a line on the final invoice.

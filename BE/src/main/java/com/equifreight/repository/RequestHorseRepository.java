@@ -2,12 +2,11 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.enums.RequestStatus;
+import java.util.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.*;
 
 @Repository
 public interface RequestHorseRepository extends JpaRepository<RequestHorse, RequestHorse.Key> {
@@ -36,8 +35,8 @@ public interface RequestHorseRepository extends JpaRepository<RequestHorse, Requ
             + " (select j.id from TransportJob j where j.request = r"
             + " and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED)))"
             + " order by r.createdAt desc")
-    List<HorseUse> findActiveUses(@Param("horseId") UUID horseId,
-                                  @Param("activeStatuses") Collection<RequestStatus> activeStatuses);
+    List<HorseUse> findActiveUses(
+            @Param("horseId") UUID horseId, @Param("activeStatuses") Collection<RequestStatus> activeStatuses);
 
     List<RequestHorse> findByRequest_Id(UUID requestId);
 

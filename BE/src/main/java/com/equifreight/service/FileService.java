@@ -12,12 +12,6 @@ import com.equifreight.model.file.FileMapper;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.FileStorage;
-import lombok.extern.log4j.Log4j2;
-import org.apache.tika.Tika;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +24,11 @@ import java.time.ZonedDateTime;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
+import lombok.extern.log4j.Log4j2;
+import org.apache.tika.Tika;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Uploads and downloads of files: horse papers and medical records, incident photos, filing results.
@@ -48,11 +47,11 @@ public class FileService {
     /**
      * PDFs for papers and records; photos from cameras and phones (iPhones save HEIC).
      */
-    static final Set<String> ALLOWED_TYPES = Set.of(
-            "application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif");
+    static final Set<String> ALLOWED_TYPES =
+            Set.of("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif");
 
-    private static final Set<String> STAFF_ROLES = Set.of(
-            RoleName.LOGISTICS_MANAGER, RoleName.TRANSPORT_SPECIALIST, RoleName.FLEET_COORDINATOR);
+    private static final Set<String> STAFF_ROLES =
+            Set.of(RoleName.LOGISTICS_MANAGER, RoleName.TRANSPORT_SPECIALIST, RoleName.FLEET_COORDINATOR);
 
     private final StoredFileRepository storedFileRepository;
     private final FileStorage fileStorage;
@@ -99,7 +98,8 @@ public class FileService {
      * A separate pass over the upload (Tomcat has it on disk), so storage retries can't skew the digest.
      */
     private static String sha256Of(MultipartFile upload) {
-        try (DigestInputStream in = new DigestInputStream(upload.getInputStream(), MessageDigest.getInstance("SHA-256"))) {
+        try (DigestInputStream in =
+                new DigestInputStream(upload.getInputStream(), MessageDigest.getInstance("SHA-256"))) {
             in.transferTo(OutputStream.nullOutputStream());
             return HexFormat.of().formatHex(in.getMessageDigest().digest());
         } catch (IOException e) {
@@ -162,7 +162,8 @@ public class FileService {
      */
     @Transactional(readOnly = true)
     public StoredFile requireAttachable(UUID id, User user) {
-        StoredFile file = storedFileRepository.findById(id)
+        StoredFile file = storedFileRepository
+                .findById(id)
                 .filter(f -> isUploader(f, user))
                 .orElseThrow(() -> ResourceNotFoundException.of("File", id));
         if (storedFileRepository.isAttached(id)) {
@@ -172,7 +173,8 @@ public class FileService {
     }
 
     private StoredFile findReadable(UUID id, User user) {
-        return storedFileRepository.findById(id)
+        return storedFileRepository
+                .findById(id)
                 .filter(f -> canRead(f, user))
                 .orElseThrow(() -> ResourceNotFoundException.of("File", id));
     }
@@ -181,11 +183,13 @@ public class FileService {
         if (hasAnyRole(user, STAFF_ROLES) || isUploader(file, user)) {
             return true;
         }
-        if (hasAnyRole(user, Set.of(RoleName.CUSTOMER)) && user.getClub() != null
+        if (hasAnyRole(user, Set.of(RoleName.CUSTOMER))
+                && user.getClub() != null
                 && storedFileRepository.isOnClubJob(file.getId(), user.getClub().getId())) {
             return true;
         }
-        return hasAnyRole(user, Set.of(RoleName.ESCORT)) && storedFileRepository.isOnCrewJob(file.getId(), user.getId());
+        return hasAnyRole(user, Set.of(RoleName.ESCORT))
+                && storedFileRepository.isOnCrewJob(file.getId(), user.getId());
     }
 
     /**
@@ -211,6 +215,5 @@ public class FileService {
     /**
      * An open file's metadata and bytes. The caller closes {@code content}.
      */
-    public record FileContent(StoredFile file, InputStream content) {
-    }
+    public record FileContent(StoredFile file, InputStream content) {}
 }

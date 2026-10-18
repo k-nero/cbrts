@@ -3,11 +3,10 @@ package com.equifreight.service;
 import com.equifreight.entity.Notification;
 import com.equifreight.entity.User;
 import com.equifreight.repository.NotificationRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NotificationService {
@@ -19,7 +18,8 @@ public class NotificationService {
     }
 
     @Transactional
-    public Notification sendNotification(User recipient, String kind, String title, String body, String entityType, UUID entityId) {
+    public Notification sendNotification(
+            User recipient, String kind, String title, String body, String entityType, UUID entityId) {
         if (recipient == null) {
             return null;
         }

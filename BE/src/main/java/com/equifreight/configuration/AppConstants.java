@@ -13,6 +13,5 @@ public final class AppConstants {
      */
     public static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    private AppConstants() {
-    }
+    private AppConstants() {}
 }
