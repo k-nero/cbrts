@@ -8,13 +8,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.equifreight.configuration.ControllerAdvise;
+import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.StartResult;
 import com.equifreight.model.review.RequestReviewResponse;
+import com.equifreight.service.QuotationDraftService;
 import com.equifreight.service.RequestReviewService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -34,17 +39,20 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 
 /** The logistics manager's request endpoints (US-F1-03, US-F1-04). */
 class StaffRequestControllerTest {
 
     RequestReviewService service;
+    QuotationDraftService quotations;
     MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(RequestReviewService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service))
+        quotations = mock(QuotationDraftService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service, quotations))
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver(), new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
@@ -54,10 +62,12 @@ class StaffRequestControllerTest {
     @Test
     void everyMethodIsForTheLogisticsManager() {
         List<Method> handlers = Arrays.stream(StaffRequestController.class.getDeclaredMethods())
-                .filter(m -> m.isAnnotationPresent(GetMapping.class) || m.isAnnotationPresent(PostMapping.class))
+                .filter(m -> m.isAnnotationPresent(GetMapping.class)
+                        || m.isAnnotationPresent(PostMapping.class)
+                        || m.isAnnotationPresent(PutMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(3);
+        assertThat(handlers).hasSize(7);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
@@ -109,5 +119,55 @@ class StaffRequestControllerTest {
         assertThat(captor.getValue().getSort().isUnsorted()).isTrue();
         assertThat(captor.getValue().getPageNumber()).isEqualTo(1);
         assertThat(captor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    // --- the draft quotation (US-Q-01) ---------------------------------------------------------------------
+
+    static QuotationDraftResponse draft() {
+        return QuotationDraftResponse.builder()
+                .code("Q-2026-0189")
+                .versionNo((short) 1)
+                .build();
+    }
+
+    @Test
+    void startAnswers201ThenThe200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(quotations.start(any(), eq(id))).thenReturn(new StartResult(draft(), true));
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("Q-2026-0189"));
+
+        when(quotations.start(any(), eq(id))).thenReturn(new StartResult(draft(), false));
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation")).andExpect(status().isOk());
+    }
+
+    @Test
+    void getPutAndRepriceMapToTheService() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(quotations.get(id)).thenReturn(draft());
+        when(quotations.changeClass(any(), eq(id), eq(ServiceClass.FIRST))).thenReturn(draft());
+        when(quotations.reprice(any(), eq(id))).thenReturn(draft());
+
+        mvc.perform(get("/api/v1/staff/requests/" + id + "/quotation")).andExpect(status().isOk());
+        mvc.perform(put("/api/v1/staff/requests/" + id + "/quotation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"airClass\":\"FIRST\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/reprice")).andExpect(status().isOk());
+
+        verify(quotations).get(id);
+        verify(quotations).changeClass(any(), eq(id), eq(ServiceClass.FIRST));
+        verify(quotations).reprice(any(), eq(id));
+    }
+
+    @Test
+    void aMissingClassIsRefusedBeforeTheService() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(put("/api/v1/staff/requests/" + id + "/quotation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(quotations);
     }
 }
