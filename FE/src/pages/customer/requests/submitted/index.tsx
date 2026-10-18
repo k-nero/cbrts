@@ -8,7 +8,7 @@ import { VersionsPanel } from '../components/VersionsPanel';
 import PageHeader from '@/components/PageHeader';
 import { Button, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
-import { formatDate, fromRequest, latestRevision } from '@/lib/utils';
+import { formatDate, fromRequest, latestRevision, passChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -29,7 +29,7 @@ const RequestSubmittedPage: FC = () => {
   const latest = latestRevision(request);
   const toList = () => router.push(router.paths.get('my-requests'));
   const back = { label: 'My requests', onClick: toList };
-  const pass = (chip: { tone: 'neutral' | 'warn'; label: string }) => (
+  const pass = (chip: ReturnType<typeof passChip>) => (
     <RequestPass
       values={fromRequest(request)}
       live={[]}
@@ -64,7 +64,7 @@ const RequestSubmittedPage: FC = () => {
                 urgency="soon"
                 title="A logistics manager needs an answer before quoting"
                 subject={`${request.code} · version ${latest}`}
-                reason={request.infoRequiredNote}
+                reason={<span className="whitespace-pre-line">{request.infoRequiredNote}</span>}
                 deadline={{
                   left: 'Waiting for you',
                   date: returnedAt ? `Returned ${formatDate(returnedAt)}` : '',
@@ -87,7 +87,7 @@ const RequestSubmittedPage: FC = () => {
             </Panel>
           </div>
           <div className="flex flex-col gap-6">
-            {pass({ tone: 'warn', label: 'Needs your answer' })}
+            {pass(passChip(request.status))}
             <VersionsPanel request={request} current />
           </div>
         </div>
@@ -135,7 +135,7 @@ const RequestSubmittedPage: FC = () => {
           </div>
         </div>
         <div className="flex flex-col gap-6">
-          {pass({ tone: 'neutral', label: 'Submitted' })}
+          {pass(passChip(request.status))}
           {latest >= 2 && <VersionsPanel request={request} />}
         </div>
       </div>

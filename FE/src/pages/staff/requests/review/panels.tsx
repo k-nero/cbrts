@@ -72,7 +72,7 @@ export const SentPanel: FC<{ revisions: ReviewRevision[] }> = ({ revisions }) =>
       }
       footer={
         version.note && (
-          <div className="rounded-md bg-sunken px-4 py-3">
+          <div>
             <p className="type-label-s m-0 text-ink-2">
               Returned
               {version.returnedAt ? ` ${ict(version.returnedAt).format('D MMM, HH:mm')}` : ''} with:

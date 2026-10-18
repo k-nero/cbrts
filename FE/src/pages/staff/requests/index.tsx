@@ -1,4 +1,4 @@
-import { type FC, useMemo, useState } from 'react';
+import { type FC, useEffect, useMemo, useState } from 'react';
 import type { TableColumnsType } from 'antd';
 
 import PageHeader from '@/components/PageHeader';
@@ -92,6 +92,10 @@ const RequestsPage: FC = () => {
   );
 
   const empty = query.isSuccess && total === 0;
+  // A page emptied by returns steps back to the last page that has rows.
+  useEffect(() => {
+    if (page > 0 && query.isSuccess && query.data.content.length === 0) setPage(page - 1);
+  }, [page, query.isSuccess, query.data]);
 
   return (
     <div className="flex flex-col gap-7">
@@ -134,6 +138,7 @@ const RequestsPage: FC = () => {
             pagination={{
               current: page + 1,
               pageSize: 20,
+              showSizeChanger: false,
               total: total ?? 0,
               showTotal: (all, [from, to]) => `${from}–${to} of ${all} requests`,
             }}

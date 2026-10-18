@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   alsoByLine,
   editable,
+  passChip,
   savedLine,
   submitLabel,
   versionLine,
@@ -690,5 +691,13 @@ describe('versions of a returned request', () => {
     expect(savedLine(returned)).toBe(
       'Changes saved 18 Oct 2026. Send them as version 2 from Review.',
     );
+  });
+});
+
+describe("the pass's chip", () => {
+  test('a returned request needs an answer; a draft and a submitted one say so', () => {
+    expect(passChip('INFO_REQUIRED')).toEqual({ tone: 'warn', label: 'Needs your answer' });
+    expect(passChip('DRAFT')).toEqual({ tone: 'neutral', label: 'Draft' });
+    expect(passChip('SUBMITTED')).toEqual({ tone: 'neutral', label: 'Submitted' });
   });
 });

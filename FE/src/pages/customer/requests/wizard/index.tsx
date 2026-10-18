@@ -28,6 +28,7 @@ import {
   holdsStep,
   blockerFieldErrors,
   liveBlockers,
+  passChip,
   retiredRefusals,
   revealSelector,
   savedLine,
@@ -292,6 +293,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
           route={route}
           notRun={notRun}
           horses={horsesQuery.data ?? []}
+          chip={saved ? passChip(saved.status) : undefined}
           rangeSub={
             step === 'review'
               ? 'Not a quote. Once you approve the quotation, this becomes your travel pass.'
@@ -333,7 +335,7 @@ const RequestWizardPage: FC = () => {
       />
       {saved?.status === 'INFO_REQUIRED' && saved.infoRequiredNote && (
         <Callout tone="warn" title="The logistics manager asked:">
-          {saved.infoRequiredNote}
+          <span className="whitespace-pre-line">{saved.infoRequiredNote}</span>
         </Callout>
       )}
       <Steps steps={STEP_LABELS} current={WIZARD_STEPS.indexOf(step)} />

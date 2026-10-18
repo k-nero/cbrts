@@ -586,3 +586,11 @@ export const savedLine = (r: TransportRequest): string =>
   r.status === 'INFO_REQUIRED'
     ? `Changes saved ${formatDate(r.updatedAt)}. Send them as version ${latestRevision(r) + 1} from Review.`
     : `Draft saved ${formatDate(r.updatedAt)}.`;
+
+/** The draft pass's chip: a returned request is waiting on the customer (spec §6.2, §6.3). */
+export const passChip = (status: RequestStatus): { tone: Tone; label: string } =>
+  status === 'INFO_REQUIRED'
+    ? { tone: 'warn', label: 'Needs your answer' }
+    : status === 'DRAFT'
+      ? { tone: 'neutral', label: 'Draft' }
+      : { tone: 'neutral', label: 'Submitted' };
