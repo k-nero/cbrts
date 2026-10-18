@@ -31,31 +31,28 @@ import java.util.Set;
 public class DataSeeder implements ApplicationRunner {
 
     private static final String[][] ROLES = {
-            { RoleName.CUSTOMER, "Racing club or horse owner" },
-            { RoleName.LOGISTICS_MANAGER, "Reviews requests, issues quotations, owns escalations" },
-            { RoleName.TRANSPORT_SPECIALIST, "Checks documents, files with authorities, keeps the catalogs" },
-            { RoleName.FLEET_COORDINATOR, "Plans routes, vehicles and stall positions" },
-            { RoleName.ESCORT, "Driver or groom on the trip" }
+            {RoleName.CUSTOMER, "Racing club or horse owner"},
+            {RoleName.LOGISTICS_MANAGER, "Reviews requests, issues quotations, owns escalations"},
+            {RoleName.TRANSPORT_SPECIALIST, "Checks documents, files with authorities, keeps the catalogs"},
+            {RoleName.FLEET_COORDINATOR, "Plans routes, vehicles and stall positions"},
+            {RoleName.ESCORT, "Driver or groom on the trip"}
     };
 
-    /** email, first name, last name, role */
+    /**
+     * email, first name, last name, role
+     */
     private static final String[][] USERS = {
-            { "bookings@saigonturf.vn", "Saigon Turf", "Club", RoleName.CUSTOMER },
-            { "yen.vu@equifreight.vn", "Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER },
-            { "lan.nguyen@equifreight.vn", "Thị Lan", "Nguyễn", RoleName.TRANSPORT_SPECIALIST },
-            { "khoi.do@equifreight.vn", "Minh Khôi", "Đỗ", RoleName.FLEET_COORDINATOR },
-            { "minh.tran@equifreight.vn", "Văn Minh", "Trần", RoleName.ESCORT },
-            { "hoa.le@equifreight.vn", "Thị Hoa", "Lê", RoleName.ESCORT },
-            { "tuan.pham@equifreight.vn", "Quốc Tuấn", "Phạm", RoleName.ESCORT }
+            {"bookings@saigonturf.vn", "Saigon Turf", "Club", RoleName.CUSTOMER},
+            {"yen.vu@equifreight.vn", "Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER},
+            {"lan.nguyen@equifreight.vn", "Thị Lan", "Nguyễn", RoleName.TRANSPORT_SPECIALIST},
+            {"khoi.do@equifreight.vn", "Minh Khôi", "Đỗ", RoleName.FLEET_COORDINATOR},
+            {"minh.tran@equifreight.vn", "Văn Minh", "Trần", RoleName.ESCORT},
+            {"hoa.le@equifreight.vn", "Thị Hoa", "Lê", RoleName.ESCORT},
+            {"tuan.pham@equifreight.vn", "Quốc Tuấn", "Phạm", RoleName.ESCORT}
     };
 
     private static final String CLUB_NAME = "Saigon Turf Club";
     private static final String CLUB_EMAIL = "bookings@saigonturf.vn";
-
-    private record DemoHorse(String name, HorseCoat coat, String breed, HorseSex sex, LocalDate born,
-                             String heightHh, int weightKg, StallType stall, Temperament temperament,
-                             String value, String microchip, String passportNo, String notes) {}
-
     private static final List<DemoHorse> HORSES = List.of(
             new DemoHorse("Shadowfax", HorseCoat.GREY, "Andalusian", HorseSex.GELDING, LocalDate.of(2019, 5, 10),
                     "16.2", 510, StallType.STANDARD, Temperament.CALM, "85000", "250259600123456",
@@ -72,12 +69,10 @@ public class DataSeeder implements ApplicationRunner {
             new DemoHorse("Silver Bell", HorseCoat.GREY, "Lipizzan", HorseSex.MARE, LocalDate.of(2020, 6, 8),
                     "15.1", 445, StallType.STANDARD, Temperament.CALM, "60000", "203098100554120",
                     "VN-PP-2020-0257", "Travels well. Hay net at shoulder height."));
-
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final String seedPassword;
-
     private final CountryRepository countryRepository;
     private final PlaceRepository placeRepository;
     private final BorderCrossingRepository borderCrossingRepository;
@@ -98,7 +93,6 @@ public class DataSeeder implements ApplicationRunner {
     private final RouteLegRepository routeLegRepository;
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final CodeCounterRepository codeCounterRepository;
-
     public DataSeeder(RoleRepository roleRepository,
                       UserRepository userRepository,
                       PasswordEncoder passwordEncoder,
@@ -184,7 +178,9 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
-    /** Saigon Turf Club, linked to the customer account (one account per club). */
+    /**
+     * Saigon Turf Club, linked to the customer account (one account per club).
+     */
     private Club seedClub() {
         Club club = clubRepository.findByBookingEmail(CLUB_EMAIL).orElseGet(() -> {
             Club created = new Club();
@@ -564,5 +560,10 @@ public class DataSeeder implements ApplicationRunner {
             counter.setLastValue(value);
             codeCounterRepository.save(counter);
         }
+    }
+
+    private record DemoHorse(String name, HorseCoat coat, String breed, HorseSex sex, LocalDate born,
+                             String heightHh, int weightKg, StallType stall, Temperament temperament,
+                             String value, String microchip, String passportNo, String notes) {
     }
 }

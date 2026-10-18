@@ -31,7 +31,9 @@ public class FileController {
         this.fileService = fileService;
     }
 
-    /** PDF, JPEG, PNG or HEIC, at most 25 MB, sent as the multipart part {@code file}. */
+    /**
+     * PDF, JPEG, PNG or HEIC, at most 25 MB, sent as the multipart part {@code file}.
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public FileResponse upload(@RequestPart("file") MultipartFile file, @AuthenticationPrincipal User user) {
         return fileService.upload(file, user);
@@ -42,7 +44,9 @@ public class FileController {
         return fileService.get(id, user);
     }
 
-    /** The file's bytes. {@code inline=true} lets the browser show a PDF or photo instead of saving it. */
+    /**
+     * The file's bytes. {@code inline=true} lets the browser show a PDF or photo instead of saving it.
+     */
     @GetMapping("/{id}/content")
     public ResponseEntity<InputStreamResource> content(
             @PathVariable UUID id,

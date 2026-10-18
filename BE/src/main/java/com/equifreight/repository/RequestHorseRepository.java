@@ -7,21 +7,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Repository
 public interface RequestHorseRepository extends JpaRepository<RequestHorse, RequestHorse.Key> {
 
-    /** Of these horses, the ones that were ever on a request past DRAFT: their identity is locked (H-07). */
+    /**
+     * Of these horses, the ones that were ever on a request past DRAFT: their identity is locked (H-07).
+     */
     @Query("select distinct rh.horse.id from RequestHorse rh where rh.horse.id in :horseIds"
             + " and rh.request.status <> com.equifreight.entity.enums.RequestStatus.DRAFT")
     Set<UUID> findHorseIdsOnSubmittedRequests(@Param("horseIds") Collection<UUID> horseIds);
 
-    /** Codes of the requests past DRAFT the horse was on, newest first; the lock message names the first. */
+    /**
+     * Codes of the requests past DRAFT the horse was on, newest first; the lock message names the first.
+     */
     @Query("select r.code from RequestHorse rh join rh.request r where rh.horse.id = :horseId"
             + " and r.status <> com.equifreight.entity.enums.RequestStatus.DRAFT order by r.createdAt desc")
     List<String> findSubmittedRequestCodes(@Param("horseId") UUID horseId);
@@ -39,15 +39,15 @@ public interface RequestHorseRepository extends JpaRepository<RequestHorse, Requ
     List<HorseUse> findActiveUses(@Param("horseId") UUID horseId,
                                   @Param("activeStatuses") Collection<RequestStatus> activeStatuses);
 
-    interface HorseUse {
-        String getCode();
-
-        RequestStatus getStatus();
-    }
-
     List<RequestHorse> findByRequest_Id(UUID requestId);
 
     boolean existsByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
 
     Optional<RequestHorse> findByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
+
+    interface HorseUse {
+        String getCode();
+
+        RequestStatus getStatus();
+    }
 }

@@ -26,28 +26,36 @@ public class RegulationController {
         this.regulationService = regulationService;
     }
 
-    /** List all regulation catalogs by country. */
+    /**
+     * List all regulation catalogs by country.
+     */
     @GetMapping("/catalogs")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<RegulationCatalogResponse> listCatalogs() {
         return regulationService.listCatalogs();
     }
 
-    /** Get detailed version information and document validation rules. */
+    /**
+     * Get detailed version information and document validation rules.
+     */
     @GetMapping("/versions/{versionId}")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public RegulationVersionResponse getVersionDetails(@PathVariable UUID versionId) {
         return regulationService.getVersionDetails(versionId);
     }
 
-    /** List all recognized document types in the system. */
+    /**
+     * List all recognized document types in the system.
+     */
     @GetMapping("/document-types")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<DocumentTypeResponse> listDocumentTypes() {
         return regulationService.listDocumentTypes();
     }
 
-    /** Publish a new regulation catalog version (DRAFT -> PUBLISHED). Transport Specialist only. */
+    /**
+     * Publish a new regulation catalog version (DRAFT -> PUBLISHED). Transport Specialist only.
+     */
     @PostMapping("/versions/{versionId}/publish")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public RegulationVersionResponse publishVersion(

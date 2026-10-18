@@ -28,17 +28,23 @@ public class ChecklistItem extends BaseEntity {
     @JoinColumn(name = "document_type_id", nullable = false)
     private DocumentType documentType;
 
-    /** The pinned rule it is checked against. */
+    /**
+     * The pinned rule it is checked against.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "regulation_rule_id")
     private RegulationRule regulationRule;
 
-    /** Required when the document scope is PER_HORSE. */
+    /**
+     * Required when the document scope is PER_HORSE.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "horse_id")
     private Horse horse;
 
-    /** Required when the document scope is PER_CROSSING. */
+    /**
+     * Required when the document scope is PER_CROSSING.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "border_crossing_id")
     private BorderCrossing borderCrossing;
@@ -51,7 +57,9 @@ public class ChecklistItem extends BaseEntity {
     @Column(length = 5)
     private Validity validity;
 
-    /** "77 days old at departure. Upload a test sampled on 19 Aug or later." */
+    /**
+     * "77 days old at departure. Upload a test sampled on 19 Aug or later."
+     */
     @Column(length = 300)
     private String validityNote;
 
@@ -61,7 +69,9 @@ public class ChecklistItem extends BaseEntity {
     @Column(length = 12)
     private ChecklistHolder holder;
 
-    /** Drives "Due in 8 days" and the T-7/T-3/T-1 reminders. */
+    /**
+     * Drives "Due in 8 days" and the T-7/T-3/T-1 reminders.
+     */
     private LocalDate dueDate;
 
     @ManyToOne(fetch = FetchType.LAZY)

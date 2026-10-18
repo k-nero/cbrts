@@ -15,7 +15,9 @@ import java.util.UUID;
 public interface AuthoritySubmissionRepository extends JpaRepository<AuthoritySubmission, UUID>,
         JpaSpecificationExecutor<AuthoritySubmission> {
 
-    /** Lấy toàn bộ đợt trình hồ sơ của 1 chuyến vận chuyển. */
+    /**
+     * Lấy toàn bộ đợt trình hồ sơ của 1 chuyến vận chuyển.
+     */
     List<AuthoritySubmission> findByJobId(UUID jobId);
 
     /**
@@ -24,10 +26,14 @@ public interface AuthoritySubmissionRepository extends JpaRepository<AuthoritySu
      */
     List<AuthoritySubmission> findByJobIdAndStatus(UUID jobId, SubmissionStatus status);
 
-    /** Lấy danh sách theo cơ quan chức năng tiếp nhận. */
+    /**
+     * Lấy danh sách theo cơ quan chức năng tiếp nhận.
+     */
     List<AuthoritySubmission> findByAuthorityId(UUID authorityId);
 
-    /** Kiểm tra xem job có bất kỳ đợt trình nào bị REFUSED chưa. */
+    /**
+     * Kiểm tra xem job có bất kỳ đợt trình nào bị REFUSED chưa.
+     */
     @Query("""
             SELECT COUNT(s) > 0 FROM AuthoritySubmission s
             WHERE s.job.id = :jobId AND s.status = com.equifreight.entity.enums.SubmissionStatus.REFUSED

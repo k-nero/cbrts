@@ -15,10 +15,14 @@ import java.util.UUID;
 public interface ChecklistItemRepository extends JpaRepository<ChecklistItem, UUID>,
         JpaSpecificationExecutor<ChecklistItem> {
 
-    /** Lấy toàn bộ checklist của 1 chuyến vận chuyển. */
+    /**
+     * Lấy toàn bộ checklist của 1 chuyến vận chuyển.
+     */
     List<ChecklistItem> findByJobId(UUID jobId);
 
-    /** Lấy checklist theo trạng thái (VD: lọc items đang IN_REVIEW). */
+    /**
+     * Lấy checklist theo trạng thái (VD: lọc items đang IN_REVIEW).
+     */
     List<ChecklistItem> findByJobIdAndStatus(UUID jobId, ChecklistStatus status);
 
     /**
@@ -34,6 +38,8 @@ public interface ChecklistItemRepository extends JpaRepository<ChecklistItem, UU
             """)
     boolean areAllMandatoryItemsCleared(@Param("jobId") UUID jobId);
 
-    /** Lấy tất cả checklist của 1 con ngựa trong 1 job (scope PER_HORSE). */
+    /**
+     * Lấy tất cả checklist của 1 con ngựa trong 1 job (scope PER_HORSE).
+     */
     List<ChecklistItem> findByJobIdAndHorseId(UUID jobId, UUID horseId);
 }

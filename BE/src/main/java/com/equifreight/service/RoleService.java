@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/** Roles follow the spec and are seeded; the app only reads them. */
+/**
+ * Roles follow the spec and are seeded; the app only reads them.
+ */
 @Service
 public class RoleService {
 

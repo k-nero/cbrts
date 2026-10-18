@@ -28,4 +28,5 @@ public record AuditLogResponse(
         JsonNode after,
         String reason,
         UUID jobId
-) {}
+) {
+}

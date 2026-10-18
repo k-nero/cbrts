@@ -19,7 +19,9 @@ import java.time.Instant;
 @Table(name = "transport_jobs")
 public class TransportJob extends BaseEntity {
 
-    /** CBRT-2026-041. */
+    /**
+     * CBRT-2026-041.
+     */
     @Column(nullable = false, unique = true, length = 14)
     private String code;
 
@@ -27,7 +29,9 @@ public class TransportJob extends BaseEntity {
     @JoinColumn(name = "request_id", nullable = false, unique = true)
     private TransportRequest request;
 
-    /** The accepted version. */
+    /**
+     * The accepted version.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quotation_id", nullable = false)
     private Quotation quotation;
@@ -47,19 +51,25 @@ public class TransportJob extends BaseEntity {
     @Column(nullable = false, length = 30)
     private DossierStatus dossierStatus = DossierStatus.OPEN;
 
-    /** When the gate opened ("Cleared 17 Oct, 16:20 by Lan"). */
+    /**
+     * When the gate opened ("Cleared 17 Oct, 16:20 by Lan").
+     */
     private Instant clearanceReadyAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private TripStatus tripStatus = TripStatus.NOT_STARTED;
 
-    /** Changing the planned dates re-evaluates every checklist item (Flow 2, B8). */
+    /**
+     * Changing the planned dates re-evaluates every checklist item (Flow 2, B8).
+     */
     private Instant plannedDepartureAt;
 
     private Instant plannedArrivalAt;
 
-    /** Copied from the request; the route is planned backwards from windowEnd. */
+    /**
+     * Copied from the request; the route is planned backwards from windowEnd.
+     */
     private Instant windowStart;
 
     private Instant windowEnd;

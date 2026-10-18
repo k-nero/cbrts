@@ -16,10 +16,14 @@ public class MoveHorseRequest {
     @NotNull
     private UUID horseId;
 
-    /** The stall the horse was in on the coordinator's screen; null when it was waiting to load. */
+    /**
+     * The stall the horse was in on the coordinator's screen; null when it was waiting to load.
+     */
     private UUID fromStallId;
 
-    /** The stall to put the horse in; null to take it off the vehicle. */
+    /**
+     * The stall to put the horse in; null to take it off the vehicle.
+     */
     private UUID toStallId;
 
     /**

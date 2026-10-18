@@ -1,6 +1,8 @@
 package com.equifreight.entity.enums;
 
-/** {@code horses.temperament}. */
+/**
+ * {@code horses.temperament}.
+ */
 public enum Temperament {
     CALM, NERVOUS, AGGRESSIVE
 }
