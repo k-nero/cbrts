@@ -80,6 +80,32 @@ class LeadTimePolicyTest {
                 "Moves within one country need 3 days' notice. The earliest departure is 29 Sep 2026.");
     }
 
+    @Test
+    void datesThatCanMoveMoveTheEarliestDepartureByTheFlex() {
+        assertThat(LeadTimePolicy.earliestDeparture(TODAY, 21, 3)).isEqualTo(LocalDate.of(2026, 10, 20));
+    }
+
+    @Test
+    void withFlexibleDatesTheFixedDateEarliestIsTooSoon() {
+        LeadTimeResponse result = LeadTimePolicy.assess(21, 3, TODAY, LocalDate.of(2026, 10, 17));
+
+        assertThat(result.isMet()).isFalse();
+        assertThat(result.getRequiredDays()).isEqualTo(21);
+        assertThat(result.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 20));
+    }
+
+    @Test
+    void withFlexibleDatesTheMovedEarliestPasses() {
+        assertThat(LeadTimePolicy.assess(21, 3, TODAY, LocalDate.of(2026, 10, 20)).isMet()).isTrue();
+    }
+
+    @Test
+    void theFlexibleDatesMessageSaysWhyTheDateIsLater() {
+        assertThat(LeadTimePolicy.tooSoonMessage(true, 21, 3, LocalDate.of(2026, 10, 20))).isEqualTo(
+                "Cross-border moves need 21 days for document clearance. With dates that can move by ±3 days, "
+                        + "the earliest departure is 20 Oct 2026.");
+    }
+
     private static RegulationVersion version(int crossBorder, int domestic) {
         RegulationVersion v = new RegulationVersion();
         v.setLeadTimeDays((short) crossBorder);

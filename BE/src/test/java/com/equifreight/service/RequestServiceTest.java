@@ -567,6 +567,17 @@ class RequestServiceTest {
         }
 
         @Test
+        void theLeadTimeAuditRowCountsTheDateFlex() {
+            draft.setDateFlexDays((short) 3);
+
+            service.submit(user, draft.getId());
+
+            verify(audit).recordSystem("LEAD_TIME_CHECKED",
+                    "Lead time checked: 34 days before departure, 21 required, plus 3 for dates that can move by ±3 days.",
+                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+        }
+
+        @Test
         void aLongHorseListIsCappedInTheAuditSummary() {
             draft.getHorses().clear();
             for (int i = 1; i <= 40; i++) {

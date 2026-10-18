@@ -159,8 +159,8 @@ public class RequestService {
                     blockers.stream().map(Blocker::getMessage).toList());
         }
         // No blocker means a resolved corridor with a known lead time (ROUTE_NOT_RUN, CATALOG_INCOMPLETE).
-        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(), today,
-                request.getDepartureDate());
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(),
+                request.getDateFlexDays(), today, request.getDepartureDate());
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
@@ -182,10 +182,17 @@ public class RequestService {
         audit.recordDecision(user, "REQUEST_SUBMITTED",
                 submittedSummary(response.getHorses().stream().map(h -> h.getName()).toList()),
                 ENTITY_TYPE, saved.getId(), code, null, "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
-        audit.recordSystem("LEAD_TIME_CHECKED", "Lead time checked: " + leadTime.getDaysBeforeDeparture()
-                        + " days before departure, " + leadTime.getRequiredDays() + " required.",
+        audit.recordSystem("LEAD_TIME_CHECKED", leadTimeSummary(leadTime, request.getDateFlexDays()),
                 ENTITY_TYPE, saved.getId(), code, null, null);
         return response;
+    }
+
+    /** "Lead time checked: 24 days before departure, 21 required, plus 3 for dates that can move by ±3 days." */
+    static String leadTimeSummary(LeadTimeResponse leadTime, int flexDays) {
+        return "Lead time checked: " + leadTime.getDaysBeforeDeparture() + " days before departure, "
+                + leadTime.getRequiredDays() + " required"
+                + (flexDays == 0 ? "" : ", plus " + flexDays + " for dates that can move by ±" + flexDays + " days")
+                + ".";
     }
 
     /**
@@ -406,7 +413,8 @@ public class RequestService {
         RouteResponse route = resolution.route();
         LeadTimeResponse leadTime = route == null || route.getLeadTimeDays() == null
                 || request.getDepartureDate() == null ? null
-                : LeadTimePolicy.assess(route.getLeadTimeDays(), today, request.getDepartureDate());
+                : LeadTimePolicy.assess(route.getLeadTimeDays(), request.getDateFlexDays(), today,
+                        request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         return RequestMapper.toResponse(request, route, leadTime, blockers);
     }

@@ -153,10 +153,11 @@ public final class SubmissionCheck {
         if (route.getLeadTimeDays() == null) {
             return;
         }
-        LeadTimeResponse leadTime = LeadTimePolicy.assess(route.getLeadTimeDays(), today, departure);
+        int flex = request.getDateFlexDays();
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(route.getLeadTimeDays(), flex, today, departure);
         if (!leadTime.isMet()) {
             blockers.add(new Blocker("LEAD_TIME_TOO_SHORT", "departureDate", LeadTimePolicy.tooSoonMessage(
-                    Boolean.TRUE.equals(route.getCrossBorder()), leadTime.getRequiredDays(),
+                    Boolean.TRUE.equals(route.getCrossBorder()), leadTime.getRequiredDays(), flex,
                     leadTime.getEarliestDeparture())));
         }
     }

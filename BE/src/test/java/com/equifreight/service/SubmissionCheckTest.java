@@ -215,6 +215,23 @@ class SubmissionCheckTest {
     }
 
     @Test
+    void flexibleDatesMustMeetTheLeadTimeAfterMovingEarlier() {
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 17));
+
+        assertThat(messages()).containsExactly("Cross-border moves need 21 days for document clearance. "
+                + "With dates that can move by ±3 days, the earliest departure is 20 Oct 2026.");
+    }
+
+    @Test
+    void flexibleDatesPassOnTheMovedEarliestDate() {
+        request.setDateFlexDays((short) 3);
+        request.setDepartureDate(LocalDate.of(2026, 10, 20));
+
+        assertThat(blockers()).isEmpty();
+    }
+
+    @Test
     void serviceChoicesBlockUntilMade() {
         request.setTrailer(null);
         request.setInsurance(null);
