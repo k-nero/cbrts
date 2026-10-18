@@ -19,6 +19,25 @@ class HorseSizingTest {
             sizeClass("L", 48, "16.3"),
             sizeClass("XL", 96, "17.3"));
 
+    private static String classFor(String height, StallType stall) {
+        return HorseSizing.sizeClassFor(new BigDecimal(height), stall, CLASSES).getCode();
+    }
+
+    private static void assertRefused(String height, String message) {
+        assertThatThrownBy(() -> HorseSizing.requireValidHeight(new BigDecimal(height)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(message)
+                .extracting("code").isEqualTo("INVALID_HEIGHT");
+    }
+
+    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
+        HorseSizeClass sizeClass = new HorseSizeClass();
+        sizeClass.setCode(code);
+        sizeClass.setWidthIn((short) widthIn);
+        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
+        return sizeClass;
+    }
+
     @Test
     void heightJustBelowABandStaysInTheLowerClass() {
         assertThat(classFor("14.2", StallType.STANDARD)).isEqualTo("S");
@@ -71,24 +90,5 @@ class HorseSizingTest {
     @Test
     void aHeightWithTwoDecimalsIsRefused() {
         assertRefused("16.25", "16.25 hh isn't a height: write hands and inches, such as 16.2 hh.");
-    }
-
-    private static String classFor(String height, StallType stall) {
-        return HorseSizing.sizeClassFor(new BigDecimal(height), stall, CLASSES).getCode();
-    }
-
-    private static void assertRefused(String height, String message) {
-        assertThatThrownBy(() -> HorseSizing.requireValidHeight(new BigDecimal(height)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(message)
-                .extracting("code").isEqualTo("INVALID_HEIGHT");
-    }
-
-    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
-        HorseSizeClass sizeClass = new HorseSizeClass();
-        sizeClass.setCode(code);
-        sizeClass.setWidthIn((short) widthIn);
-        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
-        return sizeClass;
     }
 }

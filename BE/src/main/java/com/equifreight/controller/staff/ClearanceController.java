@@ -31,7 +31,9 @@ public class ClearanceController {
         this.clearanceService = clearanceService;
     }
 
-    /** Open dossiers (not yet departed), newest first; q matches the job code or the club name. */
+    /*
+     * Open dossiers (not yet departed), newest first; q matches the job code or the club name.
+     */
     @GetMapping("/jobs")
     public Page<JobSummaryResponse> getActiveJobs(
             @RequestParam(value = "q", required = false) String q,

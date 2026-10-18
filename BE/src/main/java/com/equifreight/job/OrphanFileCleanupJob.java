@@ -41,7 +41,9 @@ public class OrphanFileCleanupJob {
         this.transactionTemplate = transactionTemplate;
     }
 
-    /** 03:30 server time, when nobody is mid-upload. */
+    /**
+     * 03:30 server time, when nobody is mid-upload.
+     */
     @Scheduled(cron = "0 30 3 * * *")
     public void removeOrphans() {
         List<StoredFile> orphans = storedFileRepository.findOrphans(Instant.now().minus(GRACE), BATCH);

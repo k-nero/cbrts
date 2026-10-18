@@ -7,7 +7,9 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
-/** Cancellation fee % or short-notice price multiplier, by days before departure. */
+/**
+ * Cancellation fee % or short-notice price multiplier, by days before departure.
+ */
 @Setter
 @Getter
 @Entity

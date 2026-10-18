@@ -71,6 +71,52 @@ class Flow3ServiceTest {
     private CrewAssignmentService crewAssignmentService;
     private TransportJobService transportJobService;
 
+    private static LoadPlan loadPlan(TransportJob job) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(UUID.randomUUID());
+        vehicle.setCode("TX-447");
+        vehicle.setStatus(VehicleStatus.ACTIVE);
+        vehicle.setPayloadKg(5504);
+        LoadPlan plan = new LoadPlan();
+        plan.setId(UUID.randomUUID());
+        plan.setJob(job);
+        plan.setVehicle(vehicle);
+        plan.setStatus(LoadPlanStatus.DRAFT);
+        return plan;
+    }
+
+    private static CrewAssignment assignment(TransportJob job, User user, CrewRole role) {
+        CrewAssignment ca = new CrewAssignment();
+        ca.setJob(job);
+        ca.setUser(user);
+        ca.setCrewRole(role);
+        return ca;
+    }
+
+    private static AssignCrewRequest crew(User a, CrewRole roleA, User b, CrewRole roleB) {
+        AssignCrewRequest.CrewItem first = new AssignCrewRequest.CrewItem();
+        first.setUserId(a.getId());
+        first.setCrewRole(roleA);
+        AssignCrewRequest.CrewItem second = new AssignCrewRequest.CrewItem();
+        second.setUserId(b.getId());
+        second.setCrewRole(roleB);
+        AssignCrewRequest request = new AssignCrewRequest();
+        request.setCrew(List.of(first, second));
+        return request;
+    }
+
+    private static User user(String email, String roleName) {
+        Role role = new Role();
+        role.setName(roleName);
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setFirstName(email.substring(0, email.indexOf('.')));
+        user.setLastName("Test");
+        user.setRoles(Set.of(role));
+        return user;
+    }
+
     @BeforeEach
     void setUp() {
         vehicleService = new VehicleService(vehicleRepository, vehicleStallRepository, vehicleBookingRepository, transportJobRepository);
@@ -372,6 +418,8 @@ class Flow3ServiceTest {
         assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, actor));
     }
 
+    // ---------- sign-off, crew and load-plan follow-up (review of #83) ----------
+
     @Test
     @DisplayName("Crew assignment refuses duplicate user in same trip crew (US-F3-06)")
     void crewAssignment_refusesDuplicateUser() {
@@ -514,8 +562,6 @@ class Flow3ServiceTest {
         assertNull(job.getSignedOffAt());
         verify(clearanceService).recheckJobDocuments(jobId);
     }
-
-    // ---------- sign-off, crew and load-plan follow-up (review of #83) ----------
 
     @Test
     @DisplayName("Sign-off records who and when but leaves the stage for the departure to change")
@@ -685,7 +731,46 @@ class Flow3ServiceTest {
         verify(loadPlanStallRepository, never()).save(any());
     }
 
-    /** One draft plan on a two-stall vehicle with Nightfall on the job, plus stubs for the move path. */
+    private TransportJob readyJob() {
+        TransportJob job = new TransportJob();
+        job.setId(UUID.randomUUID());
+        job.setCode("CBRT-2026-041");
+        job.setStage(JobStage.CLEARANCE);
+        job.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        job.setPlannedDepartureAt(Instant.parse("2026-10-18T06:00:00Z"));
+        job.setPlannedArrivalAt(Instant.parse("2026-10-18T12:30:00Z"));
+        Horse horse = new Horse();
+        horse.setId(UUID.randomUUID());
+        horse.setName("Nightfall");
+        RequestHorse onRequest = new RequestHorse();
+        onRequest.setHorse(horse);
+        TransportRequest request = new TransportRequest();
+        request.setHorses(List.of(onRequest));
+        job.setRequest(request);
+        return job;
+    }
+
+    private void stubPlansAndCrew(TransportJob job, List<CrewAssignment> overlaps) {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        ClearanceStatusResponse gate = new ClearanceStatusResponse();
+        gate.setClearanceReady(true);
+        gate.setOutstandingIssues(List.of());
+        lenient().when(clearanceService.getClearanceStatus(job.getId())).thenReturn(gate);
+        LoadPlan load = loadPlan(job);
+        load.setStatus(LoadPlanStatus.CONFIRMED);
+        lenient().when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(load));
+        RoutePlan route = new RoutePlan();
+        route.setJob(job);
+        lenient().when(routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED)).thenReturn(Optional.of(route));
+        CrewAssignment driver = assignment(job, user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
+        CrewAssignment groom = assignment(job, user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
+        lenient().when(crewAssignmentRepository.findByJobId(job.getId())).thenReturn(List.of(driver, groom));
+        lenient().when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(job.getId()), any(), any())).thenReturn(overlaps);
+    }
+
+    /**
+     * One draft plan on a two-stall vehicle with Nightfall on the job, plus stubs for the move path.
+     */
     private class MoveFixture {
         final TransportJob job = readyJob();
         final LoadPlan plan = loadPlan(job);
@@ -739,88 +824,5 @@ class Flow3ServiceTest {
             s.setRowNo((short) 1);
             return s;
         }
-    }
-
-    private TransportJob readyJob() {
-        TransportJob job = new TransportJob();
-        job.setId(UUID.randomUUID());
-        job.setCode("CBRT-2026-041");
-        job.setStage(JobStage.CLEARANCE);
-        job.setDossierStatus(DossierStatus.CLEARANCE_READY);
-        job.setPlannedDepartureAt(Instant.parse("2026-10-18T06:00:00Z"));
-        job.setPlannedArrivalAt(Instant.parse("2026-10-18T12:30:00Z"));
-        Horse horse = new Horse();
-        horse.setId(UUID.randomUUID());
-        horse.setName("Nightfall");
-        RequestHorse onRequest = new RequestHorse();
-        onRequest.setHorse(horse);
-        TransportRequest request = new TransportRequest();
-        request.setHorses(List.of(onRequest));
-        job.setRequest(request);
-        return job;
-    }
-
-    private void stubPlansAndCrew(TransportJob job, List<CrewAssignment> overlaps) {
-        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        ClearanceStatusResponse gate = new ClearanceStatusResponse();
-        gate.setClearanceReady(true);
-        gate.setOutstandingIssues(List.of());
-        lenient().when(clearanceService.getClearanceStatus(job.getId())).thenReturn(gate);
-        LoadPlan load = loadPlan(job);
-        load.setStatus(LoadPlanStatus.CONFIRMED);
-        lenient().when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(load));
-        RoutePlan route = new RoutePlan();
-        route.setJob(job);
-        lenient().when(routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED)).thenReturn(Optional.of(route));
-        CrewAssignment driver = assignment(job, user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
-        CrewAssignment groom = assignment(job, user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
-        lenient().when(crewAssignmentRepository.findByJobId(job.getId())).thenReturn(List.of(driver, groom));
-        lenient().when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(job.getId()), any(), any())).thenReturn(overlaps);
-    }
-
-    private static LoadPlan loadPlan(TransportJob job) {
-        Vehicle vehicle = new Vehicle();
-        vehicle.setId(UUID.randomUUID());
-        vehicle.setCode("TX-447");
-        vehicle.setStatus(VehicleStatus.ACTIVE);
-        vehicle.setPayloadKg(5504);
-        LoadPlan plan = new LoadPlan();
-        plan.setId(UUID.randomUUID());
-        plan.setJob(job);
-        plan.setVehicle(vehicle);
-        plan.setStatus(LoadPlanStatus.DRAFT);
-        return plan;
-    }
-
-    private static CrewAssignment assignment(TransportJob job, User user, CrewRole role) {
-        CrewAssignment ca = new CrewAssignment();
-        ca.setJob(job);
-        ca.setUser(user);
-        ca.setCrewRole(role);
-        return ca;
-    }
-
-    private static AssignCrewRequest crew(User a, CrewRole roleA, User b, CrewRole roleB) {
-        AssignCrewRequest.CrewItem first = new AssignCrewRequest.CrewItem();
-        first.setUserId(a.getId());
-        first.setCrewRole(roleA);
-        AssignCrewRequest.CrewItem second = new AssignCrewRequest.CrewItem();
-        second.setUserId(b.getId());
-        second.setCrewRole(roleB);
-        AssignCrewRequest request = new AssignCrewRequest();
-        request.setCrew(List.of(first, second));
-        return request;
-    }
-
-    private static User user(String email, String roleName) {
-        Role role = new Role();
-        role.setName(roleName);
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setEmail(email);
-        user.setFirstName(email.substring(0, email.indexOf('.')));
-        user.setLastName("Test");
-        user.setRoles(Set.of(role));
-        return user;
     }
 }

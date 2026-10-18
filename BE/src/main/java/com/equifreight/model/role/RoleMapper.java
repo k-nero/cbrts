@@ -3,7 +3,8 @@ package com.equifreight.model.role;
 import com.equifreight.entity.Role;
 
 public final class RoleMapper {
-    private RoleMapper() {}
+    private RoleMapper() {
+    }
 
     public static RoleResponse toResponse(Role role) {
         return RoleResponse.builder()

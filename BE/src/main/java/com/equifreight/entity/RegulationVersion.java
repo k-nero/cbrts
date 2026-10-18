@@ -9,7 +9,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Immutable once published; a job pins the versions its checklist was built from (BR-F2-01). */
+/**
+ * Immutable once published; a job pins the versions its checklist was built from (BR-F2-01).
+ */
 @Setter
 @Getter
 @Entity
@@ -33,7 +35,9 @@ public class RegulationVersion extends BaseEntity {
     @JoinColumn(name = "published_by")
     private User publishedBy;
 
-    /** 21 cross-border, 3 domestic (BR-F1-01). */
+    /**
+     * 21 cross-border, 3 domestic (BR-F1-01).
+     */
     @Column(nullable = false)
     private short leadTimeDays;
 

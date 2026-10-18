@@ -4,13 +4,7 @@ import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -39,7 +33,9 @@ public class HorseRequest {
 
     private LocalDate dateOfBirth;
 
-    /** Hands.inches, e.g. 16.2. */
+    /**
+     * Hands.inches, e.g. 16.2.
+     */
     @NotNull
     private BigDecimal heightHh;
 
@@ -47,7 +43,9 @@ public class HorseRequest {
     @Max(1500)
     private Short weightKg;
 
-    /** 15 digits; spaces are ignored. */
+    /**
+     * 15 digits; spaces are ignored.
+     */
     @NotBlank
     private String microchip;
 
@@ -55,7 +53,9 @@ public class HorseRequest {
     @Size(max = 40)
     private String passportNo;
 
-    /** USD. Insurance is computed on it. */
+    /**
+     * USD. Insurance is computed on it.
+     */
     @NotNull
     @Positive
     @Digits(integer = 12, fraction = 2)
@@ -63,7 +63,9 @@ public class HorseRequest {
 
     private Temperament temperament;
 
-    /** Defaults to STANDARD. */
+    /**
+     * Defaults to STANDARD.
+     */
     private StallType requiredStall;
 
     @Size(max = 2000)

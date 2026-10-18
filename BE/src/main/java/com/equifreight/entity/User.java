@@ -30,12 +30,16 @@ public class User extends BaseEntity {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    /** Set for CUSTOMER users, null for staff. One account per club (partial unique index). */
+    /**
+     * Set for CUSTOMER users, null for staff. One account per club (partial unique index).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "club_id")
     private Club club;
 
-    /** EF-015. Staff only. */
+    /**
+     * EF-015. Staff only.
+     */
     @Column(name = "staff_code", unique = true, length = 10)
     private String staffCode;
 
@@ -60,7 +64,7 @@ public class User extends BaseEntity {
     @JoinColumn(name = "invited_by")
     private User invitedBy;
 
-    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
@@ -68,7 +72,9 @@ public class User extends BaseEntity {
     )
     private Set<Role> roles = new HashSet<>();
 
-    /** "Vũ Hải Yến": family name first, as Users & roles and the audit log write names. */
+    /**
+     * "Vũ Hải Yến": family name first, as Users & roles and the audit log write names.
+     */
     public String displayName() {
         return (lastName + " " + firstName).strip();
     }

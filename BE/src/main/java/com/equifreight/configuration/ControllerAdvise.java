@@ -1,5 +1,7 @@
 package com.equifreight.configuration;
 
+import com.equifreight.exception.*;
+import com.equifreight.model.common.ApiError;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.http.HttpStatus;
@@ -16,12 +18,6 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
-import com.equifreight.exception.BusinessException;
-import com.equifreight.exception.ConflictException;
-import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.exception.StorageException;
-import com.equifreight.exception.UnauthorizedException;
-import com.equifreight.model.common.ApiError;
 
 import java.util.List;
 

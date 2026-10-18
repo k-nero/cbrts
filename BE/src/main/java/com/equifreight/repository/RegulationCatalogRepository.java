@@ -12,7 +12,9 @@ import java.util.UUID;
 public interface RegulationCatalogRepository extends JpaRepository<RegulationCatalog, UUID>,
         JpaSpecificationExecutor<RegulationCatalog> {
 
-    /** Tìm danh mục quy định theo mã quốc gia (VD: "VN", "JP"). */
+    /**
+     * Tìm danh mục quy định theo mã quốc gia (VD: "VN", "JP").
+     */
     Optional<RegulationCatalog> findByCountryCode(String countryCode);
 
     boolean existsByCountryCode(String countryCode);

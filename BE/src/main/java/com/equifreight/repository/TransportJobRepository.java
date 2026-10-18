@@ -33,17 +33,19 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
 
     List<TransportJob> findByStage(JobStage stage);
 
-    /** Jobs whose dossier is still being worked (not departed), for the specialist's job picker; q matches code or club. */
+    /**
+     * Jobs whose dossier is still being worked (not departed), for the specialist's job picker; q matches code or club.
+     */
     @Query(value = """
             select j from TransportJob j join fetch j.request r join fetch r.club c
             where j.departedAt is null
               and (:q = '' or lower(j.code) like lower(concat('%', :q, '%')) or lower(c.name) like lower(concat('%', :q, '%')))
             """,
             countQuery = """
-            select count(j) from TransportJob j join j.request r join r.club c
-            where j.departedAt is null
-              and (:q = '' or lower(j.code) like lower(concat('%', :q, '%')) or lower(c.name) like lower(concat('%', :q, '%')))
-            """)
+                    select count(j) from TransportJob j join j.request r join r.club c
+                    where j.departedAt is null
+                      and (:q = '' or lower(j.code) like lower(concat('%', :q, '%')) or lower(c.name) like lower(concat('%', :q, '%')))
+                    """)
     Page<TransportJob> findOpenDossiers(@Param("q") String q, Pageable pageable);
 
 
@@ -51,7 +53,9 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
     @Query("select j from TransportJob j where j.code = :code")
     Optional<TransportJob> findByCodeForUpdate(@Param("code") String code);
 
-    /** Origin and destination are optional on a request, so they are left-joined: a job without them still lists. */
+    /**
+     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists.
+     */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
@@ -62,7 +66,9 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
             countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
     Page<TripSummaryResponse> findAllByClubId(@Param("clubId") UUID clubId, Pageable pageable);
 
-    /** Origin and destination are optional on a request, so they are left-joined: a job without them still lists. */
+    /**
+     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists.
+     */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,

@@ -4,11 +4,7 @@ import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,7 +34,9 @@ public class HorseResponse {
     private StallType requiredStall;
     private String handlingNotes;
     private Instant archivedAt;
-    /** Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request. */
+    /**
+     * Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request.
+     */
     private boolean identityLocked;
     private Instant createdAt;
     private Instant updatedAt;

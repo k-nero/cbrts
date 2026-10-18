@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** The line between two stops. A road leg names the vehicle; an air leg has a {@link Flight}. */
+/**
+ * The line between two stops. A road leg names the vehicle; an air leg has a {@link Flight}.
+ */
 @Setter
 @Getter
 @Entity
@@ -31,7 +33,9 @@ public class RouteLeg extends BaseEntity {
     @Column(nullable = false, length = 10)
     private TransportMode mode;
 
-    /** Road legs only. */
+    /**
+     * Road legs only.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;

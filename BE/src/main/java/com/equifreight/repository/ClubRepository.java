@@ -12,6 +12,8 @@ public interface ClubRepository extends JpaRepository<Club, UUID> {
 
     Optional<Club> findByBookingEmail(String bookingEmail);
 
-    /** Flow 3's seeder looks the demo club up by name. */
+    /**
+     * Flow 3's seeder looks the demo club up by name.
+     */
     Optional<Club> findByName(String name);
 }

@@ -15,7 +15,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** A malformed field answers 400 with an ApiError (spec H-01), never a 500. */
+/**
+ * A malformed field answers 400 with an ApiError (spec H-01), never a 500.
+ */
 class HorseControllerTest {
 
     private MockMvc mvc;
