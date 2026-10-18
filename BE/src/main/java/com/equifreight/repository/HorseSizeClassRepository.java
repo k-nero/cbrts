@@ -11,7 +11,9 @@ import java.util.UUID;
 @Repository
 public interface HorseSizeClassRepository extends JpaRepository<HorseSizeClass, UUID> {
 
-    /** Ordered as HorseSizing.sizeClassFor expects. */
+    /**
+     * Ordered as HorseSizing.sizeClassFor expects.
+     */
     List<HorseSizeClass> findAllByOrderByMinHeightHhAsc();
 
     Optional<HorseSizeClass> findByCode(String code);

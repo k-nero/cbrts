@@ -13,11 +13,16 @@ public final class BusinessTime {
 
     public static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    /** A date in messages: "17 Oct 2026". */
+    /**
+     * A date in messages: "17 Oct 2026".
+     */
     public static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
-    /** A date inside a sentence about one trip: "29 Oct". */
+    /**
+     * A date inside a sentence about one trip: "29 Oct".
+     */
     public static final DateTimeFormatter SHORT_DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
-    private BusinessTime() {}
+    private BusinessTime() {
+    }
 }

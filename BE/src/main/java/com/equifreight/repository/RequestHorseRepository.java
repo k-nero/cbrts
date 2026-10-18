@@ -7,11 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Repository
 public interface RequestHorseRepository extends JpaRepository<RequestHorse, RequestHorse.Key> {
@@ -24,7 +20,9 @@ public interface RequestHorseRepository extends JpaRepository<RequestHorse, Requ
             + " and rh.request.submittedAt is not null")
     Set<UUID> findHorseIdsOnSubmittedRequests(@Param("horseIds") Collection<UUID> horseIds);
 
-    /** Codes of the submitted requests the horse was on, newest first; the lock message names the first. */
+    /**
+     * Codes of the submitted requests the horse was on, newest first; the lock message names the first.
+     */
     @Query("select r.code from RequestHorse rh join rh.request r where rh.horse.id = :horseId"
             + " and r.submittedAt is not null order by r.submittedAt desc")
     List<String> findSubmittedRequestCodes(@Param("horseId") UUID horseId);
@@ -42,15 +40,15 @@ public interface RequestHorseRepository extends JpaRepository<RequestHorse, Requ
     List<HorseUse> findActiveUses(@Param("horseId") UUID horseId,
                                   @Param("activeStatuses") Collection<RequestStatus> activeStatuses);
 
-    interface HorseUse {
-        String getCode();
-
-        RequestStatus getStatus();
-    }
-
     List<RequestHorse> findByRequest_Id(UUID requestId);
 
     boolean existsByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
 
     Optional<RequestHorse> findByRequest_IdAndHorse_Id(UUID requestId, UUID horseId);
+
+    interface HorseUse {
+        String getCode();
+
+        RequestStatus getStatus();
+    }
 }

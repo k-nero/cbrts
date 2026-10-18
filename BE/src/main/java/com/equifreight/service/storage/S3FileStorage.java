@@ -3,15 +3,17 @@ package com.equifreight.service.storage;
 import com.equifreight.exception.StorageException;
 import org.springframework.core.io.InputStreamSource;
 import software.amazon.awssdk.core.exception.SdkException;
-import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 
-/** {@link FileStorage} on any S3-compatible service, all files in one bucket. Closing it closes the client. */
+/**
+ * {@link FileStorage} on any S3-compatible service, all files in one bucket. Closing it closes the client.
+ */
 public class S3FileStorage implements FileStorage {
 
     private final S3Client s3;

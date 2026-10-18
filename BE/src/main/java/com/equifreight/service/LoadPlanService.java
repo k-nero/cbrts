@@ -308,7 +308,7 @@ public class LoadPlanService {
         }
 
         if (!state.getConflicts().isEmpty()) {
-            throw new BusinessException("Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first (" + state.getConflicts().get(0).getDescription() + ")");
+            throw new BusinessException("Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first (" + state.getConflicts().getFirst().getDescription() + ")");
         }
 
         // The vehicle is booked for the trip's planned dates, which the confirmed route sets.
@@ -322,7 +322,7 @@ public class LoadPlanService {
 
         // Check overlapping bookings excluding this job
         List<VehicleBooking> overlaps = vehicleBookingRepository.findOverlappingBookings(
-                plan.getVehicle().getId(), startsAt, endsAt, null).stream()
+                        plan.getVehicle().getId(), startsAt, endsAt, null).stream()
                 .filter(b -> b.getJob() == null || !b.getJob().getId().equals(job.getId()))
                 .toList();
         if (!overlaps.isEmpty()) {
@@ -331,7 +331,7 @@ public class LoadPlanService {
 
         // Create or update vehicle booking
         List<VehicleBooking> jobBookings = vehicleBookingRepository.findByJobId(job.getId());
-        VehicleBooking booking = jobBookings.isEmpty() ? new VehicleBooking() : jobBookings.get(0);
+        VehicleBooking booking = jobBookings.isEmpty() ? new VehicleBooking() : jobBookings.getFirst();
         booking.setVehicle(plan.getVehicle());
         booking.setJob(job);
         booking.setKind(com.equifreight.entity.enums.BookingKind.JOB);

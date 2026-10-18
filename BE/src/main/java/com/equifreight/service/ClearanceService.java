@@ -13,12 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Flow 2: Clearance Dossier and Legal Document Management Service (AGENTS.md).
@@ -55,7 +50,27 @@ public class ClearanceService {
         this.fileService = fileService;
     }
 
-    /** Retrieve all checklist items for a transport job. */
+    /**
+     * Only the most recent submission to an authority for a kind counts; earlier ones are history.
+     */
+    private static List<AuthoritySubmission> latestPerAuthorityAndKind(List<AuthoritySubmission> submissions) {
+        Map<String, AuthoritySubmission> latest = new LinkedHashMap<>();
+        Comparator<AuthoritySubmission> byTime = Comparator.comparing(ClearanceService::submittedAt,
+                Comparator.nullsFirst(Comparator.naturalOrder()));
+        for (AuthoritySubmission s : submissions) {
+            String key = (s.getAuthority() != null ? s.getAuthority().getId() : null) + "|" + s.getKind();
+            latest.merge(key, s, (a, b) -> byTime.compare(a, b) >= 0 ? a : b);
+        }
+        return new ArrayList<>(latest.values());
+    }
+
+    private static Instant submittedAt(AuthoritySubmission s) {
+        return s.getFiledAt() != null ? s.getFiledAt() : s.getCreatedAt();
+    }
+
+    /**
+     * Retrieve all checklist items for a transport job.
+     */
     @Transactional(readOnly = true)
     public List<ChecklistItemResponse> getChecklist(UUID jobId) {
         findJobOrThrow(jobId);
@@ -64,7 +79,9 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** Customer-scoped checklist: checks that the job belongs to the authenticated customer's club. */
+    /**
+     * Customer-scoped checklist: checks that the job belongs to the authenticated customer's club.
+     */
     @Transactional(readOnly = true)
     public List<ChecklistItemResponse> getCustomerChecklist(UUID jobId, User customer) {
         TransportJob job = findJobOrThrow(jobId);
@@ -74,14 +91,18 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** Retrieve unreviewed document versions for the specialist inbox with pagination. */
+    /**
+     * Retrieve unreviewed document versions for the specialist inbox with pagination.
+     */
     @Transactional(readOnly = true)
     public Page<DocumentVersionResponse> getPendingReviews(Pageable pageable) {
         return documentVersionRepository.findAllByReview(DocumentReview.PENDING, pageable)
                 .map(ClearanceMapper::toVersionResponse);
     }
 
-    /** Retrieve unreviewed document versions for the specialist inbox as a list. */
+    /**
+     * Retrieve unreviewed document versions for the specialist inbox as a list.
+     */
     @Transactional(readOnly = true)
     public List<DocumentVersionResponse> getPendingReviews() {
         return documentVersionRepository.findAllByReview(DocumentReview.PENDING).stream()
@@ -89,7 +110,9 @@ public class ClearanceService {
                 .toList();
     }
 
-    /** Jobs whose dossier is still open (not departed) for the specialist's job picker, searchable by code or club. */
+    /**
+     * Jobs whose dossier is still open (not departed) for the specialist's job picker, searchable by code or club.
+     */
     @Transactional(readOnly = true)
     public Page<JobSummaryResponse> getActiveJobs(String q, Pageable pageable) {
         return transportJobRepository.findOpenDossiers(q == null ? "" : q.strip(), pageable)
@@ -102,7 +125,9 @@ public class ClearanceService {
                         .build());
     }
 
-    /** Customer document upload: enforces that the checklist item belongs to the customer's club job (US-F2-03). */
+    /**
+     * Customer document upload: enforces that the checklist item belongs to the customer's club job (US-F2-03).
+     */
     @Transactional
     public ChecklistItemResponse uploadCustomerDocumentVersion(UUID checklistItemId, DocumentUploadRequest request, User customer) {
         ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
@@ -264,7 +289,7 @@ public class ClearanceService {
      * 1. All mandatory items are CLEARED with GREEN validity.
      * 2. All required quarantine periods are completed.
      * 3. The latest submission to each authority for each kind is ISSUED. A refusal that was
-     *    re-filed and then issued no longer blocks; an earlier issue that was later refused does.
+     * re-filed and then issued no longer blocks; an earlier issue that was later refused does.
      * The dossier status is derived here and nowhere else, so filing, info requests and reviews
      * all go through the same departure guard.
      */
@@ -352,14 +377,18 @@ public class ClearanceService {
         evaluateClearanceGate(jobId);
     }
 
-    /** Retrieve clearance gate status without mutating state. */
+    /**
+     * Retrieve clearance gate status without mutating state.
+     */
     @Transactional(readOnly = true)
     public ClearanceStatusResponse getClearanceStatus(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
         return assess(job).toResponse(job);
     }
 
-    /** What the gate sees for a job right now; shared by the evaluating and the read-only path. */
+    /**
+     * What the gate sees for a job right now; shared by the evaluating and the read-only path.
+     */
     private GateAssessment assess(TransportJob job) {
         List<ChecklistItem> items = checklistItemRepository.findByJobId(job.getId());
         List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(job.getId());
@@ -412,7 +441,8 @@ public class ClearanceService {
                     hasPending = true;
                     outstandingIssues.add(String.format("Authority submission %s pending with %s (%s)", s.getKind(), authName, s.getStatus()));
                 }
-                case ISSUED -> { }
+                case ISSUED -> {
+                }
             }
         }
 
@@ -423,20 +453,22 @@ public class ClearanceService {
                 ready, hasPending, hasAdditionalInfo, outstandingIssues);
     }
 
-    /** Only the most recent submission to an authority for a kind counts; earlier ones are history. */
-    private static List<AuthoritySubmission> latestPerAuthorityAndKind(List<AuthoritySubmission> submissions) {
-        Map<String, AuthoritySubmission> latest = new LinkedHashMap<>();
-        Comparator<AuthoritySubmission> byTime = Comparator.comparing(ClearanceService::submittedAt,
-                Comparator.nullsFirst(Comparator.naturalOrder()));
-        for (AuthoritySubmission s : submissions) {
-            String key = (s.getAuthority() != null ? s.getAuthority().getId() : null) + "|" + s.getKind();
-            latest.merge(key, s, (a, b) -> byTime.compare(a, b) >= 0 ? a : b);
+    private void assertClubOwnsJob(TransportJob job, User user) {
+        if (user == null || user.getClub() == null || job == null || job.getRequest() == null
+                || job.getRequest().getClub() == null
+                || !user.getClub().getId().equals(job.getRequest().getClub().getId())) {
+            throw ResourceNotFoundException.of("TransportJob", job != null ? job.getId() : null);
         }
-        return new ArrayList<>(latest.values());
     }
 
-    private static Instant submittedAt(AuthoritySubmission s) {
-        return s.getFiledAt() != null ? s.getFiledAt() : s.getCreatedAt();
+    private TransportJob findJobOrThrow(UUID jobId) {
+        return transportJobRepository.findById(jobId)
+                .orElseThrow(() -> ResourceNotFoundException.of("TransportJob", jobId));
+    }
+
+    private ChecklistItem findChecklistItemOrThrow(UUID checklistItemId) {
+        return checklistItemRepository.findById(checklistItemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", checklistItemId));
     }
 
     private record GateAssessment(int totalItems, int mandatoryItems, int clearedMandatoryItems,
@@ -459,23 +491,5 @@ public class ClearanceService {
                     .outstandingIssues(outstandingIssues)
                     .build();
         }
-    }
-
-    private void assertClubOwnsJob(TransportJob job, User user) {
-        if (user == null || user.getClub() == null || job == null || job.getRequest() == null
-                || job.getRequest().getClub() == null
-                || !user.getClub().getId().equals(job.getRequest().getClub().getId())) {
-            throw ResourceNotFoundException.of("TransportJob", job != null ? job.getId() : null);
-        }
-    }
-
-    private TransportJob findJobOrThrow(UUID jobId) {
-        return transportJobRepository.findById(jobId)
-                .orElseThrow(() -> ResourceNotFoundException.of("TransportJob", jobId));
-    }
-
-    private ChecklistItem findChecklistItemOrThrow(UUID checklistItemId) {
-        return checklistItemRepository.findById(checklistItemId)
-                .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", checklistItemId));
     }
 }

@@ -1,7 +1,9 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.SubmissionKind;
+import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.clearance.CreateAuthoritySubmissionRequest;
 import com.equifreight.model.clearance.UpdateAuthoritySubmissionRequest;
@@ -19,24 +21,36 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthoritySubmissionServiceTest {
 
-    @Mock private AuthorityRepository authorityRepository;
-    @Mock private AuthoritySubmissionRepository submissionRepository;
-    @Mock private QuarantinePeriodRepository quarantinePeriodRepository;
-    @Mock private TransportJobRepository transportJobRepository;
-    @Mock private ChecklistItemRepository checklistItemRepository;
-    @Mock private PlaceRepository placeRepository;
-    @Mock private HorseRepository horseRepository;
-    @Mock private FileService fileService;
-    @Mock private AuditService auditService;
-    @Mock private ClearanceService clearanceService;
-    @Mock private NotificationService notificationService;
+    @Mock
+    private AuthorityRepository authorityRepository;
+    @Mock
+    private AuthoritySubmissionRepository submissionRepository;
+    @Mock
+    private QuarantinePeriodRepository quarantinePeriodRepository;
+    @Mock
+    private TransportJobRepository transportJobRepository;
+    @Mock
+    private ChecklistItemRepository checklistItemRepository;
+    @Mock
+    private PlaceRepository placeRepository;
+    @Mock
+    private HorseRepository horseRepository;
+    @Mock
+    private FileService fileService;
+    @Mock
+    private AuditService auditService;
+    @Mock
+    private ClearanceService clearanceService;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private AuthoritySubmissionService service;

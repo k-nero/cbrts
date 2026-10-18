@@ -14,6 +14,8 @@ public class ReviewDocumentRequest {
     @NotNull(message = "Review decision is required")
     private DocumentReview review;
 
-    /** Required when review == REJECTED (BR-F2-07). */
+    /**
+     * Required when review == REJECTED (BR-F2-07).
+     */
     private String rejectReason;
 }

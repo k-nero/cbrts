@@ -165,8 +165,8 @@ public class RequestService {
                     blockers.stream().map(Blocker::getMessage).toList());
         }
         // No blocker means a resolved corridor with a known lead time (ROUTE_NOT_RUN, CATALOG_INCOMPLETE).
-        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(), today,
-                request.getDepartureDate());
+        LeadTimeResponse leadTime = LeadTimePolicy.assess(resolution.route().getLeadTimeDays(),
+                request.getDateFlexDays(), today, request.getDepartureDate());
 
         boolean resubmission = request.getCode() != null;
         RequestStatus before = request.getStatus();
@@ -198,14 +198,21 @@ public class RequestService {
                 horsesSummary(resubmission ? "Sent version " + revisionNo + " with " : "Submitted with ", names),
                 ENTITY_TYPE, saved.getId(), code, null, "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"SUBMITTED\"}");
-        audit.recordSystem("LEAD_TIME_CHECKED", "Lead time checked: " + leadTime.getDaysBeforeDeparture()
-                        + " days before departure, " + leadTime.getRequiredDays() + " required.",
+        audit.recordSystem("LEAD_TIME_CHECKED", leadTimeSummary(leadTime, request.getDateFlexDays()),
                 ENTITY_TYPE, saved.getId(), code, null, null);
         return RequestMapper.toResponse(saved, resolution.route(), null, List.of(), revisionsOf(saved));
     }
 
     static String submittedSummary(List<String> names) {
         return horsesSummary("Submitted with ", names);
+    }
+
+    /** "Lead time checked: 24 days before departure, 21 required, plus 3 for dates that can move by ±3 days." */
+    static String leadTimeSummary(LeadTimeResponse leadTime, int flexDays) {
+        return "Lead time checked: " + leadTime.getDaysBeforeDeparture() + " days before departure, "
+                + leadTime.getRequiredDays() + " required"
+                + (flexDays == 0 ? "" : ", plus " + flexDays + " for dates that can move by ±" + flexDays + " days")
+                + ".";
     }
 
     /**
@@ -294,7 +301,7 @@ public class RequestService {
                 throw ResourceNotFoundException.of("Horse", input.getHorseId());
             }
             if (!seen.add(horse.getId())) {
-                throw new BusinessException("HORSE_DUPLICATE", horse.getName() + " is on the request twice.");
+                throw new BusinessException("HORSE_LISTED_TWICE", horse.getName() + " is on the request twice.");
             }
             if (horse.getArchivedAt() != null && !alreadyOn.contains(horse.getId())) {
                 throw new ConflictException("HORSE_ARCHIVED",
@@ -434,7 +441,8 @@ public class RequestService {
         RouteResponse route = resolution.route();
         LeadTimeResponse leadTime = route == null || route.getLeadTimeDays() == null
                 || request.getDepartureDate() == null ? null
-                : LeadTimePolicy.assess(route.getLeadTimeDays(), today, request.getDepartureDate());
+                : LeadTimePolicy.assess(route.getLeadTimeDays(), request.getDateFlexDays(), today,
+                        request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         return RequestMapper.toResponse(request, route, leadTime, blockers, revisionsOf(request));
     }

@@ -42,7 +42,9 @@ public class RoutePlan extends BaseEntity {
 
     private Instant supersededAt;
 
-    /** "Re-routed via Poipet: Mộc Bài closed to vehicles over 10 t". */
+    /**
+     * "Re-routed via Poipet: Mộc Bài closed to vehicles over 10 t".
+     */
     @Column(length = 500)
     private String changeReason;
 

@@ -13,7 +13,9 @@ import java.util.UUID;
 public interface RegulationCatalogRepository extends JpaRepository<RegulationCatalog, UUID>,
         JpaSpecificationExecutor<RegulationCatalog> {
 
-    /** A country's catalog ("VN"). */
+    /**
+     * A country's catalog ("VN").
+     */
     Optional<RegulationCatalog> findByCountryCode(String countryCode);
 
     boolean existsByCountryCode(String countryCode);

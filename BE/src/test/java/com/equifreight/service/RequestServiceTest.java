@@ -200,7 +200,7 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body(shadowfax, shadowfax)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Shadowfax is on the request twice.")
-                .extracting("code").isEqualTo("HORSE_DUPLICATE");
+                .extracting("code").isEqualTo("HORSE_LISTED_TWICE");
     }
 
     @Test
@@ -683,6 +683,17 @@ class RequestServiceTest {
                     "{\"status\":\"DRAFT\"}", "{\"status\":\"SUBMITTED\"}");
             verify(audit).recordSystem("LEAD_TIME_CHECKED",
                     "Lead time checked: 34 days before departure, 21 required.",
+                    "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
+        }
+
+        @Test
+        void theLeadTimeAuditRowCountsTheDateFlex() {
+            draft.setDateFlexDays((short) 3);
+
+            service.submit(user, draft.getId());
+
+            verify(audit).recordSystem("LEAD_TIME_CHECKED",
+                    "Lead time checked: 34 days before departure, 21 required, plus 3 for dates that can move by ±3 days.",
                     "TRANSPORT_REQUEST", draft.getId(), "REQ-2026-0193", null, null);
         }
 

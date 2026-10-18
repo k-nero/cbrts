@@ -55,6 +55,23 @@ class ClearanceServiceTest {
     private ChecklistItem checklistItem;
     private DocumentVersion documentVersion;
 
+    private static Authority authority(String name) {
+        Authority authority = new Authority();
+        authority.setId(UUID.randomUUID());
+        authority.setName(name);
+        return authority;
+    }
+
+    private static AuthoritySubmission submission(Authority authority, SubmissionStatus status, Instant filedAt) {
+        AuthoritySubmission submission = new AuthoritySubmission();
+        submission.setId(UUID.randomUUID());
+        submission.setAuthority(authority);
+        submission.setKind(SubmissionKind.IMPORT_PERMIT);
+        submission.setStatus(status);
+        submission.setFiledAt(filedAt);
+        return submission;
+    }
+
     @BeforeEach
     void setUp() {
         Role specialistRole = new Role();
@@ -357,22 +374,5 @@ class ClearanceServiceTest {
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(submissions);
-    }
-
-    private static Authority authority(String name) {
-        Authority authority = new Authority();
-        authority.setId(UUID.randomUUID());
-        authority.setName(name);
-        return authority;
-    }
-
-    private static AuthoritySubmission submission(Authority authority, SubmissionStatus status, Instant filedAt) {
-        AuthoritySubmission submission = new AuthoritySubmission();
-        submission.setId(UUID.randomUUID());
-        submission.setAuthority(authority);
-        submission.setKind(SubmissionKind.IMPORT_PERMIT);
-        submission.setStatus(status);
-        submission.setFiledAt(filedAt);
-        return submission;
     }
 }

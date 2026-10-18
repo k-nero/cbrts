@@ -22,7 +22,9 @@ import java.util.List;
 @Table(name = "invoices")
 public class Invoice extends BaseEntity {
 
-    /** INV-2026-0041. */
+    /**
+     * INV-2026-0041.
+     */
     @Column(nullable = false, unique = true, length = 16)
     private String code;
 
@@ -30,12 +32,16 @@ public class Invoice extends BaseEntity {
     @Column(nullable = false, length = 12)
     private InvoiceKind kind;
 
-    /** The accepted version; its currency is the invoice currency. */
+    /**
+     * The accepted version; its currency is the invoice currency.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quotation_id", nullable = false)
     private Quotation quotation;
 
-    /** Null for the deposit invoice (the job is created at approval, after acceptance). */
+    /**
+     * Null for the deposit invoice (the job is created at approval, after acceptance).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_id")
     private TransportJob job;
@@ -54,13 +60,17 @@ public class Invoice extends BaseEntity {
 
     private Instant issuedAt;
 
-    /** 7 days after issue. */
+    /**
+     * 7 days after issue.
+     */
     private LocalDate dueOn;
 
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
 
-    /** A single rate (e.g. Vietnam VAT) set per invoice. */
+    /**
+     * A single rate (e.g. Vietnam VAT) set per invoice.
+     */
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal taxPct = BigDecimal.ZERO;
 
@@ -70,7 +80,9 @@ public class Invoice extends BaseEntity {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
-    /** Updated with the status in the same transaction as a confirmed payment. */
+    /**
+     * Updated with the status in the same transaction as a confirmed payment.
+     */
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amountPaid = BigDecimal.ZERO;
 
@@ -79,7 +91,9 @@ public class Invoice extends BaseEntity {
     @Column(length = 500)
     private String voidReason;
 
-    /** Set exactly for a credit note. */
+    /**
+     * Set exactly for a credit note.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "corrects_invoice_id")
     private Invoice correctsInvoice;

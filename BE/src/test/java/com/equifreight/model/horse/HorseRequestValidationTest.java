@@ -14,7 +14,9 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** H-01: name, sex, height, microchip, passport number and declared value are required. */
+/**
+ * H-01: name, sex, height, microchip, passport number and declared value are required.
+ */
 class HorseRequestValidationTest {
 
     private static Validator validator;
@@ -22,6 +24,17 @@ class HorseRequestValidationTest {
     @BeforeAll
     static void setUp() {
         validator = Validation.buildDefaultValidatorFactory().getValidator();
+    }
+
+    private static HorseRequest complete() {
+        HorseRequest request = new HorseRequest();
+        request.setName("Nightfall");
+        request.setSex(HorseSex.MARE);
+        request.setHeightHh(new BigDecimal("16.0"));
+        request.setMicrochip("250259600223311");
+        request.setPassportNo("VN-PP-2022-0188");
+        request.setDeclaredValue(new BigDecimal("240000"));
+        return request;
     }
 
     @ParameterizedTest
@@ -47,16 +60,5 @@ class HorseRequestValidationTest {
     @Test
     void aCompleteRequestIsValid() {
         assertThat(validator.validate(complete())).isEmpty();
-    }
-
-    private static HorseRequest complete() {
-        HorseRequest request = new HorseRequest();
-        request.setName("Nightfall");
-        request.setSex(HorseSex.MARE);
-        request.setHeightHh(new BigDecimal("16.0"));
-        request.setMicrochip("250259600223311");
-        request.setPassportNo("VN-PP-2022-0188");
-        request.setDeclaredValue(new BigDecimal("240000"));
-        return request;
     }
 }

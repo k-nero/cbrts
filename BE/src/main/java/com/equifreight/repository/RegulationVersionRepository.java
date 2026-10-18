@@ -17,14 +17,20 @@ import java.util.UUID;
 public interface RegulationVersionRepository extends JpaRepository<RegulationVersion, UUID>,
         JpaSpecificationExecutor<RegulationVersion> {
 
-    /** Every version of one country's catalog. */
+    /**
+     * Every version of one country's catalog.
+     */
     List<RegulationVersion> findByCatalogId(UUID catalogId);
 
-    /** A catalog's versions in one status, newest version first. */
+    /**
+     * A catalog's versions in one status, newest version first.
+     */
     @Query("SELECT rv FROM RegulationVersion rv WHERE rv.catalog.id = :catalogId AND rv.status = :status ORDER BY rv.versionNo DESC")
     List<RegulationVersion> findByCatalogIdAndStatusOrdered(@Param("catalogId") UUID catalogId,
-            @Param("status") CatalogStatus status);
+                                                            @Param("status") CatalogStatus status);
 
-    /** The one draft of a catalog (at most one). */
+    /**
+     * The one draft of a catalog (at most one).
+     */
     Optional<RegulationVersion> findByCatalogIdAndStatus(UUID catalogId, CatalogStatus status);
 }

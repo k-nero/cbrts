@@ -10,4 +10,5 @@ public record TripSummaryResponse(
         String origin,
         String destination,
         Instant lastUpdate
-) {}
+) {
+}

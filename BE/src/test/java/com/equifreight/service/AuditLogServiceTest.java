@@ -15,11 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -46,6 +42,19 @@ class AuditLogServiceTest {
     private TransportJobRepository transportJobRepository;
 
     private AuditLogService service;
+
+    private static AuditLog entry(String code) {
+        AuditLog log = new AuditLog();
+        log.setId(UUID.randomUUID());
+        log.setOccurredAt(Instant.parse("2026-09-26T04:31:00Z"));
+        log.setActorLabel("System");
+        log.setActorRole("SYSTEM");
+        log.setChannel(Channel.SYSTEM);
+        log.setAction("DOCUMENT_REJECTED");
+        log.setSummary("Summary");
+        log.setEntityCode(code);
+        return log;
+    }
 
     @BeforeEach
     void setUp() {
@@ -191,18 +200,5 @@ class AuditLogServiceTest {
     void formulaCellsAreDefused() {
         assertEquals("\"'=HYPERLINK(\"\"x\"\")\"", AuditLogService.cell("=HYPERLINK(\"x\")"));
         assertEquals("", AuditLogService.cell(null));
-    }
-
-    private static AuditLog entry(String code) {
-        AuditLog log = new AuditLog();
-        log.setId(UUID.randomUUID());
-        log.setOccurredAt(Instant.parse("2026-09-26T04:31:00Z"));
-        log.setActorLabel("System");
-        log.setActorRole("SYSTEM");
-        log.setChannel(Channel.SYSTEM);
-        log.setAction("DOCUMENT_REJECTED");
-        log.setSummary("Summary");
-        log.setEntityCode(code);
-        return log;
     }
 }

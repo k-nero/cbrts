@@ -10,7 +10,9 @@ public class BusinessException extends RuntimeException {
         this(null, message);
     }
 
-    /** When {@code code} is set, {@link com.equifreight.configuration.ControllerAdvise} maps it to ApiError.error. */
+    /**
+     * When {@code code} is set, {@link com.equifreight.configuration.ControllerAdvise} maps it to ApiError.error.
+     */
     public BusinessException(String code, String message) {
         super(message);
         this.code = code;

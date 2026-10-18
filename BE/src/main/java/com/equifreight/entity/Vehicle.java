@@ -15,7 +15,9 @@ import java.util.List;
 @Table(name = "vehicles")
 public class Vehicle extends BaseEntity {
 
-    /** TX-447. */
+    /**
+     * TX-447.
+     */
     @Column(nullable = false, unique = true, length = 20)
     private String code;
 

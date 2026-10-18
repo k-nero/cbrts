@@ -7,7 +7,7 @@ import com.equifreight.entity.RegulationRule;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.enums.RegulationRuleKind;
 import com.equifreight.entity.enums.Validity;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -17,10 +17,8 @@ import java.time.temporal.ChronoUnit;
  * Evaluates document versions against the job's planned schedule and pinned regulation rules.
  * All calendar day calculations work in the business calendar time zone (Asia/Ho_Chi_Minh).
  */
-@Component
+@Service
 public class ValidityEngine {
-
-    public record Result(Validity validity, String note) {}
 
     public Result evaluate(ChecklistItem item, DocumentVersion version, TransportJob job) {
         if (version == null) {
@@ -49,7 +47,7 @@ public class ValidityEngine {
             case WINDOW_BEFORE_DEPARTURE -> evaluateWindowBeforeDeparture(rule, version, departureDate);
             case VALID_THROUGH_ARRIVAL_PLUS -> evaluateValidThroughArrivalPlus(rule, version, arrivalDate);
             case BOOSTER_WINDOW -> evaluateBoosterWindow(rule, version, departureDate);
-            case PRESENCE_ONLY -> new Result(Validity.GREEN, "Valid document.");
+            default -> throw new IllegalStateException("Unexpected value: " + kind);
         };
     }
 
@@ -96,7 +94,7 @@ public class ValidityEngine {
         }
 
         short bufferDays = (rule.getVersion() != null)
-                ? (short) rule.getVersion().getArrivalBufferDays()
+                ? rule.getVersion().getArrivalBufferDays()
                 : 2;
 
         LocalDate requiredDate = arrivalDate.plusDays(bufferDays);
@@ -146,5 +144,8 @@ public class ValidityEngine {
         return new Result(Validity.GREEN, String.format(
                 "Booster vaccination valid: administered %d days before departure (allowed window: %s to %s days).",
                 daysBefore, minDays != null ? minDays : 0, maxDays != null ? maxDays : "unlimited"));
+    }
+
+    public record Result(Validity validity, String note) {
     }
 }

@@ -11,14 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -63,13 +56,17 @@ public class HorseController {
         return horseService.update(user, id, request);
     }
 
-    /** Archived, never deleted. */
+    /**
+     * Archived, never deleted.
+     */
     @PostMapping("/horses/{id}/archive")
     public HorseResponse archive(@AuthenticationPrincipal User user, @PathVariable UUID id) {
         return horseService.archive(user, id);
     }
 
-    /** The height bands, so a form can show the derived class as the height is typed. */
+    /**
+     * The height bands, so a form can show the derived class as the height is typed.
+     */
     @GetMapping("/horse-size-classes")
     public List<SizeClassResponse> sizeClasses() {
         return horseService.sizeClasses();

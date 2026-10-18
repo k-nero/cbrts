@@ -7,15 +7,20 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
 
+@Repository
 public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, CrewAssignment.Key> {
     List<CrewAssignment> findByJobId(UUID jobId);
+
     void deleteByJobId(UUID jobId);
 
-    /** The escort's upcoming and active trips (US-F4-01): closed jobs drop off the list. */
+    /**
+     * The escort's upcoming and active trips (US-F4-01): closed jobs drop off the list.
+     */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,

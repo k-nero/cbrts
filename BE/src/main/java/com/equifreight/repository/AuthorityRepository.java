@@ -13,12 +13,18 @@ import java.util.UUID;
 public interface AuthorityRepository extends JpaRepository<Authority, UUID>,
         JpaSpecificationExecutor<Authority> {
 
-    /** Lấy danh sách cơ quan chức năng theo quốc gia. */
+    /**
+     * Lấy danh sách cơ quan chức năng theo quốc gia.
+     */
     List<Authority> findByCountryCode(String countryCode);
 
-    /** Lấy danh sách theo loại cơ quan: VETERINARY | CUSTOMS | QUARANTINE. */
+    /**
+     * Lấy danh sách theo loại cơ quan: VETERINARY | CUSTOMS | QUARANTINE.
+     */
     List<Authority> findByKind(AuthorityKind kind);
 
-    /** Lấy theo quốc gia và loại cơ quan. */
+    /**
+     * Lấy theo quốc gia và loại cơ quan.
+     */
     List<Authority> findByCountryCodeAndKind(String countryCode, AuthorityKind kind);
 }

@@ -14,4 +14,5 @@ public record TripConditionRequest(
         Boolean eating,
         @Size(max = 500) String note,
         @Size(max = 8) List<@NotNull UUID> photoFileIds
-) {}
+) {
+}

@@ -9,7 +9,9 @@ import org.hibernate.annotations.Immutable;
 import java.util.HashSet;
 import java.util.Set;
 
-/** A horse's condition at a trip record. Append-only (trigger). */
+/**
+ * A horse's condition at a trip record. Append-only (trigger).
+ */
 @Setter
 @Getter
 @Entity
@@ -36,7 +38,9 @@ public class ConditionLog extends BaseEntity {
     @Column(length = 500)
     private String note;
 
-    /** Photos attached to this condition entry; the join table is append-only. */
+    /**
+     * Photos attached to this condition entry; the join table is append-only.
+     */
     @ManyToMany
     @JoinTable(
             name = "condition_log_files",

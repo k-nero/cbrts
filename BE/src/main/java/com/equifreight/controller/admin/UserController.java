@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-/** Users & roles (logistics manager). Access is enforced on /api/v1/admin/** in ApplicationConfiguration. */
+/**
+ * Users & roles (logistics manager). Access is enforced on /api/v1/admin/** in ApplicationConfiguration.
+ */
 @RestController
 @RequestMapping("/api/v1/admin/users")
 public class UserController {
