@@ -71,10 +71,10 @@ class ControllerAdviseTest {
         ResponseEntity<ApiError> response = advice.handleGeneric(new IllegalStateException(SQL_LEAK));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody().getError()).isEqualTo("Internal Server Error");
-        assertThat(response.getBody().getMessage())
+        assertThat(response.getBody().error()).isEqualTo("Internal Server Error");
+        assertThat(response.getBody().message())
                 .isEqualTo("Something went wrong on our side. Try again, and tell us if it keeps happening.");
-        assertThat(response.getBody().getDetails()).isNull();
+        assertThat(response.getBody().details()).isNull();
     }
 
     @Test
@@ -82,11 +82,11 @@ class ControllerAdviseTest {
         ResponseEntity<ApiError> response = advice.handleDataIntegrity(new DataIntegrityViolationException(SQL_LEAK));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(response.getBody().getError()).isEqualTo("DATA_CONFLICT");
-        assertThat(response.getBody().getMessage())
+        assertThat(response.getBody().error()).isEqualTo("DATA_CONFLICT");
+        assertThat(response.getBody().message())
                 .isEqualTo("This change conflicts with existing data. Reload and try again.")
                 .doesNotContain("transport_requests")
                 .doesNotContain("Failing row");
-        assertThat(response.getBody().getDetails()).isNull();
+        assertThat(response.getBody().details()).isNull();
     }
 }
