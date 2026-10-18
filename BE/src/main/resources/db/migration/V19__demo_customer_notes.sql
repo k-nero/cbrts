@@ -25,7 +25,7 @@ begin
     if v_user_customer is null then
         v_user_customer := 'a0000000-0000-0000-0000-000000000011';
         insert into users (id, email, first_name, last_name, password, status)
-        values (v_user_customer, 'bookings@saigonturf.vn', 'Saigon Turf', 'Club', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        values (v_user_customer, 'bookings@saigonturf.vn', 'Saigon Turf', 'Club', '$2a$10$PzpKHXD0WljMQybXXcSxA..EpvrYs/R22PktrFXxqllkHGWaO.dJ6', 'ACTIVE')
         on conflict (email) do update set email = excluded.email
         returning id into v_user_customer;
 
@@ -38,7 +38,7 @@ begin
     if v_user_lan is null then
         v_user_lan := 'a0000000-0000-0000-0000-000000000013';
         insert into users (id, email, first_name, last_name, staff_code, password, status)
-        values (v_user_lan, 'lan.nguyen@equifreight.vn', 'Thị Lan', 'Nguyễn', 'EF-002', '$2a$10$wT3wF2J15P45zQ992/3kOu19xUqZ08a7nI9366N6b9/iVb9rWp97e', 'ACTIVE')
+        values (v_user_lan, 'lan.nguyen@equifreight.vn', 'Thị Lan', 'Nguyễn', 'EF-002', '$2a$10$PzpKHXD0WljMQybXXcSxA..EpvrYs/R22PktrFXxqllkHGWaO.dJ6', 'ACTIVE')
         on conflict (email) do update set email = excluded.email
         returning id into v_user_lan;
 

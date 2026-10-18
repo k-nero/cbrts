@@ -206,17 +206,17 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         for (String[] u : USERS) {
-            if (userRepository.getByEmail(u[0]) != null) {
-                continue;
+            User user = userRepository.getByEmail(u[0]);
+            if (user == null) {
+                user = new User();
+                user.setEmail(u[0]);
+                user.setFirstName(u[1]);
+                user.setLastName(u[2]);
+                user.setRoles(Set.of(roleRepository.findByName(u[3]).orElseThrow()));
             }
-            User user = new User();
-            user.setEmail(u[0]);
-            user.setFirstName(u[1]);
-            user.setLastName(u[2]);
             user.setPassword(passwordEncoder.encode(seedPassword));
-            user.setRoles(Set.of(roleRepository.findByName(u[3]).orElseThrow()));
             userRepository.save(user);
-            log.info("Seeded {} ({})", u[0], u[3]);
+            log.info("Seeded/Updated {} ({})", u[0], u[3]);
         }
     }
 
