@@ -8,16 +8,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-/** #115: only the fleet & route coordinator sets a route's flex days; any staff member can read them. */
+/** #115: the fleet & route coordinator and the logistics manager set a route's flex days; any staff member reads them. */
 class CorridorControllerTest {
 
     @Test
-    void onlyTheFleetCoordinatorSetsARoutesFlexDays() throws NoSuchMethodException {
+    void theFleetCoordinatorAndTheManagerSetARoutesFlexDays() throws NoSuchMethodException {
         PreAuthorize rule = CorridorController.class
                 .getMethod("setDateFlex", User.class, UUID.class, DateFlexRequest.class)
                 .getAnnotation(PreAuthorize.class);
 
         assertThat(rule).isNotNull();
-        assertThat(rule.value()).isEqualTo("hasRole('FLEET_COORDINATOR')");
+        assertThat(rule.value()).isEqualTo("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')");
     }
 }

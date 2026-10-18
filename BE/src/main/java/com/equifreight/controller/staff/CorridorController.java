@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The routes we run (#115). Any staff member can read them; only the fleet & route coordinator, who knows the
- * roads, sets how far a request's flexible dates can move on each.
+ * The routes we run (#115). Any staff member can read them; the fleet & route coordinator, who knows the roads,
+ * and the logistics manager set how far a request's flexible dates can move on each.
  */
 @RestController
 @RequestMapping("/api/v1/staff/corridors")
@@ -41,7 +41,7 @@ public class CorridorController {
     }
 
     @PutMapping("/{id}/date-flex")
-    @PreAuthorize("hasRole('FLEET_COORDINATOR')")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public CorridorResponse setDateFlex(
             @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody DateFlexRequest request) {
         return corridorService.setDateFlexDays(user, id, request.getDateFlexDays());

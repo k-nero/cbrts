@@ -21,7 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** #115: the fleet & route coordinator sets how far a route's flexible dates can move. */
+/** #115: the fleet & route coordinator or the logistics manager sets how far a route's flexible dates can move. */
 class CorridorServiceTest {
 
     private static final UUID ID = UUID.fromString("01a1453c-0000-7000-8000-0000000000c1");

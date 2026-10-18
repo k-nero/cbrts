@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The routes we run, as the fleet & route coordinator manages them (#115): how far a request's flexible dates
+ * The routes we run, as the fleet & route coordinator and the logistics manager manage them (#115): how far a request's flexible dates
  * can move on each one. A change applies to drafts at once and to every request submitted after it; a submitted
  * request keeps the value it was submitted with.
  */
