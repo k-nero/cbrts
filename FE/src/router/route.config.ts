@@ -150,6 +150,15 @@ export const routesConfig = [
             type: 'authenticated',
             breadcrumb: 'Request review',
             name: 'request-review',
+            children: [
+              {
+                path: '/quotation',
+                roles: [LM],
+                type: 'authenticated',
+                breadcrumb: 'Quotation',
+                name: 'quotation-builder',
+              },
+            ],
           },
         ],
       },

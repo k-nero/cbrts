@@ -23,7 +23,9 @@ import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
 import AuditLogPage from '@/pages/staff/audit-log';
 import RequestsPage from '@/pages/staff/requests';
+import QuotationBuilderPage from '@/pages/staff/requests/quotation';
 import RequestReviewPage from '@/pages/staff/requests/review';
+import RatesPage from '@/pages/staff/rates';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
@@ -83,6 +85,7 @@ export const router = createBrowserRouter([
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: <RequestsPage /> },
           { path: 'requests/:id', element: <RequestReviewPage /> },
+          { path: 'requests/:id/quotation', element: <QuotationBuilderPage /> },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: <AuditLogPage /> },
@@ -90,7 +93,7 @@ export const router = createBrowserRouter([
           { path: 'authorities', element: todo('Authorities') },
           { path: 'customer-notes', element: todo('Customer notes') },
           { path: 'regulations', element: todo('Regulations') },
-          { path: 'rates', element: todo('Rates') },
+          { path: 'rates', element: <RatesPage /> },
           { path: 'fleet-calendar', element: <FleetCalendarPage /> },
           { path: 'vehicles', element: <VehiclesPage /> },
         ],

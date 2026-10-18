@@ -29,6 +29,13 @@ export const queryKeys = {
     queues: () => ['staff-requests', 'queue'] as const,
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
+    quotation: (id: string) => ['staff-requests', id, 'quotation'] as const,
+  },
+  rates: {
+    all: () => ['rates'] as const,
+    catalog: () => ['rates', 'catalog'] as const,
+    view: (versionId: string, corridorId: string) =>
+      ['rates', 'view', versionId, corridorId] as const,
   },
   audit: {
     all: () => ['admin-audit-log'] as const,
