@@ -1,9 +1,13 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.User;
 import com.equifreight.repository.AuditLogRepository;
-import tools.jackson.databind.json.JsonMapper;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,11 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AuditServiceTest {
@@ -49,8 +49,7 @@ class AuditServiceTest {
                 "CBRT-2026-001",
                 null,
                 "PENDING",
-                "APPROVED"
-        );
+                "APPROVED");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());
@@ -60,6 +59,21 @@ class AuditServiceTest {
         // Bare words must be converted to valid JSON: {"status":"PENDING"}
         assertEquals("{\"status\":\"PENDING\"}", saved.getBefore());
         assertEquals("{\"status\":\"APPROVED\"}", saved.getAfter());
+    }
+
+    @Test
+    @DisplayName("The actor label puts the family name first, as the audit log shows names")
+    void actorLabelIsFamilyNameFirst() {
+        User yen = new User();
+        yen.setId(UUID.randomUUID());
+        yen.setFirstName("Hải Yến");
+        yen.setLastName("Vũ");
+
+        auditService.recordDecision(yen, "USER_INVITED", "Invited", "USER", UUID.randomUUID(), null, null, null, null);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("Vũ Hải Yến", captor.getValue().getActorLabel());
     }
 
     @Test
@@ -74,8 +88,7 @@ class AuditServiceTest {
                 "CAT-1",
                 null,
                 "{\"version\":1}",
-                "{\"version\":2}"
-        );
+                "{\"version\":2}");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());

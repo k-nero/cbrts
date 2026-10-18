@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
+import type { AxiosError } from 'axios';
 import { z } from 'zod';
 
 import signInPhoto from '@/assets/photos/draft-signin-grey-window.jpg';
@@ -15,8 +16,9 @@ import Footer from '@/components/Footer';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import ThemeToggle from '@/components/ThemeToggle';
-import { PhotoPanel } from '@/components/ui';
+import { Button, PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
+import type { ApiError } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
@@ -52,16 +54,18 @@ const LoginPage = () => {
       await login.mutateAsync(values);
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
       router.replace(from ?? primaryRoleHome(useAuthStore.getState().roles), { force: true });
-    } catch {
-      // Never say whether the email has an account (DESIGN.md, Access).
-      methods.setError('form_error', { message: 'Email or password doesn’t match.' });
+    } catch (error) {
+      // Never say whether the email has an account (DESIGN.md, Access): the server says the same
+      // for both, and only names a removed account once its password matched.
+      const message = (error as AxiosError<Partial<ApiError>>).response?.data?.message;
+      methods.setError('form_error', { message: message ?? 'Email or password doesn’t match.' });
     }
   });
 
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand onClick={() => router.push(router.paths.get('landing'))} />
+        <Brand />
         <ThemeToggle />
       </header>
       <Flex style={{ flex: 1 }}>
@@ -96,6 +100,17 @@ const LoginPage = () => {
                   componentProps={{ autoComplete: 'current-password' }}
                 />
                 <SubmitButton type="primary" block label="Sign in" />
+                <div className="flex items-center gap-1">
+                  <span className="type-body-s text-ink-2">New to EquiFreight?</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    trailingIcon="arrow-right"
+                    onClick={() => router.push(router.paths.get('register'))}
+                  >
+                    Create a club account
+                  </Button>
+                </div>
                 <p className="m-0 border-t border-line pt-5 text-[13px] leading-5 text-ink-3">
                   Staff sign in here too, with the email your invite was sent to. Your role decides
                   where you land.

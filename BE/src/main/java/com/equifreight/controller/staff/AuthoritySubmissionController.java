@@ -5,12 +5,11 @@ import com.equifreight.entity.enums.AuthorityKind;
 import com.equifreight.model.clearance.*;
 import com.equifreight.service.AuthoritySubmissionService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Controller for regulatory authority filings and quarantine management (AGENTS.md).
@@ -26,23 +25,28 @@ public class AuthoritySubmissionController {
         this.submissionService = submissionService;
     }
 
-    /** List government authorities filtered optionally by country and agency kind. */
+    /**
+     * List government authorities filtered optionally by country and agency kind.
+     */
     @GetMapping("/authorities")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<AuthorityResponse> listAuthorities(
-            @RequestParam(required = false) String countryCode,
-            @RequestParam(required = false) AuthorityKind kind) {
+            @RequestParam(required = false) String countryCode, @RequestParam(required = false) AuthorityKind kind) {
         return submissionService.listAuthorities(countryCode, kind);
     }
 
-    /** List all authority submissions filed for a transport job. */
+    /**
+     * List all authority submissions filed for a transport job.
+     */
     @GetMapping("/jobs/{jobId}/submissions")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<AuthoritySubmissionResponse> getSubmissionsByJob(@PathVariable UUID jobId) {
         return submissionService.getSubmissionsByJob(jobId);
     }
 
-    /** File a new submission with an authority. Transport Specialist only. */
+    /**
+     * File a new submission with an authority. Transport Specialist only.
+     */
     @PostMapping("/jobs/{jobId}/submissions")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public AuthoritySubmissionResponse createSubmission(
@@ -52,7 +56,9 @@ public class AuthoritySubmissionController {
         return submissionService.createSubmission(jobId, request, user);
     }
 
-    /** Update an authority submission outcome (APPROVED, REJECTED, INFO_REQUESTED). Transport Specialist only. */
+    /**
+     * Update an authority submission outcome (APPROVED, REJECTED, INFO_REQUESTED). Transport Specialist only.
+     */
     @PutMapping("/submissions/{submissionId}")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public AuthoritySubmissionResponse updateSubmission(
@@ -62,14 +68,18 @@ public class AuthoritySubmissionController {
         return submissionService.updateSubmission(submissionId, request, user);
     }
 
-    /** List quarantine periods scheduled or completed for a transport job. */
+    /**
+     * List quarantine periods scheduled or completed for a transport job.
+     */
     @GetMapping("/jobs/{jobId}/quarantines")
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<QuarantinePeriodResponse> listQuarantines(@PathVariable UUID jobId) {
         return submissionService.listQuarantines(jobId);
     }
 
-    /** Schedule a new quarantine period for a horse or job shipment. Transport Specialist only. */
+    /**
+     * Schedule a new quarantine period for a horse or job shipment. Transport Specialist only.
+     */
     @PostMapping("/jobs/{jobId}/quarantines")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public QuarantinePeriodResponse createQuarantine(
@@ -79,12 +89,13 @@ public class AuthoritySubmissionController {
         return submissionService.createQuarantine(jobId, request, user);
     }
 
-    /** Confirm completion of a quarantine period. Transport Specialist only. */
+    /**
+     * Confirm completion of a quarantine period. Transport Specialist only.
+     */
     @PostMapping("/quarantines/{quarantineId}/complete")
     @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
     public QuarantinePeriodResponse completeQuarantine(
-            @PathVariable UUID quarantineId,
-            @AuthenticationPrincipal User user) {
+            @PathVariable UUID quarantineId, @AuthenticationPrincipal User user) {
         return submissionService.completeQuarantine(quarantineId, user);
     }
 }

@@ -2,12 +2,13 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.BookingKind;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-
-/** The fleet calendar. Overlapping bookings of one vehicle are refused by an exclusion constraint. */
+/**
+ * The fleet calendar. Overlapping bookings of one vehicle are refused by an exclusion constraint.
+ */
 @Setter
 @Getter
 @Entity
@@ -18,7 +19,9 @@ public class VehicleBooking extends BaseEntity {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
-    /** Set exactly when kind is JOB. */
+    /**
+     * Set exactly when kind is JOB.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_id")
     private TransportJob job;

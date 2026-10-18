@@ -2,13 +2,14 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.TransportMode;
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-/** "RD HCM → PNH", "AIR PNH → HKG". A request works out its border crossings from here. */
+/**
+ * "RD HCM → PNH", "AIR PNH → HKG". A request works out its border crossings from here.
+ */
 @Setter
 @Getter
 @Entity

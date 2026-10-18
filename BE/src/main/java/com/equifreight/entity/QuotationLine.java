@@ -4,6 +4,7 @@ import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.LineSource;
 import com.equifreight.entity.enums.RateBasis;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Generated;
@@ -11,9 +12,9 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
-
-/** A priced line of a quotation. Quantities are derived from the request, never typed. */
+/**
+ * A priced line of a quotation. Quantities are derived from the request, never typed.
+ */
 @Setter
 @Getter
 @Entity
@@ -28,14 +29,18 @@ public class QuotationLine extends BaseEntity {
     @Column(nullable = false, length = 1)
     private String groupCode;
 
-    /** Order inside the group. */
+    /**
+     * Order inside the group.
+     */
     @Column(nullable = false)
     private short position;
 
     @Column(nullable = false, length = 160)
     private String description;
 
-    /** "per day · 14 days". */
+    /**
+     * "per day · 14 days".
+     */
     @Column(length = 80)
     private String basisText;
 
@@ -46,7 +51,9 @@ public class QuotationLine extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal quantity;
 
-    /** Null means "No rate", which blocks issue (BR-Q-08). */
+    /**
+     * Null means "No rate", which blocks issue (BR-Q-08).
+     */
     @Column(precision = 14, scale = 2)
     private BigDecimal unitRate;
 
@@ -54,12 +61,16 @@ public class QuotationLine extends BaseEntity {
     @Column(nullable = false, length = 10)
     private LineSource source;
 
-    /** Set when source is CATALOG. */
+    /**
+     * Set when source is CATALOG.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rate_line_id")
     private RateLine rateLine;
 
-    /** For per-horse lines (isolation for Nightfall). */
+    /**
+     * For per-horse lines (isolation for Nightfall).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "horse_id")
     private Horse horse;
@@ -68,23 +79,31 @@ public class QuotationLine extends BaseEntity {
     @Column(nullable = false, length = 12)
     private LineCertainty certainty = LineCertainty.FIXED;
 
-    /** Why an estimated line can vary. */
+    /**
+     * Why an estimated line can vary.
+     */
     @Column(length = 300)
     private String estimateNote;
 
-    /** quantity × unit rate (with the line's minimum charge). */
+    /**
+     * quantity × unit rate (with the line's minimum charge).
+     */
     @Column(precision = 14, scale = 2)
     private BigDecimal catalogAmount;
 
     @Column(precision = 14, scale = 2)
     private BigDecimal overrideAmount;
 
-    /** Mandatory with an override (DB check). */
+    /**
+     * Mandatory with an override (DB check).
+     */
     @Column(length = 300)
     private String overrideReason;
 
-    /** coalesce(overrideAmount, catalogAmount): a generated column, read back after every write. */
-    @Generated(event = { EventType.INSERT, EventType.UPDATE })
+    /**
+     * coalesce(overrideAmount, catalogAmount): a generated column, read back after every write.
+     */
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
     @Column(precision = 14, scale = 2, insertable = false, updatable = false)
     private BigDecimal lineTotal;
 }

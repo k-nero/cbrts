@@ -1,5 +1,4 @@
 import type { FC, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
 
 import { Corridors, RouteMap } from './routeMap';
 import { QuoteVisual, TravelPass, WidthVisual, WindowVisual } from './visuals';
@@ -111,18 +110,20 @@ const Section: FC<{ id: string; title: string; summary?: string; children: React
  * The signed-out landing page (DESIGN.md, Landing): what EquiFreight does, the services and how
  * a move runs. Its own header, no app nav. The hero is a full-bleed photograph of a horse being
  * loaded, so it is Dark whatever the theme, with the copy on the scrim. The hero's gold is the one exception to the One Gold
- * Button rule, repeated by the closing band 2,000 px below it. A signed-in visitor never lands
- * here: their home is their work.
+ * Button rule, repeated by the closing band 2,000 px below it. Open to everyone: a signed-in
+ * visitor reaches it from the brand, and their header and calls to action lead back to their work.
  */
 const LandingPage: FC = () => {
   const router = useCustomRouter();
   const isAuthenticated = useAuthStore((state) => !!state.tokens?.accessToken);
   const roles = useAuthStore((state) => state.roles);
 
-  if (isAuthenticated) return <Navigate to={primaryRoleHome(roles)} replace />;
-
-  // Requesting transport needs a club account; until sign-up exists both go to sign-in.
+  // Requesting transport needs a club account: a returning club signs in, a new one signs up.
+  // A signed-in visitor already has one, so every call to action leads to their own home.
+  const toHome = () => router.push(primaryRoleHome(roles));
   const toSignIn = () => router.push(router.paths.get('login'));
+  const toRequest = isAuthenticated ? toHome : toSignIn;
+  const toSignUp = () => router.push(router.paths.get('register'));
   const toHowItWorks = () =>
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
 
@@ -135,9 +136,15 @@ const LandingPage: FC = () => {
             Help
           </Button>
           <ThemeToggle />
-          <Button size="sm" onClick={toSignIn}>
-            Sign in
-          </Button>
+          {isAuthenticated ? (
+            <Button size="sm" trailingIcon="arrow-right" onClick={toHome}>
+              Go to my workspace
+            </Button>
+          ) : (
+            <Button size="sm" onClick={toSignIn}>
+              Sign in
+            </Button>
+          )}
         </nav>
       </header>
 
@@ -166,10 +173,10 @@ const LandingPage: FC = () => {
                 clearance is complete.
               </p>
               <div className="flex gap-3">
-                <Button variant="primary" trailingIcon="arrow-right" onClick={toSignIn}>
+                <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
                   Request transport
                 </Button>
-                <Button onClick={toSignIn}>Create a club account</Button>
+                {!isAuthenticated && <Button onClick={toSignUp}>Create a club account</Button>}
               </div>
             </div>
           </div>
@@ -292,7 +299,7 @@ const LandingPage: FC = () => {
                   Nothing is booked until you accept the itemised quotation.
                 </p>
               </div>
-              <Button variant="primary" trailingIcon="arrow-right" onClick={toSignIn}>
+              <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
                 Request transport
               </Button>
             </div>

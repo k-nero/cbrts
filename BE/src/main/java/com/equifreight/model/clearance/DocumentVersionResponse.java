@@ -1,11 +1,10 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.DocumentReview;
-import lombok.*;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter

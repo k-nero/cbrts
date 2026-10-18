@@ -2,15 +2,14 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.QuotationStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * One version of a quotation for a request. Totals are computed in the fixed order of the quotation spec and
@@ -22,7 +21,9 @@ import java.util.List;
 @Table(name = "quotations")
 public class Quotation extends BaseEntity {
 
-    /** Q-2026-0188. Shared by all versions of one quotation. */
+    /**
+     * Q-2026-0188. Shared by all versions of one quotation.
+     */
     @Column(nullable = false, length = 14)
     private String code;
 
@@ -37,7 +38,9 @@ public class Quotation extends BaseEntity {
     @Column(nullable = false, length = 12)
     private QuotationStatus status = QuotationStatus.DRAFT;
 
-    /** Pinned: a later catalog change never alters this quotation. */
+    /**
+     * Pinned: a later catalog change never alters this quotation.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rate_catalog_version_id", nullable = false)
     private RateCatalogVersion rateCatalogVersion;
@@ -46,7 +49,9 @@ public class Quotation extends BaseEntity {
     @Column(nullable = false, length = 3)
     private String currency;
 
-    /** FX rates pinned at issue (step "Convert"), as JSON. */
+    /**
+     * FX rates pinned at issue (step "Convert"), as JSON.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     private String fxRates;
 
@@ -56,7 +61,9 @@ public class Quotation extends BaseEntity {
 
     private Instant issuedAt;
 
-    /** issuedAt + QUOTE_VALIDITY_DAYS (BR-F1-03). */
+    /**
+     * issuedAt + QUOTE_VALIDITY_DAYS (BR-F1-03).
+     */
     private Instant validUntil;
 
     @Column(precision = 14, scale = 2)
@@ -89,7 +96,9 @@ public class Quotation extends BaseEntity {
     @Column(precision = 14, scale = 2)
     private BigDecimal depositAmount;
 
-    /** Copied from the pinned catalog when there is an arrival window; part of the contract. */
+    /**
+     * Copied from the pinned catalog when there is an arrival window; part of the contract.
+     */
     @Column(precision = 5, scale = 2)
     private BigDecimal latePenaltyPctPerHour;
 
@@ -107,7 +116,9 @@ public class Quotation extends BaseEntity {
     @Column(length = 500)
     private String declineReason;
 
-    /** "Departure moved from 12 Nov to 20 Nov." */
+    /**
+     * "Departure moved from 12 Nov to 20 Nov."
+     */
     @Column(length = 300)
     private String supersededReason;
 

@@ -1,13 +1,14 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-import java.util.UUID;
-
-/** Sidebar badges and the bell read from it. */
+/**
+ * Sidebar badges and the bell read from it.
+ */
 @Setter
 @Getter
 @Entity

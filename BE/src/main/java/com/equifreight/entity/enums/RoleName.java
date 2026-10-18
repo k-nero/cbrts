@@ -12,4 +12,18 @@ public final class RoleName {
     public static final String ESCORT = "ESCORT";
 
     private RoleName() {}
+
+    /**
+     * The role as the UI writes it, e.g. "Fleet & route coordinator" (FE interfaces/enums.ts, ROLE_LABEL).
+     */
+    public static String label(String name) {
+        return switch (name) {
+            case CUSTOMER -> "Customer";
+            case LOGISTICS_MANAGER -> "Logistics manager";
+            case TRANSPORT_SPECIALIST -> "Transport specialist";
+            case FLEET_COORDINATOR -> "Fleet & route coordinator";
+            case ESCORT -> "Escort";
+            default -> name;
+        };
+    }
 }

@@ -3,7 +3,6 @@ package com.equifreight.model.trip;
 import com.equifreight.entity.enums.HorseCondition;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -13,5 +12,4 @@ public record TripConditionRequest(
         Boolean drinking,
         Boolean eating,
         @Size(max = 500) String note,
-        @Size(max = 8) List<@NotNull UUID> photoFileIds
-) {}
+        @Size(max = 8) List<@NotNull UUID> photoFileIds) {}

@@ -1,7 +1,6 @@
 package com.equifreight.model.trip;
 
 import com.equifreight.entity.enums.TripStatus;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -18,5 +17,4 @@ public record TripViewResponse(
         String vehicleCode,
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
-        List<TripRecordResponse> records
-) {}
+        List<TripRecordResponse> records) {}

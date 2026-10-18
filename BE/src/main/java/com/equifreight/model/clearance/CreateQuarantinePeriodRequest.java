@@ -1,10 +1,9 @@
 package com.equifreight.model.clearance;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
-
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
@@ -13,7 +12,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateQuarantinePeriodRequest {
 
-    /** null means the whole load/shipment. */
+    /**
+     * null means the whole load/shipment.
+     */
     private UUID horseId;
 
     @NotNull(message = "Place ID (trạm kiểm dịch) is required")

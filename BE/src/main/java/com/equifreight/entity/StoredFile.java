@@ -6,7 +6,9 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** An uploaded file: documents, incident photos, signed handover forms. Table {@code files}. */
+/**
+ * An uploaded file: documents, incident photos, signed handover forms. Table {@code files}.
+ */
 @Setter
 @Getter
 @Entity

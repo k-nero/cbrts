@@ -1,6 +1,10 @@
 package com.equifreight.entity.enums;
 
-/** {@code incidents.status}. */
+/**
+ * {@code incidents.status}.
+ */
 public enum IncidentStatus {
-    OPEN, DECIDED, RESOLVED
+    OPEN,
+    DECIDED,
+    RESOLVED
 }

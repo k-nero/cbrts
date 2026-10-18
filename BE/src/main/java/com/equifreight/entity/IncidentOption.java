@@ -22,7 +22,9 @@ public class IncidentOption extends BaseEntity {
     @Column(length = 1000)
     private String description;
 
-    /** Time, documents, the horse, cost, as JSON. */
+    /**
+     * Time, documents, the horse, cost, as JSON.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     private String facts;
 

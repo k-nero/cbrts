@@ -4,6 +4,8 @@ import com.equifreight.entity.User;
 import com.equifreight.model.clearance.*;
 import com.equifreight.service.ClearanceService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -12,9 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Controller handling Transport Specialist clearance operations (AGENTS.md).
@@ -31,7 +30,9 @@ public class ClearanceController {
         this.clearanceService = clearanceService;
     }
 
-    /** Open dossiers (not yet departed), newest first; q matches the job code or the club name. */
+    /*
+     * Open dossiers (not yet departed), newest first; q matches the job code or the club name.
+     */
     @GetMapping("/jobs")
     public Page<JobSummaryResponse> getActiveJobs(
             @RequestParam(value = "q", required = false) String q,

@@ -2,12 +2,11 @@ package com.equifreight.model.job;
 
 import com.equifreight.entity.enums.CrewRole;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter

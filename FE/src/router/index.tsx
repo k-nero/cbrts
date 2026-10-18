@@ -11,11 +11,13 @@ import MyHorsesPage from '@/pages/customer/horses';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
 import AuthoritiesPage from '@/pages/staff/authorities';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
 import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import AuditLogPage from '@/pages/staff/audit-log';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import CustomerNotesPage from '@/pages/staff/customer-notes';
@@ -36,6 +38,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       { path: '/forbidden', element: <ForbiddenPage /> },
       { path: '/design-system', element: <DesignSystemPage /> },
       { path: '/', element: <LandingPage /> },
@@ -68,7 +71,7 @@ export const router = createBrowserRouter([
           { path: 'requests', element: todo('Requests') },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
-          { path: 'audit-log', element: todo('Audit log') },
+          { path: 'audit-log', element: <AuditLogPage /> },
           { path: 'documents', element: <DocumentsPage /> },
           { path: 'authorities', element: <AuthoritiesPage /> },
           { path: 'customer-notes', element: <CustomerNotesPage /> },

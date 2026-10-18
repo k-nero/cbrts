@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.StoredFile;
@@ -11,6 +16,13 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.LocalFileStorage;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.*;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,38 +30,39 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 class FileServiceTest {
 
-    private static final byte[] PDF = "%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+    private static final byte[] PDF =
+            "%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] PNG = {
+        (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'
+    };
 
-    private StoredFileRepository repository;
     @TempDir
     Path dir;
 
+    private StoredFileRepository repository;
     private LocalFileStorage storage;
     private FileService service;
+
+    private static User user(String roleName) {
+        Role role = new Role();
+        role.setName(roleName);
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setRoles(Set.of(role));
+        return user;
+    }
+
+    // ---------- upload ----------
+
+    private static User customerOf(UUID clubId) {
+        Club club = new Club();
+        club.setId(clubId);
+        User customer = user(RoleName.CUSTOMER);
+        customer.setClub(club);
+        return customer;
+    }
 
     @BeforeEach
     void setUp() {
@@ -63,18 +76,18 @@ class FileServiceTest {
         });
     }
 
-    // ---------- upload ----------
-
     @Test
     void storesAPdfUnderItsDetectedTypeWithItsChecksum() throws Exception {
         User customer = user(RoleName.CUSTOMER);
 
-        FileResponse response = service.upload(
-                new MockMultipartFile("file", "coggins.pdf", "application/pdf", PDF), customer);
+        FileResponse response =
+                service.upload(new MockMultipartFile("file", "coggins.pdf", "application/pdf", PDF), customer);
 
         assertThat(response.getContentType()).isEqualTo("application/pdf");
         assertThat(response.getSizeBytes()).isEqualTo(PDF.length);
-        assertThat(response.getSha256()).isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(PDF)));
+        assertThat(response.getSha256())
+                .isEqualTo(HexFormat.of()
+                        .formatHex(MessageDigest.getInstance("SHA-256").digest(PDF)));
         assertThat(response.getUploadedById()).isEqualTo(customer.getId());
         assertThat(storedKeys()).hasSize(1);
         String key = storedKeys().getFirst();
@@ -92,12 +105,13 @@ class FileServiceTest {
 
     @Test
     void rejectsATextFileRenamedToPdf() throws IOException {
-        var upload = new MockMultipartFile("file", "passport.pdf", "application/pdf",
-                "just some text".getBytes(StandardCharsets.UTF_8));
+        var upload = new MockMultipartFile(
+                "file", "passport.pdf", "application/pdf", "just some text".getBytes(StandardCharsets.UTF_8));
 
         assertThatThrownBy(() -> service.upload(upload, user(RoleName.CUSTOMER)))
                 .isInstanceOf(BusinessException.class)
-                .extracting("code").isEqualTo("FILE_TYPE_NOT_ALLOWED");
+                .extracting("code")
+                .isEqualTo("FILE_TYPE_NOT_ALLOWED");
         assertThat(storedKeys()).isEmpty();
         verify(repository, never()).save(any());
     }
@@ -108,8 +122,11 @@ class FileServiceTest {
 
         assertThatThrownBy(() -> service.upload(upload, user(RoleName.CUSTOMER)))
                 .isInstanceOf(BusinessException.class)
-                .extracting("code").isEqualTo("FILE_EMPTY");
+                .extracting("code")
+                .isEqualTo("FILE_EMPTY");
     }
+
+    // ---------- reading ----------
 
     @Test
     void removesTheBytesWhenTheRowCannotBeSaved() throws IOException {
@@ -132,13 +149,13 @@ class FileServiceTest {
         assertThat(FileService.cleanFileName(longName)).hasSize(255).endsWith(".pdf");
     }
 
-    // ---------- reading ----------
-
     @Test
     void staffCanReadAnyFile() {
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));
 
-        assertThat(service.get(file.getId(), user(RoleName.TRANSPORT_SPECIALIST)).getId()).isEqualTo(file.getId());
+        assertThat(service.get(file.getId(), user(RoleName.TRANSPORT_SPECIALIST))
+                        .getId())
+                .isEqualTo(file.getId());
     }
 
     @Test
@@ -175,6 +192,8 @@ class FileServiceTest {
         assertThat(service.get(file.getId(), escort).getId()).isEqualTo(file.getId());
     }
 
+    // ---------- attaching ----------
+
     @Test
     void anEscortGetsNotFoundForOtherJobsFiles() {
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));
@@ -194,8 +213,6 @@ class FileServiceTest {
         }
     }
 
-    // ---------- attaching ----------
-
     @Test
     void attachesTheUsersOwnUnattachedUpload() {
         User customer = user(RoleName.CUSTOMER);
@@ -203,6 +220,8 @@ class FileServiceTest {
 
         assertThat(service.requireAttachable(file.getId(), customer)).isSameAs(file);
     }
+
+    // ---------- helpers ----------
 
     @Test
     void refusesToAttachSomeoneElsesUpload() {
@@ -220,35 +239,19 @@ class FileServiceTest {
 
         assertThatThrownBy(() -> service.requireAttachable(file.getId(), customer))
                 .isInstanceOf(ConflictException.class)
-                .extracting("code").isEqualTo("FILE_ALREADY_ATTACHED");
+                .extracting("code")
+                .isEqualTo("FILE_ALREADY_ATTACHED");
     }
 
-    // ---------- helpers ----------
-
-    /** Keys of the files stored under the temp directory, e.g. {@code files/2026/10/<uuid>}. */
+    /**
+     * Keys of the files stored under the temp directory, e.g. {@code files/2026/10/<uuid>}.
+     */
     private List<String> storedKeys() throws IOException {
         try (Stream<Path> paths = Files.walk(dir)) {
             return paths.filter(Files::isRegularFile)
                     .map(path -> dir.relativize(path).toString().replace('\\', '/'))
                     .toList();
         }
-    }
-
-    private static User user(String roleName) {
-        Role role = new Role();
-        role.setName(roleName);
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setRoles(Set.of(role));
-        return user;
-    }
-
-    private static User customerOf(UUID clubId) {
-        Club club = new Club();
-        club.setId(clubId);
-        User customer = user(RoleName.CUSTOMER);
-        customer.setClub(club);
-        return customer;
     }
 
     private StoredFile fileUploadedBy(User uploader) {

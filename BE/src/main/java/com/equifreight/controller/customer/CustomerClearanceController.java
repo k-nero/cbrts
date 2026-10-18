@@ -5,13 +5,12 @@ import com.equifreight.model.clearance.ChecklistItemResponse;
 import com.equifreight.model.clearance.DocumentUploadRequest;
 import com.equifreight.service.ClearanceService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Customer clearance dossier endpoints (US-F2-03).
@@ -30,8 +29,7 @@ public class CustomerClearanceController {
 
     @GetMapping("/jobs/{jobId}/checklist")
     public ResponseEntity<List<ChecklistItemResponse>> getCustomerChecklist(
-            @PathVariable UUID jobId,
-            @AuthenticationPrincipal User user) {
+            @PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(clearanceService.getCustomerChecklist(jobId, user));
     }
 
