@@ -1,0 +1,42 @@
+# Shared editor settings for IntelliJ, VS Code and the rest. The formatters are the source of truth:
+# Spotless (palantir-java-format) for BE Java, Prettier (FE/.prettierrc) for the FE.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# BE Java, matching palantir-java-format: 4 spaces, 120 columns.
+[*.java]
+indent_size = 4
+max_line_length = 120
+
+# FE sources, matching FE/.prettierrc: 2 spaces, 100 columns.
+[*.{ts,tsx,js,jsx,mjs,cjs,json,css}]
+indent_size = 2
+max_line_length = 100
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[{gradlew,*.sh}]
+end_of_line = lf
+
+[*.bat]
+end_of_line = crlf
+
+# Flyway checksums every merged migration, so even a whitespace change breaks databases that already ran it.
+# Leave these files exactly as they are: no trimming, no added final newline, no reformatting.
+[BE/src/main/resources/db/migration/*.sql]
+trim_trailing_whitespace = false
+insert_final_newline = unset
+indent_style = unset
+indent_size = unset
+max_line_length = off
