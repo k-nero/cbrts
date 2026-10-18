@@ -16,6 +16,9 @@ import java.util.Map;
  */
 public final class LeadTimePolicy {
 
+    /** The most a route's flexible dates can move (#115), mirroring corridors_date_flex_days_check. */
+    public static final int MAX_FLEX_DAYS = 7;
+
     private LeadTimePolicy() {}
 
     /** {@code countryCodes} in travel order; every one has a published version in the map. */
@@ -27,6 +30,17 @@ public final class LeadTimePolicy {
                 .mapToInt(code -> publishedByCountry.get(code).getLeadTimeDays())
                 .max()
                 .orElseThrow();
+    }
+
+    /**
+     * The flex days a request really has (#115): 0 for fixed dates; with flexible dates, its route's value. Before
+     * a route is known, the flex the request asked for stands in.
+     */
+    public static int flexDaysFor(int requested, Integer routeFlexDays) {
+        if (requested == 0) {
+            return 0;
+        }
+        return routeFlexDays == null ? requested : routeFlexDays;
     }
 
     public static LocalDate earliestDeparture(LocalDate today, int requiredDays) {

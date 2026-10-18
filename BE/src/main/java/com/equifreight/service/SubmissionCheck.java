@@ -169,7 +169,8 @@ public final class SubmissionCheck {
         if (route.getLeadTimeDays() == null) {
             return;
         }
-        int flex = request.getDateFlexDays();
+        // A route's flex can change after a draft was saved; the draft is judged by the route's current value.
+        int flex = LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), route.getDateFlexDays());
         LeadTimeResponse leadTime = LeadTimePolicy.assess(route.getLeadTimeDays(), flex, today, departure);
         if (!leadTime.isMet()) {
             blockers.add(new Blocker(

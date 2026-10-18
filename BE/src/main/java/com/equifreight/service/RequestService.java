@@ -161,6 +161,10 @@ public class RequestService {
         TransportRequest request = findDraftForUpdate(club, id);
         LocalDate today = LocalDate.now(clock);
         RouteResolution resolution = resolve(request);
+        // The route's flex is copied onto the request here (#115), before the lead time is checked with it; a later
+        // change to the corridor never moves a submitted request.
+        request.setDateFlexDays(
+                (short) LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), routeFlexDays(resolution)));
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         if (!blockers.isEmpty()) {
             throw new ConflictException(
@@ -352,9 +356,12 @@ public class RequestService {
                 || (body.getTrailer() != null && body.getAirClass() != null)) {
             throw new BusinessException("MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
         }
+        // 0 asks for fixed dates and anything above for flexible ones; the route then sets how far (#115).
         int flex = body.getDateFlexDays() == null ? 0 : body.getDateFlexDays();
-        if (flex != 0 && flex != 3) {
-            throw new BusinessException("DATE_FLEX", "Dates can move by 0 or 3 days; " + flex + " was given.");
+        if (flex < 0 || flex > LeadTimePolicy.MAX_FLEX_DAYS) {
+            throw new BusinessException(
+                    "DATE_FLEX",
+                    "Dates can move by 0 to " + LeadTimePolicy.MAX_FLEX_DAYS + " days; " + flex + " was given.");
         }
         ArrivalMode arrivalMode = body.getArrivalMode() == null ? ArrivalMode.ANY_TIME : body.getArrivalMode();
         requireValidWindow(arrivalMode, mode, body.getTrailer(), flex, body.getWindowStart(), body.getWindowEnd());
@@ -448,7 +455,15 @@ public class RequestService {
         request.setVetEscort(draft.vetEscort());
         RouteResolution resolution = resolve(request);
         request.setCorridor(resolution.corridor());
+        request.setDateFlexDays((short) LeadTimePolicy.flexDaysFor(draft.dateFlexDays(), routeFlexDays(resolution)));
         return resolution;
+    }
+
+    /** How far flexible dates can move on the resolved route, or null without one. */
+    private static Integer routeFlexDays(RouteResolution resolution) {
+        return resolution.corridor() == null
+                ? null
+                : (int) resolution.corridor().getDateFlexDays();
     }
 
     /** The fields that price the horse, copied so a later edit of the horse doesn't change the request. */
@@ -485,7 +500,10 @@ public class RequestService {
                 route == null || route.getLeadTimeDays() == null || request.getDepartureDate() == null
                         ? null
                         : LeadTimePolicy.assess(
-                                route.getLeadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
+                                route.getLeadTimeDays(),
+                                LeadTimePolicy.flexDaysFor(request.getDateFlexDays(), route.getDateFlexDays()),
+                                today,
+                                request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
         return RequestMapper.toResponse(request, route, leadTime, blockers);
     }

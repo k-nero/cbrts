@@ -31,6 +31,13 @@ public class Corridor extends BaseEntity {
 
     private Integer distanceKm;
 
+    /**
+     * How far a request's flexible dates can move on this route, 0 to 7 days (#115); 0 means fixed dates only.
+     * Set by the fleet & route coordinator, copied onto a request when it is submitted.
+     */
+    @Column(nullable = false)
+    private short dateFlexDays = 3;
+
     @OneToMany(mappedBy = "corridor", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id.seq")
     private List<CorridorCrossing> crossings = new ArrayList<>();

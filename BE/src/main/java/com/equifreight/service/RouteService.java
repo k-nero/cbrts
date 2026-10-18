@@ -171,6 +171,7 @@ public class RouteService {
                 .fromCity(reversed ? corridor.getDestinationCity() : corridor.getOriginCity())
                 .toCity(reversed ? corridor.getOriginCity() : corridor.getDestinationCity())
                 .distanceKm(corridor.getDistanceKm())
+                .dateFlexDays((int) corridor.getDateFlexDays())
                 .crossings(crossings);
         if (destination == null) {
             return new Described(route.build(), null);

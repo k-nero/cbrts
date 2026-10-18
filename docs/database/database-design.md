@@ -155,7 +155,7 @@ erDiagram
 | `countries` | `code char(2) primary key`, `name` | VN, KH, TH, LA, MY, HK. The one table keyed by a natural code. |
 | `places` | `name`, `kind`, `city`, `country_code`, `address` | `kind`: `TRAINING_CENTRE`, `STUD`, `RACECOURSE`, `STABLE`, `AIRPORT`, `CARGO_TERMINAL`, `QUARANTINE`, `WELFARE_STOP`. |
 | `border_crossings` | `name`, `from_country`, `to_country`, `road_only boolean` | "Mộc Bài – Bavet", "Poipet – Aranyaprathet". |
-| `corridors` | `code` unique, `mode`, `origin_city`, `destination_city`, `distance_km` | `mode`: `ROAD`, `AIR`. "RD HCM → PNH", "AIR PNH → HKG". |
+| `corridors` | `code` unique, `mode`, `origin_city`, `destination_city`, `distance_km`, `date_flex_days` | `mode`: `ROAD`, `AIR`. "RD HCM → PNH", "AIR PNH → HKG". `date_flex_days` smallint not null default 3, check 0–7 (#115): how far a request's flexible dates can move on this route, set by the fleet & route coordinator; 0 means fixed dates only. |
 | `corridor_crossings` | `corridor_id`, `border_crossing_id`, `seq` | Primary key `(corridor_id, seq)`. The request works out its crossings from here. |
 
 ---
@@ -282,7 +282,7 @@ erDiagram
 | `origin_text`, `destination_text` | varchar(160) | What the customer typed when it matches no place ("Singapore"). Kept so the logistics manager sees the ask. Never set together with the place of the same end (check). |
 | `corridor_id` | → `corridors` | Resolved from the places. Null means the route is not one we run. |
 | `departure_date` | date | Required once submitted. |
-| `date_flex_days` | smallint default 0 | 0 or 3 ("My dates can move by ±3 days"). |
+| `date_flex_days` | smallint default 0, check 0–7 | 0 is fixed dates. With flexible dates, the route's `corridors.date_flex_days`, followed while a draft and copied when the request is submitted (#115). |
 | `arrival_mode` | varchar(10) default 'ANY_TIME' | `ANY_TIME`, `WINDOW`. |
 | `window_start`, `window_end` | timestamptz | The arrival window. |
 | `special_instructions` | varchar(500) | |
