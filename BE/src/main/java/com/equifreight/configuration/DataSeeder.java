@@ -3,6 +3,7 @@ package com.equifreight.configuration;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.repository.*;
+import com.equifreight.service.HorseSizing;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,8 @@ import java.util.Set;
 
 /**
  * Seeds roles, demo accounts, vehicles, places, corridors, horses, and canonical jobs for CBRTS.
+ * The customer's club and its four horses come first (docs/figma-plugin/src/03-pages.js, HORSES), with
+ * their full passport identity, so the demo jobs reuse them by name. Every value is a demo placeholder.
  * Idempotent: existing records are preserved.
  */
 @Component
@@ -45,6 +48,30 @@ public class DataSeeder implements ApplicationRunner {
             { "hoa.le@equifreight.vn", "Thị Hoa", "Lê", RoleName.ESCORT },
             { "tuan.pham@equifreight.vn", "Quốc Tuấn", "Phạm", RoleName.ESCORT }
     };
+
+    private static final String CLUB_NAME = "Saigon Turf Club";
+    private static final String CLUB_EMAIL = "bookings@saigonturf.vn";
+
+    private record DemoHorse(String name, HorseCoat coat, String breed, HorseSex sex, LocalDate born,
+                             String heightHh, int weightKg, StallType stall, Temperament temperament,
+                             String value, String microchip, String passportNo, String notes) {}
+
+    private static final List<DemoHorse> HORSES = List.of(
+            new DemoHorse("Shadowfax", HorseCoat.GREY, "Andalusian", HorseSex.GELDING, LocalDate.of(2019, 5, 10),
+                    "16.2", 510, StallType.STANDARD, Temperament.CALM, "85000", "250259600123456",
+                    "VN-PP-2019-0412",
+                    "Annual vaccinations up to date. No known allergies. Loads best in a quiet yard."),
+            new DemoHorse("Nightfall", HorseCoat.BLACK, "Thoroughbred", HorseSex.MARE, LocalDate.of(2022, 4, 14),
+                    "16.0", 478, StallType.CLIMATE, Temperament.NERVOUS, "240000", "250259600223311",
+                    "VN-PP-2022-0188",
+                    "Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall."),
+            new DemoHorse("Copper King", HorseCoat.CHESTNUT, "Quarter Horse", HorseSex.STALLION,
+                    LocalDate.of(2017, 2, 20), "15.3", 583, StallType.BOX, Temperament.AGGRESSIVE, "120000",
+                    "985141000876502", "VN-PP-2017-0093",
+                    "Box stall only. Never next to a mare. Experienced handlers only."),
+            new DemoHorse("Silver Bell", HorseCoat.GREY, "Lipizzan", HorseSex.MARE, LocalDate.of(2020, 6, 8),
+                    "15.1", 445, StallType.STANDARD, Temperament.CALM, "60000", "203098100554120",
+                    "VN-PP-2020-0257", "Travels well. Hay net at shoulder height."));
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
@@ -126,6 +153,7 @@ public class DataSeeder implements ApplicationRunner {
     @Transactional
     public void run(@NonNull ApplicationArguments args) {
         seedRolesAndUsers();
+        seedHorses(seedClub());
         seedPlacesAndCorridors();
         seedVehicles();
         seedDemoJobs();
@@ -153,6 +181,60 @@ public class DataSeeder implements ApplicationRunner {
             user.setRoles(Set.of(roleRepository.findByName(u[3]).orElseThrow()));
             userRepository.save(user);
             log.info("Seeded {} ({})", u[0], u[3]);
+        }
+    }
+
+    /** Saigon Turf Club, linked to the customer account (one account per club). */
+    private Club seedClub() {
+        Club club = clubRepository.findByBookingEmail(CLUB_EMAIL).orElseGet(() -> {
+            Club created = new Club();
+            created.setName(CLUB_NAME);
+            created.setBookingEmail(CLUB_EMAIL);
+            created.setCountry(countryRepository.getReferenceById("VN"));
+            log.info("Seeded club {}", CLUB_NAME);
+            return clubRepository.save(created);
+        });
+        User customer = userRepository.getByEmail(CLUB_EMAIL);
+        if (customer != null && customer.getClub() == null) {
+            customer.setClub(club);
+            userRepository.save(customer);
+            log.info("Linked {} to {}", CLUB_EMAIL, CLUB_NAME);
+        }
+        return club;
+    }
+
+    /**
+     * Only into a club that has never had a horse: a demo horse edited through the API (a new name or
+     * microchip) must not come back, or collide with its edited self on the unique name, on the next start.
+     */
+    private void seedHorses(Club club) {
+        if (horseRepository.existsByClubId(club.getId())) {
+            return;
+        }
+        List<HorseSizeClass> classes = horseSizeClassRepository.findAllByOrderByMinHeightHhAsc();
+        for (DemoHorse demo : HORSES) {
+            if (horseRepository.findByMicrochip(demo.microchip()).isPresent()) {
+                continue;
+            }
+            BigDecimal height = new BigDecimal(demo.heightHh());
+            Horse horse = new Horse();
+            horse.setClub(club);
+            horse.setName(demo.name());
+            horse.setCoat(demo.coat());
+            horse.setBreed(demo.breed());
+            horse.setSex(demo.sex());
+            horse.setDateOfBirth(demo.born());
+            horse.setHeightHh(height);
+            horse.setWeightKg((short) demo.weightKg());
+            horse.setRequiredStall(demo.stall());
+            horse.setTemperament(demo.temperament());
+            horse.setDeclaredValue(new BigDecimal(demo.value()));
+            horse.setMicrochip(demo.microchip());
+            horse.setPassportNo(demo.passportNo());
+            horse.setHandlingNotes(demo.notes());
+            horse.setSizeClass(HorseSizing.sizeClassFor(height, demo.stall(), classes));
+            horseRepository.save(horse);
+            log.info("Seeded horse {}", demo.name());
         }
     }
 

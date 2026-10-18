@@ -114,6 +114,7 @@ erDiagram
 | `code` | varchar(4) unique | `S`, `M`, `L`, `XL`. |
 | `width_in` | smallint | 32, 32, 48, 96: the stall width one horse of the class takes. |
 | `max_weight_kg` | smallint | |
+| `min_height_hh` | numeric(3,1) not null unique | Lowest height in the class; the server derives a horse's class from its height, raised to at least L for a box stall. Demo bands: S 10.0, M 14.3, L 16.3, XL 17.3. |
 
 **`horses`**
 
