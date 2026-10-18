@@ -80,8 +80,7 @@ public class AuditService {
     }
 
     private String labelOf(User actor) {
-        return clubs.findClub(actor).map(Club::getName)
-                .orElseGet(() -> actor.getFirstName() + " " + actor.getLastName());
+        return clubs.findClub(actor).map(Club::getName).orElseGet(actor::displayName);
     }
 
     private static String roleOf(User actor) {

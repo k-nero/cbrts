@@ -14,6 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +24,8 @@ public interface TransportJobRepository extends JpaRepository<TransportJob, UUID
         JpaSpecificationExecutor<TransportJob> {
 
     Optional<TransportJob> findByCode(String code);
+
+    List<TransportJob> findByCodeIn(Collection<String> codes);
 
     Optional<TransportJob> findByRequestId(UUID requestId);
 

@@ -69,6 +69,7 @@ class AuditServiceTest {
         assertThat(log.getOccurredAt()).isEqualTo(NOW);
     }
 
+    /** Family name first, as Users & roles and the audit log write names (US-00-06). */
     @Test
     void staffAreLabelledWithTheirName() {
         User manager = user("Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER);
@@ -78,7 +79,7 @@ class AuditServiceTest {
                 "REQ-2026-0193", "No capacity", null, null);
 
         AuditLog log = saved();
-        assertThat(log.getActorLabel()).isEqualTo("Hải Yến Vũ");
+        assertThat(log.getActorLabel()).isEqualTo("Vũ Hải Yến");
         assertThat(log.getActorRole()).isEqualTo("LOGISTICS_MANAGER");
         assertThat(log.getReason()).isEqualTo("No capacity");
     }

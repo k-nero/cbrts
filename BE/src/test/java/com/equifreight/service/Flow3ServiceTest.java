@@ -689,7 +689,7 @@ class Flow3ServiceTest {
     private class MoveFixture {
         final TransportJob job = readyJob();
         final LoadPlan plan = loadPlan(job);
-        final Horse nightfall = job.getRequest().getHorses().get(0).getHorse();
+        final Horse nightfall = job.getRequest().getHorses().getFirst().getHorse();
         final VehicleStall stall1 = stall(1);
         final VehicleStall stall2 = stall(2);
         private final List<RequestHorse> onRequest = new ArrayList<>(job.getRequest().getHorses());

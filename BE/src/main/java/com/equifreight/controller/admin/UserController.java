@@ -1,5 +1,6 @@
 package com.equifreight.controller.admin;
 
+import com.equifreight.entity.User;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
 import com.equifreight.model.user.UserResponse;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -40,18 +42,19 @@ public class UserController {
     }
 
     @PostMapping
-    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
-        return userService.create(request);
+    public UserResponse create(@Valid @RequestBody CreateUserRequest request, @AuthenticationPrincipal User actor) {
+        return userService.create(request, actor);
     }
 
     @PutMapping("/{id}")
-    public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
-        return userService.update(id, request);
+    public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request,
+                               @AuthenticationPrincipal User actor) {
+        return userService.update(id, request, actor);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        userService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal User actor) {
+        userService.delete(id, actor);
         return ResponseEntity.noContent().build();
     }
 }
