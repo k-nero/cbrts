@@ -12,8 +12,7 @@ public record CreateQuarantinePeriodRequest(
          */
         UUID horseId,
 
-        @NotNull(message = "Place ID (trạm kiểm dịch) is required")
-        UUID placeId,
+        @NotNull(message = "Place ID is required") UUID placeId,
 
         @NotNull(message = "Starts on date is required") LocalDate startsOn,
         @NotNull(message = "Ends on date is required") LocalDate endsOn) {}
