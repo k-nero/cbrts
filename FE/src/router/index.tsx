@@ -10,6 +10,9 @@ import MyHorsesPage from '@/pages/customer/horses';
 import EditHorsePage from '@/pages/customer/horses/edit';
 import AddHorsePage from '@/pages/customer/horses/new';
 import HorseProfilePage from '@/pages/customer/horses/profile';
+import MyRequestsPage from '@/pages/customer/requests';
+import RequestSubmittedPage from '@/pages/customer/requests/submitted';
+import RequestWizardPage from '@/pages/customer/requests/wizard';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -57,7 +60,10 @@ export const router = createBrowserRouter([
           { path: '/horses/new', element: <AddHorsePage /> },
           { path: '/horses/:id', element: <HorseProfilePage /> },
           { path: '/horses/:id/edit', element: <EditHorsePage /> },
-          { path: '/requests', element: todo('My requests') },
+          { path: '/requests', element: <MyRequestsPage /> },
+          { path: '/requests/new', element: <RequestWizardPage /> },
+          { path: '/requests/:id/edit', element: <RequestWizardPage /> },
+          { path: '/requests/:id/submitted', element: <RequestSubmittedPage /> },
           { path: '/tracking', element: <CustomerTripPage /> },
         ],
       },

@@ -12,6 +12,18 @@ export const queryKeys = {
     sizeClasses: () => ['horses', 'size-classes'] as const,
     count: (archived: boolean) => ['horses', 'count', archived] as const,
   },
+  requests: {
+    all: () => ['requests'] as const,
+    /** The list pages (useCrudResource keys them [resource, 'page', params]). */
+    pages: () => ['requests', 'page'] as const,
+    one: (id: string) => ['requests', id] as const,
+    /** The corridors between two places. */
+    routes: (from: string, to: string) => ['routes', 'pair', from, to] as const,
+    /** The corridors touching one place's city (the alternatives on a route we don't run). */
+    originRoutes: (from: string) => ['routes', 'from', from] as const,
+    /** Under 'horses', so a horse saved or archived refreshes the pick cards. */
+    wizardHorses: () => ['horses', 'wizard'] as const,
+  },
   audit: {
     all: () => ['admin-audit-log'] as const,
     actors: () => ['admin-audit-log', 'actors'] as const,

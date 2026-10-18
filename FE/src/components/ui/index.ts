@@ -10,6 +10,7 @@ export * from './Chip';
 export * from './ClearanceGate';
 export * from './Deadline';
 export * from './DocumentRow';
+export * from './DraftPass';
 export * from './EstimateCard';
 export * from './FactCell';
 export * from './HorseCard';
