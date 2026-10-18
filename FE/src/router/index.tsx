@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
 
 import AuthenticateLayout from '@/components/AuthenticateLayout';
 import StaffMenu from '@/components/menu/StaffMenu';
@@ -6,6 +6,10 @@ import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
 import DesignSystemPage from '@/pages/design-system';
 import ForbiddenPage from '@/pages/ForbiddenPage';
 import CustomerHomePage from '@/pages/customer/home';
+import MyHorsesPage from '@/pages/customer/horses';
+import EditHorsePage from '@/pages/customer/horses/edit';
+import AddHorsePage from '@/pages/customer/horses/new';
+import HorseProfilePage from '@/pages/customer/horses/profile';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -29,6 +33,8 @@ export const router = createBrowserRouter([
   {
     element: (
       <RoutesGuardWrapper>
+        {/* A new page opens at its top; back and forward return to where you were. */}
+        <ScrollRestoration />
         <Outlet />
       </RoutesGuardWrapper>
     ),
@@ -47,7 +53,10 @@ export const router = createBrowserRouter([
         ),
         children: [
           { path: '/home', element: <CustomerHomePage /> },
-          { path: '/horses', element: todo('My horses') },
+          { path: '/horses', element: <MyHorsesPage /> },
+          { path: '/horses/new', element: <AddHorsePage /> },
+          { path: '/horses/:id', element: <HorseProfilePage /> },
+          { path: '/horses/:id/edit', element: <EditHorsePage /> },
           { path: '/requests', element: todo('My requests') },
           { path: '/tracking', element: <CustomerTripPage /> },
         ],

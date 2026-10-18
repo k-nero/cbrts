@@ -6,6 +6,12 @@ export const queryKeys = {
   me: () => ['me'] as const,
   roles: () => ['admin', 'roles'] as const,
   customerHome: () => ['customer', 'home'] as const,
+  horses: {
+    all: () => ['horses'] as const,
+    one: (id: string) => ['horses', id] as const,
+    sizeClasses: () => ['horses', 'size-classes'] as const,
+    count: (archived: boolean) => ['horses', 'count', archived] as const,
+  },
   audit: {
     all: () => ['admin-audit-log'] as const,
     actors: () => ['admin-audit-log', 'actors'] as const,
