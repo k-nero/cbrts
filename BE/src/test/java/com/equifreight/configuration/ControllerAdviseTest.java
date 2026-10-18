@@ -8,6 +8,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.model.common.ApiError;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyPath;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
@@ -57,5 +58,35 @@ class ControllerAdviseTest {
         ResponseEntity<ApiError> response = advice.handleConflict(new ConflictException("HORSE_ARCHIVED", "Archived."));
 
         assertThat(response.getBody().details()).isNull();
+    }
+
+    /** What Hibernate puts in the message of a refused update: the statement, the constraint and the row. */
+    private static final String SQL_LEAK = "could not execute statement [ERROR: new row for relation"
+            + " \"transport_requests\" violates check constraint \"transport_requests_route_check\""
+            + " Detail: Failing row contains (3f2c..., club-7, place-1, place-1, Please hurry).]"
+            + " [update transport_requests set note=? where id=?]";
+
+    @Test
+    void anUnexpectedErrorAnswersWithAFixedMessage() {
+        ResponseEntity<ApiError> response = advice.handleGeneric(new IllegalStateException(SQL_LEAK));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().getError()).isEqualTo("Internal Server Error");
+        assertThat(response.getBody().getMessage())
+                .isEqualTo("Something went wrong on our side. Try again, and tell us if it keeps happening.");
+        assertThat(response.getBody().getDetails()).isNull();
+    }
+
+    @Test
+    void aRefusedWriteIsAConflictWithoutTheSql() {
+        ResponseEntity<ApiError> response = advice.handleDataIntegrity(new DataIntegrityViolationException(SQL_LEAK));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().getError()).isEqualTo("DATA_CONFLICT");
+        assertThat(response.getBody().getMessage())
+                .isEqualTo("This change conflicts with existing data. Reload and try again.")
+                .doesNotContain("transport_requests")
+                .doesNotContain("Failing row");
+        assertThat(response.getBody().getDetails()).isNull();
     }
 }
