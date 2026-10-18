@@ -11,10 +11,14 @@ alter table transport_requests alter column departure_date drop not null;
 alter table transport_requests add column origin_text varchar(160);
 alter table transport_requests add column destination_text varchar(160);
 
--- Rows written before these checks (Flow 3's seeded REQ-2026-0193) were submitted without a time; the
--- creation time stands in, so the checks below hold for them.
+-- Rows written before these checks (Flow 3's seeded REQ-2026-0193) all have a code, since it was required,
+-- and no submission time. Every status after DRAFT came from a submission, a cancelled one included, so the
+-- creation time stands in. A draft has no code under these checks, so a code a draft was given before them
+-- is dropped; its number is never issued again.
 update transport_requests set submitted_at = created_at
-where submitted_at is null and status not in ('DRAFT', 'CANCELLED');
+where submitted_at is null and status <> 'DRAFT';
+update transport_requests set code = null
+where status = 'DRAFT' and submitted_at is null;
 
 alter table transport_requests
     -- A request has a code exactly when it has been submitted.

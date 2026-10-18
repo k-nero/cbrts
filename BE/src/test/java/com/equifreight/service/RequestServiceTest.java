@@ -192,7 +192,7 @@ class RequestServiceTest {
         assertThatThrownBy(() -> service.create(user, body(shadowfax, shadowfax)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Shadowfax is on the request twice.")
-                .extracting("code").isEqualTo("HORSE_DUPLICATE");
+                .extracting("code").isEqualTo("HORSE_LISTED_TWICE");
     }
 
     @Test

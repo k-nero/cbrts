@@ -266,7 +266,7 @@ public class RequestService {
                 throw ResourceNotFoundException.of("Horse", input.getHorseId());
             }
             if (!seen.add(horse.getId())) {
-                throw new BusinessException("HORSE_DUPLICATE", horse.getName() + " is on the request twice.");
+                throw new BusinessException("HORSE_LISTED_TWICE", horse.getName() + " is on the request twice.");
             }
             if (horse.getArchivedAt() != null && !alreadyOn.contains(horse.getId())) {
                 throw new ConflictException("HORSE_ARCHIVED",
