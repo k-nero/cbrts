@@ -1,10 +1,9 @@
 package com.equifreight.model.user;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.Set;
 
 @Getter
 @Setter

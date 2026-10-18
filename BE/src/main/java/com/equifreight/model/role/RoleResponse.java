@@ -1,9 +1,8 @@
 package com.equifreight.model.role;
 
-import lombok.*;
-
 import java.time.Instant;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter

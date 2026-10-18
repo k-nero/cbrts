@@ -4,12 +4,11 @@ import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RateCertainty;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.math.BigDecimal;
 
 /**
  * Every line the quotation builder can expand.

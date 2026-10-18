@@ -4,12 +4,11 @@ import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
-import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
@@ -38,6 +37,7 @@ public class HorseResponse {
      * Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request.
      */
     private boolean identityLocked;
+
     private Instant createdAt;
     private Instant updatedAt;
 }

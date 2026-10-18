@@ -8,12 +8,11 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
+import java.time.Instant;
+import java.util.*;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.*;
 
 @Service
 @Log4j2
@@ -30,16 +29,17 @@ public class RoutePlanService {
     private final ClearanceService clearanceService;
     private final AuditService auditService;
 
-    public RoutePlanService(RoutePlanRepository routePlanRepository,
-                            RouteStopRepository routeStopRepository,
-                            RouteLegRepository routeLegRepository,
-                            FlightRepository flightRepository,
-                            TransportJobRepository transportJobRepository,
-                            PlaceRepository placeRepository,
-                            BorderCrossingRepository borderCrossingRepository,
-                            VehicleRepository vehicleRepository,
-                            ClearanceService clearanceService,
-                            AuditService auditService) {
+    public RoutePlanService(
+            RoutePlanRepository routePlanRepository,
+            RouteStopRepository routeStopRepository,
+            RouteLegRepository routeLegRepository,
+            FlightRepository flightRepository,
+            TransportJobRepository transportJobRepository,
+            PlaceRepository placeRepository,
+            BorderCrossingRepository borderCrossingRepository,
+            VehicleRepository vehicleRepository,
+            ClearanceService clearanceService,
+            AuditService auditService) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
@@ -54,8 +54,7 @@ public class RoutePlanService {
 
     @Transactional(readOnly = true)
     public List<RoutePlanResponse> getRoutePlans(UUID jobId) {
-        return routePlanRepository.findByJobIdOrderByVersionNoDesc(jobId)
-                .stream()
+        return routePlanRepository.findByJobIdOrderByVersionNoDesc(jobId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -68,14 +67,16 @@ public class RoutePlanService {
             return toResponse(confirmed.get());
         }
 
-        RoutePlan latest = routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId)
+        RoutePlan latest = routePlanRepository
+                .findFirstByJobIdOrderByVersionNoDesc(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("No route plan found for job: " + jobId));
         return toResponse(latest);
     }
 
     @Transactional
     public RoutePlanResponse createOrUpdateDraft(UUID jobId, CreateRoutePlanRequest request, User currentUser) {
-        TransportJob job = transportJobRepository.findById(jobId)
+        TransportJob job = transportJobRepository
+                .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // Find existing draft or create next version
@@ -120,12 +121,15 @@ public class RoutePlanService {
                 if (item.getBorderCrossingId() == null) {
                     throw new BusinessException("A BORDER stop requires a border crossing ID");
                 }
-                BorderCrossing bc = borderCrossingRepository.findById(item.getBorderCrossingId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Border crossing not found: " + item.getBorderCrossingId()));
+                BorderCrossing bc = borderCrossingRepository
+                        .findById(item.getBorderCrossingId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Border crossing not found: " + item.getBorderCrossingId()));
                 stop.setBorderCrossing(bc);
             } else {
                 if (item.getPlaceId() != null) {
-                    Place place = placeRepository.findById(item.getPlaceId())
+                    Place place = placeRepository
+                            .findById(item.getPlaceId())
                             .orElseThrow(() -> new ResourceNotFoundException("Place not found: " + item.getPlaceId()));
                     stop.setPlace(place);
                 }
@@ -142,7 +146,8 @@ public class RoutePlanService {
             RouteStop toStop = stopSeqMap.get(item.getToStopSeq());
 
             if (fromStop == null || toStop == null) {
-                throw new BusinessException("Leg connects non-existing stop sequences: " + item.getFromStopSeq() + " -> " + item.getToStopSeq());
+                throw new BusinessException("Leg connects non-existing stop sequences: " + item.getFromStopSeq()
+                        + " -> " + item.getToStopSeq());
             }
 
             RouteLeg leg = new RouteLeg();
@@ -155,7 +160,8 @@ public class RoutePlanService {
             leg.setPlannedMin(item.getPlannedMin());
 
             if (item.getMode() == TransportMode.ROAD && item.getVehicleId() != null) {
-                Vehicle vehicle = vehicleRepository.findById(item.getVehicleId())
+                Vehicle vehicle = vehicleRepository
+                        .findById(item.getVehicleId())
                         .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + item.getVehicleId()));
                 leg.setVehicle(vehicle);
             }
@@ -184,10 +190,12 @@ public class RoutePlanService {
 
     @Transactional
     public RoutePlanResponse confirmRoutePlan(UUID jobId, UUID routePlanId, String changeReason, User currentUser) {
-        TransportJob job = transportJobRepository.findById(jobId)
+        TransportJob job = transportJobRepository
+                .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        RoutePlan plan = routePlanRepository.findById(routePlanId)
+        RoutePlan plan = routePlanRepository
+                .findById(routePlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("Route plan not found: " + routePlanId));
 
         if (plan.getJob() == null || !jobId.equals(plan.getJob().getId())) {
@@ -211,18 +219,21 @@ public class RoutePlanService {
             if (deliveryStop.isPresent() && deliveryStop.get().getPlannedAt() != null) {
                 Instant deliveryTime = deliveryStop.get().getPlannedAt();
                 if (deliveryTime.isAfter(job.getWindowEnd())) {
-                    throw new BusinessException("Delivery stop planned time " + deliveryTime + " is after the arrival window close " + job.getWindowEnd());
+                    throw new BusinessException("Delivery stop planned time " + deliveryTime
+                            + " is after the arrival window close " + job.getWindowEnd());
                 }
             }
         }
 
         // Supersede any currently CONFIRMED route plan for this job
-        Optional<RoutePlan> currentConfirmed = routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
+        Optional<RoutePlan> currentConfirmed =
+                routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
         if (currentConfirmed.isPresent() && !currentConfirmed.get().getId().equals(plan.getId())) {
             RoutePlan oldPlan = currentConfirmed.get();
             oldPlan.setStatus(RoutePlanStatus.SUPERSEDED);
             oldPlan.setSupersededAt(Instant.now());
-            oldPlan.setChangeReason(changeReason != null ? changeReason : "Superseded by route plan version " + plan.getVersionNo());
+            oldPlan.setChangeReason(
+                    changeReason != null ? changeReason : "Superseded by route plan version " + plan.getVersionNo());
             routePlanRepository.save(oldPlan);
         }
 
@@ -276,8 +287,14 @@ public class RoutePlanService {
                         .kind(s.getKind())
                         .placeId(s.getPlace() != null ? s.getPlace().getId() : null)
                         .placeName(s.getPlace() != null ? s.getPlace().getName() : null)
-                        .borderCrossingId(s.getBorderCrossing() != null ? s.getBorderCrossing().getId() : null)
-                        .borderCrossingName(s.getBorderCrossing() != null ? s.getBorderCrossing().getName() : null)
+                        .borderCrossingId(
+                                s.getBorderCrossing() != null
+                                        ? s.getBorderCrossing().getId()
+                                        : null)
+                        .borderCrossingName(
+                                s.getBorderCrossing() != null
+                                        ? s.getBorderCrossing().getName()
+                                        : null)
                         .plannedAt(s.getPlannedAt())
                         .plannedStayMin(s.getPlannedStayMin())
                         .details(s.getDetails())
@@ -311,8 +328,10 @@ public class RoutePlanService {
                             .fromStopId(leg.getFromStop().getId())
                             .toStopId(leg.getToStop().getId())
                             .mode(leg.getMode())
-                            .vehicleId(leg.getVehicle() != null ? leg.getVehicle().getId() : null)
-                            .vehicleCode(leg.getVehicle() != null ? leg.getVehicle().getCode() : null)
+                            .vehicleId(
+                                    leg.getVehicle() != null ? leg.getVehicle().getId() : null)
+                            .vehicleCode(
+                                    leg.getVehicle() != null ? leg.getVehicle().getCode() : null)
                             .distanceKm(leg.getDistanceKm())
                             .plannedMin(leg.getPlannedMin())
                             .flight(flightResp)
@@ -327,7 +346,11 @@ public class RoutePlanService {
                 .status(plan.getStatus())
                 .distanceKm(plan.getDistanceKm())
                 .durationMin(plan.getDurationMin())
-                .confirmedByName(plan.getConfirmedBy() != null ? plan.getConfirmedBy().getFirstName() + " " + plan.getConfirmedBy().getLastName() : null)
+                .confirmedByName(
+                        plan.getConfirmedBy() != null
+                                ? plan.getConfirmedBy().getFirstName() + " "
+                                        + plan.getConfirmedBy().getLastName()
+                                : null)
                 .confirmedAt(plan.getConfirmedAt())
                 .supersededAt(plan.getSupersededAt())
                 .changeReason(plan.getChangeReason())

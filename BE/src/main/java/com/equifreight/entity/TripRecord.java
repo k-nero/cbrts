@@ -3,14 +3,13 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.TripRecordKind;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.Immutable;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.Immutable;
 
 /**
  * The escort's log and the only source of positions. Append-only (trigger). A DEPARTED record is refused unless the

@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.StoredFile;
@@ -11,13 +16,6 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.LocalFileStorage;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.mock.web.MockMultipartFile;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -25,18 +23,24 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockMultipartFile;
 
 class FileServiceTest {
 
-    private static final byte[] PDF = "%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+    private static final byte[] PDF =
+            "%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] PNG = {
+        (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'
+    };
+
     @TempDir
     Path dir;
+
     private StoredFileRepository repository;
     private LocalFileStorage storage;
     private FileService service;
@@ -76,12 +80,14 @@ class FileServiceTest {
     void storesAPdfUnderItsDetectedTypeWithItsChecksum() throws Exception {
         User customer = user(RoleName.CUSTOMER);
 
-        FileResponse response = service.upload(
-                new MockMultipartFile("file", "coggins.pdf", "application/pdf", PDF), customer);
+        FileResponse response =
+                service.upload(new MockMultipartFile("file", "coggins.pdf", "application/pdf", PDF), customer);
 
         assertThat(response.getContentType()).isEqualTo("application/pdf");
         assertThat(response.getSizeBytes()).isEqualTo(PDF.length);
-        assertThat(response.getSha256()).isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(PDF)));
+        assertThat(response.getSha256())
+                .isEqualTo(HexFormat.of()
+                        .formatHex(MessageDigest.getInstance("SHA-256").digest(PDF)));
         assertThat(response.getUploadedById()).isEqualTo(customer.getId());
         assertThat(storedKeys()).hasSize(1);
         String key = storedKeys().getFirst();
@@ -99,12 +105,13 @@ class FileServiceTest {
 
     @Test
     void rejectsATextFileRenamedToPdf() throws IOException {
-        var upload = new MockMultipartFile("file", "passport.pdf", "application/pdf",
-                "just some text".getBytes(StandardCharsets.UTF_8));
+        var upload = new MockMultipartFile(
+                "file", "passport.pdf", "application/pdf", "just some text".getBytes(StandardCharsets.UTF_8));
 
         assertThatThrownBy(() -> service.upload(upload, user(RoleName.CUSTOMER)))
                 .isInstanceOf(BusinessException.class)
-                .extracting("code").isEqualTo("FILE_TYPE_NOT_ALLOWED");
+                .extracting("code")
+                .isEqualTo("FILE_TYPE_NOT_ALLOWED");
         assertThat(storedKeys()).isEmpty();
         verify(repository, never()).save(any());
     }
@@ -115,7 +122,8 @@ class FileServiceTest {
 
         assertThatThrownBy(() -> service.upload(upload, user(RoleName.CUSTOMER)))
                 .isInstanceOf(BusinessException.class)
-                .extracting("code").isEqualTo("FILE_EMPTY");
+                .extracting("code")
+                .isEqualTo("FILE_EMPTY");
     }
 
     // ---------- reading ----------
@@ -145,7 +153,9 @@ class FileServiceTest {
     void staffCanReadAnyFile() {
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));
 
-        assertThat(service.get(file.getId(), user(RoleName.TRANSPORT_SPECIALIST)).getId()).isEqualTo(file.getId());
+        assertThat(service.get(file.getId(), user(RoleName.TRANSPORT_SPECIALIST))
+                        .getId())
+                .isEqualTo(file.getId());
     }
 
     @Test
@@ -229,7 +239,8 @@ class FileServiceTest {
 
         assertThatThrownBy(() -> service.requireAttachable(file.getId(), customer))
                 .isInstanceOf(ConflictException.class)
-                .extracting("code").isEqualTo("FILE_ALREADY_ATTACHED");
+                .extracting("code")
+                .isEqualTo("FILE_ALREADY_ATTACHED");
     }
 
     /**

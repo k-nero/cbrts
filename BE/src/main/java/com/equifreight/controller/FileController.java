@@ -4,6 +4,8 @@ import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.User;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.service.FileService;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -12,9 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 /**
  * Upload a file, then attach it by id to the record it belongs to. Any signed-in user may upload;

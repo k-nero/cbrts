@@ -1,7 +1,6 @@
 package com.equifreight.model.trip;
 
 import com.equifreight.entity.enums.TripRecordKind;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,6 +15,4 @@ public record TripStopResponse(
         TripRecordKind latestStatus,
         Instant latestOccurredAt,
         String latestNote,
-        String latestRecordedBy
-) {
-}
+        String latestRecordedBy) {}

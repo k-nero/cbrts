@@ -1,8 +1,13 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.User;
 import com.equifreight.repository.AuditLogRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,12 +16,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AuditServiceTest {
@@ -50,8 +49,7 @@ class AuditServiceTest {
                 "CBRT-2026-001",
                 null,
                 "PENDING",
-                "APPROVED"
-        );
+                "APPROVED");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());
@@ -90,8 +88,7 @@ class AuditServiceTest {
                 "CAT-1",
                 null,
                 "{\"version\":1}",
-                "{\"version\":2}"
-        );
+                "{\"version\":2}");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());

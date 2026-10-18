@@ -4,13 +4,12 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.repository.AuditLogRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Service to record append-only audit trail entries (BR-F1-08 / AGENTS.md).
@@ -46,12 +45,11 @@ public class AuditService {
         AuditLog log = new AuditLog();
         log.setOccurredAt(Instant.now());
         log.setActor(actor);
-        log.setActorLabel(actor != null
-                ? actor.displayName()
-                : "System");
-        log.setActorRole(actor != null && actor.getRoles() != null && !actor.getRoles().isEmpty()
-                ? actor.getRoles().iterator().next().getName()
-                : "SYSTEM");
+        log.setActorLabel(actor != null ? actor.displayName() : "System");
+        log.setActorRole(
+                actor != null && actor.getRoles() != null && !actor.getRoles().isEmpty()
+                        ? actor.getRoles().iterator().next().getName()
+                        : "SYSTEM");
         log.setChannel(Channel.WEB);
         log.setAction(action);
         log.setSummary(summary);

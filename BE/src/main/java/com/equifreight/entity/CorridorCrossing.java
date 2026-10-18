@@ -1,10 +1,9 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.util.UUID;
+import lombok.*;
 
 /**
  * The border crossings of a corridor, in order.

@@ -1,10 +1,9 @@
 package com.equifreight.model.user;
 
-import lombok.*;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
@@ -22,6 +21,7 @@ public class UserResponse {
      * The customer's club name on /me; null for staff and on the admin user list.
      */
     private String clubName;
+
     private Instant createdAt;
     private Instant updatedAt;
 }

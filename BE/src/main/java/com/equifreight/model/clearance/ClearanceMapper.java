@@ -3,13 +3,11 @@ package com.equifreight.model.clearance;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.User;
-
 import java.util.UUID;
 
 public final class ClearanceMapper {
 
-    private ClearanceMapper() {
-    }
+    private ClearanceMapper() {}
 
     public static DocumentVersionResponse toVersionResponse(DocumentVersion version) {
         if (version == null) {
@@ -32,7 +30,10 @@ public final class ClearanceMapper {
 
         return DocumentVersionResponse.builder()
                 .id(version.getId())
-                .checklistItemId(version.getChecklistItem() != null ? version.getChecklistItem().getId() : null)
+                .checklistItemId(
+                        version.getChecklistItem() != null
+                                ? version.getChecklistItem().getId()
+                                : null)
                 .versionNo(version.getVersionNo())
                 .fileId(version.getFile() != null ? version.getFile().getId() : null)
                 .fileName(version.getFile() != null ? version.getFile().getFileName() : null)
@@ -162,7 +163,8 @@ public final class ClearanceMapper {
                 && sub.getStatus() != com.equifreight.entity.enums.SubmissionStatus.REFUSED
                 && java.time.LocalDate.now().isAfter(sub.getExpectedBy());
 
-        java.util.List<UUID> itemIds = sub.getChecklistItems() == null ? java.util.List.of()
+        java.util.List<UUID> itemIds = sub.getChecklistItems() == null
+                ? java.util.List.of()
                 : sub.getChecklistItems().stream().map(ChecklistItem::getId).toList();
 
         return AuthoritySubmissionResponse.builder()
@@ -179,7 +181,8 @@ public final class ClearanceMapper {
                 .isOverdue(isOverdue)
                 .issuedAt(sub.getIssuedAt())
                 .resultFileId(sub.getResultFile() != null ? sub.getResultFile().getId() : null)
-                .resultFileName(sub.getResultFile() != null ? sub.getResultFile().getFileName() : null)
+                .resultFileName(
+                        sub.getResultFile() != null ? sub.getResultFile().getFileName() : null)
                 .checklistItemIds(itemIds)
                 .build();
     }
