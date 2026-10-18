@@ -1,4 +1,4 @@
-import { type FC, useRef, useState } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import { useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
@@ -11,7 +11,7 @@ import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
 import { useReturnRequest } from '@/hooks/staffRequest';
 import type { ApiError, RequestReview } from '@/interfaces';
-import { apiErrorMessage, formatDate, noteState, requestStatusChip } from '@/lib/utils';
+import { apiErrorMessage, formatDate, NOTE_MAX, noteState, requestStatusChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 type NoteForm = { note: string };
@@ -42,29 +42,51 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const qc = useQueryClient();
   const methods = useFormCustom<NoteForm>({ defaultValues: { note: '' } });
   const note = useWatch({ control: methods.control, name: 'note' }) ?? '';
-  const [conflict, setConflict] = useState<string | null>(null);
+  /** A 409's sentence and the note that wasn't sent, kept after the refetch turns the panel read-only. */
+  const [conflict, setConflict] = useState<{ sentence: string; unsent: string } | null>(null);
   /** A send in flight: a second click queued behind the first sends nothing. */
   const sending = useRef(false);
   const { request } = review;
   const state = noteState(note);
+
+  // A server refusal on the note is about the text that was sent: any change retires it.
+  useEffect(() => {
+    if (methods.getFieldState('note').error?.type === 'server') methods.clearErrors('note');
+  }, [note, methods]);
+
+  const conflictCallout = conflict && (
+    <Callout tone="bad" title={conflict.sentence}>
+      {conflict.unsent && (
+        <span className="flex flex-col gap-1">
+          <span>Your note wasn&apos;t sent:</span>
+          <span className="whitespace-pre-line text-ink">{conflict.unsent}</span>
+        </span>
+      )}
+    </Callout>
+  );
 
   if (request.status !== 'SUBMITTED' && request.status !== 'UNDER_REVIEW') {
     const chip = requestStatusChip(request.status);
     const returned = review.revisions[review.revisions.length - 1];
     return (
       <Panel title="Waiting for the customer" extra={<Chip tone={chip.tone}>{chip.label}</Chip>}>
-        {request.infoRequiredNote ? (
-          <div className="flex flex-col gap-1">
-            <p className="type-label-s m-0 text-ink-2">
-              Returned{returned?.returnedAt ? ` ${formatDate(returned.returnedAt)}` : ''} with:
+        <div className="flex flex-col gap-4">
+          {conflictCallout}
+          {request.infoRequiredNote ? (
+            <div className="flex flex-col gap-1">
+              <p className="type-label-s m-0 text-ink-2">
+                Returned{returned?.returnedAt ? ` ${formatDate(returned.returnedAt)}` : ''} with:
+              </p>
+              <p className="type-body-s m-0 whitespace-pre-line text-ink">
+                {request.infoRequiredNote}
+              </p>
+            </div>
+          ) : (
+            <p className="type-body-s m-0 text-ink-2">
+              This request isn&apos;t waiting for review.
             </p>
-            <p className="type-body-s m-0 whitespace-pre-line text-ink">
-              {request.infoRequiredNote}
-            </p>
-          </div>
-        ) : (
-          <p className="type-body-s m-0 text-ink-2">This request isn&apos;t waiting for review.</p>
-        )}
+          )}
+        </div>
       </Panel>
     );
   }
@@ -90,9 +112,9 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
         "The request wasn't returned. Check your connection and try again.",
       );
       if (data?.error === 'NOTE_REQUIRED' || data?.error === 'NOTE_TOO_LONG') {
-        methods.setError('note', { message: sentence });
+        methods.setError('note', { type: 'server', message: sentence });
       } else {
-        setConflict(sentence);
+        setConflict({ sentence, unsent: note.trim() });
         void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(request.id) });
       }
     } finally {
@@ -106,14 +128,14 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
         <p className="type-body-s m-0 text-ink-2">
           Ask the customer before quoting, or wait for the quotation step.
         </p>
-        {conflict && <Callout tone="bad" title={conflict} />}
+        {conflictCallout}
         <div className="flex flex-col gap-3 rounded-md border border-line-strong bg-raised p-4">
           <span className="type-label-m text-ink">Ask for information</span>
           <FormWrapper methods={methods} isSubmitting={send.isPending} layout="vertical">
             <NoteField club={request.club} />
           </FormWrapper>
           <span
-            className={`type-caption self-end ${state.length > 500 ? 'text-bad' : 'text-ink-3'}`}
+            className={`type-caption self-end ${state.length > NOTE_MAX ? 'text-bad' : 'text-ink-3'}`}
           >
             {state.count}
           </span>

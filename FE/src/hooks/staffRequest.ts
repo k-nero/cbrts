@@ -27,7 +27,8 @@ export const useReturnRequest = () => {
     mutationFn: ({ id, note }) => returnForInformation(id, note),
     onSuccess: (review, { id }) => {
       qc.setQueryData(queryKeys.staffRequests.one(id), review);
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.all() });
+      // Only the queue: the review was just set from the answer, so refetching it would be a wasted GET.
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
     },
   });
 };

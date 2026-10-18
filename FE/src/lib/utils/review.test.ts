@@ -6,13 +6,15 @@ import {
   checkTally,
   checkTone,
   departsWords,
+  historyWhen,
   noteState,
   queueRoute,
   queueWords,
+  reviewSubject,
   reviewSummary,
 } from './review';
 
-import type { QueueRow, ReviewCheck, TransportRequest } from '@/interfaces';
+import type { QueueRow, RequestReview, ReviewCheck, TransportRequest } from '@/interfaces';
 
 const row = (over: Partial<QueueRow> = {}): QueueRow => ({
   id: 'r1',
@@ -135,5 +137,36 @@ describe('the review page', () => {
       count: '500 / 500',
     });
     expect(noteState('x'.repeat(501))).toEqual({ length: 501, ok: false, count: '501 / 500' });
+  });
+});
+
+describe('times in business time', () => {
+  test('a history line at 18:30 UTC is already the next day in ICT', () => {
+    expect(historyWhen('2026-09-29T18:30:00Z')).toBe('30 Sep · 01:30');
+    expect(historyWhen('2026-09-28T02:41:00Z')).toBe('28 Sep · 09:41');
+  });
+});
+
+describe('what the header describes', () => {
+  const live = {
+    ...sent({ departureDate: '2026-11-15' }),
+    club: 'Saigon Turf Club',
+  } as RequestReview['request'];
+
+  test('the latest version the customer sent, not their unsent edits', () => {
+    const review = {
+      request: { ...live, status: 'INFO_REQUIRED' },
+      revisions: [
+        { revisionNo: 1, submittedAt: '', note: 'Which?', returnedAt: null, payload: sent() },
+      ],
+    } as unknown as RequestReview;
+    const subject = reviewSubject(review);
+    expect(subject.departureDate).toBe('2026-10-30');
+    expect(subject.club).toBe('Saigon Turf Club');
+  });
+
+  test('the request itself when no version was kept', () => {
+    const review = { request: live, revisions: [] } as unknown as RequestReview;
+    expect(reviewSubject(review).departureDate).toBe('2026-11-15');
   });
 });

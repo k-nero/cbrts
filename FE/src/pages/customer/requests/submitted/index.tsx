@@ -1,10 +1,10 @@
 import type { FC } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 
-import { RequestLoadState } from '../components/RequestNotFound';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
 
+import { RequestLoadState } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';

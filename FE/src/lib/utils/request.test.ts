@@ -679,6 +679,17 @@ describe('versions of a returned request', () => {
     ).toBe('v2 · Submitted 30 Sep');
   });
 
+  test('a version line shows the ICT day: 18:30 UTC is already the next day', () => {
+    expect(
+      versionLine({
+        revisionNo: 1,
+        submittedAt: '2026-09-29T18:30:00Z',
+        note: 'Which?',
+        returnedAt: '2026-09-30T17:30:00Z',
+      }),
+    ).toBe('v1 · Submitted 30 Sep · returned 1 Oct');
+  });
+
   test('the submit button names the version it sends', () => {
     expect(submitLabel(draft())).toBe('Submit request');
     expect(submitLabel(returned)).toBe('Send version 2');

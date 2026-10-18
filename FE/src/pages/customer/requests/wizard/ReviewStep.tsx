@@ -1,10 +1,9 @@
 import { type FC, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 
-import { RequestSummary } from '../components/RequestSummary';
-
 import type { StepProps } from '.';
 
+import { RequestSummary } from '@/components/request/RequestSummary';
 import { Button, Callout, Panel } from '@/components/ui';
 import { useRequest, useSubmitRequest } from '@/hooks/request';
 import type { ApiError } from '@/interfaces';

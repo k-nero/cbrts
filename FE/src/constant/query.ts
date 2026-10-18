@@ -26,6 +26,7 @@ export const queryKeys = {
   },
   staffRequests: {
     all: () => ['staff-requests'] as const,
+    queues: () => ['staff-requests', 'queue'] as const,
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
   },

@@ -4,22 +4,12 @@ import { useParams } from 'react-router-dom';
 import { DecisionPanel } from './DecisionPanel';
 import { ChecksPanel, HistoryPanel, SentPanel } from './panels';
 
+import { RequestLoadState, RequestNotFound } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui';
 import { useRequestReview } from '@/hooks/staffRequest';
-import { RequestLoadState } from '@/pages/customer/requests/components/RequestNotFound';
-import { queueWords, reviewSummary } from '@/lib/utils';
+import { queueWords, reviewSubject, reviewSummary } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
-
-const NotFound: FC<{ onBack: () => void }> = ({ onBack }) => (
-  <div className="flex flex-col items-start gap-3 pt-[46px]">
-    <h1 className="type-display-m m-0 text-ink">We couldn’t find this request</h1>
-    <p className="type-body-m m-0 text-ink-2">
-      This request doesn&apos;t exist or isn&apos;t yours to review.
-    </p>
-    <Button onClick={onBack}>Back to Requests</Button>
-  </div>
-);
 
 /**
  * Request review (spec §5.2): the logistics manager's feasibility page. Two checks, what the customer
@@ -34,11 +24,24 @@ const RequestReviewPage: FC = () => {
   const open = (target: string) =>
     router.push(router.paths.get('request-review', { pathParams: [target] }));
 
-  if (!review) return <RequestLoadState query={query} notFound={<NotFound onBack={toList} />} />;
+  if (!review)
+    return (
+      <RequestLoadState
+        query={query}
+        notFound={
+          <RequestNotFound
+            message="This request doesn't exist, or the club hasn't sent it yet."
+            back={{ label: 'Back to Requests', onClick: toList }}
+          />
+        }
+      />
+    );
 
   const { request, queue } = review;
-  const from = request.route?.fromCity ?? request.origin?.city ?? '—';
-  const to = request.route?.toCity ?? request.destination?.city ?? '—';
+  // The header describes what the customer sent, never a returned request's unsent edits.
+  const subject = reviewSubject(review);
+  const from = subject.route?.fromCity ?? subject.origin?.city ?? '—';
+  const to = subject.route?.toCity ?? subject.destination?.city ?? '—';
 
   return (
     <div className="flex flex-col gap-7">
@@ -48,7 +51,7 @@ const RequestReviewPage: FC = () => {
         summary={
           <span className="flex flex-col gap-1">
             <span className="type-data text-ink">{request.code}</span>
-            <span>{reviewSummary(request)}</span>
+            <span>{reviewSummary(subject)}</span>
           </span>
         }
         right={

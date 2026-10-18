@@ -1,8 +1,15 @@
 import { formatDay } from './horse';
+import { ict } from './time';
 import { CLASS_WORDS, reviewRows, shortDay, TRAILER_WORDS } from './request';
 
 import type { Tone } from '@/components/ui/tone';
-import type { QueuePosition, QueueRow, ReviewCheck, TransportRequest } from '@/interfaces';
+import type {
+  QueuePosition,
+  QueueRow,
+  RequestReview,
+  ReviewCheck,
+  TransportRequest,
+} from '@/interfaces';
 
 /** request_revisions.note holds 500 characters (spec §4.2). */
 export const NOTE_MAX = 500;
@@ -99,4 +106,16 @@ export const changedRows = (
 export const noteState = (note: string): { length: number; ok: boolean; count: string } => {
   const length = note.trim().length;
   return { length, ok: length > 0 && length <= NOTE_MAX, count: `${length} / ${NOTE_MAX}` };
+};
+
+/** "30 Sep · 01:30": when a history line happened, in ICT. */
+export const historyWhen = (iso: string): string => ict(iso).format('D MMM · HH:mm');
+
+/**
+ * What the review header describes: the latest version the customer sent, so a returned request's unsent
+ * edits never show as if they were sent; the request itself when no version was kept.
+ */
+export const reviewSubject = (review: RequestReview): RequestReview['request'] => {
+  const latest = review.revisions[review.revisions.length - 1];
+  return latest ? { ...asSent(latest.payload), club: review.request.club } : review.request;
 };

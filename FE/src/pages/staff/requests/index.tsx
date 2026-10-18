@@ -1,9 +1,9 @@
 import { type FC, useEffect, useMemo, useState } from 'react';
-import type { TableColumnsType } from 'antd';
+import { Skeleton, type TableColumnsType } from 'antd';
 
 import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
-import { Button, Callout, Icon, Panel } from '@/components/ui';
+import { Button, Callout, Panel } from '@/components/ui';
 import { useReviewQueue } from '@/hooks/staffRequest';
 import type { QueueRow } from '@/interfaces';
 import { ageWords, departsWords, queueRoute } from '@/lib/utils';
@@ -83,7 +83,19 @@ const RequestsPage: FC = () => {
         key: 'open',
         width: 48,
         align: 'right',
-        render: () => <Icon name="arrow-right" size={16} />,
+        // The row opens on a click; this button is the keyboard's way in.
+        render: (_, r) => (
+          <Button
+            size="sm"
+            variant="ghost"
+            trailingIcon="arrow-right"
+            aria-label={`Open ${r.code}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              open(r.id);
+            }}
+          />
+        ),
       },
     ],
     // `now` moves every render; the ages only need to be as fresh as the last render.
@@ -116,6 +128,13 @@ const RequestsPage: FC = () => {
         >
           Nothing has changed. Check your connection and try again.
         </Callout>
+      ) : query.isPending ? (
+        <div className="flex flex-col gap-4" aria-busy>
+          <span className="type-label-s text-ink">Waiting</span>
+          <Panel>
+            <Skeleton active title={false} paragraph={{ rows: 6 }} />
+          </Panel>
+        </div>
       ) : empty ? (
         <Panel title="Nothing waiting for review">
           <p className="type-body-m m-0 text-ink-2">
@@ -124,15 +143,13 @@ const RequestsPage: FC = () => {
         </Panel>
       ) : (
         <div className="flex flex-col gap-4">
-          <span className="type-label-s text-ink">
-            {total === undefined ? 'Waiting' : `${total} waiting`}
-          </span>
+          <span className="type-label-s text-ink">{`${total ?? 0} waiting`}</span>
           <Table<QueueRow>
             id="review-queue"
             rowKey="id"
             columns={columns}
             dataSource={query.data?.content ?? []}
-            loading={query.isPending || query.isFetching}
+            loading={query.isFetching}
             ignoreKeys={['open']}
             onRow={(r) => ({ onClick: () => open(r.id), className: 'cursor-pointer' })}
             pagination={{

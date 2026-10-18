@@ -1,9 +1,17 @@
 import { type FC, useState } from 'react';
 
-import { RequestSummary } from '@/pages/customer/requests/components/RequestSummary';
+import { RequestSummary } from '@/components/request/RequestSummary';
 import { Chip, Panel, Tabs } from '@/components/ui';
 import type { HistoryEntry, ReviewCheck, ReviewRevision } from '@/interfaces';
-import { asSent, changedRows, checkTally, checkTone, ict, reviewRows } from '@/lib/utils';
+import {
+  asSent,
+  changedRows,
+  checkTally,
+  checkTone,
+  formatDayTime,
+  historyWhen,
+  reviewRows,
+} from '@/lib/utils';
 
 const CHECK_NAMES: Record<ReviewCheck['key'], string> = {
   ROUTE_SERVED: 'Route served',
@@ -74,8 +82,7 @@ export const SentPanel: FC<{ revisions: ReviewRevision[] }> = ({ revisions }) =>
         version.note && (
           <div>
             <p className="type-label-s m-0 text-ink-2">
-              Returned
-              {version.returnedAt ? ` ${ict(version.returnedAt).format('D MMM, HH:mm')}` : ''} with:
+              Returned{version.returnedAt ? ` ${formatDayTime(version.returnedAt)}` : ''} with:
             </p>
             <p className="type-body-s m-0 mt-1 whitespace-pre-line text-ink">{version.note}</p>
           </div>
@@ -94,9 +101,7 @@ export const HistoryPanel: FC<{ history: HistoryEntry[] }> = ({ history }) => (
           key={`${h.occurredAt}-${i}`}
           className={`grid grid-cols-[120px_minmax(0,1fr)] gap-4 px-6 py-3 ${i > 0 ? 'border-t border-line' : ''}`}
         >
-          <span className="type-caption pt-0.5 text-ink-3">
-            {ict(h.occurredAt).format('D MMM · HH:mm')}
-          </span>
+          <span className="type-caption pt-0.5 text-ink-3">{historyWhen(h.occurredAt)}</span>
           <span className="flex flex-col gap-0.5">
             <span className="type-body-s text-ink">{h.summary}</span>
             <span className="type-body-s text-ink-3">{h.actorLabel}</span>
