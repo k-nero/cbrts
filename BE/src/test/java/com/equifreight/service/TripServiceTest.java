@@ -24,36 +24,57 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TripServiceTest {
 
-    @Mock private TransportJobRepository jobs;
-    @Mock private CrewAssignmentRepository crew;
-    @Mock private TripRecordRepository records;
-    @Mock private RoutePlanRepository routes;
-    @Mock private LoadPlanRepository loads;
-    @Mock private RequestHorseRepository requestHorses;
-    @Mock private FileService files;
-    @Mock private AuditLogRepository audit;
-
+    private static final Instant NOW = Instant.now();
+    @Mock
+    private TransportJobRepository jobs;
+    @Mock
+    private CrewAssignmentRepository crew;
+    @Mock
+    private TripRecordRepository records;
+    @Mock
+    private RoutePlanRepository routes;
+    @Mock
+    private LoadPlanRepository loads;
+    @Mock
+    private RequestHorseRepository requestHorses;
+    @Mock
+    private FileService files;
+    @Mock
+    private AuditLogRepository audit;
     @InjectMocks
     private TripService service;
-
-    private static final Instant NOW = Instant.now();
-
     private User coordinator;
     private TransportJob job;
     private Horse shadowfax;
     private Horse nightfall;
+
+    private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions);
+    }
+
+    // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
+
+    private static TripConditionRequest condition(Horse horse, List<UUID> photos) {
+        return new TripConditionRequest(horse.getId(), HorseCondition.SOUND, true, true, null, photos);
+    }
+
+    private static Horse horse(String name) {
+        Horse horse = new Horse();
+        horse.setId(UUID.randomUUID());
+        horse.setName(name);
+        return horse;
+    }
+
+    // ---------- order of events ----------
 
     @BeforeEach
     void setUp() {
@@ -85,8 +106,6 @@ class TripServiceTest {
         when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection())).thenReturn(Optional.empty());
     }
 
-    // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
-
     @Test
     @DisplayName("Departure is refused until the dossier is CLEARANCE_READY")
     void departureIsRefusedBeforeClearance() {
@@ -107,8 +126,6 @@ class TripServiceTest {
         assertEquals(JobStage.TRIP, job.getStage());
         assertEquals(NOW, job.getDepartedAt());
     }
-
-    // ---------- order of events ----------
 
     @Test
     @DisplayName("A hold can't be recorded before the trip departs")
@@ -159,6 +176,8 @@ class TripServiceTest {
         assertEquals(JobStage.HANDOVER, job.getStage());
     }
 
+    // ---------- condition checks (US-F4-03) ----------
+
     @Test
     @DisplayName("A lifecycle step older than the latest status update is refused")
     void lateLifecycleStepIsRefused() {
@@ -178,6 +197,8 @@ class TripServiceTest {
         assertEquals("TRIP_RECORD_IN_FUTURE", ex.getCode());
     }
 
+    // ---------- helpers ----------
+
     @Test
     @DisplayName("A closed trip takes no new events")
     void closedTripIsRefused() {
@@ -185,8 +206,6 @@ class TripServiceTest {
 
         assertThrows(ConflictException.class, () -> record(TripRecordKind.NOTE, NOW));
     }
-
-    // ---------- condition checks (US-F4-03) ----------
 
     @Test
     @DisplayName("Horse observations must be sent as a condition check")
@@ -213,8 +232,6 @@ class TripServiceTest {
         verify(records, never()).save(any());
     }
 
-    // ---------- helpers ----------
-
     private void record(TripRecordKind kind, Instant at) {
         service.addCoordinatorRecord(job.getCode(), coordinator, request(kind, at, null));
     }
@@ -233,26 +250,11 @@ class TripServiceTest {
         }
     }
 
-    private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions);
-    }
-
-    private static TripConditionRequest condition(Horse horse, List<UUID> photos) {
-        return new TripConditionRequest(horse.getId(), HorseCondition.SOUND, true, true, null, photos);
-    }
-
     private TripRecord stored(TripRecordKind kind, Instant at) {
         TripRecord record = new TripRecord();
         record.setJob(job);
         record.setKind(kind);
         record.setOccurredAt(at);
         return record;
-    }
-
-    private static Horse horse(String name) {
-        Horse horse = new Horse();
-        horse.setId(UUID.randomUUID());
-        horse.setName(name);
-        return horse;
     }
 }

@@ -12,6 +12,8 @@ public class AssignStallRequest {
     @NotNull
     private UUID vehicleStallId;
 
-    /** Null to unassign */
+    /**
+     * Null to unassign
+     */
     private UUID horseId;
 }

@@ -1,13 +1,18 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.*;
+import com.equifreight.entity.RegulationVersion;
+import com.equifreight.entity.Role;
+import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.clearance.*;
-import com.equifreight.entity.enums.RoleName;
-import com.equifreight.repository.*;
+import com.equifreight.repository.DocumentTypeRepository;
+import com.equifreight.repository.RegulationCatalogRepository;
+import com.equifreight.repository.RegulationRuleRepository;
+import com.equifreight.repository.RegulationVersionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +46,9 @@ public class RegulationService {
         this.auditService = auditService;
     }
 
-    /** List all regulation catalogs by country with their current active published version. */
+    /**
+     * List all regulation catalogs by country with their current active published version.
+     */
     @Transactional(readOnly = true)
     public List<RegulationCatalogResponse> listCatalogs() {
         return catalogRepository.findAll().stream()
@@ -59,7 +66,9 @@ public class RegulationService {
                 .toList();
     }
 
-    /** Get detailed information for a regulation version, including all document rules. */
+    /**
+     * Get detailed information for a regulation version, including all document rules.
+     */
     @Transactional(readOnly = true)
     public RegulationVersionResponse getVersionDetails(UUID versionId) {
         RegulationVersion version = versionRepository.findById(versionId)
@@ -74,7 +83,9 @@ public class RegulationService {
         return resp;
     }
 
-    /** List all recognized document types in the system. */
+    /**
+     * List all recognized document types in the system.
+     */
     @Transactional(readOnly = true)
     public List<DocumentTypeResponse> listDocumentTypes() {
         return documentTypeRepository.findAll().stream()

@@ -7,7 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/** Every emailed link (verify email, staff invite, reset password). Only the hash is stored. */
+/**
+ * Every emailed link (verify email, staff invite, reset password). Only the hash is stored.
+ */
 @Setter
 @Getter
 @Entity
@@ -32,7 +34,9 @@ public class AccountToken extends BaseEntity {
 
     private Instant revokedAt;
 
-    /** Usable while neither used nor revoked and not yet expired. */
+    /**
+     * Usable while neither used nor revoked and not yet expired.
+     */
     public boolean isUsable(Instant now) {
         return usedAt == null && revokedAt == null && expiresAt.isAfter(now);
     }

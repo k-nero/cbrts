@@ -16,14 +16,20 @@ import java.util.UUID;
 public interface RegulationVersionRepository extends JpaRepository<RegulationVersion, UUID>,
         JpaSpecificationExecutor<RegulationVersion> {
 
-    /** Lấy tất cả phiên bản quy định của 1 quốc gia (theo catalog). */
+    /**
+     * Lấy tất cả phiên bản quy định của 1 quốc gia (theo catalog).
+     */
     List<RegulationVersion> findByCatalogId(UUID catalogId);
 
-    /** Tìm các phiên bản theo trạng thái (PUBLISHED, DRAFT, RETIRED). */
+    /**
+     * Tìm các phiên bản theo trạng thái (PUBLISHED, DRAFT, RETIRED).
+     */
     @Query("SELECT rv FROM RegulationVersion rv WHERE rv.catalog.id = :catalogId AND rv.status = :status ORDER BY rv.versionNo DESC")
     List<RegulationVersion> findByCatalogIdAndStatusOrdered(@Param("catalogId") UUID catalogId,
-            @Param("status") CatalogStatus status);
+                                                            @Param("status") CatalogStatus status);
 
-    /** Tìm phiên bản DRAFT duy nhất (tối đa 1) của 1 catalog. */
+    /**
+     * Tìm phiên bản DRAFT duy nhất (tối đa 1) của 1 catalog.
+     */
     Optional<RegulationVersion> findByCatalogIdAndStatus(UUID catalogId, CatalogStatus status);
 }

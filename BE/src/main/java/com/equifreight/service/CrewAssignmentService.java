@@ -1,7 +1,6 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.CrewAssignment;
-import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CrewRole;
@@ -9,7 +8,6 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.CrewMemberResponse;
-import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.UserRepository;
@@ -17,11 +15,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Log4j2

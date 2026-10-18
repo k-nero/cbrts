@@ -8,7 +8,9 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** One per job. The late-arrival penalty is credited as a line on the final invoice. */
+/**
+ * One per job. The late-arrival penalty is credited as a line on the final invoice.
+ */
 @Setter
 @Getter
 @Entity
@@ -19,14 +21,20 @@ public class Handover extends BaseEntity {
     @JoinColumn(name = "job_id", nullable = false, unique = true)
     private TransportJob job;
 
-    /** From the DELIVERED trip record. */
+    /**
+     * From the DELIVERED trip record.
+     */
     private Instant deliveredAt;
 
-    /** "Sophea, receiving groom". */
+    /**
+     * "Sophea, receiving groom".
+     */
     @Column(length = 120)
     private String receivingName;
 
-    /** Within 2 days; paused while an incident is open. */
+    /**
+     * Within 2 days; paused while an incident is open.
+     */
     private Instant confirmDueAt;
 
     @Enumerated(EnumType.STRING)
@@ -39,10 +47,14 @@ public class Handover extends BaseEntity {
 
     private Instant confirmedAt;
 
-    /** Minutes after windowEnd, minus minutes the clock was stopped. Null when there's no window. */
+    /**
+     * Minutes after windowEnd, minus minutes the clock was stopped. Null when there's no window.
+     */
     private Integer lateMinutes;
 
-    /** ⌈lateMinutes ÷ 60⌉ × pct × total, capped. */
+    /**
+     * ⌈lateMinutes ÷ 60⌉ × pct × total, capped.
+     */
     @Column(precision = 14, scale = 2)
     private BigDecimal penaltyAmount;
 }

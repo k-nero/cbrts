@@ -14,7 +14,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** Archived, never deleted, because past jobs refer to it. */
+/**
+ * Archived, never deleted, because past jobs refer to it.
+ */
 @Setter
 @Getter
 @Entity
@@ -25,7 +27,9 @@ public class Horse extends BaseEntity {
     @JoinColumn(name = "club_id", nullable = false)
     private Club club;
 
-    /** Unique per club among active horses. */
+    /**
+     * Unique per club among active horses.
+     */
     @Column(nullable = false, length = 80)
     private String name;
 
@@ -57,7 +61,9 @@ public class Horse extends BaseEntity {
     @Column(length = 40)
     private String passportNo;
 
-    /** Insurance base, taken as stated. */
+    /**
+     * Insurance base, taken as stated.
+     */
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal declaredValue;
 
@@ -69,7 +75,9 @@ public class Horse extends BaseEntity {
     @Column(length = 20)
     private Temperament temperament;
 
-    /** A stallion or aggressive horse needs BOX (application rule, shown as a load-plan conflict). */
+    /**
+     * A stallion or aggressive horse needs BOX (application rule, shown as a load-plan conflict).
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StallType requiredStall = StallType.STANDARD;

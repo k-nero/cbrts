@@ -13,4 +13,5 @@ public record TripConditionResponse(
         Boolean eating,
         String note,
         List<TripPhotoResponse> photos
-) {}
+) {
+}

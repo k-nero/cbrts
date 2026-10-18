@@ -7,7 +7,9 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
-/** Air stall classes: one position is 96 in, shared by 3, 2 or 1 horses. Air corridors only. */
+/**
+ * Air stall classes: one position is 96 in, shared by 3, 2 or 1 horses. Air corridors only.
+ */
 @Setter
 @Getter
 @Entity

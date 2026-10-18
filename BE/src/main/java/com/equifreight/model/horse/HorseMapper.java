@@ -4,7 +4,8 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
 
 public final class HorseMapper {
-    private HorseMapper() {}
+    private HorseMapper() {
+    }
 
     public static HorseResponse toResponse(Horse horse, boolean identityLocked) {
         return HorseResponse.builder()

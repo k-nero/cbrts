@@ -11,5 +11,6 @@ public final class BusinessTime {
 
     public static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    private BusinessTime() {}
+    private BusinessTime() {
+    }
 }

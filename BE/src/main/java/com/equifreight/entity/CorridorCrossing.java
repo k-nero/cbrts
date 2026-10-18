@@ -1,16 +1,14 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.io.Serializable;
 import java.util.UUID;
 
-/** The border crossings of a corridor, in order. */
+/**
+ * The border crossings of a corridor, in order.
+ */
 @Setter
 @Getter
 @Entity

@@ -38,7 +38,9 @@ public class StaffJobController {
         this.crewAssignmentService = crewAssignmentService;
     }
 
-    /** US-F3-01: Planning backlog of approved jobs, soonest departure first (jobs without a date last). */
+    /**
+     * US-F3-01: Planning backlog of approved jobs, soonest departure first (jobs without a date last).
+     */
     @GetMapping
     public Page<JobSummaryResponse> list(
             @RequestParam(value = "q", required = false) String q,
@@ -48,19 +50,25 @@ public class StaffJobController {
         return transportJobService.search(q, stage, filter, pageable);
     }
 
-    /** View detailed job workspace with its tabs. */
+    /**
+     * View detailed job workspace with its tabs.
+     */
     @GetMapping("/{id}")
     public JobDetailResponse getDetail(@PathVariable UUID id) {
         return transportJobService.getJobDetail(id);
     }
 
-    /** US-F3-05: Load plan - view current draft or confirmed plan (null if not yet created). */
+    /**
+     * US-F3-05: Load plan - view current draft or confirmed plan (null if not yet created).
+     */
     @GetMapping("/{jobId}/load-plan")
     public LoadPlanResponse getLoadPlan(@PathVariable UUID jobId) {
         return loadPlanService.getActiveLoadPlan(jobId).orElse(null);
     }
 
-    /** US-F3-05: Load plan - explicitly create load plan with selected vehicle. */
+    /**
+     * US-F3-05: Load plan - explicitly create load plan with selected vehicle.
+     */
     @PostMapping("/{jobId}/load-plan")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse createLoadPlan(@PathVariable UUID jobId,
@@ -68,7 +76,9 @@ public class StaffJobController {
         return loadPlanService.createLoadPlan(jobId, vehicleId);
     }
 
-    /** US-F3-05: Load plan - change vehicle for draft load plan. */
+    /**
+     * US-F3-05: Load plan - change vehicle for draft load plan.
+     */
     @PutMapping("/{jobId}/load-plan/vehicle")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse changeVehicle(@PathVariable UUID jobId,
@@ -76,7 +86,9 @@ public class StaffJobController {
         return loadPlanService.changeLoadPlanVehicle(jobId, vehicleId);
     }
 
-    /** US-F3-05: Load plan - assign or unassign a horse to a stall. */
+    /**
+     * US-F3-05: Load plan - assign or unassign a horse to a stall.
+     */
     @PostMapping("/{jobId}/load-plan/assign")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse assignStall(@PathVariable UUID jobId, @Valid @RequestBody AssignStallRequest request) {
@@ -93,27 +105,35 @@ public class StaffJobController {
         return loadPlanService.moveHorse(jobId, request);
     }
 
-    /** US-F3-05: Load plan - auto-arrange horses into valid stalls. */
+    /**
+     * US-F3-05: Load plan - auto-arrange horses into valid stalls.
+     */
     @PostMapping("/{jobId}/load-plan/auto-arrange")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse autoArrange(@PathVariable UUID jobId) {
         return loadPlanService.autoArrange(jobId);
     }
 
-    /** US-F3-05: Load plan - confirm load plan when zero conflicts exist. */
+    /**
+     * US-F3-05: Load plan - confirm load plan when zero conflicts exist.
+     */
     @PostMapping("/{jobId}/load-plan/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return loadPlanService.confirmLoadPlan(jobId, user);
     }
 
-    /** US-F3-03: Route plans - list version history. */
+    /**
+     * US-F3-03: Route plans - list version history.
+     */
     @GetMapping("/{jobId}/route-plans")
     public List<RoutePlanResponse> getRoutePlans(@PathVariable UUID jobId) {
         return routePlanService.getRoutePlans(jobId);
     }
 
-    /** US-F3-03: Route plans - create or update draft. */
+    /**
+     * US-F3-03: Route plans - create or update draft.
+     */
     @PostMapping("/{jobId}/route-plans")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public RoutePlanResponse createRoutePlan(@PathVariable UUID jobId,
@@ -122,23 +142,29 @@ public class StaffJobController {
         return routePlanService.createOrUpdateDraft(jobId, request, user);
     }
 
-    /** US-F3-03 / US-F3-08: Confirm route plan with optional change reason. */
+    /**
+     * US-F3-03 / US-F3-08: Confirm route plan with optional change reason.
+     */
     @PostMapping("/{jobId}/route-plans/{planId}/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public RoutePlanResponse confirmRoutePlan(@PathVariable UUID jobId,
-                                             @PathVariable UUID planId,
-                                             @RequestParam(value = "changeReason", required = false) String changeReason,
-                                             @AuthenticationPrincipal User user) {
+                                              @PathVariable UUID planId,
+                                              @RequestParam(value = "changeReason", required = false) String changeReason,
+                                              @AuthenticationPrincipal User user) {
         return routePlanService.confirmRoutePlan(jobId, planId, changeReason, user);
     }
 
-    /** US-F3-06: Crew assignment - view assigned crew. */
+    /**
+     * US-F3-06: Crew assignment - view assigned crew.
+     */
     @GetMapping("/{jobId}/crew")
     public List<CrewMemberResponse> getCrew(@PathVariable UUID jobId) {
         return crewAssignmentService.getCrew(jobId);
     }
 
-    /** US-F3-06: Crew assignment - assign crew enforcing groom ratio. */
+    /**
+     * US-F3-06: Crew assignment - assign crew enforcing groom ratio.
+     */
     @PostMapping("/{jobId}/crew")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public List<CrewMemberResponse> assignCrew(@PathVariable UUID jobId,
@@ -147,7 +173,9 @@ public class StaffJobController {
         return crewAssignmentService.assignCrew(jobId, request, user);
     }
 
-    /** US-F3-08: Manager signs off trip plan (route, load, crew). Strictly LOGISTICS_MANAGER. */
+    /**
+     * US-F3-08: Manager signs off trip plan (route, load, crew). Strictly LOGISTICS_MANAGER.
+     */
     @PostMapping("/{jobId}/sign-off")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public JobDetailResponse signOff(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {

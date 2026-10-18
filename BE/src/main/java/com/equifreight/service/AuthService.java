@@ -1,10 +1,7 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Club;
-import com.equifreight.entity.Country;
-import com.equifreight.entity.RefreshToken;
-import com.equifreight.entity.Role;
-import com.equifreight.entity.User;
+import com.equifreight.configuration.JwtConfiguration;
+import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
@@ -13,12 +10,7 @@ import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
-import com.equifreight.repository.ClubRepository;
-import com.equifreight.repository.CountryRepository;
-import com.equifreight.repository.RefreshTokenRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
-import com.equifreight.configuration.JwtConfiguration;
+import com.equifreight.repository.*;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,6 +30,8 @@ import java.util.UUID;
 @Service
 @Log4j2
 public class AuthService {
+    static final String REMOVED_MESSAGE =
+            "This account was removed. Ask your logistics manager if you need access again.";
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final ClubRepository clubRepository;
@@ -45,14 +39,19 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+    @Value("${jwt.expirationMs}")
+    private long jwtExpirationMs;
+
+    @Value("${refreshToken.expirationSeconds}")
+    private int refreshTokenExpirationSeconds;
 
     AuthService(UserRepository userRepository,
-            RefreshTokenRepository refreshTokenRepository,
-            ClubRepository clubRepository,
-            CountryRepository countryRepository,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
-            JwtEncoder jwtEncoder) {
+                RefreshTokenRepository refreshTokenRepository,
+                ClubRepository clubRepository,
+                CountryRepository countryRepository,
+                RoleRepository roleRepository,
+                PasswordEncoder passwordEncoder,
+                JwtEncoder jwtEncoder) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.clubRepository = clubRepository;
@@ -62,11 +61,19 @@ public class AuthService {
         this.jwtEncoder = jwtEncoder;
     }
 
-    @Value("${jwt.expirationMs}")
-    private long jwtExpirationMs;
+    /**
+     * A removed staff account is disabled, never deleted; it can't sign in or refresh a session.
+     */
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            log.info("Sign-in refused for removed account {}", user.getEmail());
+            throw new UnauthorizedException(REMOVED_MESSAGE);
+        }
+    }
 
-    @Value("${refreshToken.expirationSeconds}")
-    private int refreshTokenExpirationSeconds;
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 
     @Transactional
     public TokenResponse login(LoginRequest request, String ipAddress) {
@@ -118,21 +125,6 @@ public class AuthService {
 
         log.info("Club account created for {} ({})", club.getName(), email);
         return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
-    }
-
-    /** A removed staff account is disabled, never deleted; it can't sign in or refresh a session. */
-    private static void requireNotRemoved(User user) {
-        if (user.getStatus() == UserStatus.DISABLED) {
-            log.info("Sign-in refused for removed account {}", user.getEmail());
-            throw new UnauthorizedException(REMOVED_MESSAGE);
-        }
-    }
-
-    static final String REMOVED_MESSAGE =
-            "This account was removed. Ask your logistics manager if you need access again.";
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Transactional

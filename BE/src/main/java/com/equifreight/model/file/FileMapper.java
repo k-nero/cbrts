@@ -3,7 +3,8 @@ package com.equifreight.model.file;
 import com.equifreight.entity.StoredFile;
 
 public final class FileMapper {
-    private FileMapper() {}
+    private FileMapper() {
+    }
 
     public static FileResponse toResponse(StoredFile file) {
         return FileResponse.builder()

@@ -17,4 +17,5 @@ public record TripStopResponse(
         Instant latestOccurredAt,
         String latestNote,
         String latestRecordedBy
-) {}
+) {
+}

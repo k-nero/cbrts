@@ -1,6 +1,8 @@
 package com.equifreight.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -24,7 +26,9 @@ public class HorseSizeClass extends BaseEntity {
 
     private Short maxWeightKg;
 
-    /** Lowest height in the class, in hands; the class runs up to the next class's minimum. */
+    /**
+     * Lowest height in the class, in hands; the class runs up to the next class's minimum.
+     */
     @Column(nullable = false, precision = 3, scale = 1)
     private BigDecimal minHeightHh;
 }

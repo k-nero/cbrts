@@ -13,7 +13,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Every incident has one owner, the logistics manager. A customer report is answered within 2 hours. */
+/**
+ * Every incident has one owner, the logistics manager. A customer report is answered within 2 hours.
+ */
 @Setter
 @Getter
 @Entity
@@ -32,7 +34,9 @@ public class Incident extends BaseEntity {
     @Column(nullable = false, length = 12)
     private IncidentSource source;
 
-    /** The escort's record, quoted verbatim. */
+    /**
+     * The escort's record, quoted verbatim.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_record_id")
     private TripRecord tripRecord;
@@ -53,7 +57,9 @@ public class Incident extends BaseEntity {
 
     private Instant replyDueAt;
 
-    /** An authority hold or a welfare stop: the arrival-window clock and the handover deadline pause while open. */
+    /**
+     * An authority hold or a welfare stop: the arrival-window clock and the handover deadline pause while open.
+     */
     @Column(nullable = false)
     private boolean stopsClock;
 
@@ -80,7 +86,9 @@ public class Incident extends BaseEntity {
     @OrderBy("position")
     private List<IncidentOption> options = new ArrayList<>();
 
-    /** The photos with a report. */
+    /**
+     * The photos with a report.
+     */
     @ManyToMany
     @JoinTable(
             name = "incident_files",

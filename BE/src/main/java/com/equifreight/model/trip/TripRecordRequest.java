@@ -16,4 +16,5 @@ public record TripRecordRequest(
         @NotNull UUID clientRef,
         @Size(max = 500) String text,
         @Size(max = 100) List<@Valid TripConditionRequest> conditions
-) {}
+) {
+}

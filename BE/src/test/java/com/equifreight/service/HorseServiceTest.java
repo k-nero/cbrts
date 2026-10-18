@@ -28,24 +28,12 @@ import org.springframework.data.jpa.domain.Specification;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class HorseServiceTest {
 
@@ -63,6 +51,57 @@ class HorseServiceTest {
     private HorseService service;
     private User user;
     private Club club;
+
+    private static HorseRequest requestFrom(Horse horse) {
+        HorseRequest request = new HorseRequest();
+        request.setName(horse.getName());
+        request.setSex(horse.getSex());
+        request.setCoat(horse.getCoat());
+        request.setBreed(horse.getBreed());
+        request.setDateOfBirth(horse.getDateOfBirth());
+        request.setHeightHh(horse.getHeightHh());
+        request.setWeightKg(horse.getWeightKg());
+        request.setMicrochip(horse.getMicrochip());
+        request.setPassportNo(horse.getPassportNo());
+        request.setDeclaredValue(horse.getDeclaredValue());
+        request.setRequiredStall(horse.getRequiredStall());
+        return request;
+    }
+
+    private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
+        return new RequestHorseRepository.HorseUse() {
+            @Override
+            public String getCode() {
+                return code;
+            }
+
+            @Override
+            public RequestStatus getStatus() {
+                return status;
+            }
+        };
+    }
+
+    private static HorseRequest nightfallRequest() {
+        HorseRequest request = new HorseRequest();
+        request.setName("Nightfall");
+        request.setSex(HorseSex.MARE);
+        request.setHeightHh(new BigDecimal("16.0"));
+        request.setMicrochip("250259600223311");
+        request.setPassportNo("VN-PP-2022-0188");
+        request.setDeclaredValue(new BigDecimal("240000"));
+        request.setRequiredStall(StallType.CLIMATE);
+        return request;
+    }
+
+    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
+        HorseSizeClass sizeClass = new HorseSizeClass();
+        sizeClass.setId(UUID.randomUUID());
+        sizeClass.setCode(code);
+        sizeClass.setWidthIn((short) widthIn);
+        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
+        return sizeClass;
+    }
 
     @BeforeEach
     void setUp() {
@@ -420,36 +459,6 @@ class HorseServiceTest {
         return horse;
     }
 
-    private static HorseRequest requestFrom(Horse horse) {
-        HorseRequest request = new HorseRequest();
-        request.setName(horse.getName());
-        request.setSex(horse.getSex());
-        request.setCoat(horse.getCoat());
-        request.setBreed(horse.getBreed());
-        request.setDateOfBirth(horse.getDateOfBirth());
-        request.setHeightHh(horse.getHeightHh());
-        request.setWeightKg(horse.getWeightKg());
-        request.setMicrochip(horse.getMicrochip());
-        request.setPassportNo(horse.getPassportNo());
-        request.setDeclaredValue(horse.getDeclaredValue());
-        request.setRequiredStall(horse.getRequiredStall());
-        return request;
-    }
-
-    private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
-        return new RequestHorseRepository.HorseUse() {
-            @Override
-            public String getCode() {
-                return code;
-            }
-
-            @Override
-            public RequestStatus getStatus() {
-                return status;
-            }
-        };
-    }
-
     private Horse savedHorse() {
         ArgumentCaptor<Horse> captor = ArgumentCaptor.forClass(Horse.class);
         verify(horses).saveAndFlush(captor.capture());
@@ -468,26 +477,5 @@ class HorseServiceTest {
         horse.setPassportNo("VN-PP-2022-0188");
         horse.setDeclaredValue(new BigDecimal("240000"));
         return horse;
-    }
-
-    private static HorseRequest nightfallRequest() {
-        HorseRequest request = new HorseRequest();
-        request.setName("Nightfall");
-        request.setSex(HorseSex.MARE);
-        request.setHeightHh(new BigDecimal("16.0"));
-        request.setMicrochip("250259600223311");
-        request.setPassportNo("VN-PP-2022-0188");
-        request.setDeclaredValue(new BigDecimal("240000"));
-        request.setRequiredStall(StallType.CLIMATE);
-        return request;
-    }
-
-    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
-        HorseSizeClass sizeClass = new HorseSizeClass();
-        sizeClass.setId(UUID.randomUUID());
-        sizeClass.setCode(code);
-        sizeClass.setWidthIn((short) widthIn);
-        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
-        return sizeClass;
     }
 }

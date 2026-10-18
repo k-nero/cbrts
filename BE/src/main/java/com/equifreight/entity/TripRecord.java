@@ -27,7 +27,9 @@ public class TripRecord extends BaseEntity {
     @JoinColumn(name = "job_id", nullable = false)
     private TransportJob job;
 
-    /** The checkpoint, if any. */
+    /**
+     * The checkpoint, if any.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_stop_id")
     private RouteStop routeStop;
@@ -36,15 +38,21 @@ public class TripRecord extends BaseEntity {
     @Column(nullable = false, length = 20)
     private TripRecordKind kind;
 
-    /** The cab's clock. */
+    /**
+     * The cab's clock.
+     */
     @Column(nullable = false)
     private Instant occurredAt;
 
-    /** The server's clock; the gap shows records sent late from the cab. */
+    /**
+     * The server's clock; the gap shows records sent late from the cab.
+     */
     @Column(nullable = false)
     private Instant receivedAt = Instant.now();
 
-    /** Generated on the tablet, so a record re-sent after a lost connection is stored once. */
+    /**
+     * Generated on the tablet, so a record re-sent after a lost connection is stored once.
+     */
     @Column(unique = true)
     private UUID clientRef;
 
@@ -52,7 +60,9 @@ public class TripRecord extends BaseEntity {
     @JoinColumn(name = "recorded_by")
     private User recordedBy;
 
-    /** CAB_TABLET or WEB. */
+    /**
+     * CAB_TABLET or WEB.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private Channel channel;

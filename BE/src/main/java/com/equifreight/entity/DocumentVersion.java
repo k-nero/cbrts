@@ -29,14 +29,18 @@ public class DocumentVersion extends BaseEntity {
     @JoinColumn(name = "file_id", nullable = false)
     private StoredFile file;
 
-    /** What the validity rule reads. */
+    /**
+     * What the validity rule reads.
+     */
     private LocalDate issuedOn;
 
     private LocalDate sampledOn;
 
     private LocalDate validUntil;
 
-    /** "PVI Insurance", "Dept. of Animal Health". */
+    /**
+     * "PVI Insurance", "Dept. of Animal Health".
+     */
     @Column(length = 120)
     private String issuer;
 
@@ -57,7 +61,9 @@ public class DocumentVersion extends BaseEntity {
 
     private Instant reviewedAt;
 
-    /** Required when REJECTED, visible to the customer (BR-F2-07). */
+    /**
+     * Required when REJECTED, visible to the customer (BR-F2-07).
+     */
     @Column(length = 500)
     private String rejectReason;
 }
