@@ -103,6 +103,12 @@ Where to look elsewhere:
   - Validation annotations go on the components (`@NotBlank String name`); nested request parts are nested records.
   - A record component is its JSON name: `boolean isOverdue` is sent as `isOverdue` (a Lombok getter made it `overdue`). Name components after the JSON the frontend reads.
   - Mappers (`XMapper`) stay `final` classes with static methods; they are not models.
+- **Map in the model's mapper.** Turning an entity into a response belongs in its area's mapper in `model/<area>/` (`RoleMapper`, `ClearanceMapper`, `RequestMapper`, …), never in a service, controller or job.
+  - A mapper is a `final` class with a private constructor and `public static` methods named `toResponse`, `toSummary` or `to<Part>Response`. It reads only what it is given: no repositories, services or clock.
+  - Services and controllers call the mapper. They never build a response from entity fields with `X.builder()`, and response records carry no `of(Entity)` factory.
+  - Values a service works out, such as counts, conflicts, a lead-time check or a nested response from another area, are passed to the mapper as parameters. See `RequestMapper.toResponse(request, route, leadTime, blockers)`.
+  - Add the method to the area's existing mapper. A new area gets one `XMapper`; don't start a second one beside it.
+  - A response that comes from no entity, such as `TokenResponse` or `ApiError.of(...)`, can be built where it is made.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
 - **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V18` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
