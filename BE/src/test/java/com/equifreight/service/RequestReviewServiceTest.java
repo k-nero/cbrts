@@ -13,17 +13,21 @@ import static org.mockito.Mockito.when;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.QuotationRefResponse;
 import com.equifreight.model.review.QueueRowResponse;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.repository.AuditLogRepository;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
@@ -54,6 +58,7 @@ class RequestReviewServiceTest {
     RouteService routes;
     AuditService audit;
     NotificationService notifications;
+    QuotationRepository quotations;
     RequestReviewService service;
     User manager;
     User clubAccount;
@@ -68,6 +73,7 @@ class RequestReviewServiceTest {
         routes = mock(RouteService.class);
         audit = mock(AuditService.class);
         notifications = mock(NotificationService.class);
+        quotations = mock(QuotationRepository.class);
         service = new RequestReviewService(
                 requests,
                 revisions,
@@ -76,6 +82,7 @@ class RequestReviewServiceTest {
                 routes,
                 audit,
                 notifications,
+                quotations,
                 JsonMapper.builder().build(),
                 Clock.fixed(NOW, BusinessTime.ZONE));
 
@@ -358,6 +365,21 @@ class RequestReviewServiceTest {
         });
         assertThat(view.getChecks()).extracting("key").containsExactly("ROUTE_SERVED", "LEAD_TIME");
         assertThat(view.getRequest().club()).isEqualTo("Saigon Turf Club");
+    }
+
+    @Test
+    void theViewCarriesTheQuotationOnceStarted() {
+        TransportRequest r = inReview(RequestStatus.UNDER_REVIEW);
+        assertThat(service.view(r.getId()).getQuotation()).isNull();
+
+        Quotation q = new Quotation();
+        q.setCode("Q-2026-0189");
+        q.setVersionNo((short) 1);
+        q.setStatus(QuotationStatus.DRAFT);
+        when(quotations.findFirstByRequestIdOrderByVersionNoDesc(r.getId())).thenReturn(Optional.of(q));
+
+        assertThat(service.view(r.getId()).getQuotation())
+                .isEqualTo(new QuotationRefResponse("Q-2026-0189", (short) 1, QuotationStatus.DRAFT));
     }
 
     @Test
