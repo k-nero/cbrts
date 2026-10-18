@@ -3,26 +3,17 @@ package com.equifreight.model.clearance;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CreateQuarantinePeriodRequest {
+public record CreateQuarantinePeriodRequest(
+        /**
+         * null means the whole load/shipment.
+         */
+        UUID horseId,
 
-    /**
-     * null means the whole load/shipment.
-     */
-    private UUID horseId;
+        @NotNull(message = "Place ID (trạm kiểm dịch) is required")
+        UUID placeId,
 
-    @NotNull(message = "Place ID (trạm kiểm dịch) is required")
-    private UUID placeId;
-
-    @NotNull(message = "Starts on date is required")
-    private LocalDate startsOn;
-
-    @NotNull(message = "Ends on date is required")
-    private LocalDate endsOn;
-}
+        @NotNull(message = "Starts on date is required") LocalDate startsOn,
+        @NotNull(message = "Ends on date is required") LocalDate endsOn) {}

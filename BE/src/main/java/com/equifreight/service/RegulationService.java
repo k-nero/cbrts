@@ -79,9 +79,9 @@ public class RegulationService {
                 .map(ClearanceMapper::toRuleResponse)
                 .toList();
 
-        RegulationVersionResponse resp = ClearanceMapper.toVersionResponse(version);
-        resp.setRules(rules);
-        return resp;
+        return ClearanceMapper.toVersionResponse(version).toBuilder()
+                .rules(rules)
+                .build();
     }
 
     /**

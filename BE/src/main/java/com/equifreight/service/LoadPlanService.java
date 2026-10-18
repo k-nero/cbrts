@@ -169,22 +169,22 @@ public class LoadPlanService {
         if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
             throw new BusinessException("Cannot modify a CONFIRMED load plan. Create a new revision if needed.");
         }
-        if (request.getToStallId() == null && request.getExpectedOccupantId() != null) {
+        if (request.toStallId() == null && request.expectedOccupantId() != null) {
             throw new BusinessException(
                     "A horse taken off the vehicle has no stall to swap with; leave the expected occupant empty");
         }
 
         Horse horse = getJobHorses(plan.getJob()).stream()
-                .filter(h -> h.getId().equals(request.getHorseId()))
+                .filter(h -> h.getId().equals(request.horseId()))
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Horse " + request.getHorseId() + " is not assigned to this job"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Horse " + request.horseId() + " is not assigned to this job"));
 
         VehicleStall toStall = null;
-        if (request.getToStallId() != null) {
+        if (request.toStallId() != null) {
             toStall = vehicleStallRepository
-                    .findById(request.getToStallId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.getToStallId()));
+                    .findById(request.toStallId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.toStallId()));
             if (!toStall.getVehicle().getId().equals(plan.getVehicle().getId())) {
                 throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
             }
@@ -194,7 +194,7 @@ public class LoadPlanService {
         Optional<LoadPlanStall> current =
                 loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
         UUID currentStallId = current.map(a -> a.getVehicleStall().getId()).orElse(null);
-        if (!Objects.equals(currentStallId, request.getFromStallId())) {
+        if (!Objects.equals(currentStallId, request.fromStallId())) {
             throw new ConflictException(
                     "LOAD_PLAN_STALE",
                     horse.getName() + " is now "
@@ -211,7 +211,7 @@ public class LoadPlanService {
                     .map(LoadPlanStall::getHorse)
                     .orElse(null);
             UUID occupantId = occupant != null ? occupant.getId() : null;
-            if (!Objects.equals(occupantId, request.getExpectedOccupantId())) {
+            if (!Objects.equals(occupantId, request.expectedOccupantId())) {
                 throw new ConflictException(
                         "LOAD_PLAN_STALE",
                         "Stall " + toStall.getPositionNo() + " "
@@ -221,7 +221,7 @@ public class LoadPlanService {
         }
 
         // Dropped where it already is: nothing to change.
-        if (Objects.equals(request.getToStallId(), currentStallId)) {
+        if (Objects.equals(request.toStallId(), currentStallId)) {
             return buildResponse(plan);
         }
 
@@ -326,15 +326,15 @@ public class LoadPlanService {
 
         LoadPlanResponse state = buildResponse(plan);
 
-        if (!state.getUnassignedHorses().isEmpty()) {
-            throw new BusinessException("Cannot confirm load plan: "
-                    + state.getUnassignedHorses().size() + " horses are still to be placed");
+        if (!state.unassignedHorses().isEmpty()) {
+            throw new BusinessException(
+                    "Cannot confirm load plan: " + state.unassignedHorses().size() + " horses are still to be placed");
         }
 
-        if (!state.getConflicts().isEmpty()) {
+        if (!state.conflicts().isEmpty()) {
             throw new BusinessException(
-                    "Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first ("
-                            + state.getConflicts().getFirst().getDescription() + ")");
+                    "Cannot confirm load plan: resolve " + state.conflicts().size() + " placement conflicts first ("
+                            + state.conflicts().getFirst().description() + ")");
         }
 
         // The vehicle is booked for the trip's planned dates, which the confirmed route sets.
@@ -512,8 +512,8 @@ public class LoadPlanService {
         List<LoadPlanConflictResponse> conflicts = evaluateConflicts(plan, assignments, allHorses);
         Map<UUID, String> stallIssues = new HashMap<>();
         for (LoadPlanConflictResponse c : conflicts) {
-            if (c.getStallId() != null) {
-                stallIssues.merge(c.getStallId(), c.getDescription(), (o, n) -> o + "; " + n);
+            if (c.stallId() != null) {
+                stallIssues.merge(c.stallId(), c.description(), (o, n) -> o + "; " + n);
             }
         }
 

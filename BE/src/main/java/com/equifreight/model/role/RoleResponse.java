@@ -2,17 +2,7 @@ package com.equifreight.model.role;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class RoleResponse {
-    private UUID id;
-    private String name;
-    private String description;
-    private Instant createdAt;
-    private Instant updatedAt;
-}
+public record RoleResponse(UUID id, String name, String description, Instant createdAt, Instant updatedAt) {}

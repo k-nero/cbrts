@@ -34,7 +34,7 @@ public final class RequestMapper {
                 // A draft shows its route's current flex; a submitted request keeps the value copied at submission.
                 .dateFlexDays(
                         r.getStatus() == RequestStatus.DRAFT && route != null
-                                ? LeadTimePolicy.flexDaysFor(r.getDateFlexDays(), route.getDateFlexDays())
+                                ? LeadTimePolicy.flexDaysFor(r.getDateFlexDays(), route.dateFlexDays())
                                 : r.getDateFlexDays())
                 .arrivalMode(r.getArrivalMode())
                 .windowStart(r.getWindowStart())

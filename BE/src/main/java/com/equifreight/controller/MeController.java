@@ -22,8 +22,8 @@ public class MeController {
 
     @GetMapping
     public UserResponse me(@AuthenticationPrincipal User user) {
-        UserResponse response = UserMapper.toResponse(user);
-        response.setClubName(clubService.findClub(user).map(Club::getName).orElse(null));
-        return response;
+        return UserMapper.toResponse(user).toBuilder()
+                .clubName(clubService.findClub(user).map(Club::getName).orElse(null))
+                .build();
     }
 }

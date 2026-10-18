@@ -92,7 +92,7 @@ public class StaffJobController {
     @PostMapping("/{jobId}/load-plan/assign")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public LoadPlanResponse assignStall(@PathVariable UUID jobId, @Valid @RequestBody AssignStallRequest request) {
-        return loadPlanService.assignStall(jobId, request.getVehicleStallId(), request.getHorseId());
+        return loadPlanService.assignStall(jobId, request.vehicleStallId(), request.horseId());
     }
 
     /**

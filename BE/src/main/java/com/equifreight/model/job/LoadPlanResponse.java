@@ -5,23 +5,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Builder
-public class LoadPlanResponse {
-    private UUID id;
-    private UUID jobId;
-    private UUID vehicleId;
-    private String vehicleCode;
-    private LoadPlanStatus status;
-    private String confirmedByName;
-    private Instant confirmedAt;
-    private int totalWeightKg;
-    private int payloadKg;
-    private List<LoadPlanStallResponse> stalls;
-    private List<JobHorseResponse> unassignedHorses;
-    private List<LoadPlanConflictResponse> conflicts;
-}
+public record LoadPlanResponse(
+        UUID id,
+        UUID jobId,
+        UUID vehicleId,
+        String vehicleCode,
+        LoadPlanStatus status,
+        String confirmedByName,
+        Instant confirmedAt,
+        int totalWeightKg,
+        int payloadKg,
+        List<LoadPlanStallResponse> stalls,
+        List<JobHorseResponse> unassignedHorses,
+        List<LoadPlanConflictResponse> conflicts) {}

@@ -4,21 +4,16 @@ import com.equifreight.entity.enums.RouteStopKind;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Builder
-public class RouteStopResponse {
-    private UUID id;
-    private short seq;
-    private RouteStopKind kind;
-    private UUID placeId;
-    private String placeName;
-    private UUID borderCrossingId;
-    private String borderCrossingName;
-    private Instant plannedAt;
-    private Short plannedStayMin;
-    private String details;
-}
+public record RouteStopResponse(
+        UUID id,
+        short seq,
+        RouteStopKind kind,
+        UUID placeId,
+        String placeName,
+        UUID borderCrossingId,
+        String borderCrossingName,
+        Instant plannedAt,
+        Short plannedStayMin,
+        String details) {}

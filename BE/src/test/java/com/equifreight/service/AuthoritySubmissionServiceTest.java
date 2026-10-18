@@ -88,9 +88,10 @@ class AuthoritySubmissionServiceTest {
         when(authorityRepository.findById(customs.getId())).thenReturn(Optional.of(customs));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        CreateAuthoritySubmissionRequest request = new CreateAuthoritySubmissionRequest();
-        request.setAuthorityId(customs.getId());
-        request.setKind(SubmissionKind.IMPORT_PERMIT);
+        CreateAuthoritySubmissionRequest request = CreateAuthoritySubmissionRequest.builder()
+                .authorityId(customs.getId())
+                .kind(SubmissionKind.IMPORT_PERMIT)
+                .build();
 
         service.createSubmission(job.getId(), request, specialist);
 
@@ -111,10 +112,11 @@ class AuthoritySubmissionServiceTest {
         when(authorityRepository.findById(customs.getId())).thenReturn(Optional.of(customs));
         when(checklistItemRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
 
-        CreateAuthoritySubmissionRequest request = new CreateAuthoritySubmissionRequest();
-        request.setAuthorityId(customs.getId());
-        request.setKind(SubmissionKind.IMPORT_PERMIT);
-        request.setChecklistItemIds(List.of(foreign.getId()));
+        CreateAuthoritySubmissionRequest request = CreateAuthoritySubmissionRequest.builder()
+                .authorityId(customs.getId())
+                .kind(SubmissionKind.IMPORT_PERMIT)
+                .checklistItemIds(List.of(foreign.getId()))
+                .build();
 
         assertThrows(ConflictException.class, () -> service.createSubmission(job.getId(), request, specialist));
         verify(submissionRepository, never()).save(any());
@@ -133,8 +135,9 @@ class AuthoritySubmissionServiceTest {
         when(submissionRepository.findById(submission.getId())).thenReturn(Optional.of(submission));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAuthoritySubmissionRequest request = new UpdateAuthoritySubmissionRequest();
-        request.setStatus(SubmissionStatus.ADDITIONAL_INFO);
+        UpdateAuthoritySubmissionRequest request = UpdateAuthoritySubmissionRequest.builder()
+                .status(SubmissionStatus.ADDITIONAL_INFO)
+                .build();
 
         service.updateSubmission(submission.getId(), request, specialist);
 

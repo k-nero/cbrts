@@ -57,15 +57,15 @@ class LeadTimePolicyTest {
     void aDepartureOnTheEarliestDatePasses() {
         LeadTimeResponse result = LeadTimePolicy.assess(21, TODAY, LocalDate.of(2026, 10, 17));
 
-        assertThat(result.isMet()).isTrue();
-        assertThat(result.getRequiredDays()).isEqualTo(21);
-        assertThat(result.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
-        assertThat(result.getDaysBeforeDeparture()).isEqualTo(21);
+        assertThat(result.met()).isTrue();
+        assertThat(result.requiredDays()).isEqualTo(21);
+        assertThat(result.earliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
+        assertThat(result.daysBeforeDeparture()).isEqualTo(21);
     }
 
     @Test
     void aDayEarlierIsTooSoon() {
-        assertThat(LeadTimePolicy.assess(21, TODAY, LocalDate.of(2026, 10, 16)).isMet())
+        assertThat(LeadTimePolicy.assess(21, TODAY, LocalDate.of(2026, 10, 16)).met())
                 .isFalse();
     }
 
@@ -73,8 +73,8 @@ class LeadTimePolicyTest {
     void aPastDepartureIsTooSoon() {
         LeadTimeResponse result = LeadTimePolicy.assess(21, TODAY, LocalDate.of(2026, 9, 20));
 
-        assertThat(result.isMet()).isFalse();
-        assertThat(result.getDaysBeforeDeparture()).isEqualTo(-6);
+        assertThat(result.met()).isFalse();
+        assertThat(result.daysBeforeDeparture()).isEqualTo(-6);
     }
 
     @Test
@@ -95,15 +95,15 @@ class LeadTimePolicyTest {
     void withFlexibleDatesTheFixedDateEarliestIsTooSoon() {
         LeadTimeResponse result = LeadTimePolicy.assess(21, 3, TODAY, LocalDate.of(2026, 10, 17));
 
-        assertThat(result.isMet()).isFalse();
-        assertThat(result.getRequiredDays()).isEqualTo(21);
-        assertThat(result.getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 20));
+        assertThat(result.met()).isFalse();
+        assertThat(result.requiredDays()).isEqualTo(21);
+        assertThat(result.earliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 20));
     }
 
     @Test
     void withFlexibleDatesTheMovedEarliestPasses() {
         assertThat(LeadTimePolicy.assess(21, 3, TODAY, LocalDate.of(2026, 10, 20))
-                        .isMet())
+                        .met())
                 .isTrue();
     }
 

@@ -5,7 +5,9 @@ import com.equifreight.entity.enums.TripRecordKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record TripRecordResponse(
         UUID id,
         UUID routeStopId,
