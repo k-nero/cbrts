@@ -2,6 +2,7 @@ import { money } from './quotation';
 
 import type {
   ApiError,
+  FeeBand,
   RateLine,
   RatePolicyKey,
   VolumeBreak,
@@ -96,4 +97,94 @@ export const bandRefusal = (bands: VolumeBreakInput[]): string | null => {
 export const draftRefusal = (error: unknown): 'no-draft' | null => {
   const data = (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data;
   return data?.error === 'NO_DRAFT' ? 'no-draft' : null;
+};
+
+/** "PNH → HKG": the corridor code without its mode prefix (the list groups by mode already). */
+export const corridorShort = (code: string): string => code.replace(/^(AIR|RD)\s+/, '');
+
+const pctOr = (value: number | undefined, words: (p: string) => string): string =>
+  value == null ? '—' : words(pctText(value));
+
+const daySpan = (b: FeeBand): string =>
+  b.maxDays == null ? `${b.minDays}+ d` : `${b.minDays}–${b.maxDays} d`;
+
+/**
+ * The Percentages and policy panel in words. The fee bands are shown read-only: they serve deposits and
+ * cancellation terms, which come with a later slice.
+ */
+export const policyRows = (
+  policies: Partial<Record<RatePolicyKey, number>>,
+  feeBands: FeeBand[],
+): { key: string; label: string; value: string }[] => {
+  const p = policies;
+  const bands = (kind: FeeBand['kind'], value: (b: FeeBand) => string) => {
+    const list = feeBands.filter((b) => b.kind === kind);
+    return list.length ? list.map((b) => `${daySpan(b)} ${value(b)}`).join(' · ') : '—';
+  };
+  return [
+    {
+      key: 'FUEL_PCT',
+      label: 'Fuel surcharge',
+      value: pctOr(p.FUEL_PCT, (x) => `${x} · air lines only`),
+    },
+    {
+      key: 'INSURANCE_PCT',
+      label: 'Insurance',
+      value: pctOr(p.INSURANCE_PCT, (x) => `${x} of declared value`),
+    },
+    {
+      key: 'CONTINGENCY_PCT',
+      label: 'Contingency',
+      value: pctOr(p.CONTINGENCY_PCT, (x) => `${x} of cost base`),
+    },
+    {
+      key: 'SERVICE_FEE_PCT',
+      label: 'Service fee',
+      value: pctOr(p.SERVICE_FEE_PCT, (x) => `${x} after contingency`),
+    },
+    { key: 'DEPOSIT_PCT', label: 'Deposit', value: pctOr(p.DEPOSIT_PCT, (x) => x) },
+    {
+      key: 'QUOTE_VALIDITY_DAYS',
+      label: 'Quote validity',
+      value: p.QUOTE_VALIDITY_DAYS == null ? '—' : `${p.QUOTE_VALIDITY_DAYS} days`,
+    },
+    {
+      key: 'FLIGHT_VET_MIN_HORSES',
+      label: 'Flight vet',
+      value:
+        p.FLIGHT_VET_MIN_HORSES == null || p.HIGH_VALUE_THRESHOLD == null
+          ? '—'
+          : `${p.FLIGHT_VET_MIN_HORSES}+ horses or > ${money(p.HIGH_VALUE_THRESHOLD)}`,
+    },
+    {
+      key: 'SHORT_NOTICE',
+      label: 'Short notice',
+      value: bands('SHORT_NOTICE', (b) => `× ${b.value}`),
+    },
+    {
+      key: 'CANCELLATION',
+      label: 'Cancellation',
+      value: bands('CANCELLATION', (b) => pctText(b.value)),
+    },
+    {
+      key: 'ARRIVAL_WINDOW_PCT',
+      label: 'Arrival window',
+      value: pctOr(
+        p.ARRIVAL_WINDOW_PCT,
+        (x) =>
+          `Road · +${x} of ground lines` +
+          (p.ARRIVAL_WINDOW_MIN_HOURS == null ? '' : ` · ${p.ARRIVAL_WINDOW_MIN_HOURS} h minimum`),
+      ),
+    },
+    {
+      key: 'LATE_PENALTY_PCT_PER_HOUR',
+      label: 'Late arrival',
+      value: pctOr(
+        p.LATE_PENALTY_PCT_PER_HOUR,
+        (x) =>
+          `${x} per started hour` +
+          (p.LATE_PENALTY_CAP_PCT == null ? '' : ` · max ${pctText(p.LATE_PENALTY_CAP_PCT)}`),
+      ),
+    },
+  ];
 };

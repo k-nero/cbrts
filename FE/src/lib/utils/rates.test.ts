@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 
-import { bandLabel, bandRefusal, basisWords, draftRefusal, pctText } from './rates';
+import {
+  bandLabel,
+  bandRefusal,
+  basisWords,
+  corridorShort,
+  draftRefusal,
+  pctText,
+  policyRows,
+} from './rates';
 
 import type { RateLine, VolumeBreakInput } from '@/interfaces';
 
@@ -116,5 +124,64 @@ describe('draftRefusal', () => {
       draftRefusal({ response: { status: 400, data: { error: 'INVALID_VOLUME_BREAKS' } } }),
     ).toBeNull();
     expect(draftRefusal(new Error('offline'))).toBeNull();
+  });
+});
+
+describe('corridorShort', () => {
+  test('drops the mode prefix', () => {
+    expect(corridorShort('AIR PNH → HKG')).toBe('PNH → HKG');
+    expect(corridorShort('RD HAN → VTE')).toBe('HAN → VTE');
+    expect(corridorShort('HCM -> PNH')).toBe('HCM -> PNH');
+  });
+});
+
+describe('policyRows', () => {
+  test('the policy panel in words, fee bands read-only', () => {
+    const rows = policyRows(
+      {
+        FUEL_PCT: 18,
+        INSURANCE_PCT: 1.5,
+        CONTINGENCY_PCT: 5,
+        SERVICE_FEE_PCT: 12,
+        DEPOSIT_PCT: 30,
+        QUOTE_VALIDITY_DAYS: 7,
+        FLIGHT_VET_MIN_HORSES: 8,
+        HIGH_VALUE_THRESHOLD: 250000,
+        ARRIVAL_WINDOW_PCT: 20,
+        ARRIVAL_WINDOW_MIN_HOURS: 3,
+        LATE_PENALTY_PCT_PER_HOUR: 10,
+        LATE_PENALTY_CAP_PCT: 30,
+      },
+      [
+        { kind: 'CANCELLATION', minDays: 0, maxDays: 6, value: 100 },
+        { kind: 'CANCELLATION', minDays: 30, maxDays: null, value: 10 },
+        { kind: 'SHORT_NOTICE', minDays: 0, maxDays: 13, value: 1.25 },
+      ],
+    );
+    expect(rows).toEqual([
+      { key: 'FUEL_PCT', label: 'Fuel surcharge', value: '18% · air lines only' },
+      { key: 'INSURANCE_PCT', label: 'Insurance', value: '1.5% of declared value' },
+      { key: 'CONTINGENCY_PCT', label: 'Contingency', value: '5% of cost base' },
+      { key: 'SERVICE_FEE_PCT', label: 'Service fee', value: '12% after contingency' },
+      { key: 'DEPOSIT_PCT', label: 'Deposit', value: '30%' },
+      { key: 'QUOTE_VALIDITY_DAYS', label: 'Quote validity', value: '7 days' },
+      { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
+      { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
+      { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
+      {
+        key: 'ARRIVAL_WINDOW_PCT',
+        label: 'Arrival window',
+        value: 'Road · +20% of ground lines · 3 h minimum',
+      },
+      {
+        key: 'LATE_PENALTY_PCT_PER_HOUR',
+        label: 'Late arrival',
+        value: '10% per started hour · max 30%',
+      },
+    ]);
+  });
+
+  test('a missing value is a dash', () => {
+    expect(policyRows({}, [])[0]).toEqual({ key: 'FUEL_PCT', label: 'Fuel surcharge', value: '—' });
   });
 });
