@@ -416,4 +416,50 @@ class QuotePricerTest {
             });
         }
     }
+
+    // --- review fixes ------------------------------------------------------------------------------------
+
+    @Test
+    void aColtIsPricedAtTheStallionRateAndAFillyAtTheMareRate() {
+        PricingInput young = air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("Young Thunder", HorseSex.COLT, "M", 32, "50000"),
+                        horse("Little Star", HorseSex.FILLY, "M", 32, "50000")));
+
+        PricedQuote quote = QuotePricer.price(young, pnhHkgRates());
+
+        assertThat(quote.missing()).isEmpty();
+        assertThat(findAll(quote, "Pre-export isolation"))
+                .extracting(PricedLine::description, l -> l.amount().toPlainString())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Pre-export isolation · stallion", "1960.00"),
+                        org.assertj.core.groups.Tuple.tuple("Pre-export isolation · mare", "1190.00"));
+    }
+
+    @Test
+    void longCitiesStillFitTheDescriptionColumn() {
+        String city = "A city name of exactly eighty characters, which is the longest a city can be....";
+        PricingInput in = new PricingInput(
+                TransportMode.AIR,
+                "AIR X",
+                city,
+                city,
+                "Hong Kong",
+                1550,
+                0,
+                ServiceClass.BUSINESS,
+                null,
+                InsuranceOption.EQUIFREIGHT,
+                false,
+                14,
+                pnhHkgBusiness().horses());
+
+        PricedQuote quote = QuotePricer.price(in, rates(List.of(), pnhHkgLines()));
+
+        assertThat(quote.lines())
+                .allSatisfy(l -> assertThat(l.description().length()).isLessThanOrEqualTo(160));
+        assertThat(quote.missing())
+                .allSatisfy(m -> assertThat(m.description().length()).isLessThanOrEqualTo(160));
+    }
 }

@@ -121,6 +121,7 @@ class RateCatalogServiceWriteTest {
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.of(v2));
         when(versions.findByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.of(draft));
+        when(versions.lockByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.of(draft));
         when(versions.maxVersionNo()).thenReturn(2);
         when(versions.save(any())).thenAnswer(i -> i.getArgument(0));
         when(versions.saveAndFlush(any())).thenAnswer(i -> {
@@ -348,6 +349,7 @@ class RateCatalogServiceWriteTest {
     @Test
     void aWriteWithNoDraftIsNoDraft() {
         when(versions.findByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.empty());
+        when(versions.lockByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.empty());
         List<Runnable> writes = List.of(
                 () -> service.discardDraft(lan),
                 () -> service.publish(lan, new PublishRequest("note")),
@@ -644,5 +646,42 @@ class RateCatalogServiceWriteTest {
         assertThat(draft.getLastEditedBy()).isEqualTo(other);
         assertThat(draft.getUpdatedAt()).isEqualTo(NOW);
         verify(versions).save(draft);
+    }
+
+    // --- review fixes ------------------------------------------------------------------------------------
+
+    /** A write waits for the draft row lock, so after a concurrent publish it finds no draft. */
+    @Test
+    void writesReadTheDraftUnderALock() {
+        when(versions.lockByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.putPolicies(lan, Map.of(), pnhHkg.getId()))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("NO_DRAFT");
+        assertThatThrownBy(() -> service.publish(lan, new PublishRequest("note")))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("NO_DRAFT");
+        assertThatThrownBy(() -> service.discardDraft(lan))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("NO_DRAFT");
+    }
+
+    @Test
+    void aSexLineDescriptionLeavesRoomForTheSex() {
+        RateLineRequest tooLong = with(
+                lineRequest(pnhHkg.getId(), "ISO", RateBasis.PER_DAY),
+                b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.STALLION)
+                        .description("x".repeat(150)));
+        assertRefused(
+                () -> service.addLine(lan, tooLong, null),
+                "DESCRIPTION",
+                "A line for one sex can have at most 149 characters: the quotation adds the sex to it.");
+
+        RateLineRequest fits = with(tooLong, b -> b.description("x".repeat(149)));
+        service.addLine(lan, fits, null);
+        verify(lines).save(any());
     }
 }

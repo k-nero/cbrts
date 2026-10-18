@@ -121,7 +121,8 @@ public final class QuotePricer {
         BigDecimal quantity = BigDecimal.valueOf(fit.positions());
         return new PricedLine(
                 "C",
-                "Air stall position " + in.fromCity() + " → " + in.toCity() + ", " + classWord(in.airClass()),
+                PricingText.fitDescription(
+                        "Air stall position " + in.fromCity() + " → " + in.toCity() + ", " + classWord(in.airClass())),
                 RateBasis.PER_POSITION,
                 basis,
                 quantity,
@@ -137,7 +138,7 @@ public final class QuotePricer {
 
     private static void expand(PricingInput in, RateSet rates, RateRow row, List<PricedLine> lines) {
         List<PricingHorse> matching = in.horses().stream()
-                .filter(h -> row.appliesToSex() == null || h.sex() == row.appliesToSex())
+                .filter(h -> row.appliesToSex() == null || RequiredRates.rateSex(h.sex()) == row.appliesToSex())
                 .toList();
         int n = in.horses().size();
         switch (row.basis()) {
@@ -264,7 +265,8 @@ public final class QuotePricer {
 
     private static String description(RateRow row) {
         HorseSex sex = row.appliesToSex();
-        return sex == null ? row.description() : row.description() + " · " + PricingText.sexWord(sex);
+        return PricingText.fitDescription(
+                sex == null ? row.description() : row.description() + " · " + PricingText.sexWord(sex));
     }
 
     private static LineCertainty certainty(RateRow row) {

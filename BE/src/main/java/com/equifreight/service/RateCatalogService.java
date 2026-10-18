@@ -36,6 +36,7 @@ import com.equifreight.repository.RateServiceClassRepository;
 import com.equifreight.repository.RateVolumeBreakRepository;
 import com.equifreight.service.pricing.CatalogRows;
 import com.equifreight.service.pricing.MissingRate;
+import com.equifreight.service.pricing.PricingText;
 import com.equifreight.service.pricing.QuotePricer;
 import com.equifreight.service.pricing.RateSetLoader;
 import com.equifreight.service.pricing.RequiredRates;
@@ -64,6 +65,9 @@ public class RateCatalogService {
     static final String ENTITY_TYPE = "RATE_CATALOG_VERSION";
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+
+    /** " · stallion", the longest sex the quotation appends to a sex line's description. */
+    private static final int SEX_SUFFIX_MAX = " · stallion".length();
 
     private static final Map<RatePolicyKey, String> POLICY_LABELS = Map.ofEntries(
             Map.entry(RatePolicyKey.FUEL_PCT, "Fuel surcharge"),
@@ -342,7 +346,7 @@ public class RateCatalogService {
     // --- helpers ----------------------------------------------------------------------------------------------
 
     private RateCatalogVersion requireDraft() {
-        return versions.findByStatus(CatalogStatus.DRAFT)
+        return versions.lockByStatus(CatalogStatus.DRAFT)
                 .orElseThrow(
                         () -> new ConflictException("NO_DRAFT", "There is no draft to change. Create a draft first."));
     }
@@ -387,6 +391,13 @@ public class RateCatalogService {
             throw new BusinessException(
                     "BASIS",
                     "Air corridors price the flight by stall position; a road transfer to the terminal is per shipment.");
+        }
+        if (r.appliesToSex() != null
+                && r.description().strip().length() > PricingText.DESCRIPTION_MAX - SEX_SUFFIX_MAX) {
+            throw new BusinessException(
+                    "DESCRIPTION",
+                    "A line for one sex can have at most " + (PricingText.DESCRIPTION_MAX - SEX_SUFFIX_MAX)
+                            + " characters: the quotation adds the sex to it.");
         }
         if (r.appliesToTrailer() != null && r.basis() != RateBasis.PER_KM) {
             throw new BusinessException("APPLIES_TO_TRAILER", "Only a per-km line can be for one trailer kind.");

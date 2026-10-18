@@ -49,7 +49,7 @@ public final class RequiredRates {
             }
         } else if (days > 0) {
             Set<HorseSex> present = EnumSet.noneOf(HorseSex.class);
-            in.horses().forEach(h -> present.add(h.sex()));
+            in.horses().forEach(h -> present.add(rateSex(h.sex())));
             for (HorseSex sex : present) {
                 if (!hasIsolation(rates, sex)) {
                     missing.add(isolation(rates, in.corridorCode(), sex));
@@ -106,6 +106,15 @@ public final class RequiredRates {
         return missing;
     }
 
+    /** The sex a horse is priced as: a colt at the stallion rate, a filly at the mare rate (as the load plan). */
+    static HorseSex rateSex(HorseSex sex) {
+        return switch (sex) {
+            case COLT -> HorseSex.STALLION;
+            case FILLY -> HorseSex.MARE;
+            default -> sex;
+        };
+    }
+
     static ClassRow classRow(RateSet rates, ServiceClass serviceClass) {
         return rates.classes().stream()
                 .filter(c -> c.serviceClass() == serviceClass)
@@ -139,7 +148,7 @@ public final class RequiredRates {
         String word = PricingText.classWord(serviceClass);
         return new MissingRate(
                 "C",
-                "Air stall position " + route + ", " + word,
+                PricingText.fitDescription("Air stall position " + route + ", " + word),
                 catalog(rates) + word + " stall rate for " + code + ".");
     }
 
@@ -147,7 +156,7 @@ public final class RequiredRates {
         String kind = trailer == TrailerType.SHARED ? "shared-load" : "private-trailer";
         return new MissingRate(
                 "C",
-                "Road freight " + route + ", " + PricingText.trailerWord(trailer),
+                PricingText.fitDescription("Road freight " + route + ", " + PricingText.trailerWord(trailer)),
                 catalog(rates) + kind + " road rate for " + code + ".");
     }
 

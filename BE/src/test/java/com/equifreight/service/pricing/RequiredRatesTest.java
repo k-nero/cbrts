@@ -230,4 +230,18 @@ class RequiredRatesTest {
                 days,
                 in.horses());
     }
+
+    @Test
+    void coltsAndFilliesUseTheStallionAndMareRates() {
+        PricingInput young = air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("Young Thunder", HorseSex.COLT, "M", 32, "50000"),
+                        horse("Little Star", HorseSex.FILLY, "M", 32, "50000")));
+        assertThat(RequiredRates.forRequest(young, pnhHkgRates())).isEmpty();
+
+        RateSet noStallion = rates(pnhHkgRates().classes(), without(pnhHkgLines(), "ISO_STALLION"));
+        assertThat(descriptions(RequiredRates.forRequest(young, noStallion)))
+                .containsExactly("Pre-export isolation · stallion");
+    }
 }

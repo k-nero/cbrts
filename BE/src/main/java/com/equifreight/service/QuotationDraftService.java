@@ -229,6 +229,7 @@ public class QuotationDraftService {
 
     /** Replaces the draft's lines and totals with the engine's answer on its pinned version. */
     private void price(Quotation q, TransportRequest request) {
+        q.setAirClass(pricedClass(q, request));
         CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
         RateSet rates = rows.forCorridor(request.getCorridor().getId());
         PricedQuote priced = QuotePricer.price(inputs.inputFor(request, q.getAirClass()), rates);
@@ -272,10 +273,22 @@ public class QuotationDraftService {
         q.setTotal(totals.total());
     }
 
+    /**
+     * The class to price with: none for a road move; for air, the class the manager chose, else the customer's.
+     * The request's mode can change while it is back with the customer, so this follows the request as it is now.
+     */
+    private static ServiceClass pricedClass(Quotation q, TransportRequest request) {
+        if (request.getMode() != TransportMode.AIR) {
+            return null;
+        }
+        return q.getAirClass() != null ? q.getAirClass() : request.getAirClass();
+    }
+
     private QuotationDraftResponse toResponse(Quotation q, TransportRequest request) {
         CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
         RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        PricedQuote now = QuotePricer.price(inputs.inputFor(request, q.getAirClass()), rates);
+        ServiceClass airClass = pricedClass(q, request);
+        PricedQuote now = QuotePricer.price(inputs.inputFor(request, airClass), rates);
         BigDecimal validity = rates.policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
         Integer latest = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
                 .map(RateCatalogVersion::getVersionNo)
@@ -285,6 +298,6 @@ public class QuotationDraftService {
                 .map(User::displayName)
                 .orElse(null);
         return QuotationMapper.toDraftResponse(
-                q, request, now, latest, validity == null ? null : validity.intValue(), owner);
+                q, request, airClass, now, latest, validity == null ? null : validity.intValue(), owner);
     }
 }

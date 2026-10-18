@@ -4,10 +4,12 @@ import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportRequest;
+import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.rate.RateMapper;
 import com.equifreight.service.pricing.PricedLine;
 import com.equifreight.service.pricing.PricedQuote;
+import com.equifreight.service.pricing.PricedTotals;
 import com.equifreight.service.pricing.PricingText;
 import com.equifreight.service.pricing.StallFit;
 import java.math.BigDecimal;
@@ -34,6 +36,7 @@ public final class QuotationMapper {
     public static QuotationDraftResponse toDraftResponse(
             Quotation q,
             TransportRequest request,
+            ServiceClass airClass,
             PricedQuote now,
             Integer latestPublishedVersionNo,
             Integer validityDays,
@@ -42,7 +45,7 @@ public final class QuotationMapper {
                 .sorted(Comparator.comparing(QuotationLine::getGroupCode).thenComparing(QuotationLine::getPosition))
                 .toList();
         TransportMode mode = request.getCorridor().getMode();
-        boolean repriceNeeded = !sameLines(lines, now.lines());
+        boolean repriceNeeded = !sameLines(lines, now.lines()) || !sameTotals(q, now.totals());
         int priced = (int) lines.stream().filter(l -> amount(l) != null).count();
         BigDecimal pricedSum = lines.stream()
                 .map(QuotationMapper::amount)
@@ -58,14 +61,16 @@ public final class QuotationMapper {
                         q.getRateCatalogVersion().getVersionNo()))
                 .latestPublishedVersionNo(latestPublishedVersionNo)
                 .request(toFacts(request))
-                .airClass(q.getAirClass())
+                .airClass(airClass)
                 .fit(toFit(now.fit()))
                 .groups(toGroups(lines, mode))
                 .totals(QuoteTotalsResponse.builder()
                         .pricedLines(pricedSum)
                         .subtotal(q.getSubtotal())
+                        // A stale draft shows the rows' wording but not amounts that disagree with its total.
                         .rows(now.totals().rows().stream()
-                                .map(r -> new QuoteTotalRowResponse(r.key(), r.label(), r.baseText(), r.amount()))
+                                .map(r -> new QuoteTotalRowResponse(
+                                        r.key(), r.label(), r.baseText(), repriceNeeded ? null : r.amount()))
                                 .toList())
                         .total(q.getTotal())
                         .build())
@@ -147,6 +152,21 @@ public final class QuotationMapper {
         return l.getOverrideAmount() != null ? l.getOverrideAmount() : l.getCatalogAmount();
     }
 
+    /** Whether the stored totals are what the engine works out now (cover or declared values may have changed). */
+    private static boolean sameTotals(Quotation q, PricedTotals now) {
+        return same(q.getSubtotal(), now.subtotal())
+                && same(q.getVolumeBreak(), now.volumeBreak())
+                && same(q.getFuel(), now.fuel())
+                && same(q.getInsurance(), now.insurance())
+                && same(q.getContingency(), now.contingency())
+                && same(q.getServiceFee(), now.serviceFee())
+                && same(q.getTotal(), now.total());
+    }
+
+    private static boolean same(BigDecimal a, BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
+    }
+
     private static boolean sameLines(List<QuotationLine> stored, List<PricedLine> now) {
         if (stored.size() != now.size()) {
             return false;
@@ -157,7 +177,7 @@ public final class QuotationMapper {
             boolean same = s.getGroupCode().equals(p.group())
                     && s.getDescription().equals(p.description())
                     && Objects.equals(s.getBasisText(), p.basisText())
-                    && Objects.equals(s.getCatalogAmount(), p.amount());
+                    && same(s.getCatalogAmount(), p.amount());
             if (!same) {
                 return false;
             }

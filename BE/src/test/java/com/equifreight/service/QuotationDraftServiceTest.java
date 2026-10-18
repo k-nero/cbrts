@@ -187,7 +187,7 @@ class QuotationDraftServiceTest {
                 0,
                 airClass,
                 request.getTrailer(),
-                InsuranceOption.EQUIFREIGHT,
+                request.getInsurance(),
                 false,
                 0,
                 List.copyOf(horses));
@@ -529,5 +529,51 @@ class QuotationDraftServiceTest {
         verify(audit, never())
                 .recordDecision(
                         any(), startsWith("QUOTATION_REPRICED"), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    // --- review fixes ------------------------------------------------------------------------------------
+
+    @Test
+    void aCoverChangeSinceStartAsksForARepriceAndHidesTheNewRowAmounts() {
+        service.start(yen, request.getId());
+        request.setInsurance(InsuranceOption.OWN_POLICY);
+
+        QuotationDraftResponse response = service.get(request.getId());
+
+        assertThat(response.repriceNeeded()).isTrue();
+        assertThat(response.readiness().ready()).isFalse();
+        assertThat(response.totals().rows())
+                .allSatisfy(r -> assertThat(r.amount()).isNull());
+    }
+
+    @Test
+    void aRequestSwitchedToAirAfterStartTakesItsClass() {
+        request.setMode(TransportMode.ROAD);
+        request.setAirClass(null);
+        request.setTrailer(TrailerType.SHARED);
+        service.start(yen, request.getId());
+        request.setMode(TransportMode.AIR);
+        request.setTrailer(null);
+        request.setAirClass(ServiceClass.BUSINESS);
+
+        QuotationDraftResponse seen = service.get(request.getId());
+        assertThat(seen.airClass()).isEqualTo(ServiceClass.BUSINESS);
+        assertThat(seen.repriceNeeded()).isTrue();
+
+        service.reprice(yen, request.getId());
+        assertThat(stored.orElseThrow().getAirClass()).isEqualTo(ServiceClass.BUSINESS);
+    }
+
+    @Test
+    void aRequestSwitchedToRoadDropsTheAirClass() {
+        service.start(yen, request.getId());
+        request.setMode(TransportMode.ROAD);
+        request.setAirClass(null);
+        request.setTrailer(TrailerType.SHARED);
+
+        service.reprice(yen, request.getId());
+
+        assertThat(stored.orElseThrow().getAirClass()).isNull();
+        assertThat(service.get(request.getId()).airClass()).isNull();
     }
 }

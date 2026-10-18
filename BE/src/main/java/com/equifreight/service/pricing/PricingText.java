@@ -57,6 +57,16 @@ public final class PricingText {
         return sex.name().toLowerCase(Locale.ROOT);
     }
 
+    /** The longest a quotation line's description can be (quotation_lines.description varchar(160)). */
+    public static final int DESCRIPTION_MAX = 160;
+
+    /** A generated description cut to fit its column, with an ellipsis when it had to be cut. */
+    public static String fitDescription(String description) {
+        return description.length() <= DESCRIPTION_MAX
+                ? description
+                : description.substring(0, DESCRIPTION_MAX - 1) + "…";
+    }
+
     /** "1 horse", "2 horses". */
     public static String horses(int count) {
         return count + (count == 1 ? " horse" : " horses");
