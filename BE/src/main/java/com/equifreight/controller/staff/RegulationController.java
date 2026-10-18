@@ -3,6 +3,7 @@ package com.equifreight.controller.staff;
 import com.equifreight.entity.User;
 import com.equifreight.model.clearance.DocumentTypeResponse;
 import com.equifreight.model.clearance.RegulationCatalogResponse;
+import com.equifreight.model.clearance.RegulationRuleUpdateRequest;
 import com.equifreight.model.clearance.RegulationVersionResponse;
 import com.equifreight.service.RegulationService;
 import java.util.List;
@@ -50,6 +51,36 @@ public class RegulationController {
     @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
     public List<DocumentTypeResponse> listDocumentTypes() {
         return regulationService.listDocumentTypes();
+    }
+
+    /**
+     * Create a new draft regulation version from the active version.
+     */
+    @PostMapping("/catalogs/{catalogId}/draft")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
+    public RegulationVersionResponse createDraft(@PathVariable UUID catalogId, @AuthenticationPrincipal User user) {
+        return regulationService.createDraft(catalogId, user);
+    }
+
+    /**
+     * Update an individual rule within a draft version.
+     */
+    @PutMapping("/rules/{ruleId}")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
+    public RegulationVersionResponse updateRule(
+            @PathVariable UUID ruleId,
+            @RequestBody RegulationRuleUpdateRequest request,
+            @AuthenticationPrincipal User user) {
+        return regulationService.updateRule(ruleId, request, user);
+    }
+
+    /**
+     * Discard an existing draft version.
+     */
+    @DeleteMapping("/versions/{versionId}")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
+    public void discardDraft(@PathVariable UUID versionId, @AuthenticationPrincipal User user) {
+        regulationService.discardDraft(versionId, user);
     }
 
     /**

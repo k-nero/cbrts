@@ -13,4 +13,6 @@ public class RegulationCatalogResponse {
     private String countryCode;
     private String name;
     private RegulationVersionResponse activeVersion;
+    private RegulationVersionResponse draftVersion;
+    private java.util.List<RegulationVersionResponse> versions;
 }

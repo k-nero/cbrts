@@ -22,4 +22,7 @@ public class RegulationVersionResponse {
     private short quarantineMinDays;
     private short arrivalBufferDays;
     private List<RegulationRuleResponse> rules;
+    private Integer pinnedJobsCount;
+    private Integer changesCount;
+    private String changeNote;
 }

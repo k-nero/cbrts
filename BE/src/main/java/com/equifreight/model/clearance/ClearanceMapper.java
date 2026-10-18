@@ -117,6 +117,27 @@ public final class ClearanceMapper {
 
     public static RegulationRuleResponse toRuleResponse(com.equifreight.entity.RegulationRule rule) {
         if (rule == null) return null;
+        String param = "—";
+        if (rule.getRuleKind() != null) {
+            switch (rule.getRuleKind()) {
+                case VALID_THROUGH_ARRIVAL_PLUS ->
+                    param = rule.getMaxDays() != null ? "arrival + " + rule.getMaxDays() + " d" : "arrival";
+                case BOOSTER_WINDOW ->
+                    param = (rule.getMinDays() != null ? rule.getMinDays() : 0) + "–"
+                            + (rule.getMaxDays() != null ? rule.getMaxDays() : 0) + " d before";
+                case WINDOW_BEFORE_DEPARTURE ->
+                    param = rule.getMaxDays() != null ? "within " + rule.getMaxDays() + " d" : "before departure";
+                case PRESENCE_ONLY -> {
+                    if (rule.getDocumentType() != null
+                            && "CUSTOMS_VALUE_DECLARATION"
+                                    .equals(rule.getDocumentType().getCode())) {
+                        param = "1 per crossing";
+                    } else {
+                        param = "—";
+                    }
+                }
+            }
+        }
         return RegulationRuleResponse.builder()
                 .id(rule.getId())
                 .documentType(toDocumentTypeResponse(rule.getDocumentType()))
@@ -125,6 +146,7 @@ public final class ClearanceMapper {
                 .minDays(rule.getMinDays())
                 .maxDays(rule.getMaxDays())
                 .description(rule.getDescription())
+                .parameterDisplay(param)
                 .build();
     }
 

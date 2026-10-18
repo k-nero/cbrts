@@ -17,4 +17,6 @@ public class RegulationRuleResponse {
     private Short minDays;
     private Short maxDays;
     private String description;
+    private String diffStatus; // UNCHANGED, CHANGED, NEW
+    private String parameterDisplay;
 }

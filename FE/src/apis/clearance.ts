@@ -17,6 +17,7 @@ import type {
   RegulationVersion,
   ReviewDocumentRequest,
   UpdateAuthoritySubmissionRequest,
+  UpdateRegulationRuleRequest,
 } from '@/interfaces';
 
 export const clearanceApi = {
@@ -78,6 +79,15 @@ export const clearanceApi = {
 
   publishRegulationVersion: (versionId: string) =>
     client.post<RegulationVersion>(`/staff/regulations/versions/${versionId}/publish`),
+
+  updateRegulationRule: (ruleId: string, data: UpdateRegulationRuleRequest) =>
+    client.put<RegulationVersion>(`/staff/regulations/rules/${ruleId}`, data),
+
+  discardRegulationDraft: (versionId: string) =>
+    client.delete(`/staff/regulations/versions/${versionId}`),
+
+  createRegulationDraft: (catalogId: string) =>
+    client.post<RegulationVersion>(`/staff/regulations/catalogs/${catalogId}/draft`),
 
   // Customer Clearance Endpoints (US-F2-03)
   getCustomerChecklist: (jobId: string) =>

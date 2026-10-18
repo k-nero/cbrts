@@ -25,4 +25,10 @@ export const queryKeys = {
     all: () => ['customer-notes'] as const,
     detail: (id: string) => ['customer-notes', id] as const,
   },
+  regulations: {
+    all: () => ['regulations'] as const,
+    catalogs: () => ['regulations', 'catalogs'] as const,
+    version: (id: string) => ['regulations', 'version', id] as const,
+    documentTypes: () => ['regulations', 'document-types'] as const,
+  },
 } as const;

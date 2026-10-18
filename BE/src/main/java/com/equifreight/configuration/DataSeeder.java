@@ -133,6 +133,11 @@ public class DataSeeder implements ApplicationRunner {
     private final RouteLegRepository routeLegRepository;
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final CodeCounterRepository codeCounterRepository;
+    private final RegulationCatalogRepository regulationCatalogRepository;
+    private final RegulationVersionRepository regulationVersionRepository;
+    private final RegulationRuleRepository regulationRuleRepository;
+    private final DocumentTypeRepository documentTypeRepository;
+    private final JobRegulationPinRepository jobRegulationPinRepository;
 
     public DataSeeder(
             RoleRepository roleRepository,
@@ -158,7 +163,12 @@ public class DataSeeder implements ApplicationRunner {
             RouteStopRepository routeStopRepository,
             RouteLegRepository routeLegRepository,
             CrewAssignmentRepository crewAssignmentRepository,
-            CodeCounterRepository codeCounterRepository) {
+            CodeCounterRepository codeCounterRepository,
+            RegulationCatalogRepository regulationCatalogRepository,
+            RegulationVersionRepository regulationVersionRepository,
+            RegulationRuleRepository regulationRuleRepository,
+            DocumentTypeRepository documentTypeRepository,
+            JobRegulationPinRepository jobRegulationPinRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -183,6 +193,11 @@ public class DataSeeder implements ApplicationRunner {
         this.routeLegRepository = routeLegRepository;
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.codeCounterRepository = codeCounterRepository;
+        this.regulationCatalogRepository = regulationCatalogRepository;
+        this.regulationVersionRepository = regulationVersionRepository;
+        this.regulationRuleRepository = regulationRuleRepository;
+        this.documentTypeRepository = documentTypeRepository;
+        this.jobRegulationPinRepository = jobRegulationPinRepository;
     }
 
     @Override
@@ -193,6 +208,7 @@ public class DataSeeder implements ApplicationRunner {
         seedPlacesAndCorridors();
         seedVehicles();
         seedDemoJobs();
+        seedRegulations();
     }
 
     private void seedRolesAndUsers() {
@@ -678,6 +694,267 @@ public class DataSeeder implements ApplicationRunner {
         ca.getId().setJobId(job.getId());
         ca.getId().setUserId(user.getId());
         crewAssignmentRepository.save(ca);
+    }
+
+    private void seedRegulations() {
+        if (regulationCatalogRepository.count() > 0) {
+            return;
+        }
+
+        User lan = userRepository.getByEmail("lan.nguyen@equifreight.vn");
+        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
+        User publisher = lan != null ? lan : yen;
+
+        DocumentType piro = documentTypeRepository
+                .findByCode("PIROPLASMOSIS_TEST")
+                .orElseGet(() -> {
+                    DocumentType dt = new DocumentType();
+                    dt.setCode("PIROPLASMOSIS_TEST");
+                    dt.setName("Equine piroplasmosis test result");
+                    dt.setScope(DocumentScope.PER_HORSE);
+                    dt.setProvidedBy(DocumentProvider.CUSTOMER);
+                    return documentTypeRepository.save(dt);
+                });
+
+        DocumentType passport =
+                documentTypeRepository.findByCode("EQUINE_PASSPORT").orElse(null);
+        DocumentType flu =
+                documentTypeRepository.findByCode("INFLUENZA_VACCINATION").orElse(null);
+        DocumentType eia = documentTypeRepository.findByCode("EIA_TEST").orElse(null);
+        DocumentType health =
+                documentTypeRepository.findByCode("EXPORT_HEALTH_CERT").orElse(null);
+        DocumentType ownership =
+                documentTypeRepository.findByCode("PROOF_OF_OWNERSHIP").orElse(null);
+        DocumentType permit = documentTypeRepository.findByCode("IMPORT_PERMIT").orElse(null);
+        DocumentType insurance =
+                documentTypeRepository.findByCode("TRANSIT_INSURANCE").orElse(null);
+        DocumentType customs =
+                documentTypeRepository.findByCode("CUSTOMS_VALUE_DECLARATION").orElse(null);
+
+        Country kh = countryRepository.findById("KH").orElse(null);
+        if (kh != null) {
+            RegulationCatalog khCat = new RegulationCatalog();
+            khCat.setCountry(kh);
+            khCat.setName("Cambodia import");
+            khCat = regulationCatalogRepository.save(khCat);
+
+            // v5 RETIRED
+            RegulationVersion v5 = createVersion(khCat, 5, CatalogStatus.RETIRED, (short) 21, (short) 7, (short) 2);
+            v5.setPublishedAt(Instant.parse("2026-06-14T08:00:00Z"));
+            v5.setPublishedBy(publisher);
+            regulationVersionRepository.saveAndFlush(v5);
+
+            // v6 RETIRED
+            RegulationVersion v6 = createVersion(khCat, 6, CatalogStatus.RETIRED, (short) 21, (short) 7, (short) 2);
+            v6.setPublishedAt(Instant.parse("2026-08-02T08:00:00Z"));
+            v6.setPublishedBy(publisher);
+            regulationVersionRepository.saveAndFlush(v6);
+
+            // v7 PUBLISHED
+            RegulationVersion v7 = createVersion(khCat, 7, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+            if (passport != null)
+                createRule(v7, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (flu != null) createRule(v7, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+            if (eia != null)
+                createRule(
+                        v7,
+                        eia,
+                        RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                        null,
+                        (short) 60,
+                        true,
+                        "Sampled within 60 days of departure");
+            if (health != null)
+                createRule(v7, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+            if (ownership != null) createRule(v7, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+            if (permit != null)
+                createRule(v7, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (insurance != null)
+                createRule(v7, insurance, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (customs != null)
+                createRule(v7, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, "1 per crossing");
+            v7.setStatus(CatalogStatus.PUBLISHED);
+            v7.setPublishedAt(Instant.parse("2026-09-22T08:00:00Z"));
+            v7.setPublishedBy(publisher);
+            final RegulationVersion savedV7 = regulationVersionRepository.saveAndFlush(v7);
+
+            // v8 DRAFT
+            RegulationVersion v8 = createVersion(khCat, 8, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+            if (passport != null)
+                createRule(v8, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (flu != null) createRule(v8, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+            if (eia != null)
+                createRule(
+                        v8,
+                        eia,
+                        RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                        null,
+                        (short) 45,
+                        true,
+                        "Was 60 in v7. Source: GDAHP notice 14/2026.");
+            if (health != null)
+                createRule(v8, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+            if (ownership != null) createRule(v8, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+            createRule(
+                    v8,
+                    piro,
+                    RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                    null,
+                    (short) 30,
+                    true,
+                    "New requirement under GDAHP circular 2026.");
+            if (permit != null)
+                createRule(v8, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (insurance != null)
+                createRule(
+                        v8,
+                        insurance,
+                        RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS,
+                        null,
+                        (short) 2,
+                        false,
+                        "Changed to optional recommendation.");
+            if (customs != null)
+                createRule(v8, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, "1 per crossing");
+
+            // Pin demo job CBRT-2026-041 to v7
+            transportJobRepository.findByCode("CBRT-2026-041").ifPresent(job -> {
+                JobRegulationPin pin = new JobRegulationPin();
+                pin.setJob(job);
+                pin.setRegulationVersion(savedV7);
+                pin.setRole(RegulationRole.DESTINATION);
+                pin.getId().setJobId(job.getId());
+                pin.getId().setRegulationVersionId(savedV7.getId());
+                jobRegulationPinRepository.save(pin);
+            });
+            log.info("Seeded Cambodia regulation catalog v5-v8");
+        }
+
+        seedCountryCatalog(
+                "VN",
+                "Vietnam import",
+                5,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "TH",
+                "Thailand import",
+                4,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "LA", "Laos import", 3, publisher, passport, flu, eia, health, ownership, permit, insurance, customs);
+        seedCountryCatalog(
+                "MY",
+                "Malaysia import",
+                6,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "HK",
+                "Hong Kong import",
+                9,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+    }
+
+    private void seedCountryCatalog(
+            String countryCode,
+            String name,
+            int versionNo,
+            User publisher,
+            DocumentType passport,
+            DocumentType flu,
+            DocumentType eia,
+            DocumentType health,
+            DocumentType ownership,
+            DocumentType permit,
+            DocumentType insurance,
+            DocumentType customs) {
+        Country c = countryRepository.findById(countryCode).orElse(null);
+        if (c == null) return;
+        RegulationCatalog cat = new RegulationCatalog();
+        cat.setCountry(c);
+        cat.setName(name);
+        cat = regulationCatalogRepository.save(cat);
+
+        RegulationVersion v = createVersion(cat, versionNo, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+        if (passport != null)
+            createRule(v, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (flu != null) createRule(v, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+        if (eia != null) createRule(v, eia, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 60, true, null);
+        if (health != null)
+            createRule(v, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+        if (ownership != null) createRule(v, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+        if (permit != null)
+            createRule(v, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (insurance != null)
+            createRule(v, insurance, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (customs != null) createRule(v, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+        v.setStatus(CatalogStatus.PUBLISHED);
+        v.setPublishedAt(Instant.now());
+        v.setPublishedBy(publisher);
+        regulationVersionRepository.saveAndFlush(v);
+        log.info("Seeded {} regulation catalog v{}", name, versionNo);
+    }
+
+    private RegulationVersion createVersion(
+            RegulationCatalog catalog, int versionNo, CatalogStatus status, short lead, short quar, short buf) {
+        RegulationVersion v = new RegulationVersion();
+        v.setCatalog(catalog);
+        v.setVersionNo(versionNo);
+        v.setStatus(status);
+        v.setLeadTimeDays(lead);
+        v.setQuarantineMinDays(quar);
+        v.setArrivalBufferDays(buf);
+        return regulationVersionRepository.saveAndFlush(v);
+    }
+
+    private void createRule(
+            RegulationVersion version,
+            DocumentType docType,
+            RegulationRuleKind kind,
+            Short minDays,
+            Short maxDays,
+            boolean mandatory,
+            String desc) {
+        RegulationRule r = new RegulationRule();
+        r.setVersion(version);
+        r.setDocumentType(docType);
+        r.setRuleKind(kind);
+        r.setMinDays(minDays);
+        r.setMaxDays(maxDays);
+        r.setMandatory(mandatory);
+        r.setDescription(desc);
+        regulationRuleRepository.saveAndFlush(r);
     }
 
     private void advanceCodeCounter(CodePrefix prefix, short year, int value) {
