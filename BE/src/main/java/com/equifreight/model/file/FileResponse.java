@@ -8,7 +8,7 @@ import lombok.Builder;
 public record FileResponse(
         UUID id,
         String fileName,
-        /**
+        /*
          * Detected from the file's bytes on upload, not taken from the browser.
          */
         String contentType,

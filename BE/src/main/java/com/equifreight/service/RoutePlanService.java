@@ -280,82 +280,10 @@ public class RoutePlanService {
     }
 
     public RoutePlanResponse toResponse(RoutePlan plan) {
-        List<RouteStopResponse> stopResponses = plan.getStops().stream()
-                .map(s -> RouteStopResponse.builder()
-                        .id(s.getId())
-                        .seq(s.getSeq())
-                        .kind(s.getKind())
-                        .placeId(s.getPlace() != null ? s.getPlace().getId() : null)
-                        .placeName(s.getPlace() != null ? s.getPlace().getName() : null)
-                        .borderCrossingId(
-                                s.getBorderCrossing() != null
-                                        ? s.getBorderCrossing().getId()
-                                        : null)
-                        .borderCrossingName(
-                                s.getBorderCrossing() != null
-                                        ? s.getBorderCrossing().getName()
-                                        : null)
-                        .plannedAt(s.getPlannedAt())
-                        .plannedStayMin(s.getPlannedStayMin())
-                        .details(s.getDetails())
-                        .build())
-                .toList();
-
-        List<RouteLegResponse> legResponses = plan.getLegs().stream()
-                .map(leg -> {
-                    FlightResponse flightResp = null;
-                    Optional<Flight> fOpt = flightRepository.findByRouteLegId(leg.getId());
-                    if (fOpt.isPresent()) {
-                        Flight f = fOpt.get();
-                        flightResp = FlightResponse.builder()
-                                .id(f.getId())
-                                .airline(f.getAirline())
-                                .flightNo(f.getFlightNo())
-                                .airWaybill(f.getAirWaybill())
-                                .aircraftType(f.getAircraftType())
-                                .stallPositions(f.getStallPositions())
-                                .serviceClass(f.getServiceClass())
-                                .scheduledDepartureAt(f.getScheduledDepartureAt())
-                                .scheduledArrivalAt(f.getScheduledArrivalAt())
-                                .estimatedDepartureAt(f.getEstimatedDepartureAt())
-                                .estimatedArrivalAt(f.getEstimatedArrivalAt())
-                                .build();
-                    }
-
-                    return RouteLegResponse.builder()
-                            .id(leg.getId())
-                            .seq(leg.getSeq())
-                            .fromStopId(leg.getFromStop().getId())
-                            .toStopId(leg.getToStop().getId())
-                            .mode(leg.getMode())
-                            .vehicleId(
-                                    leg.getVehicle() != null ? leg.getVehicle().getId() : null)
-                            .vehicleCode(
-                                    leg.getVehicle() != null ? leg.getVehicle().getCode() : null)
-                            .distanceKm(leg.getDistanceKm())
-                            .plannedMin(leg.getPlannedMin())
-                            .flight(flightResp)
-                            .build();
-                })
-                .toList();
-
-        return RoutePlanResponse.builder()
-                .id(plan.getId())
-                .jobId(plan.getJob().getId())
-                .versionNo(plan.getVersionNo())
-                .status(plan.getStatus())
-                .distanceKm(plan.getDistanceKm())
-                .durationMin(plan.getDurationMin())
-                .confirmedByName(
-                        plan.getConfirmedBy() != null
-                                ? plan.getConfirmedBy().getFirstName() + " "
-                                        + plan.getConfirmedBy().getLastName()
-                                : null)
-                .confirmedAt(plan.getConfirmedAt())
-                .supersededAt(plan.getSupersededAt())
-                .changeReason(plan.getChangeReason())
-                .stops(stopResponses)
-                .legs(legResponses)
-                .build();
+        Map<UUID, Flight> flightsByLegId = new HashMap<>();
+        for (RouteLeg leg : plan.getLegs()) {
+            flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
+        }
+        return JobMapper.toRoutePlanResponse(plan, flightsByLegId);
     }
 }

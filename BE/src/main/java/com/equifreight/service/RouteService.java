@@ -154,31 +154,15 @@ public class RouteService {
         }
         for (CorridorCrossing cc : ordered) {
             BorderCrossing b = cc.getBorderCrossing();
-            Country from = reversed ? b.getToCountry() : b.getFromCountry();
-            Country to = reversed ? b.getFromCountry() : b.getToCountry();
-            crossings.add(CrossingResponse.builder()
-                    .name(b.getName())
-                    .fromCountry(from.getCode())
-                    .toCountry(to.getCode())
-                    .build());
-            put(countries, from);
-            put(countries, to);
+            crossings.add(RouteMapper.toCrossingResponse(b, reversed));
+            put(countries, reversed ? b.getToCountry() : b.getFromCountry());
+            put(countries, reversed ? b.getFromCountry() : b.getToCountry());
         }
-        RouteResponse.RouteResponseBuilder route = RouteResponse.builder()
-                .corridorId(corridor.getId())
-                .code(corridor.getCode())
-                .mode(corridor.getMode())
-                .fromCity(reversed ? corridor.getDestinationCity() : corridor.getOriginCity())
-                .toCity(reversed ? corridor.getOriginCity() : corridor.getDestinationCity())
-                .distanceKm(corridor.getDistanceKm())
-                .dateFlexDays((int) corridor.getDateFlexDays())
-                .crossings(crossings);
         if (destination == null) {
-            return new Described(route.build(), null);
+            return new Described(RouteMapper.toRouteResponse(corridor, reversed, crossings, null, null, null), null);
         }
         put(countries, destination.getCountry());
         List<String> codes = List.copyOf(countries.keySet());
-        route.countries(codes).crossBorder(codes.size() > 1);
 
         Map<String, RegulationVersion> published = new HashMap<>();
         for (String code : codes) {
@@ -187,14 +171,23 @@ public class RouteService {
                             versions.findByCatalogIdAndStatusOrdered(catalog.getId(), CatalogStatus.PUBLISHED).stream()
                                     .findFirst());
             if (version.isEmpty()) {
-                return new Described(route.build(), countries.get(code));
+                return new Described(
+                        RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, null, null),
+                        countries.get(code));
             }
             published.put(code, version.get());
         }
         int required = LeadTimePolicy.requiredDays(codes, published);
         LocalDate today = LocalDate.now(clock);
-        route.leadTimeDays(required).earliestDeparture(LeadTimePolicy.earliestDeparture(today, required));
-        return new Described(route.build(), null);
+        return new Described(
+                RouteMapper.toRouteResponse(
+                        corridor,
+                        reversed,
+                        crossings,
+                        codes,
+                        required,
+                        LeadTimePolicy.earliestDeparture(today, required)),
+                null);
     }
 
     private static boolean isReversed(Corridor corridor, Place origin) {

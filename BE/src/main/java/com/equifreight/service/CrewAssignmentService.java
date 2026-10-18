@@ -8,6 +8,7 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.CrewMemberResponse;
+import com.equifreight.model.job.JobMapper;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.UserRepository;
@@ -39,7 +40,7 @@ public class CrewAssignmentService {
     @Transactional(readOnly = true)
     public List<CrewMemberResponse> getCrew(UUID jobId) {
         return crewAssignmentRepository.findByJobId(jobId).stream()
-                .map(this::toResponse)
+                .map(JobMapper::toCrewMemberResponse)
                 .toList();
     }
 
@@ -153,17 +154,6 @@ public class CrewAssignmentService {
                 "CREW_ASSIGNED");
 
         log.info("Assigned {} crew members to job {}", saved.size(), job.getCode());
-        return saved.stream().map(this::toResponse).toList();
-    }
-
-    private CrewMemberResponse toResponse(CrewAssignment ca) {
-        User u = ca.getUser();
-        return CrewMemberResponse.builder()
-                .userId(u.getId())
-                .name(u.getFirstName() + " " + u.getLastName())
-                .staffCode(u.getStaffCode())
-                .email(u.getEmail())
-                .crewRole(ca.getCrewRole())
-                .build();
+        return saved.stream().map(JobMapper::toCrewMemberResponse).toList();
     }
 }

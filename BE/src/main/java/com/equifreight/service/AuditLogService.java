@@ -7,6 +7,7 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.model.audit.AuditActorOption;
 import com.equifreight.model.audit.AuditLogFilter;
 import com.equifreight.model.audit.AuditLogResponse;
+import com.equifreight.model.audit.AuditMapper;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.TransportJobRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -227,22 +228,10 @@ public class AuditLogService {
     }
 
     private AuditLogResponse toResponse(AuditLog log, Map<String, UUID> jobIds) {
-        return new AuditLogResponse(
-                log.getId(),
-                log.getOccurredAt(),
-                log.getActor() == null ? null : log.getActor().getId(),
-                log.getActorLabel(),
-                log.getActorRole(),
-                log.getChannel(),
-                log.getDeviceRecordedAt(),
-                log.getAction(),
-                log.getSummary(),
-                log.getEntityType(),
-                log.getEntityId(),
-                log.getEntityCode(),
+        return AuditMapper.toResponse(
+                log,
                 json(log.getBefore()),
                 json(log.getAfter()),
-                log.getReason(),
                 log.getEntityCode() == null ? null : jobIds.get(log.getEntityCode()));
     }
 

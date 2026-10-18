@@ -49,13 +49,13 @@ public class VehicleService {
 
     @Transactional(readOnly = true)
     public Page<VehicleResponse> search(Specification<Vehicle> spec, Pageable pageable) {
-        return vehicleRepository.findAll(spec, pageable).map(this::toResponse);
+        return vehicleRepository.findAll(spec, pageable).map(FleetMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
     public List<VehicleResponse> listAllActive() {
         return vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
-                .map(this::toResponse)
+                .map(FleetMapper::toResponse)
                 .toList();
     }
 
@@ -64,7 +64,7 @@ public class VehicleService {
         Vehicle vehicle = vehicleRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
-        return toResponse(vehicle);
+        return FleetMapper.toResponse(vehicle);
     }
 
     @Transactional
@@ -96,7 +96,7 @@ public class VehicleService {
 
         Vehicle saved = vehicleRepository.save(vehicle);
         log.info("Created vehicle {} with {} stalls", saved.getCode(), stalls.size());
-        return toResponse(saved);
+        return FleetMapper.toResponse(saved);
     }
 
     @Transactional
@@ -112,7 +112,7 @@ public class VehicleService {
             vehicle.setStatus(request.status());
         }
 
-        return toResponse(vehicleRepository.save(vehicle));
+        return FleetMapper.toResponse(vehicleRepository.save(vehicle));
     }
 
     @Transactional
@@ -170,7 +170,7 @@ public class VehicleService {
                     request.kind(),
                     request.startsAt(),
                     request.endsAt());
-            return toBookingResponse(saved);
+            return FleetMapper.toBookingResponse(saved);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new ConflictException(
                     "DOUBLE_BOOKING",
@@ -182,43 +182,7 @@ public class VehicleService {
     @Transactional(readOnly = true)
     public List<VehicleBookingResponse> getFleetCalendar(Instant rangeStart, Instant rangeEnd) {
         return vehicleBookingRepository.findInDateRange(rangeStart, rangeEnd).stream()
-                .map(this::toBookingResponse)
+                .map(FleetMapper::toBookingResponse)
                 .toList();
-    }
-
-    private VehicleResponse toResponse(Vehicle vehicle) {
-        List<VehicleStallResponse> stalls = vehicle.getStalls().stream()
-                .map(s -> VehicleStallResponse.builder()
-                        .id(s.getId())
-                        .positionNo(s.getPositionNo())
-                        .stallType(s.getStallType())
-                        .rowNo(s.getRowNo())
-                        .side(s.getSide())
-                        .nearRamp(s.isNearRamp())
-                        .build())
-                .toList();
-
-        return VehicleResponse.builder()
-                .id(vehicle.getId())
-                .code(vehicle.getCode())
-                .kind(vehicle.getKind())
-                .payloadKg(vehicle.getPayloadKg())
-                .status(vehicle.getStatus())
-                .stallCount(stalls.size())
-                .stalls(stalls)
-                .build();
-    }
-
-    private VehicleBookingResponse toBookingResponse(VehicleBooking booking) {
-        return VehicleBookingResponse.builder()
-                .id(booking.getId())
-                .vehicleId(booking.getVehicle().getId())
-                .vehicleCode(booking.getVehicle().getCode())
-                .jobId(booking.getJob() != null ? booking.getJob().getId() : null)
-                .jobCode(booking.getJob() != null ? booking.getJob().getCode() : null)
-                .kind(booking.getKind() != null ? booking.getKind().name() : "JOB")
-                .startsAt(booking.getStartsAt())
-                .endsAt(booking.getEndsAt())
-                .build();
     }
 }

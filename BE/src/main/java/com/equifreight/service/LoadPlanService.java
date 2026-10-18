@@ -424,38 +424,20 @@ public class LoadPlanService {
                     || h.getTemperament() == Temperament.AGGRESSIVE
                     || h.getRequiredStall() == StallType.BOX);
             if (needsBox && s.getStallType() != StallType.BOX) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("BOX_REQUIRED")
-                        .description("Needs a box stall (stallion or aggressive horse)")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "BOX_REQUIRED", "Needs a box stall (stallion or aggressive horse)"));
             }
 
             // Rule 2: Climate stall requirement
             if (h.getRequiredStall() == StallType.CLIMATE && s.getStallType() != StallType.CLIMATE) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("CLIMATE_REQUIRED")
-                        .description("Heat-sensitive horse needs climate stall")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "CLIMATE_REQUIRED", "Heat-sensitive horse needs climate stall"));
             }
 
             // Rule 3: Nervous horses away from ramp
             if (h.getTemperament() == Temperament.NERVOUS && s.isNearRamp()) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("NERVOUS_NEAR_RAMP")
-                        .description("Keep nervous horses away from the ramp")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "NERVOUS_NEAR_RAMP", "Keep nervous horses away from the ramp"));
             }
         }
 
@@ -480,24 +462,18 @@ public class LoadPlanService {
 
                 if (beside || behind) {
                     String reason = beside ? "Stallion stands beside a mare" : "Stallion stands behind a mare";
-                    conflicts.add(LoadPlanConflictResponse.builder()
-                            .horseId(h1.getId())
-                            .horseName(h1.getName())
-                            .stallId(stallStallion.getId())
-                            .stallPositionNo(stallStallion.getPositionNo())
-                            .rule("STALLION_NEAR_MARE")
-                            .description(reason)
-                            .build());
+                    conflicts.add(JobMapper.toConflictResponse(h1, stallStallion, "STALLION_NEAR_MARE", reason));
                 }
             }
         }
 
         // Rule 5: Payload check
         if (totalWeight > vehicle.getPayloadKg()) {
-            conflicts.add(LoadPlanConflictResponse.builder()
-                    .rule("PAYLOAD_EXCEEDED")
-                    .description("Payload limit exceeded (" + totalWeight + " kg of " + vehicle.getPayloadKg() + " kg)")
-                    .build());
+            conflicts.add(JobMapper.toConflictResponse(
+                    null,
+                    null,
+                    "PAYLOAD_EXCEEDED",
+                    "Payload limit exceeded (" + totalWeight + " kg of " + vehicle.getPayloadKg() + " kg)"));
         }
 
         return conflicts;
@@ -525,18 +501,9 @@ public class LoadPlanService {
                     LoadPlanStall a = assignmentByStallId.get(s.getId());
                     JobHorseResponse hResp = null;
                     if (a != null && a.getHorse() != null) {
-                        hResp = toHorseResponse(a.getHorse());
+                        hResp = JobMapper.toHorseResponse(a.getHorse());
                     }
-                    return LoadPlanStallResponse.builder()
-                            .stallId(s.getId())
-                            .positionNo(s.getPositionNo())
-                            .stallType(s.getStallType())
-                            .rowNo(s.getRowNo())
-                            .side(s.getSide())
-                            .nearRamp(s.isNearRamp())
-                            .horse(hResp)
-                            .issue(stallIssues.get(s.getId()))
-                            .build();
+                    return JobMapper.toLoadPlanStallResponse(s, hResp, stallIssues.get(s.getId()));
                 })
                 .toList();
 
@@ -545,31 +512,14 @@ public class LoadPlanService {
 
         List<JobHorseResponse> unassigned = allHorses.stream()
                 .filter(h -> !assignedHorseIds.contains(h.getId()))
-                .map(this::toHorseResponse)
+                .map(JobMapper::toHorseResponse)
                 .toList();
 
         int totalWeight = assignments.stream()
                 .mapToInt(a -> a.getHorse().getWeightKg() != null ? a.getHorse().getWeightKg() : 0)
                 .sum();
 
-        return LoadPlanResponse.builder()
-                .id(plan.getId())
-                .jobId(plan.getJob().getId())
-                .vehicleId(plan.getVehicle().getId())
-                .vehicleCode(plan.getVehicle().getCode())
-                .status(plan.getStatus())
-                .confirmedByName(
-                        plan.getConfirmedBy() != null
-                                ? plan.getConfirmedBy().getFirstName() + " "
-                                        + plan.getConfirmedBy().getLastName()
-                                : null)
-                .confirmedAt(plan.getConfirmedAt())
-                .totalWeightKg(totalWeight)
-                .payloadKg(plan.getVehicle().getPayloadKg())
-                .stalls(stallResponses)
-                .unassignedHorses(unassigned)
-                .conflicts(conflicts)
-                .build();
+        return JobMapper.toLoadPlanResponse(plan, totalWeight, stallResponses, unassigned, conflicts);
     }
 
     private List<Horse> getJobHorses(TransportJob job) {
@@ -579,20 +529,6 @@ public class LoadPlanService {
                     .toList();
         }
         return Collections.emptyList();
-    }
-
-    private JobHorseResponse toHorseResponse(Horse h) {
-        return JobHorseResponse.builder()
-                .id(h.getId())
-                .name(h.getName())
-                .sex(h.getSex())
-                .breed(h.getBreed())
-                .weightKg(h.getWeightKg())
-                .sizeClassCode(h.getSizeClass() != null ? h.getSizeClass().getCode() : "M")
-                .requiredStall(h.getRequiredStall())
-                .temperament(h.getTemperament())
-                .handlingNotes(h.getHandlingNotes())
-                .build();
     }
 
     private Map<Horse, VehicleStall> solveArrangement(List<Horse> horses, Set<VehicleStall> availableStalls) {
