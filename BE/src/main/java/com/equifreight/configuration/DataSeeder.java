@@ -384,10 +384,10 @@ public class DataSeeder implements ApplicationRunner {
         req.setHorses(new ArrayList<>());
         TransportRequest savedReq = transportRequestRepository.save(req);
 
-        addRequestHorse(savedReq, shadowfax, sizeM);
-        addRequestHorse(savedReq, nightfall, sizeM);
-        addRequestHorse(savedReq, copperKing, sizeM);
-        addRequestHorse(savedReq, silverBell, sizeM);
+        addRequestHorse(savedReq, shadowfax);
+        addRequestHorse(savedReq, nightfall);
+        addRequestHorse(savedReq, copperKing);
+        addRequestHorse(savedReq, silverBell);
 
         savedReq.setStatus(RequestStatus.APPROVED);
         transportRequestRepository.save(savedReq);
@@ -491,13 +491,14 @@ public class DataSeeder implements ApplicationRunner {
         });
     }
 
-    private void addRequestHorse(TransportRequest req, Horse horse, HorseSizeClass size) {
+    /** Snapshots the horse's own size class, the one the registry derived from its height and stall. */
+    private void addRequestHorse(TransportRequest req, Horse horse) {
         RequestHorse rh = new RequestHorse();
         rh.setRequest(req);
         rh.setHorse(horse);
         rh.setDeclaredValue(horse.getDeclaredValue());
         rh.setSex(horse.getSex());
-        rh.setSizeClassCode(size.getCode());
+        rh.setSizeClassCode(horse.getSizeClass().getCode());
         rh.setRequiredStall(horse.getRequiredStall());
         rh.getId().setRequestId(req.getId());
         rh.getId().setHorseId(horse.getId());
