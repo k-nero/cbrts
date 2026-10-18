@@ -9,6 +9,7 @@ import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.fleet.VehicleBookingRequest;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.LoadPlanConflictResponse;
+import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -319,7 +320,7 @@ class Flow3ServiceTest {
         plan.setVehicle(vehicle);
         plan.setStatus(LoadPlanStatus.DRAFT);
 
-        when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId)).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findLatestByJobIdForUpdate(jobId)).thenReturn(Optional.of(plan));
         when(vehicleStallRepository.findById(stallId)).thenReturn(Optional.of(stall));
 
         assertThrows(ResourceNotFoundException.class, () -> loadPlanService.assignStall(jobId, stallId, horseId));
@@ -582,7 +583,7 @@ class Flow3ServiceTest {
         job.setPlannedArrivalAt(null);
         job.getRequest().setHorses(List.of());
         LoadPlan plan = loadPlan(job);
-        when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.confirmLoadPlan(job.getId(), user("khoi.do@equifreight.vn", RoleName.FLEET_COORDINATOR)));
         assertTrue(ex.getMessage().contains("confirm the route plan first"));
@@ -595,12 +596,149 @@ class Flow3ServiceTest {
         TransportJob job = readyJob();
         job.getRequest().setHorses(List.of());
         LoadPlan plan = loadPlan(job);
-        when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
 
         loadPlanService.autoArrange(job.getId());
 
         verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
         verify(loadPlanStallRepository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    @DisplayName("Moving a horse onto a stall someone else just filled is refused with 409, nothing changes (US-F3-05)")
+    void loadPlan_move_refusesWhenTargetStallWasFilled() {
+        MoveFixture f = new MoveFixture();
+        Horse other = f.horse("Copper King");
+        f.occupy(f.stall2, other);
+
+        ConflictException ex = assertThrows(ConflictException.class,
+                () -> loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, null, f.stall2, null)));
+        assertEquals("LOAD_PLAN_STALE", ex.getCode());
+        assertTrue(ex.getMessage().contains("Stall 2 now holds Copper King"));
+        verify(loadPlanStallRepository, never()).deleteByLoadPlanIdAndHorseId(any(), any());
+        verify(loadPlanStallRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Moving a horse someone else already moved is refused with 409 (US-F3-05)")
+    void loadPlan_move_refusesWhenHorseIsNoLongerWhereTheScreenShowed() {
+        MoveFixture f = new MoveFixture();
+        f.occupy(f.stall1, f.nightfall);
+
+        ConflictException ex = assertThrows(ConflictException.class,
+                () -> loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, null, f.stall2, null)));
+        assertTrue(ex.getMessage().contains("Nightfall is now in stall 1"));
+        verify(loadPlanStallRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Dropping a placed horse on an occupied stall swaps the two in one transaction (US-F3-05)")
+    void loadPlan_move_swapsWithTheOccupant() {
+        MoveFixture f = new MoveFixture();
+        Horse other = f.horse("Copper King");
+        f.occupy(f.stall1, f.nightfall);
+        f.occupy(f.stall2, other);
+        f.job.setSignedOffAt(Instant.parse("2026-10-17T08:00:00Z"));
+
+        loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, f.stall1, f.stall2, other));
+
+        verify(loadPlanStallRepository).deleteByLoadPlanIdAndHorseId(f.plan.getId(), f.nightfall.getId());
+        verify(loadPlanStallRepository).deleteByLoadPlanIdAndVehicleStallId(f.plan.getId(), f.stall2.getId());
+        verify(loadPlanStallRepository).save(argThat(a -> a.getHorse() == f.nightfall && a.getVehicleStall() == f.stall2));
+        verify(loadPlanStallRepository).save(argThat(a -> a.getHorse() == other && a.getVehicleStall() == f.stall1));
+        assertNull(f.job.getSignedOffAt());
+    }
+
+    @Test
+    @DisplayName("Dropping a waiting horse on an occupied stall sends the occupant back to the to-load list (US-F3-05)")
+    void loadPlan_move_fromListSendsOccupantToTheList() {
+        MoveFixture f = new MoveFixture();
+        Horse other = f.horse("Copper King");
+        f.occupy(f.stall2, other);
+
+        loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, null, f.stall2, other));
+
+        verify(loadPlanStallRepository).save(argThat(a -> a.getHorse() == f.nightfall && a.getVehicleStall() == f.stall2));
+        verify(loadPlanStallRepository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Dropping a placed horse on the to-load list takes it off the vehicle (US-F3-05)")
+    void loadPlan_move_unloads() {
+        MoveFixture f = new MoveFixture();
+        f.occupy(f.stall1, f.nightfall);
+
+        loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, f.stall1, null, null));
+
+        verify(loadPlanStallRepository).deleteByLoadPlanIdAndHorseId(f.plan.getId(), f.nightfall.getId());
+        verify(loadPlanStallRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A confirmed load plan refuses moves (US-F3-05)")
+    void loadPlan_move_refusedOnConfirmedPlan() {
+        MoveFixture f = new MoveFixture();
+        f.plan.setStatus(LoadPlanStatus.CONFIRMED);
+
+        assertThrows(BusinessException.class,
+                () -> loadPlanService.moveHorse(f.job.getId(), f.move(f.nightfall, null, f.stall1, null)));
+        verify(loadPlanStallRepository, never()).save(any());
+    }
+
+    /** One draft plan on a two-stall vehicle with Nightfall on the job, plus stubs for the move path. */
+    private class MoveFixture {
+        final TransportJob job = readyJob();
+        final LoadPlan plan = loadPlan(job);
+        final Horse nightfall = job.getRequest().getHorses().get(0).getHorse();
+        final VehicleStall stall1 = stall(1);
+        final VehicleStall stall2 = stall(2);
+        private final List<RequestHorse> onRequest = new ArrayList<>(job.getRequest().getHorses());
+
+        MoveFixture() {
+            job.getRequest().setHorses(onRequest);
+            when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+            lenient().when(vehicleStallRepository.findById(stall1.getId())).thenReturn(Optional.of(stall1));
+            lenient().when(vehicleStallRepository.findById(stall2.getId())).thenReturn(Optional.of(stall2));
+            lenient().when(loadPlanStallRepository.findByLoadPlanIdAndHorseId(eq(plan.getId()), any())).thenReturn(Optional.empty());
+            lenient().when(loadPlanStallRepository.findByLoadPlanIdAndVehicleStallId(eq(plan.getId()), any())).thenReturn(Optional.empty());
+        }
+
+        Horse horse(String name) {
+            Horse h = new Horse();
+            h.setId(UUID.randomUUID());
+            h.setName(name);
+            RequestHorse rh = new RequestHorse();
+            rh.setHorse(h);
+            onRequest.add(rh);
+            return h;
+        }
+
+        void occupy(VehicleStall stall, Horse horse) {
+            LoadPlanStall lps = new LoadPlanStall();
+            lps.setLoadPlan(plan);
+            lps.setVehicleStall(stall);
+            lps.setHorse(horse);
+            lenient().when(loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horse.getId())).thenReturn(Optional.of(lps));
+            lenient().when(loadPlanStallRepository.findByLoadPlanIdAndVehicleStallId(plan.getId(), stall.getId())).thenReturn(Optional.of(lps));
+        }
+
+        MoveHorseRequest move(Horse horse, VehicleStall from, VehicleStall to, Horse expectedOccupant) {
+            MoveHorseRequest r = new MoveHorseRequest();
+            r.setHorseId(horse.getId());
+            r.setFromStallId(from != null ? from.getId() : null);
+            r.setToStallId(to != null ? to.getId() : null);
+            r.setExpectedOccupantId(expectedOccupant != null ? expectedOccupant.getId() : null);
+            return r;
+        }
+
+        private VehicleStall stall(int positionNo) {
+            VehicleStall s = new VehicleStall();
+            s.setId(UUID.randomUUID());
+            s.setVehicle(plan.getVehicle());
+            s.setPositionNo((short) positionNo);
+            s.setRowNo((short) 1);
+            return s;
+        }
     }
 
     private TransportJob readyJob() {

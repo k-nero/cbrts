@@ -45,6 +45,14 @@ const resolveScrollForPagination = (
   return resolved;
 };
 
+// Sort headers flip between ascending and descending; the trailing 'ascend' makes antd's
+// cycle wrap back instead of landing on "unsorted" (pages offer their own reset).
+const TOGGLE_SORT_DIRECTIONS: NonNullable<TableProps['sortDirections']> = [
+  'ascend',
+  'descend',
+  'ascend',
+];
+
 const Table = <T extends object = object>({
   id,
   columns = [],
@@ -61,6 +69,7 @@ const Table = <T extends object = object>({
   rowSelection,
   labels,
   sorter,
+  sortDirections = TOGGLE_SORT_DIRECTIONS,
   getPopupContainer: getPopupContainerProp,
   ...rest
 }: import('./types').TableComponentProps<T>) => {
@@ -203,7 +212,10 @@ const Table = <T extends object = object>({
       return {
         ...col,
         ellipsis: col.ellipsis ?? true,
-        sortOrder: resolvedSortOrder,
+        // antd treats any column carrying a `sortOrder` key as controlled — even when it
+        // is undefined — and then can't advance past "unsorted". Only add the key when
+        // the sort is actually controlled.
+        ...(resolvedSortOrder !== undefined && { sortOrder: resolvedSortOrder }),
 
         title: isStringTitle ? (
           <div
@@ -266,6 +278,7 @@ const Table = <T extends object = object>({
       {showTopDivider && <Divider style={{ marginBottom: 8, marginTop: 8 }} />}
       <AntTable<T>
         {...rest}
+        sortDirections={sortDirections}
         getPopupContainer={getPopupContainer}
         tableLayout={resizableEnabled ? 'fixed' : undefined}
         rowSelection={hasRealDataColumns ? rowSelection : undefined}

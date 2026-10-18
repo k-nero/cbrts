@@ -15,7 +15,7 @@ import Footer from '@/components/Footer';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import ThemeToggle from '@/components/ThemeToggle';
-import { PhotoPanel } from '@/components/ui';
+import { Button, PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
@@ -61,7 +61,7 @@ const LoginPage = () => {
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand onClick={() => router.push(router.paths.get('landing'))} />
+        <Brand />
         <ThemeToggle />
       </header>
       <Flex style={{ flex: 1 }}>
@@ -96,6 +96,17 @@ const LoginPage = () => {
                   componentProps={{ autoComplete: 'current-password' }}
                 />
                 <SubmitButton type="primary" block label="Sign in" />
+                <div className="flex items-center gap-1">
+                  <span className="type-body-s text-ink-2">New to EquiFreight?</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    trailingIcon="arrow-right"
+                    onClick={() => router.push(router.paths.get('register'))}
+                  >
+                    Create a club account
+                  </Button>
+                </div>
                 <p className="m-0 border-t border-line pt-5 text-[13px] leading-5 text-ink-3">
                   Staff sign in here too, with the email your invite was sent to. Your role decides
                   where you land.
