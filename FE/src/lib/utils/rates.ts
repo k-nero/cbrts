@@ -155,6 +155,11 @@ export const policyRows = (
       value: p.QUOTE_VALIDITY_DAYS == null ? '—' : `${p.QUOTE_VALIDITY_DAYS} days`,
     },
     {
+      key: 'ESTIMATE_BAND_PCT',
+      label: 'Estimate band',
+      value: p.ESTIMATE_BAND_PCT == null ? '—' : `± ${pctText(p.ESTIMATE_BAND_PCT)} minimum`,
+    },
+    {
       key: 'FLIGHT_VET_MIN_HORSES',
       label: 'Flight vet',
       value:

@@ -157,6 +157,7 @@ describe('policyRows', () => {
         SERVICE_FEE_PCT: 12,
         DEPOSIT_PCT: 30,
         QUOTE_VALIDITY_DAYS: 7,
+        ESTIMATE_BAND_PCT: 15,
         FLIGHT_VET_MIN_HORSES: 8,
         HIGH_VALUE_THRESHOLD: 250000,
         ARRIVAL_WINDOW_PCT: 20,
@@ -177,6 +178,7 @@ describe('policyRows', () => {
       { key: 'SERVICE_FEE_PCT', label: 'Service fee', value: '12% after contingency' },
       { key: 'DEPOSIT_PCT', label: 'Deposit', value: '30%' },
       { key: 'QUOTE_VALIDITY_DAYS', label: 'Quote validity', value: '7 days' },
+      { key: 'ESTIMATE_BAND_PCT', label: 'Estimate band', value: '± 15% minimum' },
       { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
       { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
       { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
@@ -195,6 +197,7 @@ describe('policyRows', () => {
 
   test('a missing value is a dash', () => {
     expect(policyRows({}, [])[0]).toEqual({ key: 'FUEL_PCT', label: 'Fuel surcharge', value: '—' });
+    expect(policyRows({}, []).find((r) => r.key === 'ESTIMATE_BAND_PCT')?.value).toBe('—');
   });
 });
 
