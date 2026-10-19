@@ -2,6 +2,7 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.enums.QuotationStatus;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,12 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
 
     /** The non-draft versions of a page of requests, for the requests list. */
     List<Quotation> findByRequestIdInAndStatusNot(Collection<UUID> requestIds, QuotationStatus status);
+
+    /** Quotations in a status whose validity ends before the given instant: those to expire. */
+    List<Quotation> findByStatusAndValidUntilBefore(QuotationStatus status, Instant before);
+
+    /** Quotations not yet reminded whose validity ends before the given instant: those to remind. */
+    List<Quotation> findByStatusAndReminderSentAtIsNullAndValidUntilBefore(QuotationStatus status, Instant before);
 
     /** Every version of a request's quotation, newest first. */
     List<Quotation> findByRequestIdOrderByVersionNoDesc(UUID requestId);
