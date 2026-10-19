@@ -2,6 +2,8 @@ package com.equifreight.controller.staff;
 
 import com.equifreight.entity.User;
 import com.equifreight.model.quotation.AirClassRequest;
+import com.equifreight.model.quotation.ManualLineRequest;
+import com.equifreight.model.quotation.OverrideRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.StartResult;
 import com.equifreight.model.review.QueueRowResponse;
@@ -19,12 +21,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** The logistics manager's review of incoming requests (US-F1-03, US-F1-04). */
@@ -95,5 +99,52 @@ public class StaffRequestController {
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public QuotationDraftResponse repriceQuotation(@PathVariable UUID id, @AuthenticationPrincipal User user) {
         return quotations.reprice(user, id);
+    }
+
+    @Operation(summary = "Override a priced line's amount with a reason; the totals are computed again")
+    @PutMapping("/{id}/quotation/lines/{lineId}/override")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse overrideLine(
+            @PathVariable UUID id,
+            @PathVariable UUID lineId,
+            @Valid @RequestBody OverrideRequest body,
+            @AuthenticationPrincipal User user) {
+        return quotations.override(user, id, lineId, body);
+    }
+
+    @Operation(summary = "Remove a line's override, back to the catalog amount")
+    @DeleteMapping("/{id}/quotation/lines/{lineId}/override")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse removeOverride(
+            @PathVariable UUID id, @PathVariable UUID lineId, @AuthenticationPrincipal User user) {
+        return quotations.removeOverride(user, id, lineId);
+    }
+
+    @Operation(summary = "Add a line the catalog doesn't know, with a reason (201)")
+    @PostMapping("/{id}/quotation/lines")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public QuotationDraftResponse addLine(
+            @PathVariable UUID id, @Valid @RequestBody ManualLineRequest body, @AuthenticationPrincipal User user) {
+        return quotations.addLine(user, id, body);
+    }
+
+    @Operation(summary = "Change a line the manager added")
+    @PutMapping("/{id}/quotation/lines/{lineId}")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse editLine(
+            @PathVariable UUID id,
+            @PathVariable UUID lineId,
+            @Valid @RequestBody ManualLineRequest body,
+            @AuthenticationPrincipal User user) {
+        return quotations.editLine(user, id, lineId, body);
+    }
+
+    @Operation(summary = "Remove a line the manager added")
+    @DeleteMapping("/{id}/quotation/lines/{lineId}")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse removeLine(
+            @PathVariable UUID id, @PathVariable UUID lineId, @AuthenticationPrincipal User user) {
+        return quotations.removeLine(user, id, lineId);
     }
 }

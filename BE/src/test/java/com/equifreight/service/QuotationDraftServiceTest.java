@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,6 +43,8 @@ import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.ManualLineRequest;
+import com.equifreight.model.quotation.OverrideRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuoteGroupResponse;
 import com.equifreight.model.quotation.QuoteLineResponse;
@@ -447,7 +450,7 @@ class QuotationDraftServiceTest {
                 () -> service.reprice(yen, request.getId()))) {
             assertThatThrownBy(write::run)
                     .isInstanceOf(ConflictException.class)
-                    .hasMessage("This quotation has been issued and can't be re-priced.")
+                    .hasMessage("This version has been issued and can't be changed. Revise it to make a new version.")
                     .extracting("code")
                     .isEqualTo("QUOTATION_NOT_DRAFT");
         }
@@ -461,11 +464,11 @@ class QuotationDraftServiceTest {
         assertThatThrownBy(() -> service.reprice(yen, request.getId()))
                 .isInstanceOf(ConflictException.class)
                 .extracting("code")
-                .isEqualTo("REQUEST_NOT_IN_REVIEW");
+                .isEqualTo("REQUEST_NOT_QUOTABLE");
         assertThatThrownBy(() -> service.changeClass(yen, request.getId(), ServiceClass.FIRST))
                 .isInstanceOf(ConflictException.class)
                 .extracting("code")
-                .isEqualTo("REQUEST_NOT_IN_REVIEW");
+                .isEqualTo("REQUEST_NOT_QUOTABLE");
         assertThat(service.get(request.getId()).code()).isEqualTo("Q-2026-0189");
     }
 
@@ -867,5 +870,254 @@ class QuotationDraftServiceTest {
                 l.horseId(),
                 l.certainty(),
                 l.estimateNote());
+    }
+
+    // --- slice 6: overrides and manual lines -------------------------------------------------------------
+
+    /** Starts the draft and gives its lines ids, as the database would. */
+    Quotation startedWithIds() {
+        yen.setFirstName("Thị Yến");
+        yen.setLastName("Vũ");
+        service.start(yen, request.getId());
+        Quotation q = stored.orElseThrow();
+        q.getLines().forEach(l -> l.setId(UUID.randomUUID()));
+        request.setStatus(RequestStatus.UNDER_REVIEW);
+        return q;
+    }
+
+    static OverrideRequest override(String amount) {
+        return new OverrideRequest(new BigDecimal(amount), "Groom from the club's own staff");
+    }
+
+    static ManualLineRequest ferry(String unitRate, RateCertainty certainty, String note) {
+        return new ManualLineRequest(
+                "H",
+                "Ferry booking fee",
+                new BigDecimal("2"),
+                new BigDecimal(unitRate),
+                certainty,
+                note,
+                "Ferry booking the catalog doesn't know");
+    }
+
+    @Test
+    void anOverrideSetsTheAmountAndReasonAndRetotals() {
+        Quotation q = startedWithIds();
+        UUID groomId = lineKeyed("GROOM").getId();
+        BigDecimal before = q.getTotal();
+
+        QuotationDraftResponse response = service.override(yen, request.getId(), groomId, override("1200.00"));
+
+        QuotationLine groom = lineKeyed("GROOM");
+        assertThat(groom.getId()).isEqualTo(groomId);
+        assertThat(groom.getOverrideAmount()).isEqualByComparingTo("1200.00");
+        assertThat(groom.getOverrideReason()).isEqualTo("Groom from the club's own staff");
+        assertThat(q.getTotal()).isLessThan(before);
+        assertThat(response.totals().total()).isEqualByComparingTo(q.getTotal());
+        assertThat(response.repriceNeeded()).isFalse();
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_LINE_OVERRIDDEN"),
+                        eq("Q-2026-0189 v1 · Flying groom: $1,450.00 → $1,200.00 · Groom from the club's own staff"),
+                        eq("TRANSPORT_REQUEST"),
+                        eq(request.getId()),
+                        eq("REQ-2026-0199"),
+                        eq("Groom from the club's own staff"),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void aGapLineRefusesAnOverride() {
+        when(loader.load(v2.getId())).thenReturn(rows(v2, false));
+        Quotation q = startedWithIds();
+        UUID gap = q.getLines().stream()
+                .filter(l -> l.getCatalogAmount() == null)
+                .findFirst()
+                .orElseThrow()
+                .getId();
+        clearInvocations(quotations);
+
+        assertThatThrownBy(() -> service.override(yen, request.getId(), gap, override("100.00")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("A line without a rate can't be overridden. Ask Nguyễn Thị Lan to add the rate, then"
+                        + " re-price.")
+                .extracting("code")
+                .isEqualTo("NO_RATE_TO_OVERRIDE");
+        verify(quotations, never()).save(any());
+        verify(quotations, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void removingAnOverrideRestoresTheCatalogAmount() {
+        Quotation q = startedWithIds();
+        UUID groomId = lineKeyed("GROOM").getId();
+        BigDecimal catalogTotal = q.getTotal();
+        service.override(yen, request.getId(), groomId, override("1200.00"));
+
+        service.removeOverride(yen, request.getId(), groomId);
+
+        assertThat(lineKeyed("GROOM").getOverrideAmount()).isNull();
+        assertThat(lineKeyed("GROOM").getOverrideReason()).isNull();
+        assertThat(q.getTotal()).isEqualByComparingTo(catalogTotal);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_OVERRIDE_REMOVED"),
+                        eq("Q-2026-0189 v1 · Flying groom: back to $1,450.00 from $1,200.00"),
+                        any(),
+                        any(),
+                        any(),
+                        isNull(),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void removingWhenNotOverriddenIsAConflict() {
+        startedWithIds();
+
+        assertThatThrownBy(() -> service.removeOverride(
+                        yen, request.getId(), lineKeyed("GROOM").getId()))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("NOT_OVERRIDDEN");
+    }
+
+    @Test
+    void aManualLineIsAddedWithItsAmountAndReason() {
+        Quotation q = startedWithIds();
+        BigDecimal before = q.getTotal();
+
+        service.addLine(yen, request.getId(), ferry("90.00", RateCertainty.FIXED, null));
+
+        QuotationLine added = q.getLines().getLast();
+        assertThat(added.getGroupCode()).isEqualTo("H");
+        assertThat(added.getCatalogAmount()).isEqualByComparingTo("180.00");
+        assertThat(added.getSource()).isEqualTo(LineSource.MANUAL);
+        assertThat(added.getBasis()).isEqualTo(RateBasis.PER_SHIPMENT);
+        assertThat(added.getBasisText()).isEqualTo("added by Vũ Thị Yến");
+        assertThat(added.getLineKey()).startsWith("MANUAL:");
+        assertThat(added.getManualReason()).isEqualTo("Ferry booking the catalog doesn't know");
+        assertThat(added.getCertainty()).isEqualTo(LineCertainty.FIXED);
+        assertThat(q.getTotal()).isGreaterThan(before);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_LINE_ADDED"),
+                        eq("Q-2026-0189 v1 · Ferry booking fee, $180.00 · Ferry booking the catalog doesn't know"),
+                        any(),
+                        any(),
+                        any(),
+                        eq("Ferry booking the catalog doesn't know"),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void anEstimatedManualLineNeedsANote() {
+        startedWithIds();
+
+        assertThatThrownBy(() -> service.addLine(yen, request.getId(), ferry("90.00", RateCertainty.ESTIMATED, " ")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Say why this line may vary.")
+                .extracting("code")
+                .isEqualTo("ESTIMATE_NOTE");
+    }
+
+    @Test
+    void aManualLineCanBeEditedAndRemoved() {
+        Quotation q = startedWithIds();
+        service.addLine(yen, request.getId(), ferry("90.00", RateCertainty.FIXED, null));
+        QuotationLine added = q.getLines().getLast();
+        added.setId(UUID.randomUUID());
+
+        service.editLine(yen, request.getId(), added.getId(), ferry("100.00", RateCertainty.ESTIMATED, "Ferry tariff"));
+
+        assertThat(added.getCatalogAmount()).isEqualByComparingTo("200.00");
+        assertThat(added.getCertainty()).isEqualTo(LineCertainty.ESTIMATED);
+        assertThat(added.getEstimateNote()).isEqualTo("Ferry tariff");
+
+        service.removeLine(yen, request.getId(), added.getId());
+
+        assertThat(q.getLines()).doesNotContain(added);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_LINE_REMOVED"),
+                        eq("Q-2026-0189 v1 · Ferry booking fee, $200.00 removed"),
+                        any(),
+                        any(),
+                        any(),
+                        isNull(),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void onlyAManualLineCanBeEditedOrRemoved() {
+        startedWithIds();
+        UUID groomId = lineKeyed("GROOM").getId();
+
+        for (Runnable write : List.<Runnable>of(
+                () -> service.editLine(yen, request.getId(), groomId, ferry("90.00", RateCertainty.FIXED, null)),
+                () -> service.removeLine(yen, request.getId(), groomId))) {
+            assertThatThrownBy(write::run)
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Only a line you added can be edited. Override a catalog line instead.")
+                    .extracting("code")
+                    .isEqualTo("NOT_A_MANUAL_LINE");
+        }
+    }
+
+    @Test
+    void aLineOfAnotherQuotationIsNotFound() {
+        startedWithIds();
+
+        assertThatThrownBy(() -> service.override(yen, request.getId(), UUID.randomUUID(), override("1.00")))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aV2DraftCanBeWrittenWhileQuoted() {
+        Quotation q = startedWithIds();
+        q.setVersionNo((short) 2);
+        request.setStatus(RequestStatus.QUOTED);
+
+        service.override(yen, request.getId(), lineKeyed("GROOM").getId(), override("1200.00"));
+
+        assertThat(lineKeyed("GROOM").getOverrideAmount()).isEqualByComparingTo("1200.00");
+    }
+
+    @Test
+    void aV1DraftIsRefusedOnceQuoted() {
+        startedWithIds();
+        request.setStatus(RequestStatus.QUOTED);
+
+        assertThatThrownBy(() -> service.override(
+                        yen, request.getId(), lineKeyed("GROOM").getId(), override("1200.00")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This request can't be quoted in its current state.")
+                .extracting("code")
+                .isEqualTo("REQUEST_NOT_QUOTABLE");
+    }
+
+    @Test
+    void anOverrideAfterIssueIsRefused() {
+        Quotation q = startedWithIds();
+        UUID groomId = lineKeyed("GROOM").getId();
+        q.setStatus(QuotationStatus.ISSUED);
+        request.setStatus(RequestStatus.QUOTED);
+        clearInvocations(quotations, audit);
+
+        assertThatThrownBy(() -> service.override(yen, request.getId(), groomId, override("1200.00")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This version has been issued and can't be changed. Revise it to make a new version.")
+                .extracting("code")
+                .isEqualTo("QUOTATION_NOT_DRAFT");
+        assertThat(lineKeyed("GROOM").getOverrideAmount()).isNull();
+        verify(quotations, never()).save(any());
+        verifyNoInteractions(audit);
     }
 }

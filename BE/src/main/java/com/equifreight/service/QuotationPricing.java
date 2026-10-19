@@ -135,6 +135,22 @@ public class QuotationPricing {
         return dropped;
     }
 
+    /**
+     * Totals the draft again over its stored lines as they stand (an override or an added line changed), without
+     * pricing the lines again.
+     */
+    public void retotal(Quotation q, TransportRequest request) {
+        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
+                .forCorridor(request.getCorridor().getId());
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        List<PricedLine> stored = q.getLines().stream()
+                .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
+                        .thenComparing(QuotationLine::getPosition))
+                .map(QuotationPricing::asPriced)
+                .toList();
+        store(q, QuotePricer.retotal(in, rates, stored));
+    }
+
     /** The draft's answer, with the overrides a write could not carry. */
     public QuotationDraftResponse toResponse(Quotation q, TransportRequest request, List<String> dropped) {
         CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
@@ -199,24 +215,29 @@ public class QuotationPricing {
         }
         for (QuotationLine s : stored) {
             if (s.getManualReason() != null) {
-                result.add(new PricedLine(
-                        s.getGroupCode(),
-                        s.getLineKey(),
-                        s.getDescription(),
-                        s.getBasis(),
-                        s.getBasisText(),
-                        s.getQuantity(),
-                        s.getUnitRate(),
-                        s.getOverrideAmount() != null ? s.getOverrideAmount() : s.getCatalogAmount(),
-                        s.getSource(),
-                        null,
-                        null,
-                        null,
-                        s.getCertainty(),
-                        s.getEstimateNote()));
+                result.add(asPriced(s));
             }
         }
         return result;
+    }
+
+    /** A stored line as the engine sees it, at its override amount when it has one. */
+    private static PricedLine asPriced(QuotationLine s) {
+        return new PricedLine(
+                s.getGroupCode(),
+                s.getLineKey(),
+                s.getDescription(),
+                s.getBasis(),
+                s.getBasisText(),
+                s.getQuantity(),
+                s.getUnitRate(),
+                s.getOverrideAmount() != null ? s.getOverrideAmount() : s.getCatalogAmount(),
+                s.getSource(),
+                null,
+                null,
+                null,
+                s.getCertainty(),
+                s.getEstimateNote());
     }
 
     private static PricedLine withAmount(PricedLine p, BigDecimal amount) {

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -37,6 +38,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -64,10 +66,11 @@ class StaffRequestControllerTest {
         List<Method> handlers = Arrays.stream(StaffRequestController.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(GetMapping.class)
                         || m.isAnnotationPresent(PostMapping.class)
-                        || m.isAnnotationPresent(PutMapping.class))
+                        || m.isAnnotationPresent(PutMapping.class)
+                        || m.isAnnotationPresent(DeleteMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(7);
+        assertThat(handlers).hasSize(12);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
@@ -169,5 +172,45 @@ class StaffRequestControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
         org.mockito.Mockito.verifyNoInteractions(quotations);
+    }
+
+    // --- overrides and manual lines (US-Q-02, US-F1-05) ---------------------------------------------------
+
+    @Test
+    void overrideAndManualLineRoutes() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID line = UUID.randomUUID();
+        when(quotations.override(any(), eq(id), eq(line), any())).thenReturn(draft());
+        when(quotations.removeOverride(any(), eq(id), eq(line))).thenReturn(draft());
+        when(quotations.addLine(any(), eq(id), any())).thenReturn(draft());
+        when(quotations.editLine(any(), eq(id), eq(line), any())).thenReturn(draft());
+        when(quotations.removeLine(any(), eq(id), eq(line))).thenReturn(draft());
+        String base = "/api/v1/staff/requests/" + id + "/quotation/lines";
+        String manual = "{\"group\":\"H\",\"description\":\"Ferry booking fee\",\"quantity\":2,"
+                + "\"unitRate\":90,\"certainty\":\"FIXED\",\"reason\":\"Ferry\"}";
+
+        mvc.perform(put(base + "/" + line + "/override")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":1200.00,\"reason\":\"Own groom\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(delete(base + "/" + line + "/override")).andExpect(status().isOk());
+        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(manual))
+                .andExpect(status().isCreated());
+        mvc.perform(put(base + "/" + line)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(manual))
+                .andExpect(status().isOk());
+        mvc.perform(delete(base + "/" + line)).andExpect(status().isOk());
+    }
+
+    @Test
+    void anOverrideWithThreeDecimalsOrNoReasonIsRefused() throws Exception {
+        String url =
+                "/api/v1/staff/requests/" + UUID.randomUUID() + "/quotation/lines/" + UUID.randomUUID() + "/override";
+
+        mvc.perform(put(url).contentType(MediaType.APPLICATION_JSON).content("{\"amount\":1.005,\"reason\":\"x\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put(url).contentType(MediaType.APPLICATION_JSON).content("{\"amount\":10,\"reason\":\"\"}"))
+                .andExpect(status().isBadRequest());
     }
 }
