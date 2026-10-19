@@ -274,4 +274,25 @@ class RequiredRatesTest {
                 .containsExactly(new MissingRate(
                         null, "Corridor distance", "RD HAN → VTE has no distance in the corridor catalog."));
     }
+
+    // --- the estimate band (US-Q-05) ---------------------------------------------------------------------
+
+    @Test
+    void aCorridorWithoutTheEstimateBandListsIt() {
+        Map<RatePolicyKey, BigDecimal> noBand = new java.util.EnumMap<>(standardPolicies());
+        noBand.remove(RatePolicyKey.ESTIMATE_BAND_PCT);
+        RateSet rates = new RateSet(2, pnhHkgRates().classes(), pnhHkgLines(), standardBreaks(), noBand);
+
+        assertThat(RequiredRates.forCorridor(TransportMode.AIR, "AIR PNH → HKG", "Phnom Penh", "Hong Kong", 0, rates))
+                .containsExactly(new MissingRate(null, "Estimate band", "Rate catalog v2 has no estimate band value."));
+    }
+
+    @Test
+    void aRequestDoesNotNeedTheEstimateBand() {
+        Map<RatePolicyKey, BigDecimal> noBand = new java.util.EnumMap<>(standardPolicies());
+        noBand.remove(RatePolicyKey.ESTIMATE_BAND_PCT);
+        RateSet rates = new RateSet(2, pnhHkgRates().classes(), pnhHkgLines(), standardBreaks(), noBand);
+
+        assertThat(RequiredRates.forRequest(pnhHkgBusiness(), rates)).isEmpty();
+    }
 }

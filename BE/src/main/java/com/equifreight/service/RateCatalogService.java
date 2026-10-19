@@ -77,6 +77,7 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.SERVICE_FEE_PCT, "Service fee"),
             Map.entry(RatePolicyKey.DEPOSIT_PCT, "Deposit"),
             Map.entry(RatePolicyKey.QUOTE_VALIDITY_DAYS, "Quote validity"),
+            Map.entry(RatePolicyKey.ESTIMATE_BAND_PCT, "Estimate band"),
             Map.entry(RatePolicyKey.FLIGHT_VET_MIN_HORSES, "The flight vet threshold"),
             Map.entry(RatePolicyKey.HIGH_VALUE_THRESHOLD, "The high value threshold"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_PCT, "Arrival window surcharge"),

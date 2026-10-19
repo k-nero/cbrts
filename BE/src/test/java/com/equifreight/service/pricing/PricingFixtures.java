@@ -121,6 +121,7 @@ final class PricingFixtures {
         policies.put(RatePolicyKey.FLIGHT_VET_MIN_HORSES, d("8"));
         policies.put(RatePolicyKey.HIGH_VALUE_THRESHOLD, d("250000"));
         policies.put(RatePolicyKey.ARRIVAL_WINDOW_PCT, d("20"));
+        policies.put(RatePolicyKey.ESTIMATE_BAND_PCT, d("15"));
         return policies;
     }
 

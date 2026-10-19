@@ -121,6 +121,7 @@ public final class RequiredRates {
         requirePolicy(missing, rates, RatePolicyKey.SERVICE_FEE_PCT, "Service fee");
         requirePolicy(missing, rates, RatePolicyKey.FUEL_PCT, "Fuel surcharge");
         requirePolicy(missing, rates, RatePolicyKey.INSURANCE_PCT, "Transit insurance");
+        requirePolicy(missing, rates, RatePolicyKey.ESTIMATE_BAND_PCT, "Estimate band");
         return missing;
     }
 
