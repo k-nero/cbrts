@@ -655,6 +655,51 @@ class RequestServiceTest {
             when(routes.resolve(any(), any(), any(), any(), any()))
                     .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
             when(codes.next(CodePrefix.REQ, 2026)).thenReturn("REQ-2026-0193");
+            when(estimator.rangeFor(any()))
+                    .thenReturn(com.equifreight.service.pricing.EstimateResult.range(
+                            new java.math.BigDecimal("31900.00"), new java.math.BigDecimal("43300.00")));
+        }
+
+        @Test
+        void submitKeepsTheEstimateShownAtSubmission() {
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(draft.getEstimateLow()).isEqualByComparingTo("31900");
+            assertThat(draft.getEstimateHigh()).isEqualByComparingTo("43300");
+            assertThat(response.estimateLow()).isEqualByComparingTo("31900");
+            assertThat(response.estimateHigh()).isEqualByComparingTo("43300");
+            verify(estimator).rangeFor(draft);
+        }
+
+        @Test
+        void aResubmissionReplacesTheEstimate() {
+            backToTheCustomer(Instant.parse("2026-09-20T02:00:00Z"));
+            draft.setEstimateLow(new java.math.BigDecimal("1000"));
+            draft.setEstimateHigh(new java.math.BigDecimal("2000"));
+            when(estimator.rangeFor(any()))
+                    .thenReturn(com.equifreight.service.pricing.EstimateResult.range(
+                            new java.math.BigDecimal("3000.00"), new java.math.BigDecimal("4000.00")));
+
+            service.submit(user, draft.getId());
+
+            assertThat(draft.getEstimateLow()).isEqualByComparingTo("3000");
+            assertThat(draft.getEstimateHigh()).isEqualByComparingTo("4000");
+        }
+
+        @Test
+        void noEstimateIsKeptWhenItIsUnavailable() {
+            draft.setEstimateLow(new java.math.BigDecimal("1000"));
+            draft.setEstimateHigh(new java.math.BigDecimal("2000"));
+            when(estimator.rangeFor(any()))
+                    .thenReturn(com.equifreight.service.pricing.EstimateResult.unavailable(
+                            com.equifreight.service.pricing.EstimateStatus.UNAVAILABLE,
+                            "No estimate yet: the rate catalog has no estimate band."));
+
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(draft.getEstimateLow()).isNull();
+            assertThat(draft.getEstimateHigh()).isNull();
+            assertThat(response.status()).isEqualTo(RequestStatus.SUBMITTED);
         }
 
         @Test

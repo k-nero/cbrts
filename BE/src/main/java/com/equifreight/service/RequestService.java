@@ -37,6 +37,7 @@ import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.pricing.EstimateResult;
 import com.equifreight.service.pricing.EstimateStatus;
 import java.time.Clock;
 import java.time.Duration;
@@ -231,6 +232,11 @@ public class RequestService {
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
+        // The range shown at this submission is kept to compare the quotation against; never a quotation itself.
+        EstimateResult estimate = estimator.rangeFor(request);
+        boolean ranged = estimate.status() == EstimateStatus.READY;
+        request.setEstimateLow(ranged ? estimate.low() : null);
+        request.setEstimateHigh(ranged ? estimate.high() : null);
         Instant now = Instant.now(clock);
         if (!resubmission) {
             request.setCode(codes.next(CodePrefix.REQ, today.getYear()));
