@@ -13,6 +13,7 @@ import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RateCertainty;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.ServiceClass;
+import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -298,6 +299,7 @@ public final class QuotePricer {
                 : null;
         BigDecimal contingencyPct = rates.policies().get(RatePolicyKey.CONTINGENCY_PCT);
         BigDecimal serviceFeePct = rates.policies().get(RatePolicyKey.SERVICE_FEE_PCT);
+        BigDecimal windowPct = windowApplies(in) ? rates.policies().get(RatePolicyKey.ARRIVAL_WINDOW_PCT) : null;
 
         List<TotalRow> rows = new ArrayList<>();
         String freight = in.mode() == TransportMode.AIR ? "air" : "road";
@@ -308,6 +310,9 @@ public final class QuotePricer {
                         breakLabel(band),
                         pct(discount) + " of " + freight + " and ground lines (A, C, G)",
                         null));
+            }
+            if (windowPct != null) {
+                rows.add(new TotalRow("ARRIVAL_WINDOW", "Arrival window", windowBase(windowPct), null));
             }
             if (fuelPct != null) {
                 rows.add(new TotalRow(
@@ -326,7 +331,7 @@ public final class QuotePricer {
             if (serviceFeePct != null) {
                 rows.add(new TotalRow("SERVICE_FEE", "Service fee", pct(serviceFeePct) + " after contingency", null));
             }
-            return new PricedTotals(cents(priced), null, null, null, null, null, null, null, rows);
+            return new PricedTotals(cents(priced), null, null, null, null, null, null, null, null, rows);
         }
 
         BigDecimal subtotal = cents(priced);
@@ -337,6 +342,16 @@ public final class QuotePricer {
                     breakLabel(band),
                     pct(discount) + " of " + freight + " and ground lines (A, C, G) · " + money(breakBase),
                     volumeBreak));
+        }
+        BigDecimal arrivalWindow = null;
+        if (windowPct != null) {
+            BigDecimal groundAfterBreak = cents(breakBase.multiply(BigDecimal.ONE.subtract(discount.divide(HUNDRED))));
+            arrivalWindow = percent(groundAfterBreak, windowPct);
+            rows.add(new TotalRow(
+                    "ARRIVAL_WINDOW",
+                    "Arrival window",
+                    windowBase(windowPct) + " · " + money(groundAfterBreak),
+                    arrivalWindow));
         }
         BigDecimal fuel = null;
         if (fuelPct != null) {
@@ -357,7 +372,10 @@ public final class QuotePricer {
                     pct(insurancePct) + " of declared value · " + money(declared),
                     insurance));
         }
-        BigDecimal costBase = subtotal.subtract(volumeBreak).add(zero(fuel)).add(zero(insurance));
+        BigDecimal costBase = subtotal.subtract(volumeBreak)
+                .add(zero(arrivalWindow))
+                .add(zero(fuel))
+                .add(zero(insurance));
         BigDecimal contingency = percent(costBase, contingencyPct);
         rows.add(new TotalRow(
                 "CONTINGENCY", "Contingency", pct(contingencyPct) + " of " + money(costBase), contingency));
@@ -373,12 +391,22 @@ public final class QuotePricer {
                 subtotal,
                 subtotal,
                 volumeBreak.signum() > 0 ? volumeBreak : null,
+                arrivalWindow,
                 fuel,
                 insurance,
                 contingency,
                 serviceFee,
                 total,
                 rows);
+    }
+
+    /** The arrival-window surcharge applies to a road move with a private trailer and a window (AGENTS.md). */
+    static boolean windowApplies(PricingInput in) {
+        return in.mode() == TransportMode.ROAD && in.trailer() == TrailerType.PRIVATE && in.arrivalWindow();
+    }
+
+    private static String windowBase(BigDecimal windowPct) {
+        return pct(windowPct) + " of ground lines (A, C, G) after the volume break";
     }
 
     private static String breakLabel(BreakRow band) {

@@ -190,7 +190,8 @@ class QuotationDraftServiceTest {
                 request.getInsurance(),
                 false,
                 0,
-                List.copyOf(horses));
+                List.copyOf(horses),
+                request.getArrivalMode() == com.equifreight.entity.enums.ArrivalMode.WINDOW);
     }
 
     /** Business and first stall rows (business optional), a groom line, the four percentages. */
@@ -627,5 +628,51 @@ class QuotationDraftServiceTest {
                 .recordDecision(
                         eq(yen), eq("QUOTATION_REPRICED"), summary.capture(), any(), any(), any(), any(), any(), any());
         assertThat(summary.getValue()).hasSize(AuditText.MAX).endsWith("…");
+    }
+
+    // --- arrival window (US-Q-05 slice) ------------------------------------------------------------------
+
+    /** A private road move: a per-km road line, a groom and the window surcharge policy. */
+    CatalogRows roadWindowRows(RateCatalogVersion v) {
+        CatalogRows base = rows(v, true);
+        RateLine road = new RateLine();
+        road.setId(UUID.randomUUID());
+        road.setVersion(v);
+        road.setCode("ROAD");
+        road.setGroupCode("C");
+        road.setDescription("Road freight");
+        road.setBasis(RateBasis.PER_KM);
+        road.setRate(new BigDecimal("3.60"));
+        road.setCertainty(RateCertainty.FIXED);
+        List<RatePolicy> policies = new ArrayList<>(base.policies());
+        RatePolicy window = new RatePolicy();
+        window.setId(new RatePolicy.Key(v.getId(), RatePolicyKey.ARRIVAL_WINDOW_PCT));
+        window.setValue(new BigDecimal("20"));
+        policies.add(window);
+        List<RateLine> lines = new ArrayList<>(base.lines());
+        lines.add(road);
+        return new CatalogRows(v, List.of(), lines, List.of(), policies, List.of());
+    }
+
+    @Test
+    void aWindowRequestStoresTheSurcharge() {
+        corridor.setMode(TransportMode.ROAD);
+        request.setMode(TransportMode.ROAD);
+        request.setAirClass(null);
+        request.setTrailer(TrailerType.PRIVATE);
+        request.setArrivalMode(com.equifreight.entity.enums.ArrivalMode.WINDOW);
+        when(loader.load(v2.getId())).thenReturn(roadWindowRows(v2));
+
+        service.start(yen, request.getId());
+
+        // 1,550 km x $3.60 = $5,580.00 of road freight; 20% of it.
+        assertThat(stored.orElseThrow().getArrivalWindowSurcharge()).isEqualByComparingTo("1116.00");
+    }
+
+    @Test
+    void noWindowStoresNoSurcharge() {
+        service.start(yen, request.getId());
+
+        assertThat(stored.orElseThrow().getArrivalWindowSurcharge()).isNull();
     }
 }

@@ -286,6 +286,7 @@ public class QuotationDraftService {
         PricedTotals totals = priced.totals();
         q.setSubtotal(totals.subtotal());
         q.setVolumeBreak(totals.volumeBreak());
+        q.setArrivalWindowSurcharge(totals.arrivalWindow());
         q.setFuel(totals.fuel());
         q.setInsurance(totals.insurance());
         q.setContingency(totals.contingency());

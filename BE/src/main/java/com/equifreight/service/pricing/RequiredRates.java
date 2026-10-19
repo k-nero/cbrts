@@ -71,6 +71,9 @@ public final class RequiredRates {
                 }
             }
         }
+        if (QuotePricer.windowApplies(in)) {
+            requirePolicy(missing, rates, RatePolicyKey.ARRIVAL_WINDOW_PCT, "Arrival window surcharge");
+        }
         requirePolicy(missing, rates, RatePolicyKey.CONTINGENCY_PCT, "Contingency");
         requirePolicy(missing, rates, RatePolicyKey.SERVICE_FEE_PCT, "Service fee");
         if (in.mode() == TransportMode.AIR) {

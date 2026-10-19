@@ -6,6 +6,7 @@ import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
+import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.repository.HorseSizeClassRepository;
@@ -60,7 +61,8 @@ public class PricingInputs {
                 request.getInsurance(),
                 request.isVetEscort(),
                 quarantineDays(origin, destinationCountry),
-                horses);
+                horses,
+                request.getArrivalMode() == ArrivalMode.WINDOW);
     }
 
     /** A move within one country has no quarantine; otherwise the destination's published minimum, or null. */

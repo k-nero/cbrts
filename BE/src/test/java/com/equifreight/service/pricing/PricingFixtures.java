@@ -120,6 +120,7 @@ final class PricingFixtures {
         policies.put(RatePolicyKey.SERVICE_FEE_PCT, d("12"));
         policies.put(RatePolicyKey.FLIGHT_VET_MIN_HORSES, d("8"));
         policies.put(RatePolicyKey.HIGH_VALUE_THRESHOLD, d("250000"));
+        policies.put(RatePolicyKey.ARRIVAL_WINDOW_PCT, d("20"));
         return policies;
     }
 
@@ -177,7 +178,8 @@ final class PricingFixtures {
                 InsuranceOption.EQUIFREIGHT,
                 false,
                 14,
-                horses);
+                horses,
+                false);
     }
 
     static PricingInput pnhHkgBusiness() {
@@ -202,6 +204,26 @@ final class PricingFixtures {
                 InsuranceOption.OWN_POLICY,
                 false,
                 7,
-                horses);
+                horses,
+                false);
+    }
+
+    /** The same input asking for an arrival window. */
+    static PricingInput withWindow(PricingInput in) {
+        return new PricingInput(
+                in.mode(),
+                in.corridorCode(),
+                in.fromCity(),
+                in.toCity(),
+                in.destinationCountryName(),
+                in.distanceKm(),
+                in.crossingCount(),
+                in.airClass(),
+                in.trailer(),
+                in.insurance(),
+                in.vetEscort(),
+                in.quarantineDays(),
+                in.horses(),
+                true);
     }
 }
