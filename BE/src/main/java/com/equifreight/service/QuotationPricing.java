@@ -171,8 +171,7 @@ public class QuotationPricing {
                 .orElse(null);
         QuotationDraftResponse answer = q.getStatus() == QuotationStatus.DRAFT
                 ? draftResponse(q, request, latest, dropped)
-                : QuotationMapper.toIssuedResponse(
-                        q, request, snapshots.read(q.getIssuedSnapshot()), latest, catalogOwner());
+                : QuotationMapper.toIssuedResponse(q, request, snapshots.of(q, request), latest, catalogOwner());
         List<Quotation> all = quotations.findByRequestIdOrderByVersionNoDesc(request.getId());
         Quotation previous = all.stream()
                 .filter(v -> v.getVersionNo() < q.getVersionNo() && v.getStatus() != QuotationStatus.DRAFT)

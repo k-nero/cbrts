@@ -59,7 +59,7 @@ public class CustomerQuotationService {
         Quotation q = quotations
                 .findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(requestId, QuotationStatus.DRAFT)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation for request not issued: " + requestId));
-        QuotationSnapshot snapshot = snapshots.read(q.getIssuedSnapshot());
+        QuotationSnapshot snapshot = snapshots.of(q, request);
         LocalDate today = LocalDate.now(clock.withZone(BusinessTime.ZONE));
         LocalDate departure = snapshot.request().departureDate();
         long days = departure == null ? 0 : ChronoUnit.DAYS.between(today, departure);

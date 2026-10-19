@@ -2,6 +2,9 @@ package com.equifreight.service.quotation;
 
 import static com.equifreight.service.pricing.PricingText.classWord;
 
+import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Place;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.RateBasis;
@@ -17,6 +20,7 @@ import com.equifreight.service.pricing.StallFit;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,6 +46,60 @@ public class Snapshots {
 
     public QuotationSnapshot read(String stored) {
         return json.readValue(stored, QuotationSnapshot.class);
+    }
+
+    /**
+     * The quotation's snapshot; one issued before snapshots existed (or written by a seeder) gets one made from its
+     * stored totals and the request, with the totals' labels but no bases, and no stall note.
+     */
+    public QuotationSnapshot of(Quotation q, TransportRequest request) {
+        return q.getIssuedSnapshot() != null ? read(q.getIssuedSnapshot()) : fromStoredTotals(q, request);
+    }
+
+    static QuotationSnapshot fromStoredTotals(Quotation q, TransportRequest request) {
+        List<QuotationSnapshot.Row> rows = new ArrayList<>();
+        row(rows, "VOLUME_BREAK", "Volume break", q.getVolumeBreak());
+        row(rows, "ARRIVAL_WINDOW", "Arrival window", q.getArrivalWindowSurcharge());
+        row(rows, "FUEL", "Fuel surcharge", q.getFuel());
+        row(rows, "INSURANCE", "Transit insurance", q.getInsurance());
+        row(rows, "CONTINGENCY", "Contingency", q.getContingency());
+        row(rows, "SERVICE_FEE", "Service fee", q.getServiceFee());
+        Corridor corridor = request.getCorridor();
+        List<QuotationSnapshot.Horse> horses = request.getHorses().stream()
+                .map(rh -> new QuotationSnapshot.Horse(
+                        rh.getHorse().getId(),
+                        rh.getHorse().getName(),
+                        rh.getSex(),
+                        rh.getSizeClassCode(),
+                        rh.getHorse().getCoat() == null
+                                ? null
+                                : rh.getHorse().getCoat().name()))
+                .toList();
+        QuotationSnapshot.Facts facts = new QuotationSnapshot.Facts(
+                city(request.getOriginPlace(), corridor == null ? null : corridor.getOriginCity()),
+                city(request.getDestinationPlace(), corridor == null ? null : corridor.getDestinationCity()),
+                request.getMode(),
+                request.getTrailer(),
+                q.getAirClass() != null ? q.getAirClass() : request.getAirClass(),
+                horses,
+                request.getDepartureDate(),
+                request.getDateFlexDays(),
+                request.getArrivalMode(),
+                request.getWindowStart(),
+                request.getWindowEnd(),
+                request.getInsurance(),
+                request.isVetEscort());
+        return new QuotationSnapshot(List.copyOf(rows), null, null, facts);
+    }
+
+    private static void row(List<QuotationSnapshot.Row> rows, String key, String label, BigDecimal amount) {
+        if (amount != null) {
+            rows.add(new QuotationSnapshot.Row(key, label, "", amount));
+        }
+    }
+
+    private static String city(Place place, String fallback) {
+        return place == null ? fallback : place.getCity();
     }
 
     /**

@@ -244,6 +244,32 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void aQuotationIssuedBeforeSnapshotsReadsFromItsStoredTotals() {
+        Quotation seeded = issued();
+        seeded.setStatus(QuotationStatus.ACCEPTED);
+        seeded.setSubtotal(new BigDecimal("6000.00"));
+        seeded.setContingency(new BigDecimal("300.00"));
+        seeded.setServiceFee(new BigDecimal("756.00"));
+        seeded.setTotal(new BigDecimal("7056.00"));
+        seeded.setDepositPct(new BigDecimal("30"));
+        seeded.setDepositAmount(new BigDecimal("2116.80"));
+        stored = Optional.of(seeded);
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(seeded));
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(seeded));
+
+        CustomerQuotationResponse r = customer.get(bookings, request.getId());
+
+        assertThat(r.totals().rows()).extracting(row -> row.key()).containsExactly("CONTINGENCY", "SERVICE_FEE");
+        assertThat(r.totals().rows().getFirst().label()).isEqualTo("Contingency");
+        assertThat(r.request().fromCity()).isEqualTo("Phnom Penh");
+        assertThat(r.cancellation().daysToDeparture()).isEqualTo(31);
+        assertThat(service.get(request.getId()).totals().rows())
+                .extracting(row -> row.amount())
+                .containsExactly(new BigDecimal("300.00"), new BigDecimal("756.00"));
+    }
+
+    @Test
     void anIssuedReadIgnoresLaterRequestAndCatalogChanges() {
         Quotation q = issuedV1();
         List<String> bases = snapshots.read(q.getIssuedSnapshot()).rows().stream()
