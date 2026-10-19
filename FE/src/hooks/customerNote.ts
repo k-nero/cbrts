@@ -41,7 +41,9 @@ export const useReplyCustomerNote = () => {
       customerNoteApi.replyNote(id, data),
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.customerNotes.all() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.customerNotes.detail(variables.id) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.customerNotes.detail(variables.id),
+      });
     },
   });
 };

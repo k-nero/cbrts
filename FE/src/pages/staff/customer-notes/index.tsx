@@ -81,7 +81,8 @@ export const CustomerNotesPage: FC = () => {
           {dueTodayCount > 0 && <Chip tone="warn">{dueTodayCount} due today</Chip>}
         </div>
         <p className="type-body-s m-0 text-ink-secondary">
-          Notes customers left on their requests, routed to you by topic. Reply within 1 business day.
+          Notes customers left on their requests, routed to you by topic. Reply within 1 business
+          day.
         </p>
       </header>
 

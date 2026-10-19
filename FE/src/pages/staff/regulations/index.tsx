@@ -69,7 +69,9 @@ export const RegulationsPage: FC = () => {
 
   // Currently selected country catalog
   const selectedCatalog = useMemo(() => {
-    return catalogs.find((c) => c.countryCode === selectedDestinationId || c.id === selectedDestinationId);
+    return catalogs.find(
+      (c) => c.countryCode === selectedDestinationId || c.id === selectedDestinationId,
+    );
   }, [catalogs, selectedDestinationId]);
 
   // Determine active displayed version: preferentially the draft if one exists, else activeVersion
@@ -78,7 +80,8 @@ export const RegulationsPage: FC = () => {
     return selectedCatalog.draftVersion?.id || selectedCatalog.activeVersion?.id || null;
   }, [selectedCatalog]);
 
-  const { data: versionDetail, isLoading: isLoadingVersion } = useRegulationVersion(currentVersionId);
+  const { data: versionDetail, isLoading: isLoadingVersion } =
+    useRegulationVersion(currentVersionId);
 
   // Selected rule for edit form
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
@@ -91,7 +94,9 @@ export const RegulationsPage: FC = () => {
   // Active version info
   const isDraft = versionDetail?.status === 'DRAFT';
   const hasDraft = Boolean(selectedCatalog?.draftVersion);
-  const draftVersionNo = selectedCatalog?.draftVersion?.versionNo ?? (selectedCatalog?.activeVersion ? selectedCatalog.activeVersion.versionNo + 1 : 8);
+  const draftVersionNo =
+    selectedCatalog?.draftVersion?.versionNo ??
+    (selectedCatalog?.activeVersion ? selectedCatalog.activeVersion.versionNo + 1 : 8);
 
   // Sync selected rule on load or when rules change
   useEffect(() => {
@@ -143,7 +148,8 @@ export const RegulationsPage: FC = () => {
 
   // Handle publish version
   const handlePublishVersion = async () => {
-    const versionIdToPublish = selectedCatalog?.draftVersion?.id || (isDraft ? versionDetail?.id : null);
+    const versionIdToPublish =
+      selectedCatalog?.draftVersion?.id || (isDraft ? versionDetail?.id : null);
     if (!versionIdToPublish) return;
     try {
       await publishMutation.mutateAsync(versionIdToPublish);
@@ -227,7 +233,11 @@ export const RegulationsPage: FC = () => {
               Draft v{draftVersionNo} · {selectedCatalog?.draftVersion?.changesCount ?? 3} changes
             </Chip>
           ) : (
-            <Button variant="secondary" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={handleCreateDraft}
+              disabled={createDraftMutation.isPending}
+            >
               Create draft version
             </Button>
           )
@@ -258,14 +268,18 @@ export const RegulationsPage: FC = () => {
                   type="button"
                   onClick={() => setSelectedDestinationId(item.id)}
                   className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-md transition-colors text-left cursor-pointer ${
-                    isSelected ? 'bg-sunken border border-line' : 'hover:bg-sunken/50 border border-transparent'
+                    isSelected
+                      ? 'bg-sunken border border-line'
+                      : 'hover:bg-sunken/50 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="grid h-[22px] w-[30px] place-items-center rounded border border-line-strong text-[11px] font-mono font-medium text-ink-2 shrink-0">
                       {item.code}
                     </span>
-                    <span className={`type-label-s truncate ${isSelected ? 'text-ink font-semibold' : 'text-ink-2'}`}>
+                    <span
+                      className={`type-label-s truncate ${isSelected ? 'text-ink font-semibold' : 'text-ink-2'}`}
+                    >
                       {item.label}
                     </span>
                   </div>
@@ -274,7 +288,9 @@ export const RegulationsPage: FC = () => {
                       Draft
                     </Chip>
                   ) : (
-                    <span className="type-mono text-[11px] text-ink-3 shrink-0">{item.version}</span>
+                    <span className="type-mono text-[11px] text-ink-3 shrink-0">
+                      {item.version}
+                    </span>
                   )}
                 </button>
               );
@@ -291,14 +307,18 @@ export const RegulationsPage: FC = () => {
                   type="button"
                   onClick={() => setSelectedDestinationId(item.id)}
                   className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-md transition-colors text-left cursor-pointer ${
-                    isSelected ? 'bg-sunken border border-line' : 'hover:bg-sunken/50 border border-transparent'
+                    isSelected
+                      ? 'bg-sunken border border-line'
+                      : 'hover:bg-sunken/50 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="grid h-[22px] w-[30px] place-items-center rounded border border-line-strong text-[11px] font-mono font-medium text-ink-2 shrink-0">
                       {item.code}
                     </span>
-                    <span className={`type-label-s truncate ${isSelected ? 'text-ink font-semibold' : 'text-ink-2'}`}>
+                    <span
+                      className={`type-label-s truncate ${isSelected ? 'text-ink font-semibold' : 'text-ink-2'}`}
+                    >
                       {item.label}
                     </span>
                   </div>
@@ -329,8 +349,8 @@ export const RegulationsPage: FC = () => {
                         Publishing makes v{versionDetail.versionNo} the rules for new jobs. The{' '}
                         {selectedCatalog?.activeVersion?.pinnedJobsCount ?? 3} jobs pinned to v
                         {selectedCatalog?.activeVersion?.versionNo ?? 7} keep v
-                        {selectedCatalog?.activeVersion?.versionNo ?? 7}; 2 of them are flagged for review under the
-                        new EIA window.
+                        {selectedCatalog?.activeVersion?.versionNo ?? 7}; 2 of them are flagged for
+                        review under the new EIA window.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
@@ -391,11 +411,21 @@ export const RegulationsPage: FC = () => {
                   <table className="w-full border-collapse text-left">
                     <thead>
                       <tr className="border-b border-line bg-sunken/40">
-                        <th className="py-2.5 px-6 type-label-s text-ink-3 font-medium">Document</th>
-                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[170px]">Rule shape</th>
-                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[180px]">Parameter</th>
-                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[120px]">Applies to</th>
-                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[90px]">Blocks</th>
+                        <th className="py-2.5 px-6 type-label-s text-ink-3 font-medium">
+                          Document
+                        </th>
+                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[170px]">
+                          Rule shape
+                        </th>
+                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[180px]">
+                          Parameter
+                        </th>
+                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[120px]">
+                          Applies to
+                        </th>
+                        <th className="py-2.5 px-4 type-label-s text-ink-3 font-medium w-[90px]">
+                          Blocks
+                        </th>
                         <th className="py-2.5 px-6 type-label-s text-ink-3 font-medium text-right w-[60px]"></th>
                       </tr>
                     </thead>
@@ -407,11 +437,14 @@ export const RegulationsPage: FC = () => {
                         const isHighlighted = isChanged || isNew;
 
                         let scopeLabel = 'Per horse';
-                        if (rule.documentType?.scope === 'PER_SHIPMENT') scopeLabel = 'Per shipment';
-                        if (rule.documentType?.scope === 'PER_CROSSING') scopeLabel = 'Per crossing';
+                        if (rule.documentType?.scope === 'PER_SHIPMENT')
+                          scopeLabel = 'Per shipment';
+                        if (rule.documentType?.scope === 'PER_CROSSING')
+                          scopeLabel = 'Per crossing';
 
                         let blocksLabel = rule.mandatory ? 'Yes' : 'Optional';
-                        if (rule.documentType?.scope === 'PER_CROSSING') blocksLabel = 'Per crossing';
+                        if (rule.documentType?.scope === 'PER_CROSSING')
+                          blocksLabel = 'Per crossing';
 
                         return (
                           <tr
@@ -555,8 +588,9 @@ export const RegulationsPage: FC = () => {
 
                     {/* Re-check impact callout */}
                     <Callout tone="warn" title="Re-check impact: 2 open jobs">
-                      CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 45 days at departure.
-                      After publishing they are flagged for review; approved documents are not revoked automatically.
+                      CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 45 days at
+                      departure. After publishing they are flagged for review; approved documents
+                      are not revoked automatically.
                     </Callout>
 
                     {/* Actions */}
@@ -581,7 +615,9 @@ export const RegulationsPage: FC = () => {
                 </Panel>
 
                 {/* Versions Panel (1 col) */}
-                <Panel title={`Versions · ${selectedCatalog?.name?.replace(' import', '') ?? 'Cambodia'}`}>
+                <Panel
+                  title={`Versions · ${selectedCatalog?.name?.replace(' import', '') ?? 'Cambodia'}`}
+                >
                   <div className="flex flex-col divide-y divide-line">
                     {/* v8 Draft */}
                     {selectedCatalog?.draftVersion && (
@@ -595,7 +631,8 @@ export const RegulationsPage: FC = () => {
                           </Chip>
                         </div>
                         <span className="type-body-s text-ink-3">
-                          {selectedCatalog.draftVersion.changesCount ?? 3} changes · edited by Nguyễn Thị Lan today, 10:40
+                          {selectedCatalog.draftVersion.changesCount ?? 3} changes · edited by
+                          Nguyễn Thị Lan today, 10:40
                         </span>
                       </div>
                     )}
@@ -612,7 +649,8 @@ export const RegulationsPage: FC = () => {
                           </Chip>
                         </div>
                         <span className="type-body-s text-ink-3">
-                          Published 22 Sep 2026 · {selectedCatalog.activeVersion.pinnedJobsCount ?? 3} jobs pinned
+                          Published 22 Sep 2026 ·{' '}
+                          {selectedCatalog.activeVersion.pinnedJobsCount ?? 3} jobs pinned
                         </span>
                       </div>
                     )}

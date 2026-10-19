@@ -53,7 +53,9 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
   const [issuer, setIssuer] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [submittedIds, setSubmittedIds] = useState<Record<string, { fileName: string; fileId: string }>>({});
+  const [submittedIds, setSubmittedIds] = useState<
+    Record<string, { fileName: string; fileId: string }>
+  >({});
 
   const overdue = home.owed.filter((o) => o.urgency === 'overdue' && !submittedIds[o.id]).length;
 
@@ -86,7 +88,9 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
     // US-F2-09: Refuse an out-of-date certificate at upload
     const today = new Date().toISOString().split('T')[0];
     if (validUntil.trim() < today) {
-      setUploadError('This certificate is expired. Expired certificates cannot be accepted (US-F2-09).');
+      setUploadError(
+        'This certificate is expired. Expired certificates cannot be accepted (US-F2-09).',
+      );
       return;
     }
 
@@ -102,7 +106,8 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       setUploadModalOpen(false);
       setSelectedItem(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to upload document. Please try again.';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to upload document. Please try again.';
       setUploadError(msg);
     } finally {
       setUploading(false);
@@ -128,7 +133,8 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       </header>
       {home.owed.map((o, i) => {
         const submitted = submittedIds[o.id];
-        const isUploadAction = o.action.icon === 'upload' || o.action.label.toLowerCase().includes('upload');
+        const isUploadAction =
+          o.action.icon === 'upload' || o.action.label.toLowerCase().includes('upload');
 
         return (
           <OwedItem
@@ -184,7 +190,9 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       {/* Customer Upload Modal */}
       <Modal
         open={uploadModalOpen}
-        title={selectedItem ? `${selectedItem.action.label}: ${selectedItem.title}` : 'Upload Document'}
+        title={
+          selectedItem ? `${selectedItem.action.label}: ${selectedItem.title}` : 'Upload Document'
+        }
         onCancel={() => setUploadModalOpen(false)}
         footer={[
           <Button

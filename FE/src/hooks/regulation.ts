@@ -55,13 +55,7 @@ export const useDocumentTypes = () => {
 export const useUpdateRegulationRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      ruleId,
-      data,
-    }: {
-      ruleId: string;
-      data: UpdateRegulationRuleRequest;
-    }) => {
+    mutationFn: async ({ ruleId, data }: { ruleId: string; data: UpdateRegulationRuleRequest }) => {
       const res = await clearanceApi.updateRegulationRule(ruleId, data);
       return res.data;
     },

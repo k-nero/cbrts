@@ -12,12 +12,7 @@ import {
   Alert,
   message,
 } from 'antd';
-import {
-  BankOutlined,
-  ExperimentOutlined,
-  ReloadOutlined,
-  SendOutlined,
-} from '@ant-design/icons';
+import { BankOutlined, ExperimentOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import PageHeader from '@/components/PageHeader';
@@ -241,7 +236,9 @@ const AuthoritiesPage: FC = () => {
       const values = await quarantineForm.validateFields();
       const [start, end] = values.dates;
       if (end.diff(start, 'day') < 7) {
-        message.error('Quarantine period must be at least 7 days according to veterinary regulations.');
+        message.error(
+          'Quarantine period must be at least 7 days according to veterinary regulations.',
+        );
         return;
       }
       const payload: CreateQuarantinePeriodRequest = {
@@ -275,8 +272,7 @@ const AuthoritiesPage: FC = () => {
     }
   };
 
-  const isLoading =
-    loadingSubmissions || loadingQuarantines || loadingAuthorities || loadingStatus;
+  const isLoading = loadingSubmissions || loadingQuarantines || loadingAuthorities || loadingStatus;
 
   return (
     <Flex vertical gap={28} className="max-w-[1240px] pb-16">
@@ -303,11 +299,7 @@ const AuthoritiesPage: FC = () => {
             >
               Schedule quarantine
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenCreateModal}
-            >
+            <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
               <SendOutlined className="mr-1" /> Record submission
             </Button>
           </Flex>
@@ -399,7 +391,8 @@ const AuthoritiesPage: FC = () => {
           <div>
             <h2 className="type-h4 m-0 text-ink">Authority Dossiers</h2>
             <p className="type-body-s m-0 text-ink-2">
-              Each authority on the transport route requires an independent dossier and is tracked against its SLA response window.
+              Each authority on the transport route requires an independent dossier and is tracked
+              against its SLA response window.
             </p>
           </div>
           <span className="type-mono-caption text-ink-3">
@@ -416,7 +409,8 @@ const AuthoritiesPage: FC = () => {
             <BankOutlined className="text-4xl text-ink-3 mb-3" />
             <h3 className="type-label-m text-ink mb-1">No authority dossiers found for this job</h3>
             <p className="type-body-s text-ink-2 mb-4">
-              Click &quot;Record submission&quot; to log a filing with Veterinary, Customs, or Quarantine authorities.
+              Click &quot;Record submission&quot; to log a filing with Veterinary, Customs, or
+              Quarantine authorities.
             </p>
             <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
               Record submission
@@ -427,8 +421,13 @@ const AuthoritiesPage: FC = () => {
             {submissions.map((sub) => {
               const isOverdue =
                 sub.isOverdue ||
-                (sub.expectedBy && dayjs().isAfter(dayjs(sub.expectedBy)) && sub.status !== 'ISSUED');
-              const statusConfig = STATUS_CHIP_CONFIG[sub.status] ?? { tone: 'neutral', label: sub.status };
+                (sub.expectedBy &&
+                  dayjs().isAfter(dayjs(sub.expectedBy)) &&
+                  sub.status !== 'ISSUED');
+              const statusConfig = STATUS_CHIP_CONFIG[sub.status] ?? {
+                tone: 'neutral',
+                label: sub.status,
+              };
               const kindLabel = SUBMISSION_KIND_LABELS[sub.kind] ?? sub.kind;
 
               return (
@@ -468,15 +467,19 @@ const AuthoritiesPage: FC = () => {
                       </Chip>
 
                       <div className="flex flex-col items-end">
-                        <span className={`type-label-s ${isOverdue ? 'text-bad font-semibold' : 'text-ink'}`}>
+                        <span
+                          className={`type-label-s ${isOverdue ? 'text-bad font-semibold' : 'text-ink'}`}
+                        >
                           {sub.status === 'ISSUED'
                             ? 'Approved & Issued'
                             : isOverdue
-                            ? 'Response overdue'
-                            : 'Expected response'}
+                              ? 'Response overdue'
+                              : 'Expected response'}
                         </span>
                         <span className="type-mono-caption text-ink-2">
-                          {sub.expectedBy ? dayjs(sub.expectedBy).format('DD MMM YYYY') : 'Not scheduled'}
+                          {sub.expectedBy
+                            ? dayjs(sub.expectedBy).format('DD MMM YYYY')
+                            : 'Not scheduled'}
                         </span>
                       </div>
                     </div>
@@ -523,7 +526,11 @@ const AuthoritiesPage: FC = () => {
                         tone="bad"
                         title="Departure schedule at risk due to overdue authority SLA!"
                       >
-                        This authority has not issued a decision within the committed SLA window ({sub.expectedBy ? dayjs(sub.expectedBy).format('DD MMM YYYY') : 'expected date'}). An urgent escalation has been dispatched to the Logistics Manager.
+                        This authority has not issued a decision within the committed SLA window (
+                        {sub.expectedBy
+                          ? dayjs(sub.expectedBy).format('DD MMM YYYY')
+                          : 'expected date'}
+                        ). An urgent escalation has been dispatched to the Logistics Manager.
                       </Callout>
                     </div>
                   )}
@@ -534,8 +541,8 @@ const AuthoritiesPage: FC = () => {
                       {sub.status === 'READY_TO_FILE'
                         ? 'Record official submission reference once lodged with the authority.'
                         : sub.status === 'ISSUED'
-                        ? 'Dossier approved and archived in the clearance gate.'
-                        : 'Contact office liaison if additional documents or laboratory tests are requested.'}
+                          ? 'Dossier approved and archived in the clearance gate.'
+                          : 'Contact office liaison if additional documents or laboratory tests are requested.'}
                     </span>
                     <Flex gap={8}>
                       <Button
@@ -560,7 +567,8 @@ const AuthoritiesPage: FC = () => {
           <div>
             <h2 className="type-h4 m-0 text-ink">Pre-export Quarantine & Veterinary Inspection</h2>
             <p className="type-body-s m-0 text-ink-2">
-              Mandatory pre-export quarantine period recorded against the destination requirement (Cambodia requires at least 7 days before border crossing).
+              Mandatory pre-export quarantine period recorded against the destination requirement
+              (Cambodia requires at least 7 days before border crossing).
             </p>
           </div>
           <Button
@@ -580,7 +588,9 @@ const AuthoritiesPage: FC = () => {
         ) : quarantines.length === 0 ? (
           <Panel className="text-center py-8">
             <ExperimentOutlined className="text-3xl text-ink-3 mb-2" />
-            <p className="type-body-s text-ink-2 mb-3">No quarantine periods scheduled for this job.</p>
+            <p className="type-body-s text-ink-2 mb-3">
+              No quarantine periods scheduled for this job.
+            </p>
             <Button variant="secondary" size="sm" onClick={handleOpenQuarantineModal}>
               Schedule quarantine now
             </Button>
@@ -607,14 +617,15 @@ const AuthoritiesPage: FC = () => {
                       {q.isCompleted
                         ? 'Inspection completed'
                         : isMeetsMin
-                        ? 'In progress (Meets 7-day min)'
-                        : 'Under minimum duration'}
+                          ? 'In progress (Meets 7-day min)'
+                          : 'Under minimum duration'}
                     </Chip>
                   }
                   footer={
                     <div className="flex items-center justify-between">
                       <span className="type-body-s text-ink-3">
-                        Cambodia entry regulations require at least 7 days in an approved quarantine facility.
+                        Cambodia entry regulations require at least 7 days in an approved quarantine
+                        facility.
                       </span>
                       {!q.isCompleted && (
                         <Popconfirm
@@ -646,16 +657,16 @@ const AuthoritiesPage: FC = () => {
                     </div>
                     <div>
                       <span className="type-mono-caption block text-ink-3">Duration</span>
-                      <span className="type-label-s text-ink">
-                        {durationDays} days
-                      </span>
+                      <span className="type-label-s text-ink">{durationDays} days</span>
                     </div>
                     <div>
                       <span className="type-mono-caption block text-ink-3">Regulatory minimum</span>
                       <span className="type-label-s text-ink">7 days (Cambodia GDAHP)</span>
                     </div>
                     <div>
-                      <span className="type-mono-caption block text-ink-3">Station veterinarian</span>
+                      <span className="type-mono-caption block text-ink-3">
+                        Station veterinarian
+                      </span>
                       <span className="type-body-s text-ink">
                         {q.completedAt ? (
                           <span className="text-ok font-medium">
@@ -752,23 +763,20 @@ const AuthoritiesPage: FC = () => {
               options={[
                 { label: 'Approved & Issued (ISSUED)', value: 'ISSUED' },
                 { label: 'With the authority (FILED)', value: 'FILED' },
-                { label: 'Additional information requested (ADDITIONAL_INFO)', value: 'ADDITIONAL_INFO' },
+                {
+                  label: 'Additional information requested (ADDITIONAL_INFO)',
+                  value: 'ADDITIONAL_INFO',
+                },
                 { label: 'Refused / Rejected (REFUSED)', value: 'REFUSED' },
               ]}
             />
           </Form.Item>
 
-          <Form.Item
-            name="referenceNo"
-            label="Official permit / Decision reference number"
-          >
+          <Form.Item name="referenceNo" label="Official permit / Decision reference number">
             <Input placeholder="Permit number or official dispatch reference" />
           </Form.Item>
 
-          <Form.Item
-            name="expectedBy"
-            label="Revised response date (if rescheduled)"
-          >
+          <Form.Item name="expectedBy" label="Revised response date (if rescheduled)">
             <DatePicker className="w-full" format="DD/MM/YYYY" />
           </Form.Item>
         </Form>
