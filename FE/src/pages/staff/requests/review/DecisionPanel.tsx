@@ -9,7 +9,7 @@ import { afterReturn } from './afterReturn';
 import FormWrapper, { useFormCustom, useFormWrapperCtx } from '@/components/form/FormWrapper';
 import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
-import { useReturnRequest } from '@/hooks/staffRequest';
+import { useReturnRequest, useStartQuotation } from '@/hooks/staffRequest';
 import type { ApiError, RequestReview } from '@/interfaces';
 import { apiErrorMessage, formatDate, NOTE_MAX, noteState, requestStatusChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
@@ -29,6 +29,43 @@ const NoteField: FC<{ club: string }> = ({ club }) => {
           'Required. The customer sees it exactly as written; the request goes back to them with your note.',
       }}
     />
+  );
+};
+
+/**
+ * Start quotation, or open the one already started (pricing slice, spec §7.3). A double click sends one
+ * start; the builder opens once it answers.
+ */
+const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
+  const router = useCustomRouter();
+  const start = useStartQuotation();
+  const starting = useRef(false);
+  const id = review.request.id;
+  const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));
+
+  if (review.quotation) {
+    return (
+      <Button variant="secondary" block onClick={open}>
+        {`Open quotation ${review.quotation.code} · v${review.quotation.versionNo}`}
+      </Button>
+    );
+  }
+  const onStart = async () => {
+    if (starting.current) return;
+    starting.current = true;
+    try {
+      await start.mutateAsync({ requestId: id, value: undefined });
+      open();
+    } catch (error) {
+      message.error(apiErrorMessage(error, "The quotation wasn't started. Try again."));
+    } finally {
+      starting.current = false;
+    }
+  };
+  return (
+    <Button variant="secondary" block disabled={start.isPending} onClick={() => void onStart()}>
+      Start quotation
+    </Button>
   );
 };
 
@@ -148,11 +185,10 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
             Send to customer
           </Button>
         </div>
-        <div className="flex flex-col gap-1 border-t border-line pt-4">
+        <div className="flex flex-col gap-2 border-t border-line pt-4">
           <span className="type-label-s text-ink-2">Other outcomes</span>
-          <p className="type-body-s m-0 text-ink-3">
-            Start quotation and Reject come with the quotation and approval steps.
-          </p>
+          <QuotationAction review={review} />
+          <p className="type-body-s m-0 text-ink-3">Reject comes with the approval step.</p>
         </div>
       </div>
     </Panel>

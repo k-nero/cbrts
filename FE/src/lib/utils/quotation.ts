@@ -48,3 +48,60 @@ export const repriceOffer = (
   q.latestPublishedVersionNo != null && q.latestPublishedVersionNo > q.pinnedVersion.versionNo
     ? `Re-price on v${q.latestPublishedVersionNo}`
     : null;
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "20 Nov 2026" from a calendar date ("2026-11-20"), with no time zone involved. */
+const dayWords = (date: string): string => {
+  const [y, m, d] = date.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
+/** The builder's header line: "v1 draft · Saigon Turf Club · 2 horses · air, business · departs 20 Nov 2026". */
+export const quoteSummary = (
+  q: Pick<QuotationDraft, 'versionNo' | 'status' | 'airClass' | 'request'>,
+): string => {
+  const r = q.request;
+  const service =
+    r.mode === 'AIR'
+      ? `air${q.airClass ? `, ${q.airClass.toLowerCase()}` : ''}`
+      : `road${r.trailer ? `, ${r.trailer === 'SHARED' ? 'shared load' : 'private trailer'}` : ''}`;
+  const parts = [
+    `v${q.versionNo} ${q.status.toLowerCase()}`,
+    r.club,
+    `${r.horseCount} ${r.horseCount === 1 ? 'horse' : 'horses'}`,
+    service,
+    r.departureDate
+      ? `departs ${dayWords(r.departureDate)}${r.dateFlexDays ? ` ±${r.dateFlexDays} d` : ''}`
+      : null,
+  ];
+  return parts.filter(Boolean).join(' · ');
+};
+
+/**
+ * The issue panel's readiness, worded by its cause: missing rates, a class the horses can't fit, or a
+ * request that changed since the draft was priced.
+ */
+export const readinessView = (
+  q: Pick<QuotationDraft, 'readiness' | 'repriceNeeded' | 'fit' | 'airClass' | 'missing'>,
+): { tone: 'ok' | 'neutral'; chip: string; text: string } => {
+  if (q.readiness.ready) return { tone: 'ok', chip: 'Ready', text: readinessText(q.readiness) };
+  if (q.repriceNeeded) {
+    return {
+      tone: 'neutral',
+      chip: 'Not ready',
+      text: 'The request changed since this was priced.',
+    };
+  }
+  if (q.missing.length > 0) {
+    return { tone: 'neutral', chip: 'Waiting on rates', text: readinessText(q.readiness) };
+  }
+  if (q.fit?.refusal && q.airClass) {
+    return {
+      tone: 'neutral',
+      chip: 'Not ready',
+      text: `The horses don't fit ${q.airClass.toLowerCase()}.`,
+    };
+  }
+  return { tone: 'neutral', chip: 'Not ready', text: readinessText(q.readiness) };
+};
