@@ -48,6 +48,7 @@ import {
   type WizardStep,
   type WizardValues,
   estimateStub,
+  liveEstimate,
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -72,7 +73,7 @@ export type StepProps = {
   onContinue: () => void;
   onBack: () => void;
   goTo: (step: WizardStep) => void;
-  /** The instant estimate for the values on screen (US-Q-05); undefined until it answers. */
+  /** A ready estimate for the values on screen (US-Q-05); undefined while it is older or has no range. */
   estimate: Estimate | undefined;
 };
 
@@ -284,7 +285,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
   });
 
   const props: StepProps = {
-    estimate: estimateQuery.data,
+    estimate: liveEstimate(estimateQuery.data, estimateQuery.stale),
     saved,
     live,
     horses: horsesQuery.data ?? [],

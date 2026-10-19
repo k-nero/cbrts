@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
-import { deltaText, estimateStub, exactText, optionMeta, rangeText } from './estimate';
+import {
+  deltaText,
+  estimateStub,
+  exactText,
+  liveEstimate,
+  optionMeta,
+  rangeText,
+} from './estimate';
 
 import type { Estimate, OptionEffect } from '@/interfaces';
 
@@ -134,5 +141,41 @@ describe('estimateStub', () => {
       range: null,
       rangeSub: "The estimate didn't load. It will try again when you change something.",
     });
+  });
+});
+
+describe('estimateStub on a submitted request without a stored range', () => {
+  test('says it is not a quote, never asks for a route the customer cannot change', () => {
+    expect(
+      estimateStub({
+        estimate: undefined,
+        loading: false,
+        error: false,
+        stored: { low: null, high: null },
+        step: 'review',
+      }),
+    ).toEqual({
+      range: null,
+      rangeSub:
+        'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.',
+    });
+  });
+});
+
+describe('liveEstimate', () => {
+  test('the option cards read a ready answer for the values on screen', () => {
+    const ready = estimate({});
+    expect(liveEstimate(ready, false)).toBe(ready);
+  });
+
+  test('nothing while the answer is for older values', () => {
+    expect(liveEstimate(estimate({}), true)).toBeUndefined();
+  });
+
+  test('nothing when there is no range, so no card says it is in the estimate', () => {
+    expect(
+      liveEstimate(estimate({ status: 'UNAVAILABLE', low: null, high: null, message: 'x' }), false),
+    ).toBeUndefined();
+    expect(liveEstimate(undefined, false)).toBeUndefined();
   });
 });

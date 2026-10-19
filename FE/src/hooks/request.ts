@@ -107,7 +107,7 @@ export const useWizardHorses = () =>
  */
 export const useEstimate = (input: RequestDraftInput, enabled: boolean) => {
   const settled = useDebouncedValue(input, 400);
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.requests.estimate(settled),
     queryFn: () => getEstimate(settled),
     enabled,
@@ -115,4 +115,7 @@ export const useEstimate = (input: RequestDraftInput, enabled: boolean) => {
     staleTime: 30_000,
     retry: false,
   });
+  /** The answer on hand is for older values: the debounce or the next request is still running. */
+  const stale = JSON.stringify(input) !== JSON.stringify(settled) || query.isPlaceholderData;
+  return { ...query, stale };
 };

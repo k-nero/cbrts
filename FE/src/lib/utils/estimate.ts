@@ -60,11 +60,15 @@ export const estimateStub = (a: {
   stored: { low: number | null; high: number | null } | null;
   step: 'horses' | 'route' | 'service' | 'review';
 }): { range: string | null; rangeSub: string } => {
-  if (a.stored && a.stored.low != null && a.stored.high != null) {
-    return {
-      range: rangeText(a.stored.low, a.stored.high),
-      rangeSub: 'Your estimate when you submitted. Not a quote.',
-    };
+  if (a.stored) {
+    // A submitted request: the range it was submitted with, or none (submitted before estimates, or
+    // while the catalog couldn't price it). Nothing on this page can change it.
+    return a.stored.low != null && a.stored.high != null
+      ? {
+          range: rangeText(a.stored.low, a.stored.high),
+          rangeSub: 'Your estimate when you submitted. Not a quote.',
+        }
+      : { range: null, rangeSub: NOT_A_QUOTE };
   }
   if (a.error) {
     return {
@@ -89,3 +93,11 @@ export const estimateStub = (a: {
     rangeSub: a.step === 'review' ? ON_REVIEW : (e.assumptions[0] ?? NOT_A_QUOTE),
   };
 };
+
+/**
+ * The answer the option cards may read: a range for the values now on screen. An answer for older values
+ * (the debounce or the next request still running) or one without a range gives the cards nothing, so no
+ * card says "In the estimate" when it isn't.
+ */
+export const liveEstimate = (e: Estimate | undefined, stale: boolean): Estimate | undefined =>
+  !stale && e?.status === 'READY' ? e : undefined;
