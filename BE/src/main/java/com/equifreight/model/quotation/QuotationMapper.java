@@ -32,20 +32,25 @@ public final class QuotationMapper {
     /**
      * @param now the engine's answer for the request as it is now, on the pinned version: it gives the fit, the
      *     missing rates and the totals' wording, and tells whether the stored lines are out of date
+     * @param expected the totals over {@code now}'s lines with the stored overrides and added lines applied: what the
+     *     stored totals should be, and the rows' wording
+     * @param droppedOverrides the overrides the write that answers could not carry, in words
      */
     public static QuotationDraftResponse toDraftResponse(
             Quotation q,
             TransportRequest request,
             ServiceClass airClass,
             PricedQuote now,
+            PricedTotals expected,
             Integer latestPublishedVersionNo,
             Integer validityDays,
-            String catalogOwner) {
+            String catalogOwner,
+            List<String> droppedOverrides) {
         List<QuotationLine> lines = q.getLines().stream()
                 .sorted(Comparator.comparing(QuotationLine::getGroupCode).thenComparing(QuotationLine::getPosition))
                 .toList();
         TransportMode mode = request.getCorridor().getMode();
-        boolean repriceNeeded = !sameLines(lines, now.lines()) || !sameTotals(q, now.totals());
+        boolean repriceNeeded = !sameLines(lines, now.lines()) || !sameTotals(q, expected);
         int priced = (int) lines.stream().filter(l -> amount(l) != null).count();
         BigDecimal pricedSum = lines.stream()
                 .map(QuotationMapper::amount)
@@ -68,7 +73,7 @@ public final class QuotationMapper {
                         .pricedLines(pricedSum)
                         .subtotal(q.getSubtotal())
                         // A stale draft shows the rows' wording but not amounts that disagree with its total.
-                        .rows(now.totals().rows().stream()
+                        .rows(expected.rows().stream()
                                 .map(r -> new QuoteTotalRowResponse(
                                         r.key(), r.label(), r.baseText(), repriceNeeded ? null : r.amount()))
                                 .toList())
@@ -82,6 +87,7 @@ public final class QuotationMapper {
                 .currency(q.getCurrency())
                 .catalogOwner(catalogOwner)
                 .repriceNeeded(repriceNeeded)
+                .droppedOverrides(droppedOverrides)
                 .build();
     }
 
@@ -136,6 +142,8 @@ public final class QuotationMapper {
 
     private static QuoteLineResponse toLine(QuotationLine l) {
         return QuoteLineResponse.builder()
+                .id(l.getId())
+                .lineKey(l.getLineKey())
                 .description(l.getDescription())
                 .basisText(l.getBasisText())
                 .quantity(l.getQuantity())
@@ -144,6 +152,11 @@ public final class QuotationMapper {
                 .certainty(l.getCertainty())
                 .estimateNote(l.getEstimateNote())
                 .source(l.getSource())
+                .catalogAmount(l.getCatalogAmount())
+                .overrideAmount(l.getOverrideAmount())
+                .overrideReason(l.getOverrideReason())
+                .manual(l.getManualReason() != null)
+                .manualReason(l.getManualReason())
                 .build();
     }
 
@@ -156,6 +169,7 @@ public final class QuotationMapper {
     private static boolean sameTotals(Quotation q, PricedTotals now) {
         return same(q.getSubtotal(), now.subtotal())
                 && same(q.getVolumeBreak(), now.volumeBreak())
+                && same(q.getArrivalWindowSurcharge(), now.arrivalWindow())
                 && same(q.getFuel(), now.fuel())
                 && same(q.getInsurance(), now.insurance())
                 && same(q.getContingency(), now.contingency())
@@ -167,7 +181,13 @@ public final class QuotationMapper {
         return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
 
-    private static boolean sameLines(List<QuotationLine> stored, List<PricedLine> now) {
+    /**
+     * Whether the stored engine lines are what the engine gives now. Added lines are the manager's, not the
+     * engine's, so they are left out; a line stored before keys existed matches on its other fields.
+     */
+    private static boolean sameLines(List<QuotationLine> all, List<PricedLine> now) {
+        List<QuotationLine> stored =
+                all.stream().filter(l -> l.getManualReason() == null).toList();
         if (stored.size() != now.size()) {
             return false;
         }
@@ -175,6 +195,7 @@ public final class QuotationMapper {
             QuotationLine s = stored.get(i);
             PricedLine p = now.get(i);
             boolean same = s.getGroupCode().equals(p.group())
+                    && (s.getLineKey() == null || s.getLineKey().equals(p.lineKey()))
                     && s.getDescription().equals(p.description())
                     && Objects.equals(s.getBasisText(), p.basisText())
                     && same(s.getCatalogAmount(), p.amount());

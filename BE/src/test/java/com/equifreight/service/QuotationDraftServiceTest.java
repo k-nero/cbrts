@@ -17,6 +17,7 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.RateLine;
 import com.equifreight.entity.RatePolicy;
@@ -27,6 +28,7 @@ import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
+import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.LineSource;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RateBasis;
@@ -41,15 +43,20 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.QuoteGroupResponse;
+import com.equifreight.model.quotation.QuoteLineResponse;
 import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.pricing.CatalogRows;
+import com.equifreight.service.pricing.PricedLine;
 import com.equifreight.service.pricing.PricingHorse;
 import com.equifreight.service.pricing.PricingInput;
 import com.equifreight.service.pricing.PricingInputs;
+import com.equifreight.service.pricing.QuotePricer;
+import com.equifreight.service.pricing.RateSet;
 import com.equifreight.service.pricing.RateSetLoader;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -100,10 +107,8 @@ class QuotationDraftServiceTest {
                 requests,
                 quotations,
                 versions,
-                loader,
-                inputs,
+                new QuotationPricing(loader, inputs, versions, users),
                 codes,
-                users,
                 audit,
                 Clock.fixed(NOW, BusinessTime.ZONE));
 
@@ -674,5 +679,193 @@ class QuotationDraftServiceTest {
         service.start(yen, request.getId());
 
         assertThat(stored.orElseThrow().getArrivalWindowSurcharge()).isNull();
+    }
+
+    // --- slice 6: adjustments survive pricing ------------------------------------------------------------
+
+    QuotationLine lineKeyed(String key) {
+        return stored.orElseThrow().getLines().stream()
+                .filter(l -> key.equals(l.getLineKey()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    void overrideGroom(String amount) {
+        QuotationLine groom = lineKeyed("GROOM");
+        groom.setOverrideAmount(new BigDecimal(amount));
+        groom.setOverrideReason("Groom from the club's own staff");
+    }
+
+    QuotationLine manualLine(String group, String description, String amount) {
+        QuotationLine line = new QuotationLine();
+        line.setQuotation(stored.orElseThrow());
+        line.setGroupCode(group);
+        line.setPosition((short) 9);
+        line.setLineKey("MANUAL:" + UUID.randomUUID());
+        line.setDescription(description);
+        line.setBasis(RateBasis.PER_SHIPMENT);
+        line.setBasisText("added by Vũ Thị Yến");
+        line.setQuantity(BigDecimal.ONE);
+        line.setUnitRate(new BigDecimal(amount));
+        line.setCatalogAmount(new BigDecimal(amount));
+        line.setSource(LineSource.MANUAL);
+        line.setCertainty(LineCertainty.FIXED);
+        line.setManualReason("Ferry booking the catalog doesn't know");
+        return line;
+    }
+
+    CatalogRows rowsWithGroom(RateCatalogVersion v, String groomRate) {
+        CatalogRows base = rows(v, true);
+        base.lines().getFirst().setRate(new BigDecimal(groomRate));
+        return base;
+    }
+
+    @Test
+    void storedLinesCarryTheirKeys() {
+        service.start(yen, request.getId());
+
+        assertThat(stored.orElseThrow().getLines())
+                .extracting(QuotationLine::getLineKey)
+                .containsExactly("STALL", "GROOM");
+    }
+
+    @Test
+    void anOverrideSurvivesARepriceByKey() {
+        service.start(yen, request.getId());
+        overrideGroom("1200.00");
+        when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
+                .thenReturn(Optional.of(v3));
+
+        QuotationDraftResponse response = service.reprice(yen, request.getId());
+
+        QuotationLine groom = lineKeyed("GROOM");
+        assertThat(groom.getOverrideAmount()).isEqualByComparingTo("1200.00");
+        assertThat(groom.getOverrideReason()).isEqualTo("Groom from the club's own staff");
+        RateSet rates = rows(v3, true).forCorridor(corridor.getId());
+        List<PricedLine> fresh =
+                QuotePricer.price(input(ServiceClass.BUSINESS), rates).lines();
+        List<PricedLine> adjusted = fresh.stream()
+                .map(l -> l.lineKey().equals("GROOM") ? withAmount(l, new BigDecimal("1200.00")) : l)
+                .toList();
+        BigDecimal expected = QuotePricer.retotal(input(ServiceClass.BUSINESS), rates, adjusted)
+                .total();
+        assertThat(stored.orElseThrow().getTotal()).isEqualByComparingTo(expected);
+        assertThat(response.totals().total()).isEqualByComparingTo(expected);
+        assertThat(response.repriceNeeded()).isFalse();
+    }
+
+    @Test
+    void aCarriedOverrideShowsTheNewCatalogAmount() {
+        service.start(yen, request.getId());
+        overrideGroom("1200.00");
+        when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
+                .thenReturn(Optional.of(v3));
+        when(loader.load(v3.getId())).thenReturn(rowsWithGroom(v3, "1600"));
+
+        QuotationDraftResponse response = service.reprice(yen, request.getId());
+
+        QuoteLineResponse groom = response.groups().stream()
+                .flatMap(g -> g.lines().stream())
+                .filter(l -> "GROOM".equals(l.lineKey()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(groom.catalogAmount()).isEqualByComparingTo("1600.00");
+        assertThat(groom.overrideAmount()).isEqualByComparingTo("1200.00");
+        assertThat(groom.amount()).isEqualByComparingTo("1200.00");
+        assertThat(groom.overrideReason()).isEqualTo("Groom from the club's own staff");
+    }
+
+    @Test
+    void aManualLineSurvivesARepriceAtTheEndOfItsGroup() {
+        service.start(yen, request.getId());
+        QuotationLine ferry = manualLine("D", "Ferry booking fee", "180.00");
+        stored.orElseThrow().getLines().add(ferry);
+
+        QuotationDraftResponse response = service.reprice(yen, request.getId());
+
+        QuoteGroupResponse d = response.groups().stream()
+                .filter(g -> g.code().equals("D"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(d.lines())
+                .extracting(QuoteLineResponse::description)
+                .containsExactly("Flying groom", "Ferry booking fee");
+        QuoteLineResponse kept = d.lines().getLast();
+        assertThat(kept.lineKey()).isEqualTo(ferry.getLineKey());
+        assertThat(kept.manual()).isTrue();
+        assertThat(kept.manualReason()).isEqualTo("Ferry booking the catalog doesn't know");
+        assertThat(d.subtotal()).isEqualByComparingTo("1630.00");
+    }
+
+    @Test
+    void anOverrideWhoseLineVanishedIsDroppedAndNamed() {
+        service.start(yen, request.getId());
+        QuotationLine vet = manualLine("D", "Flight veterinarian", "2200.00");
+        vet.setLineKey("FLIGHT_VET");
+        vet.setManualReason(null);
+        vet.setSource(LineSource.CATALOG);
+        vet.setOverrideAmount(new BigDecimal("2000.00"));
+        vet.setOverrideReason("Agreed with the club");
+        stored.orElseThrow().getLines().add(vet);
+
+        QuotationDraftResponse response = service.reprice(yen, request.getId());
+
+        assertThat(response.droppedOverrides()).containsExactly("Flight veterinarian: the line is no longer quoted");
+        assertThat(stored.orElseThrow().getLines())
+                .extracting(QuotationLine::getLineKey)
+                .doesNotContain("FLIGHT_VET");
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_REPRICED"),
+                        eq("Quotation Q-2026-0189 v1 re-priced on rate catalog v2; override on Flight veterinarian"
+                                + " dropped"),
+                        any(),
+                        any(),
+                        any(),
+                        isNull(),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void aWindowDraftWhoseSurchargeAloneChangedAsksForAReprice() {
+        corridor.setMode(TransportMode.ROAD);
+        request.setMode(TransportMode.ROAD);
+        request.setAirClass(null);
+        request.setTrailer(TrailerType.PRIVATE);
+        request.setArrivalMode(com.equifreight.entity.enums.ArrivalMode.WINDOW);
+        when(loader.load(v2.getId())).thenReturn(roadWindowRows(v2));
+        service.start(yen, request.getId());
+        stored.orElseThrow().setArrivalWindowSurcharge(new BigDecimal("1000.00"));
+
+        assertThat(service.get(request.getId()).repriceNeeded()).isTrue();
+    }
+
+    @Test
+    void theRepriceFlagIgnoresManualLines() {
+        service.start(yen, request.getId());
+        stored.orElseThrow().getLines().add(manualLine("H", "Ferry booking fee", "180.00"));
+        service.reprice(yen, request.getId());
+
+        assertThat(service.get(request.getId()).repriceNeeded()).isFalse();
+    }
+
+    static PricedLine withAmount(PricedLine l, BigDecimal amount) {
+        return new PricedLine(
+                l.group(),
+                l.lineKey(),
+                l.description(),
+                l.basis(),
+                l.basisText(),
+                l.quantity(),
+                l.unitRate(),
+                amount,
+                l.source(),
+                l.rateLineId(),
+                l.rateServiceClassId(),
+                l.horseId(),
+                l.certainty(),
+                l.estimateNote());
     }
 }

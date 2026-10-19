@@ -29,4 +29,5 @@ public record QuotationDraftResponse(
         Integer validityDays,
         String currency,
         String catalogOwner,
-        boolean repriceNeeded) {}
+        boolean repriceNeeded,
+        List<String> droppedOverrides) {}
