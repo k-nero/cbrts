@@ -1,20 +1,28 @@
 package com.equifreight.controller.staff;
 
 import com.equifreight.entity.User;
+import com.equifreight.model.quotation.AirClassRequest;
+import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.StartResult;
 import com.equifreight.model.review.QueueRowResponse;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.model.review.ReturnRequest;
+import com.equifreight.service.QuotationDraftService;
 import com.equifreight.service.RequestReviewService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,9 +35,11 @@ public class StaffRequestController {
     private static final int PAGE_SIZE = 20;
 
     private final RequestReviewService service;
+    private final QuotationDraftService quotations;
 
-    public StaffRequestController(RequestReviewService service) {
+    public StaffRequestController(RequestReviewService service, QuotationDraftService quotations) {
         this.service = service;
+        this.quotations = quotations;
     }
 
     @Operation(summary = "The review queue: requests waiting for review, oldest first, 20 to a page")
@@ -53,5 +63,37 @@ public class StaffRequestController {
     public RequestReviewResponse returnForInformation(
             @PathVariable UUID id, @RequestBody ReturnRequest body, @AuthenticationPrincipal User user) {
         return service.returnForInformation(user, id, body.note());
+    }
+
+    @Operation(summary = "Start the request's draft quotation from the published rate catalog (201), or open it (200)")
+    @PostMapping("/{id}/quotation")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public ResponseEntity<QuotationDraftResponse> startQuotation(
+            @PathVariable UUID id, @AuthenticationPrincipal User user) {
+        StartResult result = quotations.start(user, id);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result.quotation());
+    }
+
+    @Operation(summary = "The request's quotation: grouped lines, totals with their bases, stall fit and missing rates")
+    @GetMapping("/{id}/quotation")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse quotation(@PathVariable UUID id) {
+        return quotations.get(id);
+    }
+
+    @Operation(summary = "Price the draft quotation with another air class, on the catalog version it pins")
+    @PutMapping("/{id}/quotation")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse changeQuotationClass(
+            @PathVariable UUID id, @Valid @RequestBody AirClassRequest body, @AuthenticationPrincipal User user) {
+        return quotations.changeClass(user, id, body.airClass());
+    }
+
+    @Operation(summary = "Re-price the draft quotation on the latest published rate catalog")
+    @PostMapping("/{id}/quotation/reprice")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse repriceQuotation(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        return quotations.reprice(user, id);
     }
 }
