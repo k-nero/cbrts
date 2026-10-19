@@ -174,6 +174,8 @@ export interface RegulationRule {
   minDays?: number;
   maxDays?: number;
   description?: string;
+  diffStatus?: 'UNCHANGED' | 'CHANGED' | 'NEW';
+  parameterDisplay?: string;
 }
 
 export interface RegulationVersion {
@@ -187,6 +189,9 @@ export interface RegulationVersion {
   quarantineMinDays: number;
   arrivalBufferDays: number;
   rules: RegulationRule[];
+  pinnedJobsCount?: number;
+  changesCount?: number;
+  changeNote?: string;
 }
 
 export interface RegulationCatalog {
@@ -194,6 +199,16 @@ export interface RegulationCatalog {
   countryCode: string;
   name: string;
   activeVersion?: RegulationVersion;
+  draftVersion?: RegulationVersion;
+  versions?: RegulationVersion[];
+}
+
+export interface UpdateRegulationRuleRequest {
+  ruleKind?: RegulationRuleKind;
+  minDays?: number;
+  maxDays?: number;
+  mandatory?: boolean;
+  description?: string;
 }
 
 export interface ClearanceJobSummary {

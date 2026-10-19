@@ -39,4 +39,20 @@ export const queryKeys = {
     submissions: (jobId: string) => ['clearance', 'jobs', jobId, 'submissions'] as const,
     quarantines: (jobId: string) => ['clearance', 'jobs', jobId, 'quarantines'] as const,
   },
+  customerNotes: {
+    all: () => ['customer-notes'] as const,
+    detail: (id: string) => ['customer-notes', id] as const,
+  },
+  regulations: {
+    all: () => ['regulations'] as const,
+    catalogs: () => ['regulations', 'catalogs'] as const,
+    version: (id: string) => ['regulations', 'version', id] as const,
+    documentTypes: () => ['regulations', 'document-types'] as const,
+  },
+  rates: {
+    all: () => ['rates'] as const,
+    corridors: () => ['rates', 'corridors'] as const,
+    details: (corridorId?: string, versionId?: string) =>
+      ['rates', 'details', corridorId ?? '', versionId ?? ''] as const,
+  },
 } as const;

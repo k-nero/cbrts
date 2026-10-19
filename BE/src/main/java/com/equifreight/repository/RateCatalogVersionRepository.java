@@ -23,6 +23,8 @@ public interface RateCatalogVersionRepository extends JpaRepository<RateCatalogV
     /** The one draft (at most one, V4 index). */
     Optional<RateCatalogVersion> findByStatus(CatalogStatus status);
 
+    List<RateCatalogVersion> findByStatusOrderByVersionNoDesc(CatalogStatus status);
+
     /**
      * The version in a status, its row locked until the transaction ends: every draft write takes it, so a write
      * that waited on a publish or a discard finds no draft instead of writing over the published row.

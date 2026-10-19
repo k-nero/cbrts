@@ -36,6 +36,15 @@ public class AuthoritySubmissionController {
     }
 
     /**
+     * List designated quarantine facilities.
+     */
+    @GetMapping("/quarantine-facilities")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    public List<com.equifreight.model.route.PlaceResponse> listQuarantineFacilities() {
+        return submissionService.listQuarantineFacilities();
+    }
+
+    /**
      * List all authority submissions filed for a transport job.
      */
     @GetMapping("/jobs/{jobId}/submissions")

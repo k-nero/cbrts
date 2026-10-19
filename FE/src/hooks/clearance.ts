@@ -2,12 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clearanceApi } from '@/apis/clearance';
 import { queryKeys } from '@/constant/query';
 import type {
+  AuthorityKind,
   ChecklistItem,
   ClearanceStatus,
+  CreateAuthoritySubmissionRequest,
+  CreateQuarantinePeriodRequest,
   DocumentUploadRequest,
   DocumentVersion,
   JobSummary,
   ReviewDocumentRequest,
+  UpdateAuthoritySubmissionRequest,
 } from '@/interfaces';
 
 /**
@@ -27,7 +31,7 @@ export const useClearanceJobs = (q: string) => {
 
 /**
  * Transport Specialist pending reviews inbox.
- * Uses TanStack Query with caching and invalidation (AGENTS.md).
+ * Uses TanStack Query with caching and invalidation.
  * Safely extracts items whether returned as a plain array or paginated content.
  */
 export const usePendingReviews = () => {
@@ -86,7 +90,7 @@ export const useClearanceStatus = (jobId: string | null | undefined) => {
 
 /**
  * Review document version mutation (Approve / Reject).
- * Invalidates affected queries on success (AGENTS.md).
+ * Invalidates affected queries on success.
  */
 export const useReviewDocument = (jobId?: string | null) => {
   const queryClient = useQueryClient();
@@ -132,11 +136,154 @@ export const useUploadDocumentVersion = (jobId?: string | null) => {
 export const useEvaluateClearanceGate = (jobId?: string | null) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (targetJobId: string) => clearanceApi.evaluateClearanceGate(targetJobId),
+    mutationFn: (targetJobId?: string) => {
+      const idToEvaluate = targetJobId ?? jobId;
+      if (!idToEvaluate) throw new Error('No jobId provided to evaluate clearance gate');
+      return clearanceApi.evaluateClearanceGate(idToEvaluate);
+    },
     onSuccess: () => {
       if (jobId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
+      }
+    },
+  });
+};
+
+/**
+ * Recognised authorities list.
+ */
+export const useAuthorities = (params?: { countryCode?: string; kind?: AuthorityKind }) => {
+  return useQuery({
+    queryKey: queryKeys.clearance.authorities(),
+    queryFn: async () => {
+      const res = await clearanceApi.getAuthorities(params);
+      return res.data;
+    },
+    staleTime: 60_000,
+  });
+};
+
+/**
+ * Submissions filed with authorities for a specific job.
+ */
+export const useJobSubmissions = (jobId: string | null | undefined) => {
+  return useQuery({
+    queryKey: queryKeys.clearance.submissions(jobId ?? ''),
+    queryFn: async () => {
+      if (!jobId || !jobId.trim()) return [];
+      const res = await clearanceApi.getSubmissionsByJob(jobId);
+      return res.data;
+    },
+    enabled: Boolean(jobId && jobId.trim()),
+  });
+};
+
+/**
+ * File new authority submission mutation.
+ */
+export const useCreateSubmission = (jobId: string | null | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateAuthoritySubmissionRequest) => {
+      if (!jobId) throw new Error('No jobId provided for submission');
+      const res = await clearanceApi.createSubmission(jobId, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (jobId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.submissions(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+      }
+    },
+  });
+};
+
+/**
+ * Update authority submission status mutation.
+ */
+export const useUpdateSubmission = (jobId: string | null | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      submissionId,
+      data,
+    }: {
+      submissionId: string;
+      data: UpdateAuthoritySubmissionRequest;
+    }) => {
+      const res = await clearanceApi.updateSubmission(submissionId, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (jobId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.submissions(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
+      }
+    },
+  });
+};
+
+/**
+ * Quarantine periods list for a job.
+ */
+export const useQuarantineFacilities = () => {
+  return useQuery({
+    queryKey: ['clearance', 'quarantine-facilities'],
+    queryFn: async () => {
+      const res = await clearanceApi.getQuarantineFacilities();
+      return res.data;
+    },
+  });
+};
+
+export const useJobQuarantines = (jobId: string | null | undefined) => {
+  return useQuery({
+    queryKey: queryKeys.clearance.quarantines(jobId ?? ''),
+    queryFn: async () => {
+      if (!jobId || !jobId.trim()) return [];
+      const res = await clearanceApi.getQuarantinesByJob(jobId);
+      return res.data;
+    },
+    enabled: Boolean(jobId && jobId.trim()),
+  });
+};
+
+/**
+ * Create quarantine period mutation.
+ */
+export const useCreateQuarantine = (jobId: string | null | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateQuarantinePeriodRequest) => {
+      if (!jobId) throw new Error('No jobId provided for quarantine');
+      const res = await clearanceApi.createQuarantine(jobId, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (jobId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.quarantines(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+      }
+    },
+  });
+};
+
+/**
+ * Complete quarantine inspection mutation.
+ */
+export const useCompleteQuarantine = (jobId: string | null | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (quarantineId: string) => {
+      const res = await clearanceApi.completeQuarantine(quarantineId);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (jobId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.quarantines(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
       }
     },
   });

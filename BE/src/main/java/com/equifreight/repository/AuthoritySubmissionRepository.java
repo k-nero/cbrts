@@ -19,6 +19,16 @@ public interface AuthoritySubmissionRepository
      */
     List<AuthoritySubmission> findByJobId(UUID jobId);
 
+    /** Lấy toàn bộ đợt trình hồ sơ kèm chi tiết authority, job và checklistItems. */
+    @Query("""
+            SELECT DISTINCT s FROM AuthoritySubmission s
+            LEFT JOIN FETCH s.authority
+            LEFT JOIN FETCH s.job
+            LEFT JOIN FETCH s.checklistItems
+            WHERE s.job.id = :jobId
+            """)
+    List<AuthoritySubmission> findByJobIdWithDetails(@Param("jobId") UUID jobId);
+
     /**
      * Lấy theo tiến độ xử lý (VD: chỉ lấy các đợt đang FILED hoặc chờ
      * ADDITIONAL_INFO).
