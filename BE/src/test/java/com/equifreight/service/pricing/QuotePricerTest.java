@@ -21,12 +21,16 @@ import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.LineSource;
 import com.equifreight.entity.enums.RateBasis;
+import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -576,5 +580,135 @@ class QuotePricerTest {
         PricingInput noWindow =
                 road(TrailerType.PRIVATE, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
         assertThat(QuotePricer.price(noWindow, noPolicy).missing()).isEmpty();
+    }
+
+    // --- slice 6: line keys and re-totalling over adjusted lines -------------------------------------------------
+
+    @Test
+    void everyLineCarriesItsKey() {
+        PricingInput in = pnhHkgBusiness();
+        PricedQuote quote = QuotePricer.price(in, pnhHkgRates());
+
+        assertThat(find(quote, "Air stall position").lineKey()).isEqualTo("STALL");
+        assertThat(find(quote, "Flying groom").lineKey()).isEqualTo("GROOM");
+        UUID nightfall = in.horses().getFirst().horseId();
+        assertThat(find(quote, "Pre-export isolation · mare").lineKey()).isEqualTo("ISO_MARE:" + nightfall);
+        assertThat(find(quote, "Post-arrival isolation").lineKey()).isEqualTo("POST_ISO");
+        assertThat(find(quote, "Loading and handling").lineKey()).isEqualTo("LOADING");
+    }
+
+    @Test
+    void aGapLineIsKeyedByItsPlaceInTheMissingList() {
+        List<RateRow> lines = new ArrayList<>(pnhHkgLines());
+        lines.removeIf(l -> l.code().equals("GROOM"));
+        PricedQuote quote =
+                QuotePricer.price(pnhHkgBusiness(), rates(pnhHkgRates().classes(), lines));
+
+        PricedLine gap = quote.lines().stream()
+                .filter(l -> l.amount() == null)
+                .findFirst()
+                .orElseThrow();
+        assertThat(gap.lineKey()).isEqualTo("MISSING:1");
+    }
+
+    @Test
+    void retotalOverUnadjustedLinesEqualsPrice() {
+        PricingInput in = pnhHkgBusiness();
+        PricedQuote quote = QuotePricer.price(in, pnhHkgRates());
+
+        assertThat(QuotePricer.retotal(in, pnhHkgRates(), quote.lines())).isEqualTo(quote.totals());
+    }
+
+    @Test
+    void retotalWithAnOverrideInCMovesEveryRowAfterIt() {
+        PricingInput in = pnhHkgBusiness();
+        PricedQuote quote = QuotePricer.price(in, pnhHkgRates());
+        List<PricedLine> adjusted = withAmount(quote.lines(), "STALL", d("15000.00"));
+
+        PricedTotals totals = QuotePricer.retotal(in, pnhHkgRates(), adjusted);
+
+        assertThat(totals.subtotal()).isEqualByComparingTo("24570.00");
+        assertThat(totals.volumeBreak()).isEqualByComparingTo("837.00");
+        assertThat(totals.fuel()).isEqualByComparingTo("2727.45");
+        assertThat(totals.insurance()).isEqualByComparingTo("4875.00");
+        assertThat(totals.contingency()).isEqualByComparingTo("1566.77");
+        assertThat(totals.serviceFee()).isEqualByComparingTo("3948.27");
+        assertThat(totals.total()).isEqualByComparingTo("36850.49");
+    }
+
+    @Test
+    void aManualLineInHMovesOnlyContingencyAndTheFee() {
+        PricingInput in = pnhHkgBusiness();
+        PricedQuote quote = QuotePricer.price(in, pnhHkgRates());
+        List<PricedLine> adjusted = new ArrayList<>(quote.lines());
+        adjusted.add(new PricedLine(
+                "H",
+                "MANUAL:" + UUID.randomUUID(),
+                "Ferry booking fee",
+                RateBasis.PER_SHIPMENT,
+                "added by Vũ Thị Yến",
+                d("2"),
+                d("90.00"),
+                d("180.00"),
+                LineSource.MANUAL,
+                null,
+                null,
+                null,
+                LineCertainty.FIXED,
+                null));
+
+        PricedTotals totals = QuotePricer.retotal(in, pnhHkgRates(), adjusted);
+
+        assertThat(totals.subtotal()).isEqualByComparingTo("26550.00");
+        assertThat(totals.volumeBreak()).isEqualByComparingTo("927.00");
+        assertThat(totals.fuel()).isEqualByComparingTo("3035.25");
+        assertThat(totals.contingency()).isEqualByComparingTo("1676.66");
+        assertThat(totals.serviceFee()).isEqualByComparingTo("4225.19");
+        assertThat(totals.total()).isEqualByComparingTo("39435.10");
+    }
+
+    @Test
+    void aZeroOverrideKeepsTheTotalsAndDropsTheLinesAmount() {
+        PricingInput in = pnhHkgBusiness();
+        PricedQuote quote = QuotePricer.price(in, pnhHkgRates());
+
+        PricedTotals totals = QuotePricer.retotal(in, pnhHkgRates(), withAmount(quote.lines(), "GROOM", d("0.00")));
+
+        assertThat(totals.subtotal()).isEqualByComparingTo("24920.00");
+        assertThat(totals.total()).isEqualByComparingTo("37518.22");
+    }
+
+    @Test
+    void retotalWithAMissingPolicyLeavesTheTotalEmpty() {
+        PricingInput in = pnhHkgBusiness();
+        RateSet base = pnhHkgRates();
+        Map<RatePolicyKey, BigDecimal> policies = new EnumMap<>(base.policies());
+        policies.remove(RatePolicyKey.CONTINGENCY_PCT);
+        RateSet rates = new RateSet(base.versionNo(), base.classes(), base.lines(), base.breaks(), policies);
+        PricedQuote quote = QuotePricer.price(in, rates);
+
+        assertThat(QuotePricer.retotal(in, rates, quote.lines()).total()).isNull();
+    }
+
+    private static List<PricedLine> withAmount(List<PricedLine> lines, String key, BigDecimal amount) {
+        return lines.stream()
+                .map(l -> l.lineKey().equals(key)
+                        ? new PricedLine(
+                                l.group(),
+                                l.lineKey(),
+                                l.description(),
+                                l.basis(),
+                                l.basisText(),
+                                l.quantity(),
+                                l.unitRate(),
+                                amount,
+                                l.source(),
+                                l.rateLineId(),
+                                l.rateServiceClassId(),
+                                l.horseId(),
+                                l.certainty(),
+                                l.estimateNote())
+                        : l)
+                .toList();
     }
 }
