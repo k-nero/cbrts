@@ -17,6 +17,15 @@ public final class RequestMapper {
 
     public static RequestResponse toResponse(
             TransportRequest r, RouteResponse route, LeadTimeResponse leadTime, List<Blocker> blockers) {
+        return toResponse(r, route, leadTime, blockers, List.of());
+    }
+
+    public static RequestResponse toResponse(
+            TransportRequest r,
+            RouteResponse route,
+            LeadTimeResponse leadTime,
+            List<Blocker> blockers,
+            List<RevisionSummaryResponse> revisions) {
         return RequestResponse.builder()
                 .id(r.getId())
                 .code(r.getCode())
@@ -48,6 +57,8 @@ public final class RequestMapper {
                 .route(route)
                 .leadTime(leadTime)
                 .blockers(blockers)
+                .infoRequiredNote(r.getInfoRequiredNote())
+                .revisions(revisions)
                 .build();
     }
 

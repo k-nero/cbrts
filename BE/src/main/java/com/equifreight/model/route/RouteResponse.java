@@ -23,6 +23,8 @@ public record RouteResponse(
         Integer dateFlexDays,
         List<CrossingResponse> crossings,
         List<String> countries,
+        /** The same countries by name, in travel order ("Vietnam", "Cambodia"). */
+        List<String> countryNames,
         Boolean crossBorder,
         Integer leadTimeDays,
         LocalDate earliestDeparture) {}

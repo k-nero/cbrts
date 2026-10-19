@@ -45,7 +45,8 @@ public final class RouteMapper {
     }
 
     /**
-     * A corridor read in the direction of travel. {@code countries} is null without a destination place, and
+     * A corridor read in the direction of travel. {@code countries} and {@code countryNames} are null without a
+     * destination place, and
      * {@code leadTimeDays} and {@code earliestDeparture} are null when either is unknown.
      */
     public static RouteResponse toRouteResponse(
@@ -53,6 +54,7 @@ public final class RouteMapper {
             boolean reversed,
             List<CrossingResponse> crossings,
             List<String> countries,
+            List<String> countryNames,
             Integer leadTimeDays,
             LocalDate earliestDeparture) {
         return RouteResponse.builder()
@@ -65,6 +67,7 @@ public final class RouteMapper {
                 .dateFlexDays((int) corridor.getDateFlexDays())
                 .crossings(crossings)
                 .countries(countries)
+                .countryNames(countryNames)
                 .crossBorder(countries == null ? null : countries.size() > 1)
                 .leadTimeDays(leadTimeDays)
                 .earliestDeparture(earliestDeparture)

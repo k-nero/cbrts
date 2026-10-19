@@ -13,8 +13,11 @@ import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
-/** A transport request. {@code leadTime} and {@code blockers} are only worked out for a draft. */
-@Builder
+/**
+ * A transport request. {@code leadTime} and {@code blockers} are worked out while the customer may still change
+ * it: a draft, or a request returned for information.
+ */
+@Builder(toBuilder = true)
 public record RequestResponse(
         UUID id,
         /** Null until submitted. */
@@ -39,4 +42,10 @@ public record RequestResponse(
         boolean vetEscort,
         RouteResponse route,
         LeadTimeResponse leadTime,
-        List<Blocker> blockers) {}
+        List<Blocker> blockers,
+        /** The logistics manager's note while the request is INFO_REQUIRED (US-F1-04). */
+        String infoRequiredNote,
+        /** Every submitted version, oldest first; empty for a draft. */
+        List<RevisionSummaryResponse> revisions,
+        /** The customer's club; set on staff views only. */
+        String club) {}

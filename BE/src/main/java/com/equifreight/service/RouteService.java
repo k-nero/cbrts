@@ -159,10 +159,12 @@ public class RouteService {
             put(countries, reversed ? b.getFromCountry() : b.getToCountry());
         }
         if (destination == null) {
-            return new Described(RouteMapper.toRouteResponse(corridor, reversed, crossings, null, null, null), null);
+            return new Described(
+                    RouteMapper.toRouteResponse(corridor, reversed, crossings, null, null, null, null), null);
         }
         put(countries, destination.getCountry());
         List<String> codes = List.copyOf(countries.keySet());
+        List<String> names = List.copyOf(countries.values());
 
         Map<String, RegulationVersion> published = new HashMap<>();
         for (String code : codes) {
@@ -172,7 +174,7 @@ public class RouteService {
                                     .findFirst());
             if (version.isEmpty()) {
                 return new Described(
-                        RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, null, null),
+                        RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, names, null, null),
                         countries.get(code));
             }
             published.put(code, version.get());
@@ -185,6 +187,7 @@ public class RouteService {
                         reversed,
                         crossings,
                         codes,
+                        names,
                         required,
                         LeadTimePolicy.earliestDeparture(today, required)),
                 null);

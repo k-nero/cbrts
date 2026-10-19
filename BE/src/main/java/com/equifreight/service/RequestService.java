@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
@@ -27,7 +28,9 @@ import com.equifreight.model.request.RequestHorseInput;
 import com.equifreight.model.request.RequestMapper;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
+import com.equifreight.model.request.RevisionSummaryResponse;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
@@ -67,8 +70,8 @@ public class RequestService {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
-    /** audit_log.summary is varchar(500). */
-    private static final int AUDIT_SUMMARY_MAX = 500;
+    /** The audit action of a return for information (US-F1-04); RequestReviewService writes it. */
+    static final String INFO_REQUIRED_ACTION = "REQUEST_INFO_REQUIRED";
 
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
@@ -78,6 +81,7 @@ public class RequestService {
     private final ClubService clubs;
     private final CodeService codes;
     private final AuditService audit;
+    private final AuditLogRepository auditLogs;
     private final JsonMapper json;
     private final Clock clock;
 
@@ -90,6 +94,7 @@ public class RequestService {
             ClubService clubs,
             CodeService codes,
             AuditService audit,
+            AuditLogRepository auditLogs,
             JsonMapper json,
             Clock clock) {
         this.requests = requests;
@@ -100,6 +105,7 @@ public class RequestService {
         this.clubs = clubs;
         this.codes = codes;
         this.audit = audit;
+        this.auditLogs = auditLogs;
         this.json = json;
         this.clock = clock;
     }
@@ -123,7 +129,7 @@ public class RequestService {
         Club club = clubs.requireClub(user);
         TransportRequest request = requests.findByIdAndClubId(id, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
-        return toResponse(request, request.getStatus() == RequestStatus.DRAFT ? resolve(request) : null);
+        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null);
     }
 
     @Transactional
@@ -142,7 +148,7 @@ public class RequestService {
     @Transactional
     public RequestResponse update(User user, UUID id, RequestDraftRequest body) {
         Club club = clubs.requireClub(user);
-        TransportRequest request = findDraftForUpdate(club, id);
+        TransportRequest request = findEditableForUpdate(club, id);
         Set<UUID> alreadyOn =
                 request.getHorses().stream().map(rh -> rh.getHorse().getId()).collect(Collectors.toSet());
         Draft draft = validate(club, body, alreadyOn);
@@ -158,7 +164,7 @@ public class RequestService {
     @Transactional
     public RequestResponse submit(User user, UUID id) {
         Club club = clubs.requireClub(user);
-        TransportRequest request = findDraftForUpdate(club, id);
+        TransportRequest request = findEditableForUpdate(club, id);
         LocalDate today = LocalDate.now(clock);
         RouteResolution resolution = resolve(request);
         // The route's flex is copied onto the request here (#115), before the lead time is checked with it; a later
@@ -176,32 +182,46 @@ public class RequestService {
         LeadTimeResponse leadTime = LeadTimePolicy.assess(
                 resolution.route().leadTimeDays(), request.getDateFlexDays(), today, request.getDepartureDate());
 
+        boolean resubmission = request.getCode() != null;
+        RequestStatus before = request.getStatus();
+        short revisionNo = resubmission
+                ? (short) (revisions.findByRequestIdOrderByRevisionNoAsc(request.getId()).stream()
+                                .mapToInt(RequestRevision::getRevisionNo)
+                                .max()
+                                .orElse(0)
+                        + 1)
+                : 1;
+
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
-        String code = codes.next(CodePrefix.REQ, today.getYear());
         Instant now = Instant.now(clock);
-        request.setCode(code);
+        if (!resubmission) {
+            request.setCode(codes.next(CodePrefix.REQ, today.getYear()));
+            request.setSubmittedAt(now);
+        }
+        String code = request.getCode();
         request.setStatus(RequestStatus.SUBMITTED);
-        request.setSubmittedAt(now);
+        request.setInfoRequiredNote(null);
         TransportRequest saved = requests.save(request);
         RequestResponse response = RequestMapper.toResponse(saved, resolution.route(), null, List.of());
 
         RequestRevision revision = new RequestRevision();
         revision.setRequest(saved);
-        revision.setRevisionNo((short) 1);
+        revision.setRevisionNo(revisionNo);
         revision.setPayload(json.writeValueAsString(response));
         revision.setSubmittedAt(now);
         revisions.save(revision);
 
+        List<String> names = response.horses().stream().map(h -> h.name()).toList();
         audit.recordDecision(
                 user,
-                "REQUEST_SUBMITTED",
-                submittedSummary(response.horses().stream().map(h -> h.name()).toList()),
+                resubmission ? "REQUEST_RESUBMITTED" : "REQUEST_SUBMITTED",
+                horsesSummary(resubmission ? "Sent version " + revisionNo + " with " : "Submitted with ", names),
                 ENTITY_TYPE,
                 saved.getId(),
                 code,
                 null,
-                "{\"status\":\"DRAFT\"}",
+                "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"SUBMITTED\"}");
         audit.recordSystem(
                 "LEAD_TIME_CHECKED",
@@ -211,7 +231,11 @@ public class RequestService {
                 code,
                 null,
                 null);
-        return response;
+        return RequestMapper.toResponse(saved, resolution.route(), null, List.of(), revisionsOf(saved));
+    }
+
+    static String submittedSummary(List<String> names) {
+        return horsesSummary("Submitted with ", names);
     }
 
     /** "Lead time checked: 24 days before departure, 21 required, plus 3 for dates that can move by ±3 days." */
@@ -226,10 +250,10 @@ public class RequestService {
      * "Submitted with 2 horses: Nightfall, Shadowfax." A long string is cut to "… and 12 more." so the line
      * fits audit_log.summary.
      */
-    static String submittedSummary(List<String> names) {
-        String head = "Submitted with " + names.size() + (names.size() == 1 ? " horse: " : " horses: ");
+    static String horsesSummary(String lead, List<String> names) {
+        String head = lead + names.size() + (names.size() == 1 ? " horse: " : " horses: ");
         String all = head + String.join(", ", names) + ".";
-        if (all.length() <= AUDIT_SUMMARY_MAX) {
+        if (all.length() <= AuditText.MAX) {
             return all;
         }
         StringBuilder listed = new StringBuilder();
@@ -237,7 +261,7 @@ public class RequestService {
         for (String name : names) {
             String next = (shown == 0 ? "" : ", ") + name;
             String tail = " and " + (names.size() - shown - 1) + " more.";
-            if (head.length() + listed.length() + next.length() + tail.length() > AUDIT_SUMMARY_MAX) {
+            if (head.length() + listed.length() + next.length() + tail.length() > AuditText.MAX) {
                 break;
             }
             listed.append(next);
@@ -250,7 +274,11 @@ public class RequestService {
     @Transactional
     public void delete(User user, UUID id) {
         Club club = clubs.requireClub(user);
-        requests.delete(findDraftForUpdate(club, id));
+        TransportRequest request = findForUpdate(club, id);
+        if (request.getStatus() != RequestStatus.DRAFT) {
+            throw notEditable(request);
+        }
+        requests.delete(request);
     }
 
     // --- loading ------------------------------------------------------------------------------------------
@@ -259,22 +287,26 @@ public class RequestService {
         return requests.findForUpdate(id, club.getId()).orElseThrow(() -> ResourceNotFoundException.of("Request", id));
     }
 
-    private TransportRequest findDraftForUpdate(Club club, UUID id) {
+    /** A draft, or a request returned for information (US-F1-04): the two states a customer may change. */
+    static boolean editable(RequestStatus status) {
+        return status == RequestStatus.DRAFT || status == RequestStatus.INFO_REQUIRED;
+    }
+
+    private TransportRequest findEditableForUpdate(Club club, UUID id) {
         TransportRequest request = findForUpdate(club, id);
-        requireDraft(request);
+        if (!editable(request.getStatus())) {
+            throw notEditable(request);
+        }
         return request;
     }
 
-    private static void requireDraft(TransportRequest request) {
-        if (request.getStatus() == RequestStatus.DRAFT) {
-            return;
-        }
+    private static ConflictException notEditable(TransportRequest request) {
         String message = request.getCode() == null || request.getSubmittedAt() == null
                 ? "This request is no longer a draft and can't be edited here."
                 : request.getCode() + " was submitted on "
                         + BusinessTime.DAY.format(request.getSubmittedAt().atZone(BusinessTime.ZONE))
                         + " and can't be edited here.";
-        throw new ConflictException("REQUEST_NOT_DRAFT", message);
+        return new ConflictException("REQUEST_NOT_DRAFT", message);
     }
 
     // --- validate, then write -----------------------------------------------------------------------------
@@ -487,11 +519,11 @@ public class RequestService {
 
     /** A draft carries its route, lead time and blockers; a submitted request only its stored route. */
     private RequestResponse toResponse(TransportRequest request, RouteResolution resolution) {
-        if (request.getStatus() != RequestStatus.DRAFT) {
+        if (!editable(request.getStatus())) {
             RouteResponse route = request.getCorridor() == null || request.getOriginPlace() == null
                     ? null
                     : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
-            return RequestMapper.toResponse(request, route, null, List.of());
+            return RequestMapper.toResponse(request, route, null, List.of(), revisionsOf(request));
         }
         LocalDate today = LocalDate.now(clock);
         RouteResponse route = resolution.route();
@@ -503,7 +535,30 @@ public class RequestService {
                         today,
                         request.getDepartureDate());
         List<Blocker> blockers = SubmissionCheck.blockers(request, resolution, today);
-        return RequestMapper.toResponse(request, route, leadTime, blockers);
+        return RequestMapper.toResponse(request, route, leadTime, blockers, revisionsOf(request));
+    }
+
+    /** Every submitted version, oldest first, with the day each returned one came back (US-F1-04). */
+    private List<RevisionSummaryResponse> revisionsOf(TransportRequest request) {
+        if (request.getCode() == null) {
+            return List.of();
+        }
+        List<RequestRevision> all = revisions.findByRequestIdOrderByRevisionNoAsc(request.getId());
+        List<Instant> returns = auditLogs
+                .findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+                        ENTITY_TYPE, request.getId(), INFO_REQUIRED_ACTION)
+                .stream()
+                .map(AuditLog::getOccurredAt)
+                .toList();
+        Map<Short, Instant> returned = RevisionDates.returnedAt(all, returns);
+        return all.stream()
+                .map(v -> RevisionSummaryResponse.builder()
+                        .revisionNo(v.getRevisionNo())
+                        .submittedAt(v.getSubmittedAt())
+                        .note(v.getNote())
+                        .returnedAt(returned.get(v.getRevisionNo()))
+                        .build())
+                .toList();
     }
 
     /** A pickup or delivery point; a welfare stop is a stop on the way, not an end of the trip. */
