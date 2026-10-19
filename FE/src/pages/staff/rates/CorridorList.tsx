@@ -19,6 +19,11 @@ const GROUPS: { mode: RateCorridor['mode']; label: string; tag: string }[] = [
 /** The corridors we run, grouped by mode, each with the rates it still lacks (DESIGN.md, Rate catalog). */
 export const CorridorList: FC<Props> = ({ corridors, selectedId, versionNo, onSelect }) => (
   <Panel title="Corridors" flush>
+    {corridors.length === 0 && (
+      <p className="type-body-s m-0 px-6 py-3 text-ink-2">
+        No corridors in the catalog yet. Corridors come from the route catalog.
+      </p>
+    )}
     {GROUPS.map((group) => {
       const rows = corridors.filter((c) => c.mode === group.mode);
       if (rows.length === 0) return null;

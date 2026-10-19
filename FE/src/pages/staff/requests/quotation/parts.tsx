@@ -94,14 +94,14 @@ export const StallChoice: FC<{
   onChange: (c: ServiceClass) => void;
 }> = ({ quotation, pending, onChange }) => {
   const current = quotation.airClass ?? quotation.request.requestedClass ?? 'BUSINESS';
-  const options = classOptions(quotation.request.mode, quotation.fit);
+  const options = classOptions(quotation.request.mode, quotation.fit, pending);
   const fit = quotation.fit;
   return (
     <Panel title="Air stall">
       <div className="flex flex-col gap-3">
         <Tabs<ServiceClass>
           label="Service class"
-          items={options.map((o) => ({ key: o.value, label: o.label }))}
+          items={options.map((o) => ({ key: o.value, label: o.label, disabled: o.disabled }))}
           activeKey={current}
           onChange={(key) => !pending && key !== current && onChange(key)}
         />

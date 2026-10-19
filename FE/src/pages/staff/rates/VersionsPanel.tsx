@@ -18,6 +18,9 @@ const describe = (v: RateVersion): string => {
 /** Every catalog version, newest first; quotations keep the version they pinned. */
 export const VersionsPanel: FC<{ versions: RateVersion[] }> = ({ versions }) => (
   <Panel title="Versions" flush>
+    {versions.length === 0 && (
+      <p className="type-body-s m-0 px-6 py-3 text-ink-2">No version has been published yet.</p>
+    )}
     <ul className="m-0 list-none p-0">
       {versions.map((v, i) => (
         <li

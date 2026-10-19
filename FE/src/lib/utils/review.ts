@@ -4,9 +4,11 @@ import { CLASS_WORDS, reviewRows, shortDay, TRAILER_WORDS } from './request';
 
 import type { Tone } from '@/components/ui/tone';
 import type {
+  QuotationRef,
   QueuePosition,
   QueueRow,
   RequestReview,
+  RequestStatus,
   ReviewCheck,
   TransportRequest,
 } from '@/interfaces';
@@ -118,4 +120,16 @@ export const historyWhen = (iso: string): string => ict(iso).format('D MMM · HH
 export const reviewSubject = (review: RequestReview): RequestReview['request'] => {
   const latest = review.revisions[review.revisions.length - 1];
   return latest ? { ...asSent(latest.payload), club: review.request.club } : review.request;
+};
+
+/**
+ * The quotation button on the decision panel: start one while the request is in review, open the one
+ * started whatever the request's status (the builder reads it in any status), else none.
+ */
+export const quotationAction = (
+  status: RequestStatus,
+  quotation: QuotationRef | null,
+): 'start' | 'open' | null => {
+  if (quotation) return 'open';
+  return status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'start' : null;
 };

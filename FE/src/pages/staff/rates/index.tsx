@@ -19,7 +19,13 @@ import {
   useRateCorridor,
 } from '@/hooks/rates';
 import type { RateCatalog, RateCorridorView, RateLine, ServiceClassRow } from '@/interfaces';
-import { apiErrorMessage, corridorShort, draftRefusal, formatDate } from '@/lib/utils';
+import {
+  apiErrorMessage,
+  corridorShort,
+  draftRefusal,
+  formatDate,
+  pickCorridor,
+} from '@/lib/utils';
 
 const LoadError: FC<{ what: string; onRetry: () => void }> = ({ what, onRetry }) => (
   <Callout
@@ -119,7 +125,12 @@ const CorridorRates: FC<{
         view={view}
         edit={
           editing && (
-            <Button size="sm" variant="ghost" onClick={editing.onEditBreaks}>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Edit volume breaks"
+              onClick={editing.onEditBreaks}
+            >
               Edit
             </Button>
           )
@@ -129,7 +140,12 @@ const CorridorRates: FC<{
         view={view}
         edit={
           editing && (
-            <Button size="sm" variant="ghost" onClick={editing.onEditPolicies}>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Edit percentages and policy"
+              onClick={editing.onEditPolicies}
+            >
               Edit
             </Button>
           )
@@ -158,7 +174,8 @@ const RatesPage: FC = () => {
   const catalogQuery = useRateCatalog();
   const catalog = catalogQuery.data;
   const [params, setParams] = useSearchParams();
-  const corridorId = params.get('corridor') ?? catalog?.corridors[0]?.id ?? null;
+  const picked = pickCorridor(catalog?.corridors ?? [], params.get('corridor'));
+  const corridorId = picked.id;
   const versionId = catalog ? (catalog.draftVersionId ?? catalog.currentVersionId) : null;
   const viewQuery = useRateCorridor(versionId, corridorId);
   const shown = catalog?.versions.find((v) => v.id === versionId);
@@ -184,12 +201,21 @@ const RatesPage: FC = () => {
   const deleteClass = useDeleteServiceClass();
   const close = () => setModalOpen(null);
 
-  /** Someone published or discarded the draft meanwhile: say so and reload the catalog. */
+  /**
+   * Someone published or discarded the draft meanwhile, or replaced it (an old row is gone): say so and
+   * reload the catalog.
+   */
   const onDraftGone = (error: unknown): boolean => {
-    if (draftRefusal(error) !== 'no-draft') return false;
-    setNotice(
-      'This draft was published or discarded by someone else. The catalog has been reloaded.',
-    );
+    const refusal = draftRefusal(error);
+    if (!refusal) return false;
+    if (refusal === 'no-draft')
+      setNotice(
+        'This draft was published or discarded by someone else. The catalog has been reloaded.',
+      );
+    else
+      message.warning(
+        'That row changed since the page loaded, so nothing was saved. The catalog has been reloaded.',
+      );
     void qc.invalidateQueries({ queryKey: queryKeys.rates.all() });
     return true;
   };
@@ -265,13 +291,37 @@ const RatesPage: FC = () => {
             <VersionsPanel versions={catalog.versions} />
           </div>
           <div className="flex min-w-0 flex-col gap-6">
+            {picked.unknown && (
+              <Callout
+                tone="warn"
+                title="That corridor isn't in the rate catalog."
+                action={
+                  corridorId && (
+                    <Button size="sm" variant="secondary" onClick={() => select(corridorId)}>
+                      Show this corridor
+                    </Button>
+                  )
+                }
+              >
+                {corridorId
+                  ? 'The link may be out of date. Showing the first corridor instead.'
+                  : 'The link may be out of date.'}
+              </Callout>
+            )}
             {notice && (
               <Callout tone="warn" title={notice}>
                 Create a new draft to make further changes.
               </Callout>
             )}
             <DraftPanel catalog={catalog} onDraftGone={onDraftGone} />
-            {viewQuery.isError ? (
+            {!corridorId ? (
+              <Panel title="No corridors yet">
+                <p className="type-body-m m-0 text-ink-2">
+                  There is no corridor to price. Rates are set per corridor once the route catalog
+                  has one.
+                </p>
+              </Panel>
+            ) : viewQuery.isError ? (
               <LoadError what="corridor's rates" onRetry={() => void viewQuery.refetch()} />
             ) : viewQuery.data ? (
               <CorridorRates catalog={catalog} view={viewQuery.data} editing={editing} />

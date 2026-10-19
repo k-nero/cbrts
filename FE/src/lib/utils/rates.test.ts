@@ -7,11 +7,15 @@ import {
   basisWords,
   corridorShort,
   draftRefusal,
+  editorRefusal,
+  lineScopeWarning,
   pctText,
+  pickCorridor,
   policyRows,
+  rowActionLabels,
 } from './rates';
 
-import type { RateLine, VolumeBreakInput } from '@/interfaces';
+import type { RateCorridor, RateLine, VolumeBreakInput } from '@/interfaces';
 
 const line = (over: Partial<RateLine>): RateLine => ({
   id: 'l1',
@@ -120,6 +124,13 @@ describe('draftRefusal', () => {
     expect(draftRefusal(error)).toBe('no-draft');
   });
 
+  test('a 404 means the row or draft was replaced since the page loaded', () => {
+    const error = {
+      response: { status: 404, data: { error: 'Not Found', message: 'Rate line not found.' } },
+    };
+    expect(draftRefusal(error)).toBe('stale');
+  });
+
   test('anything else is not', () => {
     expect(
       draftRefusal({ response: { status: 400, data: { error: 'INVALID_VOLUME_BREAKS' } } }),
@@ -201,5 +212,112 @@ describe('bandsSave', () => {
 
   test('the shared bands are saved for every corridor', () => {
     expect(bandsSave('GLOBAL', false, bands)).toEqual({ corridorScoped: false, bands });
+  });
+});
+
+describe('editorRefusal', () => {
+  const validation = {
+    response: {
+      status: 400,
+      data: {
+        error: 'Validation Failed',
+        message: 'Validation failed',
+        details: ['rate: Use at most 2 decimals.', 'corridorId: must not be null'],
+      },
+    },
+  };
+
+  test('a shown field keeps its message and a hidden one joins the form message', () => {
+    expect(editorRefusal(validation, {}, ['rate', 'code'])).toEqual({
+      fields: { rate: 'Use at most 2 decimals.' },
+      form: 'corridorId: must not be null',
+      focus: 'rate',
+    });
+  });
+
+  test('a coded refusal goes to its field', () => {
+    const error = {
+      response: {
+        status: 400,
+        data: {
+          error: 'DESCRIPTION',
+          message: 'A line for one sex can have at most 149 characters.',
+        },
+      },
+    };
+    expect(editorRefusal(error, { DESCRIPTION: 'description' }, ['description'])).toEqual({
+      fields: { description: 'A line for one sex can have at most 149 characters.' },
+      form: null,
+      focus: 'description',
+    });
+  });
+
+  test('no answer at all is a form message', () => {
+    expect(editorRefusal(new Error('offline'), {}, ['rate']).form).toBe(
+      "Couldn't save. Check your connection and try again.",
+    );
+  });
+});
+
+describe('lineScopeWarning', () => {
+  const every = line({ everyCorridor: true });
+  const own = line({ everyCorridor: false });
+
+  test('unticking every corridor on an every-corridor line warns that the others lose it', () => {
+    expect(lineScopeWarning(every, false, 'RD HAN → VTE')).toBe(
+      'Saving moves this line to HAN → VTE only: every other corridor loses it.',
+    );
+  });
+
+  test('ticking every corridor on a corridor line warns that every corridor gets it', () => {
+    expect(lineScopeWarning(own, true, 'RD HAN → VTE')).toBe(
+      'Saving makes this line apply to every corridor, not only HAN → VTE.',
+    );
+  });
+
+  test('no change of scope, or a new line, has no warning', () => {
+    expect(lineScopeWarning(every, true, 'RD HAN → VTE')).toBeNull();
+    expect(lineScopeWarning(own, false, 'RD HAN → VTE')).toBeNull();
+    expect(lineScopeWarning(null, false, 'RD HAN → VTE')).toBeNull();
+  });
+});
+
+describe('pickCorridor', () => {
+  const corridor = (id: string): RateCorridor => ({
+    id,
+    code: `RD ${id}`,
+    mode: 'ROAD',
+    fromCity: 'From',
+    toCity: 'To',
+    distanceKm: 100,
+    crossingCount: 0,
+    missingCount: 0,
+  });
+  const list = [corridor('a'), corridor('b')];
+
+  test('the corridor in the address when it is in the catalog', () => {
+    expect(pickCorridor(list, 'b')).toEqual({ id: 'b', unknown: false });
+  });
+
+  test('the first corridor when the address names none', () => {
+    expect(pickCorridor(list, null)).toEqual({ id: 'a', unknown: false });
+  });
+
+  test('an unknown corridor in the address falls back to the first and says so', () => {
+    expect(pickCorridor(list, 'gone')).toEqual({ id: 'a', unknown: true });
+  });
+
+  test('no corridors at all', () => {
+    expect(pickCorridor([], null)).toEqual({ id: null, unknown: false });
+    expect(pickCorridor([], 'gone')).toEqual({ id: null, unknown: true });
+  });
+});
+
+describe('rowActionLabels', () => {
+  test('edit and remove name the row', () => {
+    expect(rowActionLabels('Flying groom')).toEqual({
+      edit: 'Edit Flying groom',
+      remove: 'Remove Flying groom',
+    });
   });
 });

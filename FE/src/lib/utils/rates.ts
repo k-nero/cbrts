@@ -1,9 +1,11 @@
+import { apiErrorView, formRefusal } from './error';
 import { money } from './quotation';
 
 import type {
   ApiError,
   FeeBand,
   RateLine,
+  RateCorridor,
   RatePolicyKey,
   VolumeBreak,
   VolumeBreakInput,
@@ -93,10 +95,14 @@ export const bandRefusal = (bands: VolumeBreakInput[]): string | null => {
   return null;
 };
 
-/** 'no-draft' when a write found no draft (someone published or discarded it meanwhile). */
-export const draftRefusal = (error: unknown): 'no-draft' | null => {
-  const data = (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data;
-  return data?.error === 'NO_DRAFT' ? 'no-draft' : null;
+/**
+ * 'no-draft' when a write found no draft (someone published or discarded it meanwhile); 'stale' when what
+ * it wrote to is gone (a 404: the draft was replaced since the page loaded, so an old row id is unknown).
+ */
+export const draftRefusal = (error: unknown): 'no-draft' | 'stale' | null => {
+  const response = (error as AxiosError<Partial<ApiError>> | undefined)?.response;
+  if (response?.data?.error === 'NO_DRAFT') return 'no-draft';
+  return response?.status === 404 ? 'stale' : null;
 };
 
 /** "PNH → HKG": the corridor code without its mode prefix (the list groups by mode already). */
@@ -202,3 +208,51 @@ export const bandsSave = (
   if (scope === 'CORRIDOR') return { corridorScoped: true, bands: [] };
   return { corridorScoped: false, bands };
 };
+
+/**
+ * Where an editor's refusal goes: the server's sentence on the field it names when the form shows that
+ * field, everything else in the form's message, so nothing is lost (formRefusal).
+ */
+export const editorRefusal = (
+  error: unknown,
+  fieldsByCode: Record<string, string>,
+  shownFields: string[],
+): { fields: Record<string, string>; form: string | null; focus: string | null } =>
+  formRefusal(
+    apiErrorView(error, fieldsByCode, "Couldn't save. Check your connection and try again."),
+    shownFields,
+  );
+
+/**
+ * What saving does to a line whose "Applies to every corridor" box was changed while editing it: the
+ * line moves rather than being copied, so the other corridors lose it or gain it.
+ */
+export const lineScopeWarning = (
+  editing: Pick<RateLine, 'everyCorridor'> | null,
+  everyCorridor: boolean,
+  corridorCode: string,
+): string | null => {
+  if (!editing || editing.everyCorridor === everyCorridor) return null;
+  const here = corridorShort(corridorCode);
+  return everyCorridor
+    ? `Saving makes this line apply to every corridor, not only ${here}.`
+    : `Saving moves this line to ${here} only: every other corridor loses it.`;
+};
+
+/**
+ * The corridor to show: the one in the address when the catalog has it, else the first. `unknown` says the
+ * address named a corridor the catalog doesn't have (an old link), so the page can say so.
+ */
+export const pickCorridor = (
+  corridors: Pick<RateCorridor, 'id'>[],
+  param: string | null,
+): { id: string | null; unknown: boolean } => {
+  if (param && corridors.some((c) => c.id === param)) return { id: param, unknown: false };
+  return { id: corridors[0]?.id ?? null, unknown: param != null };
+};
+
+/** Accessible names for a table row's Edit and Remove buttons. */
+export const rowActionLabels = (name: string): { edit: string; remove: string } => ({
+  edit: `Edit ${name}`,
+  remove: `Remove ${name}`,
+});

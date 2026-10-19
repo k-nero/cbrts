@@ -1,5 +1,5 @@
 import { type FC, useEffect } from 'react';
-import { useFieldArray } from 'react-hook-form';
+import { useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import BaseModal from '@/components/modal/BaseModal';
-import { Button } from '@/components/ui';
+import { Button, Callout } from '@/components/ui';
 import {
   usePutPolicies,
   usePutServiceClass,
@@ -25,7 +25,17 @@ import type {
   ServiceClassRow,
   TrailerType,
 } from '@/interfaces';
-import { apiErrorView, bandRefusal, bandsSave } from '@/lib/utils';
+import { bandRefusal, bandsSave, editorRefusal, lineScopeWarning } from '@/lib/utils';
+
+import {
+  type BandsForm,
+  bandsSchema,
+  type ClassForm,
+  classSchema,
+  LINE_FIELDS,
+  type LineForm,
+  lineSchema,
+} from './schemas';
 
 type Opt<T extends string> = { label: string; value: T };
 const opt = <T extends string>(value: T, label: string): Opt<T> => ({ value, label });
@@ -71,85 +81,40 @@ const CLASSES: Opt<ServiceClass>[] = [
   opt('FIRST', 'First'),
 ];
 
-const option = z.object({ label: z.string(), value: z.string() });
-const amount = z.number({ error: 'Enter an amount.' }).min(0, "An amount can't be negative.");
-
 /** A modal's save failed: the page handles a vanished draft, the form shows everything else. */
 type OnDraftGone = (error: unknown) => boolean;
 
+/** Puts a refusal on the fields the form shows (focusing the first) and the rest in the form message. */
 const refuse = (
   error: unknown,
   fieldsByCode: Record<string, string>,
-  setError: (name: string, message: string) => void,
+  shownFields: string[],
+  setError: (name: string, message: string, focus: boolean) => void,
 ) => {
-  const view = apiErrorView(
-    error,
-    fieldsByCode,
-    "Couldn't save. Check your connection and try again.",
+  const refusal = editorRefusal(error, fieldsByCode, shownFields);
+  Object.entries(refusal.fields).forEach(([field, message]) =>
+    setError(field, message, field === refusal.focus),
   );
-  Object.entries(view.fields).forEach(([field, message]) => setError(field, message));
-  if (view.form) setError('form_error', view.form);
+  if (refusal.form) setError('form_error', refusal.form, false);
 };
 
 // --- catalog lines ------------------------------------------------------------------------------------
 
-const lineSchema = z
-  .object({
-    everyCorridor: z.boolean(),
-    code: z
-      .string()
-      .trim()
-      .min(1, 'Enter a code.')
-      .max(40, 'At most 40 characters.')
-      .regex(/^[A-Z0-9_]+$/, 'Use capitals, digits and underscores.'),
-    group: option,
-    description: z.string().trim().min(1, 'Describe the line.').max(160, 'At most 160 characters.'),
-    basis: option,
-    appliesToSex: option.nullable(),
-    appliesToTrailer: option.nullable(),
-    rate: amount,
-    minCharge: z.number().min(0, "An amount can't be negative.").nullable(),
-    defaultQuantity: z.number().positive('Enter more than zero.').nullable(),
-    certainty: option,
-    estimateNote: z.string().max(300, 'At most 300 characters.'),
-  })
-  .superRefine((v, ctx) => {
-    const basis = v.basis.value as RateBasis;
-    if (v.appliesToTrailer && basis !== 'PER_KM')
-      ctx.addIssue({
-        code: 'custom',
-        path: ['appliesToTrailer'],
-        message: 'Only a per-km line can be for one trailer kind.',
-      });
-    if (v.minCharge != null && basis !== 'PER_KM')
-      ctx.addIssue({
-        code: 'custom',
-        path: ['minCharge'],
-        message: 'Only a per-km line has a minimum charge.',
-      });
-    if (basis === 'PER_HOUR' && v.defaultQuantity == null)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['defaultQuantity'],
-        message: 'A per-hour line needs the hours it assumes.',
-      });
-    if (v.certainty.value === 'ESTIMATED' && !v.estimateNote.trim())
-      ctx.addIssue({
-        code: 'custom',
-        path: ['estimateNote'],
-        message: 'Say why an estimated line may vary.',
-      });
-  });
-type LineForm = z.infer<typeof lineSchema>;
-
-const LINE_FIELDS: Record<string, string> = {
-  DUPLICATE_RATE_CODE: 'code',
-  BASIS: 'basis',
-  APPLIES_TO_TRAILER: 'appliesToTrailer',
-  MIN_CHARGE: 'minCharge',
-  DEFAULT_QUANTITY: 'defaultQuantity',
-  ESTIMATE_NOTE: 'estimateNote',
-};
+/** Every field the line form shows, so a refusal for any other lands in the form message. */
+const LINE_SHOWN = [
+  'everyCorridor',
+  'code',
+  'group',
+  'description',
+  'basis',
+  'rate',
+  'appliesToSex',
+  'appliesToTrailer',
+  'minCharge',
+  'defaultQuantity',
+  'certainty',
+  'estimateNote',
+];
 
 /** Add or change a catalog line in the draft, for this corridor or for every corridor. */
 export const LineModal: FC<{
@@ -184,6 +149,9 @@ export const LineModal: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, methods, open]);
 
+  const everyCorridor = useWatch({ control: methods.control, name: 'everyCorridor' }) ?? false;
+  const scopeWarning = lineScopeWarning(editing, everyCorridor, view.corridor.code);
+
   const onSubmit = methods.handleSubmit(async (v) => {
     try {
       await save.mutateAsync({
@@ -208,7 +176,9 @@ export const LineModal: FC<{
       onClose();
     } catch (error) {
       if (onDraftGone(error)) return onClose();
-      refuse(error, LINE_FIELDS, (name, msg) => methods.setError(name as never, { message: msg }));
+      refuse(error, LINE_FIELDS, LINE_SHOWN, (name, msg, focus) =>
+        methods.setError(name as never, { message: msg }, { shouldFocus: focus }),
+      );
     }
   });
 
@@ -229,6 +199,7 @@ export const LineModal: FC<{
               component="checkbox"
               componentProps={{ children: 'Applies to every corridor' }}
             />
+            {scopeWarning && <Callout tone="warn" title={scopeWarning} />}
             <Flex gap={16}>
               <FormField
                 name="code"
@@ -316,17 +287,6 @@ export const LineModal: FC<{
 
 // --- air stall classes ----------------------------------------------------------------------------------
 
-const classSchema = z.object({
-  serviceClass: option,
-  widthPerHorseIn: z
-    .number({ error: 'Enter the width.' })
-    .int('Whole inches.')
-    .min(1, 'The width per horse must be 1 to 96 in.')
-    .max(96, 'The width per horse must be 1 to 96 in.'),
-  positionRate: amount,
-});
-type ClassForm = z.infer<typeof classSchema>;
-
 /** Set an air stall class's width per horse and position rate; horses per position follow from the width. */
 export const ClassModal: FC<{
   open: boolean;
@@ -361,8 +321,12 @@ export const ClassModal: FC<{
       onClose();
     } catch (error) {
       if (onDraftGone(error)) return onClose();
-      refuse(error, { WIDTH_PER_HORSE_IN: 'widthPerHorseIn' }, (name, msg) =>
-        methods.setError(name as never, { message: msg }),
+      refuse(
+        error,
+        { WIDTH_PER_HORSE_IN: 'widthPerHorseIn' },
+        ['serviceClass', 'widthPerHorseIn', 'positionRate'],
+        (name, msg, focus) =>
+          methods.setError(name as never, { message: msg }, { shouldFocus: focus }),
       );
     }
   });
@@ -421,18 +385,6 @@ export const ClassModal: FC<{
 
 // --- volume breaks -------------------------------------------------------------------------------------
 
-const bandsSchema = z.object({
-  ownBands: z.boolean(),
-  bands: z.array(
-    z.object({
-      minHorses: z.number().int().nullable(),
-      maxHorses: z.number().int().nullable(),
-      discountPct: z.number().nullable(),
-    }),
-  ),
-});
-type BandsForm = z.infer<typeof bandsSchema>;
-
 /** Edit the volume breaks as a whole: this corridor's own bands, or the bands for every corridor. */
 export const BreaksModal: FC<{
   open: boolean;
@@ -471,7 +423,8 @@ export const BreaksModal: FC<{
       onClose();
     } catch (error) {
       if (onDraftGone(error)) return onClose();
-      refuse(error, {}, (name, msg) => methods.setError(name as never, { message: msg }));
+      // The bands are edited as a set: every refusal is about the whole list.
+      refuse(error, {}, [], (name, msg) => methods.setError(name as never, { message: msg }));
     }
   });
 
@@ -594,8 +547,10 @@ export const PoliciesModal: FC<{
       onClose();
     } catch (error) {
       if (onDraftGone(error)) return onClose();
-      const fields = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, f.key]));
-      refuse(error, fields, (name, msg) => methods.setError(name as never, { message: msg }));
+      const keys = POLICY_FIELDS.map((f) => f.key);
+      refuse(error, Object.fromEntries(keys.map((k) => [k, k])), keys, (name, msg, focus) =>
+        methods.setError(name as never, { message: msg }, { shouldFocus: focus }),
+      );
     }
   });
 

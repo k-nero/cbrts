@@ -50,10 +50,14 @@ describe('classOptions', () => {
 
   test('all three classes when the horses fit', () => {
     expect(classOptions('AIR', fits)).toEqual([
-      { value: 'ECONOMY', label: 'Economy', fits: true },
-      { value: 'BUSINESS', label: 'Business', fits: true },
-      { value: 'FIRST', label: 'First', fits: true },
+      { value: 'ECONOMY', label: 'Economy', fits: true, disabled: false },
+      { value: 'BUSINESS', label: 'Business', fits: true, disabled: false },
+      { value: 'FIRST', label: 'First', fits: true, disabled: false },
     ]);
+  });
+
+  test('every class is disabled while a change is pending', () => {
+    expect(classOptions('AIR', fits, true).map((o) => o.disabled)).toEqual([true, true, true]);
   });
 
   test('only the achievable classes fit after a refusal', () => {

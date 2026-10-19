@@ -42,11 +42,13 @@ const CLASSES: { value: ServiceClass; label: string }[] = [
 export const classOptions = (
   mode: TransportMode,
   fit: StallFit | null,
-): { value: ServiceClass; label: string; fits: boolean }[] => {
+  pending = false,
+): { value: ServiceClass; label: string; fits: boolean; disabled: boolean }[] => {
   if (mode !== 'AIR') return [];
   return CLASSES.map((c) => ({
     ...c,
     fits: fit?.refusal ? fit.achievableClasses.includes(c.value) : true,
+    disabled: pending,
   }));
 };
 

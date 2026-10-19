@@ -9,6 +9,7 @@ import {
   historyWhen,
   noteState,
   queueRoute,
+  quotationAction,
   queueWords,
   reviewSubject,
   reviewSummary,
@@ -168,5 +169,23 @@ describe('what the header describes', () => {
   test('the request itself when no version was kept', () => {
     const review = { request: live, revisions: [] } as unknown as RequestReview;
     expect(reviewSubject(review).departureDate).toBe('2026-11-15');
+  });
+});
+
+describe('quotationAction', () => {
+  const ref = { code: 'Q-2026-0191', versionNo: 1, status: 'DRAFT' as const };
+
+  test('a request in review starts its quotation, or opens the one started', () => {
+    expect(quotationAction('SUBMITTED', null)).toBe('start');
+    expect(quotationAction('UNDER_REVIEW', ref)).toBe('open');
+  });
+
+  test('a request that has left review still opens its quotation', () => {
+    expect(quotationAction('INFO_REQUIRED', ref)).toBe('open');
+    expect(quotationAction('QUOTED', ref)).toBe('open');
+  });
+
+  test('a request out of review with no quotation has no quotation action', () => {
+    expect(quotationAction('INFO_REQUIRED', null)).toBeNull();
   });
 });

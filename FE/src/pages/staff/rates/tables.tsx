@@ -4,7 +4,15 @@ import type { TableColumnsType } from 'antd';
 import Table from '@/components/table';
 import { Button, Chip, Panel, cx } from '@/components/ui';
 import type { RateCorridorView, RateLine, ServiceClass, ServiceClassRow } from '@/interfaces';
-import { bandLabel, basisWords, corridorShort, money, pctText, policyRows } from '@/lib/utils';
+import {
+  bandLabel,
+  basisWords,
+  corridorShort,
+  money,
+  pctText,
+  policyRows,
+  rowActionLabels,
+} from '@/lib/utils';
 
 const CLASS_WORDS: Record<ServiceClass, string> = {
   ECONOMY: 'Economy',
@@ -24,13 +32,18 @@ const actionsColumn = <T extends object>(actions: RowActions<T>, label: (row: T)
           align: 'right' as const,
           render: (_: unknown, row: T) => (
             <span className="flex justify-end gap-1">
-              <Button size="sm" variant="ghost" onClick={() => actions.onEdit(row)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={rowActionLabels(label(row)).edit}
+                onClick={() => actions.onEdit(row)}
+              >
                 Edit
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                aria-label={`Remove ${label(row)}`}
+                aria-label={rowActionLabels(label(row)).remove}
                 onClick={() => actions.onRemove(row)}
               >
                 Remove
@@ -116,6 +129,11 @@ export const BreaksPanel: FC<{ view: RateCorridorView; edit?: ReactNode }> = ({ 
           ? "This corridor's own bands, applied to air and ground lines."
           : 'The bands for every corridor, applied to air and ground lines.'}
       </span>
+      {view.volumeBreaks.length === 0 && (
+        <span className="type-body-s text-ink-2">
+          No volume breaks: every quotation is priced without a discount.
+        </span>
+      )}
       <dl className="m-0 flex flex-col gap-2">
         {view.volumeBreaks.map((b) => (
           <div key={b.minHorses} className="flex items-center justify-between gap-4">

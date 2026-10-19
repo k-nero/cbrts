@@ -11,7 +11,14 @@ import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
 import { useReturnRequest, useStartQuotation } from '@/hooks/staffRequest';
 import type { ApiError, RequestReview } from '@/interfaces';
-import { apiErrorMessage, formatDate, NOTE_MAX, noteState, requestStatusChip } from '@/lib/utils';
+import {
+  apiErrorMessage,
+  formatDate,
+  NOTE_MAX,
+  noteState,
+  quotationAction,
+  requestStatusChip,
+} from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 type NoteForm = { note: string };
@@ -44,7 +51,9 @@ const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
   const id = review.request.id;
   const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));
 
-  if (review.quotation) {
+  const action = quotationAction(review.request.status, review.quotation);
+  if (action === null) return null;
+  if (action === 'open' && review.quotation) {
     return (
       <Button variant="secondary" block onClick={open}>
         {`Open quotation ${review.quotation.code} · v${review.quotation.versionNo}`}
@@ -126,6 +135,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               This request isn&apos;t waiting for review.
             </p>
           )}
+          <QuotationAction review={review} />
         </div>
       </Panel>
     );
