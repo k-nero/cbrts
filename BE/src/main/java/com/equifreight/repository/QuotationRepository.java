@@ -1,6 +1,8 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.enums.QuotationStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +17,12 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
     Optional<Quotation> findFirstByRequestIdOrderByVersionNoDesc(UUID requestId);
 
     Optional<Quotation> findByRequestIdAndVersionNo(UUID requestId, short versionNo);
+
+    /** A request's latest version that is not a draft: what the customer sees. */
+    Optional<Quotation> findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(UUID requestId, QuotationStatus status);
+
+    /** The non-draft versions of a page of requests, for the requests list. */
+    List<Quotation> findByRequestIdInAndStatusNot(Collection<UUID> requestIds, QuotationStatus status);
 
     /** Every version of a request's quotation, newest first. */
     List<Quotation> findByRequestIdOrderByVersionNoDesc(UUID requestId);

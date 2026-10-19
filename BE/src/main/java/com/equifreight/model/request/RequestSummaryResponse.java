@@ -7,7 +7,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 /** A row of the club's requests list. */
-@Builder
+@Builder(toBuilder = true)
 public record RequestSummaryResponse(
         UUID id,
         String code,
@@ -17,4 +17,5 @@ public record RequestSummaryResponse(
         LocalDate departureDate,
         long horseCount,
         Instant createdAt,
-        Instant submittedAt) {}
+        Instant submittedAt,
+        QuotationIssuedRefResponse quotation) {}

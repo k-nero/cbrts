@@ -3,10 +3,13 @@ package com.equifreight.controller.customer;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.estimate.EstimateResponse;
+import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
+import com.equifreight.service.CustomerQuotationService;
 import com.equifreight.service.RequestService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -31,8 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class RequestController {
 
     private final RequestService requestService;
+    private final CustomerQuotationService quotations;
 
-    public RequestController(RequestService requestService) {
+    public RequestController(RequestService requestService, CustomerQuotationService quotations) {
+        this.quotations = quotations;
         this.requestService = requestService;
     }
 
@@ -83,5 +88,11 @@ public class RequestController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal User user, @PathVariable UUID id) {
         requestService.delete(user, id);
+    }
+
+    @Operation(summary = "The request's latest issued quotation, with its terms and versions; 404 until one is issued")
+    @GetMapping("/requests/{id}/quotation")
+    public CustomerQuotationResponse quotation(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        return quotations.get(user, id);
     }
 }

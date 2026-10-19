@@ -22,6 +22,7 @@ import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
@@ -30,6 +31,7 @@ import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.StallType;
@@ -48,6 +50,7 @@ import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import java.math.BigDecimal;
@@ -88,6 +91,7 @@ class RequestServiceTest {
     AuditService audit;
     AuditLogRepository auditLogs;
     RequestEstimator estimator;
+    QuotationRepository quotations;
     RequestService service;
     User user;
     Club club;
@@ -110,6 +114,7 @@ class RequestServiceTest {
         audit = mock(AuditService.class);
         auditLogs = mock(AuditLogRepository.class);
         estimator = mock(RequestEstimator.class);
+        quotations = mock(QuotationRepository.class);
         service = new RequestService(
                 requests,
                 horses,
@@ -122,7 +127,8 @@ class RequestServiceTest {
                 auditLogs,
                 JsonMapper.builder().build(),
                 Clock.fixed(NOW, BusinessTime.ZONE),
-                estimator);
+                estimator,
+                quotations);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -567,6 +573,69 @@ class RequestServiceTest {
                 .containsExactly(second.getId());
     }
 
+    // --- slice 6: the request names its issued quotation ----------------------------------------------
+
+    static Quotation issuedQuotation(TransportRequest r, int versionNo) {
+        Quotation q = new Quotation();
+        q.setId(UUID.randomUUID());
+        q.setRequest(r);
+        q.setCode("Q-2026-0192");
+        q.setVersionNo((short) versionNo);
+        q.setStatus(QuotationStatus.ISSUED);
+        q.setValidUntil(Instant.parse("2026-10-27T16:59:59.999Z"));
+        return q;
+    }
+
+    @Test
+    void theRequestNamesItsIssuedQuotation() {
+        TransportRequest quoted = submitted();
+        quoted.setStatus(RequestStatus.QUOTED);
+        Corridor corridor = new Corridor();
+        quoted.setCorridor(corridor);
+        quoted.setOriginPlace(phuTho);
+        quoted.setDestinationPlace(chaoPhraya);
+        when(requests.findByIdAndClubId(quoted.getId(), CLUB_ID)).thenReturn(Optional.of(quoted));
+        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(quoted.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(issuedQuotation(quoted, 2)));
+
+        RequestResponse response = service.get(user, quoted.getId());
+
+        assertThat(response.quotation().code()).isEqualTo("Q-2026-0192");
+        assertThat(response.quotation().versionNo()).isEqualTo((short) 2);
+        assertThat(response.quotation().status()).isEqualTo(QuotationStatus.ISSUED);
+        assertThat(response.quotation().validUntil()).isEqualTo(Instant.parse("2026-10-27T16:59:59.999Z"));
+    }
+
+    @Test
+    void aRequestWithOnlyADraftQuotationNamesNone() {
+        TransportRequest inReview = submitted();
+        Corridor corridor = new Corridor();
+        inReview.setCorridor(corridor);
+        inReview.setOriginPlace(phuTho);
+        inReview.setDestinationPlace(chaoPhraya);
+        when(requests.findByIdAndClubId(inReview.getId(), CLUB_ID)).thenReturn(Optional.of(inReview));
+        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+
+        assertThat(service.get(user, inReview.getId()).quotation()).isNull();
+    }
+
+    @Test
+    void listRowsNameTheirLatestIssuedQuotation() {
+        TransportRequest first = draft(shadowfax, nightfall);
+        TransportRequest second = draft(copperKing);
+        Pageable pageable = PageRequest.of(0, 20);
+        when(requests.findByClubId(CLUB_ID, pageable)).thenReturn(new PageImpl<>(List.of(first, second)));
+        when(requests.countHorses(anyCollection())).thenReturn(List.of());
+        when(quotations.findByRequestIdInAndStatusNot(anyCollection(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(issuedQuotation(first, 1), issuedQuotation(first, 2)));
+
+        Page<RequestSummaryResponse> page = service.list(user, null, pageable);
+
+        assertThat(page.getContent().get(0).quotation().versionNo()).isEqualTo((short) 2);
+        assertThat(page.getContent().get(1).quotation()).isNull();
+    }
+
     /** Spec R-07: submitting a draft. */
     // --- an INFO_REQUIRED request (US-F1-04) ----------------------------------------------------------
 
@@ -981,7 +1050,8 @@ class RequestServiceTest {
                     auditLogs,
                     JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE),
-                    estimator);
+                    estimator,
+                    quotations);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 
