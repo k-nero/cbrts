@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
+import type { QuoteLineRow, Readiness } from '@/interfaces';
+
 import {
+  changedSince,
   classOptions,
   conflictMessage,
+  depositText,
+  issueBlocker,
+  overrideDefaults,
+  validityText,
   money,
   moneyOrDash,
   quoteSummary,
@@ -198,5 +205,101 @@ describe('conflictMessage', () => {
   test('anything else is not a conflict', () => {
     expect(conflictMessage({ response: { status: 400, data: { message: 'x' } } })).toBeNull();
     expect(conflictMessage(new Error('offline'))).toBeNull();
+  });
+});
+
+// --- slice 6: issuing -------------------------------------------------------------------------------
+
+const readiness = (blockers: string[]): Readiness => ({
+  ready: blockers.length === 0,
+  pricedLines: 9,
+  lineCount: 9,
+  blockers,
+});
+
+const line = (over: Partial<QuoteLineRow> = {}): QuoteLineRow => ({
+  id: 'l1',
+  lineKey: 'GROOM',
+  description: 'Flying groom',
+  basisText: 'one per three horses · 2 ÷ 3, rounded up = 1',
+  quantity: 1,
+  unitRate: 1450,
+  amount: 1450,
+  certainty: 'FIXED',
+  estimateNote: null,
+  source: 'CATALOG',
+  catalogAmount: 1450,
+  overrideAmount: null,
+  overrideReason: null,
+  manual: false,
+  manualReason: null,
+  ...over,
+});
+
+describe('issueBlocker', () => {
+  test('nothing blocks an issued version or a ready draft', () => {
+    expect(issueBlocker(null)).toBeNull();
+    expect(issueBlocker(readiness([]))).toBeNull();
+  });
+  test('names the first blocker', () => {
+    expect(
+      issueBlocker(
+        readiness([
+          '1 rate is missing on Hanoi → Vientiane.',
+          'Rate catalog v5 has no deposit percentage.',
+        ]),
+      ),
+    ).toBe('1 rate is missing on Hanoi → Vientiane.');
+  });
+});
+
+describe('changedSince', () => {
+  const previous = { versionNo: 1, total: 9120.4, amountsByKey: { GROOM: 1450 } };
+  test('a changed amount says what it was', () => {
+    expect(changedSince(line({ amount: 1200, overrideAmount: 1200 }), previous)).toBe(
+      'was $1,450.00',
+    );
+  });
+  test('a line the previous version did not have is new', () => {
+    expect(changedSince(line({ lineKey: 'MANUAL:abc' }), previous)).toBe('new');
+  });
+  test('an unchanged line, or no previous version, says nothing', () => {
+    expect(changedSince(line(), previous)).toBeNull();
+    expect(changedSince(line({ amount: 1200 }), null)).toBeNull();
+  });
+});
+
+describe('validityText', () => {
+  test('a draft counts its days from issue', () => {
+    expect(validityText(null, 7)).toEqual({ line1: 'In 7 days', line2: 'from issue' });
+  });
+  test('an issued version names its last day', () => {
+    expect(validityText('2026-10-27T16:59:59.999Z', 7)).toEqual({
+      line1: 'Until 27 Oct 2026',
+      line2: 'end of day, Vietnam time',
+    });
+  });
+  test('no validity in the catalog', () => {
+    expect(validityText(null, null)).toEqual({ line1: '—', line2: 'no validity in the catalog' });
+  });
+});
+
+describe('depositText', () => {
+  test('percentage and amount', () => {
+    expect(depositText({ pct: 30, amount: 2627.02 })).toBe('30% · $2,627.02');
+  });
+  test('a draft shows the percentage of the total to come', () => {
+    expect(depositText(null)).toBe('—');
+  });
+});
+
+describe('overrideDefaults', () => {
+  test('starts from the catalog amount', () => {
+    expect(overrideDefaults(line())).toEqual({ amount: '1450.00', reason: '' });
+  });
+  test('editing an override starts from it', () => {
+    expect(
+      overrideDefaults(line({ amount: 1200, overrideAmount: 1200, overrideReason: 'Own groom' })),
+    ).toEqual({ amount: '1200.00', reason: 'Own groom' });
   });
 });

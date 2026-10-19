@@ -31,7 +31,11 @@ export const queryKeys = {
     queues: () => ['staff-requests', 'queue'] as const,
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
-    quotation: (id: string) => ['staff-requests', id, 'quotation'] as const,
+    /** Every version of the request's quotation; invalidate this after a write. */
+    quotations: (id: string) => ['staff-requests', id, 'quotation'] as const,
+    /** One version, or the latest when none is named. */
+    quotation: (id: string, version?: number) =>
+      ['staff-requests', id, 'quotation', version ?? 'latest'] as const,
   },
   rates: {
     all: () => ['rates'] as const,
