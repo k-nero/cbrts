@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { ScrollRestoration, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import LoadingPage from '@/components/LoadingPage';
 import { useCustomRouter } from '@/router/route.hook';
@@ -46,10 +46,5 @@ export const RoutesGuardWrapper: React.FC<{ children: React.ReactNode }> = ({ ch
 
   if (!isAllowedToPass) return <LoadingPage fullscreen />;
 
-  return (
-    <>
-      <ScrollRestoration getKey={(location) => location.pathname + location.search} />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 };

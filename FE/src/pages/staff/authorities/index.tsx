@@ -1,4 +1,4 @@
-import { FC, useState, useMemo } from 'react';
+import { FC, useState, useMemo, useEffect } from 'react';
 import {
   Flex,
   Select,
@@ -24,6 +24,8 @@ import { StatTile } from '@/components/ui/StatTile';
 import { ClearanceGate } from '@/components/ui/ClearanceGate';
 import {
   useAuthorities,
+  useClearanceJobs,
+  useQuarantineFacilities,
   useJobSubmissions,
   useCreateSubmission,
   useUpdateSubmission,
@@ -34,6 +36,7 @@ import {
   useEvaluateClearanceGate,
 } from '@/hooks/clearance';
 import type {
+  JobSummary,
   AuthoritySubmission,
   SubmissionKind,
   SubmissionStatus,
@@ -41,39 +44,6 @@ import type {
   UpdateAuthoritySubmissionRequest,
   CreateQuarantinePeriodRequest,
 } from '@/interfaces';
-
-// Canonical demo job ID
-const CANONICAL_JOB_ID = 'a0000000-0000-0000-0000-000000000041';
-
-const JOB_OPTIONS = [
-  {
-    label: 'CBRT-2026-041 · Saigon Turf Club (Ho Chi Minh City → Phnom Penh)',
-    value: 'a0000000-0000-0000-0000-000000000041',
-  },
-  {
-    label: 'CBRT-2026-001 · Royal Bangkok Stables (Hanoi → Bangkok)',
-    value: '00000000-0000-0000-0000-000000000001',
-  },
-];
-
-// Seeded quarantine facilities
-const QUARANTINE_STATIONS = [
-  {
-    id: 'a1000000-0000-0000-0000-000000000001',
-    name: 'Phú Thọ Pre-Export Quarantine Station (Ho Chi Minh City, VN)',
-    minDays: 7,
-  },
-  {
-    id: 'a1000000-0000-0000-0000-000000000002',
-    name: 'Svay Rieng Border Quarantine Station (Svay Rieng, KH)',
-    minDays: 7,
-  },
-  {
-    id: 'a1000000-0000-0000-0000-000000000003',
-    name: 'Phnom Penh Equestrian Quarantine Facility (Phnom Penh, KH)',
-    minDays: 7,
-  },
-];
 
 const SUBMISSION_KIND_LABELS: Record<SubmissionKind, string> = {
   EXPORT_HEALTH_CERTS: 'Export Health Certificates (DAH / RAHO)',
@@ -93,7 +63,19 @@ const STATUS_CHIP_CONFIG: Record<
 };
 
 const AuthoritiesPage: FC = () => {
-  const [jobId, setJobId] = useState<string>(CANONICAL_JOB_ID);
+  const [jobSearch, setJobSearch] = useState('');
+  const { data: clearanceJobs = [], isLoading: loadingJobs } = useClearanceJobs(jobSearch);
+  const { data: quarantineStations = [], isLoading: loadingStations } = useQuarantineFacilities();
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  // Auto-select first job if not yet selected
+  useEffect(() => {
+    if (!jobId && clearanceJobs.length > 0) {
+      setJobId(clearanceJobs[0].id);
+    }
+  }, [jobId, clearanceJobs]);
+
+  const selectedJob = clearanceJobs.find((j: JobSummary) => j.id === jobId);
 
   // Queries
   const { data: authorities = [], isLoading: loadingAuthorities } = useAuthorities();
@@ -225,7 +207,7 @@ const AuthoritiesPage: FC = () => {
   const handleOpenQuarantineModal = () => {
     quarantineForm.resetFields();
     quarantineForm.setFieldsValue({
-      placeId: QUARANTINE_STATIONS[0].id,
+      placeId: quarantineStations[0]?.id,
       dates: [dayjs(), dayjs().add(7, 'day')],
     });
     setQuarantineModalOpen(true);
@@ -311,16 +293,27 @@ const AuthoritiesPage: FC = () => {
         <div className="flex items-center gap-3">
           <span className="type-label-s text-ink-2">Transport job:</span>
           <Select
-            value={jobId}
-            onChange={(val) => setJobId(val)}
-            options={JOB_OPTIONS}
+            showSearch
+            placeholder="Search by job code or club"
+            value={jobId ?? undefined}
+            onChange={(val) => setJobId(val ?? null)}
+            onSearch={setJobSearch}
+            loading={loadingJobs}
+            options={clearanceJobs.map((j: JobSummary) => ({
+              label: `${j.code} · ${j.clubName ? j.clubName + ' ' : ''}(${j.originCity} → ${j.destinationCity})`,
+              value: j.id,
+            }))}
             className="w-[380px] sm:w-[460px]"
             size="middle"
           />
         </div>
         <div className="flex items-center gap-2 text-[13px] text-ink-2">
           <span>Crossing route:</span>
-          <Tag color="cyan">VN → KH (Mộc Bài – Bavet Border)</Tag>
+          <Tag color="cyan">
+            {selectedJob
+              ? `${selectedJob.originCity} → ${selectedJob.destinationCity}`
+              : (clearanceStatus?.jobCode ?? 'In transit')}
+          </Tag>
         </div>
       </div>
 
@@ -329,8 +322,8 @@ const AuthoritiesPage: FC = () => {
         state={clearanceStatus?.clearanceReady ? 'clear' : 'locked'}
         title={
           clearanceStatus?.clearanceReady
-            ? `Clearance Gate OPEN (Job ${clearanceStatus.jobCode ?? 'CBRT-2026-041'})`
-            : `Clearance Gate LOCKED (Job ${clearanceStatus?.jobCode ?? 'CBRT-2026-041'})`
+            ? `Clearance Gate OPEN (${clearanceStatus.jobCode ?? selectedJob?.code ?? 'Job'})`
+            : `Clearance Gate LOCKED (${clearanceStatus?.jobCode ?? selectedJob?.code ?? 'Job'})`
         }
         action={
           <Button
@@ -800,8 +793,9 @@ const AuthoritiesPage: FC = () => {
             rules={[{ required: true, message: 'Please select a facility' }]}
           >
             <Select
-              options={QUARANTINE_STATIONS.map((s) => ({
-                label: `${s.name} (Requires min ${s.minDays} days)`,
+              loading={loadingStations}
+              options={quarantineStations.map((s: { id: string; name: string; city?: string }) => ({
+                label: `${s.name}${s.city ? ` (${s.city})` : ''}`,
                 value: s.id,
               }))}
             />

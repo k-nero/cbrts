@@ -228,6 +228,16 @@ export const useUpdateSubmission = (jobId: string | null | undefined) => {
 /**
  * Quarantine periods list for a job.
  */
+export const useQuarantineFacilities = () => {
+  return useQuery({
+    queryKey: ['clearance', 'quarantine-facilities'],
+    queryFn: async () => {
+      const res = await clearanceApi.getQuarantineFacilities();
+      return res.data;
+    },
+  });
+};
+
 export const useJobQuarantines = (jobId: string | null | undefined) => {
   return useQuery({
     queryKey: queryKeys.clearance.quarantines(jobId ?? ''),

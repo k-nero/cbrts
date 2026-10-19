@@ -668,35 +668,10 @@ export const RegulationsPage: FC = () => {
                             <span className="type-mono font-medium text-ink-2">v{v.versionNo}</span>
                           </div>
                           <span className="type-body-s text-ink-3">
-                            {v.versionNo === 6
-                              ? 'Published 2 Aug 2026 · 0 jobs pinned'
-                              : 'Published 14 Jun 2026 · archived'}
+                            {`Published ${v.publishedAt ? new Date(v.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'earlier'}${v.pinnedJobsCount ? ` · ${v.pinnedJobsCount} jobs pinned` : ' · archived'}`}
                           </span>
                         </div>
                       ))}
-
-                    {/* Fallback historical rows if catalog has fewer versions seeded */}
-                    {(!selectedCatalog?.versions || selectedCatalog.versions.length <= 2) &&
-                      selectedCatalog?.countryCode === 'KH' && (
-                        <>
-                          <div className="py-3 flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="type-mono font-medium text-ink-2">v6</span>
-                            </div>
-                            <span className="type-body-s text-ink-3">
-                              Published 2 Aug 2026 · 0 jobs pinned
-                            </span>
-                          </div>
-                          <div className="py-3 flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="type-mono font-medium text-ink-2">v5</span>
-                            </div>
-                            <span className="type-body-s text-ink-3">
-                              Published 14 Jun 2026 · archived
-                            </span>
-                          </div>
-                        </>
-                      )}
                   </div>
                 </Panel>
               </div>

@@ -59,6 +59,11 @@ export const clearanceApi = {
   updateSubmission: (submissionId: string, data: UpdateAuthoritySubmissionRequest) =>
     client.put<AuthoritySubmission>(`/staff/clearance/submissions/${submissionId}`, data),
 
+  getQuarantineFacilities: () =>
+    client.get<Array<{ id: string; name: string; city?: string; countryCode?: string }>>(
+      '/staff/clearance/quarantine-facilities',
+    ),
+
   // Quarantines
   getQuarantinesByJob: (jobId: string) =>
     client.get<QuarantinePeriod[]>(`/staff/clearance/jobs/${jobId}/quarantines`),

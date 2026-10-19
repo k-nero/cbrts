@@ -69,11 +69,11 @@ class DataSeederTest {
                 mock(RegulationRuleRepository.class),
                 mock(DocumentTypeRepository.class),
                 mock(JobRegulationPinRepository.class),
-                mock(RateServiceClassRepository.class),
-                mock(RateVolumeBreakRepository.class),
-                mock(RatePolicyRepository.class),
-                mock(RateFeeBandRepository.class),
-                mock(RateLineRepository.class),
+                mock(AuthorityRepository.class),
+                mock(AuthoritySubmissionRepository.class),
+                mock(QuarantinePeriodRepository.class),
+                mock(NoteRepository.class),
+                mock(NoteReplyRepository.class),
                 mock(CatalogSeeder.class));
 
         Club club = new Club();

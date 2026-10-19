@@ -138,11 +138,11 @@ public class DataSeeder implements ApplicationRunner {
     private final RegulationRuleRepository regulationRuleRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final JobRegulationPinRepository jobRegulationPinRepository;
-    private final RateServiceClassRepository rateServiceClassRepository;
-    private final RateVolumeBreakRepository rateVolumeBreakRepository;
-    private final RatePolicyRepository ratePolicyRepository;
-    private final RateFeeBandRepository rateFeeBandRepository;
-    private final RateLineRepository rateLineRepository;
+    private final AuthorityRepository authorityRepository;
+    private final AuthoritySubmissionRepository authoritySubmissionRepository;
+    private final QuarantinePeriodRepository quarantinePeriodRepository;
+    private final NoteRepository noteRepository;
+    private final NoteReplyRepository noteReplyRepository;
     private final CatalogSeeder catalogSeeder;
 
     public DataSeeder(
@@ -175,11 +175,11 @@ public class DataSeeder implements ApplicationRunner {
             RegulationRuleRepository regulationRuleRepository,
             DocumentTypeRepository documentTypeRepository,
             JobRegulationPinRepository jobRegulationPinRepository,
-            RateServiceClassRepository rateServiceClassRepository,
-            RateVolumeBreakRepository rateVolumeBreakRepository,
-            RatePolicyRepository ratePolicyRepository,
-            RateFeeBandRepository rateFeeBandRepository,
-            RateLineRepository rateLineRepository,
+            AuthorityRepository authorityRepository,
+            AuthoritySubmissionRepository authoritySubmissionRepository,
+            QuarantinePeriodRepository quarantinePeriodRepository,
+            NoteRepository noteRepository,
+            NoteReplyRepository noteReplyRepository,
             CatalogSeeder catalogSeeder) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -210,11 +210,11 @@ public class DataSeeder implements ApplicationRunner {
         this.regulationRuleRepository = regulationRuleRepository;
         this.documentTypeRepository = documentTypeRepository;
         this.jobRegulationPinRepository = jobRegulationPinRepository;
-        this.rateServiceClassRepository = rateServiceClassRepository;
-        this.rateVolumeBreakRepository = rateVolumeBreakRepository;
-        this.ratePolicyRepository = ratePolicyRepository;
-        this.rateFeeBandRepository = rateFeeBandRepository;
-        this.rateLineRepository = rateLineRepository;
+        this.authorityRepository = authorityRepository;
+        this.authoritySubmissionRepository = authoritySubmissionRepository;
+        this.quarantinePeriodRepository = quarantinePeriodRepository;
+        this.noteRepository = noteRepository;
+        this.noteReplyRepository = noteReplyRepository;
         this.catalogSeeder = catalogSeeder;
     }
 
@@ -230,7 +230,8 @@ public class DataSeeder implements ApplicationRunner {
         seedVehicles();
         seedDemoJobs();
         seedRegulations();
-        seedRateCatalog();
+        seedAuthoritiesAndQuarantinePlaces();
+        seedClearanceSubmissionsAndNotes();
     }
 
     private void seedRolesAndUsers() {
@@ -1020,353 +1021,161 @@ public class DataSeeder implements ApplicationRunner {
         regulationRuleRepository.saveAndFlush(r);
     }
 
-    private void seedRateCatalog() {
-        if (countryRepository.findById("VN").isEmpty() || rateCatalogVersionRepository.count() > 0) {
+    private void seedAuthoritiesAndQuarantinePlaces() {
+        if (authorityRepository.count() > 0) {
             return;
         }
+        createAuthority("Regional Animal Health Office No. VI (RAHO6)", "VN", AuthorityKind.VETERINARY, (short) 5);
+        createAuthority("Mộc Bài Customs Sub-Department", "VN", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority(
+                "General Directorate of Animal Health and Production (GDAHP)", "KH", AuthorityKind.VETERINARY, (short)
+                        4);
+        createAuthority("Bavet International Border Customs", "KH", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority("Cambodia Border Animal Quarantine Station", "KH", AuthorityKind.QUARANTINE, (short) 1);
 
-        User publisher = userRepository.getByEmail("lan.nguyen@equifreight.vn");
-        if (publisher == null) {
+        createPlaceIfMissing(
+                "Phú Thọ Pre-Export Quarantine Station",
+                PlaceKind.QUARANTINE,
+                "Ho Chi Minh City",
+                "VN",
+                "District 11, HCMC");
+        createPlaceIfMissing(
+                "Svay Rieng Border Quarantine Station",
+                PlaceKind.QUARANTINE,
+                "Svay Rieng",
+                "KH",
+                "National Road 1, Svay Rieng");
+        createPlaceIfMissing(
+                "Phnom Penh Equestrian Quarantine Facility",
+                PlaceKind.QUARANTINE,
+                "Phnom Penh",
+                "KH",
+                "Dangkao, Phnom Penh");
+        log.info("Seeded regulatory authorities and quarantine stations");
+    }
+
+    private void createAuthority(String name, String countryCode, AuthorityKind kind, short slaDays) {
+        if (authorityRepository.findByName(name).isPresent()) {
             return;
         }
+        Authority a = new Authority();
+        a.setName(name);
+        a.setCountry(countryRepository.getReferenceById(countryCode));
+        a.setKind(kind);
+        a.setSlaDays(slaDays);
+        authorityRepository.save(a);
+    }
 
-        Corridor pnhHkg = corridorRepository.findByCode("AIR PNH -> HKG").orElse(null);
-        Corridor sgnHkg = corridorRepository.findByCode("AIR SGN -> HKG").orElse(null);
-
-        // 1. Seed retired v11
-        RateCatalogVersion v11 = new RateCatalogVersion();
-        v11.setVersionNo(11);
-        v11.setStatus(CatalogStatus.DRAFT);
-        v11.setChangeNote("Previous rates");
-        rateCatalogVersionRepository.saveAndFlush(v11);
-        v11.setStatus(CatalogStatus.RETIRED);
-        v11.setPublishedAt(Instant.parse("2026-08-01T08:00:00Z"));
-        v11.setPublishedBy(publisher);
-        rateCatalogVersionRepository.saveAndFlush(v11);
-
-        // 2. Seed published v12
-        RateCatalogVersion v12 = new RateCatalogVersion();
-        v12.setVersionNo(12);
-        v12.setStatus(CatalogStatus.DRAFT);
-        v12.setChangeNote("Base rates for Q3 2026");
-        rateCatalogVersionRepository.saveAndFlush(v12);
-
-        if (pnhHkg != null) {
-            createServiceClass(v12, pnhHkg, ServiceClass.ECONOMY, (short) 32, (short) 3, BigDecimal.valueOf(16800.00));
-            createServiceClass(v12, pnhHkg, ServiceClass.BUSINESS, (short) 48, (short) 2, BigDecimal.valueOf(16800.00));
-            createServiceClass(v12, pnhHkg, ServiceClass.FIRST, (short) 96, (short) 1, BigDecimal.valueOf(16800.00));
+    private void createPlaceIfMissing(String name, PlaceKind kind, String city, String countryCode, String address) {
+        if (placeRepository.findByName(name).isPresent()) {
+            return;
         }
-        if (sgnHkg != null) {
-            createServiceClass(v12, sgnHkg, ServiceClass.ECONOMY, (short) 32, (short) 3, BigDecimal.valueOf(16800.00));
-            createServiceClass(v12, sgnHkg, ServiceClass.BUSINESS, (short) 48, (short) 2, BigDecimal.valueOf(16800.00));
-            createServiceClass(v12, sgnHkg, ServiceClass.FIRST, (short) 96, (short) 1, BigDecimal.valueOf(16800.00));
-        }
+        Place p = new Place();
+        p.setName(name);
+        p.setKind(kind);
+        p.setCity(city);
+        p.setCountry(countryRepository.getReferenceById(countryCode));
+        p.setAddress(address);
+        placeRepository.save(p);
+    }
 
-        createVolumeBreak(v12, (short) 1, (short) 1, BigDecimal.ZERO);
-        createVolumeBreak(v12, (short) 2, (short) 3, BigDecimal.valueOf(5.00));
-        createVolumeBreak(v12, (short) 4, (short) 7, BigDecimal.valueOf(8.00));
-        createVolumeBreak(v12, (short) 8, null, BigDecimal.valueOf(15.00));
+    private void seedClearanceSubmissionsAndNotes() {
+        TransportJob job = transportJobRepository.findByCode("CBRT-2026-041").orElse(null);
+        if (job == null) return;
 
-        createPolicy(v12, RatePolicyKey.FUEL_PCT, BigDecimal.valueOf(18.000));
-        createPolicy(v12, RatePolicyKey.INSURANCE_PCT, BigDecimal.valueOf(1.500));
-        createPolicy(v12, RatePolicyKey.CONTINGENCY_PCT, BigDecimal.valueOf(5.000));
-        createPolicy(v12, RatePolicyKey.SERVICE_FEE_PCT, BigDecimal.valueOf(12.000));
-        createPolicy(v12, RatePolicyKey.DEPOSIT_PCT, BigDecimal.valueOf(30.000));
-        createPolicy(v12, RatePolicyKey.QUOTE_VALIDITY_DAYS, BigDecimal.valueOf(7.000));
-        createPolicy(v12, RatePolicyKey.ARRIVAL_WINDOW_PCT, BigDecimal.valueOf(20.000));
-        createPolicy(v12, RatePolicyKey.ARRIVAL_WINDOW_MIN_HOURS, BigDecimal.valueOf(3.000));
-        createPolicy(v12, RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, BigDecimal.valueOf(10.000));
-        createPolicy(v12, RatePolicyKey.LATE_PENALTY_CAP_PCT, BigDecimal.valueOf(30.000));
-        createPolicy(v12, RatePolicyKey.FLIGHT_VET_MIN_HORSES, BigDecimal.valueOf(8.000));
-        createPolicy(v12, RatePolicyKey.HIGH_VALUE_THRESHOLD, BigDecimal.valueOf(250000.000));
+        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
+        User lan = userRepository.getByEmail("lan.nguyen@equifreight.vn");
+        User customer = userRepository.getByEmail("bookings@saigonturf.vn");
+        Club saigonClub = clubRepository.findByName("Saigon Turf Club").orElse(null);
 
-        createFeeBand(v12, FeeBandKind.SHORT_NOTICE, (short) 0, (short) 13, BigDecimal.valueOf(1.250));
-        createFeeBand(v12, FeeBandKind.SHORT_NOTICE, (short) 14, (short) 21, BigDecimal.valueOf(1.100));
-        createFeeBand(v12, FeeBandKind.CANCELLATION, (short) 0, (short) 2, BigDecimal.valueOf(100.000));
-        createFeeBand(v12, FeeBandKind.CANCELLATION, (short) 3, (short) 7, BigDecimal.valueOf(50.000));
-        createFeeBand(v12, FeeBandKind.CANCELLATION, (short) 8, (short) 14, BigDecimal.valueOf(25.000));
-        createFeeBand(v12, FeeBandKind.CANCELLATION, (short) 15, null, BigDecimal.valueOf(10.000));
+        // Authority Submissions
+        if (authoritySubmissionRepository.count() == 0) {
+            Authority raho6 = authorityRepository
+                    .findByName("Regional Animal Health Office No. VI (RAHO6)")
+                    .orElse(null);
+            Authority gdahp = authorityRepository
+                    .findByName("General Directorate of Animal Health and Production (GDAHP)")
+                    .orElse(null);
 
-        createRateLine(
-                v12,
-                null,
-                "ISO-STALLION",
-                "B",
-                "Pre-export isolation · stallion",
-                RateBasis.PER_DAY,
-                HorseSex.STALLION,
-                BigDecimal.valueOf(140.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "ISO-MARE",
-                "B",
-                "Pre-export isolation · mare",
-                RateBasis.PER_DAY,
-                HorseSex.MARE,
-                BigDecimal.valueOf(85.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "ISO-GELDING",
-                "B",
-                "Pre-export isolation · gelding",
-                RateBasis.PER_DAY,
-                HorseSex.GELDING,
-                BigDecimal.valueOf(70.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "GROOM-AIR",
-                "D",
-                "Flying groom",
-                RateBasis.PER_SHIPMENT,
-                null,
-                BigDecimal.valueOf(1450.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "VET-AIR",
-                "D",
-                "Flight veterinarian",
-                RateBasis.PER_SHIPMENT,
-                null,
-                BigDecimal.valueOf(2200.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "DOC-EXPORT-HEALTH",
-                "E",
-                "Export health certificate",
-                RateBasis.PER_HORSE,
-                null,
-                BigDecimal.valueOf(180.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "DOC-CUSTOMS",
-                "E",
-                "Customs and border documentation",
-                RateBasis.PER_CROSSING,
-                null,
-                BigDecimal.valueOf(420.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v12,
-                null,
-                "WAITING-TERMINAL",
-                "H",
-                "Waiting time at terminal",
-                RateBasis.PER_HOUR,
-                null,
-                BigDecimal.valueOf(95.00),
-                RateCertainty.ESTIMATED);
-
-        v12.setStatus(CatalogStatus.PUBLISHED);
-        v12.setPublishedAt(Instant.parse("2026-09-23T08:00:00Z"));
-        v12.setPublishedBy(publisher);
-        rateCatalogVersionRepository.saveAndFlush(v12);
-
-        // 3. Seed active DRAFT v13 (1 change: volume break 4–7 changed from 8% to 10%)
-        RateCatalogVersion v13 = new RateCatalogVersion();
-        v13.setVersionNo(13);
-        v13.setStatus(CatalogStatus.DRAFT);
-        v13.setChangeNote("1 change");
-        rateCatalogVersionRepository.saveAndFlush(v13);
-
-        if (pnhHkg != null) {
-            createServiceClass(v13, pnhHkg, ServiceClass.ECONOMY, (short) 32, (short) 3, BigDecimal.valueOf(16800.00));
-            createServiceClass(v13, pnhHkg, ServiceClass.BUSINESS, (short) 48, (short) 2, BigDecimal.valueOf(16800.00));
-            createServiceClass(v13, pnhHkg, ServiceClass.FIRST, (short) 96, (short) 1, BigDecimal.valueOf(16800.00));
-        }
-        if (sgnHkg != null) {
-            createServiceClass(v13, sgnHkg, ServiceClass.ECONOMY, (short) 32, (short) 3, BigDecimal.valueOf(16800.00));
-            createServiceClass(v13, sgnHkg, ServiceClass.BUSINESS, (short) 48, (short) 2, BigDecimal.valueOf(16800.00));
-            createServiceClass(v13, sgnHkg, ServiceClass.FIRST, (short) 96, (short) 1, BigDecimal.valueOf(16800.00));
+            if (raho6 != null) {
+                AuthoritySubmission sub1 = new AuthoritySubmission();
+                sub1.setJob(job);
+                sub1.setAuthority(raho6);
+                sub1.setKind(SubmissionKind.EXPORT_HEALTH_CERTS);
+                sub1.setStatus(SubmissionStatus.FILED);
+                sub1.setFiledAt(Instant.now().minus(java.time.Duration.ofDays(2)));
+                sub1.setFiledBy(yen != null ? yen : lan);
+                sub1.setReferenceNo("RAHO6-EXP-2026-081");
+                sub1.setExpectedBy(LocalDate.now().plusDays(3));
+                authoritySubmissionRepository.save(sub1);
+            }
+            if (gdahp != null) {
+                AuthoritySubmission sub2 = new AuthoritySubmission();
+                sub2.setJob(job);
+                sub2.setAuthority(gdahp);
+                sub2.setKind(SubmissionKind.IMPORT_PERMIT);
+                sub2.setStatus(SubmissionStatus.READY_TO_FILE);
+                sub2.setExpectedBy(LocalDate.now().plusDays(6));
+                authoritySubmissionRepository.save(sub2);
+            }
+            log.info("Seeded authority submissions for CBRT-2026-041");
         }
 
-        createVolumeBreak(v13, (short) 1, (short) 1, BigDecimal.ZERO);
-        createVolumeBreak(v13, (short) 2, (short) 3, BigDecimal.valueOf(5.00));
-        createVolumeBreak(v13, (short) 4, (short) 7, BigDecimal.valueOf(10.00));
-        createVolumeBreak(v13, (short) 8, null, BigDecimal.valueOf(15.00));
+        // Quarantine Period
+        if (quarantinePeriodRepository.count() == 0) {
+            Place pt = placeRepository
+                    .findByName("Phú Thọ Pre-Export Quarantine Station")
+                    .orElse(null);
+            if (pt != null) {
+                QuarantinePeriod qp = new QuarantinePeriod();
+                qp.setJob(job);
+                qp.setPlace(pt);
+                qp.setStartsOn(LocalDate.now().minusDays(10));
+                qp.setEndsOn(LocalDate.now().minusDays(3));
+                qp.setCompletedAt(Instant.now().minus(java.time.Duration.ofDays(3)));
+                quarantinePeriodRepository.save(qp);
+                log.info("Seeded completed quarantine period for CBRT-2026-041");
+            }
+        }
 
-        createPolicy(v13, RatePolicyKey.FUEL_PCT, BigDecimal.valueOf(18.000));
-        createPolicy(v13, RatePolicyKey.INSURANCE_PCT, BigDecimal.valueOf(1.500));
-        createPolicy(v13, RatePolicyKey.CONTINGENCY_PCT, BigDecimal.valueOf(5.000));
-        createPolicy(v13, RatePolicyKey.SERVICE_FEE_PCT, BigDecimal.valueOf(12.000));
-        createPolicy(v13, RatePolicyKey.DEPOSIT_PCT, BigDecimal.valueOf(30.000));
-        createPolicy(v13, RatePolicyKey.QUOTE_VALIDITY_DAYS, BigDecimal.valueOf(7.000));
-        createPolicy(v13, RatePolicyKey.ARRIVAL_WINDOW_PCT, BigDecimal.valueOf(20.000));
-        createPolicy(v13, RatePolicyKey.ARRIVAL_WINDOW_MIN_HOURS, BigDecimal.valueOf(3.000));
-        createPolicy(v13, RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, BigDecimal.valueOf(10.000));
-        createPolicy(v13, RatePolicyKey.LATE_PENALTY_CAP_PCT, BigDecimal.valueOf(30.000));
-        createPolicy(v13, RatePolicyKey.FLIGHT_VET_MIN_HORSES, BigDecimal.valueOf(8.000));
-        createPolicy(v13, RatePolicyKey.HIGH_VALUE_THRESHOLD, BigDecimal.valueOf(250000.000));
+        // Customer Notes
+        if (noteRepository.count() == 0 && saigonClub != null && customer != null) {
+            Note n1 = new Note();
+            n1.setClub(saigonClub);
+            n1.setJob(job);
+            n1.setRequest(job.getRequest());
+            n1.setTopic(NoteTopic.DOCUMENTS);
+            n1.setRoutedRole("TRANSPORT_SPECIALIST");
+            n1.setCreatedBy(customer);
+            n1.setSubject("Equine Influenza vaccination window");
+            n1.setBody(
+                    "Copper King's EI booster is scheduled for 10 Oct at the club clinic. Can we submit the updated veterinary record 7 days before departure instead of the required 14 days?");
+            n1.setStatus(NoteStatus.ANSWERED);
+            Note savedN1 = noteRepository.save(n1);
 
-        createFeeBand(v13, FeeBandKind.SHORT_NOTICE, (short) 0, (short) 13, BigDecimal.valueOf(1.250));
-        createFeeBand(v13, FeeBandKind.SHORT_NOTICE, (short) 14, (short) 21, BigDecimal.valueOf(1.100));
-        createFeeBand(v13, FeeBandKind.CANCELLATION, (short) 0, (short) 2, BigDecimal.valueOf(100.000));
-        createFeeBand(v13, FeeBandKind.CANCELLATION, (short) 3, (short) 7, BigDecimal.valueOf(50.000));
-        createFeeBand(v13, FeeBandKind.CANCELLATION, (short) 8, (short) 14, BigDecimal.valueOf(25.000));
-        createFeeBand(v13, FeeBandKind.CANCELLATION, (short) 15, null, BigDecimal.valueOf(10.000));
+            if (lan != null) {
+                NoteReply r1 = new NoteReply();
+                r1.setNote(savedN1);
+                r1.setAuthor(lan);
+                r1.setBody(
+                        "Reviewed with Cambodia GDAHP requirements. 7 days is within the allowable window if accompanied by the clinic's certification of no post-vaccinal adverse reaction. Please upload the clinic certificate as soon as administered.");
+                noteReplyRepository.save(r1);
+            }
 
-        createRateLine(
-                v13,
-                null,
-                "ISO-STALLION",
-                "B",
-                "Pre-export isolation · stallion",
-                RateBasis.PER_DAY,
-                HorseSex.STALLION,
-                BigDecimal.valueOf(140.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "ISO-MARE",
-                "B",
-                "Pre-export isolation · mare",
-                RateBasis.PER_DAY,
-                HorseSex.MARE,
-                BigDecimal.valueOf(85.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "ISO-GELDING",
-                "B",
-                "Pre-export isolation · gelding",
-                RateBasis.PER_DAY,
-                HorseSex.GELDING,
-                BigDecimal.valueOf(70.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "GROOM-AIR",
-                "D",
-                "Flying groom",
-                RateBasis.PER_SHIPMENT,
-                null,
-                BigDecimal.valueOf(1450.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "VET-AIR",
-                "D",
-                "Flight veterinarian",
-                RateBasis.PER_SHIPMENT,
-                null,
-                BigDecimal.valueOf(2200.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "DOC-EXPORT-HEALTH",
-                "E",
-                "Export health certificate",
-                RateBasis.PER_HORSE,
-                null,
-                BigDecimal.valueOf(180.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "DOC-CUSTOMS",
-                "E",
-                "Customs and border documentation",
-                RateBasis.PER_CROSSING,
-                null,
-                BigDecimal.valueOf(420.00),
-                RateCertainty.FIXED);
-        createRateLine(
-                v13,
-                null,
-                "WAITING-TERMINAL",
-                "H",
-                "Waiting time at terminal",
-                RateBasis.PER_HOUR,
-                null,
-                BigDecimal.valueOf(95.00),
-                RateCertainty.ESTIMATED);
-
-        log.info("Seeded rate catalog versions v11 (RETIRED), v12 (PUBLISHED), and v13 (DRAFT).");
-    }
-
-    private void createServiceClass(
-            RateCatalogVersion version,
-            Corridor corridor,
-            ServiceClass sc,
-            short width,
-            short horses,
-            BigDecimal rate) {
-        RateServiceClass entity = new RateServiceClass();
-        entity.setVersion(version);
-        entity.setCorridor(corridor);
-        entity.setServiceClass(sc);
-        entity.setWidthPerHorseIn(width);
-        entity.setHorsesPerPosition(horses);
-        entity.setPositionRate(rate);
-        rateServiceClassRepository.saveAndFlush(entity);
-    }
-
-    private void createVolumeBreak(RateCatalogVersion version, short min, Short max, BigDecimal pct) {
-        RateVolumeBreak entity = new RateVolumeBreak();
-        entity.setVersion(version);
-        entity.setMinHorses(min);
-        entity.setMaxHorses(max);
-        entity.setDiscountPct(pct);
-        rateVolumeBreakRepository.saveAndFlush(entity);
-    }
-
-    private void createPolicy(RateCatalogVersion version, RatePolicyKey key, BigDecimal value) {
-        RatePolicy entity = new RatePolicy();
-        entity.setVersion(version);
-        entity.getId().setVersionId(version.getId());
-        entity.getId().setKey(key);
-        entity.setValue(value);
-        ratePolicyRepository.saveAndFlush(entity);
-    }
-
-    private void createFeeBand(
-            RateCatalogVersion version, FeeBandKind kind, short minDays, Short maxDays, BigDecimal val) {
-        RateFeeBand entity = new RateFeeBand();
-        entity.setVersion(version);
-        entity.setKind(kind);
-        entity.setMinDays(minDays);
-        entity.setMaxDays(maxDays);
-        entity.setValue(val);
-        rateFeeBandRepository.saveAndFlush(entity);
-    }
-
-    private void createRateLine(
-            RateCatalogVersion version,
-            Corridor corridor,
-            String code,
-            String groupCode,
-            String desc,
-            RateBasis basis,
-            HorseSex sex,
-            BigDecimal rate,
-            RateCertainty certainty) {
-        RateLine entity = new RateLine();
-        entity.setVersion(version);
-        entity.setCorridor(corridor);
-        entity.setCode(code);
-        entity.setGroupCode(groupCode);
-        entity.setDescription(desc);
-        entity.setBasis(basis);
-        entity.setAppliesToSex(sex);
-        entity.setRate(rate);
-        entity.setCertainty(certainty);
-        rateLineRepository.saveAndFlush(entity);
+            Note n2 = new Note();
+            n2.setClub(saigonClub);
+            n2.setJob(job);
+            n2.setRequest(job.getRequest());
+            n2.setTopic(NoteTopic.TRIP);
+            n2.setRoutedRole("FLEET_ROUTE_COORDINATOR");
+            n2.setCreatedBy(customer);
+            n2.setSubject("Border transit timing at Mộc Bài – Bavet");
+            n2.setBody(
+                    "Please confirm expected arrival at Mộc Bài border. The owner's escort veterinarian will meet the convoy at Bavet side for handover inspection.");
+            n2.setStatus(NoteStatus.OPEN);
+            noteRepository.save(n2);
+            log.info("Seeded customer notes and reply for CBRT-2026-041");
+        }
     }
 
     private void advanceCodeCounter(CodePrefix prefix, short year, int value) {

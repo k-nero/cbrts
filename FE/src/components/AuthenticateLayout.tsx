@@ -1,4 +1,4 @@
-import { FC, useEffect } from 'react';
+import { FC } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DownOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Dropdown, Flex, Layout } from 'antd';
@@ -62,13 +62,9 @@ const SideUser: FC = () => {
 };
 
 const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   const roles = useAuthStore((state) => state.roles);
   const role = primaryRole(roles);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [pathname, search]);
 
   if (!menu) {
     // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout).

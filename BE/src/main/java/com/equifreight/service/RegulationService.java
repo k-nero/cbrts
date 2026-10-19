@@ -93,17 +93,7 @@ public class RegulationService {
     private RegulationVersionResponse toVersionSummary(RegulationVersion v) {
         RegulationVersionResponse resp = ClearanceMapper.toVersionResponse(v);
         int pinned = (int) jobRegulationPinRepository.countByRegulationVersionId(v.getId());
-        // For Cambodia v7 demo fallback to 3 pinned jobs if not linked
-        if (pinned == 0
-                && v.getVersionNo() == 7
-                && v.getCatalog() != null
-                && "KH".equals(v.getCatalog().getCountry().getCode())) {
-            pinned = 3;
-        }
         resp.setPinnedJobsCount(pinned);
-        if (v.getStatus() == CatalogStatus.DRAFT) {
-            resp.setChangesCount(3);
-        }
         return resp;
     }
 
@@ -170,14 +160,8 @@ public class RegulationService {
         resp.setRules(ruleResponses);
 
         int pinned = (int) jobRegulationPinRepository.countByRegulationVersionId(versionId);
-        if (pinned == 0
-                && version.getVersionNo() == 7
-                && version.getCatalog() != null
-                && "KH".equals(version.getCatalog().getCountry().getCode())) {
-            pinned = 3;
-        }
         resp.setPinnedJobsCount(pinned);
-        resp.setChangesCount(Math.max(changesCount, version.getStatus() == CatalogStatus.DRAFT ? 3 : 0));
+        resp.setChangesCount(changesCount);
         return resp;
     }
 
