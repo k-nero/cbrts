@@ -9,6 +9,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.model.request.RequestMapper;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RevisionSummaryResponse;
@@ -20,6 +21,7 @@ import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.model.review.RevisionResponse;
 import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
@@ -71,6 +73,7 @@ public class RequestReviewService {
     private final RouteService routes;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final QuotationRepository quotations;
     private final JsonMapper json;
     private final Clock clock;
 
@@ -82,6 +85,7 @@ public class RequestReviewService {
             RouteService routes,
             AuditService audit,
             NotificationService notifications,
+            QuotationRepository quotations,
             JsonMapper json,
             Clock clock) {
         this.requests = requests;
@@ -91,6 +95,7 @@ public class RequestReviewService {
         this.routes = routes;
         this.audit = audit;
         this.notifications = notifications;
+        this.quotations = quotations;
         this.json = json;
         this.clock = clock;
     }
@@ -180,6 +185,10 @@ public class RequestReviewService {
                                         .build())
                                 .toList())
                 .queue(position(request))
+                .quotation(quotations
+                        .findFirstByRequestIdOrderByVersionNoDesc(request.getId())
+                        .map(QuotationMapper::toRef)
+                        .orElse(null))
                 .build();
     }
 
