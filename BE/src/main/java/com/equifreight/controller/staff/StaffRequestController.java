@@ -2,6 +2,7 @@ package com.equifreight.controller.staff;
 
 import com.equifreight.entity.User;
 import com.equifreight.model.quotation.AirClassRequest;
+import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.ManualLineRequest;
 import com.equifreight.model.quotation.OverrideRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
@@ -10,6 +11,7 @@ import com.equifreight.model.review.QueueRowResponse;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.model.review.ReturnRequest;
 import com.equifreight.service.QuotationDraftService;
+import com.equifreight.service.QuotationIssueService;
 import com.equifreight.service.RequestReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -40,10 +42,13 @@ public class StaffRequestController {
 
     private final RequestReviewService service;
     private final QuotationDraftService quotations;
+    private final QuotationIssueService issues;
 
-    public StaffRequestController(RequestReviewService service, QuotationDraftService quotations) {
+    public StaffRequestController(
+            RequestReviewService service, QuotationDraftService quotations, QuotationIssueService issues) {
         this.service = service;
         this.quotations = quotations;
+        this.issues = issues;
     }
 
     @Operation(summary = "The review queue: requests waiting for review, oldest first, 20 to a page")
@@ -146,5 +151,14 @@ public class StaffRequestController {
     public QuotationDraftResponse removeLine(
             @PathVariable UUID id, @PathVariable UUID lineId, @AuthenticationPrincipal User user) {
         return quotations.removeLine(user, id, lineId);
+    }
+
+    @Operation(
+            summary = "Issue the draft: it becomes a document valid for the catalog's days; 409 names what blocks it")
+    @PostMapping("/{id}/quotation/issue")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse issueQuotation(
+            @PathVariable UUID id, @Valid @RequestBody IssueRequest body, @AuthenticationPrincipal User user) {
+        return issues.issue(user, id, body);
     }
 }

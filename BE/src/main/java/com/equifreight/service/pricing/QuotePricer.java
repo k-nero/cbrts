@@ -419,7 +419,7 @@ public final class QuotePricer {
     }
 
     /** The arrival-window surcharge applies to a road move with a private trailer and a window (AGENTS.md). */
-    static boolean windowApplies(PricingInput in) {
+    public static boolean windowApplies(PricingInput in) {
         return in.mode() == TransportMode.ROAD && in.trailer() == TrailerType.PRIVATE && in.arrivalWindow();
     }
 

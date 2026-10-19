@@ -45,12 +45,13 @@ public final class QuotationMapper {
             Integer latestPublishedVersionNo,
             Integer validityDays,
             String catalogOwner,
+            List<String> blockers,
             List<String> droppedOverrides) {
         List<QuotationLine> lines = q.getLines().stream()
                 .sorted(Comparator.comparing(QuotationLine::getGroupCode).thenComparing(QuotationLine::getPosition))
                 .toList();
         TransportMode mode = request.getCorridor().getMode();
-        boolean repriceNeeded = !sameLines(lines, now.lines()) || !sameTotals(q, expected);
+        boolean repriceNeeded = repriceNeeded(q, now, expected);
         int priced = (int) lines.stream().filter(l -> amount(l) != null).count();
         BigDecimal pricedSum = lines.stream()
                 .map(QuotationMapper::amount)
@@ -82,13 +83,25 @@ public final class QuotationMapper {
                 .missing(now.missing().stream()
                         .map(RateMapper::toMissingResponse)
                         .toList())
-                .readiness(new ReadinessResponse(q.getTotal() != null && !repriceNeeded, priced, lines.size()))
+                .readiness(new ReadinessResponse(
+                        q.getTotal() != null && blockers.isEmpty(), priced, lines.size(), blockers))
                 .validityDays(validityDays)
                 .currency(q.getCurrency())
                 .catalogOwner(catalogOwner)
                 .repriceNeeded(repriceNeeded)
                 .droppedOverrides(droppedOverrides)
                 .build();
+    }
+
+    /**
+     * Whether the stored lines or totals no longer agree with the engine's answer for the request as it is now
+     * (with the stored adjustments applied): the draft must be re-priced before it can be trusted or issued.
+     */
+    public static boolean repriceNeeded(Quotation q, PricedQuote now, PricedTotals expected) {
+        List<QuotationLine> lines = q.getLines().stream()
+                .sorted(Comparator.comparing(QuotationLine::getGroupCode).thenComparing(QuotationLine::getPosition))
+                .toList();
+        return !sameLines(lines, now.lines()) || !sameTotals(q, expected);
     }
 
     private static QuotationRequestFacts toFacts(TransportRequest r) {

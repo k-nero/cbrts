@@ -21,6 +21,7 @@ import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.StartResult;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.service.QuotationDraftService;
+import com.equifreight.service.QuotationIssueService;
 import com.equifreight.service.RequestReviewService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -48,13 +49,15 @@ class StaffRequestControllerTest {
 
     RequestReviewService service;
     QuotationDraftService quotations;
+    QuotationIssueService issues;
     MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(RequestReviewService.class);
         quotations = mock(QuotationDraftService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service, quotations))
+        issues = mock(QuotationIssueService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service, quotations, issues))
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver(), new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
@@ -70,7 +73,7 @@ class StaffRequestControllerTest {
                         || m.isAnnotationPresent(DeleteMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(12);
+        assertThat(handlers).hasSize(13);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
@@ -212,5 +215,31 @@ class StaffRequestControllerTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(put(url).contentType(MediaType.APPLICATION_JSON).content("{\"amount\":10,\"reason\":\"\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- issuing (US-F1-05) --------------------------------------------------------------------------------
+
+    @Test
+    void issuePassesTheNoteAndAnswersTheBlockers() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(issues.issue(any(), eq(id), any())).thenReturn(draft());
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/issue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changeNote\":\"Departure moved\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("Q-2026-0189"));
+
+        UUID blocked = UUID.randomUUID();
+        when(issues.issue(any(), eq(blocked), any()))
+                .thenThrow(new ConflictException(
+                        "QUOTATION_NOT_READY",
+                        "This quotation isn't ready to issue.",
+                        List.of("1 rate is missing on Hanoi → Vientiane.")));
+        mvc.perform(post("/api/v1/staff/requests/" + blocked + "/quotation/issue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("QUOTATION_NOT_READY"))
+                .andExpect(jsonPath("$.details[0]").value("1 rate is missing on Hanoi → Vientiane."));
     }
 }

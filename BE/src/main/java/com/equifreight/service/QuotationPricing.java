@@ -153,26 +153,66 @@ public class QuotationPricing {
 
     /** The draft's answer, with the overrides a write could not carry. */
     public QuotationDraftResponse toResponse(Quotation q, TransportRequest request, List<String> dropped) {
-        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
-        RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        ServiceClass airClass = pricedClass(q, request);
-        PricingInput in = inputs.inputFor(request, airClass);
-        PricedQuote now = QuotePricer.price(in, rates);
-        PricedTotals expected = QuotePricer.retotal(in, rates, adjusted(now.lines(), q.getLines()));
-        BigDecimal validity = rates.policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
+        Evaluation e = evaluate(q, request);
+        BigDecimal validity = e.rates().policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
         Integer latest = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
                 .map(RateCatalogVersion::getVersionNo)
                 .orElse(null);
         return QuotationMapper.toDraftResponse(
                 q,
                 request,
-                airClass,
-                now,
-                expected,
+                e.input().airClass(),
+                e.now(),
+                e.expected(),
                 latest,
                 validity == null ? null : validity.intValue(),
                 catalogOwner(),
+                e.blockers(),
                 dropped);
+    }
+
+    /**
+     * The engine's answer for the request as it is now, on the draft's pinned version, against what is stored.
+     *
+     * @param expected the totals over {@code now}'s lines with the stored overrides and added lines applied
+     * @param blockers what stops the draft being issued, in words, in the order of spec §5.3; empty when ready
+     */
+    public record Evaluation(
+            PricingInput input,
+            RateSet rates,
+            PricedQuote now,
+            PricedTotals expected,
+            boolean repriceNeeded,
+            List<String> blockers) {}
+
+    public Evaluation evaluate(Quotation q, TransportRequest request) {
+        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
+                .forCorridor(request.getCorridor().getId());
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        PricedQuote now = QuotePricer.price(in, rates);
+        PricedTotals expected = QuotePricer.retotal(in, rates, adjusted(now.lines(), q.getLines()));
+        boolean stale = QuotationMapper.repriceNeeded(q, now, expected);
+
+        List<String> blockers = new ArrayList<>();
+        int missing = now.missing().size();
+        if (missing > 0) {
+            blockers.add((missing == 1 ? "1 rate is missing" : missing + " rates are missing") + " on " + in.fromCity()
+                    + " → " + in.toCity() + ".");
+        }
+        if (now.fit() != null && now.fit().refusal() != null) {
+            blockers.add(now.fit().refusal());
+        }
+        if (stale) {
+            blockers.add("The request changed since this was priced. Re-price it first.");
+        }
+        int versionNo = q.getRateCatalogVersion().getVersionNo();
+        if (rates.policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS) == null) {
+            blockers.add("Rate catalog v" + versionNo + " has no quote validity.");
+        }
+        if (rates.policies().get(RatePolicyKey.DEPOSIT_PCT) == null) {
+            blockers.add("Rate catalog v" + versionNo + " has no deposit percentage.");
+        }
+        return new Evaluation(in, rates, now, expected, stale, List.copyOf(blockers));
     }
 
     /** The display name of the transport specialist who keeps the rate catalog, or null. */
