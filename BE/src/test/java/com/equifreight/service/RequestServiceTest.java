@@ -87,6 +87,7 @@ class RequestServiceTest {
     CodeService codes;
     AuditService audit;
     AuditLogRepository auditLogs;
+    RequestEstimator estimator;
     RequestService service;
     User user;
     Club club;
@@ -108,6 +109,7 @@ class RequestServiceTest {
         codes = mock(CodeService.class);
         audit = mock(AuditService.class);
         auditLogs = mock(AuditLogRepository.class);
+        estimator = mock(RequestEstimator.class);
         service = new RequestService(
                 requests,
                 horses,
@@ -119,7 +121,8 @@ class RequestServiceTest {
                 audit,
                 auditLogs,
                 JsonMapper.builder().build(),
-                Clock.fixed(NOW, BusinessTime.ZONE));
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                estimator);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -932,7 +935,8 @@ class RequestServiceTest {
                     audit,
                     auditLogs,
                     JsonMapper.builder().build(),
-                    Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE));
+                    Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE),
+                    estimator);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 
@@ -1093,5 +1097,111 @@ class RequestServiceTest {
         p.setCity(city);
         p.setCountry(vn);
         return p;
+    }
+
+    // --- the instant estimate (US-Q-05) ------------------------------------------------------------------
+
+    RequestDraftRequest routed(Horse... list) {
+        return body(list).toBuilder()
+                .originPlaceId(phuTho.getId())
+                .destinationPlaceId(chaoPhraya.getId())
+                .build();
+    }
+
+    @Test
+    void anEstimateNeedsHorsesAndARoute() {
+        com.equifreight.model.estimate.EstimateResponse noHorses = service.estimate(user, routed());
+        assertThat(noHorses.status()).isEqualTo(com.equifreight.service.pricing.EstimateStatus.NOT_READY);
+        assertThat(noHorses.message()).isEqualTo("Choose the route and horses to see an estimate.");
+        assertThat(noHorses.options().mode()).isEmpty();
+
+        RequestDraftRequest noDestination =
+                routed(shadowfax).toBuilder().destinationPlaceId(null).build();
+        assertThat(service.estimate(user, noDestination).status())
+                .isEqualTo(com.equifreight.service.pricing.EstimateStatus.NOT_READY);
+        verifyNoInteractions(estimator);
+    }
+
+    @Test
+    void anEstimateOnARouteWeDontRun() {
+        com.equifreight.model.estimate.EstimateResponse response = service.estimate(user, routed(shadowfax));
+
+        assertThat(response.status()).isEqualTo(com.equifreight.service.pricing.EstimateStatus.NOT_RUN);
+        assertThat(response.message()).isEqualTo("We don't run this route yet, so there's no estimate.");
+        verifyNoInteractions(estimator);
+    }
+
+    @Test
+    void anEstimateRefusesAnotherClubsHorse() {
+        RequestDraftRequest body = routed().toBuilder()
+                .horses(List.of(input(UUID.randomUUID(), false)))
+                .build();
+
+        assertThatThrownBy(() -> service.estimate(user, body)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aBodyTheSaveWouldRefuseIsUnavailableWithItsReason() {
+        RequestDraftRequest flexible = window("08:00", "12:00").toBuilder()
+                .horses(List.of(input(shadowfax.getId(), false)))
+                .originPlaceId(phuTho.getId())
+                .destinationPlaceId(chaoPhraya.getId())
+                .dateFlexDays(3)
+                .build();
+
+        com.equifreight.model.estimate.EstimateResponse response = service.estimate(user, flexible);
+
+        assertThat(response.status()).isEqualTo(com.equifreight.service.pricing.EstimateStatus.UNAVAILABLE);
+        assertThat(response.message())
+                .isEqualTo("An arrival window needs a road move with a private trailer and fixed dates. Choose road "
+                        + "and a private trailer, and untick ±3 days, or arrive any time on the day.");
+    }
+
+    @Test
+    void anEstimateSavesNothing() {
+        com.equifreight.entity.Corridor corridor = new com.equifreight.entity.Corridor();
+        corridor.setId(UUID.randomUUID());
+        corridor.setMode(TransportMode.ROAD);
+        when(routes.resolve(any(), any(), any(), any(), any()))
+                .thenReturn(
+                        new RouteResolution(corridor, null, java.util.Set.of(TransportMode.ROAD), null, false, false));
+        when(estimator.estimate(any(), any()))
+                .thenReturn(new RequestEstimator.View(
+                        com.equifreight.service.pricing.EstimateResult.range(
+                                new java.math.BigDecimal("31900"), new java.math.BigDecimal("43300")),
+                        List.of("Assumes a shared load until you choose a trailer on step 3."),
+                        5,
+                        java.util.Map.of(
+                                "mode",
+                                List.of(new RequestEstimator.Option("ROAD", true, null, null, null, null)),
+                                "trailer",
+                                List.of(new RequestEstimator.Option(
+                                        "PRIVATE",
+                                        false,
+                                        new java.math.BigDecimal("400"),
+                                        new java.math.BigDecimal("600"),
+                                        null,
+                                        null)))));
+
+        com.equifreight.model.estimate.EstimateResponse response = service.estimate(user, routed(shadowfax));
+
+        verify(requests, never()).save(any());
+        verify(requests, never()).saveAndFlush(any());
+        verify(requests, never()).delete(any());
+        verifyNoInteractions(audit);
+        assertThat(response.status()).isEqualTo(com.equifreight.service.pricing.EstimateStatus.READY);
+        assertThat(response.low()).isEqualByComparingTo("31900");
+        assertThat(response.high()).isEqualByComparingTo("43300");
+        assertThat(response.assumptions())
+                .containsExactly("Assumes a shared load until you choose a trailer on step 3.");
+        assertThat(response.versionNo()).isEqualTo(5);
+        assertThat(response.options().mode())
+                .singleElement()
+                .satisfies(o -> assertThat(o.current()).isTrue());
+        assertThat(response.options().trailer())
+                .singleElement()
+                .satisfies(o -> assertThat(o.deltaHigh()).isEqualByComparingTo("600"));
+        assertThat(response.options().airClass()).isEmpty();
+        assertThat(response.options().arrivalWindow()).isEmpty();
     }
 }

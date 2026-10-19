@@ -2,6 +2,7 @@ package com.equifreight.controller.customer;
 
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
@@ -60,6 +61,15 @@ public class RequestController {
     public RequestResponse update(
             @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody RequestDraftRequest body) {
         return requestService.update(user, id, body);
+    }
+
+    /**
+     * The instant estimate for the wizard's current values (US-Q-05): a range or why there is none, with each
+     * choice's effect. Nothing is saved; it is a POST only because it carries the draft's body.
+     */
+    @PostMapping("/requests/estimate")
+    public EstimateResponse estimate(@AuthenticationPrincipal User user, @Valid @RequestBody RequestDraftRequest body) {
+        return requestService.estimate(user, body);
     }
 
     /** Submits a draft: SUBMITTED with its REQ code, or 409 SUBMISSION_BLOCKED with every blocker in details. */
