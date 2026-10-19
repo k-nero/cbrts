@@ -12,6 +12,7 @@ import com.equifreight.service.pricing.PricedQuote;
 import com.equifreight.service.pricing.PricedTotals;
 import com.equifreight.service.pricing.PricingText;
 import com.equifreight.service.pricing.StallFit;
+import com.equifreight.service.quotation.QuotationSnapshot;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -90,7 +91,108 @@ public final class QuotationMapper {
                 .catalogOwner(catalogOwner)
                 .repriceNeeded(repriceNeeded)
                 .droppedOverrides(droppedOverrides)
+                .issuedAt(q.getIssuedAt())
+                .validUntil(q.getValidUntil())
+                .deposit(toDeposit(q))
                 .build();
+    }
+
+    /**
+     * An issued, expired or superseded version, from its stored rows and its snapshot alone: it reads the same
+     * whatever the request or the catalog do later. It has no readiness and never asks for a re-price.
+     */
+    public static QuotationDraftResponse toIssuedResponse(
+            Quotation q,
+            TransportRequest request,
+            QuotationSnapshot snapshot,
+            Integer latestPublishedVersionNo,
+            String catalogOwner) {
+        List<QuotationLine> lines = q.getLines().stream()
+                .sorted(Comparator.comparing(QuotationLine::getGroupCode).thenComparing(QuotationLine::getPosition))
+                .toList();
+        QuotationSnapshot.Facts facts = snapshot.request();
+        BigDecimal pricedSum = lines.stream()
+                .map(QuotationMapper::amount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return QuotationDraftResponse.builder()
+                .id(q.getId())
+                .code(q.getCode())
+                .versionNo(q.getVersionNo())
+                .status(q.getStatus())
+                .pinnedVersion(new PinnedVersionResponse(
+                        q.getRateCatalogVersion().getId(),
+                        q.getRateCatalogVersion().getVersionNo()))
+                .latestPublishedVersionNo(latestPublishedVersionNo)
+                .request(QuotationRequestFacts.builder()
+                        .id(request.getId())
+                        .code(request.getCode())
+                        .club(
+                                request.getClub() == null
+                                        ? null
+                                        : request.getClub().getName())
+                        .fromCity(facts.fromCity())
+                        .toCity(facts.toCity())
+                        .mode(facts.mode())
+                        .trailer(facts.trailer())
+                        .requestedClass(request.getAirClass())
+                        .horseCount(facts.horses().size())
+                        .departureDate(facts.departureDate())
+                        .dateFlexDays(facts.dateFlexDays())
+                        .insurance(facts.insurance())
+                        .vetEscort(facts.vetEscort())
+                        .build())
+                .airClass(q.getAirClass())
+                .fit(
+                        snapshot.fit() == null
+                                ? null
+                                : new StallFitResponse(
+                                        snapshot.fit().positions(),
+                                        snapshot.fit().widthUsedIn(),
+                                        null,
+                                        List.of()))
+                .groups(toGroups(lines, facts.mode()))
+                .totals(QuoteTotalsResponse.builder()
+                        .pricedLines(pricedSum)
+                        .subtotal(q.getSubtotal())
+                        .rows(snapshot.rows().stream()
+                                .map(r -> new QuoteTotalRowResponse(r.key(), r.label(), r.baseText(), r.amount()))
+                                .toList())
+                        .total(q.getTotal())
+                        .build())
+                .missing(List.of())
+                .readiness(null)
+                .currency(q.getCurrency())
+                .catalogOwner(catalogOwner)
+                .repriceNeeded(false)
+                .droppedOverrides(List.of())
+                .issuedAt(q.getIssuedAt())
+                .validUntil(q.getValidUntil())
+                .deposit(toDeposit(q))
+                .build();
+    }
+
+    public static QuotationVersionResponse toVersion(Quotation q) {
+        return new QuotationVersionResponse(
+                q.getVersionNo(),
+                q.getStatus(),
+                q.getIssuedAt(),
+                q.getValidUntil(),
+                q.getTotal(),
+                q.getSupersededReason());
+    }
+
+    /** The version a revision replaces: its total and each keyed line's amount. */
+    public static PreviousVersionResponse toPrevious(Quotation q) {
+        Map<String, BigDecimal> amounts = new LinkedHashMap<>();
+        q.getLines().stream()
+                .filter(l -> l.getLineKey() != null && amount(l) != null)
+                .forEach(l -> amounts.put(l.getLineKey(), amount(l)));
+        return new PreviousVersionResponse(q.getVersionNo(), q.getTotal(), amounts);
+    }
+
+    private static DepositResponse toDeposit(Quotation q) {
+        return q.getDepositPct() == null ? null : new DepositResponse(q.getDepositPct(), q.getDepositAmount());
     }
 
     /**

@@ -43,6 +43,7 @@ import com.equifreight.service.pricing.PricingHorse;
 import com.equifreight.service.pricing.PricingInput;
 import com.equifreight.service.pricing.PricingInputs;
 import com.equifreight.service.pricing.RateSetLoader;
+import com.equifreight.service.quotation.Snapshots;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -52,6 +53,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import tools.jackson.databind.json.JsonMapper;
 
 /** The draft and issue services over one mocked request, rate catalog and repositories. */
 abstract class QuotationServiceFixture {
@@ -68,6 +70,7 @@ abstract class QuotationServiceFixture {
     AuditService audit;
     QuotationDraftService service;
     QuotationPricing pricing;
+    Snapshots snapshots;
 
     User yen;
     TransportRequest request;
@@ -87,7 +90,8 @@ abstract class QuotationServiceFixture {
         codes = mock(CodeService.class);
         users = mock(UserRepository.class);
         audit = mock(AuditService.class);
-        pricing = new QuotationPricing(loader, inputs, versions, users);
+        snapshots = new Snapshots(JsonMapper.builder().build());
+        pricing = new QuotationPricing(loader, inputs, versions, users, quotations, snapshots);
         service = new QuotationDraftService(
                 requests, quotations, versions, pricing, codes, audit, Clock.fixed(NOW, BusinessTime.ZONE));
 

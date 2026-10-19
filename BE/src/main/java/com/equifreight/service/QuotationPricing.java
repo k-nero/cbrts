@@ -9,6 +9,7 @@ import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
@@ -16,6 +17,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationMapper;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.pricing.CatalogRows;
@@ -27,6 +29,7 @@ import com.equifreight.service.pricing.PricingInputs;
 import com.equifreight.service.pricing.QuotePricer;
 import com.equifreight.service.pricing.RateSet;
 import com.equifreight.service.pricing.RateSetLoader;
+import com.equifreight.service.quotation.Snapshots;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,12 +54,22 @@ public class QuotationPricing {
     private final RateCatalogVersionRepository versions;
     private final UserRepository users;
 
+    private final QuotationRepository quotations;
+    private final Snapshots snapshots;
+
     public QuotationPricing(
-            RateSetLoader loader, PricingInputs inputs, RateCatalogVersionRepository versions, UserRepository users) {
+            RateSetLoader loader,
+            PricingInputs inputs,
+            RateCatalogVersionRepository versions,
+            UserRepository users,
+            QuotationRepository quotations,
+            Snapshots snapshots) {
         this.loader = loader;
         this.inputs = inputs;
         this.versions = versions;
         this.users = users;
+        this.quotations = quotations;
+        this.snapshots = snapshots;
     }
 
     /**
@@ -153,11 +166,28 @@ public class QuotationPricing {
 
     /** The draft's answer, with the overrides a write could not carry. */
     public QuotationDraftResponse toResponse(Quotation q, TransportRequest request, List<String> dropped) {
-        Evaluation e = evaluate(q, request);
-        BigDecimal validity = e.rates().policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
         Integer latest = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
                 .map(RateCatalogVersion::getVersionNo)
                 .orElse(null);
+        QuotationDraftResponse answer = q.getStatus() == QuotationStatus.DRAFT
+                ? draftResponse(q, request, latest, dropped)
+                : QuotationMapper.toIssuedResponse(
+                        q, request, snapshots.read(q.getIssuedSnapshot()), latest, catalogOwner());
+        List<Quotation> all = quotations.findByRequestIdOrderByVersionNoDesc(request.getId());
+        Quotation previous = all.stream()
+                .filter(v -> v.getVersionNo() < q.getVersionNo() && v.getStatus() != QuotationStatus.DRAFT)
+                .findFirst()
+                .orElse(null);
+        return answer.toBuilder()
+                .versions(all.stream().map(QuotationMapper::toVersion).toList())
+                .previous(previous == null ? null : QuotationMapper.toPrevious(previous))
+                .build();
+    }
+
+    private QuotationDraftResponse draftResponse(
+            Quotation q, TransportRequest request, Integer latest, List<String> dropped) {
+        Evaluation e = evaluate(q, request);
+        BigDecimal validity = e.rates().policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
         return QuotationMapper.toDraftResponse(
                 q,
                 request,

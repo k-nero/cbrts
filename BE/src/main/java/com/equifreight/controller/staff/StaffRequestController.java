@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -87,8 +88,8 @@ public class StaffRequestController {
     @Operation(summary = "The request's quotation: grouped lines, totals with their bases, stall fit and missing rates")
     @GetMapping("/{id}/quotation")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
-    public QuotationDraftResponse quotation(@PathVariable UUID id) {
-        return quotations.get(id);
+    public QuotationDraftResponse quotation(@PathVariable UUID id, @RequestParam(required = false) Short version) {
+        return quotations.get(id, version);
     }
 
     @Operation(summary = "Price the draft quotation with another air class, on the catalog version it pins")
@@ -160,5 +161,22 @@ public class StaffRequestController {
     public QuotationDraftResponse issueQuotation(
             @PathVariable UUID id, @Valid @RequestBody IssueRequest body, @AuthenticationPrincipal User user) {
         return issues.issue(user, id, body);
+    }
+
+    @Operation(
+            summary = "Draft the next version from the latest issued or expired one (201); the issued one stays live")
+    @PostMapping("/{id}/quotation/revise")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public QuotationDraftResponse reviseQuotation(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        return issues.revise(user, id).quotation();
+    }
+
+    @Operation(summary = "Discard a revision's draft; the version it came from stands")
+    @DeleteMapping("/{id}/quotation/draft")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void discardRevision(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        issues.discardDraft(user, id);
     }
 }

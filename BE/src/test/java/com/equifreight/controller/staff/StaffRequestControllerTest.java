@@ -73,7 +73,7 @@ class StaffRequestControllerTest {
                         || m.isAnnotationPresent(DeleteMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(13);
+        assertThat(handlers).hasSize(15);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));
@@ -151,7 +151,7 @@ class StaffRequestControllerTest {
     @Test
     void getPutAndRepriceMapToTheService() throws Exception {
         UUID id = UUID.randomUUID();
-        when(quotations.get(id)).thenReturn(draft());
+        when(quotations.get(id, null)).thenReturn(draft());
         when(quotations.changeClass(any(), eq(id), eq(ServiceClass.FIRST))).thenReturn(draft());
         when(quotations.reprice(any(), eq(id))).thenReturn(draft());
 
@@ -162,7 +162,7 @@ class StaffRequestControllerTest {
                 .andExpect(status().isOk());
         mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/reprice")).andExpect(status().isOk());
 
-        verify(quotations).get(id);
+        verify(quotations).get(id, null);
         verify(quotations).changeClass(any(), eq(id), eq(ServiceClass.FIRST));
         verify(quotations).reprice(any(), eq(id));
     }
@@ -241,5 +241,22 @@ class StaffRequestControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("QUOTATION_NOT_READY"))
                 .andExpect(jsonPath("$.details[0]").value("1 rate is missing on Hanoi → Vientiane."));
+    }
+
+    // --- versions (US-Q-07) --------------------------------------------------------------------------------
+
+    @Test
+    void reviseDiscardAndReadAVersion() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(issues.revise(any(), eq(id))).thenReturn(new StartResult(draft(), true));
+        when(quotations.get(id, (short) 1)).thenReturn(draft());
+
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/revise")).andExpect(status().isCreated());
+        mvc.perform(delete("/api/v1/staff/requests/" + id + "/quotation/draft")).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/staff/requests/" + id + "/quotation").param("version", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("Q-2026-0189"));
+
+        verify(issues).discardDraft(any(), eq(id));
     }
 }

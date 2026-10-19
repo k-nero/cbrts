@@ -4,8 +4,11 @@ import static com.equifreight.service.pricing.PricingText.money;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationLine;
+import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RequestStatus;
@@ -14,7 +17,9 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
+import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.pricing.QuotePricer;
@@ -28,7 +33,9 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +47,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class QuotationIssueService {
 
+    private static final Set<RequestStatus> REVISABLE_REQUEST = Set.of(RequestStatus.QUOTED, RequestStatus.EXPIRED);
+    private static final Set<QuotationStatus> REVISABLE = Set.of(QuotationStatus.ISSUED, QuotationStatus.EXPIRED);
+
     private final TransportRequestRepository requests;
     private final QuotationRepository quotations;
+    private final RateCatalogVersionRepository versions;
     private final QuotationPricing pricing;
     private final UserRepository users;
     private final NotificationService notifications;
@@ -52,6 +63,7 @@ public class QuotationIssueService {
     public QuotationIssueService(
             TransportRequestRepository requests,
             QuotationRepository quotations,
+            RateCatalogVersionRepository versions,
             QuotationPricing pricing,
             UserRepository users,
             NotificationService notifications,
@@ -60,6 +72,7 @@ public class QuotationIssueService {
             Clock clock) {
         this.requests = requests;
         this.quotations = quotations;
+        this.versions = versions;
         this.pricing = pricing;
         this.users = users;
         this.notifications = notifications;
@@ -154,5 +167,116 @@ public class QuotationIssueService {
                     request.getId());
         }
         return pricing.toResponse(saved, request, List.of());
+    }
+
+    /**
+     * Drafts the next version from the latest issued or expired one (US-Q-07): its class, overrides and added lines
+     * are carried onto the latest published catalog. The issued version stays live for the customer until the new
+     * one is issued, so the request's status doesn't change.
+     */
+    @Transactional
+    public StartResult revise(User manager, UUID requestId) {
+        TransportRequest request = requests.findByIdForUpdate(requestId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        Quotation latest = quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                .orElseThrow(
+                        () -> new ConflictException("NOTHING_TO_REVISE", "There is no issued quotation to revise."));
+        if (latest.getStatus() == QuotationStatus.DRAFT) {
+            throw new ConflictException(
+                    "DRAFT_EXISTS", "Version " + latest.getVersionNo() + " is already being drafted.");
+        }
+        if (!REVISABLE_REQUEST.contains(request.getStatus())) {
+            throw new ConflictException("REQUEST_NOT_QUOTABLE", "This request can't be quoted in its current state.");
+        }
+        if (!REVISABLE.contains(latest.getStatus())) {
+            throw new ConflictException("NOTHING_TO_REVISE", "There is no issued quotation to revise.");
+        }
+        RateCatalogVersion published = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
+                .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
+
+        Quotation q = new Quotation();
+        q.setCode(latest.getCode());
+        q.setRequest(request);
+        q.setVersionNo((short) (latest.getVersionNo() + 1));
+        q.setStatus(QuotationStatus.DRAFT);
+        q.setRateCatalogVersion(published);
+        q.setCurrency(latest.getCurrency());
+        q.setPreparedBy(manager);
+        q.setAirClass(latest.getAirClass());
+        for (QuotationLine line : latest.getLines()) {
+            q.getLines().add(adjustmentOf(line, q));
+        }
+        List<String> dropped = pricing.price(q, request);
+        try {
+            q = quotations.saveAndFlush(q);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(
+                    "DRAFT_EXISTS", "Someone else just started the next version. Reload the page to see it.");
+        }
+        StringBuilder summary = new StringBuilder("Quotation " + q.getCode() + " v" + q.getVersionNo()
+                + " drafted from v" + latest.getVersionNo() + " on rate catalog v" + published.getVersionNo());
+        for (String gone : dropped) {
+            summary.append("; override on ").append(gone, 0, gone.indexOf(':')).append(" dropped");
+        }
+        audit.recordDecision(
+                manager,
+                "QUOTATION_REVISED",
+                AuditText.fit(summary.toString()),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                null,
+                null,
+                null);
+        return new StartResult(pricing.toResponse(q, request, dropped), true);
+    }
+
+    /** Discards a revision's draft; the version it was drafted from stands. The first version is never discarded. */
+    @Transactional
+    public void discardDraft(User manager, UUID requestId) {
+        TransportRequest request = requests.findByIdForUpdate(requestId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        Quotation q = quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
+        QuotationRules.requireDraft(q);
+        if (q.getVersionNo() == 1) {
+            throw new ConflictException("FIRST_VERSION", "The first version can't be discarded.");
+        }
+        quotations.delete(q);
+        audit.recordDecision(
+                manager,
+                "QUOTATION_DRAFT_DISCARDED",
+                AuditText.fit("Quotation " + q.getCode() + " v" + q.getVersionNo() + " draft discarded; v"
+                        + (q.getVersionNo() - 1) + " stands"),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                null,
+                null,
+                null);
+    }
+
+    /** A line of the version being revised, as the new draft's starting point: its key and the manager's changes. */
+    private static QuotationLine adjustmentOf(QuotationLine from, Quotation to) {
+        QuotationLine line = new QuotationLine();
+        line.setQuotation(to);
+        line.setGroupCode(from.getGroupCode());
+        line.setPosition(from.getPosition());
+        line.setLineKey(from.getLineKey());
+        line.setDescription(from.getDescription());
+        line.setBasisText(from.getBasisText());
+        line.setBasis(from.getBasis());
+        line.setQuantity(from.getQuantity());
+        line.setUnitRate(from.getUnitRate());
+        line.setSource(from.getSource());
+        line.setCertainty(from.getCertainty());
+        line.setEstimateNote(from.getEstimateNote());
+        line.setCatalogAmount(from.getCatalogAmount());
+        line.setOverrideAmount(from.getOverrideAmount());
+        line.setOverrideReason(from.getOverrideReason());
+        line.setManualReason(from.getManualReason());
+        return line;
     }
 }

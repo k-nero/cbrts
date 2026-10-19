@@ -14,6 +14,8 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
     /** A request's latest quotation version. */
     Optional<Quotation> findFirstByRequestIdOrderByVersionNoDesc(UUID requestId);
 
+    Optional<Quotation> findByRequestIdAndVersionNo(UUID requestId, short versionNo);
+
     /** Every version of a request's quotation, newest first. */
     List<Quotation> findByRequestIdOrderByVersionNoDesc(UUID requestId);
 

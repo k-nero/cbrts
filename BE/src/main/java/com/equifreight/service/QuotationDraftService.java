@@ -136,10 +136,17 @@ public class QuotationDraftService {
 
     @Transactional(readOnly = true)
     public QuotationDraftResponse get(UUID requestId) {
+        return get(requestId, null);
+    }
+
+    /** One version of the request's quotation, or the latest when {@code version} is null. */
+    @Transactional(readOnly = true)
+    public QuotationDraftResponse get(UUID requestId, Short version) {
         TransportRequest request =
                 requests.findById(requestId).orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
-        Quotation q = quotations
-                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+        Quotation q = (version == null
+                        ? quotations.findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                        : quotations.findByRequestIdAndVersionNo(requestId, version))
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
         return pricing.toResponse(q, request, List.of());
     }
