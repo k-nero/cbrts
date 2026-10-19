@@ -1,5 +1,6 @@
 package com.equifreight.model.review;
 
+import com.equifreight.model.quotation.QuotationRefResponse;
 import com.equifreight.model.request.RequestResponse;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -20,4 +21,6 @@ public class RequestReviewResponse {
     private List<HistoryEntryResponse> history;
     /** Null when the request isn't waiting for review. */
     private QueuePositionResponse queue;
+    /** The request's quotation once started (Start quotation or Open quotation); null before. */
+    private QuotationRefResponse quotation;
 }
