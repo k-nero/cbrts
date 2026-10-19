@@ -8,3 +8,4 @@ export * from './job';
 export * from './vehicle';
 export * from './note';
 export * from './audit';
+export * from './rate';

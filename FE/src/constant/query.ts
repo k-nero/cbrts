@@ -31,4 +31,10 @@ export const queryKeys = {
     version: (id: string) => ['regulations', 'version', id] as const,
     documentTypes: () => ['regulations', 'document-types'] as const,
   },
+  rates: {
+    all: () => ['rates'] as const,
+    corridors: () => ['rates', 'corridors'] as const,
+    details: (corridorId?: string, versionId?: string) =>
+      ['rates', 'details', corridorId ?? '', versionId ?? ''] as const,
+  },
 } as const;

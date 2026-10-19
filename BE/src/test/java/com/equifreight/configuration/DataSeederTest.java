@@ -68,7 +68,12 @@ class DataSeederTest {
                 mock(RegulationVersionRepository.class),
                 mock(RegulationRuleRepository.class),
                 mock(DocumentTypeRepository.class),
-                mock(JobRegulationPinRepository.class));
+                mock(JobRegulationPinRepository.class),
+                mock(RateServiceClassRepository.class),
+                mock(RateVolumeBreakRepository.class),
+                mock(RatePolicyRepository.class),
+                mock(RateFeeBandRepository.class),
+                mock(RateLineRepository.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

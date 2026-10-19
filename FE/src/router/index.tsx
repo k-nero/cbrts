@@ -22,6 +22,7 @@ import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import CustomerNotesPage from '@/pages/staff/customer-notes';
 import RegulationsPage from '@/pages/staff/regulations';
+import RatesPage from '@/pages/staff/rates';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 
 /**
@@ -77,7 +78,7 @@ export const router = createBrowserRouter([
           { path: 'authorities', element: <AuthoritiesPage /> },
           { path: 'customer-notes', element: <CustomerNotesPage /> },
           { path: 'regulations', element: <RegulationsPage /> },
-          { path: 'rates', element: todo('Rates') },
+          { path: 'rates', element: <RatesPage /> },
           { path: 'fleet-calendar', element: <FleetCalendarPage /> },
           { path: 'vehicles', element: <VehiclesPage /> },
         ],
