@@ -22,6 +22,7 @@ import {
   windowLength,
   windowMinutes,
   type WizardValues,
+  optionMeta,
 } from '@/lib/utils';
 
 /** Every half hour of the day, for the window's From and Until. */
@@ -93,6 +94,7 @@ const alternativeLine = (r: Route) => {
 
 /** Step 2 (spec §5.3): from and to, the route we run (or that we don't), dates and arrival. */
 const RouteStep: FC<StepProps> = ({
+  estimate,
   saved,
   live,
   routes,
@@ -227,6 +229,7 @@ const RouteStep: FC<StepProps> = ({
                 onChange={() => set('arrivalMode', 'ANY_TIME')}
                 title="Any time on the day"
                 description="We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days."
+                meta={optionMeta(estimate?.options.arrivalWindow.find((o) => o.value === 'false'))}
               />
               <OptionCard
                 name="arrivalMode"
@@ -237,7 +240,10 @@ const RouteStep: FC<StepProps> = ({
                 onChange={() => set('arrivalMode', 'WINDOW')}
                 title="Within a window"
                 description="You choose a window of at least 3 hours. We use a private trailer so the departure is yours."
-                meta={windowRuns ? undefined : 'Road moves only'}
+                meta={optionMeta(
+                  estimate?.options.arrivalWindow.find((o) => o.value === 'true'),
+                  windowRuns ? undefined : 'Road moves only',
+                )}
               />
             </div>
             {arrivalMode === 'WINDOW' ? (

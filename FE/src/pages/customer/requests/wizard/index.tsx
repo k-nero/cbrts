@@ -16,8 +16,14 @@ import { RequestLoadState } from '@/components/request/RequestNotFound';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import PageHeader from '@/components/PageHeader';
 import { Callout, Steps } from '@/components/ui';
-import { useRequest, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/request';
-import type { ApiError, Blocker, Horse, Route, TransportRequest } from '@/interfaces';
+import {
+  useEstimate,
+  useRequest,
+  useRoutes,
+  useSaveRequest,
+  useWizardHorses,
+} from '@/hooks/request';
+import type { ApiError, Blocker, Horse, Route, TransportRequest, Estimate } from '@/interfaces';
 import {
   apiErrorView,
   editable,
@@ -41,6 +47,7 @@ import {
   type FieldStep,
   type WizardStep,
   type WizardValues,
+  estimateStub,
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -65,6 +72,8 @@ export type StepProps = {
   onContinue: () => void;
   onBack: () => void;
   goTo: (step: WizardStep) => void;
+  /** The instant estimate for the values on screen (US-Q-05); undefined until it answers. */
+  estimate: Estimate | undefined;
 };
 
 const STEP_LABELS = ['Horses', 'Route & dates', 'Service', 'Review'];
@@ -262,7 +271,20 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
     goTo(WIZARD_STEPS[index - 1]);
   });
 
+  const estimateQuery = useEstimate(
+    toDraftInput(values),
+    !saved || saved.status === 'DRAFT' || saved.status === 'INFO_REQUIRED',
+  );
+  const stub = estimateStub({
+    estimate: estimateQuery.data,
+    loading: estimateQuery.isFetching,
+    error: estimateQuery.isError,
+    stored: null,
+    step,
+  });
+
   const props: StepProps = {
+    estimate: estimateQuery.data,
     saved,
     live,
     horses: horsesQuery.data ?? [],
@@ -294,11 +316,8 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
           notRun={notRun}
           horses={horsesQuery.data ?? []}
           chip={saved ? passChip(saved.status) : undefined}
-          rangeSub={
-            step === 'review'
-              ? 'Not a quote. Once you approve the quotation, this becomes your travel pass.'
-              : undefined
-          }
+          range={stub.range}
+          rangeSub={stub.rangeSub}
         />
       </div>
     </FormWrapper>

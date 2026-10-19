@@ -8,7 +8,7 @@ import { RequestLoadState } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
-import { formatDate, fromRequest, latestRevision, passChip } from '@/lib/utils';
+import { estimateStub, formatDate, fromRequest, latestRevision, passChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -37,6 +37,12 @@ const RequestSubmittedPage: FC = () => {
       notRun={false}
       horses={horses.data ?? []}
       chip={chip}
+      {...estimateStub({
+        loading: false,
+        error: false,
+        stored: { low: request.estimateLow, high: request.estimateHigh },
+        step: 'review',
+      })}
     />
   );
 
