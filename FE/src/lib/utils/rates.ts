@@ -188,3 +188,17 @@ export const policyRows = (
     },
   ];
 };
+
+/**
+ * Where a volume-break edit goes. A corridor with its own bands that unticks "own bands" loses them (the
+ * shared bands then apply); the shared bands change only when they were the ones being edited.
+ */
+export const bandsSave = (
+  scope: 'CORRIDOR' | 'GLOBAL',
+  ownBands: boolean,
+  bands: VolumeBreakInput[],
+): { corridorScoped: boolean; bands: VolumeBreakInput[] } => {
+  if (ownBands) return { corridorScoped: true, bands };
+  if (scope === 'CORRIDOR') return { corridorScoped: true, bands: [] };
+  return { corridorScoped: false, bands };
+};

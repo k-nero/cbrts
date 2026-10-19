@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   classOptions,
+  conflictMessage,
   money,
   moneyOrDash,
   quoteSummary,
@@ -48,7 +49,7 @@ describe('classOptions', () => {
   };
 
   test('all three classes when the horses fit', () => {
-    expect(classOptions(fits, 'BUSINESS')).toEqual([
+    expect(classOptions('AIR', fits)).toEqual([
       { value: 'ECONOMY', label: 'Economy', fits: true },
       { value: 'BUSINESS', label: 'Business', fits: true },
       { value: 'FIRST', label: 'First', fits: true },
@@ -56,7 +57,7 @@ describe('classOptions', () => {
   });
 
   test('only the achievable classes fit after a refusal', () => {
-    expect(classOptions(refused, 'BUSINESS').map((o) => [o.value, o.fits])).toEqual([
+    expect(classOptions('AIR', refused).map((o) => [o.value, o.fits])).toEqual([
       ['ECONOMY', false],
       ['BUSINESS', false],
       ['FIRST', true],
@@ -64,7 +65,11 @@ describe('classOptions', () => {
   });
 
   test('a road move has no classes', () => {
-    expect(classOptions(null, 'BUSINESS')).toEqual([]);
+    expect(classOptions('ROAD', null)).toEqual([]);
+  });
+
+  test('an air class with no catalog row still offers every class', () => {
+    expect(classOptions('AIR', null).map((o) => o.value)).toEqual(['ECONOMY', 'BUSINESS', 'FIRST']);
   });
 });
 
@@ -169,5 +174,25 @@ describe('readinessView', () => {
       chip: 'Not ready',
       text: 'The request changed since this was priced.',
     });
+  });
+});
+
+describe('conflictMessage', () => {
+  test("a 409 gives the server's sentence", () => {
+    const error = {
+      response: {
+        status: 409,
+        data: {
+          error: 'REQUEST_NOT_IN_REVIEW',
+          message: 'Only a request in review can be quoted.',
+        },
+      },
+    };
+    expect(conflictMessage(error)).toBe('Only a request in review can be quoted.');
+  });
+
+  test('anything else is not a conflict', () => {
+    expect(conflictMessage({ response: { status: 400, data: { message: 'x' } } })).toBeNull();
+    expect(conflictMessage(new Error('offline'))).toBeNull();
   });
 });

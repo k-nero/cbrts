@@ -94,7 +94,7 @@ export const StallChoice: FC<{
   onChange: (c: ServiceClass) => void;
 }> = ({ quotation, pending, onChange }) => {
   const current = quotation.airClass ?? quotation.request.requestedClass ?? 'BUSINESS';
-  const options = classOptions(quotation.fit, current);
+  const options = classOptions(quotation.request.mode, quotation.fit);
   const fit = quotation.fit;
   return (
     <Panel title="Air stall">

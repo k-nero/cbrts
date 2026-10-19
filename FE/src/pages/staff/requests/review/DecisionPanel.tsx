@@ -39,6 +39,7 @@ const NoteField: FC<{ club: string }> = ({ club }) => {
 const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
   const router = useCustomRouter();
   const start = useStartQuotation();
+  const qc = useQueryClient();
   const starting = useRef(false);
   const id = review.request.id;
   const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));
@@ -58,6 +59,8 @@ const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
       open();
     } catch (error) {
       message.error(apiErrorMessage(error, "The quotation wasn't started. Try again."));
+      // The request may have moved on (returned, or started by someone else): show where it stands.
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(id), exact: true });
     } finally {
       starting.current = false;
     }
@@ -163,7 +166,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
     <Panel title="Your decision">
       <div className="flex flex-col gap-4">
         <p className="type-body-s m-0 text-ink-2">
-          Ask the customer before quoting, or wait for the quotation step.
+          Ask the customer before quoting, or start the quotation.
         </p>
         {conflictCallout}
         <div className="flex flex-col gap-3 rounded-md border border-line-strong bg-raised p-4">

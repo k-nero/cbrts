@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   bandLabel,
   bandRefusal,
+  bandsSave,
   basisWords,
   corridorShort,
   draftRefusal,
@@ -183,5 +184,22 @@ describe('policyRows', () => {
 
   test('a missing value is a dash', () => {
     expect(policyRows({}, [])[0]).toEqual({ key: 'FUEL_PCT', label: 'Fuel surcharge', value: '—' });
+  });
+});
+
+describe('bandsSave', () => {
+  const bands = [{ minHorses: 1, maxHorses: null, discountPct: 3 }];
+
+  test("unticking a corridor's own bands removes them and leaves the shared bands alone", () => {
+    expect(bandsSave('CORRIDOR', false, bands)).toEqual({ corridorScoped: true, bands: [] });
+  });
+
+  test('own bands are saved to the corridor', () => {
+    expect(bandsSave('CORRIDOR', true, bands)).toEqual({ corridorScoped: true, bands });
+    expect(bandsSave('GLOBAL', true, bands)).toEqual({ corridorScoped: true, bands });
+  });
+
+  test('the shared bands are saved for every corridor', () => {
+    expect(bandsSave('GLOBAL', false, bands)).toEqual({ corridorScoped: false, bands });
   });
 });

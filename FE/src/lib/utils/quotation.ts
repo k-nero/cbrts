@@ -1,4 +1,12 @@
-import type { QuotationDraft, Readiness, ServiceClass, StallFit } from '@/interfaces';
+import type {
+  ApiError,
+  QuotationDraft,
+  Readiness,
+  ServiceClass,
+  StallFit,
+  TransportMode,
+} from '@/interfaces';
+import type { AxiosError } from 'axios';
 
 const USD = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -27,17 +35,18 @@ const CLASSES: { value: ServiceClass; label: string }[] = [
 ];
 
 /**
- * The air classes for the stall choice. After a refusal only the classes every horse fits are marked as
- * fitting; a road move (no fit) has none.
+ * The air classes for the stall choice: none for a road move. After a refusal only the classes every
+ * horse fits are marked as fitting. An air class with no catalog row has no fit, and every class is offered,
+ * so the manager can move to one that is priced.
  */
 export const classOptions = (
+  mode: TransportMode,
   fit: StallFit | null,
-  _current: ServiceClass,
 ): { value: ServiceClass; label: string; fits: boolean }[] => {
-  if (!fit) return [];
+  if (mode !== 'AIR') return [];
   return CLASSES.map((c) => ({
     ...c,
-    fits: fit.refusal ? fit.achievableClasses.includes(c.value) : true,
+    fits: fit?.refusal ? fit.achievableClasses.includes(c.value) : true,
   }));
 };
 
@@ -104,4 +113,10 @@ export const readinessView = (
     };
   }
   return { tone: 'neutral', chip: 'Not ready', text: readinessText(q.readiness) };
+};
+
+/** The server's sentence when a quotation write was refused because things moved on (409), else null. */
+export const conflictMessage = (error: unknown): string | null => {
+  const response = (error as AxiosError<Partial<ApiError>> | undefined)?.response;
+  return response?.status === 409 ? (response.data?.message ?? null) : null;
 };

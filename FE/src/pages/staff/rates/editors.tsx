@@ -25,7 +25,7 @@ import type {
   ServiceClassRow,
   TrailerType,
 } from '@/interfaces';
-import { apiErrorView, bandRefusal } from '@/lib/utils';
+import { apiErrorView, bandRefusal, bandsSave } from '@/lib/utils';
 
 type Opt<T extends string> = { label: string; value: T };
 const opt = <T extends string>(value: T, label: string): Opt<T> => ({ value, label });
@@ -454,15 +454,17 @@ export const BreaksModal: FC<{
   }, [methods, open, view]);
 
   const onSubmit = methods.handleSubmit(async (v) => {
-    const refusal = bandRefusal(v.bands);
-    if (refusal && !(v.ownBands && v.bands.length === 0)) {
+    const save = bandsSave(view.volumeBreaksScope, v.ownBands, v.bands);
+    // An empty corridor list only removes the corridor's own bands; anything else must be a valid set.
+    const refusal = save.corridorScoped && save.bands.length === 0 ? null : bandRefusal(save.bands);
+    if (refusal) {
       methods.setError('form_error', { message: refusal });
       return;
     }
     try {
       await put.mutateAsync({
-        corridorId: v.ownBands ? view.corridor.id : null,
-        bands: v.bands,
+        corridorId: save.corridorScoped ? view.corridor.id : null,
+        bands: save.bands,
         view: view.corridor.id,
       });
       message.success('Volume breaks saved to the draft');

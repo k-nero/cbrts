@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
 import { useSearchParams } from 'react-router-dom';
@@ -168,6 +168,11 @@ const RatesPage: FC = () => {
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
+  // The notice is about the draft that vanished; a new draft makes it moot.
+  const draftId = catalog?.draftVersionId;
+  useEffect(() => {
+    if (draftId) setNotice(null);
+  }, [draftId]);
   const [modalOpen, setModalOpen] = useState<
     | { kind: 'line'; row: RateLine | null }
     | { kind: 'class'; row: ServiceClassRow | null }

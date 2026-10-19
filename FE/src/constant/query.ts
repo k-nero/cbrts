@@ -34,6 +34,8 @@ export const queryKeys = {
   rates: {
     all: () => ['rates'] as const,
     catalog: () => ['rates', 'catalog'] as const,
+    /** Every corridor's view of one version: policies, global bands and shared lines appear in all of them. */
+    versionViews: (versionId: string) => ['rates', 'view', versionId] as const,
     view: (versionId: string, corridorId: string) =>
       ['rates', 'view', versionId, corridorId] as const,
   },

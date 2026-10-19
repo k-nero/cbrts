@@ -58,6 +58,12 @@ const useDraftWrite = <V>(write: (value: V) => Promise<RateCorridorView>) => {
   return useMutation<RateCorridorView, unknown, V>({
     mutationFn: write,
     onSuccess: (view) => {
+      // Other corridors show the same policies, global bands and shared lines: mark them stale first, then
+      // fill the shown corridor with the answer, which is fresh.
+      void qc.invalidateQueries({
+        queryKey: queryKeys.rates.versionViews(view.versionId),
+        refetchType: 'none',
+      });
       qc.setQueryData(queryKeys.rates.view(view.versionId, view.corridor.id), view);
       void qc.invalidateQueries({ queryKey: queryKeys.rates.catalog() });
     },

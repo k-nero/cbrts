@@ -1,4 +1,5 @@
-import { type FC, useRef } from 'react';
+import { type FC, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
 import { useParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
@@ -14,7 +15,8 @@ import {
   useStartQuotation,
 } from '@/hooks/staffRequest';
 import type { ServiceClass } from '@/interfaces';
-import { apiErrorMessage, quoteSummary } from '@/lib/utils';
+import { queryKeys } from '@/constant/query';
+import { apiErrorMessage, conflictMessage, quoteSummary } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -30,6 +32,8 @@ const QuotationBuilderPage: FC = () => {
   const changeClass = useChangeQuotationClass();
   const reprice = useRepriceQuotation();
   const starting = useRef(false);
+  const qc = useQueryClient();
+  const [conflict, setConflict] = useState<string | null>(null);
   const toReview = () =>
     router.push(router.paths.get('request-review', { pathParams: [id ?? ''] }));
   const back = { label: 'Request review', onClick: toReview };
@@ -37,9 +41,18 @@ const QuotationBuilderPage: FC = () => {
   const write = async (run: () => Promise<unknown>, done: string) => {
     try {
       await run();
+      setConflict(null);
       message.success(done);
     } catch (error) {
-      message.error(apiErrorMessage(error, "That didn't go through. Try again."));
+      const conflict = conflictMessage(error);
+      if (!conflict) {
+        message.error(apiErrorMessage(error, "That didn't go through. Try again."));
+        return;
+      }
+      // Someone returned the request or the draft moved on: say so, and show what is true now.
+      setConflict(conflict);
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotation(id ?? '') });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(id ?? ''), exact: true });
     }
   };
 
@@ -126,6 +139,11 @@ const QuotationBuilderPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-6">
+          {conflict && (
+            <Callout tone="bad" title={conflict}>
+              The quotation has been reloaded to show where it stands now.
+            </Callout>
+          )}
           <MissingCallout quotation={q} />
           {q.repriceNeeded && (
             <Callout tone="warn" title="The request changed since this was priced">
