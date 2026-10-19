@@ -169,22 +169,22 @@ public class LoadPlanService {
         if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
             throw new BusinessException("Cannot modify a CONFIRMED load plan. Create a new revision if needed.");
         }
-        if (request.getToStallId() == null && request.getExpectedOccupantId() != null) {
+        if (request.toStallId() == null && request.expectedOccupantId() != null) {
             throw new BusinessException(
                     "A horse taken off the vehicle has no stall to swap with; leave the expected occupant empty");
         }
 
         Horse horse = getJobHorses(plan.getJob()).stream()
-                .filter(h -> h.getId().equals(request.getHorseId()))
+                .filter(h -> h.getId().equals(request.horseId()))
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Horse " + request.getHorseId() + " is not assigned to this job"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Horse " + request.horseId() + " is not assigned to this job"));
 
         VehicleStall toStall = null;
-        if (request.getToStallId() != null) {
+        if (request.toStallId() != null) {
             toStall = vehicleStallRepository
-                    .findById(request.getToStallId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.getToStallId()));
+                    .findById(request.toStallId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.toStallId()));
             if (!toStall.getVehicle().getId().equals(plan.getVehicle().getId())) {
                 throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
             }
@@ -194,7 +194,7 @@ public class LoadPlanService {
         Optional<LoadPlanStall> current =
                 loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
         UUID currentStallId = current.map(a -> a.getVehicleStall().getId()).orElse(null);
-        if (!Objects.equals(currentStallId, request.getFromStallId())) {
+        if (!Objects.equals(currentStallId, request.fromStallId())) {
             throw new ConflictException(
                     "LOAD_PLAN_STALE",
                     horse.getName() + " is now "
@@ -211,7 +211,7 @@ public class LoadPlanService {
                     .map(LoadPlanStall::getHorse)
                     .orElse(null);
             UUID occupantId = occupant != null ? occupant.getId() : null;
-            if (!Objects.equals(occupantId, request.getExpectedOccupantId())) {
+            if (!Objects.equals(occupantId, request.expectedOccupantId())) {
                 throw new ConflictException(
                         "LOAD_PLAN_STALE",
                         "Stall " + toStall.getPositionNo() + " "
@@ -221,7 +221,7 @@ public class LoadPlanService {
         }
 
         // Dropped where it already is: nothing to change.
-        if (Objects.equals(request.getToStallId(), currentStallId)) {
+        if (Objects.equals(request.toStallId(), currentStallId)) {
             return buildResponse(plan);
         }
 
@@ -326,15 +326,15 @@ public class LoadPlanService {
 
         LoadPlanResponse state = buildResponse(plan);
 
-        if (!state.getUnassignedHorses().isEmpty()) {
-            throw new BusinessException("Cannot confirm load plan: "
-                    + state.getUnassignedHorses().size() + " horses are still to be placed");
+        if (!state.unassignedHorses().isEmpty()) {
+            throw new BusinessException(
+                    "Cannot confirm load plan: " + state.unassignedHorses().size() + " horses are still to be placed");
         }
 
-        if (!state.getConflicts().isEmpty()) {
+        if (!state.conflicts().isEmpty()) {
             throw new BusinessException(
-                    "Cannot confirm load plan: resolve " + state.getConflicts().size() + " placement conflicts first ("
-                            + state.getConflicts().getFirst().getDescription() + ")");
+                    "Cannot confirm load plan: resolve " + state.conflicts().size() + " placement conflicts first ("
+                            + state.conflicts().getFirst().description() + ")");
         }
 
         // The vehicle is booked for the trip's planned dates, which the confirmed route sets.
@@ -424,38 +424,20 @@ public class LoadPlanService {
                     || h.getTemperament() == Temperament.AGGRESSIVE
                     || h.getRequiredStall() == StallType.BOX);
             if (needsBox && s.getStallType() != StallType.BOX) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("BOX_REQUIRED")
-                        .description("Needs a box stall (stallion or aggressive horse)")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "BOX_REQUIRED", "Needs a box stall (stallion or aggressive horse)"));
             }
 
             // Rule 2: Climate stall requirement
             if (h.getRequiredStall() == StallType.CLIMATE && s.getStallType() != StallType.CLIMATE) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("CLIMATE_REQUIRED")
-                        .description("Heat-sensitive horse needs climate stall")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "CLIMATE_REQUIRED", "Heat-sensitive horse needs climate stall"));
             }
 
             // Rule 3: Nervous horses away from ramp
             if (h.getTemperament() == Temperament.NERVOUS && s.isNearRamp()) {
-                conflicts.add(LoadPlanConflictResponse.builder()
-                        .horseId(h.getId())
-                        .horseName(h.getName())
-                        .stallId(s.getId())
-                        .stallPositionNo(s.getPositionNo())
-                        .rule("NERVOUS_NEAR_RAMP")
-                        .description("Keep nervous horses away from the ramp")
-                        .build());
+                conflicts.add(JobMapper.toConflictResponse(
+                        h, s, "NERVOUS_NEAR_RAMP", "Keep nervous horses away from the ramp"));
             }
         }
 
@@ -480,24 +462,18 @@ public class LoadPlanService {
 
                 if (beside || behind) {
                     String reason = beside ? "Stallion stands beside a mare" : "Stallion stands behind a mare";
-                    conflicts.add(LoadPlanConflictResponse.builder()
-                            .horseId(h1.getId())
-                            .horseName(h1.getName())
-                            .stallId(stallStallion.getId())
-                            .stallPositionNo(stallStallion.getPositionNo())
-                            .rule("STALLION_NEAR_MARE")
-                            .description(reason)
-                            .build());
+                    conflicts.add(JobMapper.toConflictResponse(h1, stallStallion, "STALLION_NEAR_MARE", reason));
                 }
             }
         }
 
         // Rule 5: Payload check
         if (totalWeight > vehicle.getPayloadKg()) {
-            conflicts.add(LoadPlanConflictResponse.builder()
-                    .rule("PAYLOAD_EXCEEDED")
-                    .description("Payload limit exceeded (" + totalWeight + " kg of " + vehicle.getPayloadKg() + " kg)")
-                    .build());
+            conflicts.add(JobMapper.toConflictResponse(
+                    null,
+                    null,
+                    "PAYLOAD_EXCEEDED",
+                    "Payload limit exceeded (" + totalWeight + " kg of " + vehicle.getPayloadKg() + " kg)"));
         }
 
         return conflicts;
@@ -512,8 +488,8 @@ public class LoadPlanService {
         List<LoadPlanConflictResponse> conflicts = evaluateConflicts(plan, assignments, allHorses);
         Map<UUID, String> stallIssues = new HashMap<>();
         for (LoadPlanConflictResponse c : conflicts) {
-            if (c.getStallId() != null) {
-                stallIssues.merge(c.getStallId(), c.getDescription(), (o, n) -> o + "; " + n);
+            if (c.stallId() != null) {
+                stallIssues.merge(c.stallId(), c.description(), (o, n) -> o + "; " + n);
             }
         }
 
@@ -525,18 +501,9 @@ public class LoadPlanService {
                     LoadPlanStall a = assignmentByStallId.get(s.getId());
                     JobHorseResponse hResp = null;
                     if (a != null && a.getHorse() != null) {
-                        hResp = toHorseResponse(a.getHorse());
+                        hResp = JobMapper.toHorseResponse(a.getHorse());
                     }
-                    return LoadPlanStallResponse.builder()
-                            .stallId(s.getId())
-                            .positionNo(s.getPositionNo())
-                            .stallType(s.getStallType())
-                            .rowNo(s.getRowNo())
-                            .side(s.getSide())
-                            .nearRamp(s.isNearRamp())
-                            .horse(hResp)
-                            .issue(stallIssues.get(s.getId()))
-                            .build();
+                    return JobMapper.toLoadPlanStallResponse(s, hResp, stallIssues.get(s.getId()));
                 })
                 .toList();
 
@@ -545,31 +512,14 @@ public class LoadPlanService {
 
         List<JobHorseResponse> unassigned = allHorses.stream()
                 .filter(h -> !assignedHorseIds.contains(h.getId()))
-                .map(this::toHorseResponse)
+                .map(JobMapper::toHorseResponse)
                 .toList();
 
         int totalWeight = assignments.stream()
                 .mapToInt(a -> a.getHorse().getWeightKg() != null ? a.getHorse().getWeightKg() : 0)
                 .sum();
 
-        return LoadPlanResponse.builder()
-                .id(plan.getId())
-                .jobId(plan.getJob().getId())
-                .vehicleId(plan.getVehicle().getId())
-                .vehicleCode(plan.getVehicle().getCode())
-                .status(plan.getStatus())
-                .confirmedByName(
-                        plan.getConfirmedBy() != null
-                                ? plan.getConfirmedBy().getFirstName() + " "
-                                        + plan.getConfirmedBy().getLastName()
-                                : null)
-                .confirmedAt(plan.getConfirmedAt())
-                .totalWeightKg(totalWeight)
-                .payloadKg(plan.getVehicle().getPayloadKg())
-                .stalls(stallResponses)
-                .unassignedHorses(unassigned)
-                .conflicts(conflicts)
-                .build();
+        return JobMapper.toLoadPlanResponse(plan, totalWeight, stallResponses, unassigned, conflicts);
     }
 
     private List<Horse> getJobHorses(TransportJob job) {
@@ -579,20 +529,6 @@ public class LoadPlanService {
                     .toList();
         }
         return Collections.emptyList();
-    }
-
-    private JobHorseResponse toHorseResponse(Horse h) {
-        return JobHorseResponse.builder()
-                .id(h.getId())
-                .name(h.getName())
-                .sex(h.getSex())
-                .breed(h.getBreed())
-                .weightKg(h.getWeightKg())
-                .sizeClassCode(h.getSizeClass() != null ? h.getSizeClass().getCode() : "M")
-                .requiredStall(h.getRequiredStall())
-                .temperament(h.getTemperament())
-                .handlingNotes(h.getHandlingNotes())
-                .build();
     }
 
     private Map<Horse, VehicleStall> solveArrangement(List<Horse> horses, Set<VehicleStall> availableStalls) {

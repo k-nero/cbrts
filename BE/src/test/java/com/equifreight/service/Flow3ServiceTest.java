@@ -110,14 +110,16 @@ class Flow3ServiceTest {
     }
 
     private static AssignCrewRequest crew(User a, CrewRole roleA, User b, CrewRole roleB) {
-        AssignCrewRequest.CrewItem first = new AssignCrewRequest.CrewItem();
-        first.setUserId(a.getId());
-        first.setCrewRole(roleA);
-        AssignCrewRequest.CrewItem second = new AssignCrewRequest.CrewItem();
-        second.setUserId(b.getId());
-        second.setCrewRole(roleB);
-        AssignCrewRequest request = new AssignCrewRequest();
-        request.setCrew(List.of(first, second));
+        AssignCrewRequest.CrewItem first = AssignCrewRequest.CrewItem.builder()
+                .userId(a.getId())
+                .crewRole(roleA)
+                .build();
+        AssignCrewRequest.CrewItem second = AssignCrewRequest.CrewItem.builder()
+                .userId(b.getId())
+                .crewRole(roleB)
+                .build();
+        AssignCrewRequest request =
+                AssignCrewRequest.builder().crew(List.of(first, second)).build();
         return request;
     }
 
@@ -189,11 +191,12 @@ class Flow3ServiceTest {
         when(vehicleBookingRepository.findOverlappingBookings(eq(vehicle.getId()), eq(start), eq(end), isNull()))
                 .thenReturn(List.of(existing));
 
-        VehicleBookingRequest req = new VehicleBookingRequest();
-        req.setVehicleId(vehicleId);
-        req.setStartsAt(start);
-        req.setEndsAt(end);
-        req.setKind(BookingKind.MAINTENANCE);
+        VehicleBookingRequest req = VehicleBookingRequest.builder()
+                .vehicleId(vehicleId)
+                .startsAt(start)
+                .endsAt(end)
+                .kind(BookingKind.MAINTENANCE)
+                .build();
 
         assertThrows(ConflictException.class, () -> vehicleService.bookVehicle(req));
     }
@@ -207,11 +210,12 @@ class Flow3ServiceTest {
         vehicle.setStatus(VehicleStatus.MAINTENANCE);
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
 
-        VehicleBookingRequest req = new VehicleBookingRequest();
-        req.setVehicleId(vehicleId);
-        req.setStartsAt(Instant.parse("2026-10-18T06:00:00Z"));
-        req.setEndsAt(Instant.parse("2026-10-18T14:00:00Z"));
-        req.setKind(BookingKind.MAINTENANCE);
+        VehicleBookingRequest req = VehicleBookingRequest.builder()
+                .vehicleId(vehicleId)
+                .startsAt(Instant.parse("2026-10-18T06:00:00Z"))
+                .endsAt(Instant.parse("2026-10-18T14:00:00Z"))
+                .kind(BookingKind.MAINTENANCE)
+                .build();
 
         assertThrows(BusinessException.class, () -> vehicleService.bookVehicle(req));
     }
@@ -226,12 +230,13 @@ class Flow3ServiceTest {
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
 
         // kind = JOB but jobId = null
-        VehicleBookingRequest req = new VehicleBookingRequest();
-        req.setVehicleId(vehicleId);
-        req.setStartsAt(Instant.parse("2026-10-18T06:00:00Z"));
-        req.setEndsAt(Instant.parse("2026-10-18T14:00:00Z"));
-        req.setKind(BookingKind.JOB);
-        req.setJobId(null);
+        VehicleBookingRequest req = VehicleBookingRequest.builder()
+                .vehicleId(vehicleId)
+                .startsAt(Instant.parse("2026-10-18T06:00:00Z"))
+                .endsAt(Instant.parse("2026-10-18T14:00:00Z"))
+                .kind(BookingKind.JOB)
+                .jobId(null)
+                .build();
 
         assertThrows(BusinessException.class, () -> vehicleService.bookVehicle(req));
     }
@@ -279,7 +284,7 @@ class Flow3ServiceTest {
                 loadPlanService.evaluateConflicts(plan, List.of(s1, s2), List.of(stallion, mare));
 
         assertFalse(conflicts.isEmpty());
-        assertTrue(conflicts.stream().anyMatch(c -> c.getRule().equals("STALLION_NEAR_MARE")));
+        assertTrue(conflicts.stream().anyMatch(c -> c.rule().equals("STALLION_NEAR_MARE")));
     }
 
     @Test
@@ -311,7 +316,7 @@ class Flow3ServiceTest {
                 loadPlanService.evaluateConflicts(plan, List.of(s1), List.of(nervousHorse));
 
         assertFalse(conflicts.isEmpty());
-        assertTrue(conflicts.stream().anyMatch(c -> c.getRule().equals("NERVOUS_NEAR_RAMP")));
+        assertTrue(conflicts.stream().anyMatch(c -> c.rule().equals("NERVOUS_NEAR_RAMP")));
     }
 
     @Test
@@ -331,16 +336,18 @@ class Flow3ServiceTest {
 
         when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
-        AssignCrewRequest crewReq = new AssignCrewRequest();
-        AssignCrewRequest.CrewItem driver = new AssignCrewRequest.CrewItem();
-        driver.setUserId(UUID.randomUUID());
-        driver.setCrewRole(CrewRole.DRIVER);
+        AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.DRIVER)
+                .build();
 
-        AssignCrewRequest.CrewItem groom = new AssignCrewRequest.CrewItem();
-        groom.setUserId(UUID.randomUUID());
-        groom.setCrewRole(CrewRole.GROOM); // only 1 groom, needs 2
+        AssignCrewRequest.CrewItem groom = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM) // only 1 groom, needs 2
+                .build();
 
-        crewReq.setCrew(List.of(driver, groom));
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(driver, groom)).build();
 
         User user = new User();
         user.setEmail("khoi.do@equifreight.vn");
@@ -446,16 +453,18 @@ class Flow3ServiceTest {
         when(userRepository.findById(groomId)).thenReturn(Optional.of(groomUser));
         when(userRepository.findById(driverId)).thenReturn(Optional.of(driverUser));
 
-        AssignCrewRequest crewReq = new AssignCrewRequest();
-        AssignCrewRequest.CrewItem groomItem = new AssignCrewRequest.CrewItem();
-        groomItem.setUserId(groomId);
-        groomItem.setCrewRole(CrewRole.GROOM);
+        AssignCrewRequest.CrewItem groomItem = AssignCrewRequest.CrewItem.builder()
+                .userId(groomId)
+                .crewRole(CrewRole.GROOM)
+                .build();
 
-        AssignCrewRequest.CrewItem driverItem = new AssignCrewRequest.CrewItem();
-        driverItem.setUserId(driverId);
-        driverItem.setCrewRole(CrewRole.DRIVER);
+        AssignCrewRequest.CrewItem driverItem = AssignCrewRequest.CrewItem.builder()
+                .userId(driverId)
+                .crewRole(CrewRole.DRIVER)
+                .build();
 
-        crewReq.setCrew(List.of(groomItem, driverItem));
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(groomItem, driverItem)).build();
 
         User actor = new User();
         actor.setEmail("khoi.do@equifreight.vn");
@@ -479,14 +488,16 @@ class Flow3ServiceTest {
 
         UUID escortId = UUID.randomUUID();
 
-        AssignCrewRequest crewReq = new AssignCrewRequest();
-        AssignCrewRequest.CrewItem item1 = new AssignCrewRequest.CrewItem();
-        item1.setUserId(escortId);
-        item1.setCrewRole(CrewRole.DRIVER);
-        AssignCrewRequest.CrewItem item2 = new AssignCrewRequest.CrewItem();
-        item2.setUserId(escortId); // duplicate!
-        item2.setCrewRole(CrewRole.GROOM);
-        crewReq.setCrew(List.of(item1, item2));
+        AssignCrewRequest.CrewItem item1 = AssignCrewRequest.CrewItem.builder()
+                .userId(escortId)
+                .crewRole(CrewRole.DRIVER)
+                .build();
+        AssignCrewRequest.CrewItem item2 = AssignCrewRequest.CrewItem.builder()
+                .userId(escortId) // duplicate!
+                .crewRole(CrewRole.GROOM)
+                .build();
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(item1, item2)).build();
 
         User actor = new User();
         actor.setEmail("khoi.do@equifreight.vn");
@@ -528,16 +539,18 @@ class Flow3ServiceTest {
         when(crewAssignmentRepository.findOverlappingAssignments(eq(driverId), eq(jobId), any(), any()))
                 .thenReturn(List.of(overlapping));
 
-        AssignCrewRequest crewReq = new AssignCrewRequest();
-        AssignCrewRequest.CrewItem driverItem = new AssignCrewRequest.CrewItem();
-        driverItem.setUserId(driverId);
-        driverItem.setCrewRole(CrewRole.DRIVER);
+        AssignCrewRequest.CrewItem driverItem = AssignCrewRequest.CrewItem.builder()
+                .userId(driverId)
+                .crewRole(CrewRole.DRIVER)
+                .build();
 
-        AssignCrewRequest.CrewItem groomItem = new AssignCrewRequest.CrewItem();
-        groomItem.setUserId(UUID.randomUUID());
-        groomItem.setCrewRole(CrewRole.GROOM);
+        AssignCrewRequest.CrewItem groomItem = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
 
-        crewReq.setCrew(List.of(driverItem, groomItem));
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(driverItem, groomItem)).build();
 
         User actor = new User();
         actor.setEmail("khoi.do@equifreight.vn");
@@ -560,9 +573,10 @@ class Flow3ServiceTest {
         job.setCode("CBRT-2026-041");
         when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
-        ClearanceStatusResponse gate = new ClearanceStatusResponse();
-        gate.setClearanceReady(false);
-        gate.setOutstandingIssues(List.of("4 items outstanding"));
+        ClearanceStatusResponse gate = ClearanceStatusResponse.builder()
+                .clearanceReady(false)
+                .outstandingIssues(List.of("4 items outstanding"))
+                .build();
         when(clearanceService.getClearanceStatus(jobId)).thenReturn(gate);
 
         assertThrows(BusinessException.class, () -> transportJobService.signOffTripPlan(jobId, manager));
@@ -814,9 +828,10 @@ class Flow3ServiceTest {
 
     private void stubPlansAndCrew(TransportJob job, List<CrewAssignment> overlaps) {
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        ClearanceStatusResponse gate = new ClearanceStatusResponse();
-        gate.setClearanceReady(true);
-        gate.setOutstandingIssues(List.of());
+        ClearanceStatusResponse gate = ClearanceStatusResponse.builder()
+                .clearanceReady(true)
+                .outstandingIssues(List.of())
+                .build();
         lenient().when(clearanceService.getClearanceStatus(job.getId())).thenReturn(gate);
         LoadPlan load = loadPlan(job);
         load.setStatus(LoadPlanStatus.CONFIRMED);
@@ -885,11 +900,12 @@ class Flow3ServiceTest {
         }
 
         MoveHorseRequest move(Horse horse, VehicleStall from, VehicleStall to, Horse expectedOccupant) {
-            MoveHorseRequest r = new MoveHorseRequest();
-            r.setHorseId(horse.getId());
-            r.setFromStallId(from != null ? from.getId() : null);
-            r.setToStallId(to != null ? to.getId() : null);
-            r.setExpectedOccupantId(expectedOccupant != null ? expectedOccupant.getId() : null);
+            MoveHorseRequest r = MoveHorseRequest.builder()
+                    .horseId(horse.getId())
+                    .fromStallId(from != null ? from.getId() : null)
+                    .toStallId(to != null ? to.getId() : null)
+                    .expectedOccupantId(expectedOccupant != null ? expectedOccupant.getId() : null)
+                    .build();
             return r;
         }
 

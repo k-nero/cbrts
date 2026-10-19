@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +15,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
@@ -34,12 +38,14 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestHorseInput;
 import com.equifreight.model.request.RequestHorseResponse;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
@@ -80,6 +86,7 @@ class RequestServiceTest {
     ClubService clubs;
     CodeService codes;
     AuditService audit;
+    AuditLogRepository auditLogs;
     RequestService service;
     User user;
     Club club;
@@ -100,6 +107,7 @@ class RequestServiceTest {
         clubs = mock(ClubService.class);
         codes = mock(CodeService.class);
         audit = mock(AuditService.class);
+        auditLogs = mock(AuditLogRepository.class);
         service = new RequestService(
                 requests,
                 horses,
@@ -109,6 +117,7 @@ class RequestServiceTest {
                 clubs,
                 codes,
                 audit,
+                auditLogs,
                 JsonMapper.builder().build(),
                 Clock.fixed(NOW, BusinessTime.ZONE));
 
@@ -163,10 +172,8 @@ class RequestServiceTest {
         assertThat(snapshot.getSex()).isEqualTo(HorseSex.MARE);
         assertThat(snapshot.getSizeClassCode()).isEqualTo("M");
         assertThat(snapshot.getRequiredStall()).isEqualTo(StallType.CLIMATE);
-        assertThat(response.getHorses())
-                .extracting(RequestHorseResponse::getName)
-                .containsExactly("Nightfall", "Shadowfax");
-        assertThat(response.getStatus()).isEqualTo(RequestStatus.DRAFT);
+        assertThat(response.horses()).extracting(RequestHorseResponse::name).containsExactly("Nightfall", "Shadowfax");
+        assertThat(response.status()).isEqualTo(RequestStatus.DRAFT);
     }
 
     @Test
@@ -182,15 +189,16 @@ class RequestServiceTest {
 
         RequestResponse response = service.create(user, body(shadowfax));
 
-        assertThat(response.getCreatedAt()).isEqualTo(written);
-        assertThat(response.getUpdatedAt()).isEqualTo(written);
+        assertThat(response.createdAt()).isEqualTo(written);
+        assertThat(response.updatedAt()).isEqualTo(written);
     }
 
     @Test
     void anotherClubsHorseAnswers404() {
         UUID stranger = UUID.randomUUID();
-        RequestDraftRequest body = new RequestDraftRequest();
-        body.setHorses(List.of(input(stranger, false)));
+        RequestDraftRequest body = RequestDraftRequest.builder()
+                .horses(List.of(input(stranger, false)))
+                .build();
 
         assertThatThrownBy(() -> service.create(user, body))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -225,24 +233,26 @@ class RequestServiceTest {
 
         RequestResponse response = service.update(user, draft.getId(), body(silverBell));
 
-        assertThat(response.getHorses())
+        assertThat(response.horses())
                 .singleElement()
-                .satisfies(h -> assertThat(h.isArchived()).isTrue());
+                .satisfies(h -> assertThat(h.archived()).isTrue());
         verify(requests).saveAndFlush(draft);
     }
 
     @Test
     void aFoalIsOnlyForAMare() {
-        RequestDraftRequest gelding = new RequestDraftRequest();
-        gelding.setHorses(List.of(input(shadowfax.getId(), true)));
+        RequestDraftRequest gelding = RequestDraftRequest.builder()
+                .horses(List.of(input(shadowfax.getId(), true)))
+                .build();
         assertThatThrownBy(() -> service.create(user, gelding))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Only a mare can travel with a foal at foot; Shadowfax is a gelding.")
                 .extracting("code")
                 .isEqualTo("FOAL_NOT_A_MARE");
 
-        RequestDraftRequest mare = new RequestDraftRequest();
-        mare.setHorses(List.of(input(nightfall.getId(), true)));
+        RequestDraftRequest mare = RequestDraftRequest.builder()
+                .horses(List.of(input(nightfall.getId(), true)))
+                .build();
         service.create(user, mare);
         assertThat(savedRequest().getHorses().getFirst().isWithFoal()).isTrue();
     }
@@ -256,29 +266,31 @@ class RequestServiceTest {
         assertThat(draft.getHorses())
                 .extracting(rh -> rh.getHorse().getName())
                 .containsExactlyInAnyOrder("Nightfall", "Copper King");
-        assertThat(response.getHorses())
-                .extracting(RequestHorseResponse::getName)
+        assertThat(response.horses())
+                .extracting(RequestHorseResponse::name)
                 .containsExactly("Copper King", "Nightfall");
     }
 
     @Test
     void anEndIsAPlaceOrATextNotBoth() {
-        RequestDraftRequest origin = body();
-        origin.setOriginPlaceId(phuTho.getId());
-        origin.setOriginText("Ho Chi Minh City");
+        RequestDraftRequest origin = body().toBuilder()
+                .originPlaceId(phuTho.getId())
+                .originText("Ho Chi Minh City")
+                .build();
         assertRefused(origin, "PLACE_OR_TEXT", "Choose a place or type a city for the origin, not both.");
 
-        RequestDraftRequest destination = body();
-        destination.setDestinationPlaceId(chaoPhraya.getId());
-        destination.setDestinationText("Bangkok");
+        RequestDraftRequest destination = body().toBuilder()
+                .destinationPlaceId(chaoPhraya.getId())
+                .destinationText("Bangkok")
+                .build();
         assertRefused(destination, "PLACE_OR_TEXT", "Choose a place or type a city for the destination, not both.");
     }
 
     @Test
     void anUnknownPlaceAnswers404() {
         UUID unknown = UUID.randomUUID();
-        RequestDraftRequest body = body();
-        body.setDestinationPlaceId(unknown);
+        RequestDraftRequest body =
+                body().toBuilder().destinationPlaceId(unknown).build();
 
         assertThatThrownBy(() -> service.create(user, body))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -287,19 +299,21 @@ class RequestServiceTest {
 
     @Test
     void theSamePlaceTwiceIsRefused() {
-        RequestDraftRequest body = body();
-        body.setOriginPlaceId(phuTho.getId());
-        body.setDestinationPlaceId(phuTho.getId());
+        RequestDraftRequest body = body().toBuilder()
+                .originPlaceId(phuTho.getId())
+                .destinationPlaceId(phuTho.getId())
+                .build();
 
         assertRefused(body, "SAME_PLACE", "The horses can't be collected and delivered at the same place.");
     }
 
     @Test
     void textsAreTrimmedAndBlankIsNull() {
-        RequestDraftRequest body = body();
-        body.setOriginText(" Singapore ");
-        body.setDestinationText("  ");
-        body.setSpecialInstructions("  Quiet loading. ");
+        RequestDraftRequest body = body().toBuilder()
+                .originText(" Singapore ")
+                .destinationText("  ")
+                .specialInstructions("  Quiet loading. ")
+                .build();
 
         service.create(user, body);
 
@@ -311,22 +325,25 @@ class RequestServiceTest {
 
     @Test
     void roadWithAnAirClassOrAirWithATrailerIsRefused() {
-        RequestDraftRequest road = body();
-        road.setMode(TransportMode.ROAD);
-        road.setAirClass(ServiceClass.BUSINESS);
+        RequestDraftRequest road = body().toBuilder()
+                .mode(TransportMode.ROAD)
+                .airClass(ServiceClass.BUSINESS)
+                .build();
         assertRefused(road, "MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
 
-        RequestDraftRequest air = body();
-        air.setMode(TransportMode.AIR);
-        air.setTrailer(TrailerType.SHARED);
+        RequestDraftRequest air = body().toBuilder()
+                .mode(TransportMode.AIR)
+                .trailer(TrailerType.SHARED)
+                .build();
         assertRefused(air, "MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
     }
 
     @Test
     void aTrailerAndAnAirClassWithoutAModeAreRefused() {
-        RequestDraftRequest body = body();
-        body.setTrailer(TrailerType.SHARED);
-        body.setAirClass(ServiceClass.BUSINESS);
+        RequestDraftRequest body = body().toBuilder()
+                .trailer(TrailerType.SHARED)
+                .airClass(ServiceClass.BUSINESS)
+                .build();
 
         assertRefused(body, "MODE_OPTIONS", "Air moves have no trailer, and road moves have no air class.");
     }
@@ -336,8 +353,8 @@ class RequestServiceTest {
         Place welfare = place("Svay Rieng welfare stop", "Svay Rieng");
         welfare.setKind(PlaceKind.WELFARE_STOP);
         when(places.findById(welfare.getId())).thenReturn(Optional.of(welfare));
-        RequestDraftRequest body = body();
-        body.setOriginPlaceId(welfare.getId());
+        RequestDraftRequest body =
+                body().toBuilder().originPlaceId(welfare.getId()).build();
 
         assertRefused(
                 body,
@@ -347,11 +364,9 @@ class RequestServiceTest {
 
     @Test
     void flexIsZeroToSevenDays() {
-        RequestDraftRequest eight = body();
-        eight.setDateFlexDays(8);
+        RequestDraftRequest eight = body().toBuilder().dateFlexDays(8).build();
         assertRefused(eight, "DATE_FLEX", "Dates can move by 0 to 7 days; 8 was given.");
-        RequestDraftRequest negative = body();
-        negative.setDateFlexDays(-1);
+        RequestDraftRequest negative = body().toBuilder().dateFlexDays(-1).build();
         assertRefused(negative, "DATE_FLEX", "Dates can move by 0 to 7 days; -1 was given.");
 
         service.create(user, body());
@@ -365,40 +380,42 @@ class RequestServiceTest {
         hcmBkk.setDateFlexDays((short) 5);
         when(routes.resolve(phuTho, null, chaoPhraya, null, TransportMode.ROAD))
                 .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
-        RequestDraftRequest body = body(shadowfax);
-        body.setOriginPlaceId(phuTho.getId());
-        body.setDestinationPlaceId(chaoPhraya.getId());
-        body.setMode(TransportMode.ROAD);
-        body.setDateFlexDays(3);
+        RequestDraftRequest body = body(shadowfax).toBuilder()
+                .originPlaceId(phuTho.getId())
+                .destinationPlaceId(chaoPhraya.getId())
+                .mode(TransportMode.ROAD)
+                .dateFlexDays(3)
+                .build();
 
         RequestResponse response = service.create(user, body);
 
         assertThat(savedRequest().getDateFlexDays()).isEqualTo((short) 5);
-        assertThat(response.getDateFlexDays()).isEqualTo(5);
+        assertThat(response.dateFlexDays()).isEqualTo(5);
     }
 
     @Test
     void aWindowNeedsRoadAPrivateTrailerAndFixedDates() {
         String message = "An arrival window needs a road move with a private trailer and fixed dates. Choose road "
                 + "and a private trailer, and untick ±3 days, or arrive any time on the day.";
-        RequestDraftRequest air = window("08:00", "12:00");
-        air.setMode(TransportMode.AIR);
-        air.setTrailer(null);
+        RequestDraftRequest air = window("08:00", "12:00").toBuilder()
+                .mode(TransportMode.AIR)
+                .trailer(null)
+                .build();
         assertRefused(air, "ARRIVAL_WINDOW", message);
 
-        RequestDraftRequest shared = window("08:00", "12:00");
-        shared.setTrailer(TrailerType.SHARED);
+        RequestDraftRequest shared =
+                window("08:00", "12:00").toBuilder().trailer(TrailerType.SHARED).build();
         assertRefused(shared, "ARRIVAL_WINDOW", message);
 
-        RequestDraftRequest flexible = window("08:00", "12:00");
-        flexible.setDateFlexDays(3);
+        RequestDraftRequest flexible =
+                window("08:00", "12:00").toBuilder().dateFlexDays(3).build();
         assertRefused(flexible, "ARRIVAL_WINDOW", message);
     }
 
     @Test
     void aWindowNeedsBothTimes() {
-        RequestDraftRequest body = window("08:00", "12:00");
-        body.setWindowEnd(null);
+        RequestDraftRequest body =
+                window("08:00", "12:00").toBuilder().windowEnd(null).build();
 
         assertRefused(body, "ARRIVAL_WINDOW", "An arrival window needs both a start and an end.");
     }
@@ -421,8 +438,9 @@ class RequestServiceTest {
 
     @Test
     void anyTimeTakesNoWindowTimes() {
-        RequestDraftRequest body = window("08:00", "12:00");
-        body.setArrivalMode(ArrivalMode.ANY_TIME);
+        RequestDraftRequest body = window("08:00", "12:00").toBuilder()
+                .arrivalMode(ArrivalMode.ANY_TIME)
+                .build();
 
         assertRefused(body, "ARRIVAL_WINDOW", "Arrival any time on the day takes no window times.");
     }
@@ -433,15 +451,16 @@ class RequestServiceTest {
         hcmBkk.setCode("RD HCM → BKK");
         when(routes.resolve(phuTho, null, chaoPhraya, null, TransportMode.ROAD))
                 .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
-        RequestDraftRequest body = body(shadowfax);
-        body.setOriginPlaceId(phuTho.getId());
-        body.setDestinationPlaceId(chaoPhraya.getId());
-        body.setMode(TransportMode.ROAD);
+        RequestDraftRequest body = body(shadowfax).toBuilder()
+                .originPlaceId(phuTho.getId())
+                .destinationPlaceId(chaoPhraya.getId())
+                .mode(TransportMode.ROAD)
+                .build();
 
         RequestResponse response = service.create(user, body);
 
         assertThat(savedRequest().getCorridor()).isSameAs(hcmBkk);
-        assertThat(response.getRoute().getCode()).isEqualTo("RD HCM → BKK");
+        assertThat(response.route().code()).isEqualTo("RD HCM → BKK");
     }
 
     @Test
@@ -449,15 +468,16 @@ class RequestServiceTest {
         when(routes.resolve(any(), any(), any(), any(), any()))
                 .thenReturn(
                         new RouteResolution(new Corridor(), route(21), Set.of(TransportMode.ROAD), null, false, false));
-        RequestDraftRequest body = body(shadowfax);
-        body.setDepartureDate(LocalDate.of(2026, 10, 30));
+        RequestDraftRequest body = body(shadowfax).toBuilder()
+                .departureDate(LocalDate.of(2026, 10, 30))
+                .build();
 
         RequestResponse response = service.create(user, body);
 
-        assertThat(response.getLeadTime().getRequiredDays()).isEqualTo(21);
-        assertThat(response.getLeadTime().getEarliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
-        assertThat(response.getLeadTime().getDaysBeforeDeparture()).isEqualTo(34);
-        assertThat(response.getLeadTime().isMet()).isTrue();
+        assertThat(response.leadTime().requiredDays()).isEqualTo(21);
+        assertThat(response.leadTime().earliestDeparture()).isEqualTo(LocalDate.of(2026, 10, 17));
+        assertThat(response.leadTime().daysBeforeDeparture()).isEqualTo(34);
+        assertThat(response.leadTime().met()).isTrue();
     }
 
     @Test
@@ -517,10 +537,10 @@ class RequestServiceTest {
 
         RequestResponse response = service.get(user, submitted.getId());
 
-        assertThat(response.getBlockers()).isEmpty();
-        assertThat(response.getLeadTime()).isNull();
-        assertThat(response.getRoute().getCode()).isEqualTo("RD HCM → BKK");
-        assertThat(response.getCode()).isEqualTo("REQ-2026-0001");
+        assertThat(response.blockers()).isEmpty();
+        assertThat(response.leadTime()).isNull();
+        assertThat(response.route().code()).isEqualTo("RD HCM → BKK");
+        assertThat(response.code()).isEqualTo("REQ-2026-0001");
     }
 
     @Test
@@ -537,14 +557,81 @@ class RequestServiceTest {
         Page<RequestSummaryResponse> page = service.list(user, null, pageable);
 
         assertThat(page.getContent())
-                .extracting(RequestSummaryResponse::getHorseCount)
+                .extracting(RequestSummaryResponse::horseCount)
                 .containsExactly(2L, 1L);
         assertThat(service.list(user, RequestStatus.DRAFT, pageable).getContent())
-                .extracting(RequestSummaryResponse::getId)
+                .extracting(RequestSummaryResponse::id)
                 .containsExactly(second.getId());
     }
 
     /** Spec R-07: submitting a draft. */
+    // --- an INFO_REQUIRED request (US-F1-04) ----------------------------------------------------------
+
+    @Test
+    void anInfoRequiredRequestCanBeSaved() {
+        TransportRequest r = infoRequired();
+
+        RequestResponse response = service.update(user, r.getId(), body(shadowfax));
+
+        verify(requests).saveAndFlush(r);
+        assertThat(response.status()).isEqualTo(RequestStatus.INFO_REQUIRED);
+    }
+
+    @Test
+    void aSubmittedRequestStillCantBeEdited() {
+        TransportRequest r = submitted();
+
+        assertThatThrownBy(() -> service.update(user, r.getId(), body(shadowfax)))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("REQUEST_NOT_DRAFT");
+    }
+
+    @Test
+    void anInfoRequiredRequestComesBackWithItsBlockers() {
+        TransportRequest r = infoRequired();
+
+        RequestResponse response = service.get(user, r.getId());
+
+        assertThat(response.blockers()).extracting(Blocker::code).contains("ORIGIN_MISSING");
+    }
+
+    @Test
+    void anInfoRequiredRequestCantBeDiscarded() {
+        TransportRequest r = infoRequired();
+
+        assertThatThrownBy(() -> service.delete(user, r.getId()))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("REQUEST_NOT_DRAFT");
+        verify(requests, never()).delete(any());
+    }
+
+    @Test
+    void theResponseListsRevisionsAndTheNote() {
+        TransportRequest r = infoRequired();
+        Instant returned = Instant.parse("2026-09-28T02:41:00Z");
+        when(auditLogs.findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+                        "TRANSPORT_REQUEST", r.getId(), "REQUEST_INFO_REQUIRED"))
+                .thenReturn(List.of(auditAt(returned)));
+
+        RequestResponse response = service.get(user, r.getId());
+
+        assertThat(response.infoRequiredNote()).isEqualTo("Which stable?");
+        assertThat(response.revisions()).singleElement().satisfies(v -> {
+            assertThat(v.getRevisionNo()).isEqualTo((short) 1);
+            assertThat(v.getNote()).isEqualTo("Which stable?");
+            assertThat(v.getReturnedAt()).isEqualTo(returned);
+        });
+    }
+
+    @Test
+    void aDraftHasNoRevisions() {
+        TransportRequest r = draft(shadowfax);
+
+        assertThat(service.get(user, r.getId()).revisions()).isEmpty();
+    }
+
     @Nested
     class Submit {
 
@@ -568,13 +655,76 @@ class RequestServiceTest {
         }
 
         @Test
+        void resubmittingKeepsTheCodeAndAppendsVersion2() {
+            Instant first = Instant.parse("2026-09-20T02:00:00Z");
+            backToTheCustomer(first);
+
+            RequestResponse response = service.submit(user, draft.getId());
+
+            assertThat(response.code()).isEqualTo("REQ-2026-0195");
+            verify(codes, never()).next(any(), anyInt());
+            assertThat(draft.getSubmittedAt()).isEqualTo(first);
+            assertThat(draft.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
+            assertThat(draft.getInfoRequiredNote()).isNull();
+            ArgumentCaptor<RequestRevision> captor = ArgumentCaptor.forClass(RequestRevision.class);
+            verify(revisions).save(captor.capture());
+            assertThat(captor.getValue().getRevisionNo()).isEqualTo((short) 2);
+            assertThat(captor.getValue().getNote()).isNull();
+            assertThat(captor.getValue().getSubmittedAt()).isEqualTo(NOW);
+            verify(audit)
+                    .recordDecision(
+                            eq(user),
+                            eq("REQUEST_RESUBMITTED"),
+                            startsWith("Sent version 2 with 2 horses: "),
+                            eq("TRANSPORT_REQUEST"),
+                            eq(draft.getId()),
+                            eq("REQ-2026-0195"),
+                            isNull(),
+                            eq("{\"status\":\"INFO_REQUIRED\"}"),
+                            eq("{\"status\":\"SUBMITTED\"}"));
+            verify(audit)
+                    .recordSystem(
+                            eq("LEAD_TIME_CHECKED"),
+                            startsWith("Lead time checked: "),
+                            eq("TRANSPORT_REQUEST"),
+                            eq(draft.getId()),
+                            eq("REQ-2026-0195"),
+                            isNull(),
+                            isNull());
+        }
+
+        @Test
+        void aBlockedResubmitWritesNothing() {
+            backToTheCustomer(Instant.parse("2026-09-20T02:00:00Z"));
+            draft.setDepartureDate(null);
+
+            assertThatThrownBy(() -> service.submit(user, draft.getId()))
+                    .isInstanceOf(ConflictException.class)
+                    .extracting("code")
+                    .isEqualTo("SUBMISSION_BLOCKED");
+            verify(revisions, never()).save(any());
+            verify(codes, never()).next(any(), anyInt());
+            verifyNoInteractions(audit);
+            assertThat(draft.getStatus()).isEqualTo(RequestStatus.INFO_REQUIRED);
+        }
+
+        void backToTheCustomer(Instant firstSubmitted) {
+            draft.setStatus(RequestStatus.INFO_REQUIRED);
+            draft.setCode("REQ-2026-0195");
+            draft.setSubmittedAt(firstSubmitted);
+            draft.setInfoRequiredNote("Which stable?");
+            when(revisions.findByRequestIdOrderByRevisionNoAsc(draft.getId()))
+                    .thenReturn(List.of(revision(draft, 1, "Which stable?")));
+        }
+
+        @Test
         void submitIssuesTheCodeAndSetsSubmitted() {
             RequestResponse response = service.submit(user, draft.getId());
 
-            assertThat(response.getCode()).isEqualTo("REQ-2026-0193");
-            assertThat(response.getStatus()).isEqualTo(RequestStatus.SUBMITTED);
-            assertThat(response.getSubmittedAt()).isEqualTo(NOW);
-            assertThat(response.getBlockers()).isEmpty();
+            assertThat(response.code()).isEqualTo("REQ-2026-0193");
+            assertThat(response.status()).isEqualTo(RequestStatus.SUBMITTED);
+            assertThat(response.submittedAt()).isEqualTo(NOW);
+            assertThat(response.blockers()).isEmpty();
             assertThat(draft.getCode()).isEqualTo("REQ-2026-0193");
             assertThat(draft.getCorridor()).isSameAs(hcmBkk);
         }
@@ -640,7 +790,7 @@ class RequestServiceTest {
             RequestResponse response = service.submit(user, draft.getId());
 
             assertThat(draft.getDateFlexDays()).isEqualTo((short) 5);
-            assertThat(response.getDateFlexDays()).isEqualTo(5);
+            assertThat(response.dateFlexDays()).isEqualTo(5);
             verify(audit)
                     .recordSystem(
                             "LEAD_TIME_CHECKED",
@@ -780,12 +930,13 @@ class RequestServiceTest {
                     clubs,
                     codes,
                     audit,
+                    auditLogs,
                     JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE));
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 
-            assertThat(service.submit(user, draft.getId()).getCode()).isEqualTo("REQ-2027-0001");
+            assertThat(service.submit(user, draft.getId()).code()).isEqualTo("REQ-2027-0001");
             verify(codes).next(CodePrefix.REQ, 2027);
         }
     }
@@ -808,27 +959,28 @@ class RequestServiceTest {
     }
 
     RequestDraftRequest body(Horse... list) {
-        RequestDraftRequest body = new RequestDraftRequest();
-        body.setHorses(new ArrayList<>(
-                Arrays.stream(list).map(h -> input(h.getId(), false)).toList()));
+        RequestDraftRequest body = RequestDraftRequest.builder().build().toBuilder()
+                .horses(new ArrayList<>(
+                        Arrays.stream(list).map(h -> input(h.getId(), false)).toList()))
+                .build();
         return body;
     }
 
     RequestDraftRequest window(String from, String until) {
-        RequestDraftRequest body = body();
-        body.setMode(TransportMode.ROAD);
-        body.setTrailer(TrailerType.PRIVATE);
-        body.setDateFlexDays(0);
-        body.setArrivalMode(ArrivalMode.WINDOW);
-        body.setWindowStart(OffsetDateTime.parse("2026-10-31T" + from + ":00+07:00"));
-        body.setWindowEnd(OffsetDateTime.parse("2026-10-31T" + until + ":00+07:00"));
+        RequestDraftRequest body = body().toBuilder()
+                .mode(TransportMode.ROAD)
+                .trailer(TrailerType.PRIVATE)
+                .dateFlexDays(0)
+                .arrivalMode(ArrivalMode.WINDOW)
+                .windowStart(OffsetDateTime.parse("2026-10-31T" + from + ":00+07:00"))
+                .windowEnd(OffsetDateTime.parse("2026-10-31T" + until + ":00+07:00"))
+                .build();
         return body;
     }
 
     static RequestHorseInput input(UUID horseId, boolean withFoal) {
-        RequestHorseInput input = new RequestHorseInput();
-        input.setHorseId(horseId);
-        input.setWithFoal(withFoal);
+        RequestHorseInput input =
+                RequestHorseInput.builder().horseId(horseId).withFoal(withFoal).build();
         return input;
     }
 
@@ -850,6 +1002,34 @@ class RequestServiceTest {
         when(requests.findForUpdate(r.getId(), CLUB_ID)).thenReturn(Optional.of(r));
         when(requests.findByIdAndClubId(r.getId(), CLUB_ID)).thenReturn(Optional.of(r));
         return r;
+    }
+
+    TransportRequest infoRequired() {
+        TransportRequest r = draft(shadowfax);
+        r.setStatus(RequestStatus.INFO_REQUIRED);
+        r.setCode("REQ-2026-0195");
+        r.setSubmittedAt(Instant.parse("2026-09-20T02:00:00Z"));
+        r.setInfoRequiredNote("Which stable?");
+        when(revisions.findByRequestIdOrderByRevisionNoAsc(r.getId()))
+                .thenReturn(List.of(revision(r, 1, "Which stable?")));
+        return r;
+    }
+
+    static RequestRevision revision(TransportRequest r, int no, String note) {
+        RequestRevision revision = new RequestRevision();
+        revision.setId(UUID.randomUUID());
+        revision.setRequest(r);
+        revision.setRevisionNo((short) no);
+        revision.setPayload("{}");
+        revision.setSubmittedAt(Instant.parse("2026-09-20T02:00:00Z"));
+        revision.setNote(note);
+        return revision;
+    }
+
+    static AuditLog auditAt(Instant at) {
+        AuditLog log = new AuditLog();
+        log.setOccurredAt(at);
+        return log;
     }
 
     TransportRequest submitted() {

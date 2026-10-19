@@ -113,16 +113,16 @@ public class UserService {
      */
     @Transactional
     public UserResponse create(CreateUserRequest request, User actor) {
-        if (userRepository.getByEmail(request.getEmail()) != null) {
+        if (userRepository.getByEmail(request.email()) != null) {
             throw new BusinessException("Email already in use");
         }
-        Set<Role> roles = resolveRoles(request.getRoles());
+        Set<Role> roles = resolveRoles(request.roles());
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhone(request.getPhone());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.email());
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setPhone(request.phone());
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setRoles(roles);
         User saved = userRepository.save(user);
         auditService.recordDecision(
@@ -145,15 +145,14 @@ public class UserService {
     public UserResponse update(UUID id, UpdateUserRequest request, User actor) {
         User user = findOrThrow(id);
         requireNotRemoved(user);
-        Set<Role> roles = request.getRoles() != null && !request.getRoles().isEmpty()
-                ? resolveRoles(request.getRoles())
-                : user.getRoles();
+        Set<Role> roles =
+                request.roles() != null && !request.roles().isEmpty() ? resolveRoles(request.roles()) : user.getRoles();
         String before = snapshot(user);
         String oldName = user.displayName();
         List<String> oldRoles = roleNames(user.getRoles());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhone(request.getPhone());
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setPhone(request.phone());
         user.setRoles(roles);
         User saved = userRepository.save(user);
         String after = snapshot(saved);

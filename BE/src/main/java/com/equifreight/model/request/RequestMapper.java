@@ -17,6 +17,15 @@ public final class RequestMapper {
 
     public static RequestResponse toResponse(
             TransportRequest r, RouteResponse route, LeadTimeResponse leadTime, List<Blocker> blockers) {
+        return toResponse(r, route, leadTime, blockers, List.of());
+    }
+
+    public static RequestResponse toResponse(
+            TransportRequest r,
+            RouteResponse route,
+            LeadTimeResponse leadTime,
+            List<Blocker> blockers,
+            List<RevisionSummaryResponse> revisions) {
         return RequestResponse.builder()
                 .id(r.getId())
                 .code(r.getCode())
@@ -34,7 +43,7 @@ public final class RequestMapper {
                 // A draft shows its route's current flex; a submitted request keeps the value copied at submission.
                 .dateFlexDays(
                         r.getStatus() == RequestStatus.DRAFT && route != null
-                                ? LeadTimePolicy.flexDaysFor(r.getDateFlexDays(), route.getDateFlexDays())
+                                ? LeadTimePolicy.flexDaysFor(r.getDateFlexDays(), route.dateFlexDays())
                                 : r.getDateFlexDays())
                 .arrivalMode(r.getArrivalMode())
                 .windowStart(r.getWindowStart())
@@ -48,6 +57,8 @@ public final class RequestMapper {
                 .route(route)
                 .leadTime(leadTime)
                 .blockers(blockers)
+                .infoRequiredNote(r.getInfoRequiredNote())
+                .revisions(revisions)
                 .build();
     }
 

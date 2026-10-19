@@ -101,84 +101,84 @@ public class RoutePlanService {
             plan.setStatus(RoutePlanStatus.DRAFT);
         }
 
-        plan.setDistanceKm(request.getDistanceKm());
-        plan.setDurationMin(request.getDurationMin());
-        plan.setChangeReason(request.getChangeReason());
+        plan.setDistanceKm(request.distanceKm());
+        plan.setDurationMin(request.durationMin());
+        plan.setChangeReason(request.changeReason());
         RoutePlan savedPlan = routePlanRepository.save(plan);
 
         // Save stops
         Map<Short, RouteStop> stopSeqMap = new HashMap<>();
-        for (CreateRoutePlanRequest.StopItem item : request.getStops()) {
+        for (CreateRoutePlanRequest.StopItem item : request.stops()) {
             RouteStop stop = new RouteStop();
             stop.setRoutePlan(savedPlan);
-            stop.setSeq(item.getSeq());
-            stop.setKind(item.getKind());
-            stop.setPlannedAt(item.getPlannedAt());
-            stop.setPlannedStayMin(item.getPlannedStayMin());
-            stop.setDetails(item.getDetails());
+            stop.setSeq(item.seq());
+            stop.setKind(item.kind());
+            stop.setPlannedAt(item.plannedAt());
+            stop.setPlannedStayMin(item.plannedStayMin());
+            stop.setDetails(item.details());
 
-            if (item.getKind() == RouteStopKind.BORDER) {
-                if (item.getBorderCrossingId() == null) {
+            if (item.kind() == RouteStopKind.BORDER) {
+                if (item.borderCrossingId() == null) {
                     throw new BusinessException("A BORDER stop requires a border crossing ID");
                 }
                 BorderCrossing bc = borderCrossingRepository
-                        .findById(item.getBorderCrossingId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Border crossing not found: " + item.getBorderCrossingId()));
+                        .findById(item.borderCrossingId())
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("Border crossing not found: " + item.borderCrossingId()));
                 stop.setBorderCrossing(bc);
             } else {
-                if (item.getPlaceId() != null) {
+                if (item.placeId() != null) {
                     Place place = placeRepository
-                            .findById(item.getPlaceId())
-                            .orElseThrow(() -> new ResourceNotFoundException("Place not found: " + item.getPlaceId()));
+                            .findById(item.placeId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Place not found: " + item.placeId()));
                     stop.setPlace(place);
                 }
             }
 
             RouteStop savedStop = routeStopRepository.save(stop);
-            stopSeqMap.put(item.getSeq(), savedStop);
+            stopSeqMap.put(item.seq(), savedStop);
             savedPlan.getStops().add(savedStop);
         }
 
         // Save legs
-        for (CreateRoutePlanRequest.LegItem item : request.getLegs()) {
-            RouteStop fromStop = stopSeqMap.get(item.getFromStopSeq());
-            RouteStop toStop = stopSeqMap.get(item.getToStopSeq());
+        for (CreateRoutePlanRequest.LegItem item : request.legs()) {
+            RouteStop fromStop = stopSeqMap.get(item.fromStopSeq());
+            RouteStop toStop = stopSeqMap.get(item.toStopSeq());
 
             if (fromStop == null || toStop == null) {
-                throw new BusinessException("Leg connects non-existing stop sequences: " + item.getFromStopSeq()
-                        + " -> " + item.getToStopSeq());
+                throw new BusinessException(
+                        "Leg connects non-existing stop sequences: " + item.fromStopSeq() + " -> " + item.toStopSeq());
             }
 
             RouteLeg leg = new RouteLeg();
             leg.setRoutePlan(savedPlan);
-            leg.setSeq(item.getSeq());
+            leg.setSeq(item.seq());
             leg.setFromStop(fromStop);
             leg.setToStop(toStop);
-            leg.setMode(item.getMode());
-            leg.setDistanceKm(item.getDistanceKm());
-            leg.setPlannedMin(item.getPlannedMin());
+            leg.setMode(item.mode());
+            leg.setDistanceKm(item.distanceKm());
+            leg.setPlannedMin(item.plannedMin());
 
-            if (item.getMode() == TransportMode.ROAD && item.getVehicleId() != null) {
+            if (item.mode() == TransportMode.ROAD && item.vehicleId() != null) {
                 Vehicle vehicle = vehicleRepository
-                        .findById(item.getVehicleId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + item.getVehicleId()));
+                        .findById(item.vehicleId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + item.vehicleId()));
                 leg.setVehicle(vehicle);
             }
 
             RouteLeg savedLeg = routeLegRepository.save(leg);
 
-            if (item.getMode() == TransportMode.AIR && item.getFlight() != null) {
+            if (item.mode() == TransportMode.AIR && item.flight() != null) {
                 Flight flight = new Flight();
                 flight.setRouteLeg(savedLeg);
-                flight.setAirline(item.getFlight().getAirline());
-                flight.setFlightNo(item.getFlight().getFlightNo());
-                flight.setAirWaybill(item.getFlight().getAirWaybill());
-                flight.setAircraftType(item.getFlight().getAircraftType());
-                flight.setStallPositions(item.getFlight().getStallPositions());
-                flight.setServiceClass(item.getFlight().getServiceClass());
-                flight.setScheduledDepartureAt(item.getFlight().getScheduledDepartureAt());
-                flight.setScheduledArrivalAt(item.getFlight().getScheduledArrivalAt());
+                flight.setAirline(item.flight().airline());
+                flight.setFlightNo(item.flight().flightNo());
+                flight.setAirWaybill(item.flight().airWaybill());
+                flight.setAircraftType(item.flight().aircraftType());
+                flight.setStallPositions(item.flight().stallPositions());
+                flight.setServiceClass(item.flight().serviceClass());
+                flight.setScheduledDepartureAt(item.flight().scheduledDepartureAt());
+                flight.setScheduledArrivalAt(item.flight().scheduledArrivalAt());
                 flightRepository.save(flight);
             }
 
@@ -280,82 +280,10 @@ public class RoutePlanService {
     }
 
     public RoutePlanResponse toResponse(RoutePlan plan) {
-        List<RouteStopResponse> stopResponses = plan.getStops().stream()
-                .map(s -> RouteStopResponse.builder()
-                        .id(s.getId())
-                        .seq(s.getSeq())
-                        .kind(s.getKind())
-                        .placeId(s.getPlace() != null ? s.getPlace().getId() : null)
-                        .placeName(s.getPlace() != null ? s.getPlace().getName() : null)
-                        .borderCrossingId(
-                                s.getBorderCrossing() != null
-                                        ? s.getBorderCrossing().getId()
-                                        : null)
-                        .borderCrossingName(
-                                s.getBorderCrossing() != null
-                                        ? s.getBorderCrossing().getName()
-                                        : null)
-                        .plannedAt(s.getPlannedAt())
-                        .plannedStayMin(s.getPlannedStayMin())
-                        .details(s.getDetails())
-                        .build())
-                .toList();
-
-        List<RouteLegResponse> legResponses = plan.getLegs().stream()
-                .map(leg -> {
-                    FlightResponse flightResp = null;
-                    Optional<Flight> fOpt = flightRepository.findByRouteLegId(leg.getId());
-                    if (fOpt.isPresent()) {
-                        Flight f = fOpt.get();
-                        flightResp = FlightResponse.builder()
-                                .id(f.getId())
-                                .airline(f.getAirline())
-                                .flightNo(f.getFlightNo())
-                                .airWaybill(f.getAirWaybill())
-                                .aircraftType(f.getAircraftType())
-                                .stallPositions(f.getStallPositions())
-                                .serviceClass(f.getServiceClass())
-                                .scheduledDepartureAt(f.getScheduledDepartureAt())
-                                .scheduledArrivalAt(f.getScheduledArrivalAt())
-                                .estimatedDepartureAt(f.getEstimatedDepartureAt())
-                                .estimatedArrivalAt(f.getEstimatedArrivalAt())
-                                .build();
-                    }
-
-                    return RouteLegResponse.builder()
-                            .id(leg.getId())
-                            .seq(leg.getSeq())
-                            .fromStopId(leg.getFromStop().getId())
-                            .toStopId(leg.getToStop().getId())
-                            .mode(leg.getMode())
-                            .vehicleId(
-                                    leg.getVehicle() != null ? leg.getVehicle().getId() : null)
-                            .vehicleCode(
-                                    leg.getVehicle() != null ? leg.getVehicle().getCode() : null)
-                            .distanceKm(leg.getDistanceKm())
-                            .plannedMin(leg.getPlannedMin())
-                            .flight(flightResp)
-                            .build();
-                })
-                .toList();
-
-        return RoutePlanResponse.builder()
-                .id(plan.getId())
-                .jobId(plan.getJob().getId())
-                .versionNo(plan.getVersionNo())
-                .status(plan.getStatus())
-                .distanceKm(plan.getDistanceKm())
-                .durationMin(plan.getDurationMin())
-                .confirmedByName(
-                        plan.getConfirmedBy() != null
-                                ? plan.getConfirmedBy().getFirstName() + " "
-                                        + plan.getConfirmedBy().getLastName()
-                                : null)
-                .confirmedAt(plan.getConfirmedAt())
-                .supersededAt(plan.getSupersededAt())
-                .changeReason(plan.getChangeReason())
-                .stops(stopResponses)
-                .legs(legResponses)
-                .build();
+        Map<UUID, Flight> flightsByLegId = new HashMap<>();
+        for (RouteLeg leg : plan.getLegs()) {
+            flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
+        }
+        return JobMapper.toRoutePlanResponse(plan, flightsByLegId);
     }
 }

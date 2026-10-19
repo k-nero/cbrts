@@ -5,20 +5,15 @@ import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
 import java.util.UUID;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Builder
-public class JobHorseResponse {
-    private UUID id;
-    private String name;
-    private HorseSex sex;
-    private String breed;
-    private Short weightKg;
-    private String sizeClassCode;
-    private StallType requiredStall;
-    private Temperament temperament;
-    private String handlingNotes;
-}
+public record JobHorseResponse(
+        UUID id,
+        String name,
+        HorseSex sex,
+        String breed,
+        Short weightKg,
+        String sizeClassCode,
+        StallType requiredStall,
+        Temperament temperament,
+        String handlingNotes) {}

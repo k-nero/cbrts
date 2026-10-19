@@ -3,25 +3,19 @@ package com.equifreight.model.user;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserResponse {
-    private UUID id;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private String phone;
-    private List<String> roles;
-    /**
-     * The customer's club name on /me; null for staff and on the admin user list.
-     */
-    private String clubName;
-
-    private Instant createdAt;
-    private Instant updatedAt;
-}
+@Builder(toBuilder = true)
+public record UserResponse(
+        UUID id,
+        String email,
+        String firstName,
+        String lastName,
+        String phone,
+        List<String> roles,
+        /**
+         * The customer's club name on /me; null for staff and on the admin user list.
+         */
+        String clubName,
+        Instant createdAt,
+        Instant updatedAt) {}

@@ -2,12 +2,64 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.DocumentVersion;
+import com.equifreight.entity.RegulationCatalog;
+import com.equifreight.entity.RegulationVersion;
+import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.DossierStatus;
+import java.util.List;
 import java.util.UUID;
 
 public final class ClearanceMapper {
 
     private ClearanceMapper() {}
+
+    /** A job on the transport specialist's picker. */
+    public static JobSummaryResponse toJobSummaryResponse(TransportJob job) {
+        return JobSummaryResponse.builder()
+                .id(job.getId())
+                .code(job.getCode())
+                .dossierStatus(job.getDossierStatus())
+                .stage(job.getStage())
+                .clubName(job.getRequest().getClub().getName())
+                .build();
+    }
+
+    /** The clearance gate of a job, with the counts ClearanceService worked out. */
+    public static ClearanceStatusResponse toStatusResponse(
+            TransportJob job,
+            int totalChecklistItems,
+            int mandatoryItems,
+            int clearedMandatoryItems,
+            int totalQuarantines,
+            int completedQuarantines,
+            List<String> outstandingIssues) {
+        return ClearanceStatusResponse.builder()
+                .jobId(job.getId())
+                .jobCode(job.getCode())
+                .dossierStatus(job.getDossierStatus())
+                .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
+                .clearanceReadyAt(job.getClearanceReadyAt())
+                .totalChecklistItems(totalChecklistItems)
+                .mandatoryItems(mandatoryItems)
+                .clearedMandatoryItems(clearedMandatoryItems)
+                .totalQuarantines(totalQuarantines)
+                .completedQuarantines(completedQuarantines)
+                .allQuarantinesCompleted(completedQuarantines == totalQuarantines)
+                .outstandingIssues(outstandingIssues)
+                .build();
+    }
+
+    /** A country's regulation catalog; {@code activeVersion} is its latest published version, or null. */
+    public static RegulationCatalogResponse toCatalogResponse(
+            RegulationCatalog catalog, RegulationVersion activeVersion) {
+        return RegulationCatalogResponse.builder()
+                .id(catalog.getId())
+                .countryCode(catalog.getCountry() != null ? catalog.getCountry().getCode() : null)
+                .name(catalog.getName())
+                .activeVersion(activeVersion != null ? toVersionResponse(activeVersion) : null)
+                .build();
+    }
 
     public static DocumentVersionResponse toVersionResponse(DocumentVersion version) {
         if (version == null) {

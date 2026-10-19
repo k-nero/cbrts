@@ -1,10 +1,6 @@
 package com.equifreight.model.auth;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Builder;
 
-@Getter
-@Setter
-public class RefreshTokenRequest {
-    private String refreshToken;
-}
+@Builder
+public record RefreshTokenRequest(String refreshToken) {}

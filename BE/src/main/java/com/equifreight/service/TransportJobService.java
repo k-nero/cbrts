@@ -113,40 +113,29 @@ public class TransportJobService {
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
 
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(job.getId());
-        boolean isClear = gate.isClearanceReady();
+        boolean isClear = gate.clearanceReady();
         String gateState = isClear ? "Clear" : "Locked";
         String gateSummary;
         if (isClear) {
             gateSummary = "Dossier cleared. Vehicle and trip departure may proceed.";
-        } else if (gate.getOutstandingIssues().isEmpty()) {
+        } else if (gate.outstandingIssues().isEmpty()) {
             gateSummary = "Clearance gate is locked. Documents are awaiting clearance.";
         } else {
             gateSummary = String.format(
                     "Clearance gate is locked. %d items are outstanding before departure can be recorded.",
-                    gate.getOutstandingIssues().size());
+                    gate.outstandingIssues().size());
         }
 
-        return JobDetailResponse.builder()
-                .id(job.getId())
-                .code(job.getCode())
-                .originCity(getOriginCity(job))
-                .destinationCity(getDestinationCity(job))
-                .stage(job.getStage())
-                .dossierStatus(job.getDossierStatus())
-                .tripStatus(job.getTripStatus())
-                .plannedDepartureAt(job.getPlannedDepartureAt())
-                .windowStart(job.getWindowStart())
-                .windowEnd(job.getWindowEnd())
-                .clearanceReadyAt(job.getClearanceReadyAt())
-                .blockingReason(getBlockingReason(job))
-                .nextStepOwner(getNextStepOwner(job))
-                .clearanceGateState(gateState)
-                .clearanceGateSummary(gateSummary)
-                .horses(horses)
-                .loadPlan(loadPlan)
-                .routePlan(routePlan)
-                .crew(crew)
-                .build();
+        return JobMapper.toDetailResponse(
+                job,
+                getBlockingReason(job),
+                getNextStepOwner(job),
+                gateState,
+                gateSummary,
+                horses,
+                loadPlan,
+                routePlan,
+                crew);
     }
 
     @Transactional
@@ -162,9 +151,9 @@ public class TransportJobService {
 
         // Clearance gate check: departure gate must be CLEAR (US-F3-08)
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(jobId);
-        if (!gate.isClearanceReady()) {
+        if (!gate.clearanceReady()) {
             throw new BusinessException("Cannot sign off trip plan: clearance gate is locked ("
-                    + gate.getOutstandingIssues().size() + " items outstanding)");
+                    + gate.outstandingIssues().size() + " items outstanding)");
         }
 
         // Validate load plan confirmed
@@ -242,54 +231,7 @@ public class TransportJobService {
     }
 
     private JobSummaryResponse toSummaryResponse(TransportJob job) {
-        List<JobHorseResponse> horses = getJobHorses(job);
-        List<String> horseNames = horses.stream().map(JobHorseResponse::getName).toList();
-
-        return JobSummaryResponse.builder()
-                .id(job.getId())
-                .code(job.getCode())
-                .originCity(getOriginCity(job))
-                .destinationCity(getDestinationCity(job))
-                .horseCount(horses.size())
-                .horseNames(horseNames)
-                .stage(job.getStage())
-                .dossierStatus(job.getDossierStatus())
-                .tripStatus(job.getTripStatus())
-                .plannedDepartureAt(job.getPlannedDepartureAt())
-                .windowStart(job.getWindowStart())
-                .windowEnd(job.getWindowEnd())
-                .clearanceReadyAt(job.getClearanceReadyAt())
-                .blockingReason(getBlockingReason(job))
-                .nextStepOwner(getNextStepOwner(job))
-                .build();
-    }
-
-    private String getOriginCity(TransportJob job) {
-        if (job.getRequest() != null) {
-            if (job.getRequest().getOriginPlace() != null
-                    && job.getRequest().getOriginPlace().getCity() != null) {
-                return job.getRequest().getOriginPlace().getCity();
-            }
-            if (job.getRequest().getCorridor() != null
-                    && job.getRequest().getCorridor().getOriginCity() != null) {
-                return job.getRequest().getCorridor().getOriginCity();
-            }
-        }
-        return "Not set";
-    }
-
-    private String getDestinationCity(TransportJob job) {
-        if (job.getRequest() != null) {
-            if (job.getRequest().getDestinationPlace() != null
-                    && job.getRequest().getDestinationPlace().getCity() != null) {
-                return job.getRequest().getDestinationPlace().getCity();
-            }
-            if (job.getRequest().getCorridor() != null
-                    && job.getRequest().getCorridor().getDestinationCity() != null) {
-                return job.getRequest().getCorridor().getDestinationCity();
-            }
-        }
-        return "Not set";
+        return JobMapper.toSummaryResponse(job, getJobHorses(job), getBlockingReason(job), getNextStepOwner(job));
     }
 
     private String getBlockingReason(TransportJob job) {
@@ -340,18 +282,7 @@ public class TransportJobService {
         if (job.getRequest() != null && job.getRequest().getHorses() != null) {
             return job.getRequest().getHorses().stream()
                     .map(RequestHorse::getHorse)
-                    .map(h -> JobHorseResponse.builder()
-                            .id(h.getId())
-                            .name(h.getName())
-                            .sex(h.getSex())
-                            .breed(h.getBreed())
-                            .weightKg(h.getWeightKg())
-                            .sizeClassCode(
-                                    h.getSizeClass() != null ? h.getSizeClass().getCode() : "M")
-                            .requiredStall(h.getRequiredStall())
-                            .temperament(h.getTemperament())
-                            .handlingNotes(h.getHandlingNotes())
-                            .build())
+                    .map(JobMapper::toHorseResponse)
                     .toList();
         }
         return Collections.emptyList();

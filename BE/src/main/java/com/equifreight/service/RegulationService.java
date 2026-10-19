@@ -55,13 +55,7 @@ public class RegulationService {
                     List<RegulationVersion> published =
                             versionRepository.findByCatalogIdAndStatusOrdered(cat.getId(), CatalogStatus.PUBLISHED);
                     RegulationVersion active = published.isEmpty() ? null : published.get(0);
-                    return RegulationCatalogResponse.builder()
-                            .id(cat.getId())
-                            .countryCode(
-                                    cat.getCountry() != null ? cat.getCountry().getCode() : null)
-                            .name(cat.getName())
-                            .activeVersion(active != null ? ClearanceMapper.toVersionResponse(active) : null)
-                            .build();
+                    return ClearanceMapper.toCatalogResponse(cat, active);
                 })
                 .toList();
     }
@@ -79,9 +73,9 @@ public class RegulationService {
                 .map(ClearanceMapper::toRuleResponse)
                 .toList();
 
-        RegulationVersionResponse resp = ClearanceMapper.toVersionResponse(version);
-        resp.setRules(rules);
-        return resp;
+        return ClearanceMapper.toVersionResponse(version).toBuilder()
+                .rules(rules)
+                .build();
     }
 
     /**
