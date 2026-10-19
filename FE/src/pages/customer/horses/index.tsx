@@ -1,86 +1,173 @@
-import { useState, useMemo, type FC } from 'react';
+import type { FC } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Pagination, Skeleton } from 'antd';
+
+import { archivedChip, horseCardProps } from './components/horseCardProps';
+import FirstRun from './FirstRun';
+
 import PageHeader from '@/components/PageHeader';
-import { Panel, Chip, Icon, COAT_SWATCH, TONE_FG, cx } from '@/components/ui';
-import { useCustomerHome } from '@/hooks/home';
+import { Button, Callout, HorseCard, Icon, Tabs } from '@/components/ui';
+import { useMe } from '@/hooks/auth';
+import { useHorseCount, useHorses } from '@/hooks/horse';
+import { ict } from '@/lib/utils';
+import { useCustomRouter } from '@/router/route.hook';
 
-export const MyHorsesPage: FC = () => {
-  const { data: home, isPending } = useCustomerHome();
-  const [searchQuery, setSearchQuery] = useState('');
+type Tab = 'active' | 'archived';
 
-  const horses = useMemo(() => {
-    if (!home?.horses) return [];
-    if (!searchQuery.trim()) return home.horses;
-    const q = searchQuery.toLowerCase();
-    return home.horses.filter(
-      (h) => h.name.toLowerCase().includes(q) || h.line.toLowerCase().includes(q),
-    );
-  }, [home?.horses, searchQuery]);
+/** The dashed card that closes the Active grid (frame: My horses). */
+const AddHorseCard: FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line-strong bg-transparent p-8 text-center"
+  >
+    <span className="flex size-11 items-center justify-center rounded-full bg-muted text-ink-2">
+      <Icon name="plus" size={22} />
+    </span>
+    <span className="type-h4 text-ink">Add a horse</span>
+    <span className="type-body-s max-w-[260px] text-ink-3">
+      Name, sex, size class and microchip are needed for quotes and border checks.
+    </span>
+  </button>
+);
 
-  if (isPending || !home) {
+/** My horses (spec §4): the club's horses as cards, in Active and Archived tabs. */
+const MyHorsesPage: FC = () => {
+  const router = useCustomRouter();
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = params.get('archived') === 'true' ? 'archived' : 'active';
+  const archived = tab === 'archived';
+
+  const { listQuery, pageState, setPageState } = useHorses(archived);
+  const me = useMe();
+  const activeCount = useHorseCount(false, true);
+  const page = listQuery.data;
+  const activeEmpty = activeCount.data === 0;
+  const archivedCount = useHorseCount(true, activeEmpty);
+  const firstRun = activeEmpty && archivedCount.data === 0;
+
+  const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
+  const toAdd = () => router.push(router.paths.get('horse-new'));
+  const toProfile = (id: string) =>
+    router.push(router.paths.get('horse-profile', { pathParams: [id] }));
+  const toEdit = (id: string) => router.push(router.paths.get('horse-edit', { pathParams: [id] }));
+
+  const n = activeCount.data;
+  const club = me.data?.clubName;
+  const summary =
+    n === undefined
+      ? 'Profiles feed transport requests, load plans and document checks.'
+      : `${n} ${n === 1 ? 'horse' : 'horses'}${club ? ` · ${club}` : ''}. Profiles feed transport requests, load plans and document checks.`;
+
+  const setTab = (next: Tab) => {
+    setParams(next === 'archived' ? { archived: 'true' } : {});
+    setPageState((prev) => ({ ...prev, number: 0 }));
+  };
+
+  const body = () => {
+    if (listQuery.isPending || activeCount.isPending) {
+      return (
+        <div className="grid grid-cols-3 gap-6" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <Skeleton.Node key={i} active className="!h-[420px] !w-full" />
+          ))}
+        </div>
+      );
+    }
+    if (listQuery.isError || !page) {
+      return (
+        <Callout
+          tone="bad"
+          title="Your horses didn't load"
+          action={
+            <Button size="sm" onClick={() => listQuery.refetch()}>
+              Try again
+            </Button>
+          }
+        >
+          Nothing has changed. Check your connection and try again.
+        </Callout>
+      );
+    }
+    if (firstRun) return <FirstRun onAdd={toAdd} />;
+    if (page.empty) {
+      return archived ? (
+        <p className="type-body-m m-0 text-ink-2">
+          No archived horses. Archiving keeps a horse’s history but takes it off new requests.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <p className="type-body-m m-0 text-ink-2">
+            No active horses. Add one, or see the Archived tab.
+          </p>
+          <div className="grid grid-cols-3 gap-6">
+            <AddHorseCard onClick={toAdd} />
+          </div>
+        </div>
+      );
+    }
     return (
-      <div className="flex h-64 items-center justify-center text-ink-tertiary">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gold border-t-transparent" />
-        <span className="ml-3 type-body-m">Loading horses...</span>
+      <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-3 items-start gap-6">
+          {page.content.map((horse) => (
+            <HorseCard
+              key={horse.id}
+              {...horseCardProps(horse, today)}
+              status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
+              actions={
+                <>
+                  <Button onClick={() => toProfile(horse.id)}>Open profile</Button>
+                  {!horse.archivedAt && (
+                    <Button variant="ghost" leadingIcon="pencil" onClick={() => toEdit(horse.id)}>
+                      Edit
+                    </Button>
+                  )}
+                </>
+              }
+            />
+          ))}
+          {!archived && page.last && <AddHorseCard onClick={toAdd} />}
+        </div>
+        {page.totalPages > 1 && (
+          <Pagination
+            align="center"
+            current={pageState.number + 1}
+            pageSize={pageState.size}
+            total={page.totalElements}
+            showSizeChanger={false}
+            onChange={(p) => setPageState((prev) => ({ ...prev, number: p - 1 }))}
+          />
+        )}
       </div>
     );
-  }
+  };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+    <div className="flex flex-col gap-7">
       <PageHeader
+        reserveBack
         title="My horses"
-        summary={`${home.horseCount} registered horses · ${home.clubName}. Documents and passports on file.`}
+        summary={summary}
+        right={
+          !firstRun && (
+            <Button leadingIcon="plus" onClick={toAdd}>
+              Add a horse
+            </Button>
+          )
+        }
       />
-
-      <div className="flex items-center justify-between gap-4 border-b border-line pb-4">
-        <div className="type-label-s text-ink-secondary">
-          {home.horsesNote || 'Documents cleared for the 18 Oct move, CBRT-2026-041.'}
-        </div>
-        <input
-          type="text"
-          placeholder="Search horses..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-64 rounded-lg border border-line bg-sunken px-3.5 py-1.5 type-body-s text-ink focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+      {!firstRun && (
+        <Tabs<Tab>
+          label="Horse lists"
+          items={[
+            { key: 'active', label: 'Active' },
+            { key: 'archived', label: 'Archived' },
+          ]}
+          activeKey={tab}
+          onChange={setTab}
         />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {horses.map((horse) => (
-          <div
-            key={horse.id}
-            className="flex items-start justify-between rounded-xl border border-line bg-card p-5 shadow-xs"
-          >
-            <div className="flex items-start gap-3.5">
-              <span
-                aria-hidden
-                className={cx(
-                  'mt-1 size-4 shrink-0 rounded-full border border-line-strong ring-2 ring-card',
-                  COAT_SWATCH[horse.coat],
-                )}
-              />
-              <div className="flex flex-col gap-1">
-                <span className="type-h4 text-ink font-semibold">{horse.name}</span>
-                <span className="type-body-s text-ink-secondary">{horse.line}</span>
-                <span className="type-mono-caption text-ink-tertiary mt-1">
-                  Passport ID: EQ-{horse.id.toUpperCase()}-2026
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-1.5 text-right">
-              <Chip tone={horse.documents.includes('5 of 5') ? 'ok' : 'info'}>
-                {horse.documents}
-              </Chip>
-              {horse.note && (
-                <span className={cx('type-caption font-medium', TONE_FG[horse.note.tone])}>
-                  {horse.note.text}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      )}
+      {body()}
     </div>
   );
 };

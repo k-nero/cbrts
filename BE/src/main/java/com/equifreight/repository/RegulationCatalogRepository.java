@@ -7,12 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+/** The same methods as on feat/flow-2-clearance, so the two branches keep one copy. */
 @Repository
 public interface RegulationCatalogRepository
         extends JpaRepository<RegulationCatalog, UUID>, JpaSpecificationExecutor<RegulationCatalog> {
 
     /**
-     * Tìm danh mục quy định theo mã quốc gia (VD: "VN", "JP").
+     * A country's catalog ("VN").
      */
     Optional<RegulationCatalog> findByCountryCode(String countryCode);
 

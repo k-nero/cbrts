@@ -7,6 +7,8 @@ export interface User extends BaseEntity {
   phone?: string | null;
   /** Role names, e.g. ["LOGISTICS_MANAGER"]. */
   roles: string[];
+  /** The customer's club (GET /me); null for staff. */
+  clubName?: string | null;
 }
 
 export interface Role extends BaseEntity {

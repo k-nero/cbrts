@@ -4,21 +4,11 @@ import com.equifreight.entity.enums.SubmissionStatus;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UpdateAuthoritySubmissionRequest {
-
-    @NotNull(message = "Status is required")
-    private SubmissionStatus status;
-
-    private String referenceNo;
-
-    private LocalDate expectedBy;
-
-    private UUID resultFileId;
-}
+public record UpdateAuthoritySubmissionRequest(
+        @NotNull(message = "Status is required") SubmissionStatus status,
+        String referenceNo,
+        LocalDate expectedBy,
+        UUID resultFileId) {}

@@ -21,7 +21,6 @@ import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -48,7 +47,6 @@ public class HorseService {
             RequestStatus.CUSTOMER_ACCEPTED));
 
     private static final String DEFAULT_CURRENCY = "USD";
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
     private final HorseRepository horses;
     private final HorseSizeClassRepository sizeClasses;
@@ -98,22 +96,22 @@ public class HorseService {
      */
     private static void requireIdentityUnchanged(Horse horse, HorseRequest request, String requestCode) {
         List<String> changed = new ArrayList<>();
-        if (!Objects.equals(horse.getName(), trimToNull(request.getName()))) {
+        if (!Objects.equals(horse.getName(), trimToNull(request.name()))) {
             changed.add("Name");
         }
-        if (!Objects.equals(horse.getMicrochip(), stripSpaces(request.getMicrochip()))) {
+        if (!Objects.equals(horse.getMicrochip(), stripSpaces(request.microchip()))) {
             changed.add("Microchip");
         }
-        if (horse.getSex() != request.getSex()) {
+        if (horse.getSex() != request.sex()) {
             changed.add("Sex");
         }
-        if (!Objects.equals(horse.getBreed(), trimToNull(request.getBreed()))) {
+        if (!Objects.equals(horse.getBreed(), trimToNull(request.breed()))) {
             changed.add("Breed");
         }
-        if (!Objects.equals(horse.getDateOfBirth(), request.getDateOfBirth())) {
+        if (!Objects.equals(horse.getDateOfBirth(), request.dateOfBirth())) {
             changed.add("Date of birth");
         }
-        if (horse.getCoat() != request.getCoat()) {
+        if (horse.getCoat() != request.coat()) {
             changed.add("Coat");
         }
         if (changed.isEmpty()) {
@@ -168,7 +166,8 @@ public class HorseService {
     private static void requireDateOfBirthNotAfterToday(LocalDate dateOfBirth) {
         if (dateOfBirth != null && dateOfBirth.isAfter(LocalDate.now(BusinessTime.ZONE))) {
             throw new BusinessException(
-                    "INVALID_DATE_OF_BIRTH", "The date of birth " + DAY.format(dateOfBirth) + " is after today.");
+                    "INVALID_DATE_OF_BIRTH",
+                    "The date of birth " + BusinessTime.DAY.format(dateOfBirth) + " is after today.");
         }
     }
 
@@ -287,27 +286,27 @@ public class HorseService {
      * Validates every rule against the request, then copies it onto the horse. Nothing is saved here.
      */
     void applyChecked(Club club, Horse horse, HorseRequest request) {
-        BigDecimal height = HorseSizing.requireValidHeight(request.getHeightHh());
-        String microchip = normalizeMicrochip(request.getMicrochip());
-        requireDateOfBirthNotAfterToday(request.getDateOfBirth());
-        String name = request.getName().trim();
+        BigDecimal height = HorseSizing.requireValidHeight(request.heightHh());
+        String microchip = normalizeMicrochip(request.microchip());
+        requireDateOfBirthNotAfterToday(request.dateOfBirth());
+        String name = request.name().trim();
         requireNameFree(club, horse, name);
         requireMicrochipFree(horse, microchip);
-        StallType stall = request.getRequiredStall() == null ? StallType.STANDARD : request.getRequiredStall();
+        StallType stall = request.requiredStall() == null ? StallType.STANDARD : request.requiredStall();
 
         horse.setName(name);
-        horse.setSex(request.getSex());
-        horse.setCoat(request.getCoat());
-        horse.setBreed(trimToNull(request.getBreed()));
-        horse.setDateOfBirth(request.getDateOfBirth());
+        horse.setSex(request.sex());
+        horse.setCoat(request.coat());
+        horse.setBreed(trimToNull(request.breed()));
+        horse.setDateOfBirth(request.dateOfBirth());
         horse.setHeightHh(height);
-        horse.setWeightKg(request.getWeightKg());
+        horse.setWeightKg(request.weightKg());
         horse.setMicrochip(microchip);
-        horse.setPassportNo(request.getPassportNo().trim());
-        horse.setDeclaredValue(request.getDeclaredValue());
-        horse.setTemperament(request.getTemperament());
+        horse.setPassportNo(request.passportNo().trim());
+        horse.setDeclaredValue(request.declaredValue());
+        horse.setTemperament(request.temperament());
         horse.setRequiredStall(stall);
-        horse.setHandlingNotes(trimToNull(request.getHandlingNotes()));
+        horse.setHandlingNotes(trimToNull(request.handlingNotes()));
         horse.setSizeClass(HorseSizing.sizeClassFor(height, stall, sizeClasses.findAllByOrderByMinHeightHhAsc()));
     }
 

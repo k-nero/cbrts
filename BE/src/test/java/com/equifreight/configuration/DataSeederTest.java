@@ -73,7 +73,8 @@ class DataSeederTest {
                 mock(RateVolumeBreakRepository.class),
                 mock(RatePolicyRepository.class),
                 mock(RateFeeBandRepository.class),
-                mock(RateLineRepository.class));
+                mock(RateLineRepository.class),
+                mock(CatalogSeeder.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

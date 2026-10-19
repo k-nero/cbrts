@@ -8,5 +8,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface BorderCrossingRepository extends JpaRepository<BorderCrossing, UUID> {
+
+    /** The seeder's natural key ("Mộc Bài – Bavet"). */
     Optional<BorderCrossing> findByName(String name);
 }

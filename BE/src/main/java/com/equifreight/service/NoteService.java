@@ -14,14 +14,12 @@ import com.equifreight.model.note.NoteResponse;
 import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.NoteReplyRepository;
 import com.equifreight.repository.NoteRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NoteService {
@@ -31,10 +29,11 @@ public class NoteService {
     private final ChecklistItemRepository checklistItemRepository;
     private final AuditService auditService;
 
-    public NoteService(NoteRepository noteRepository,
-                       NoteReplyRepository noteReplyRepository,
-                       ChecklistItemRepository checklistItemRepository,
-                       AuditService auditService) {
+    public NoteService(
+            NoteRepository noteRepository,
+            NoteReplyRepository noteReplyRepository,
+            ChecklistItemRepository checklistItemRepository,
+            AuditService auditService) {
         this.noteRepository = noteRepository;
         this.noteReplyRepository = noteReplyRepository;
         this.checklistItemRepository = checklistItemRepository;
@@ -44,9 +43,7 @@ public class NoteService {
     /** List customer notes routed to the given staff role (or all notes for Logistics Manager). */
     @Transactional(readOnly = true)
     public List<NoteResponse> listNotesForStaff(User user) {
-        boolean isManager = user.getRoles().stream()
-                .map(Role::getName)
-                .anyMatch(RoleName.LOGISTICS_MANAGER::equals);
+        boolean isManager = user.getRoles().stream().map(Role::getName).anyMatch(RoleName.LOGISTICS_MANAGER::equals);
 
         List<Note> notes;
         if (isManager) {
@@ -61,7 +58,8 @@ public class NoteService {
     /** Retrieve single note details with replies. */
     @Transactional(readOnly = true)
     public NoteResponse getNote(UUID noteId) {
-        Note note = noteRepository.findByIdWithDetails(noteId)
+        Note note = noteRepository
+                .findByIdWithDetails(noteId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Note", noteId));
         return toResponse(note);
     }
@@ -69,8 +67,7 @@ public class NoteService {
     /** Reply to a customer note and optionally move checklist item deadline. */
     @Transactional
     public NoteResponse replyToNote(UUID noteId, CreateNoteReplyRequest request, User author) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Note", noteId));
+        Note note = noteRepository.findById(noteId).orElseThrow(() -> ResourceNotFoundException.of("Note", noteId));
 
         NoteReply reply = new NoteReply();
         reply.setNote(note);
@@ -95,8 +92,7 @@ public class NoteService {
                     note.getJob() != null ? note.getJob().getCode() : null,
                     request.getReasonForMove() != null ? request.getReasonForMove() : "Customer note reply",
                     null,
-                    "{\"dueDate\":\"" + request.getMoveDueDateTo() + "\"}"
-            );
+                    "{\"dueDate\":\"" + request.getMoveDueDateTo() + "\"}");
         }
 
         Note savedNote = noteRepository.save(note);
@@ -104,14 +100,14 @@ public class NoteService {
         auditService.recordDecision(
                 author,
                 "NOTE_REPLIED",
-                "Replied to customer note on " + (note.getRequest() != null ? note.getRequest().getCode() : "Job"),
+                "Replied to customer note on "
+                        + (note.getRequest() != null ? note.getRequest().getCode() : "Job"),
                 "Note",
                 savedNote.getId(),
                 note.getJob() != null ? note.getJob().getCode() : null,
                 "Staff replied to customer note",
                 "OPEN",
-                "ANSWERED"
-        );
+                "ANSWERED");
 
         return toResponse(savedNote);
     }
@@ -129,16 +125,18 @@ public class NoteService {
             }
         }
 
-        List<NoteReplyResponse> replyResponses = n.getReplies() == null ? List.of() :
-                n.getReplies().stream().map(r -> NoteReplyResponse.builder()
-                        .id(r.getId())
-                        .authorId(r.getAuthor() != null ? r.getAuthor().getId() : null)
-                        .authorName(formatUserName(r.getAuthor()))
-                        .authorRole(extractPrimaryRole(r.getAuthor()))
-                        .body(r.getBody())
-                        .createdAt(r.getCreatedAt())
-                        .build()
-                ).toList();
+        List<NoteReplyResponse> replyResponses = n.getReplies() == null
+                ? List.of()
+                : n.getReplies().stream()
+                        .map(r -> NoteReplyResponse.builder()
+                                .id(r.getId())
+                                .authorId(r.getAuthor() != null ? r.getAuthor().getId() : null)
+                                .authorName(formatUserName(r.getAuthor()))
+                                .authorRole(extractPrimaryRole(r.getAuthor()))
+                                .body(r.getBody())
+                                .createdAt(r.getCreatedAt())
+                                .build())
+                        .toList();
 
         return NoteResponse.builder()
                 .id(n.getId())
@@ -148,10 +146,14 @@ public class NoteService {
                 .requestCode(n.getRequest() != null ? n.getRequest().getCode() : null)
                 .jobId(n.getJob() != null ? n.getJob().getId() : null)
                 .jobCode(n.getJob() != null ? n.getJob().getCode() : null)
-                .checklistItemId(n.getChecklistItem() != null ? n.getChecklistItem().getId() : null)
-                .checklistItemName(n.getChecklistItem() != null && n.getChecklistItem().getDocumentType() != null
-                        ? n.getChecklistItem().getDocumentType().getName() : null)
-                .checklistItemDueDate(n.getChecklistItem() != null ? n.getChecklistItem().getDueDate() : null)
+                .checklistItemId(
+                        n.getChecklistItem() != null ? n.getChecklistItem().getId() : null)
+                .checklistItemName(
+                        n.getChecklistItem() != null && n.getChecklistItem().getDocumentType() != null
+                                ? n.getChecklistItem().getDocumentType().getName()
+                                : null)
+                .checklistItemDueDate(
+                        n.getChecklistItem() != null ? n.getChecklistItem().getDueDate() : null)
                 .checklistItemWarning("Expires in transit")
                 .topic(n.getTopic())
                 .routedRole(n.getRoutedRole())

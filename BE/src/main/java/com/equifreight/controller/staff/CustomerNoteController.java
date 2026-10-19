@@ -5,12 +5,11 @@ import com.equifreight.model.note.CreateNoteReplyRequest;
 import com.equifreight.model.note.NoteResponse;
 import com.equifreight.service.NoteService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/staff/customer-notes")

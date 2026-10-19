@@ -9,3 +9,5 @@ export * from './vehicle';
 export * from './note';
 export * from './audit';
 export * from './rate';
+export * from './horse';
+export * from './request';

@@ -52,18 +52,19 @@ class HorseServiceTest {
     private Club club;
 
     private static HorseRequest requestFrom(Horse horse) {
-        HorseRequest request = new HorseRequest();
-        request.setName(horse.getName());
-        request.setSex(horse.getSex());
-        request.setCoat(horse.getCoat());
-        request.setBreed(horse.getBreed());
-        request.setDateOfBirth(horse.getDateOfBirth());
-        request.setHeightHh(horse.getHeightHh());
-        request.setWeightKg(horse.getWeightKg());
-        request.setMicrochip(horse.getMicrochip());
-        request.setPassportNo(horse.getPassportNo());
-        request.setDeclaredValue(horse.getDeclaredValue());
-        request.setRequiredStall(horse.getRequiredStall());
+        HorseRequest request = HorseRequest.builder()
+                .name(horse.getName())
+                .sex(horse.getSex())
+                .coat(horse.getCoat())
+                .breed(horse.getBreed())
+                .dateOfBirth(horse.getDateOfBirth())
+                .heightHh(horse.getHeightHh())
+                .weightKg(horse.getWeightKg())
+                .microchip(horse.getMicrochip())
+                .passportNo(horse.getPassportNo())
+                .declaredValue(horse.getDeclaredValue())
+                .requiredStall(horse.getRequiredStall())
+                .build();
         return request;
     }
 
@@ -82,14 +83,15 @@ class HorseServiceTest {
     }
 
     private static HorseRequest nightfallRequest() {
-        HorseRequest request = new HorseRequest();
-        request.setName("Nightfall");
-        request.setSex(HorseSex.MARE);
-        request.setHeightHh(new BigDecimal("16.0"));
-        request.setMicrochip("250259600223311");
-        request.setPassportNo("VN-PP-2022-0188");
-        request.setDeclaredValue(new BigDecimal("240000"));
-        request.setRequiredStall(StallType.CLIMATE);
+        HorseRequest request = HorseRequest.builder()
+                .name("Nightfall")
+                .sex(HorseSex.MARE)
+                .heightHh(new BigDecimal("16.0"))
+                .microchip("250259600223311")
+                .passportNo("VN-PP-2022-0188")
+                .declaredValue(new BigDecimal("240000"))
+                .requiredStall(StallType.CLIMATE)
+                .build();
         return request;
     }
 
@@ -129,14 +131,14 @@ class HorseServiceTest {
     void createDerivesTheSizeClassFromHeight() {
         HorseResponse response = service.create(user, nightfallRequest());
 
-        assertThat(response.getSizeClass().getCode()).isEqualTo("M");
-        assertThat(response.getSizeClass().getWidthIn()).isEqualTo((short) 32);
+        assertThat(response.sizeClass().code()).isEqualTo("M");
+        assertThat(response.sizeClass().widthIn()).isEqualTo((short) 32);
     }
 
     @Test
     void createStoresTheMicrochipWithoutSpaces() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("250 259 600 223 311").build();
 
         service.create(user, request);
 
@@ -145,16 +147,16 @@ class HorseServiceTest {
 
     @Test
     void createRefusesAMicrochipThatIsNot15Digits() {
-        HorseRequest shortChip = nightfallRequest();
-        shortChip.setMicrochip("25025960022331");
+        HorseRequest shortChip =
+                nightfallRequest().toBuilder().microchip("25025960022331").build();
         assertThatThrownBy(() -> service.create(user, shortChip))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; 25025960022331 has 14.")
                 .extracting("code")
                 .isEqualTo("INVALID_MICROCHIP");
 
-        HorseRequest letters = nightfallRequest();
-        letters.setMicrochip("25025960022331X");
+        HorseRequest letters =
+                nightfallRequest().toBuilder().microchip("25025960022331X").build();
         assertThatThrownBy(() -> service.create(user, letters))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; 25025960022331X has letters or symbols.");
@@ -162,8 +164,8 @@ class HorseServiceTest {
 
     @Test
     void createRefusesAMicrochipWithNonAsciiDigits() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("２５０２５９６００２２３３１１");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("２５０２５９６００２２３３１１").build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
@@ -174,8 +176,8 @@ class HorseServiceTest {
 
     @Test
     void createStripsNonBreakingSpacesFromTheMicrochip() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("250 259 600 223 311").build();
 
         service.create(user, request);
 
@@ -187,9 +189,10 @@ class HorseServiceTest {
         Horse existing = horse("Nightfall", "250259600223311");
         when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(CLUB_ID, "NIGHTFALL"))
                 .thenReturn(Optional.of(existing));
-        HorseRequest request = nightfallRequest();
-        request.setName("NIGHTFALL");
-        request.setMicrochip("111222333444555");
+        HorseRequest request = nightfallRequest().toBuilder()
+                .name("NIGHTFALL")
+                .microchip("111222333444555")
+                .build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(ConflictException.class)
@@ -219,8 +222,9 @@ class HorseServiceTest {
 
     @Test
     void createRefusesADateOfBirthAfterToday() {
-        HorseRequest request = nightfallRequest();
-        request.setDateOfBirth(LocalDate.of(2999, 1, 1));
+        HorseRequest request = nightfallRequest().toBuilder()
+                .dateOfBirth(LocalDate.of(2999, 1, 1))
+                .build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
@@ -231,11 +235,12 @@ class HorseServiceTest {
 
     @Test
     void createTrimsTextAndDefaultsStallAndCurrency() {
-        HorseRequest request = nightfallRequest();
-        request.setName(" Nightfall ");
-        request.setBreed("   ");
-        request.setPassportNo(" VN-PP-2022-0188 ");
-        request.setRequiredStall(null);
+        HorseRequest request = nightfallRequest().toBuilder()
+                .name(" Nightfall ")
+                .breed("   ")
+                .passportNo(" VN-PP-2022-0188 ")
+                .requiredStall(null)
+                .build();
 
         service.create(user, request);
 
@@ -274,7 +279,7 @@ class HorseServiceTest {
         when(horses.findByIdAndClubId(nightfall.getId(), CLUB_ID)).thenReturn(Optional.of(nightfall));
         when(requestHorses.findHorseIdsOnSubmittedRequests(any())).thenReturn(Set.of(nightfall.getId()));
 
-        assertThat(service.get(user, nightfall.getId()).isIdentityLocked()).isTrue();
+        assertThat(service.get(user, nightfall.getId()).identityLocked()).isTrue();
     }
 
     @Test
@@ -288,7 +293,7 @@ class HorseServiceTest {
 
         List<HorseResponse> page = service.list(user, null, false, pageable).getContent();
 
-        assertThat(page).extracting(HorseResponse::isIdentityLocked).containsExactly(true, false);
+        assertThat(page).extracting(HorseResponse::identityLocked).containsExactly(true, false);
         verify(requestHorses, times(1))
                 .findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
                         ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
@@ -297,8 +302,8 @@ class HorseServiceTest {
     @Test
     void identityFieldsCanChangeBeforeAnySubmittedRequest() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setName("Nightfall II");
+        HorseRequest request =
+                requestFrom(nightfall).toBuilder().name("Nightfall II").build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -309,9 +314,10 @@ class HorseServiceTest {
     void changingIdentityAfterASubmittedRequestIsRefused() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setName("Nightfall II");
-        request.setSex(HorseSex.FILLY);
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .name("Nightfall II")
+                .sex(HorseSex.FILLY)
+                .build();
 
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
                 .isInstanceOf(ConflictException.class)
@@ -328,8 +334,8 @@ class HorseServiceTest {
         nightfall.setCoat(HorseCoat.BLACK);
         owned(nightfall);
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setCoat(HorseCoat.BAY);
+        HorseRequest request =
+                requestFrom(nightfall).toBuilder().coat(HorseCoat.BAY).build();
 
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
                 .isInstanceOf(ConflictException.class)
@@ -341,23 +347,25 @@ class HorseServiceTest {
     void resendingTheSameIdentityInADifferentFormatPassesWhenLocked() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setMicrochip("250 259 600 223 311");
-        request.setName("Nightfall ");
-        request.setWeightKg((short) 480);
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .microchip("250 259 600 223 311")
+                .name("Nightfall ")
+                .weightKg((short) 480)
+                .build();
 
         HorseResponse response = service.update(user, nightfall.getId(), request);
 
         assertThat(savedHorse().getWeightKg()).isEqualTo((short) 480);
-        assertThat(response.isIdentityLocked()).isTrue();
+        assertThat(response.identityLocked()).isTrue();
     }
 
     @Test
     void aLockedMicrochipResentWithNonBreakingSpacesPasses() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .microchip("250 259 600 223 311")
+                .build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -368,9 +376,10 @@ class HorseServiceTest {
     void nonIdentityFieldsStayEditableWhenLocked() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setDeclaredValue(new BigDecimal("250000"));
-        request.setHandlingNotes("Kicks at the partition when the trailer stops.");
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .declaredValue(new BigDecimal("250000"))
+                .handlingNotes("Kicks at the partition when the trailer stops.")
+                .build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -455,7 +464,7 @@ class HorseServiceTest {
         HorseResponse response = service.archive(user, nightfall.getId());
 
         assertThat(savedHorse().getArchivedAt()).isNotNull();
-        assertThat(response.getArchivedAt()).isNotNull();
+        assertThat(response.archivedAt()).isNotNull();
     }
 
     @Test
@@ -467,7 +476,7 @@ class HorseServiceTest {
 
         HorseResponse response = service.archive(user, nightfall.getId());
 
-        assertThat(response.getArchivedAt()).isEqualTo(archivedAt);
+        assertThat(response.archivedAt()).isEqualTo(archivedAt);
         verify(horses, never()).saveAndFlush(any());
     }
 

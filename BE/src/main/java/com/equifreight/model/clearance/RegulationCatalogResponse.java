@@ -5,7 +5,7 @@ import lombok.*;
 
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegulationCatalogResponse {

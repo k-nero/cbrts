@@ -11,9 +11,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for append-only audit log records (BR-F1-08 / AGENTS.md).
- */
+/** The append-only audit log (BR-F1-08). The same shape as on feat/flow-2-clearance, so the two merge. */
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSpecificationExecutor<AuditLog> {
 
@@ -21,9 +19,14 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
 
     Page<AuditLog> findByEntityTypeOrderByOccurredAtDesc(String entityType, Pageable pageable);
 
-    /**
-     * Everyone with an account who has entries, once each; a renamed person shows one of their stored labels.
-     */
+    /** One entity's history, newest first (the Request review page). */
+    List<AuditLog> findByEntityTypeAndEntityIdOrderByOccurredAtDesc(String entityType, UUID entityId);
+
+    /** One entity's rows of one action, oldest first (when each return for information happened). */
+    List<AuditLog> findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(
+            String entityType, UUID entityId, String action);
+
+    /** Everyone with an account who has entries, once each; a renamed person shows one of their stored labels. */
     @Query("""
             select new com.equifreight.model.audit.AuditActorOption(a.actor.id, max(a.actorLabel), max(a.actorRole))
             from AuditLog a
