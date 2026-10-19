@@ -122,6 +122,7 @@ class RateCatalogServiceWriteTest {
                 .thenReturn(Optional.of(v2));
         when(versions.findByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.of(draft));
         when(versions.lockByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.of(draft));
+        when(versions.lockByStatus(CatalogStatus.PUBLISHED)).thenReturn(Optional.of(v2));
         when(versions.maxVersionNo()).thenReturn(2);
         when(versions.save(any())).thenAnswer(i -> i.getArgument(0));
         when(versions.saveAndFlush(any())).thenAnswer(i -> {
@@ -284,6 +285,7 @@ class RateCatalogServiceWriteTest {
         when(versions.findByStatus(CatalogStatus.DRAFT)).thenReturn(Optional.empty());
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.empty());
+        when(versions.lockByStatus(CatalogStatus.PUBLISHED)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createDraft(lan))
                 .isInstanceOf(ConflictException.class)
@@ -683,5 +685,83 @@ class RateCatalogServiceWriteTest {
         RateLineRequest fits = with(tooLong, b -> b.description("x".repeat(149)));
         service.addLine(lan, fits, null);
         verify(lines).save(any());
+    }
+
+    // --- deferred minors ---------------------------------------------------------------------------------
+
+    /** Only per-horse and per-day lines price horses one by one, so only they can be for one sex. */
+    @Test
+    void onlyPerHorseAndPerDayLinesCanBeForOneSex() {
+        for (RateBasis basis : List.of(
+                RateBasis.PER_SHIPMENT,
+                RateBasis.PER_CROSSING,
+                RateBasis.PER_HOUR,
+                RateBasis.PER_THREE_HORSES,
+                RateBasis.FLIGHT_VET)) {
+            RateLineRequest request = with(
+                    lineRequest(hanVte.getId(), "X", basis),
+                    b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.MARE)
+                            .defaultQuantity(BigDecimal.ONE));
+            assertRefused(
+                    () -> service.addLine(lan, request, null),
+                    "APPLIES_TO_SEX",
+                    "Only a per-horse or per-day line can be for one sex.");
+        }
+        assertRefused(
+                () -> service.addLine(
+                        lan,
+                        with(
+                                lineRequest(hanVte.getId(), "X", RateBasis.PER_KM),
+                                b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.MARE)),
+                        null),
+                "APPLIES_TO_SEX",
+                "Only a per-horse or per-day line can be for one sex.");
+        verify(lines, never()).save(any());
+
+        service.addLine(
+                lan,
+                with(
+                        lineRequest(hanVte.getId(), "ISO_MARE", RateBasis.PER_DAY),
+                        b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.MARE)),
+                null);
+        service.addLine(
+                lan,
+                with(
+                        lineRequest(hanVte.getId(), "VET_MARE", RateBasis.PER_HORSE),
+                        b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.MARE)),
+                null);
+        verify(lines, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void anEmptyBandOrAThreeDecimalDiscountIsRefused() {
+        UUID view = pnhHkg.getId();
+        List<VolumeBreakRequest> withNull = new ArrayList<>();
+        withNull.add(band(1, null, "0"));
+        withNull.add(null);
+        assertRefused(
+                () -> service.putVolumeBreaks(lan, null, withNull, view),
+                "INVALID_VOLUME_BREAKS",
+                "Each band needs the horse count it starts at.");
+        assertRefused(
+                () -> service.putVolumeBreaks(lan, null, List.of(band(1, null, "2.505")), view),
+                "INVALID_VOLUME_BREAKS",
+                "A discount has at most 2 decimals.");
+        verify(breaks, never()).deleteGlobalBands(any());
+    }
+
+    /**
+     * Two drafts created at once: each locks the published version first, so the second waits for the first to
+     * commit and then finds its draft, instead of colliding on the one-draft index with a generic conflict.
+     */
+    @Test
+    void createDraftLocksThePublishedVersionBeforeLookingForADraft() {
+        DraftResult result = service.createDraft(lan);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.version().id()).isEqualTo(draft.getId());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(versions);
+        order.verify(versions).lockByStatus(CatalogStatus.PUBLISHED);
+        order.verify(versions).findByStatus(CatalogStatus.DRAFT);
     }
 }

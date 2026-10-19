@@ -462,4 +462,34 @@ class QuotePricerTest {
         assertThat(quote.missing())
                 .allSatisfy(m -> assertThat(m.description().length()).isLessThanOrEqualTo(160));
     }
+
+    // --- deferred minors ---------------------------------------------------------------------------------
+
+    @Test
+    void aHorseWithAnUnknownSizeClassFitsNoClass() {
+        PricingInput unknown =
+                air(ServiceClass.FIRST, List.of(horse("Lotus Crown", HorseSex.GELDING, "Z", null, "1000")));
+
+        PricedQuote quote = QuotePricer.price(unknown, pnhHkgRates());
+
+        assertThat(find(quote, "Air stall position")).isNull();
+        assertThat(quote.fit().refusal())
+                .isEqualTo("Lotus Crown's size class Z is unknown, so the stall can't be measured.");
+        assertThat(quote.fit().achievableClasses()).isEmpty();
+        assertThat(quote.totals().total()).isNull();
+    }
+
+    @Test
+    void aRoadMoveWithoutADistanceHasNoKmLineAndNoTotal() {
+        RateSet rates =
+                roadRates(kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"));
+        PricingInput noDistance =
+                road(TrailerType.SHARED, null, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+
+        PricedQuote quote = QuotePricer.price(noDistance, rates);
+
+        assertThat(find(quote, "Road freight")).isNull();
+        assertThat(quote.missing()).extracting(MissingRate::description).contains("Corridor distance");
+        assertThat(quote.totals().total()).isNull();
+    }
 }

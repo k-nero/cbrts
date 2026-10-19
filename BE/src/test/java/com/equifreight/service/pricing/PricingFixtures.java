@@ -24,7 +24,7 @@ final class PricingFixtures {
         return new BigDecimal(value);
     }
 
-    static PricingHorse horse(String name, HorseSex sex, String size, int widthIn, String value) {
+    static PricingHorse horse(String name, HorseSex sex, String size, Integer widthIn, String value) {
         return new PricingHorse(UUID.randomUUID(), name, sex, size, widthIn, false, d(value));
     }
 
@@ -188,7 +188,7 @@ final class PricingFixtures {
                         horse("Shadowfax", HorseSex.GELDING, "M", 32, "150000")));
     }
 
-    static PricingInput road(TrailerType trailer, int km, int crossings, List<PricingHorse> horses) {
+    static PricingInput road(TrailerType trailer, Integer km, int crossings, List<PricingHorse> horses) {
         return new PricingInput(
                 TransportMode.ROAD,
                 "RD HAN → VTE",

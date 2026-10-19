@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RateCertainty;
 import com.equifreight.entity.enums.TrailerType;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -28,11 +29,21 @@ public record RateLineRequest(
         @NotNull RateBasis basis,
         HorseSex appliesToSex,
         TrailerType appliesToTrailer,
-        @NotNull @DecimalMin("0") BigDecimal rate,
-        @DecimalMin("0") BigDecimal minCharge,
-        @DecimalMin(value = "0", inclusive = false) BigDecimal defaultQuantity,
+
+        @NotNull @DecimalMin("0") @Digits(integer = 12, fraction = 2, message = TWO_DECIMALS)
+        BigDecimal rate,
+
+        @DecimalMin("0") @Digits(integer = 12, fraction = 2, message = TWO_DECIMALS)
+        BigDecimal minCharge,
+
+        @DecimalMin(value = "0", inclusive = false) @Digits(integer = 8, fraction = 2, message = TWO_DECIMALS)
+        BigDecimal defaultQuantity,
+
         RateCertainty certainty,
         @Size(max = 300) String estimateNote) {
+
+    /** rate_lines keeps money and quantities as numeric(…, 2). */
+    public static final String TWO_DECIMALS = "Use at most 2 decimals.";
 
     public RateLineRequest {
         certainty = certainty == null ? RateCertainty.FIXED : certainty;

@@ -1,6 +1,7 @@
 package com.equifreight.model.rate;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import lombok.Builder;
@@ -9,4 +10,6 @@ import lombok.Builder;
 @Builder
 public record ServiceClassRequest(
         @NotNull Short widthPerHorseIn,
-        @NotNull @DecimalMin("0") BigDecimal positionRate) {}
+
+        @NotNull @DecimalMin("0") @Digits(integer = 12, fraction = 2, message = RateLineRequest.TWO_DECIMALS)
+        BigDecimal positionRate) {}

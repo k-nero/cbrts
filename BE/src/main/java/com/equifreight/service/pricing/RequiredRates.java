@@ -30,8 +30,23 @@ public final class RequiredRates {
             if (classRow(rates, in.airClass()) == null) {
                 missing.add(stall(rates, in.corridorCode(), route, in.airClass()));
             }
-        } else if (!hasRoadLine(rates, in.trailer())) {
-            missing.add(road(rates, in.corridorCode(), route, in.trailer()));
+            for (PricingHorse horse : in.horses()) {
+                if (horse.widthIn() == null) {
+                    missing.add(new MissingRate(
+                            null,
+                            PricingText.fitDescription("Size class of " + horse.name()),
+                            "Size class " + horse.sizeClassCode() + " is not in the size class table, so "
+                                    + horse.name() + "'s stall width is unknown."));
+                }
+            }
+        } else {
+            if (!hasRoadLine(rates, in.trailer())) {
+                missing.add(road(rates, in.corridorCode(), route, in.trailer()));
+            }
+            if (in.distanceKm() == null) {
+                missing.add(new MissingRate(
+                        null, "Corridor distance", in.corridorCode() + " has no distance in the corridor catalog."));
+            }
         }
         if (in.crossingCount() > 0 && !has(rates, RateBasis.PER_CROSSING)) {
             missing.add(crossing(rates, in.corridorCode()));

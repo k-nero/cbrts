@@ -244,4 +244,32 @@ class RequiredRatesTest {
         assertThat(descriptions(RequiredRates.forRequest(young, noStallion)))
                 .containsExactly("Pre-export isolation · stallion");
     }
+
+    // --- deferred minors ---------------------------------------------------------------------------------
+
+    @Test
+    void aHorseWithAnUnknownSizeClassIsAMissingInput() {
+        PricingInput unknown = air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("Nightfall", HorseSex.MARE, "M", 32, "175000"),
+                        horse("Lotus Crown", HorseSex.MARE, "Z", null, "90000")));
+
+        assertThat(RequiredRates.forRequest(unknown, pnhHkgRates()))
+                .containsExactly(new MissingRate(
+                        null,
+                        "Size class of Lotus Crown",
+                        "Size class Z is not in the size class table, so Lotus Crown's stall width is unknown."));
+    }
+
+    @Test
+    void aRoadCorridorWithoutADistanceIsAMissingInput() {
+        RateSet rates = rates(List.of(), roadLines(kmLine("ROAD", "Road freight", null, "3.00", null)));
+        PricingInput noDistance =
+                road(TrailerType.SHARED, null, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+
+        assertThat(RequiredRates.forRequest(noDistance, rates))
+                .containsExactly(new MissingRate(
+                        null, "Corridor distance", "RD HAN → VTE has no distance in the corridor catalog."));
+    }
 }

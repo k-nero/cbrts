@@ -101,6 +101,10 @@ public final class QuotePricer {
     }
 
     private static String refusal(PricingHorse horse, ServiceClass serviceClass, int classWidth) {
+        if (horse.widthIn() == null) {
+            return horse.name() + "'s size class " + horse.sizeClassCode()
+                    + " is unknown, so the stall can't be measured.";
+        }
         if (horse.withFoal() && classWidth < POSITION_WIDTH_IN) {
             return horse.name() + " travels with a foal and needs a full 96 in box; " + classWord(serviceClass)
                     + " gives " + classWidth + " in.";
@@ -150,7 +154,7 @@ public final class QuotePricer {
             case PER_SHIPMENT -> lines.add(priced(row, "per shipment", 1, null));
             case PER_KM -> {
                 boolean trailerMatches = row.appliesToTrailer() == null || row.appliesToTrailer() == in.trailer();
-                if (in.mode() == TransportMode.ROAD && trailerMatches) {
+                if (in.mode() == TransportMode.ROAD && trailerMatches && in.distanceKm() != null) {
                     lines.add(perKm(in, row));
                 }
             }

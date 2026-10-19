@@ -53,7 +53,7 @@ public class PricingInputs {
                 origin == null ? corridor.getOriginCity() : origin.getCity(),
                 destination == null ? corridor.getDestinationCity() : destination.getCity(),
                 destinationCountry == null ? null : destinationCountry.getName(),
-                corridor.getDistanceKm() == null ? 0 : corridor.getDistanceKm(),
+                corridor.getDistanceKm(),
                 corridor.getCrossings().size(),
                 airClass,
                 request.getTrailer(),
@@ -82,13 +82,12 @@ public class PricingInputs {
     }
 
     private static PricingHorse horse(RequestHorse rh, Function<String, Integer> widthOf) {
-        Integer width = widthOf.apply(rh.getSizeClassCode());
         return new PricingHorse(
                 rh.getHorse().getId(),
                 rh.getHorse().getName(),
                 rh.getSex(),
                 rh.getSizeClassCode(),
-                width == null ? 0 : width,
+                widthOf.apply(rh.getSizeClassCode()),
                 rh.isWithFoal(),
                 rh.getDeclaredValue());
     }

@@ -45,6 +45,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -128,17 +129,14 @@ public class RateCatalogService {
         RateCatalogVersion draft = first(all, CatalogStatus.DRAFT);
         RateCatalogVersion counted = draft != null ? draft : current;
         CatalogRows rows = counted == null ? null : loader.load(counted.getId());
-        return RateCatalogResponse.builder()
-                .currentVersionId(current == null ? null : current.getId())
-                .draftVersionId(draft == null ? null : draft.getId())
-                .versions(all.stream()
-                        .map(v -> RateMapper.toVersionResponse(v, quotations.countByRateCatalogVersionId(v.getId())))
-                        .toList())
-                .corridors(corridors.findAll(Sort.by("code")).stream()
-                        .map(c -> RateMapper.toCorridorResponse(
-                                c, rows == null ? 0 : missing(rows, c).size()))
-                        .toList())
-                .build();
+        List<Corridor> sorted = corridors.findAll(Sort.by("code"));
+        Map<UUID, Long> pinned = new HashMap<>();
+        all.forEach(v -> pinned.put(v.getId(), quotations.countByRateCatalogVersionId(v.getId())));
+        Map<UUID, Integer> missingCounts = new HashMap<>();
+        if (rows != null) {
+            sorted.forEach(c -> missingCounts.put(c.getId(), missing(rows, c).size()));
+        }
+        return RateMapper.toCatalogResponse(all, pinned, sorted, missingCounts);
     }
 
     /** One corridor's rates in one version, with the rates it lacks. */
@@ -152,15 +150,19 @@ public class RateCatalogService {
 
     // --- the draft ----------------------------------------------------------------------------------------
 
-    /** Copies the published version into a new draft numbered next; returns the draft if one already exists. */
+    /**
+     * Copies the published version into a new draft numbered next; returns the draft if one already exists. The
+     * published row is locked first, so two calls at once are served one after the other and the second finds the
+     * first's draft instead of colliding on the one-draft index.
+     */
     @Transactional
     public DraftResult createDraft(User user) {
+        RateCatalogVersion current = versions.lockByStatus(CatalogStatus.PUBLISHED)
+                .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
         Optional<RateCatalogVersion> existing = versions.findByStatus(CatalogStatus.DRAFT);
         if (existing.isPresent()) {
             return new DraftResult(RateMapper.toVersionResponse(existing.get(), 0), false);
         }
-        RateCatalogVersion current = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
-                .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
         CatalogRows rows = loader.load(current.getId());
         RateCatalogVersion draft = new RateCatalogVersion();
         Integer max = versions.maxVersionNo();
@@ -392,6 +394,9 @@ public class RateCatalogService {
                     "BASIS",
                     "Air corridors price the flight by stall position; a road transfer to the terminal is per shipment.");
         }
+        if (r.appliesToSex() != null && r.basis() != RateBasis.PER_HORSE && r.basis() != RateBasis.PER_DAY) {
+            throw new BusinessException("APPLIES_TO_SEX", "Only a per-horse or per-day line can be for one sex.");
+        }
         if (r.appliesToSex() != null
                 && r.description().strip().length() > PricingText.DESCRIPTION_MAX - SEX_SUFFIX_MAX) {
             throw new BusinessException(
@@ -451,12 +456,15 @@ public class RateCatalogService {
             throw bandRefusal("The first band must start at 1 horse.");
         }
         for (VolumeBreakRequest band : bands) {
-            if (band.minHorses() == null) {
+            if (band == null || band.minHorses() == null) {
                 throw bandRefusal("Each band needs the horse count it starts at.");
             }
             BigDecimal pct = band.discountPct();
             if (pct == null || pct.signum() < 0 || pct.compareTo(HUNDRED) > 0) {
                 throw bandRefusal("A discount must be between 0 and 100%.");
+            }
+            if (pct.stripTrailingZeros().scale() > 2) {
+                throw bandRefusal("A discount has at most 2 decimals.");
             }
             if (band.maxHorses() != null && band.maxHorses() < band.minHorses()) {
                 throw bandRefusal(

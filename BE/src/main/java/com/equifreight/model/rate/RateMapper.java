@@ -7,12 +7,14 @@ import com.equifreight.entity.RateLine;
 import com.equifreight.entity.RateServiceClass;
 import com.equifreight.entity.RateVolumeBreak;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.service.pricing.CatalogRows;
 import com.equifreight.service.pricing.MissingRate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Rate catalog entities to the Rates page's responses. */
@@ -32,6 +34,35 @@ public final class RateMapper {
                 .lastEditedBy(name(v.getLastEditedBy()))
                 .updatedAt(v.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * The Rates page's frame: the versions as given (newest first) with the quotations each pins, and the corridors
+     * with their missing-rate counts; a version or corridor absent from a count map counts 0.
+     */
+    public static RateCatalogResponse toCatalogResponse(
+            List<RateCatalogVersion> versions,
+            Map<UUID, Long> pinned,
+            List<Corridor> corridors,
+            Map<UUID, Integer> missing) {
+        return RateCatalogResponse.builder()
+                .currentVersionId(firstId(versions, CatalogStatus.PUBLISHED))
+                .draftVersionId(firstId(versions, CatalogStatus.DRAFT))
+                .versions(versions.stream()
+                        .map(v -> toVersionResponse(v, pinned.getOrDefault(v.getId(), 0L)))
+                        .toList())
+                .corridors(corridors.stream()
+                        .map(c -> toCorridorResponse(c, missing.getOrDefault(c.getId(), 0)))
+                        .toList())
+                .build();
+    }
+
+    private static UUID firstId(List<RateCatalogVersion> versions, CatalogStatus status) {
+        return versions.stream()
+                .filter(v -> v.getStatus() == status)
+                .map(RateCatalogVersion::getId)
+                .findFirst()
+                .orElse(null);
     }
 
     public static RateCorridorResponse toCorridorResponse(Corridor c, int missingCount) {

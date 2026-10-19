@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * Everything the price is derived from (spec §4.1). Cities and the destination country come from the request's
  * places, because a corridor may be used in reverse. {@code quarantineDays} is null when the destination has no
- * published regulation version.
+ * published regulation version, and {@code distanceKm} is null when the corridor has no distance.
  */
 public record PricingInput(
         TransportMode mode,
@@ -17,7 +17,7 @@ public record PricingInput(
         String fromCity,
         String toCity,
         String destinationCountryName,
-        int distanceKm,
+        Integer distanceKm,
         int crossingCount,
         ServiceClass airClass,
         TrailerType trailer,

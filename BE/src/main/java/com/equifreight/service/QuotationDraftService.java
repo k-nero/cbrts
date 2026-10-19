@@ -103,8 +103,12 @@ public class QuotationDraftService {
         requireInReview(request);
         Optional<Quotation> existing = quotations.findFirstByRequestIdOrderByVersionNoDesc(requestId);
         if (existing.isPresent()) {
-            requireDraft(existing.get());
-            return new StartResult(toResponse(existing.get(), request), false);
+            Quotation q = existing.get();
+            requireDraft(q);
+            if (request.getStatus() == RequestStatus.SUBMITTED) {
+                underReview(manager, request, "Quotation " + q.getCode() + " v" + q.getVersionNo() + " resumed");
+            }
+            return new StartResult(toResponse(q, request), false);
         }
         RateCatalogVersion published = latestPublished();
 
@@ -181,8 +185,8 @@ public class QuotationDraftService {
         audit.recordDecision(
                 manager,
                 "QUOTATION_REPRICED",
-                "Quotation " + q.getCode() + " v" + q.getVersionNo() + " re-priced on rate catalog v"
-                        + published.getVersionNo(),
+                AuditText.fit("Quotation " + q.getCode() + " v" + q.getVersionNo() + " re-priced on rate catalog v"
+                        + published.getVersionNo()),
                 ENTITY_TYPE,
                 request.getId(),
                 request.getCode(),
@@ -193,6 +197,22 @@ public class QuotationDraftService {
     }
 
     // --- helpers -----------------------------------------------------------------------------------------------
+
+    /** A request submitted again after a return: opening its draft takes it back under review. */
+    private void underReview(User manager, TransportRequest request, String what) {
+        request.setStatus(RequestStatus.UNDER_REVIEW);
+        requests.save(request);
+        audit.recordDecision(
+                manager,
+                "QUOTATION_RESUMED",
+                AuditText.fit(what + "; the request is under review"),
+                ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                null,
+                "{\"status\":\"" + RequestStatus.SUBMITTED + "\"}",
+                "{\"status\":\"" + RequestStatus.UNDER_REVIEW + "\"}");
+    }
 
     private TransportRequest lockedInReview(UUID requestId) {
         TransportRequest request = requests.findByIdForUpdate(requestId)

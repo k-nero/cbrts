@@ -576,4 +576,56 @@ class QuotationDraftServiceTest {
         assertThat(stored.orElseThrow().getAirClass()).isNull();
         assertThat(service.get(request.getId()).airClass()).isNull();
     }
+
+    // --- deferred minors ---------------------------------------------------------------------------------
+
+    /** A request returned to the customer and submitted again goes back under review when Start opens its draft. */
+    @Test
+    void startOnAResubmittedRequestMovesItUnderReviewAndAudits() {
+        service.start(yen, request.getId());
+        request.setStatus(RequestStatus.SUBMITTED);
+        org.mockito.Mockito.clearInvocations(audit, requests);
+
+        StartResult again = service.start(yen, request.getId());
+
+        assertThat(again.created()).isFalse();
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.UNDER_REVIEW);
+        verify(requests).save(request);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_RESUMED"),
+                        eq("Quotation Q-2026-0189 v1 resumed; the request is under review"),
+                        eq("TRANSPORT_REQUEST"),
+                        eq(request.getId()),
+                        eq("REQ-2026-0199"),
+                        isNull(),
+                        eq("{\"status\":\"SUBMITTED\"}"),
+                        eq("{\"status\":\"UNDER_REVIEW\"}"));
+    }
+
+    @Test
+    void startOnADraftAlreadyUnderReviewWritesNothing() {
+        service.start(yen, request.getId());
+        org.mockito.Mockito.clearInvocations(audit, requests);
+
+        service.start(yen, request.getId());
+
+        verify(requests, never()).save(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void aRepriceAuditSummaryFitsTheColumn() {
+        when(codes.next(CodePrefix.Q, 2026)).thenReturn("Q".repeat(600));
+        service.start(yen, request.getId());
+
+        service.reprice(yen, request.getId());
+
+        org.mockito.ArgumentCaptor<String> summary = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(audit)
+                .recordDecision(
+                        eq(yen), eq("QUOTATION_REPRICED"), summary.capture(), any(), any(), any(), any(), any(), any());
+        assertThat(summary.getValue()).hasSize(AuditText.MAX).endsWith("…");
+    }
 }

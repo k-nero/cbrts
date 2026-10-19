@@ -179,4 +179,23 @@ class PricingInputsTest {
         assertThat(horse.sex()).isEqualTo(HorseSex.MARE);
         assertThat(horse.declaredValue()).isEqualByComparingTo("175000");
     }
+
+    // --- deferred minors ---------------------------------------------------------------------------------
+
+    @Test
+    void anUnknownSizeClassHasNoWidth() {
+        TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
+        r.getHorses().getFirst().setSizeClassCode("Z");
+
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).horses().getFirst().widthIn())
+                .isNull();
+    }
+
+    @Test
+    void aCorridorWithoutADistanceHasNoDistance() {
+        TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
+        r.getCorridor().setDistanceKm(null);
+
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).distanceKm()).isNull();
+    }
 }
