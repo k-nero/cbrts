@@ -31,4 +31,11 @@ public class RateCatalogVersion extends BaseEntity {
 
     @Column(length = 500)
     private String changeNote;
+
+    /**
+     * Who changed the draft last.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_edited_by")
+    private User lastEditedBy;
 }

@@ -133,6 +133,16 @@ public class DataSeeder implements ApplicationRunner {
     private final RouteLegRepository routeLegRepository;
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final CodeCounterRepository codeCounterRepository;
+    private final RegulationCatalogRepository regulationCatalogRepository;
+    private final RegulationVersionRepository regulationVersionRepository;
+    private final RegulationRuleRepository regulationRuleRepository;
+    private final DocumentTypeRepository documentTypeRepository;
+    private final JobRegulationPinRepository jobRegulationPinRepository;
+    private final AuthorityRepository authorityRepository;
+    private final AuthoritySubmissionRepository authoritySubmissionRepository;
+    private final QuarantinePeriodRepository quarantinePeriodRepository;
+    private final NoteRepository noteRepository;
+    private final NoteReplyRepository noteReplyRepository;
     private final CatalogSeeder catalogSeeder;
 
     public DataSeeder(
@@ -160,6 +170,16 @@ public class DataSeeder implements ApplicationRunner {
             RouteLegRepository routeLegRepository,
             CrewAssignmentRepository crewAssignmentRepository,
             CodeCounterRepository codeCounterRepository,
+            RegulationCatalogRepository regulationCatalogRepository,
+            RegulationVersionRepository regulationVersionRepository,
+            RegulationRuleRepository regulationRuleRepository,
+            DocumentTypeRepository documentTypeRepository,
+            JobRegulationPinRepository jobRegulationPinRepository,
+            AuthorityRepository authorityRepository,
+            AuthoritySubmissionRepository authoritySubmissionRepository,
+            QuarantinePeriodRepository quarantinePeriodRepository,
+            NoteRepository noteRepository,
+            NoteReplyRepository noteReplyRepository,
             CatalogSeeder catalogSeeder) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -185,6 +205,16 @@ public class DataSeeder implements ApplicationRunner {
         this.routeLegRepository = routeLegRepository;
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.codeCounterRepository = codeCounterRepository;
+        this.regulationCatalogRepository = regulationCatalogRepository;
+        this.regulationVersionRepository = regulationVersionRepository;
+        this.regulationRuleRepository = regulationRuleRepository;
+        this.documentTypeRepository = documentTypeRepository;
+        this.jobRegulationPinRepository = jobRegulationPinRepository;
+        this.authorityRepository = authorityRepository;
+        this.authoritySubmissionRepository = authoritySubmissionRepository;
+        this.quarantinePeriodRepository = quarantinePeriodRepository;
+        this.noteRepository = noteRepository;
+        this.noteReplyRepository = noteReplyRepository;
         this.catalogSeeder = catalogSeeder;
     }
 
@@ -199,6 +229,9 @@ public class DataSeeder implements ApplicationRunner {
         catalogSeeder.seed();
         seedVehicles();
         seedDemoJobs();
+        seedRegulations();
+        seedAuthoritiesAndQuarantinePlaces();
+        seedClearanceSubmissionsAndNotes();
     }
 
     private void seedRolesAndUsers() {
@@ -212,17 +245,17 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         for (String[] u : USERS) {
-            if (userRepository.getByEmail(u[0]) != null) {
-                continue;
+            User user = userRepository.getByEmail(u[0]);
+            if (user == null) {
+                user = new User();
+                user.setEmail(u[0]);
+                user.setFirstName(u[1]);
+                user.setLastName(u[2]);
+                user.setRoles(Set.of(roleRepository.findByName(u[3]).orElseThrow()));
             }
-            User user = new User();
-            user.setEmail(u[0]);
-            user.setFirstName(u[1]);
-            user.setLastName(u[2]);
             user.setPassword(passwordEncoder.encode(seedPassword));
-            user.setRoles(Set.of(roleRepository.findByName(u[3]).orElseThrow()));
             userRepository.save(user);
-            log.info("Seeded {} ({})", u[0], u[3]);
+            log.info("Seeded/Updated {} ({})", u[0], u[3]);
         }
     }
 
@@ -285,6 +318,9 @@ public class DataSeeder implements ApplicationRunner {
     private void seedPlacesAndCorridors() {
         Country vn = countryRepository.findById("VN").orElse(null);
         Country kh = countryRepository.findById("KH").orElse(null);
+        Country th = countryRepository.findById("TH").orElse(null);
+        Country la = countryRepository.findById("LA").orElse(null);
+        Country my = countryRepository.findById("MY").orElse(null);
         if (vn == null || kh == null) return;
 
         createPlaceIfAbsent(
@@ -303,13 +339,49 @@ public class DataSeeder implements ApplicationRunner {
             borderCrossingRepository.save(bc);
         }
 
-        if (corridorRepository.findByCode("RD HCM -> PNH").isEmpty()) {
+        if (borderCrossingRepository.findByName("Poipet – Aranyaprathet").isEmpty() && th != null) {
+            BorderCrossing bc = new BorderCrossing();
+            bc.setName("Poipet – Aranyaprathet");
+            bc.setFromCountry(kh);
+            bc.setToCountry(th);
+            bc.setRoadOnly(true);
+            borderCrossingRepository.save(bc);
+        }
+
+        if (borderCrossingRepository.findByName("Cầu Treo – Nam Phao").isEmpty() && la != null) {
+            BorderCrossing bc = new BorderCrossing();
+            bc.setName("Cầu Treo – Nam Phao");
+            bc.setFromCountry(vn);
+            bc.setToCountry(la);
+            bc.setRoadOnly(true);
+            borderCrossingRepository.save(bc);
+        }
+
+        if (borderCrossingRepository.findByName("Sadao – Bukit Kayu Hitam").isEmpty() && th != null && my != null) {
+            BorderCrossing bc = new BorderCrossing();
+            bc.setName("Sadao – Bukit Kayu Hitam");
+            bc.setFromCountry(th);
+            bc.setToCountry(my);
+            bc.setRoadOnly(true);
+            borderCrossingRepository.save(bc);
+        }
+
+        createCorridorIfAbsent("AIR PNH -> HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1510);
+        createCorridorIfAbsent("AIR SGN -> HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500);
+        createCorridorIfAbsent("RD HCM -> PNH", TransportMode.ROAD, "Ho Chi Minh City", "Phnom Penh", 240);
+        createCorridorIfAbsent("RD HCM -> BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", 890);
+        createCorridorIfAbsent("RD BKK -> KUL", TransportMode.ROAD, "Bangkok", "Kuala Lumpur", 1480);
+        createCorridorIfAbsent("RD HAN -> VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 850);
+    }
+
+    private void createCorridorIfAbsent(String code, TransportMode mode, String origin, String dest, int distKm) {
+        if (corridorRepository.findByCode(code).isEmpty()) {
             Corridor c = new Corridor();
-            c.setCode("RD HCM -> PNH");
-            c.setMode(TransportMode.ROAD);
-            c.setOriginCity("Ho Chi Minh City");
-            c.setDestinationCity("Phnom Penh");
-            c.setDistanceKm(240);
+            c.setCode(code);
+            c.setMode(mode);
+            c.setOriginCity(origin);
+            c.setDestinationCity(dest);
+            c.setDistanceKm(distKm);
             corridorRepository.save(c);
         }
     }
@@ -686,6 +758,424 @@ public class DataSeeder implements ApplicationRunner {
         ca.getId().setJobId(job.getId());
         ca.getId().setUserId(user.getId());
         crewAssignmentRepository.save(ca);
+    }
+
+    private void seedRegulations() {
+        if (regulationCatalogRepository.count() > 0) {
+            return;
+        }
+
+        User lan = userRepository.getByEmail("lan.nguyen@equifreight.vn");
+        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
+        User publisher = lan != null ? lan : yen;
+
+        DocumentType piro = documentTypeRepository
+                .findByCode("PIROPLASMOSIS_TEST")
+                .orElseGet(() -> {
+                    DocumentType dt = new DocumentType();
+                    dt.setCode("PIROPLASMOSIS_TEST");
+                    dt.setName("Equine piroplasmosis test result");
+                    dt.setScope(DocumentScope.PER_HORSE);
+                    dt.setProvidedBy(DocumentProvider.CUSTOMER);
+                    return documentTypeRepository.save(dt);
+                });
+
+        DocumentType passport =
+                documentTypeRepository.findByCode("EQUINE_PASSPORT").orElse(null);
+        DocumentType flu =
+                documentTypeRepository.findByCode("INFLUENZA_VACCINATION").orElse(null);
+        DocumentType eia = documentTypeRepository.findByCode("EIA_TEST").orElse(null);
+        DocumentType health =
+                documentTypeRepository.findByCode("EXPORT_HEALTH_CERT").orElse(null);
+        DocumentType ownership =
+                documentTypeRepository.findByCode("PROOF_OF_OWNERSHIP").orElse(null);
+        DocumentType permit = documentTypeRepository.findByCode("IMPORT_PERMIT").orElse(null);
+        DocumentType insurance =
+                documentTypeRepository.findByCode("TRANSIT_INSURANCE").orElse(null);
+        DocumentType customs =
+                documentTypeRepository.findByCode("CUSTOMS_VALUE_DECLARATION").orElse(null);
+
+        Country kh = countryRepository.findById("KH").orElse(null);
+        if (kh != null) {
+            RegulationCatalog khCat = new RegulationCatalog();
+            khCat.setCountry(kh);
+            khCat.setName("Cambodia import");
+            khCat = regulationCatalogRepository.save(khCat);
+
+            // v5 RETIRED
+            RegulationVersion v5 = createVersion(khCat, 5, CatalogStatus.RETIRED, (short) 21, (short) 7, (short) 2);
+            v5.setPublishedAt(Instant.parse("2026-06-14T08:00:00Z"));
+            v5.setPublishedBy(publisher);
+            regulationVersionRepository.saveAndFlush(v5);
+
+            // v6 RETIRED
+            RegulationVersion v6 = createVersion(khCat, 6, CatalogStatus.RETIRED, (short) 21, (short) 7, (short) 2);
+            v6.setPublishedAt(Instant.parse("2026-08-02T08:00:00Z"));
+            v6.setPublishedBy(publisher);
+            regulationVersionRepository.saveAndFlush(v6);
+
+            // v7 PUBLISHED
+            RegulationVersion v7 = createVersion(khCat, 7, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+            if (passport != null)
+                createRule(v7, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (flu != null) createRule(v7, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+            if (eia != null)
+                createRule(
+                        v7,
+                        eia,
+                        RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                        null,
+                        (short) 60,
+                        true,
+                        "Sampled within 60 days of departure");
+            if (health != null)
+                createRule(v7, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+            if (ownership != null) createRule(v7, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+            if (permit != null)
+                createRule(v7, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (insurance != null)
+                createRule(v7, insurance, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (customs != null)
+                createRule(v7, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, "1 per crossing");
+            v7.setStatus(CatalogStatus.PUBLISHED);
+            v7.setPublishedAt(Instant.parse("2026-09-22T08:00:00Z"));
+            v7.setPublishedBy(publisher);
+            final RegulationVersion savedV7 = regulationVersionRepository.saveAndFlush(v7);
+
+            // v8 DRAFT
+            RegulationVersion v8 = createVersion(khCat, 8, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+            if (passport != null)
+                createRule(v8, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (flu != null) createRule(v8, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+            if (eia != null)
+                createRule(
+                        v8,
+                        eia,
+                        RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                        null,
+                        (short) 45,
+                        true,
+                        "Was 60 in v7. Source: GDAHP notice 14/2026.");
+            if (health != null)
+                createRule(v8, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+            if (ownership != null) createRule(v8, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+            createRule(
+                    v8,
+                    piro,
+                    RegulationRuleKind.WINDOW_BEFORE_DEPARTURE,
+                    null,
+                    (short) 30,
+                    true,
+                    "New requirement under GDAHP circular 2026.");
+            if (permit != null)
+                createRule(v8, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+            if (insurance != null)
+                createRule(
+                        v8,
+                        insurance,
+                        RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS,
+                        null,
+                        (short) 2,
+                        false,
+                        "Changed to optional recommendation.");
+            if (customs != null)
+                createRule(v8, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, "1 per crossing");
+
+            // Pin demo job CBRT-2026-041 to v7
+            transportJobRepository.findByCode("CBRT-2026-041").ifPresent(job -> {
+                JobRegulationPin pin = new JobRegulationPin();
+                pin.setJob(job);
+                pin.setRegulationVersion(savedV7);
+                pin.setRole(RegulationRole.DESTINATION);
+                pin.getId().setJobId(job.getId());
+                pin.getId().setRegulationVersionId(savedV7.getId());
+                jobRegulationPinRepository.save(pin);
+            });
+            log.info("Seeded Cambodia regulation catalog v5-v8");
+        }
+
+        seedCountryCatalog(
+                "VN",
+                "Vietnam import",
+                5,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "TH",
+                "Thailand import",
+                4,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "LA", "Laos import", 3, publisher, passport, flu, eia, health, ownership, permit, insurance, customs);
+        seedCountryCatalog(
+                "MY",
+                "Malaysia import",
+                6,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+        seedCountryCatalog(
+                "HK",
+                "Hong Kong import",
+                9,
+                publisher,
+                passport,
+                flu,
+                eia,
+                health,
+                ownership,
+                permit,
+                insurance,
+                customs);
+    }
+
+    private void seedCountryCatalog(
+            String countryCode,
+            String name,
+            int versionNo,
+            User publisher,
+            DocumentType passport,
+            DocumentType flu,
+            DocumentType eia,
+            DocumentType health,
+            DocumentType ownership,
+            DocumentType permit,
+            DocumentType insurance,
+            DocumentType customs) {
+        Country c = countryRepository.findById(countryCode).orElse(null);
+        if (c == null) return;
+        RegulationCatalog cat = new RegulationCatalog();
+        cat.setCountry(c);
+        cat.setName(name);
+        cat = regulationCatalogRepository.save(cat);
+
+        RegulationVersion v = createVersion(cat, versionNo, CatalogStatus.DRAFT, (short) 21, (short) 7, (short) 2);
+        if (passport != null)
+            createRule(v, passport, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (flu != null) createRule(v, flu, RegulationRuleKind.BOOSTER_WINDOW, (short) 7, (short) 180, true, null);
+        if (eia != null) createRule(v, eia, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 60, true, null);
+        if (health != null)
+            createRule(v, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+        if (ownership != null) createRule(v, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+        if (permit != null)
+            createRule(v, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (insurance != null)
+            createRule(v, insurance, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
+        if (customs != null) createRule(v, customs, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
+        v.setStatus(CatalogStatus.PUBLISHED);
+        v.setPublishedAt(Instant.now());
+        v.setPublishedBy(publisher);
+        regulationVersionRepository.saveAndFlush(v);
+        log.info("Seeded {} regulation catalog v{}", name, versionNo);
+    }
+
+    private RegulationVersion createVersion(
+            RegulationCatalog catalog, int versionNo, CatalogStatus status, short lead, short quar, short buf) {
+        RegulationVersion v = new RegulationVersion();
+        v.setCatalog(catalog);
+        v.setVersionNo(versionNo);
+        v.setStatus(status);
+        v.setLeadTimeDays(lead);
+        v.setQuarantineMinDays(quar);
+        v.setArrivalBufferDays(buf);
+        return regulationVersionRepository.saveAndFlush(v);
+    }
+
+    private void createRule(
+            RegulationVersion version,
+            DocumentType docType,
+            RegulationRuleKind kind,
+            Short minDays,
+            Short maxDays,
+            boolean mandatory,
+            String desc) {
+        RegulationRule r = new RegulationRule();
+        r.setVersion(version);
+        r.setDocumentType(docType);
+        r.setRuleKind(kind);
+        r.setMinDays(minDays);
+        r.setMaxDays(maxDays);
+        r.setMandatory(mandatory);
+        r.setDescription(desc);
+        regulationRuleRepository.saveAndFlush(r);
+    }
+
+    private void seedAuthoritiesAndQuarantinePlaces() {
+        if (authorityRepository.count() > 0) {
+            return;
+        }
+        createAuthority("Regional Animal Health Office No. VI (RAHO6)", "VN", AuthorityKind.VETERINARY, (short) 5);
+        createAuthority("Mộc Bài Customs Sub-Department", "VN", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority(
+                "General Directorate of Animal Health and Production (GDAHP)", "KH", AuthorityKind.VETERINARY, (short)
+                        4);
+        createAuthority("Bavet International Border Customs", "KH", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority("Cambodia Border Animal Quarantine Station", "KH", AuthorityKind.QUARANTINE, (short) 1);
+
+        createPlaceIfMissing(
+                "Phú Thọ Pre-Export Quarantine Station",
+                PlaceKind.QUARANTINE,
+                "Ho Chi Minh City",
+                "VN",
+                "District 11, HCMC");
+        createPlaceIfMissing(
+                "Svay Rieng Border Quarantine Station",
+                PlaceKind.QUARANTINE,
+                "Svay Rieng",
+                "KH",
+                "National Road 1, Svay Rieng");
+        createPlaceIfMissing(
+                "Phnom Penh Equestrian Quarantine Facility",
+                PlaceKind.QUARANTINE,
+                "Phnom Penh",
+                "KH",
+                "Dangkao, Phnom Penh");
+        log.info("Seeded regulatory authorities and quarantine stations");
+    }
+
+    private void createAuthority(String name, String countryCode, AuthorityKind kind, short slaDays) {
+        if (authorityRepository.findByName(name).isPresent()) {
+            return;
+        }
+        Authority a = new Authority();
+        a.setName(name);
+        a.setCountry(countryRepository.getReferenceById(countryCode));
+        a.setKind(kind);
+        a.setSlaDays(slaDays);
+        authorityRepository.save(a);
+    }
+
+    private void createPlaceIfMissing(String name, PlaceKind kind, String city, String countryCode, String address) {
+        if (placeRepository.findByName(name).isPresent()) {
+            return;
+        }
+        Place p = new Place();
+        p.setName(name);
+        p.setKind(kind);
+        p.setCity(city);
+        p.setCountry(countryRepository.getReferenceById(countryCode));
+        p.setAddress(address);
+        placeRepository.save(p);
+    }
+
+    private void seedClearanceSubmissionsAndNotes() {
+        TransportJob job = transportJobRepository.findByCode("CBRT-2026-041").orElse(null);
+        if (job == null) return;
+
+        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
+        User lan = userRepository.getByEmail("lan.nguyen@equifreight.vn");
+        User customer = userRepository.getByEmail("bookings@saigonturf.vn");
+        Club saigonClub = clubRepository.findByName("Saigon Turf Club").orElse(null);
+
+        // Authority Submissions
+        if (authoritySubmissionRepository.count() == 0) {
+            Authority raho6 = authorityRepository
+                    .findByName("Regional Animal Health Office No. VI (RAHO6)")
+                    .orElse(null);
+            Authority gdahp = authorityRepository
+                    .findByName("General Directorate of Animal Health and Production (GDAHP)")
+                    .orElse(null);
+
+            if (raho6 != null) {
+                AuthoritySubmission sub1 = new AuthoritySubmission();
+                sub1.setJob(job);
+                sub1.setAuthority(raho6);
+                sub1.setKind(SubmissionKind.EXPORT_HEALTH_CERTS);
+                sub1.setStatus(SubmissionStatus.FILED);
+                sub1.setFiledAt(Instant.now().minus(java.time.Duration.ofDays(2)));
+                sub1.setFiledBy(yen != null ? yen : lan);
+                sub1.setReferenceNo("RAHO6-EXP-2026-081");
+                sub1.setExpectedBy(LocalDate.now().plusDays(3));
+                authoritySubmissionRepository.save(sub1);
+            }
+            if (gdahp != null) {
+                AuthoritySubmission sub2 = new AuthoritySubmission();
+                sub2.setJob(job);
+                sub2.setAuthority(gdahp);
+                sub2.setKind(SubmissionKind.IMPORT_PERMIT);
+                sub2.setStatus(SubmissionStatus.READY_TO_FILE);
+                sub2.setExpectedBy(LocalDate.now().plusDays(6));
+                authoritySubmissionRepository.save(sub2);
+            }
+            log.info("Seeded authority submissions for CBRT-2026-041");
+        }
+
+        // Quarantine Period
+        if (quarantinePeriodRepository.count() == 0) {
+            Place pt = placeRepository
+                    .findByName("Phú Thọ Pre-Export Quarantine Station")
+                    .orElse(null);
+            if (pt != null) {
+                QuarantinePeriod qp = new QuarantinePeriod();
+                qp.setJob(job);
+                qp.setPlace(pt);
+                qp.setStartsOn(LocalDate.now().minusDays(10));
+                qp.setEndsOn(LocalDate.now().minusDays(3));
+                qp.setCompletedAt(Instant.now().minus(java.time.Duration.ofDays(3)));
+                quarantinePeriodRepository.save(qp);
+                log.info("Seeded completed quarantine period for CBRT-2026-041");
+            }
+        }
+
+        // Customer Notes
+        if (noteRepository.count() == 0 && saigonClub != null && customer != null) {
+            Note n1 = new Note();
+            n1.setClub(saigonClub);
+            n1.setJob(job);
+            n1.setRequest(job.getRequest());
+            n1.setTopic(NoteTopic.DOCUMENTS);
+            n1.setRoutedRole("TRANSPORT_SPECIALIST");
+            n1.setCreatedBy(customer);
+            n1.setSubject("Equine Influenza vaccination window");
+            n1.setBody(
+                    "Copper King's EI booster is scheduled for 10 Oct at the club clinic. Can we submit the updated veterinary record 7 days before departure instead of the required 14 days?");
+            n1.setStatus(NoteStatus.ANSWERED);
+            Note savedN1 = noteRepository.save(n1);
+
+            if (lan != null) {
+                NoteReply r1 = new NoteReply();
+                r1.setNote(savedN1);
+                r1.setAuthor(lan);
+                r1.setBody(
+                        "Reviewed with Cambodia GDAHP requirements. 7 days is within the allowable window if accompanied by the clinic's certification of no post-vaccinal adverse reaction. Please upload the clinic certificate as soon as administered.");
+                noteReplyRepository.save(r1);
+            }
+
+            Note n2 = new Note();
+            n2.setClub(saigonClub);
+            n2.setJob(job);
+            n2.setRequest(job.getRequest());
+            n2.setTopic(NoteTopic.TRIP);
+            n2.setRoutedRole("FLEET_ROUTE_COORDINATOR");
+            n2.setCreatedBy(customer);
+            n2.setSubject("Border transit timing at Mộc Bài – Bavet");
+            n2.setBody(
+                    "Please confirm expected arrival at Mộc Bài border. The owner's escort veterinarian will meet the convoy at Bavet side for handover inspection.");
+            n2.setStatus(NoteStatus.OPEN);
+            noteRepository.save(n2);
+            log.info("Seeded customer notes and reply for CBRT-2026-041");
+        }
     }
 
     private void advanceCodeCounter(CodePrefix prefix, short year, int value) {

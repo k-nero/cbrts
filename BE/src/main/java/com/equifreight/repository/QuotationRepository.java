@@ -9,4 +9,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
     Optional<Quotation> findByCode(String code);
+
+    /** A request's latest quotation version. */
+    Optional<Quotation> findFirstByRequestIdOrderByVersionNoDesc(UUID requestId);
+
+    /** How many quotations a catalog version is pinned to. */
+    long countByRateCatalogVersionId(UUID versionId);
 }

@@ -1,6 +1,7 @@
 package com.equifreight.entity;
 
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.ServiceClass;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,6 +45,13 @@ public class Quotation extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rate_catalog_version_id", nullable = false)
     private RateCatalogVersion rateCatalogVersion;
+
+    /**
+     * The air class the manager priced, which may differ from the customer's choice; null for road.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private ServiceClass airClass;
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3)

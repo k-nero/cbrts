@@ -77,6 +77,13 @@ public class AuthoritySubmissionService {
     }
 
     @Transactional(readOnly = true)
+    public List<com.equifreight.model.route.PlaceResponse> listQuarantineFacilities() {
+        return placeRepository.findByKind(com.equifreight.entity.enums.PlaceKind.QUARANTINE).stream()
+                .map(com.equifreight.model.route.RouteMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AuthoritySubmissionResponse> getSubmissionsByJob(UUID jobId) {
         return listSubmissionsByJob(jobId);
     }

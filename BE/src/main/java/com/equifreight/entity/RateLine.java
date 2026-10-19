@@ -3,6 +3,7 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RateCertainty;
+import com.equifreight.entity.enums.TrailerType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import lombok.Getter;
@@ -63,4 +64,23 @@ public class RateLine extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private RateCertainty certainty = RateCertainty.FIXED;
+
+    /**
+     * A road rate for one trailer kind; null means both.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private TrailerType appliesToTrailer;
+
+    /**
+     * The hours a per-hour line assumes; required for PER_HOUR (DB check).
+     */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal defaultQuantity;
+
+    /**
+     * Why an estimated line may vary, copied to the quotation line.
+     */
+    @Column(length = 300)
+    private String estimateNote;
 }

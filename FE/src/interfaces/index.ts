@@ -6,6 +6,7 @@ export * from './clearance';
 export * from './trip';
 export * from './job';
 export * from './vehicle';
+export * from './note';
 export * from './audit';
 export * from './horse';
 export * from './request';
