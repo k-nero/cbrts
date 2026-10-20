@@ -90,8 +90,8 @@ public class QuotationPricing {
         for (QuotationLine old : q.getLines()) {
             if (old.getManualReason() != null) {
                 manual.add(old);
-            } else if (old.getOverrideAmount() != null && old.getLineKey() != null) {
-                overrides.put(old.getLineKey(), old);
+            } else if (old.getOverrideAmount() != null && QuotationMapper.keyOf(old) != null) {
+                overrides.put(QuotationMapper.keyOf(old), old);
             }
         }
 
@@ -274,8 +274,8 @@ public class QuotationPricing {
             if (s.getManualReason() != null) {
                 continue;
             }
-            if (s.getOverrideAmount() != null && s.getLineKey() != null) {
-                overrides.put(s.getLineKey(), s.getOverrideAmount());
+            if (s.getOverrideAmount() != null && QuotationMapper.keyOf(s) != null) {
+                overrides.put(QuotationMapper.keyOf(s), s.getOverrideAmount());
             }
         }
         for (PricedLine p : engine) {

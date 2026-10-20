@@ -451,6 +451,44 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
 
     // --- slice 6: adjustments survive pricing ------------------------------------------------------------
 
+    /** A draft priced before V22: its lines have no keys. */
+    Quotation legacyDraftWithIds() {
+        Quotation q = startedWithIds();
+        q.getLines().forEach(l -> l.setLineKey(null));
+        return q;
+    }
+
+    @Test
+    void anOverrideOnALineWithoutAKeyDoesNotAskForAReprice() {
+        Quotation q = legacyDraftWithIds();
+        UUID groom = q.getLines().stream()
+                .filter(l -> l.getDescription().equals("Flying groom"))
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        QuotationDraftResponse response = service.override(yen, request.getId(), groom, override("1200.00"));
+
+        assertThat(response.repriceNeeded()).isFalse();
+        assertThat(response.readiness().ready()).isTrue();
+    }
+
+    @Test
+    void aRepriceCarriesAnOverrideOnALineWithoutAKey() {
+        Quotation q = legacyDraftWithIds();
+        QuotationLine groom = q.getLines().stream()
+                .filter(l -> l.getDescription().equals("Flying groom"))
+                .findFirst()
+                .orElseThrow();
+        groom.setOverrideAmount(new BigDecimal("1200.00"));
+        groom.setOverrideReason("Groom from the club's own staff");
+
+        QuotationDraftResponse response = service.reprice(yen, request.getId());
+
+        assertThat(lineKeyed("GROOM").getOverrideAmount()).isEqualByComparingTo("1200.00");
+        assertThat(response.droppedOverrides()).isEmpty();
+    }
+
     @Test
     void storedLinesCarryTheirKeys() {
         service.start(yen, request.getId());

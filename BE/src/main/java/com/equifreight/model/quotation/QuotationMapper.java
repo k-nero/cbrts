@@ -4,6 +4,7 @@ import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportRequest;
+import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.rate.RateMapper;
@@ -172,6 +173,26 @@ public final class QuotationMapper {
                 .build();
     }
 
+    /**
+     * The line's key; a line stored before keys existed (V22) gets the one its price would write: the stall class's
+     * STALL, or its catalog line's code (with the horse on a per-day line of one horse). A gap line has none.
+     */
+    public static String keyOf(QuotationLine l) {
+        if (l.getLineKey() != null) {
+            return l.getLineKey();
+        }
+        if (l.getRateServiceClass() != null) {
+            return "STALL";
+        }
+        if (l.getRateLine() == null) {
+            return null;
+        }
+        String code = l.getRateLine().getCode();
+        return l.getBasis() == RateBasis.PER_DAY && l.getHorse() != null
+                ? code + ":" + l.getHorse().getId()
+                : code;
+    }
+
     public static QuotationVersionResponse toVersion(Quotation q) {
         return new QuotationVersionResponse(
                 q.getVersionNo(),
@@ -186,8 +207,8 @@ public final class QuotationMapper {
     public static PreviousVersionResponse toPrevious(Quotation q) {
         Map<String, BigDecimal> amounts = new LinkedHashMap<>();
         q.getLines().stream()
-                .filter(l -> l.getLineKey() != null && amount(l) != null)
-                .forEach(l -> amounts.put(l.getLineKey(), amount(l)));
+                .filter(l -> keyOf(l) != null && amount(l) != null)
+                .forEach(l -> amounts.put(keyOf(l), amount(l)));
         return new PreviousVersionResponse(q.getVersionNo(), q.getTotal(), amounts);
     }
 
@@ -258,7 +279,7 @@ public final class QuotationMapper {
     private static QuoteLineResponse toLine(QuotationLine l) {
         return QuoteLineResponse.builder()
                 .id(l.getId())
-                .lineKey(l.getLineKey())
+                .lineKey(keyOf(l))
                 .description(l.getDescription())
                 .basisText(l.getBasisText())
                 .quantity(l.getQuantity())
@@ -310,7 +331,7 @@ public final class QuotationMapper {
             QuotationLine s = stored.get(i);
             PricedLine p = now.get(i);
             boolean same = s.getGroupCode().equals(p.group())
-                    && (s.getLineKey() == null || s.getLineKey().equals(p.lineKey()))
+                    && (keyOf(s) == null || keyOf(s).equals(p.lineKey()))
                     && s.getDescription().equals(p.description())
                     && Objects.equals(s.getBasisText(), p.basisText())
                     && same(s.getCatalogAmount(), p.amount());
