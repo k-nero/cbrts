@@ -146,15 +146,15 @@ public class TripService {
                     "CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
         boolean handedOver = request.kind() == TripRecordKind.HANDED_OVER;
         if (handedOver && channel != Channel.CAB_TABLET)
-            throw new BusinessException(
-                    "HANDOVER_ESCORT_ONLY", "Handover must be confirmed by the escort in the cab.");
+            throw new BusinessException("HANDOVER_ESCORT_ONLY", "Handover must be confirmed by the escort in the cab.");
         if (handedOver
                 && (request.receiverName() == null
                         || request.receiverName().isBlank()
                         || request.receiverSignature() == null
                         || !request.receiverSignature().startsWith("data:image/png;base64,")))
             throw new BusinessException(
-                    "HANDOVER_SIGNATURE_REQUIRED", "Enter the receiver's name and capture their signature on the tablet.");
+                    "HANDOVER_SIGNATURE_REQUIRED",
+                    "Enter the receiver's name and capture their signature on the tablet.");
         if (!handedOver && (request.receiverName() != null || request.receiverSignature() != null))
             throw new BusinessException(
                     "HANDOVER_FIELDS_NOT_ALLOWED", "Receiver details can only be recorded with handover.");

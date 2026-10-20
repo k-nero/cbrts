@@ -2,9 +2,9 @@ package com.equifreight.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentCaptor.forClass;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
@@ -215,8 +215,8 @@ class TripServiceTest {
     void coordinatorCannotRecordHandover() {
         job.setTripStatus(TripStatus.DELIVERED);
         job.setStage(JobStage.HANDOVER);
-        TripRecordRequest request = new TripRecordRequest(
-                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, null);
+        TripRecordRequest request =
+                new TripRecordRequest(null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, null);
 
         BusinessException ex = assertThrows(
                 BusinessException.class, () -> service.addCoordinatorRecord(job.getCode(), coordinator, request));
