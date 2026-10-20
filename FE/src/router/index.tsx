@@ -21,7 +21,7 @@ import DocumentsPage from '@/pages/staff/documents';
 import AuthoritiesPage from '@/pages/staff/authorities';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
-import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import JobDetailPage from '@/pages/staff/jobs/ViewAddEdit';
 import AuditLogPage from '@/pages/staff/audit-log';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';

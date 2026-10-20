@@ -13,6 +13,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { type ReactNode, useState } from 'react';
+import { Select, Skeleton } from 'antd';
 
 import {
   Button,
@@ -123,22 +124,24 @@ export function LoadPlanTab({ job }: Props) {
           </div>
 
           {loadingVehicles ? (
-            <span className="type-body-s text-ink-3">Loading fleet vehicles…</span>
+            <Skeleton active title={false} paragraph={{ rows: 2 }} />
           ) : (
             <div className="flex w-full flex-col gap-4">
               <div className="flex flex-col gap-1.5 text-left">
-                <label className="type-label-s text-ink">Assigned vehicle</label>
-                <select
-                  value={vehicleToUse || ''}
-                  onChange={(e) => setSelectedVehicleId(e.target.value)}
-                  className="focus-ring type-body-s h-10 w-full rounded-md border border-line bg-canvas px-3 text-ink outline-none"
-                >
-                  {activeVehicles?.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.code} · {v.kind} ({v.stalls?.length || v.stallCount || 0} stalls)
-                    </option>
-                  ))}
-                </select>
+                <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
+                  Assigned vehicle
+                </label>
+                <Select
+                  id="load-plan-vehicle"
+                  className="w-full"
+                  placeholder="Choose a vehicle"
+                  value={vehicleToUse || undefined}
+                  onChange={setSelectedVehicleId}
+                  options={activeVehicles?.map((v) => ({
+                    value: v.id,
+                    label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
+                  }))}
+                />
               </div>
 
               <Button

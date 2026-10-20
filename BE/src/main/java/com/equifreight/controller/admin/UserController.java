@@ -3,6 +3,8 @@ package com.equifreight.controller.admin;
 import com.equifreight.entity.User;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
+import com.equifreight.model.user.UserGroup;
+import com.equifreight.model.user.UserGroupCounts;
 import com.equifreight.model.user.UserResponse;
 import com.equifreight.service.UserService;
 import jakarta.validation.Valid;
@@ -33,8 +35,15 @@ public class UserController {
     public Page<UserResponse> list(
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "group", required = false) UserGroup group,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return userService.search(q, role, pageable);
+        return userService.search(q, role, group, pageable);
+    }
+
+    /** The counts on the Staff, Customers and Pending invites tabs. */
+    @GetMapping("/counts")
+    public UserGroupCounts counts() {
+        return userService.countGroups();
     }
 
     @GetMapping("/{id}")
