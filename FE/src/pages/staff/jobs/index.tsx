@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { TableToolbarRefreshButton } from '@/components/table';
-import { Chip, Deadline, Icon, StageMark } from '@/components/ui';
+import { Chip, Deadline, StageMark } from '@/components/ui';
 import { useJobs } from '@/hooks/useJob';
 import type { JobSummary } from '@/interfaces';
 

@@ -472,7 +472,7 @@ public class DataSeeder implements ApplicationRunner {
 
         HorseSizeClass sizeM = horseSizeClassRepository
                 .findByCode("M")
-                .orElseGet(() -> horseSizeClassRepository.findAll().get(0));
+                .orElseGet(() -> horseSizeClassRepository.findAll().getFirst());
 
         Horse shadowfax = createHorseIfAbsent(
                 "Shadowfax",

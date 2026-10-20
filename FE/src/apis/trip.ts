@@ -1,5 +1,5 @@
 import apiV1Instance from '@/config/axios';
-import type { TripPage, TripRecordInput, TripRecord, TripView } from '@/interfaces';
+import type { TripPage, TripRecord, TripRecordInput, TripView } from '@/interfaces';
 
 export const tripApi = {
   list: async (audience: 'escort' | 'staff' | 'customer', page: number) =>
