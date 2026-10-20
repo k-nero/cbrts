@@ -112,9 +112,7 @@ export const CabBar: FC<CabBarProps> = ({
           size={18}
           className={synced ? 'text-ok' : 'text-warn'}
         />
-        <span className={`type-label-s ${synced ? 'text-ink-3' : 'text-warn'}`}>
-          {syncLabel}
-        </span>
+        <span className={`type-label-s ${synced ? 'text-ink-3' : 'text-warn'}`}>{syncLabel}</span>
       </div>
 
       <div className="type-data-l font-mono text-2xl font-bold tracking-tight text-ink">
@@ -233,9 +231,12 @@ export const ConditionControl: FC<{
         const isSelected = value === opt.key;
         let activeStyles = 'text-ink-2 hover:bg-muted';
         if (isSelected) {
-          if (opt.tone === 'ok') activeStyles = 'bg-ok-soft text-ok border-ok border-[1.5px] font-semibold';
-          else if (opt.tone === 'warn') activeStyles = 'bg-warn-soft text-warn border-warn border-[1.5px] font-semibold';
-          else if (opt.tone === 'bad') activeStyles = 'bg-bad-soft text-bad border-bad border-[1.5px] font-semibold';
+          if (opt.tone === 'ok')
+            activeStyles = 'bg-ok-soft text-ok border-ok border-[1.5px] font-semibold';
+          else if (opt.tone === 'warn')
+            activeStyles = 'bg-warn-soft text-warn border-warn border-[1.5px] font-semibold';
+          else if (opt.tone === 'bad')
+            activeStyles = 'bg-bad-soft text-bad border-bad border-[1.5px] font-semibold';
         }
 
         return (
@@ -284,11 +285,7 @@ export const Toggle48: FC<{
       </div>
       <span className="type-label-m text-ink">{label}</span>
     </div>
-    {sub && (
-      <span className="type-mono-caption truncate pl-3 text-right text-ink-3">
-        {sub}
-      </span>
-    )}
+    {sub && <span className="type-mono-caption truncate pl-3 text-right text-ink-3">{sub}</span>}
   </button>
 );
 

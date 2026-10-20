@@ -1,6 +1,15 @@
 import { useMemo, useState } from 'react';
 import { message, Select, Spin } from 'antd';
-import { Button, Callout, Chip, Icon, OwedItem, Panel, RouteStrip, type RouteStripStop } from '@/components/ui';
+import {
+  Button,
+  Callout,
+  Chip,
+  Icon,
+  OwedItem,
+  Panel,
+  RouteStrip,
+  type RouteStripStop,
+} from '@/components/ui';
 import { useTrip, useTrips } from '@/hooks/trip';
 import { TripStatusEnum } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
@@ -74,16 +83,29 @@ export function CustomerTripView() {
   const stageSteps = [
     { name: 'Request', detail: 'Submitted. Feasibility checked.', state: 'done' as const },
     { name: 'Quotation', detail: 'Quotation accepted; deposit confirmed.', state: 'done' as const },
-    { name: 'Approval', detail: `Approved as ${trip?.jobCode || 'CBRT-2026-041'}.`, state: 'done' as const },
-    { name: 'Documents', detail: 'Clearance documents uploaded and checked.', state: 'done' as const },
-    { name: 'Clearance', detail: 'Quarantine and border clearances ready.', state: 'done' as const },
+    {
+      name: 'Approval',
+      detail: `Approved as ${trip?.jobCode || 'CBRT-2026-041'}.`,
+      state: 'done' as const,
+    },
+    {
+      name: 'Documents',
+      detail: 'Clearance documents uploaded and checked.',
+      state: 'done' as const,
+    },
+    {
+      name: 'Clearance',
+      detail: 'Quarantine and border clearances ready.',
+      state: 'done' as const,
+    },
     {
       name: 'Trip',
       detail:
         trip?.tripStatus === TripStatusEnum.DELIVERED
           ? 'Horses delivered and handed over.'
           : 'On the road with driver and grooms.',
-      state: trip?.tripStatus === TripStatusEnum.DELIVERED ? ('done' as const) : ('current' as const),
+      state:
+        trip?.tripStatus === TripStatusEnum.DELIVERED ? ('done' as const) : ('current' as const),
     },
     {
       name: 'Handover',
@@ -91,7 +113,10 @@ export function CustomerTripView() {
         trip?.tripStatus === TripStatusEnum.DELIVERED
           ? 'Confirm condition within 2 days.'
           : 'Confirm handover and condition on arrival.',
-      state: trip?.tripStatus === TripStatusEnum.DELIVERED ? ('current' as const) : ('upcoming' as const),
+      state:
+        trip?.tripStatus === TripStatusEnum.DELIVERED
+          ? ('current' as const)
+          : ('upcoming' as const),
     },
   ];
 
@@ -104,7 +129,8 @@ export function CustomerTripView() {
         <div>
           <h1 className="type-display-m m-0 text-ink">Trip tracking</h1>
           <p className="type-body-s m-0 text-ink-3">
-            Positions come from checkpoints recorded by escort staff. Between checkpoints you see the last confirmed one.
+            Positions come from checkpoints recorded by escort staff. Between checkpoints you see
+            the last confirmed one.
           </p>
         </div>
 
@@ -156,7 +182,9 @@ export function CustomerTripView() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => messageApi.success('Handover accepted and confirmed. Thank you!')}
+                      onClick={() =>
+                        messageApi.success('Handover accepted and confirmed. Thank you!')
+                      }
                     >
                       Confirm handover
                     </Button>
@@ -200,7 +228,8 @@ export function CustomerTripView() {
             }
           >
             <p className="type-body-s m-0 mb-4 text-ink-3">
-              Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.
+              Positions come from checkpoints the escort records. Between checkpoints we show the
+              last confirmed one, never a guess.
             </p>
             <RouteStrip stops={routeStripStops} gate="clear" />
           </Panel>
@@ -225,8 +254,16 @@ export function CustomerTripView() {
                         <strong className="type-label-m text-ink">{s.name}</strong>
                         <span className="type-body-s text-ink-3">{s.detail}</span>
                       </div>
-                      <Chip tone={s.state === 'done' ? 'ok' : s.state === 'current' ? 'info' : 'neutral'}>
-                        {s.state === 'done' ? 'Done' : s.state === 'current' ? 'Current' : 'Upcoming'}
+                      <Chip
+                        tone={
+                          s.state === 'done' ? 'ok' : s.state === 'current' ? 'info' : 'neutral'
+                        }
+                      >
+                        {s.state === 'done'
+                          ? 'Done'
+                          : s.state === 'current'
+                            ? 'Current'
+                            : 'Upcoming'}
                       </Chip>
                     </div>
                   ))}

@@ -95,7 +95,9 @@ export function EscortCabSurface() {
   const [horseConditions, setHorseConditions] = useState<Record<string, HorseObservation>>({});
 
   // Handover form state
-  const [arrivalConditions, setArrivalConditions] = useState<Record<string, { condition: ConditionPick; note: string }>>({});
+  const [arrivalConditions, setArrivalConditions] = useState<
+    Record<string, { condition: ConditionPick; note: string }>
+  >({});
   const [handoverChecks, setHandoverChecks] = useState<Record<string, boolean>>({
     horses: true,
     passports: true,
@@ -140,7 +142,10 @@ export function EscortCabSurface() {
     // Auto-detect mode if trip is HELD
     if (trip.tripStatus === TripStatusEnum.HELD) {
       setMode('HELD');
-    } else if (trip.tripStatus === TripStatusEnum.ARRIVED || trip.tripStatus === TripStatusEnum.DELIVERED) {
+    } else if (
+      trip.tripStatus === TripStatusEnum.ARRIVED ||
+      trip.tripStatus === TripStatusEnum.DELIVERED
+    ) {
       setMode('DELIVERY');
     }
   }, [trip]);
@@ -200,9 +205,7 @@ export function EscortCabSurface() {
 
     return trip.stops.map((stop) => {
       const isPast = Boolean(stop.latestOccurredAt);
-      const isCurrent =
-        !isPast &&
-        trip.stops.find((s) => !s.latestOccurredAt)?.id === stop.id;
+      const isCurrent = !isPast && trip.stops.find((s) => !s.latestOccurredAt)?.id === stop.id;
       const isHeld = isCurrent && trip.tripStatus === TripStatusEnum.HELD;
 
       let state: CabStripStop['state'] = 'upcoming';
@@ -297,7 +300,9 @@ export function EscortCabSurface() {
         kind,
         occurredAt: new Date().toISOString(),
         clientRef: crypto.randomUUID(),
-        text: checkpointNote || (checkpointOutcome === 'HELD' ? 'Held at checkpoint.' : 'Cleared checkpoint.'),
+        text:
+          checkpointNote ||
+          (checkpointOutcome === 'HELD' ? 'Held at checkpoint.' : 'Cleared checkpoint.'),
       });
       messageApi.success(
         checkpointOutcome === 'HELD'
@@ -473,7 +478,10 @@ export function EscortCabSurface() {
     return {
       summary: 'Waiting for Yến’s decision',
       sub: 'Nothing to record until she decides; any water or checks you log go on the trip record.',
-      secondary: { label: 'Call Yến', onClick: () => messageApi.info('Calling operations desk: +84 28 0000 0000') },
+      secondary: {
+        label: 'Call Yến',
+        onClick: () => messageApi.info('Calling operations desk: +84 28 0000 0000'),
+      },
     };
   }, [
     mode,
@@ -508,11 +516,7 @@ export function EscortCabSurface() {
                 ? 'Clear to depart'
                 : 'Departure locked',
           tone:
-            trip?.tripStatus === TripStatusEnum.HELD
-              ? 'bad'
-              : trip?.clearanceReady
-                ? 'ok'
-                : 'bad',
+            trip?.tripStatus === TripStatusEnum.HELD ? 'bad' : trip?.clearanceReady ? 'ok' : 'bad',
         }}
         synced={!mutation.isPending}
         syncLabel={mutation.isPending ? 'Sending record…' : 'All records sent'}
@@ -556,7 +560,8 @@ export function EscortCabSurface() {
         {/* Clearance Hard Gate Warning */}
         {trip && !trip.clearanceReady && (
           <Callout tone="bad" title="Departure locked">
-            Departure cannot be recorded until the transport specialist marks the dossier as CLEARANCE_READY.
+            Departure cannot be recorded until the transport specialist marks the dossier as
+            CLEARANCE_READY.
           </Callout>
         )}
 
@@ -725,12 +730,14 @@ export function EscortCabSurface() {
 
                 {/* Horses on Board */}
                 <div className="divide-y divide-line p-6 flex flex-col gap-6">
-                  {(trip?.horses || [
-                    { id: 'h1', name: 'Shadowfax', stall: 'Stall 1 · standard' },
-                    { id: 'h2', name: 'Nightfall', stall: 'Stall 4 · climate' },
-                    { id: 'h3', name: 'Copper King', stall: 'Stall 2 · box' },
-                    { id: 'h4', name: 'Silver Bell', stall: 'Stall 6 · standard' },
-                  ]).map((horse) => {
+                  {(
+                    trip?.horses || [
+                      { id: 'h1', name: 'Shadowfax', stall: 'Stall 1 · standard' },
+                      { id: 'h2', name: 'Nightfall', stall: 'Stall 4 · climate' },
+                      { id: 'h3', name: 'Copper King', stall: 'Stall 2 · box' },
+                      { id: 'h4', name: 'Silver Bell', stall: 'Stall 6 · standard' },
+                    ]
+                  ).map((horse) => {
                     const obs = horseConditions[horse.id] ?? {
                       condition: 'SOUND',
                       drinking: true,
@@ -843,12 +850,14 @@ export function EscortCabSurface() {
                   {/* Arrival condition rows */}
                   <div className="flex flex-col gap-3">
                     <span className="type-label-m text-ink-2">Arrival condition</span>
-                    {(trip?.horses || [
-                      { id: 'h1', name: 'Shadowfax', stall: 'Stall 1 · standard' },
-                      { id: 'h2', name: 'Nightfall', stall: 'Stall 4 · climate' },
-                      { id: 'h3', name: 'Copper King', stall: 'Stall 2 · box' },
-                      { id: 'h4', name: 'Silver Bell', stall: 'Stall 6 · standard' },
-                    ]).map((h) => {
+                    {(
+                      trip?.horses || [
+                        { id: 'h1', name: 'Shadowfax', stall: 'Stall 1 · standard' },
+                        { id: 'h2', name: 'Nightfall', stall: 'Stall 4 · climate' },
+                        { id: 'h3', name: 'Copper King', stall: 'Stall 2 · box' },
+                        { id: 'h4', name: 'Silver Bell', stall: 'Stall 6 · standard' },
+                      ]
+                    ).map((h) => {
                       const arr = arrivalConditions[h.id] ?? {
                         condition: 'SOUND',
                         note: 'Sound on arrival.',
@@ -957,7 +966,8 @@ export function EscortCabSurface() {
 
                 <div className="flex flex-col gap-5 p-6">
                   <Callout tone="info" title="Yến was alerted at 08:12 and is deciding">
-                    She’ll choose between waiting, re-routing via Xa Mát or returning, and call you. Stay in the exit lane. Unload only if horses need it.
+                    She’ll choose between waiting, re-routing via Xa Mát or returning, and call you.
+                    Stay in the exit lane. Unload only if horses need it.
                   </Callout>
 
                   {/* On trailer clock */}
@@ -997,9 +1007,12 @@ export function EscortCabSurface() {
                   <div className="rounded-lg border border-line bg-raised p-4">
                     <strong className="type-label-s text-ink-3">What you recorded</strong>
                     <blockquote className="type-body-m my-1.5 text-ink italic">
-                      “Mộc Bài is closed to vehicles over 10 t until 16:00 for a bridge inspection. We are parked in the Bavet exit lane. Horses are settled.”
+                      “Mộc Bài is closed to vehicles over 10 t until 16:00 for a bridge inspection.
+                      We are parked in the Bavet exit lane. Horses are settled.”
                     </blockquote>
-                    <span className="type-mono-caption text-ink-3">08:12 · Minh, driver · sent</span>
+                    <span className="type-mono-caption text-ink-3">
+                      08:12 · Minh, driver · sent
+                    </span>
                   </div>
                 </div>
               </section>
@@ -1016,12 +1029,14 @@ export function EscortCabSurface() {
             />
 
             <OnBoardPanel
-              horses={trip?.horses || [
-                { name: 'Shadowfax', stall: 'Stall 1 · standard' },
-                { name: 'Nightfall', stall: 'Stall 4 · climate' },
-                { name: 'Copper King', stall: 'Stall 2 · box' },
-                { name: 'Silver Bell', stall: 'Stall 6 · standard' },
-              ]}
+              horses={
+                trip?.horses || [
+                  { name: 'Shadowfax', stall: 'Stall 1 · standard' },
+                  { name: 'Nightfall', stall: 'Stall 4 · climate' },
+                  { name: 'Copper King', stall: 'Stall 2 · box' },
+                  { name: 'Silver Bell', stall: 'Stall 6 · standard' },
+                ]
+              }
             />
 
             <CustomerSeesPanel

@@ -124,7 +124,8 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
       {/* Clearance Gate Notice if Locked */}
       {!trip.clearanceReady && (
         <Callout tone="bad" title="Departure locked">
-          Departure cannot be recorded until clearance is marked CLEARANCE_READY by the transport specialist.
+          Departure cannot be recorded until clearance is marked CLEARANCE_READY by the transport
+          specialist.
         </Callout>
       )}
 
@@ -237,7 +238,16 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
                         </div>
                       ) : isNext ? (
                         <span className="type-body-s text-info">
-                          Expected in {nextStop?.plannedAt ? durText(Math.max(toMin(formatTimeOnly(nextStop.plannedAt)) - toMin(formatTimeOnly(new Date().toISOString())), 0)) : 'plan'}
+                          Expected in{' '}
+                          {nextStop?.plannedAt
+                            ? durText(
+                                Math.max(
+                                  toMin(formatTimeOnly(nextStop.plannedAt)) -
+                                    toMin(formatTimeOnly(new Date().toISOString())),
+                                  0,
+                                ),
+                              )
+                            : 'plan'}
                         </span>
                       ) : (
                         <span className="type-body-s text-ink-3">Planned</span>
@@ -385,9 +395,7 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
               </div>
               <div className="flex justify-between py-1.5 border-b border-line">
                 <span className="type-body-s text-ink-3">Grooms</span>
-                <span className="type-body-s text-ink font-medium">
-                  Lê Thị Hoa, Phạm Quốc Tuấn
-                </span>
+                <span className="type-body-s text-ink font-medium">Lê Thị Hoa, Phạm Quốc Tuấn</span>
               </div>
               <div className="flex justify-between py-1.5">
                 <span className="type-body-s text-ink-3">Records</span>
@@ -410,7 +418,8 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
           {/* If the Trip Stops Panel */}
           <Panel title="If the trip stops">
             <p className="type-body-s m-0 mb-3 text-ink-2">
-              A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the customer. Raise one yourself for anything the cab can’t record.
+              A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the
+              customer. Raise one yourself for anything the cab can’t record.
             </p>
             <Button
               variant="secondary"
