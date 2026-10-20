@@ -11,3 +11,4 @@ export * from './note';
 export * from './audit';
 export * from './horse';
 export * from './request';
+export * from './staffRequest';

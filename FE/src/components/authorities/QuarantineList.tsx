@@ -11,7 +11,8 @@ type Props = {
   jobId: string | null;
   quarantines: QuarantinePeriod[];
   loading: boolean;
-  onSchedule: () => void;
+  /** Absent for a read-only viewer, who can neither schedule nor sign off a quarantine. */
+  onSchedule?: () => void;
   /** The pinned destination catalog and its minimum stay; both absent before the job is approved. */
   minDays?: number;
   destination?: string;
@@ -50,9 +51,11 @@ const QuarantineList: FC<Props> = ({
               : 'The destination’s minimum stay applies once the job is pinned to its regulation catalog.'}
           </p>
         </div>
-        <Button variant="secondary" size="sm" leadingIcon="plus" onClick={onSchedule}>
-          Schedule quarantine
-        </Button>
+        {onSchedule && (
+          <Button variant="secondary" size="sm" leadingIcon="plus" onClick={onSchedule}>
+            Schedule quarantine
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -65,9 +68,11 @@ const QuarantineList: FC<Props> = ({
           <p className="type-body-s mb-3 text-ink-2">
             No quarantine periods scheduled for this job.
           </p>
-          <Button variant="secondary" size="sm" onClick={onSchedule}>
-            Schedule quarantine now
-          </Button>
+          {onSchedule && (
+            <Button variant="secondary" size="sm" onClick={onSchedule}>
+              Schedule quarantine now
+            </Button>
+          )}
         </Panel>
       ) : (
         <div className="flex flex-col gap-4">
@@ -100,7 +105,7 @@ const QuarantineList: FC<Props> = ({
                     <span className="type-body-s text-ink-3">
                       The station veterinarian signs off before the horses leave.
                     </span>
-                    {!q.isCompleted && (
+                    {!q.isCompleted && onSchedule && (
                       <Popconfirm
                         title="Confirm quarantine completion?"
                         description="Has the station veterinarian inspected the horses and certified them fit for transit?"

@@ -143,6 +143,15 @@ export const routesConfig = [
         type: 'authenticated',
         breadcrumb: 'Requests',
         name: 'requests',
+        children: [
+          {
+            path: '/{id}',
+            roles: [LM],
+            type: 'authenticated',
+            breadcrumb: 'Request review',
+            name: 'request-review',
+          },
+        ],
       },
       {
         path: '/incidents',

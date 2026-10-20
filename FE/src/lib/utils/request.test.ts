@@ -2,6 +2,11 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   alsoByLine,
+  editable,
+  passChip,
+  savedLine,
+  submitLabel,
+  versionLine,
   blockerFieldErrors,
   bordersSummary,
   EMPTY_WIZARD,
@@ -80,6 +85,8 @@ const draft = (over: Partial<TransportRequest> = {}): TransportRequest => ({
   route: null,
   leadTime: null,
   blockers: [],
+  infoRequiredNote: null,
+  revisions: [],
   ...over,
 });
 
@@ -635,5 +642,81 @@ describe('small rules', () => {
     expect(list.map((x) => x.id)).toEqual(['h1', 'h9']);
     expect(list[0]).toMatchObject({ horse: { id: 'h1' }, draft: { horseId: 'h1' } });
     expect(list[1]).toMatchObject({ horse: null, draft: { archived: true } });
+  });
+});
+
+describe('versions of a returned request', () => {
+  const v1 = {
+    revisionNo: 1,
+    submittedAt: '2026-09-26T02:14:00Z',
+    note: 'Which stable?',
+    returnedAt: '2026-09-28T02:41:00Z',
+  };
+  const returned = draft({
+    status: 'INFO_REQUIRED',
+    code: 'REQ-2026-0195',
+    updatedAt: '2026-10-18T03:00:00Z',
+    infoRequiredNote: 'Which stable?',
+    revisions: [v1],
+  });
+
+  test('a draft and a returned request can be edited; nothing else can', () => {
+    expect(editable('DRAFT')).toBe(true);
+    expect(editable('INFO_REQUIRED')).toBe(true);
+    expect(editable('SUBMITTED')).toBe(false);
+    expect(editable('QUOTED')).toBe(false);
+  });
+
+  test('a version line says when it was sent and when it came back', () => {
+    expect(versionLine(v1)).toBe('v1 · Submitted 26 Sep · returned 28 Sep');
+    expect(
+      versionLine({
+        revisionNo: 2,
+        submittedAt: '2026-09-30T04:00:00Z',
+        note: null,
+        returnedAt: null,
+      }),
+    ).toBe('v2 · Submitted 30 Sep');
+  });
+
+  test('a version line shows the ICT day: 18:30 UTC is already the next day', () => {
+    expect(
+      versionLine({
+        revisionNo: 1,
+        submittedAt: '2026-09-29T18:30:00Z',
+        note: 'Which?',
+        returnedAt: '2026-09-30T17:30:00Z',
+      }),
+    ).toBe('v1 · Submitted 30 Sep · returned 1 Oct');
+  });
+
+  test('the submit button names the version it sends', () => {
+    expect(submitLabel(draft())).toBe('Submit request');
+    expect(submitLabel(returned)).toBe('Send version 2');
+  });
+
+  test('the saved line says where the changes go', () => {
+    expect(savedLine(draft({ updatedAt: '2026-10-18T03:00:00Z' }))).toBe(
+      'Draft saved 18 Oct 2026.',
+    );
+    expect(savedLine(returned)).toBe(
+      'Changes saved 18 Oct 2026. Send them as version 2 from Review.',
+    );
+  });
+
+  test('the return itself is not a saved change', () => {
+    // The return bumps updatedAt a few milliseconds after the audit row that dates it.
+    const justReturned = { ...returned, updatedAt: '2026-09-28T02:41:00.004Z' };
+    expect(savedLine(justReturned)).toBe(
+      'Returned 28 Sep 2026. Send your answer as version 2 from Review.',
+    );
+  });
+});
+
+describe("the pass's chip", () => {
+  test('a returned request needs an answer; a draft and a submitted one say so', () => {
+    expect(passChip('INFO_REQUIRED')).toEqual({ tone: 'warn', label: 'Needs your answer' });
+    expect(passChip('DRAFT')).toEqual({ tone: 'neutral', label: 'Draft' });
+    expect(passChip('SUBMITTED')).toEqual({ tone: 'neutral', label: 'Submitted' });
   });
 });

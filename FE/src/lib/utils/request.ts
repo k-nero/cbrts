@@ -1,5 +1,5 @@
 import { formatDay } from './horse';
-import { ict } from './time';
+import { formatDate, ict } from './time';
 
 import type { Tone } from '@/components/ui/tone';
 import type {
@@ -11,6 +11,7 @@ import type {
   RequestDraftInput,
   RequestHorse,
   RequestStatus,
+  RevisionSummary,
   Route,
   ServiceClass,
   TrailerType,
@@ -376,7 +377,7 @@ export type PassRow = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "5 Oct", from YYYY-MM-DD without shifting the day. */
-const shortDay = (day: string): string => {
+export const shortDay = (day: string): string => {
   const [, m, d] = day.split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
 };
@@ -397,10 +398,23 @@ const serviceWords = (
   trailer: TrailerType | null,
   airClass: ServiceClass | null,
 ): string | null => {
-  if (mode === 'ROAD') return trailer ? `Road · ${TRAILER_WORDS[trailer]}` : 'Road';
-  if (mode === 'AIR') return airClass ? `Air · ${CLASS_WORDS[airClass]}` : 'Air';
-  return null;
+  if (!mode) return null;
+  const parts = serviceParts(mode, trailer, airClass);
+  return parts.detail ? `${parts.mode} · ${parts.detail}` : parts.mode;
 };
+
+/**
+ * The service as its words, `{ mode: 'Road', detail: 'shared load' }`, for a line that joins them
+ * its own way.
+ */
+export const serviceParts = (
+  mode: TransportMode,
+  trailer: TrailerType | null,
+  airClass: ServiceClass | null,
+): { mode: string; detail: string | null } =>
+  mode === 'AIR'
+    ? { mode: 'Air', detail: airClass ? CLASS_WORDS[airClass] : null }
+    : { mode: 'Road', detail: trailer ? TRAILER_WORDS[trailer] : null };
 
 /** A window always books road and a private trailer (toDraftInput sends them). */
 const effectiveService = (v: WizardValues) =>
@@ -562,3 +576,47 @@ export const pickableHorses = (
     if (!shown.has(h.horseId)) rows.push({ id: h.horseId, horse: null, draft: h });
   return rows;
 };
+
+/** A customer may change a draft, and a request returned for information (US-F1-04). */
+export const editable = (status: RequestStatus): boolean =>
+  status === 'DRAFT' || status === 'INFO_REQUIRED';
+
+/** The latest submitted version; 0 for a draft. */
+export const latestRevision = (r: TransportRequest): number =>
+  r.revisions.reduce((n, v) => Math.max(n, v.revisionNo), 0);
+
+/** "v1 · Submitted 26 Sep · returned 28 Sep", or "v2 · Submitted 30 Sep". */
+export const versionLine = (v: RevisionSummary): string =>
+  `v${v.revisionNo} · Submitted ${ict(v.submittedAt).format('D MMM')}` +
+  (v.returnedAt ? ` · returned ${ict(v.returnedAt).format('D MMM')}` : '');
+
+/** Review's primary: "Submit request", or "Send version 2" for a returned request. */
+export const submitLabel = (r: TransportRequest): string =>
+  r.status === 'INFO_REQUIRED' ? `Send version ${latestRevision(r) + 1}` : 'Submit request';
+
+/**
+ * The return itself bumps `updatedAt` a moment after the audit row that dates it, so a save counts as the
+ * customer's only when it lands well after the return.
+ */
+const RETURN_SAVE_SLACK_MS = 5_000;
+
+/** The wizard header's first sentence. */
+export const savedLine = (r: TransportRequest): string => {
+  if (r.status !== 'INFO_REQUIRED') return `Draft saved ${formatDate(r.updatedAt)}.`;
+  const next = latestRevision(r) + 1;
+  const returnedAt = r.revisions.findLast((v) => v.returnedAt)?.returnedAt;
+  if (
+    returnedAt &&
+    new Date(r.updatedAt).getTime() - new Date(returnedAt).getTime() <= RETURN_SAVE_SLACK_MS
+  )
+    return `Returned ${formatDate(returnedAt)}. Send your answer as version ${next} from Review.`;
+  return `Changes saved ${formatDate(r.updatedAt)}. Send them as version ${next} from Review.`;
+};
+
+/** The draft pass's chip: a returned request is waiting on the customer (spec §6.2, §6.3). */
+export const passChip = (status: RequestStatus): { tone: Tone; label: string } =>
+  status === 'INFO_REQUIRED'
+    ? { tone: 'warn', label: 'Needs your answer' }
+    : status === 'DRAFT'
+      ? { tone: 'neutral', label: 'Draft' }
+      : { tone: 'neutral', label: 'Submitted' };

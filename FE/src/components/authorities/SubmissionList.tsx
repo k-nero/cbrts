@@ -8,8 +8,9 @@ import SubmissionCard from './SubmissionCard';
 type Props = {
   submissions: AuthoritySubmission[];
   loading: boolean;
-  onRecord: () => void;
-  onUpdate: (submission: AuthoritySubmission) => void;
+  /** Absent for a read-only viewer, who gets no Record or Update buttons. */
+  onRecord?: () => void;
+  onUpdate?: (submission: AuthoritySubmission) => void;
 };
 
 /** The "Authority Dossiers" section: one card per authority filing for the job. */
@@ -36,13 +37,21 @@ const SubmissionList: FC<Props> = ({ submissions, loading, onRecord, onUpdate })
       <Panel className="py-12 text-center">
         <BankOutlined className="mb-3 text-4xl text-ink-3" />
         <h3 className="type-label-m mb-1 text-ink">No authority dossiers found for this job</h3>
-        <p className="type-body-s mb-4 text-ink-2">
-          Click &quot;Record submission&quot; to log a filing with Veterinary, Customs, or
-          Quarantine authorities.
-        </p>
-        <Button variant="primary" size="sm" onClick={onRecord}>
-          Record submission
-        </Button>
+        {onRecord ? (
+          <>
+            <p className="type-body-s mb-4 text-ink-2">
+              Click &quot;Record submission&quot; to log a filing with Veterinary, Customs, or
+              Quarantine authorities.
+            </p>
+            <Button variant="primary" size="sm" onClick={onRecord}>
+              Record submission
+            </Button>
+          </>
+        ) : (
+          <p className="type-body-s m-0 text-ink-2">
+            The transport specialist hasn&apos;t filed with any authority yet.
+          </p>
+        )}
       </Panel>
     ) : (
       <div className="flex flex-col gap-4">

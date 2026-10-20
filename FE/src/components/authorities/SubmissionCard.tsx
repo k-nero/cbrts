@@ -8,7 +8,8 @@ import { AUTHORITY_KIND_LABELS, SUBMISSION_KIND_LABELS, SUBMISSION_STATUS_CHIPS 
 /** One authority's dossier: who, what, its SLA date, the filing facts and the next step. */
 const SubmissionCard: FC<{
   submission: AuthoritySubmission;
-  onUpdate: (submission: AuthoritySubmission) => void;
+  /** Absent for a read-only viewer. */
+  onUpdate?: (submission: AuthoritySubmission) => void;
 }> = ({ submission: sub, onUpdate }) => {
   const isOverdue =
     sub.isOverdue ||
@@ -111,9 +112,11 @@ const SubmissionCard: FC<{
               ? 'Dossier approved and archived in the clearance gate.'
               : 'Contact office liaison if additional documents or laboratory tests are requested.'}
         </span>
-        <Button variant="secondary" size="sm" onClick={() => onUpdate(sub)}>
-          Update decision
-        </Button>
+        {onUpdate && (
+          <Button variant="secondary" size="sm" onClick={() => onUpdate(sub)}>
+            Update decision
+          </Button>
+        )}
       </div>
     </div>
   );
