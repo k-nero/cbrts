@@ -19,4 +19,5 @@ public record TripRecordResponse(
         String recordedBy,
         Channel channel,
         String text,
-        List<TripConditionResponse> conditions) {}
+        List<TripConditionResponse> conditions,
+        List<UUID> documentsShown) {}

@@ -231,6 +231,20 @@ function TripRecords({ trip }: { trip: TripView }) {
                 <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
               </div>
               {record.text && <p className="type-body-s mb-2 mt-1 text-ink-2">{record.text}</p>}
+              {record.documentsShown.length > 0 && (
+                <p className="type-body-s mb-2 mt-1 text-ink-2">
+                  Documents shown:{' '}
+                  {record.documentsShown
+                    .map(
+                      (id) =>
+                        trip.stops
+                          .flatMap((stop) => stop.borderDocuments)
+                          .find((document) => document.id === id)?.label,
+                    )
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+              )}
               {record.conditions.map((condition) => (
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -790,6 +804,20 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
               </p>
             )}
           </Panel>
+          <Panel title="If the trip stops">
+            <Callout
+              tone={trip.tripStatus === TripStatusEnum.HELD ? 'bad' : 'info'}
+              title={
+                trip.tripStatus === TripStatusEnum.HELD
+                  ? 'Trip is held'
+                  : 'Record a hold from the cab'
+              }
+            >
+              The escort records the stop and reason in the cab. That hold stays in the journey log
+              and customer tracking until the trip resumes. The logistics manager owns incident
+              follow-up.
+            </Callout>
+          </Panel>
         </div>
       </div>
     </div>
@@ -1030,6 +1058,7 @@ function TripWorkspace({
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [stopId, setStopId] = useState<string>();
+  const [documentsShown, setDocumentsShown] = useState<string[]>([]);
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
   const occurredAtEdited = useRef(false);
   const [text, setText] = useState('');
@@ -1114,10 +1143,12 @@ function TripWorkspace({
         occurredAt: occurredAtForSave(),
         clientRef,
         text: text || undefined,
+        documentsShown,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
+      setDocumentsShown([]);
       refreshRecordTime();
     } catch (error) {
       messageApi.error(errorMessage(error));
@@ -1293,6 +1324,7 @@ function TripWorkspace({
   useEffect(() => {
     occurredAtEdited.current = false;
     setOccurredAt(datetimeLocal());
+    setDocumentsShown([]);
   }, [audience, selectedCode, taskMode, selectedStop?.id]);
   const currentLog = trip ? lastRecord(trip) : undefined;
   const conditionLog = trip ? lastConditionRecord(trip) : undefined;
@@ -1574,6 +1606,40 @@ function TripWorkspace({
                               />
                             </label>
                           )}
+                          {selectedStop?.kind === 'BORDER' &&
+                            selectedStop.borderDocuments.length > 0 && (
+                              <fieldset className="flex flex-col gap-3 border-0 p-0 md:col-span-2">
+                                <legend className="type-body-s mb-2 text-ink-2">
+                                  Documents shown at this border
+                                </legend>
+                                <div className="grid gap-2 md:grid-cols-2">
+                                  {selectedStop.borderDocuments.map((document) => (
+                                    <div
+                                      key={document.id}
+                                      className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-line bg-raised px-4 py-3"
+                                    >
+                                      <Checkbox
+                                        checked={documentsShown.includes(document.id)}
+                                      disabled={mutation.isPending}
+                                        onChange={(event) =>
+                                          setDocumentsShown((current) =>
+                                            event.target.checked
+                                              ? [...current, document.id]
+                                              : current.filter((id) => id !== document.id),
+                                          )
+                                        }
+                                        label={document.label}
+                                      />
+                                      <span className="type-label-s shrink-0 text-ink-3">
+                                        {document.readyToShow
+                                          ? 'Ready to show'
+                                          : `${sentence(document.status)} · ${sentence(document.validity ?? 'unknown')}`}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </fieldset>
+                            )}
                           <label className="type-body-s flex flex-col gap-2 text-ink-2">
                             Recorded time
                             <input

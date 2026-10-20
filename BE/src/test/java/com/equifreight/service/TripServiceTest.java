@@ -53,6 +53,9 @@ class TripServiceTest {
     private RequestHorseRepository requestHorses;
 
     @Mock
+    private ChecklistItemRepository checklistItems;
+
+    @Mock
     private FileService files;
 
     @Mock
@@ -67,7 +70,7 @@ class TripServiceTest {
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------

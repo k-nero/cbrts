@@ -52,6 +52,7 @@ public class TripService {
     private final RoutePlanRepository routes;
     private final LoadPlanRepository loads;
     private final RequestHorseRepository requestHorses;
+    private final ChecklistItemRepository checklistItems;
     private final FileService files;
     private final AuditLogRepository audit;
 
@@ -62,6 +63,7 @@ public class TripService {
             RoutePlanRepository routes,
             LoadPlanRepository loads,
             RequestHorseRepository requestHorses,
+            ChecklistItemRepository checklistItems,
             FileService files,
             AuditLogRepository audit) {
         this.jobs = jobs;
@@ -70,6 +72,7 @@ public class TripService {
         this.routes = routes;
         this.loads = loads;
         this.requestHorses = requestHorses;
+        this.checklistItems = checklistItems;
         this.files = files;
         this.audit = audit;
     }
@@ -159,6 +162,7 @@ public class TripService {
                     .findFirst()
                     .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
         }
+        List<UUID> documentsShown = validateDocumentsShown(job, stop, request.kind(), request.documentsShown());
         TripRecord record = new TripRecord();
         record.setJob(job);
         record.setRouteStop(stop);
@@ -169,6 +173,7 @@ public class TripService {
         record.setRecordedBy(user);
         record.setChannel(channel);
         record.setText(request.text());
+        record.setDocumentsShown(documentsShown);
         Set<UUID> seen = new HashSet<>();
         Set<UUID> attachedFiles = new HashSet<>();
         if (request.conditions() != null)
@@ -200,6 +205,35 @@ public class TripService {
         if (!late) updateJobStatus(job, request.kind(), request.occurredAt(), stop);
         writeAudit(saved, user, channel, stop);
         return TripMapper.toRecordResponse(saved);
+    }
+
+    private List<UUID> validateDocumentsShown(
+            TransportJob job, RouteStop stop, TripRecordKind kind, List<UUID> documentIds) {
+        if (documentIds == null || documentIds.isEmpty()) return List.of();
+        boolean borderEvent = EnumSet.of(
+                        TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.HELD)
+                .contains(kind);
+        if (stop == null || stop.getKind() != RouteStopKind.BORDER || !borderEvent)
+            throw new BusinessException(
+                    "BORDER_DOCUMENTS_REQUIRE_BORDER_EVENT",
+                    "Documents shown can be recorded only at a border checkpoint");
+        if (documentIds.size() != new HashSet<>(documentIds).size())
+            throw new BusinessException("DUPLICATE_BORDER_DOCUMENT", "A border document can be recorded only once");
+
+        Map<UUID, ChecklistItem> jobItems = new HashMap<>();
+        checklistItems.findByJobId(job.getId()).forEach(item -> jobItems.put(item.getId(), item));
+        UUID crossingId = stop.getBorderCrossing() == null
+                ? null
+                : stop.getBorderCrossing().getId();
+        for (UUID documentId : documentIds) {
+            ChecklistItem item = jobItems.get(documentId);
+            if (item == null
+                    || crossingId == null
+                    || item.getBorderCrossing() == null
+                    || !crossingId.equals(item.getBorderCrossing().getId()))
+                throw ResourceNotFoundException.of("Border document", documentId);
+        }
+        return List.copyOf(documentIds);
     }
 
     /**
@@ -338,6 +372,7 @@ public class TripService {
 
     private TripViewResponse view(TransportJob job) {
         List<TripRecord> tripRecords = records.findByJob_IdOrderByOccurredAtAsc(job.getId());
+        List<ChecklistItem> jobChecklist = checklistItems.findByJobId(job.getId());
         Map<UUID, TripRecord> latest = new HashMap<>();
         tripRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
@@ -345,7 +380,18 @@ public class TripService {
         List<TripStopResponse> stops = routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(
                         job.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
-                        .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
+                        .map(s -> TripMapper.toStopResponse(
+                                s,
+                                latest.get(s.getId()),
+                                s.getBorderCrossing() == null
+                                        ? List.of()
+                                        : jobChecklist.stream()
+                                                .filter(item -> item.getBorderCrossing() != null
+                                                        && item.getBorderCrossing()
+                                                                .getId()
+                                                                .equals(s.getBorderCrossing()
+                                                                        .getId()))
+                                                .toList()))
                         .toList())
                 .orElse(List.of());
         LoadPlan load = loads.findTopByJob_IdAndStatusOrderByConfirmedAtDesc(job.getId(), LoadPlanStatus.CONFIRMED)

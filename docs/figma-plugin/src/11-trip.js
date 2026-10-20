@@ -366,8 +366,7 @@ function scrTripCoordinator() {
   add(crew, btn('Secondary', 'MD', 'Call the cab', { fill: true }));
   var stop = panel('If the trip stops', { gap: 10 });
   addAll(stop, [Tx('If the trip stops', 'Heading/H4'),
-    Tx('A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the customer. Raise one yourself for anything the cab can’t record.', 'Body/S', 'text/secondary', { fill: true }),
-    btn('Secondary', 'MD', 'Raise an incident', { lead: 'alert' })]);
+    Tx('The escort records the stop and reason in the cab. That hold stays in the journey log and customer tracking until the trip resumes. The logistics manager owns incident follow-up.', 'Body/S', 'text/secondary', { fill: true })]);
   /* the table takes the full width; below it, what was recorded and what the customer reads, beside the horses and the crew */
   var left = column([lp, customerSees('Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop, expected 09:30.')]);
   var right = column([board, crew, stop]);

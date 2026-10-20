@@ -1,5 +1,6 @@
 package com.equifreight.model.trip;
 
+import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.ConditionLog;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.LoadPlanStall;
@@ -8,7 +9,9 @@ import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TripRecord;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.Validity;
 import java.util.List;
 import java.util.Locale;
 
@@ -44,7 +47,7 @@ public final class TripMapper {
     }
 
     /** A stop of the confirmed route plan with the latest record made there, or null. */
-    public static TripStopResponse toStopResponse(RouteStop s, TripRecord latest) {
+    public static TripStopResponse toStopResponse(RouteStop s, TripRecord latest, List<ChecklistItem> borderDocuments) {
         return new TripStopResponse(
                 s.getId(),
                 s.getSeq(),
@@ -56,7 +59,21 @@ public final class TripMapper {
                 latest == null ? null : latest.getKind(),
                 latest == null ? null : latest.getOccurredAt(),
                 latest == null ? null : latest.getText(),
-                latest == null ? null : fullName(latest.getRecordedBy()));
+                latest == null ? null : fullName(latest.getRecordedBy()),
+                borderDocuments.stream()
+                        .map(TripMapper::toBorderDocumentResponse)
+                        .toList());
+    }
+
+    public static TripBorderDocumentResponse toBorderDocumentResponse(ChecklistItem item) {
+        String horse = item.getHorse() == null ? null : item.getHorse().getName();
+        String label = item.getDocumentType().getName() + (horse == null ? "" : " · " + horse);
+        return new TripBorderDocumentResponse(
+                item.getId(),
+                label,
+                item.getStatus(),
+                item.getValidity(),
+                item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN);
     }
 
     /** A horse on the trip; {@code stall} is its place on the confirmed load plan, or null. */
@@ -89,7 +106,8 @@ public final class TripMapper {
                 record.getText(),
                 record.getConditionLogs().stream()
                         .map(TripMapper::toConditionResponse)
-                        .toList());
+                        .toList(),
+                record.getDocumentsShown() == null ? List.of() : List.copyOf(record.getDocumentsShown()));
     }
 
     public static TripConditionResponse toConditionResponse(ConditionLog log) {

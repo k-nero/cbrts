@@ -63,6 +63,7 @@ export interface TripRecord {
   channel: 'WEB' | 'CAB_TABLET' | 'SYSTEM';
   text: string | null;
   conditions: TripCondition[];
+  documentsShown: string[];
 }
 export interface TripStop {
   id: string;
@@ -76,6 +77,13 @@ export interface TripStop {
   latestOccurredAt: string | null;
   latestNote: string | null;
   latestRecordedBy: string | null;
+  borderDocuments: Array<{
+    id: string;
+    label: string;
+    status: string;
+    validity: string | null;
+    readyToShow: boolean;
+  }>;
 }
 export interface TripHorse {
   id: string;
@@ -117,6 +125,7 @@ export interface TripRecordInput {
   occurredAt: string;
   clientRef: string;
   text?: string;
+  documentsShown?: string[];
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;

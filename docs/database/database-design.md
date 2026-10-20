@@ -521,6 +521,7 @@ erDiagram
 | `recorded_by` | → `users` | Driver or groom. |
 | `channel` | varchar(12) | `CAB_TABLET`, `WEB`. |
 | `text` | varchar(500) | "Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet." |
+| `documents_shown` | jsonb not null default `[]` | Checklist item IDs presented at this border checkpoint; kept with the append-only event. |
 
 Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
 
