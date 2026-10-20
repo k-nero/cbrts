@@ -1,15 +1,19 @@
 import { formatDay } from './horse';
-import { ict } from './time';
-import { CLASS_WORDS, reviewRows, shortDay, TRAILER_WORDS } from './request';
+import { reviewRows, serviceParts, shortDay } from './request';
 
 import type { Tone } from '@/components/ui/tone';
 import type {
   QueuePosition,
   QueueRow,
   RequestReview,
+  RequestStatus,
   ReviewCheck,
   TransportRequest,
 } from '@/interfaces';
+
+/** Waiting on the manager: the only statuses the checks and the decision apply to. */
+export const inReview = (status: RequestStatus): boolean =>
+  status === 'SUBMITTED' || status === 'UNDER_REVIEW';
 
 /** request_revisions.note holds 500 characters (spec §4.2). */
 export const NOTE_MAX = 500;
@@ -44,10 +48,9 @@ export const checkTone = (state: ReviewCheck['state']): Tone => (state === 'OK' 
 /** "Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d". */
 export const reviewSummary = (r: TransportRequest & { club: string }): string => {
   const n = r.horses.length;
-  const service =
-    r.mode === 'AIR'
-      ? `air${r.airClass ? `, ${CLASS_WORDS[r.airClass]}` : ''}`
-      : `road${r.trailer ? `, ${TRAILER_WORDS[r.trailer]}` : ''}`;
+  // The line already runs on "·", so the service joins its words with a comma: "road, shared load".
+  const parts = serviceParts(r.mode ?? 'ROAD', r.trailer, r.airClass);
+  const service = `${parts.mode.toLowerCase()}${parts.detail ? `, ${parts.detail}` : ''}`;
   const departs = r.departureDate
     ? ` · departs ${formatDay(r.departureDate)}${r.dateFlexDays === 3 ? ' ±3 d' : ''}`
     : '';
@@ -107,9 +110,6 @@ export const noteState = (note: string): { length: number; ok: boolean; count: s
   const length = note.trim().length;
   return { length, ok: length > 0 && length <= NOTE_MAX, count: `${length} / ${NOTE_MAX}` };
 };
-
-/** "30 Sep · 01:30": when a history line happened, in ICT. */
-export const historyWhen = (iso: string): string => ict(iso).format('D MMM · HH:mm');
 
 /**
  * What the review header describes: the latest version the customer sent, so a returned request's unsent

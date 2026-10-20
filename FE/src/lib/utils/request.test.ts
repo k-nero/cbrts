@@ -703,6 +703,14 @@ describe('versions of a returned request', () => {
       'Changes saved 18 Oct 2026. Send them as version 2 from Review.',
     );
   });
+
+  test('the return itself is not a saved change', () => {
+    // The return bumps updatedAt a few milliseconds after the audit row that dates it.
+    const justReturned = { ...returned, updatedAt: '2026-09-28T02:41:00.004Z' };
+    expect(savedLine(justReturned)).toBe(
+      'Returned 28 Sep 2026. Send your answer as version 2 from Review.',
+    );
+  });
 });
 
 describe("the pass's chip", () => {

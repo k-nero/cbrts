@@ -3,23 +3,30 @@ import { type FC, useState } from 'react';
 import { RequestSummary } from '@/components/request/RequestSummary';
 import { Chip, Panel, Tabs } from '@/components/ui';
 import type { HistoryEntry, ReviewCheck, ReviewRevision } from '@/interfaces';
-import {
-  asSent,
-  changedRows,
-  checkTally,
-  checkTone,
-  formatDayTime,
-  historyWhen,
-  reviewRows,
-} from '@/lib/utils';
+import { asSent, changedRows, checkTally, checkTone, formatDayTime, reviewRows } from '@/lib/utils';
 
 const CHECK_NAMES: Record<ReviewCheck['key'], string> = {
   ROUTE_SERVED: 'Route served',
   LEAD_TIME: 'Lead time',
 };
 
-/** The two checks the server worked out, each a toned word and its evidence (spec §5.2). */
-export const ChecksPanel: FC<{ checks: ReviewCheck[] }> = ({ checks }) => {
+/**
+ * The two checks the server worked out, each a toned word and its evidence (spec §5.2). The server works
+ * them out from the request as it stands, which for a request out of review can hold the customer's unsent
+ * edits, so they only show while the request is in review.
+ */
+export const ChecksPanel: FC<{ checks: ReviewCheck[]; inReview: boolean }> = ({
+  checks,
+  inReview,
+}) => {
+  if (!inReview)
+    return (
+      <Panel title="Feasibility checks">
+        <p className="type-body-s m-0 text-ink-3">
+          The checks run again when the request is back in review.
+        </p>
+      </Panel>
+    );
   const allPass = checks.every((c) => c.state === 'OK');
   return (
     <Panel
@@ -101,7 +108,7 @@ export const HistoryPanel: FC<{ history: HistoryEntry[] }> = ({ history }) => (
           key={`${h.occurredAt}-${i}`}
           className={`grid grid-cols-[120px_minmax(0,1fr)] gap-4 px-6 py-3 ${i > 0 ? 'border-t border-line' : ''}`}
         >
-          <span className="type-caption pt-0.5 text-ink-3">{historyWhen(h.occurredAt)}</span>
+          <span className="type-caption pt-0.5 text-ink-3">{formatDayTime(h.occurredAt)}</span>
           <span className="flex flex-col gap-0.5">
             <span className="type-body-s text-ink">{h.summary}</span>
             <span className="type-body-s text-ink-3">{h.actorLabel}</span>
