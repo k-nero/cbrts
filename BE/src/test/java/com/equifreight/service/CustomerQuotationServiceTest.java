@@ -270,6 +270,17 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void aSeededQuotationWithoutADepositSaysNone() {
+        Quotation seeded = issued();
+        seeded.setStatus(QuotationStatus.ACCEPTED);
+        seeded.setTotal(new BigDecimal("4200.00"));
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(seeded));
+
+        assertThat(customer.get(bookings, request.getId()).deposit()).isNull();
+    }
+
+    @Test
     void anIssuedReadIgnoresLaterRequestAndCatalogChanges() {
         Quotation q = issuedV1();
         List<String> bases = snapshots.read(q.getIssuedSnapshot()).rows().stream()

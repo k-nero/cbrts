@@ -73,7 +73,8 @@ public final class CustomerQuotationMapper {
                                         high,
                                         low.compareTo(q.getTotal()) <= 0
                                                 && q.getTotal().compareTo(high) <= 0))
-                .deposit(new DepositResponse(q.getDepositPct(), q.getDepositAmount()))
+                .deposit(
+                        q.getDepositPct() == null ? null : new DepositResponse(q.getDepositPct(), q.getDepositAmount()))
                 .cancellation(new CustomerQuotationResponse.Cancellation(
                         daysToDeparture,
                         cancellation.stream()
