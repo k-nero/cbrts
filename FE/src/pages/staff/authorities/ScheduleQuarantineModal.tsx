@@ -1,31 +1,42 @@
 import { type FC, useEffect } from 'react';
-import { Alert, App, DatePicker, Form, Select } from 'antd';
+import { App, DatePicker, Form, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import BaseModal from '@/components/modal/BaseModal';
-import { Button } from '@/components/ui';
+import { Button, Callout } from '@/components/ui';
 import { useCreateQuarantine, useQuarantineFacilities } from '@/hooks/clearance';
-import { QUARANTINE_MIN_DAYS } from './labels';
+import { apiErrorMessage } from '@/lib/utils';
+import { quarantineRule } from './labels';
 
 type Values = { placeId: string; dates: [Dayjs, Dayjs] };
 
-type Props = { open: boolean; jobId: string | null; onClose: () => void };
+type Props = {
+  open: boolean;
+  jobId: string | null;
+  /** The pinned destination catalog's minimum stay; the server refuses a shorter period either way. */
+  minDays?: number;
+  destination?: string;
+  onClose: () => void;
+};
 
 /** Schedule a pre-export quarantine period at an approved facility. */
-const ScheduleQuarantineModal: FC<Props> = ({ open, jobId, onClose }) => (
+const ScheduleQuarantineModal: FC<Props> = ({ open, onClose, ...rest }) => (
   <BaseModal open={open} onCancel={onClose} title="Schedule Pre-Export Quarantine Period">
     {/* Mounted per open (BaseModal destroys hidden content), so the window starts from today. */}
-    {open && <ScheduleQuarantineForm jobId={jobId} onClose={onClose} />}
+    {open && <ScheduleQuarantineForm {...rest} onClose={onClose} />}
   </BaseModal>
 );
 
-const ScheduleQuarantineForm: FC<{ jobId: string | null; onClose: () => void }> = ({
+const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
   jobId,
+  minDays,
+  destination,
   onClose,
 }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm<Values>();
   const { data: stations = [], isLoading: loadingStations } = useQuarantineFacilities();
   const create = useCreateQuarantine(jobId);
+  const rule = quarantineRule(minDays, destination);
 
   // Default to the first station, also when the list arrives after the dialog opened.
   const firstStationId = stations[0]?.id;
@@ -35,10 +46,8 @@ const ScheduleQuarantineForm: FC<{ jobId: string | null; onClose: () => void }> 
   }, [firstStationId, form]);
 
   const submit = async ({ placeId, dates: [start, end] }: Values) => {
-    if (end.diff(start, 'day') < QUARANTINE_MIN_DAYS) {
-      message.error(
-        'Quarantine period must be at least 7 days according to veterinary regulations.',
-      );
+    if (minDays !== undefined && end.diff(start, 'day') < minDays) {
+      message.error(`The quarantine must last at least ${rule}.`);
       return;
     }
     try {
@@ -49,8 +58,8 @@ const ScheduleQuarantineForm: FC<{ jobId: string | null; onClose: () => void }> 
       });
       message.success('Quarantine period scheduled successfully.');
       onClose();
-    } catch {
-      // The API refusal shows through the mutation's error state.
+    } catch (err: unknown) {
+      message.error(apiErrorMessage(err, 'The quarantine could not be scheduled.'));
     }
   };
 
@@ -59,7 +68,7 @@ const ScheduleQuarantineForm: FC<{ jobId: string | null; onClose: () => void }> 
       form={form}
       layout="vertical"
       className="mt-4"
-      initialValues={{ dates: [dayjs(), dayjs().add(7, 'day')] }}
+      initialValues={{ dates: [dayjs(), dayjs().add(minDays ?? 7, 'day')] }}
       onFinish={submit}
     >
       <Form.Item
@@ -78,18 +87,23 @@ const ScheduleQuarantineForm: FC<{ jobId: string | null; onClose: () => void }> 
 
       <Form.Item
         name="dates"
-        label="Quarantine window (Minimum 7 days required)"
+        label={rule ? `Quarantine window (at least ${minDays} days)` : 'Quarantine window'}
         rules={[{ required: true, message: 'Please select start and end dates' }]}
       >
         <DatePicker.RangePicker className="w-full" format="DD/MM/YYYY" />
       </Form.Item>
 
-      <Alert
-        type="info"
-        showIcon
-        message="Cambodia GDAHP Veterinary Regulation"
-        description="All horses must complete at least 7 days of certified pre-export quarantine before crossing the Bavet border."
-      />
+      {rule ? (
+        <Callout tone="info" title="Destination minimum">
+          The job is pinned to {destination ?? 'its destination catalog'}, which requires at least{' '}
+          {minDays} days of certified pre-export quarantine.
+        </Callout>
+      ) : (
+        <Callout tone="warn" title="No destination catalog pinned yet">
+          The minimum stay is checked once the job is approved and pinned to its destination&apos;s
+          regulation catalog.
+        </Callout>
+      )}
 
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onClose}>

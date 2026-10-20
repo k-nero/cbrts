@@ -2,7 +2,7 @@ import { type FC, useState } from 'react';
 import { Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { Chip } from '@/components/ui';
-import { BORDER_CROSSINGS, type DestinationItem } from './constants';
+import type { DestinationItem } from './constants';
 
 type Props = {
   countries: DestinationItem[];
@@ -13,14 +13,14 @@ type Props = {
 const matches = (item: DestinationItem, query: string) =>
   item.label.toLowerCase().includes(query) || item.code.toLowerCase().includes(query);
 
-/** The destinations sidebar: country catalogs, then border crossings, filtered by one search. */
+/**
+ * The destinations sidebar: one regulation catalog per country. Rules for a crossing live in the
+ * country catalog as "Per crossing" documents, so crossings have no catalog of their own.
+ */
 const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
   const [search, setSearch] = useState('');
   const query = search.trim().toLowerCase();
-  const shownCountries = query ? countries.filter((c) => matches(c, query)) : countries;
-  const shownCrossings = query
-    ? BORDER_CROSSINGS.filter((b) => matches(b, query))
-    : BORDER_CROSSINGS;
+  const shown = query ? countries.filter((c) => matches(c, query)) : countries;
 
   return (
     <div className="flex w-full shrink-0 flex-col gap-3 rounded-lg border border-line bg-card p-3 lg:w-64">
@@ -28,7 +28,7 @@ const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
 
       <Input
         prefix={<SearchOutlined className="text-ink-3" />}
-        placeholder="Country or crossing"
+        placeholder="Country"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         className="rounded-md"
@@ -36,8 +36,7 @@ const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
       />
 
       <div className="flex flex-col gap-1">
-        <span className="type-body-s px-1 font-medium text-ink-3">Countries</span>
-        {shownCountries.map((item) => (
+        {shown.map((item) => (
           <DestinationButton
             key={item.id}
             item={item}
@@ -45,18 +44,9 @@ const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
             onSelect={onSelect}
           />
         ))}
-      </div>
-
-      <div className="flex flex-col gap-1 border-t border-line pt-2">
-        <span className="type-body-s px-1 font-medium text-ink-3">Border crossings</span>
-        {shownCrossings.map((item) => (
-          <DestinationButton
-            key={item.id}
-            item={item}
-            selected={selectedId === item.id}
-            onSelect={onSelect}
-          />
-        ))}
+        {shown.length === 0 && (
+          <span className="type-body-s px-1 text-ink-3">No country matches.</span>
+        )}
       </div>
     </div>
   );

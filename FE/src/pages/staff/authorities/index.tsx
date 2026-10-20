@@ -86,7 +86,6 @@ const AuthoritiesPage: FC = () => {
         jobs={jobs}
         loading={loadingJobs}
         jobId={jobId}
-        fallbackCode={status.data?.jobCode}
         onSelect={setJobId}
         onSearch={setJobSearch}
       />
@@ -110,6 +109,8 @@ const AuthoritiesPage: FC = () => {
         quarantines={quarantines.data ?? []}
         loading={quarantines.isLoading}
         onSchedule={() => setScheduling(true)}
+        minDays={status.data?.quarantineMinDays ?? undefined}
+        destination={status.data?.destination ?? undefined}
       />
 
       <RecordSubmissionModal open={recording} jobId={jobId} onClose={() => setRecording(false)} />
@@ -117,6 +118,8 @@ const AuthoritiesPage: FC = () => {
       <ScheduleQuarantineModal
         open={scheduling}
         jobId={jobId}
+        minDays={status.data?.quarantineMinDays ?? undefined}
+        destination={status.data?.destination ?? undefined}
         onClose={() => setScheduling(false)}
       />
     </Flex>

@@ -5,17 +5,28 @@ import dayjs from 'dayjs';
 import { Button, Chip, Panel } from '@/components/ui';
 import { useCompleteQuarantine } from '@/hooks/clearance';
 import type { QuarantinePeriod } from '@/interfaces';
-import { QUARANTINE_MIN_DAYS } from './labels';
+import { quarantineRule } from './labels';
 
 type Props = {
   jobId: string | null;
   quarantines: QuarantinePeriod[];
   loading: boolean;
   onSchedule: () => void;
+  /** The pinned destination catalog and its minimum stay; both absent before the job is approved. */
+  minDays?: number;
+  destination?: string;
 };
 
 /** The pre-export quarantine section: each period, its length against the minimum, and sign-off. */
-const QuarantineList: FC<Props> = ({ jobId, quarantines, loading, onSchedule }) => {
+const QuarantineList: FC<Props> = ({
+  jobId,
+  quarantines,
+  loading,
+  onSchedule,
+  minDays,
+  destination,
+}) => {
+  const rule = quarantineRule(minDays, destination);
   const { message } = App.useApp();
   const complete = useCompleteQuarantine(jobId);
 
@@ -34,8 +45,9 @@ const QuarantineList: FC<Props> = ({ jobId, quarantines, loading, onSchedule }) 
         <div>
           <h2 className="type-h4 m-0 text-ink">Pre-export Quarantine & Veterinary Inspection</h2>
           <p className="type-body-s m-0 text-ink-2">
-            Mandatory pre-export quarantine period recorded against the destination requirement
-            (Cambodia requires at least 7 days before border crossing).
+            {rule
+              ? `Pre-export quarantine is checked against the destination's minimum: ${rule}.`
+              : 'The destination’s minimum stay applies once the job is pinned to its regulation catalog.'}
           </p>
         </div>
         <Button variant="secondary" size="sm" leadingIcon="plus" onClick={onSchedule}>
@@ -63,7 +75,7 @@ const QuarantineList: FC<Props> = ({ jobId, quarantines, loading, onSchedule }) 
             const start = dayjs(q.startsOn);
             const end = dayjs(q.endsOn);
             const durationDays = end.diff(start, 'day');
-            const meetsMinimum = durationDays >= QUARANTINE_MIN_DAYS;
+            const meetsMinimum = minDays === undefined || durationDays >= minDays;
 
             return (
               <Panel
@@ -79,15 +91,14 @@ const QuarantineList: FC<Props> = ({ jobId, quarantines, loading, onSchedule }) 
                     {q.isCompleted
                       ? 'Inspection completed'
                       : meetsMinimum
-                        ? 'In progress (Meets 7-day min)'
+                        ? 'In progress'
                         : 'Under minimum duration'}
                   </Chip>
                 }
                 footer={
                   <div className="flex items-center justify-between">
                     <span className="type-body-s text-ink-3">
-                      Cambodia entry regulations require at least 7 days in an approved quarantine
-                      facility.
+                      The station veterinarian signs off before the horses leave.
                     </span>
                     {!q.isCompleted && (
                       <Popconfirm
@@ -123,7 +134,7 @@ const QuarantineList: FC<Props> = ({ jobId, quarantines, loading, onSchedule }) 
                   </div>
                   <div>
                     <span className="type-mono-caption block text-ink-3">Regulatory minimum</span>
-                    <span className="type-label-s text-ink">7 days (Cambodia GDAHP)</span>
+                    <span className="type-label-s text-ink">{rule ?? 'Not pinned yet'}</span>
                   </div>
                   <div>
                     <span className="type-mono-caption block text-ink-3">Station veterinarian</span>

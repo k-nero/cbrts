@@ -79,8 +79,7 @@ const AuthorityGate: FC<Props> = ({ jobId, jobCode, status, submissions }) => {
           tone="neutral"
           value={total}
           label="Total submissions"
-          // FIXME(mock): 'CBRT-2026-041' is a Figma placeholder shown when no job is loaded.
-          lead={`Job: ${status?.jobCode ?? 'CBRT-2026-041'}`}
+          lead={`Job: ${status?.jobCode ?? jobCode ?? '—'}`}
         />
         <StatTile
           tone="info"

@@ -165,6 +165,10 @@ export interface ClearanceStatus {
   totalQuarantines: number;
   completedQuarantines: number;
   outstandingIssues: string[];
+  /** The pinned destination catalog ("Cambodia import"); absent until the job is approved. */
+  destination?: string;
+  /** That catalog's minimum pre-export quarantine, in days. */
+  quarantineMinDays?: number;
 }
 
 export interface ReviewDocumentRequest {
@@ -300,4 +304,6 @@ export interface ClearanceJobSummary {
   dossierStatus: DossierStatus;
   stage: string;
   clubName?: string;
+  originCity?: string;
+  destinationCity?: string;
 }

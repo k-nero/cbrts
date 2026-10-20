@@ -1,10 +1,9 @@
 import type { FC } from 'react';
-import { Tag } from 'antd';
 import { BankOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Button, Callout, Chip } from '@/components/ui';
 import { type AuthoritySubmission, SubmissionStatusEnum } from '@/interfaces';
-import { SUBMISSION_KIND_LABELS, SUBMISSION_STATUS_CHIPS } from './labels';
+import { AUTHORITY_KIND_LABELS, SUBMISSION_KIND_LABELS, SUBMISSION_STATUS_CHIPS } from './labels';
 
 /** One authority's dossier: who, what, its SLA date, the filing facts and the next step. */
 const SubmissionCard: FC<{
@@ -33,9 +32,9 @@ const SubmissionCard: FC<{
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="type-h4 font-semibold text-ink">{sub.authority.name}</span>
-              <Tag color="geekblue" className="font-mono text-[11px] uppercase">
-                {sub.authority.countryCode} · {sub.authority.kind}
-              </Tag>
+              <Chip tone="neutral" dot={false}>
+                {sub.authority.countryCode} · {AUTHORITY_KIND_LABELS[sub.authority.kind]}
+              </Chip>
               {sub.authority.slaDays && (
                 <span className="type-mono-caption text-ink-3">
                   SLA: {sub.authority.slaDays} business days
@@ -96,11 +95,10 @@ const SubmissionCard: FC<{
 
       {isOverdue && (
         <div className="border-b border-bad/20 bg-bad/5 p-4">
-          <Callout tone="bad" title="Departure schedule at risk due to overdue authority SLA!">
-            {/* FIXME(mock): nothing dispatches this escalation; the sentence is Figma copy. */}
-            This authority has not issued a decision within the committed SLA window (
-            {expected ?? 'expected date'}). An urgent escalation has been dispatched to the
-            Logistics Manager.
+          <Callout tone="bad" title="The authority's decision is overdue">
+            No decision has arrived within the SLA window
+            {expected ? ` (due ${expected})` : ''}. Chase the authority, and tell the logistics
+            manager if it puts the departure date at risk.
           </Callout>
         </div>
       )}

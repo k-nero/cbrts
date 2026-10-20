@@ -3,9 +3,10 @@ import { App, DatePicker, Form, Input, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import BaseModal from '@/components/modal/BaseModal';
 import { Button } from '@/components/ui';
+import { apiErrorMessage } from '@/lib/utils';
 import { useAuthorities, useCreateSubmission } from '@/hooks/clearance';
 import { type SubmissionKind, SubmissionKindEnum } from '@/interfaces';
-import { SUBMISSION_KIND_LABELS } from './labels';
+import { AUTHORITY_KIND_LABELS, SUBMISSION_KIND_LABELS } from './labels';
 
 type Values = {
   authorityId: string;
@@ -43,8 +44,8 @@ const RecordSubmissionForm: FC<{ jobId: string | null; onClose: () => void }> = 
       });
       message.success('Authority submission recorded successfully.');
       onClose();
-    } catch {
-      // The API refusal shows through the mutation's error state.
+    } catch (err: unknown) {
+      message.error(apiErrorMessage(err, 'The change could not be saved.'));
     }
   };
 
@@ -67,7 +68,7 @@ const RecordSubmissionForm: FC<{ jobId: string | null; onClose: () => void }> = 
         <Select
           placeholder="Select authority (Customs, Veterinary, GDAHP...)"
           options={authorities.map((a) => ({
-            label: `${a.name} (${a.countryCode} · ${a.kind} · SLA ${a.slaDays} days)`,
+            label: `${a.name} (${a.countryCode} · ${AUTHORITY_KIND_LABELS[a.kind]}${a.slaDays ? ` · SLA ${a.slaDays} days` : ''})`,
             value: a.id,
           }))}
         />

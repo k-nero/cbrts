@@ -1,5 +1,7 @@
 import type { Tone } from '@/components/ui';
 import {
+  type AuthorityKind,
+  AuthorityKindEnum,
   type SubmissionKind,
   SubmissionKindEnum,
   type SubmissionStatus,
@@ -12,6 +14,12 @@ export const SUBMISSION_KIND_LABELS: Record<SubmissionKind, string> = {
   [SubmissionKindEnum.IMPORT_PERMIT]: 'Live Equine Import Permit (GDAHP)',
 };
 
+export const AUTHORITY_KIND_LABELS: Record<AuthorityKind, string> = {
+  [AuthorityKindEnum.VETERINARY]: 'Veterinary',
+  [AuthorityKindEnum.CUSTOMS]: 'Customs',
+  [AuthorityKindEnum.QUARANTINE]: 'Quarantine',
+};
+
 export const SUBMISSION_STATUS_CHIPS: Record<SubmissionStatus, { tone: Tone; label: string }> = {
   [SubmissionStatusEnum.READY_TO_FILE]: { tone: 'warn', label: 'Ready to file' },
   [SubmissionStatusEnum.FILED]: { tone: 'info', label: 'With the authority' },
@@ -20,5 +28,16 @@ export const SUBMISSION_STATUS_CHIPS: Record<SubmissionStatus, { tone: Tone; lab
   [SubmissionStatusEnum.REFUSED]: { tone: 'bad', label: 'Refused' },
 };
 
-/** The minimum pre-export quarantine the page checks against (shown as the Cambodia GDAHP rule). */
-export const QUARANTINE_MIN_DAYS = 7;
+/** The decisions staff record from the authority's reply (READY_TO_FILE is where a filing starts). */
+export const DECISION_OPTIONS: { label: string; value: SubmissionStatus }[] = [
+  { label: 'Approved and issued', value: SubmissionStatusEnum.ISSUED },
+  { label: 'With the authority', value: SubmissionStatusEnum.FILED },
+  { label: 'Additional information requested', value: SubmissionStatusEnum.ADDITIONAL_INFO },
+  { label: 'Refused', value: SubmissionStatusEnum.REFUSED },
+];
+
+/** "7 days (Cambodia import)", or null before the job is pinned to a catalog. */
+export const quarantineRule = (minDays?: number, destination?: string) =>
+  minDays === undefined || minDays === null
+    ? null
+    : `${minDays} days${destination ? ` (${destination})` : ''}`;

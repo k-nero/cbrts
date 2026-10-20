@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { App, Spin } from 'antd';
+import { App, Empty, Spin } from 'antd';
 import PageHeader from '@/components/PageHeader';
 import { Button, Chip, StatTile } from '@/components/ui';
 import {
@@ -9,12 +9,15 @@ import {
 } from '@/hooks/regulation';
 import { CatalogStatusEnum, type RegulationRule } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
-import { defaultRule, type DestinationItem } from './constants';
+import { changesLabel, defaultRule, type DestinationItem } from './constants';
 import DestinationList from './DestinationList';
 import DraftBanner from './DraftBanner';
 import RuleEditor from './RuleEditor';
 import RulesTable from './RulesTable';
 import VersionsPanel from './VersionsPanel';
+
+/** "21 d", or a dash while the version hasn't loaded. */
+const days = (value?: number) => (value === undefined || value === null ? '—' : `${value} d`);
 
 /**
  * The transport specialist's regulation catalog: pick a destination, read its rules, edit them in a
@@ -27,28 +30,21 @@ export const RegulationsPage: FC = () => {
 
   const [destinationId, setDestinationId] = useState('KH');
   const catalog = catalogs.find((c) => c.countryCode === destinationId || c.id === destinationId);
+  const active = catalog?.activeVersion;
   // A destination opens on its draft when it has one, else on the published version.
-  const versionId = catalog?.draftVersion?.id || catalog?.activeVersion?.id || null;
+  const versionId = catalog?.draftVersion?.id || active?.id || null;
   const { data: version, isLoading: loadingVersion } = useRegulationVersion(versionId);
 
   const rules = version?.rules ?? [];
   const [pickedRuleId, setPickedRuleId] = useState<string | null>(null);
   const rule = rules.find((r) => r.id === pickedRuleId) ?? defaultRule(rules);
-
   const isDraft = version?.status === CatalogStatusEnum.DRAFT;
-  const hasDraft = Boolean(catalog?.draftVersion);
-  // FIXME(mock): 8 is the Figma frame's next version, used when the catalog has no version at all.
-  const draftVersionNo =
-    catalog?.draftVersion?.versionNo ??
-    (catalog?.activeVersion ? catalog.activeVersion.versionNo + 1 : 8);
 
   const countries: DestinationItem[] = catalogs.map((c) => ({
     id: c.countryCode,
     code: c.countryCode,
-    label: c.countryCode === 'KH' ? 'Cambodia' : c.name.replace(' import', ''),
-    version: `v${c.activeVersion?.versionNo ?? 1}`,
-    isCountry: true,
-    countryCode: c.countryCode,
+    label: c.name.replace(' import', ''),
+    version: c.activeVersion ? `v${c.activeVersion.versionNo}` : '—',
     hasDraft: Boolean(c.draftVersion),
   }));
 
@@ -66,14 +62,19 @@ export const RegulationsPage: FC = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Regulation catalog"
-        summary="Validity rules for each destination and border crossing. Publishing creates a new version; approved jobs keep the version they were pinned to."
+        summary="Validity rules for each destination country. Publishing creates a new version; approved jobs keep the version they were pinned to."
         right={
-          hasDraft ? (
+          catalog?.draftVersion ? (
             <Chip tone="warn" dot={true}>
-              Draft v{draftVersionNo} · {catalog?.draftVersion?.changesCount ?? 3} changes
+              Draft v{catalog.draftVersion.versionNo}
+              {isDraft ? ` · ${changesLabel(version?.changesCount)}` : ''}
             </Chip>
           ) : (
-            <Button variant="secondary" onClick={startDraft} disabled={createDraft.isPending}>
+            <Button
+              variant="secondary"
+              onClick={startDraft}
+              disabled={!catalog || createDraft.isPending}
+            >
               Create draft version
             </Button>
           )
@@ -92,45 +93,49 @@ export const RegulationsPage: FC = () => {
             <div className="flex items-center justify-center py-24">
               <Spin size="large" />
             </div>
+          ) : !catalog || !version ? (
+            <div className="rounded-lg border border-line bg-card p-12 text-center">
+              <Empty
+                description={
+                  catalog
+                    ? 'This catalog has no version yet. Create a draft to start its rules.'
+                    : 'Choose a destination to see its rules.'
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            </div>
           ) : (
             <>
-              {isDraft && (
-                <DraftBanner catalog={catalog} draft={version} draftVersionNo={draftVersionNo} />
-              )}
+              {isDraft && <DraftBanner catalog={catalog} draft={version} />}
 
-              {/* FIXME(mock): the 21/7/2/3/7 fallbacks are Figma values shown when the API omits them. */}
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <StatTile tone="neutral" value={days(version.leadTimeDays)} label="Lead time" />
                 <StatTile
                   tone="neutral"
-                  value={`${version?.leadTimeDays ?? 21} d`}
-                  label="Lead time"
-                />
-                <StatTile
-                  tone="neutral"
-                  value={`${version?.quarantineMinDays ?? 7} d`}
+                  value={days(version.quarantineMinDays)}
                   label="Quarantine minimum"
                 />
                 <StatTile
                   tone="neutral"
-                  value={`${version?.arrivalBufferDays ?? 2} d`}
+                  value={days(version.arrivalBufferDays)}
                   label="Arrival buffer"
                 />
                 <StatTile
                   tone="info"
-                  value={String(version?.pinnedJobsCount ?? 3)}
-                  label={`Jobs pinned to v${catalog?.activeVersion?.versionNo ?? version?.versionNo ?? 7}`}
+                  value={String(active?.pinnedJobsCount ?? 0)}
+                  label={active ? `Jobs pinned to v${active.versionNo}` : 'Jobs pinned'}
                 />
               </div>
 
               <RulesTable
-                title={`Document rules · ${catalog?.name ?? 'Cambodia import'}`}
+                title={`Document rules · ${catalog.name}`}
                 rules={rules}
                 selectedRuleId={rule?.id}
                 onEdit={(r: RegulationRule) => setPickedRuleId(r.id)}
               />
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <RuleEditor key={rule?.id ?? 'none'} rule={rule} />
+                <RuleEditor key={rule?.id ?? 'none'} rule={rule} editable={isDraft} />
                 <VersionsPanel catalog={catalog} />
               </div>
             </>
