@@ -1262,11 +1262,13 @@ function TripWorkspace({
         TripRecordKindEnum.NOTE,
       ]
     )
-      .filter((event) => (coordinatorKindsByStatus[trip.tripStatus] ?? []).includes(event))
+      .filter(
+        (event) => trip !== undefined && coordinatorKindsByStatus[trip.tripStatus].includes(event),
+      )
       .filter(
         (event) =>
           (event !== TripRecordKindEnum.DEPARTED && event !== TripRecordKindEnum.FLIGHT_DEPARTED) ||
-          trip.clearanceReady,
+          trip?.clearanceReady === true,
       );
     const departureLocked =
       (kind === TripRecordKindEnum.DEPARTED || kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
