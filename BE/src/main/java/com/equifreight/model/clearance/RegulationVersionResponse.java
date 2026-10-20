@@ -1,15 +1,14 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.CatalogStatus;
-import lombok.*;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegulationVersionResponse {
@@ -23,4 +22,7 @@ public class RegulationVersionResponse {
     private short quarantineMinDays;
     private short arrivalBufferDays;
     private List<RegulationRuleResponse> rules;
+    private Integer pinnedJobsCount;
+    private Integer changesCount;
+    private String changeNote;
 }

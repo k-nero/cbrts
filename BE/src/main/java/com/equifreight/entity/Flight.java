@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.ServiceClass;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.Instant;
 
 /**
  * The flight of an air leg. The airline owns the times, so scheduled and latest estimated times are kept apart;

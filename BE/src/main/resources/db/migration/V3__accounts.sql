@@ -15,31 +15,33 @@ alter table users
 -- One account per club. Dropping this index allows several people per club.
 create unique index users_club_id_idx on users (club_id) where club_id is not null;
 
-create table account_tokens (
-    id uuid not null,
-    created_at timestamptz not null default now(),
+create table account_tokens
+(
+    id         uuid         not null,
+    created_at timestamptz  not null default now(),
     updated_at timestamptz,
-    user_id uuid not null references users (id) on delete cascade,
-    purpose varchar(20) not null
+    user_id    uuid         not null references users (id) on delete cascade,
+    purpose    varchar(20)  not null
         constraint account_tokens_purpose_check check (purpose in ('VERIFY_EMAIL', 'STAFF_INVITE', 'RESET_PASSWORD')),
     token_hash varchar(100) not null unique,
-    expires_at timestamptz not null,
-    used_at timestamptz,
+    expires_at timestamptz  not null,
+    used_at    timestamptz,
     revoked_at timestamptz,
     primary key (id)
 );
 
 create index account_tokens_user_id_idx on account_tokens (user_id);
 
-create table sign_in_attempts (
-    id uuid not null,
-    created_at timestamptz not null default now(),
-    updated_at timestamptz,
-    email varchar(255) not null,
-    user_id uuid references users (id) on delete set null,
-    succeeded boolean not null,
-    ip inet,
-    attempted_at timestamptz not null default now(),
+create table sign_in_attempts
+(
+    id           uuid         not null,
+    created_at   timestamptz  not null default now(),
+    updated_at   timestamptz,
+    email        varchar(255) not null,
+    user_id      uuid         references users (id) on delete set null,
+    succeeded    boolean      not null,
+    ip           inet,
+    attempted_at timestamptz  not null default now(),
     primary key (id)
 );
 

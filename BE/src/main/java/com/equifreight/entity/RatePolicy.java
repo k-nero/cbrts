@@ -2,17 +2,14 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RatePolicyKey;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.UUID;
+import lombok.*;
 
-/** One value per key and catalog version (fuel %, deposit %, quote validity days, …). */
+/**
+ * One value per key and catalog version (fuel %, deposit %, quote validity days, …).
+ */
 @Setter
 @Getter
 @Entity

@@ -2,26 +2,18 @@ package com.equifreight.model.job;
 
 import com.equifreight.entity.enums.CrewRole;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
-public class AssignCrewRequest {
+/** The job's whole crew; a missing list is empty. */
+@Builder
+public record AssignCrewRequest(List<CrewItem> crew) {
 
-    private List<CrewItem> crew = new ArrayList<>();
-
-    @Getter
-    @Setter
-    public static class CrewItem {
-        @NotNull
-        private UUID userId;
-
-        @NotNull
-        private CrewRole crewRole;
+    public AssignCrewRequest {
+        crew = crew == null ? List.of() : crew;
     }
+
+    @Builder
+    public record CrewItem(@NotNull UUID userId, @NotNull CrewRole crewRole) {}
 }

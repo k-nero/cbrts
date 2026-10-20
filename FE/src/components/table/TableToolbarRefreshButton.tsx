@@ -13,6 +13,7 @@ const TableToolbarRefreshButton = ({ onClick, spin }: Props) => {
     <Tooltip title="Refresh">
       <Button
         type="text"
+        aria-label="Refresh"
         className={`${TABLE_CSS_PREFIX}-toolbar-refresh`}
         onClick={onClick}
         icon={<SyncOutlined spin={spin} />}

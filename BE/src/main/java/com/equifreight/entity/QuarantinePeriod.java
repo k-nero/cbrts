@@ -1,13 +1,14 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-import java.time.LocalDate;
-
-/** At least the pinned quarantine_min_days long (application rule, BR-F2-06). */
+/**
+ * At least the pinned quarantine_min_days long (application rule, BR-F2-06).
+ */
 @Setter
 @Getter
 @Entity
@@ -18,7 +19,9 @@ public class QuarantinePeriod extends BaseEntity {
     @JoinColumn(name = "job_id", nullable = false)
     private TransportJob job;
 
-    /** Null means the whole load. */
+    /**
+     * Null means the whole load.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "horse_id")
     private Horse horse;

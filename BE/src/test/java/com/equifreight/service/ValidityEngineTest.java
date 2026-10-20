@@ -1,16 +1,16 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RegulationRuleKind;
 import com.equifreight.entity.enums.Validity;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDate;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ValidityEngineTest {
 
@@ -27,8 +27,12 @@ class ValidityEngineTest {
 
         // Simulated job: Departure 2026-11-01, Arrival 2026-11-05 in Asia/Ho_Chi_Minh business zone
         job = new TransportJob();
-        job.setPlannedDepartureAt(LocalDate.of(2026, 11, 1).atStartOfDay(AppConstants.BUSINESS_ZONE).toInstant());
-        job.setPlannedArrivalAt(LocalDate.of(2026, 11, 5).atStartOfDay(AppConstants.BUSINESS_ZONE).toInstant());
+        job.setPlannedDepartureAt(LocalDate.of(2026, 11, 1)
+                .atStartOfDay(AppConstants.BUSINESS_ZONE)
+                .toInstant());
+        job.setPlannedArrivalAt(LocalDate.of(2026, 11, 5)
+                .atStartOfDay(AppConstants.BUSINESS_ZONE)
+                .toInstant());
 
         regulationVersion = new RegulationVersion();
         regulationVersion.setArrivalBufferDays((short) 2);

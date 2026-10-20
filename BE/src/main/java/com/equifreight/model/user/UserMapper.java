@@ -2,7 +2,6 @@ package com.equifreight.model.user;
 
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
-
 import java.util.List;
 
 public final class UserMapper {
@@ -19,6 +18,9 @@ public final class UserMapper {
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
                 .roles(roles)
+                .staffCode(user.getStaffCode())
+                .status(user.getStatus())
+                .lastActiveAt(user.getLastActiveAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

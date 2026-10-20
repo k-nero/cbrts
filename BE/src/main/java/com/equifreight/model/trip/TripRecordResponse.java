@@ -2,11 +2,12 @@ package com.equifreight.model.trip;
 
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.TripRecordKind;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record TripRecordResponse(
         UUID id,
         UUID routeStopId,
@@ -18,5 +19,4 @@ public record TripRecordResponse(
         String recordedBy,
         Channel channel,
         String text,
-        List<TripConditionResponse> conditions
-) {}
+        List<TripConditionResponse> conditions) {}

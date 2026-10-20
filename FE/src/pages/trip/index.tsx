@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { Input, Select, Spin, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
+import { Input, message, Select, Spin, Upload } from 'antd';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 import type {
   HorseCondition,
   TripPhoto,
@@ -16,6 +15,7 @@ import type {
   TripSummary,
   TripView,
 } from '@/interfaces';
+import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 
 const eventLabels: Record<TripRecordKind, string> = {
   [TripRecordKindEnum.LOADED]: 'Loaded',
@@ -265,6 +265,7 @@ function TripWorkspace({
   const [stopId, setStopId] = useState<string>();
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
   const [text, setText] = useState('');
+  const [receiverName, setReceiverName] = useState('');
   const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
   const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
     checkpoint: null,
@@ -291,10 +292,13 @@ function TripWorkspace({
         occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
+        receiverName:
+          kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
+      setReceiverName('');
       setOccurredAt(datetimeLocal());
     } catch (error) {
       messageApi.error(errorMessage(error));
@@ -519,6 +523,17 @@ function TripWorkspace({
                     placeholder="What happened at this checkpoint?"
                   />
                 </label>
+                {kind === TripRecordKindEnum.HANDED_OVER && (
+                  <label className="type-body-s flex flex-col gap-2">
+                    Received by
+                    <Input
+                      value={receiverName}
+                      onChange={(event) => setReceiverName(event.target.value)}
+                      maxLength={120}
+                      placeholder="Name of the receiving person"
+                    />
+                  </label>
+                )}
               </div>
               {audience === 'escort' && (
                 <div className="mt-5 divide-y divide-line">
@@ -613,7 +628,8 @@ function TripWorkspace({
                     mutation.isPending ||
                     ((kind === TripRecordKindEnum.DEPARTED ||
                       kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                      !trip.clearanceReady)
+                      !trip.clearanceReady) ||
+                    (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
                   }
                   onClick={saveCheckpoint}
                 >

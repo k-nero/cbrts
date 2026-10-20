@@ -1,13 +1,12 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.RegulationRuleKind;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegulationRuleResponse {
@@ -18,4 +17,6 @@ public class RegulationRuleResponse {
     private Short minDays;
     private Short maxDays;
     private String description;
+    private String diffStatus; // UNCHANGED, CHANGED, NEW
+    private String parameterDisplay;
 }

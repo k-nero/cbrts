@@ -1,4 +1,5 @@
 export * from './api';
+export * from './auth';
 export * from './entities';
 export * from './enums';
 export * from './home';
@@ -6,6 +7,7 @@ export * from './clearance';
 export * from './trip';
 export * from './job';
 export * from './vehicle';
+export * from './note';
 export * from './audit';
 export * from './horse';
 export * from './request';

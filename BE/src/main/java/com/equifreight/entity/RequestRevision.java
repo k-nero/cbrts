@@ -1,14 +1,15 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.Instant;
-
-/** Keeps both versions of a request visible after an INFO_REQUIRED round. */
+/**
+ * Keeps both versions of a request visible after an INFO_REQUIRED round.
+ */
 @Setter
 @Getter
 @Entity
@@ -22,7 +23,9 @@ public class RequestRevision extends BaseEntity {
     @Column(nullable = false)
     private short revisionNo;
 
-    /** The request as submitted, as JSON. */
+    /**
+     * The request as submitted, as JSON.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
     private String payload;

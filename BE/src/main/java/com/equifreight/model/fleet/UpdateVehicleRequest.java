@@ -1,12 +1,7 @@
 package com.equifreight.model.fleet;
 
 import com.equifreight.entity.enums.VehicleStatus;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Builder;
 
-@Getter
-@Setter
-public class UpdateVehicleRequest {
-    private Integer payloadKg;
-    private VehicleStatus status;
-}
+@Builder
+public record UpdateVehicleRequest(Integer payloadKg, VehicleStatus status) {}

@@ -1,20 +1,103 @@
-export type ChecklistStatus =
-  'NOT_ISSUED' | 'AWAITING_UPLOAD' | 'IN_REVIEW' | 'CLEARED' | 'REJECTED' | 'WITH_AUTHORITY';
+/** The enums below mirror the backend's (entity/enums/*.java); compare against XEnum.VALUE, not a string. */
+export const ChecklistStatusEnum = {
+  NOT_ISSUED: 'NOT_ISSUED',
+  AWAITING_UPLOAD: 'AWAITING_UPLOAD',
+  IN_REVIEW: 'IN_REVIEW',
+  CLEARED: 'CLEARED',
+  REJECTED: 'REJECTED',
+  WITH_AUTHORITY: 'WITH_AUTHORITY',
+} as const;
+export type ChecklistStatus = (typeof ChecklistStatusEnum)[keyof typeof ChecklistStatusEnum];
 
-export type Validity = 'GREEN' | 'AMBER' | 'RED';
-export type DocumentReview = 'PENDING' | 'APPROVED' | 'REJECTED';
-export type ChecklistHolder = 'CUSTOMER' | 'SPECIALIST' | 'AUTHORITY';
-export type DocumentScope = 'PER_HORSE' | 'PER_SHIPMENT' | 'PER_CROSSING';
-export type DocumentProvider = 'CUSTOMER' | 'AUTHORITY';
+export const ValidityEnum = {
+  GREEN: 'GREEN',
+  AMBER: 'AMBER',
+  RED: 'RED',
+} as const;
+export type Validity = (typeof ValidityEnum)[keyof typeof ValidityEnum];
+
+export const DocumentReviewEnum = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+export type DocumentReview = (typeof DocumentReviewEnum)[keyof typeof DocumentReviewEnum];
+
+export const ChecklistHolderEnum = {
+  CUSTOMER: 'CUSTOMER',
+  SPECIALIST: 'SPECIALIST',
+  AUTHORITY: 'AUTHORITY',
+} as const;
+export type ChecklistHolder = (typeof ChecklistHolderEnum)[keyof typeof ChecklistHolderEnum];
+
+export const DocumentScopeEnum = {
+  PER_HORSE: 'PER_HORSE',
+  PER_SHIPMENT: 'PER_SHIPMENT',
+  PER_CROSSING: 'PER_CROSSING',
+} as const;
+export type DocumentScope = (typeof DocumentScopeEnum)[keyof typeof DocumentScopeEnum];
+
+export const DocumentProviderEnum = {
+  CUSTOMER: 'CUSTOMER',
+  AUTHORITY: 'AUTHORITY',
+} as const;
+export type DocumentProvider = (typeof DocumentProviderEnum)[keyof typeof DocumentProviderEnum];
+
+export const RegulationRuleKindEnum = {
+  WINDOW_BEFORE_DEPARTURE: 'WINDOW_BEFORE_DEPARTURE',
+  VALID_THROUGH_ARRIVAL_PLUS: 'VALID_THROUGH_ARRIVAL_PLUS',
+  BOOSTER_WINDOW: 'BOOSTER_WINDOW',
+  PRESENCE_ONLY: 'PRESENCE_ONLY',
+} as const;
 export type RegulationRuleKind =
-  'WINDOW_BEFORE_DEPARTURE' | 'VALID_THROUGH_ARRIVAL_PLUS' | 'BOOSTER_WINDOW' | 'PRESENCE_ONLY';
+  (typeof RegulationRuleKindEnum)[keyof typeof RegulationRuleKindEnum];
 
-export type DossierStatus =
-  'OPEN' | 'SUBMITTED_TO_AUTHORITY' | 'ADDITIONAL_INFO_REQUIRED' | 'CLEARANCE_READY';
+/** How a draft rule differs from the published version (regulations page). */
+export const RegulationRuleDiffEnum = {
+  UNCHANGED: 'UNCHANGED',
+  CHANGED: 'CHANGED',
+  NEW: 'NEW',
+} as const;
+export type RegulationRuleDiff =
+  (typeof RegulationRuleDiffEnum)[keyof typeof RegulationRuleDiffEnum];
 
-export type AuthorityKind = 'VETERINARY' | 'CUSTOMS' | 'QUARANTINE';
-export type SubmissionKind = 'EXPORT_HEALTH_CERTS' | 'IMPORT_PERMIT' | 'CUSTOMS_DOSSIER';
-export type SubmissionStatus = 'READY_TO_FILE' | 'FILED' | 'ADDITIONAL_INFO' | 'ISSUED' | 'REFUSED';
+export const CatalogStatusEnum = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  RETIRED: 'RETIRED',
+} as const;
+export type CatalogStatus = (typeof CatalogStatusEnum)[keyof typeof CatalogStatusEnum];
+
+export const DossierStatusEnum = {
+  OPEN: 'OPEN',
+  SUBMITTED_TO_AUTHORITY: 'SUBMITTED_TO_AUTHORITY',
+  ADDITIONAL_INFO_REQUIRED: 'ADDITIONAL_INFO_REQUIRED',
+  CLEARANCE_READY: 'CLEARANCE_READY',
+} as const;
+export type DossierStatus = (typeof DossierStatusEnum)[keyof typeof DossierStatusEnum];
+
+export const AuthorityKindEnum = {
+  VETERINARY: 'VETERINARY',
+  CUSTOMS: 'CUSTOMS',
+  QUARANTINE: 'QUARANTINE',
+} as const;
+export type AuthorityKind = (typeof AuthorityKindEnum)[keyof typeof AuthorityKindEnum];
+
+export const SubmissionKindEnum = {
+  EXPORT_HEALTH_CERTS: 'EXPORT_HEALTH_CERTS',
+  IMPORT_PERMIT: 'IMPORT_PERMIT',
+  CUSTOMS_DOSSIER: 'CUSTOMS_DOSSIER',
+} as const;
+export type SubmissionKind = (typeof SubmissionKindEnum)[keyof typeof SubmissionKindEnum];
+
+export const SubmissionStatusEnum = {
+  READY_TO_FILE: 'READY_TO_FILE',
+  FILED: 'FILED',
+  ADDITIONAL_INFO: 'ADDITIONAL_INFO',
+  ISSUED: 'ISSUED',
+  REFUSED: 'REFUSED',
+} as const;
+export type SubmissionStatus = (typeof SubmissionStatusEnum)[keyof typeof SubmissionStatusEnum];
 
 export interface DocumentVersion {
   id: string;
@@ -82,6 +165,10 @@ export interface ClearanceStatus {
   totalQuarantines: number;
   completedQuarantines: number;
   outstandingIssues: string[];
+  /** The pinned destination catalog ("Cambodia import"); absent until the job is approved. */
+  destination?: string;
+  /** That catalog's minimum pre-export quarantine, in days. */
+  quarantineMinDays?: number;
 }
 
 export interface ReviewDocumentRequest {
@@ -174,19 +261,24 @@ export interface RegulationRule {
   minDays?: number;
   maxDays?: number;
   description?: string;
+  diffStatus?: RegulationRuleDiff;
+  parameterDisplay?: string;
 }
 
 export interface RegulationVersion {
   id: string;
   catalogId: string;
   versionNo: number;
-  status: 'DRAFT' | 'PUBLISHED' | 'RETIRED';
+  status: CatalogStatus;
   publishedAt?: string;
   publishedByName?: string;
   leadTimeDays: number;
   quarantineMinDays: number;
   arrivalBufferDays: number;
   rules: RegulationRule[];
+  pinnedJobsCount?: number;
+  changesCount?: number;
+  changeNote?: string;
 }
 
 export interface RegulationCatalog {
@@ -194,6 +286,16 @@ export interface RegulationCatalog {
   countryCode: string;
   name: string;
   activeVersion?: RegulationVersion;
+  draftVersion?: RegulationVersion;
+  versions?: RegulationVersion[];
+}
+
+export interface UpdateRegulationRuleRequest {
+  ruleKind?: RegulationRuleKind;
+  minDays?: number;
+  maxDays?: number;
+  mandatory?: boolean;
+  description?: string;
 }
 
 export interface ClearanceJobSummary {
@@ -202,4 +304,6 @@ export interface ClearanceJobSummary {
   dossierStatus: DossierStatus;
   stage: string;
   clubName?: string;
+  originCity?: string;
+  destinationCity?: string;
 }

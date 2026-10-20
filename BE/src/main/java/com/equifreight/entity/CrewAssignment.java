@@ -2,16 +2,13 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CrewRole;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.util.UUID;
+import lombok.*;
 
-/** Grooms = ⌈horses ÷ 3⌉ is checked by the application. */
+/**
+ * Grooms = ⌈horses ÷ 3⌉ is checked by the application.
+ */
 @Setter
 @Getter
 @Entity

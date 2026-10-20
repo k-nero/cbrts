@@ -1,12 +1,6 @@
 package com.equifreight.model.auth;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Builder;
 
-@Getter
-@Setter
-public class LoginRequest {
-    private String email;
-    private String password;
-}
-
+@Builder
+public record LoginRequest(String email, String password) {}

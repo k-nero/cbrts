@@ -2,19 +2,9 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.DocumentProvider;
 import com.equifreight.entity.enums.DocumentScope;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class DocumentTypeResponse {
-    private UUID id;
-    private String code;
-    private String name;
-    private DocumentScope scope;
-    private DocumentProvider providedBy;
-}
+public record DocumentTypeResponse(
+        UUID id, String code, String name, DocumentScope scope, DocumentProvider providedBy) {}

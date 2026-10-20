@@ -1,24 +1,18 @@
 package com.equifreight.model.job;
 
 import com.equifreight.entity.enums.TransportMode;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-public class RouteLegResponse {
-    private UUID id;
-    private short seq;
-    private UUID fromStopId;
-    private UUID toStopId;
-    private TransportMode mode;
-    private UUID vehicleId;
-    private String vehicleCode;
-    private Integer distanceKm;
-    private Integer plannedMin;
-    private FlightResponse flight;
-}
+public record RouteLegResponse(
+        UUID id,
+        short seq,
+        UUID fromStopId,
+        UUID toStopId,
+        TransportMode mode,
+        UUID vehicleId,
+        String vehicleCode,
+        Integer distanceKm,
+        Integer plannedMin,
+        FlightResponse flight) {}
