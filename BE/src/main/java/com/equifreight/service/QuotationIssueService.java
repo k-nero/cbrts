@@ -17,6 +17,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
@@ -264,7 +265,7 @@ public class QuotationIssueService {
         line.setQuotation(to);
         line.setGroupCode(from.getGroupCode());
         line.setPosition(from.getPosition());
-        line.setLineKey(from.getLineKey());
+        line.setLineKey(QuotationMapper.keyOf(from));
         line.setDescription(from.getDescription());
         line.setBasisText(from.getBasisText());
         line.setBasis(from.getBasis());

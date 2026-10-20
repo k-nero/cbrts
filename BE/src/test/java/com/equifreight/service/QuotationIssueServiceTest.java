@@ -399,6 +399,17 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void reviseCarriesAnOverrideFromAVersionPricedBeforeLineKeys() {
+        Quotation v1 = issuedV1WithAdjustments();
+        v1.getLines().stream().filter(l -> l.getManualReason() == null).forEach(l -> l.setLineKey(null));
+
+        StartResult result = issue.revise(yen, request.getId());
+
+        assertThat(lineKeyed("GROOM").getOverrideAmount()).isEqualByComparingTo("1200.00");
+        assertThat(result.quotation().droppedOverrides()).isEmpty();
+    }
+
+    @Test
     void reviseRefusals() {
         startedWithIds();
         request.setStatus(RequestStatus.QUOTED);
