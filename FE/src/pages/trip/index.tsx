@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { Input, Select, Spin, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
+import { Input, message, Select, Spin, Upload } from 'antd';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 import type {
   HorseCondition,
   TripPhoto,
@@ -16,6 +15,7 @@ import type {
   TripSummary,
   TripView,
 } from '@/interfaces';
+import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 
 const eventLabels: Record<TripRecordKind, string> = {
   [TripRecordKindEnum.LOADED]: 'Loaded',

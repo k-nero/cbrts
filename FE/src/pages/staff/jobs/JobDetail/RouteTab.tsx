@@ -1,4 +1,4 @@
-import { Button, Callout, Chip, Icon, TimelineStop } from '@/components/ui';
+import { Button, Callout, Chip, TimelineStop } from '@/components/ui';
 import { useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 

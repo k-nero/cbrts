@@ -20,13 +20,14 @@ import { useRequest, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/
 import type { ApiError, Blocker, Horse, Route, TransportRequest } from '@/interfaces';
 import {
   apiErrorView,
+  blockerFieldErrors,
   EMPTY_WIZARD,
+  type FieldStep,
   firstOpenStep,
   formatDate,
   formRefusal,
   fromRequest,
   holdsStep,
-  blockerFieldErrors,
   liveBlockers,
   retiredRefusals,
   revealSelector,
@@ -36,7 +37,6 @@ import {
   stepOfBlocker,
   toDraftInput,
   WIZARD_STEPS,
-  type FieldStep,
   type WizardStep,
   type WizardValues,
 } from '@/lib/utils';
