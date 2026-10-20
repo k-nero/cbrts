@@ -165,7 +165,7 @@ class Flow3ServiceTest {
                 clearanceService,
                 auditService);
         crewAssignmentService = new CrewAssignmentService(
-                crewAssignmentRepository, transportJobRepository, userRepository, auditService, notificationService);
+                crewAssignmentRepository, transportJobRepository, userRepository, auditService);
         transportJobService = new TransportJobService(
                 transportJobRepository,
                 loadPlanService,
@@ -175,7 +175,8 @@ class Flow3ServiceTest {
                 routePlanRepository,
                 crewAssignmentRepository,
                 clearanceService,
-                auditService);
+                auditService,
+                notificationService);
     }
 
     @Test
@@ -639,6 +640,14 @@ class Flow3ServiceTest {
         assertEquals(JobStage.CLEARANCE, job.getStage());
         assertNotNull(job.getSignedOffAt());
         assertEquals(manager, job.getSignedOffBy());
+        verify(notificationService, times(2))
+                .sendNotification(
+                        any(),
+                        eq("TRIP_RELEASED"),
+                        contains("Trip plan signed off"),
+                        any(),
+                        eq("TRANSPORT_JOB"),
+                        eq(job.getId()));
     }
 
     @Test
@@ -977,32 +986,43 @@ class Flow3ServiceTest {
 
         assertThat(conflicts)
                 .anyMatch(c ->
-                        "WIDTH_EXCEEDED".equals(c.rule()) && c.description().contains("exceeds standard stall width"));
+                        "WIDTH_EXCEEDED".equals(c.rule()) && c.description().contains("exceeds stall width"));
     }
 
     @Test
-    @DisplayName("Assigning crew sends in-app notifications to each assigned member (US-F3-06)")
-    void crewAssignment_notifiesAssignedCrew() {
+    @DisplayName("Auto-arranging a load plan with a mare and foal places her in a BOX stall (US-F3-05)")
+    void loadPlan_autoArrange_mareWithFoalGetsBox() {
         TransportJob job = readyJob();
-        User escortA = user("khoi.do@equifreight.test", "ESCORT");
-        User escortB = user("yen.vu@equifreight.test", "ESCORT");
+        Horse mare = job.getRequest().getHorses().getFirst().getHorse();
+        mare.setSex(HorseSex.MARE);
+        job.getRequest().getHorses().getFirst().setWithFoal(true);
 
-        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        when(userRepository.findById(escortA.getId())).thenReturn(Optional.of(escortA));
-        when(userRepository.findById(escortB.getId())).thenReturn(Optional.of(escortB));
-        when(crewAssignmentRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        LoadPlan plan = loadPlan(job);
 
-        AssignCrewRequest req = crew(escortA, CrewRole.DRIVER, escortB, CrewRole.GROOM);
-        crewAssignmentService.assignCrew(job.getId(), req, escortA);
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
 
-        verify(notificationService, times(2))
-                .sendNotification(
-                        any(),
-                        eq("CREW_ASSIGNED"),
-                        contains("Assigned to trip"),
-                        any(),
-                        eq("TRANSPORT_JOB"),
-                        eq(job.getId()));
+        VehicleStall boxStall = new VehicleStall();
+        boxStall.setId(UUID.randomUUID());
+        boxStall.setStallType(StallType.BOX);
+        boxStall.setPositionNo((short) 2);
+        boxStall.setRowNo((short) 1);
+
+        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, boxStall));
+
+        User coordinator = user("khoi.do@equifreight.test", "FLEET_COORDINATOR");
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(mare.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.BOX));
     }
 
     @Test

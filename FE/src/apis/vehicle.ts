@@ -6,13 +6,12 @@ import type {
   Vehicle,
   VehicleBooking,
   VehicleBookingInput,
+  VehicleKind,
 } from '@/interfaces';
 
 export const vehicleApi = {
-  list: (params?: { page?: number; size?: number; sort?: string }) =>
+  list: (params?: { page?: number; size?: number }) =>
     client.get<PagedResponse<Vehicle>>('/staff/vehicles', { params }).then((r) => r.data),
-
-  listActive: () => client.get<Vehicle[]>('/staff/vehicles/active').then((r) => r.data),
 
   get: (id: string) => client.get<Vehicle>(`/staff/vehicles/${id}`).then((r) => r.data),
 
@@ -25,6 +24,6 @@ export const vehicleApi = {
   book: (body: VehicleBookingInput) =>
     client.post<VehicleBooking>('/staff/vehicles/bookings', body).then((r) => r.data),
 
-  getFleetCalendar: (params?: { from?: string; to?: string }) =>
+  getFleetCalendar: (params?: { from?: string; to?: string; vehicleKind?: VehicleKind }) =>
     client.get<VehicleBooking[]>('/staff/fleet-calendar', { params }).then((r) => r.data),
 };

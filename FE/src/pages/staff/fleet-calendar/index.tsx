@@ -1,36 +1,28 @@
 import { useState } from 'react';
 import { Chip, Icon, Panel } from '@/components/ui';
 import { useFleetCalendar, useVehicles } from '@/hooks/useVehicle';
+import { type VehicleKind, VehicleKindEnum } from '@/interfaces';
 
 export default function FleetCalendarPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('ALL');
-  const [selectedKind, setSelectedKind] = useState<string>('ALL');
+  const [selectedKind, setSelectedKind] = useState<VehicleKind | 'ALL'>('ALL');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  const fromIso = startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined;
+  const toIso = endDate ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined;
+  const kindParam = selectedKind !== 'ALL' ? selectedKind : undefined;
+
   const { data: vehiclesData } = useVehicles();
-  const { data: bookings, isLoading } = useFleetCalendar();
+  const { data: bookings, isLoading } = useFleetCalendar(fromIso, toIso, kindParam);
 
   const vehicles = vehiclesData?.content ?? [];
   const allBookings = bookings ?? [];
 
-  const filteredBookings = allBookings.filter((b) => {
-    if (selectedVehicleId !== 'ALL' && b.vehicleId !== selectedVehicleId) {
-      return false;
-    }
-    const v = vehicles.find((veh) => veh.id === b.vehicleId);
-    const vehicleKind = b.vehicleKind || v?.kind;
-    if (selectedKind !== 'ALL' && vehicleKind !== selectedKind) {
-      return false;
-    }
-    if (startDate && new Date(b.endsAt) < new Date(startDate)) {
-      return false;
-    }
-    if (endDate && new Date(b.startsAt) > new Date(`${endDate}T23:59:59`)) {
-      return false;
-    }
-    return true;
-  });
+  const filteredBookings =
+    selectedVehicleId === 'ALL'
+      ? allBookings
+      : allBookings.filter((b) => b.vehicleId === selectedVehicleId);
 
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -49,12 +41,15 @@ export default function FleetCalendarPage() {
             <span className="type-label-s text-ink-3">Type:</span>
             <select
               value={selectedKind}
-              onChange={(e) => setSelectedKind(e.target.value)}
+              onChange={(e) => setSelectedKind(e.target.value as VehicleKind | 'ALL')}
               className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
             >
               <option value="ALL">All types</option>
-              <option value="TRAILER">Trailer</option>
-              <option value="TRUCK">Rigid Truck</option>
+              {Object.values(VehicleKindEnum).map((k) => (
+                <option key={k} value={k}>
+                  {k === 'TRAILER' ? 'Trailer' : 'Rigid Truck'}
+                </option>
+              ))}
             </select>
           </div>
 

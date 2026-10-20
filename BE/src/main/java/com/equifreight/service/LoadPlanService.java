@@ -419,33 +419,23 @@ public class LoadPlanService {
                 totalWeight += h.getWeightKg();
             }
 
-            // Rule 1: Box stall requirement (stallion, aggressive horse, mare with foal, or XL size)
-            boolean travelsWithFoal = maresWithFoal.contains(h.getId());
-            boolean isLargeHorse = (h.getSizeClass() != null && h.getSizeClass().getWidthIn() >= 96);
-            boolean needsBox = (travelsWithFoal
-                    || isLargeHorse
-                    || h.getSex() == HorseSex.STALLION
-                    || h.getSex() == HorseSex.COLT
-                    || h.getTemperament() == Temperament.AGGRESSIVE
-                    || h.getRequiredStall() == StallType.BOX);
-            if (needsBox && s.getStallType() != StallType.BOX) {
-                String reason = travelsWithFoal
+            // Rule 1: Box stall requirement
+            if (requiresBox(h, maresWithFoal) && s.getStallType() != StallType.BOX) {
+                String reason = maresWithFoal.contains(h.getId())
                         ? "A mare with foal at foot takes a full box"
-                        : (isLargeHorse
-                                ? "Horse size class XL (96 in) requires a box stall"
-                                : "Needs a box stall (stallion or aggressive horse)");
+                        : "Needs a box stall (stallion or aggressive horse)";
                 conflicts.add(JobMapper.toConflictResponse(h, s, "BOX_REQUIRED", reason));
             }
 
             // Rule 1b: Horse width requirement vs stall width (US-F3-05)
             if (h.getSizeClass() != null
-                    && h.getSizeClass().getWidthIn() > 32
-                    && s.getStallType() == StallType.STANDARD) {
+                    && h.getSizeClass().getWidthIn() > s.getStallType().getWidthIn()) {
                 conflicts.add(JobMapper.toConflictResponse(
                         h,
                         s,
                         "WIDTH_EXCEEDED",
-                        "Horse width (" + h.getSizeClass().getWidthIn() + " in) exceeds standard stall width (32 in)"));
+                        "Horse width (" + h.getSizeClass().getWidthIn() + " in) exceeds stall width ("
+                                + s.getStallType().getWidthIn() + " in)"));
             }
 
             // Rule 2: Climate stall requirement
@@ -551,6 +541,31 @@ public class LoadPlanService {
         return Collections.emptyList();
     }
 
+    private boolean requiresBox(Horse horse, Set<UUID> maresWithFoal) {
+        return maresWithFoal.contains(horse.getId())
+                || horse.getSex() == HorseSex.STALLION
+                || horse.getSex() == HorseSex.COLT
+                || horse.getTemperament() == Temperament.AGGRESSIVE
+                || horse.getRequiredStall() == StallType.BOX;
+    }
+
+    private boolean fitsStall(Horse horse, VehicleStall stall, Set<UUID> maresWithFoal) {
+        if (requiresBox(horse, maresWithFoal) && stall.getStallType() != StallType.BOX) {
+            return false;
+        }
+        if (horse.getSizeClass() != null
+                && horse.getSizeClass().getWidthIn() > stall.getStallType().getWidthIn()) {
+            return false;
+        }
+        if (horse.getRequiredStall() == StallType.CLIMATE && stall.getStallType() != StallType.CLIMATE) {
+            return false;
+        }
+        if (horse.getTemperament() == Temperament.NERVOUS && stall.isNearRamp()) {
+            return false;
+        }
+        return true;
+    }
+
     private Set<UUID> getHorsesWithFoal(TransportJob job) {
         Set<UUID> mares = new HashSet<>();
         if (job != null && job.getRequest() != null && job.getRequest().getHorses() != null) {
@@ -592,27 +607,7 @@ public class LoadPlanService {
             }
 
             // Check hard constraints for this candidate stall:
-            boolean travelsWithFoal = maresWithFoal.contains(horse.getId());
-            boolean isLargeHorse =
-                    (horse.getSizeClass() != null && horse.getSizeClass().getWidthIn() >= 96);
-            boolean needsBox = (travelsWithFoal
-                    || isLargeHorse
-                    || horse.getSex() == HorseSex.STALLION
-                    || horse.getSex() == HorseSex.COLT
-                    || horse.getTemperament() == Temperament.AGGRESSIVE
-                    || horse.getRequiredStall() == StallType.BOX);
-            if (needsBox && stall.getStallType() != StallType.BOX) {
-                continue;
-            }
-            if (horse.getSizeClass() != null
-                    && horse.getSizeClass().getWidthIn() > 32
-                    && stall.getStallType() == StallType.STANDARD) {
-                continue;
-            }
-            if (horse.getRequiredStall() == StallType.CLIMATE && stall.getStallType() != StallType.CLIMATE) {
-                continue;
-            }
-            if (horse.getTemperament() == Temperament.NERVOUS && stall.isNearRamp()) {
+            if (!fitsStall(horse, stall, maresWithFoal)) {
                 continue;
             }
 

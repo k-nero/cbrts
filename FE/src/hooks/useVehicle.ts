@@ -1,9 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
 import { vehicleApi } from '@/apis/vehicle';
-import type { CreateVehicleInput, UpdateVehicleInput, VehicleBookingInput } from '@/interfaces';
+import type {
+  CreateVehicleInput,
+  UpdateVehicleInput,
+  VehicleBookingInput,
+  VehicleKind,
+} from '@/interfaces';
 
-export const useVehicles = (params?: { page?: number; size?: number; sort?: string }) => {
+export const useVehicles = (params?: { page?: number; size?: number }) => {
   return useQuery({
     queryKey: ['vehicles', params],
     queryFn: () => vehicleApi.list(params),
@@ -13,7 +17,10 @@ export const useVehicles = (params?: { page?: number; size?: number; sort?: stri
 export const useActiveVehicles = () => {
   return useQuery({
     queryKey: ['vehicles', 'active'],
-    queryFn: () => vehicleApi.listActive(),
+    queryFn: async () => {
+      const res = await vehicleApi.list({ size: 100 });
+      return (res.content ?? []).filter((v) => v.status === 'ACTIVE');
+    },
   });
 };
 
@@ -21,7 +28,7 @@ export const useVehicle = (id: string) => {
   return useQuery({
     queryKey: ['vehicle', id],
     queryFn: () => vehicleApi.get(id),
-    enabled: Boolean(id),
+    enabled: !!id,
   });
 };
 
@@ -40,9 +47,9 @@ export const useUpdateVehicle = () => {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateVehicleInput }) =>
       vehicleApi.update(id, body),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vehicle', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
     },
   });
 };
@@ -58,9 +65,9 @@ export const useBookVehicle = () => {
   });
 };
 
-export const useFleetCalendar = (from?: string, to?: string) => {
+export const useFleetCalendar = (from?: string, to?: string, vehicleKind?: VehicleKind) => {
   return useQuery({
-    queryKey: ['fleet-calendar', from, to],
-    queryFn: () => vehicleApi.getFleetCalendar({ from, to }),
+    queryKey: ['fleet-calendar', from, to, vehicleKind],
+    queryFn: () => vehicleApi.getFleetCalendar({ from, to, vehicleKind }),
   });
 };

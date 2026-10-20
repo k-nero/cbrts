@@ -26,10 +26,10 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
                 j.code, j.tripStatus, o.name, d.name,
                 (select max(r.occurredAt) from TripRecord r where r.job = j))
             from CrewAssignment c join c.job j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
-            where c.user.id = :userId and j.signedOffAt is not null and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+            where c.user.id = :userId and (j.signedOffAt is not null or j.tripStatus <> com.equifreight.entity.enums.TripStatus.NOT_STARTED) and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
             """, countQuery = """
                     select count(c) from CrewAssignment c join c.job j
-                    where c.user.id = :userId and j.signedOffAt is not null and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+                    where c.user.id = :userId and (j.signedOffAt is not null or j.tripStatus <> com.equifreight.entity.enums.TripStatus.NOT_STARTED) and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
                     """)
     Page<TripSummaryResponse> findTripSummariesByUserId(@Param("userId") UUID userId, Pageable pageable);
 

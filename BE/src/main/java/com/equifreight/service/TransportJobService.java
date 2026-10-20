@@ -33,6 +33,7 @@ public class TransportJobService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final ClearanceService clearanceService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -43,7 +44,8 @@ public class TransportJobService {
             RoutePlanRepository routePlanRepository,
             CrewAssignmentRepository crewAssignmentRepository,
             ClearanceService clearanceService,
-            AuditService auditService) {
+            AuditService auditService,
+            NotificationService notificationService) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -53,6 +55,7 @@ public class TransportJobService {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.clearanceService = clearanceService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -225,6 +228,16 @@ public class TransportJobService {
                 null,
                 "NOT_SIGNED_OFF",
                 "SIGNED_OFF");
+
+        for (CrewAssignment member : crewAssignments) {
+            notificationService.sendNotification(
+                    member.getUser(),
+                    "TRIP_RELEASED",
+                    "Trip plan signed off: " + job.getCode(),
+                    "The trip plan for job " + job.getCode() + " has been signed off and released.",
+                    "TRANSPORT_JOB",
+                    job.getId());
+        }
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);

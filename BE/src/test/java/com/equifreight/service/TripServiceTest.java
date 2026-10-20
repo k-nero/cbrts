@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
@@ -9,6 +10,7 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.repository.*;
@@ -486,5 +488,52 @@ class TripServiceTest {
         record.setKind(kind);
         record.setOccurredAt(at);
         return record;
+    }
+
+    // ---------- escort sign-off gate (US-F3-08) ----------
+
+    @Test
+    @DisplayName("Escort cannot open or record a trip before manager sign-off when not started")
+    void escortAccess_refusedBeforeSignOffWhenNotStarted() {
+        job.setSignedOffAt(null);
+        job.setTripStatus(TripStatus.NOT_STARTED);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+
+        assertThrows(ResourceNotFoundException.class, () -> service.escortTrip(job.getCode(), escort));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.addEscortRecord(job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null)));
+    }
+
+    @Test
+    @DisplayName("Escort can open and record on a signed-off trip")
+    void escortAccess_allowedAfterSignOff() {
+        job.setSignedOffAt(NOW.minus(Duration.ofHours(1)));
+        job.setTripStatus(TripStatus.NOT_STARTED);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(routes.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(loads.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.empty());
+        when(crew.findByJobId(job.getId())).thenReturn(List.of());
+
+        assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
+        assertDoesNotThrow(
+                () -> service.addEscortRecord(job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null)));
+    }
+
+    @Test
+    @DisplayName("Escort retains access mid-trip even if a plan change cleared signedOffAt")
+    void escortAccess_allowedMidTripEvenIfSignedOffAtNull() {
+        job.setSignedOffAt(null);
+        departed();
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(routes.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(loads.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.empty());
+        when(crew.findByJobId(job.getId())).thenReturn(List.of());
+
+        assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
+        assertDoesNotThrow(
+                () -> service.addEscortRecord(job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null)));
     }
 }
