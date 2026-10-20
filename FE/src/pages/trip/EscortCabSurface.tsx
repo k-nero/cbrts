@@ -387,6 +387,28 @@ export function EscortCabSurface() {
         };
       });
 
+      // 1. If in ARRIVED, log condition check and mark DELIVERED first if needed
+      if (trip.tripStatus === TripStatusEnum.ARRIVED) {
+        if (conditions.length > 0) {
+          await mutation.mutateAsync({
+            routeStopId: currentStop?.id ?? null,
+            kind: TripRecordKindEnum.CONDITION_CHECK,
+            occurredAt: new Date().toISOString(),
+            clientRef: crypto.randomUUID(),
+            text: 'Arrival condition logged on handover.',
+            conditions,
+          });
+        }
+        await mutation.mutateAsync({
+          routeStopId: currentStop?.id ?? null,
+          kind: TripRecordKindEnum.DELIVERED,
+          occurredAt: new Date().toISOString(),
+          clientRef: crypto.randomUUID(),
+          text: `Delivered at ${currentStop?.name || 'destination'}.`,
+        });
+      }
+
+      // 2. Record handover with receiverName (conditions not sent on HANDED_OVER)
       await mutation.mutateAsync({
         routeStopId: currentStop?.id ?? null,
         kind: TripRecordKindEnum.HANDED_OVER,
@@ -394,7 +416,6 @@ export function EscortCabSurface() {
         clientRef: crypto.randomUUID(),
         text: `Handed over to ${receivedByGroom}. Signed on tablet.`,
         receiverName: receivedByGroom.trim() || undefined,
-        conditions,
       });
 
       messageApi.success(`Handover recorded at ${nowTime}.`);
