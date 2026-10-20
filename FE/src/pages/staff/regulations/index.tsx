@@ -1,5 +1,5 @@
-import { FC, useState, useMemo, useEffect } from 'react';
-import { Input, Select, message, Spin } from 'antd';
+import { FC, useEffect, useMemo, useState } from 'react';
+import { Input, message, Select, Spin } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -9,19 +9,14 @@ import { Callout } from '@/components/ui/Callout';
 import { StatTile } from '@/components/ui/StatTile';
 import { Checkbox } from '@/components/ui/Checkbox';
 import {
+  useCreateRegulationDraft,
+  useDiscardRegulationDraft,
+  usePublishRegulationVersion,
   useRegulationCatalogs,
   useRegulationVersion,
   useUpdateRegulationRule,
-  usePublishRegulationVersion,
-  useDiscardRegulationDraft,
-  useCreateRegulationDraft,
 } from '@/hooks/regulation';
-import type {
-  RegulationCatalog,
-  RegulationRule,
-  RegulationRuleKind,
-  RegulationVersion,
-} from '@/interfaces';
+import type { RegulationRule, RegulationRuleKind } from '@/interfaces';
 
 interface DestinationItem {
   id: string;

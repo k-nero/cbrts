@@ -12,7 +12,7 @@ import lombok.Builder;
 @Builder(toBuilder = true)
 public record RegisterRequest(
         @NotBlank @Size(max = 160) String clubName,
-        /**
+        /*
          * ISO 3166-1 alpha-2, one of the countries EquiFreight serves.
          */
         @NotBlank @Pattern(regexp = "[A-Z]{2}") String countryCode,

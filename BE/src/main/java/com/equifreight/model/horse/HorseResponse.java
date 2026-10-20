@@ -29,7 +29,7 @@ public record HorseResponse(
         StallType requiredStall,
         String handlingNotes,
         Instant archivedAt,
-        /**
+        /*
          * Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request.
          */
         boolean identityLocked,

@@ -101,10 +101,10 @@ export default function JobDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3">
-              <h1 className="type-h1 text-ink">
+              <h1 className="type-display-m text-ink">
                 {job.originCity} → {job.destinationCity}
               </h1>
-              <span className="type-mono-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">
+              <span className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">
                 {job.code}
               </span>
             </div>

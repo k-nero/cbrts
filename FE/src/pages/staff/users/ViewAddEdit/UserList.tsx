@@ -25,6 +25,7 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
         title: 'Name',
         key: 'firstName',
         dataIndex: 'firstName',
+        width: 300,
         sorter: true,
         render: (_, r) => (
           <div className="flex flex-col">
@@ -36,6 +37,7 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       {
         title: 'Role',
         key: 'roles',
+        width: 200,
         dataIndex: 'roles',
         render: (roles: string[]) =>
           roles.map((r) => <Tag key={r}>{ROLE_LABEL[r as RoleName] ?? r}</Tag>),
@@ -79,6 +81,8 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       dataSource={listQuery.data?.content ?? []}
       // Spinner until the first page arrives, and while a new page or sort loads.
       loading={listQuery.isPending || listQuery.isFetching}
+      onRefresh={() => void listQuery.refetch()}
+      refreshing={listQuery.isFetching && !listQuery.isPending}
       ignoreKeys={['actions']}
       // Controlled, so the header highlight follows the page's sort and "Reset order" clears it.
       sorter={
