@@ -36,6 +36,7 @@ import {
   ict,
   money,
   quoteSummary,
+  statusActions,
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -150,8 +151,7 @@ const QuotationBuilderPage: FC = () => {
       'Quotation re-priced',
     );
   const draft = q.status === 'DRAFT';
-  const latest = q.versions.length === 0 || q.versions[0].versionNo === q.versionNo;
-  const draftVersionNo = q.versions[0]?.status === 'DRAFT' ? q.versions[0].versionNo : null;
+  const actions = statusActions(q);
   const onIssue = (changeNote: string | null) =>
     modal.confirm({
       title: `Issue ${q.code} v${q.versionNo} for ${q.totals.total == null ? '—' : money(q.totals.total)}?`,
@@ -237,7 +237,7 @@ const QuotationBuilderPage: FC = () => {
           {draft && q.request.mode === 'AIR' && (
             <StallChoice quotation={q} pending={changeClass.isPending} onChange={onClass} />
           )}
-          <Ledger quotation={q} editable={q.status === 'DRAFT'} run={write} />
+          <Ledger key={`${q.versionNo}-${q.status}`} quotation={q} editable={draft} run={write} />
           <TotalsPanel quotation={q} />
         </div>
         <div className="flex flex-col gap-6">
@@ -254,8 +254,9 @@ const QuotationBuilderPage: FC = () => {
           ) : (
             <StatusPanel
               quotation={q}
-              latest={latest}
-              draftVersionNo={draftVersionNo}
+              latest={actions.latest}
+              canRevise={actions.canRevise}
+              draftVersionNo={actions.draftVersionNo}
               revising={revise.isPending}
               onRevise={onRevise}
               onOpenDraft={() => showVersion(null)}

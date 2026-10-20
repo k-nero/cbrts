@@ -185,10 +185,10 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
                 note={note(l)}
                 extra={extra(l)}
               />
-              {open?.kind === 'override' && open.lineId === l.id && (
+              {editable && open?.kind === 'override' && open.lineId === l.id && (
                 <OverrideEditor requestId={requestId} line={l} run={run} onClose={close} />
               )}
-              {open?.kind === 'edit' && open.lineId === l.id && (
+              {editable && open?.kind === 'edit' && open.lineId === l.id && (
                 <ManualLineEditor
                   requestId={requestId}
                   group={g.code}
@@ -199,7 +199,7 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
               )}
             </div>
           ))}
-          {open?.kind === 'add' && open.group === g.code && (
+          {editable && open?.kind === 'add' && open.group === g.code && (
             <ManualLineEditor
               requestId={requestId}
               group={g.code}
@@ -466,11 +466,12 @@ export const VersionChip: FC<{ status: QuotationDraft['status'] }> = ({ status }
 export const StatusPanel: FC<{
   quotation: QuotationDraft;
   latest: boolean;
+  canRevise: boolean;
   draftVersionNo: number | null;
   revising: boolean;
   onRevise: () => void;
   onOpenDraft: () => void;
-}> = ({ quotation, latest, draftVersionNo, revising, onRevise, onOpenDraft }) => {
+}> = ({ quotation, latest, canRevise, draftVersionNo, revising, onRevise, onOpenDraft }) => {
   const validity = validityText(quotation.validUntil, quotation.validityDays);
   const expired = quotation.status === 'EXPIRED';
   return (
@@ -503,7 +504,7 @@ export const StatusPanel: FC<{
               <Button variant="secondary" block onClick={onOpenDraft}>
                 {`Open draft v${draftVersionNo}`}
               </Button>
-            ) : (
+            ) : canRevise ? (
               <>
                 <span className="type-body-s text-ink-2">
                   {expired
@@ -514,7 +515,7 @@ export const StatusPanel: FC<{
                   Revise quotation
                 </Button>
               </>
-            )}
+            ) : null}
           </div>
         )}
       </div>

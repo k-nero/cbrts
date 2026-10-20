@@ -1,6 +1,12 @@
+import { formatDay } from './horse';
 import { daysUntil, formatDate } from './time';
 
-import type { CancellationBand, CustomerQuotation, CustomerQuoteGroup } from '@/interfaces';
+import type {
+  CancellationBand,
+  CustomerQuotation,
+  CustomerQuoteGroup,
+  QuotationIssuedRef,
+} from '@/interfaces';
 
 export type MoneyRow = { code: string | null; name: string; amount: number; share: number };
 
@@ -92,3 +98,34 @@ export const owedKind = (
       : status === 'DECLINED'
         ? 'declined'
         : 'answer';
+
+/** "1 Dec 2026 ±3 d": the departure is a calendar day, read as written (no time zone may shift it). */
+export const departsText = (day: string | null, flexDays: number): string =>
+  day ? `${formatDay(day)}${flexDays ? ` ±${flexDays} d` : ''}` : '—';
+
+/** The submitted page's pointer to the quotation, worded by where the quotation stands. */
+export const quotationCallout = (
+  ref: QuotationIssuedRef,
+): { tone: 'info' | 'ok'; title: string; body: string } => {
+  const label = `${ref.code} v${ref.versionNo}`;
+  const until = ref.validUntil ? formatDate(ref.validUntil) : null;
+  if (ref.status === 'EXPIRED')
+    return {
+      tone: 'info',
+      title: `Your quotation ${label} expired${until ? ` on ${until}` : ''}.`,
+      body: 'A logistics manager can re-price it from the rate catalog in force now.',
+    };
+  if (ref.status === 'ACCEPTED')
+    return {
+      tone: 'ok',
+      title: `You accepted quotation ${label}.`,
+      body: 'Its price and horse list hold for this move.',
+    };
+  return {
+    tone: 'info',
+    title: `Your quotation is ready: ${label}.`,
+    body: until
+      ? `It holds its price until ${until}.`
+      : 'It is itemised, with the deposit and cancellation terms.',
+  };
+};

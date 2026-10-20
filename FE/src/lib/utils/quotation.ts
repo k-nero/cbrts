@@ -175,3 +175,20 @@ export const overrideDefaults = (line: QuoteLineRow): { amount: string; reason: 
   amount: (line.overrideAmount ?? line.catalogAmount ?? 0).toFixed(2),
   reason: line.overrideReason ?? '',
 });
+
+/**
+ * What an issued version's status panel offers. It is the latest when no later version was issued (a
+ * revision being drafted doesn't count); then it opens that draft, or, while issued or expired, is revised.
+ */
+export const statusActions = (
+  q: Pick<QuotationDraft, 'versionNo' | 'status' | 'versions'>,
+): { latest: boolean; draftVersionNo: number | null; canRevise: boolean } => {
+  const draft = q.versions.find((v) => v.status === 'DRAFT') ?? null;
+  const newestIssued = q.versions.find((v) => v.status !== 'DRAFT');
+  const latest = !newestIssued || newestIssued.versionNo === q.versionNo;
+  return {
+    latest,
+    draftVersionNo: latest && draft ? draft.versionNo : null,
+    canRevise: latest && !draft && (q.status === 'ISSUED' || q.status === 'EXPIRED'),
+  };
+};

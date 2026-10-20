@@ -2,7 +2,7 @@ import type { FC } from 'react';
 
 import { COAT_SWATCH, cx, DraftPass } from '@/components/ui';
 import type { CustomerQuotation, HorseCoat } from '@/interfaces';
-import { coatOf, formatDate, formatDayTime, formatTime, money } from '@/lib/utils';
+import { coatOf, departsText, formatDate, formatDayTime, formatTime, money } from '@/lib/utils';
 
 /** The horses as coat swatches with their names, as on the pass. */
 const Horses: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => (
@@ -66,9 +66,7 @@ export const QuotedPass: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
         { label: 'Horses', value: <Horses quotation={quotation} /> },
         {
           label: 'Departs',
-          value: r.departureDate
-            ? `${formatDate(r.departureDate)}${r.dateFlexDays ? ` ±${r.dateFlexDays} d` : ''}`
-            : '—',
+          value: departsText(r.departureDate, r.dateFlexDays),
           mono: true,
         },
         { label: 'Mode', value: mode(quotation) },

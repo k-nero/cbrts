@@ -8,8 +8,10 @@ import {
   estimateVerdict,
   largestLine,
   moneyHead,
+  departsText,
   moneyRows,
   owedKind,
+  quotationCallout,
   shareText,
 } from './customerQuotation';
 
@@ -130,5 +132,36 @@ describe('moneyRows with no lines', () => {
   test('nothing to draw', () => {
     expect(moneyRows([], { subtotal: 4200, total: 4200 })).toEqual([]);
     expect(moneyHead([])).toBe('');
+  });
+});
+
+describe('departsText', () => {
+  test('a calendar day is read as written, never shifted by a time zone', () => {
+    expect(departsText('2026-12-01', 0)).toBe('1 Dec 2026');
+    expect(departsText('2026-12-01', 3)).toBe('1 Dec 2026 ±3 d');
+    expect(departsText(null, 0)).toBe('—');
+  });
+});
+
+describe('quotationCallout', () => {
+  const ref = { code: 'Q-2026-0189', versionNo: 2, validUntil: '2026-10-27T16:59:59.999Z' };
+  test('an issued quotation waits for an answer', () => {
+    expect(quotationCallout({ ...ref, status: 'ISSUED' })).toEqual({
+      tone: 'info',
+      title: 'Your quotation is ready: Q-2026-0189 v2.',
+      body: 'It holds its price until 27 Oct 2026.',
+    });
+  });
+  test('an expired one says so', () => {
+    expect(quotationCallout({ ...ref, status: 'EXPIRED' })).toEqual({
+      tone: 'info',
+      title: 'Your quotation Q-2026-0189 v2 expired on 27 Oct 2026.',
+      body: 'A logistics manager can re-price it from the rate catalog in force now.',
+    });
+  });
+  test('an accepted one says so', () => {
+    expect(quotationCallout({ ...ref, status: 'ACCEPTED' }).title).toBe(
+      'You accepted quotation Q-2026-0189 v2.',
+    );
   });
 });

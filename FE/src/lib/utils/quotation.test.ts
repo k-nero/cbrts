@@ -8,6 +8,7 @@ import {
   conflictMessage,
   depositText,
   issueBlocker,
+  statusActions,
   overrideDefaults,
   validityText,
   money,
@@ -301,5 +302,47 @@ describe('overrideDefaults', () => {
     expect(
       overrideDefaults(line({ amount: 1200, overrideAmount: 1200, overrideReason: 'Own groom' })),
     ).toEqual({ amount: '1200.00', reason: 'Own groom' });
+  });
+});
+
+describe('statusActions', () => {
+  const v = (versionNo: number, status: string) => ({
+    versionNo,
+    status: status as never,
+    issuedAt: null,
+    validUntil: null,
+    total: null,
+    supersededReason: null,
+  });
+  test('the latest issued version can be revised', () => {
+    expect(statusActions({ versionNo: 1, status: 'ISSUED', versions: [v(1, 'ISSUED')] })).toEqual({
+      latest: true,
+      draftVersionNo: null,
+      canRevise: true,
+    });
+  });
+  test('with a revision drafted, the issued version offers the draft', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'ISSUED', versions: [v(2, 'DRAFT'), v(1, 'ISSUED')] }),
+    ).toEqual({ latest: true, draftVersionNo: 2, canRevise: false });
+  });
+  test('a superseded version is not the latest', () => {
+    expect(
+      statusActions({
+        versionNo: 1,
+        status: 'SUPERSEDED',
+        versions: [v(2, 'ISSUED'), v(1, 'SUPERSEDED')],
+      }).latest,
+    ).toBe(false);
+  });
+  test('an accepted or declined quotation is not revised', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'ACCEPTED', versions: [v(1, 'ACCEPTED')] }).canRevise,
+    ).toBe(false);
+  });
+  test('an expired version can be revised', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'EXPIRED', versions: [v(1, 'EXPIRED')] }).canRevise,
+    ).toBe(true);
   });
 });

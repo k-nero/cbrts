@@ -8,7 +8,14 @@ import { RequestLoadState } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
-import { estimateStub, formatDate, fromRequest, latestRevision, passChip } from '@/lib/utils';
+import {
+  estimateStub,
+  formatDate,
+  fromRequest,
+  latestRevision,
+  passChip,
+  quotationCallout,
+} from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -124,8 +131,8 @@ const RequestSubmittedPage: FC = () => {
         <div className="flex flex-col gap-6">
           {request.quotation && (
             <Callout
-              tone="info"
-              title={`Your quotation is ready: ${request.quotation.code} v${request.quotation.versionNo}.`}
+              tone={quotationCallout(request.quotation).tone}
+              title={quotationCallout(request.quotation).title}
               action={
                 <Button
                   size="sm"
@@ -137,9 +144,7 @@ const RequestSubmittedPage: FC = () => {
                 </Button>
               }
             >
-              {request.quotation.validUntil
-                ? `It holds its price until ${formatDate(request.quotation.validUntil)}.`
-                : 'It is itemised, with the deposit and cancellation terms.'}
+              {quotationCallout(request.quotation).body}
             </Callout>
           )}
           {!request.quotation && (
