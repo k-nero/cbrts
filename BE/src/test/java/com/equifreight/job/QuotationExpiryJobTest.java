@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,8 @@ import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.AuditService;
 import com.equifreight.service.NotificationService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +43,7 @@ class QuotationExpiryJobTest {
     UserRepository users;
     NotificationService notifications;
     AuditService audit;
+    EntityManager entities;
     QuotationExpiryJob job;
     List<Quotation> issued = new ArrayList<>();
     TransportRequest request;
@@ -52,8 +56,9 @@ class QuotationExpiryJobTest {
         users = mock(UserRepository.class);
         notifications = mock(NotificationService.class);
         audit = mock(AuditService.class);
+        entities = mock(EntityManager.class);
         job = new QuotationExpiryJob(
-                quotations, requests, users, notifications, audit, Clock.fixed(NOW, BusinessTime.ZONE));
+                quotations, requests, users, notifications, audit, entities, Clock.fixed(NOW, BusinessTime.ZONE));
         Club club = new Club();
         club.setId(UUID.randomUUID());
         request = new TransportRequest();
@@ -179,5 +184,27 @@ class QuotationExpiryJobTest {
         verify(quotations)
                 .findByStatusAndReminderSentAtIsNullAndValidUntilBefore(
                         QuotationStatus.ISSUED, NOW.plus(Duration.ofHours(24)));
+    }
+
+    @Test
+    void aQuotationSupersededWhileTheJobRanIsLeftAsItIs() {
+        Quotation q = issuedUntil(NOW.minus(Duration.ofHours(1)));
+        // A manager issued v2 between the job's read and its lock: the refreshed row is SUPERSEDED.
+        doAnswer(i -> {
+                    q.setStatus(QuotationStatus.SUPERSEDED);
+                    q.setSupersededReason("Departure moved from 12 Nov to 20 Nov.");
+                    return null;
+                })
+                .when(entities)
+                .refresh(q);
+
+        job.run();
+
+        verify(entities).refresh(request, LockModeType.PESSIMISTIC_WRITE);
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.SUPERSEDED);
+        assertThat(q.getSupersededReason()).isEqualTo("Departure moved from 12 Nov to 20 Nov.");
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.QUOTED);
+        verify(quotations, never()).save(q);
+        verify(notifications, never()).sendNotification(any(), any(), any(), any(), any(), any());
     }
 }

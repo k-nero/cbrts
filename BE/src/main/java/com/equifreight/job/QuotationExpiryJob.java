@@ -11,6 +11,8 @@ import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.AuditService;
 import com.equifreight.service.NotificationService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +38,7 @@ public class QuotationExpiryJob {
     private final UserRepository users;
     private final NotificationService notifications;
     private final AuditService audit;
+    private final EntityManager entities;
     private final Clock clock;
 
     public QuotationExpiryJob(
@@ -44,12 +47,14 @@ public class QuotationExpiryJob {
             UserRepository users,
             NotificationService notifications,
             AuditService audit,
+            EntityManager entities,
             Clock clock) {
         this.quotations = quotations;
         this.requests = requests;
         this.users = users;
         this.notifications = notifications;
         this.audit = audit;
+        this.entities = entities;
         this.clock = clock;
     }
 
@@ -59,16 +64,31 @@ public class QuotationExpiryJob {
         Instant now = clock.instant();
         int expired = 0;
         for (Quotation q : quotations.findByStatusAndValidUntilBefore(QuotationStatus.ISSUED, now)) {
-            expire(q);
-            expired++;
+            if (stillIssuedBefore(q, now)) {
+                expire(q);
+                expired++;
+            }
         }
-        for (Quotation q : quotations.findByStatusAndReminderSentAtIsNullAndValidUntilBefore(
-                QuotationStatus.ISSUED, now.plus(Duration.ofHours(24)))) {
-            remind(q, now);
+        Instant soon = now.plus(Duration.ofHours(24));
+        for (Quotation q :
+                quotations.findByStatusAndReminderSentAtIsNullAndValidUntilBefore(QuotationStatus.ISSUED, soon)) {
+            if (stillIssuedBefore(q, soon) && q.getReminderSentAt() == null) {
+                remind(q, now);
+            }
         }
         if (expired > 0) {
             log.info("Expired {} quotation(s)", expired);
         }
+    }
+
+    /**
+     * Locks the request row (the order every staff write takes) and reads the quotation again: a manager may have
+     * issued the next version, which supersedes this one, between the job's read and now.
+     */
+    private boolean stillIssuedBefore(Quotation q, Instant before) {
+        entities.refresh(q.getRequest(), LockModeType.PESSIMISTIC_WRITE);
+        entities.refresh(q);
+        return q.getStatus() == QuotationStatus.ISSUED && q.getValidUntil().isBefore(before);
     }
 
     private void expire(Quotation q) {
