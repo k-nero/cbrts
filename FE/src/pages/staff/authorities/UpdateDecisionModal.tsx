@@ -3,12 +3,10 @@ import { App, DatePicker, Form, Input, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import BaseModal from '@/components/modal/BaseModal';
 import { Button } from '@/components/ui';
+import { apiErrorMessage } from '@/lib/utils';
 import { useUpdateSubmission } from '@/hooks/clearance';
-import {
-  type AuthoritySubmission,
-  type SubmissionStatus,
-  SubmissionStatusEnum,
-} from '@/interfaces';
+import type { AuthoritySubmission, SubmissionStatus } from '@/interfaces';
+import { DECISION_OPTIONS } from './labels';
 
 type Values = { status: SubmissionStatus; referenceNo?: string; expectedBy?: Dayjs };
 
@@ -52,8 +50,8 @@ const UpdateDecisionForm: FC<{
       });
       message.success('Submission status updated successfully.');
       onClose();
-    } catch {
-      // The API refusal shows through the mutation's error state.
+    } catch (err: unknown) {
+      message.error(apiErrorMessage(err, 'The change could not be saved.'));
     }
   };
 
@@ -74,17 +72,7 @@ const UpdateDecisionForm: FC<{
         label="Authority decision / Status"
         rules={[{ required: true, message: 'Please select status' }]}
       >
-        <Select
-          options={[
-            { label: 'Approved & Issued (ISSUED)', value: SubmissionStatusEnum.ISSUED },
-            { label: 'With the authority (FILED)', value: SubmissionStatusEnum.FILED },
-            {
-              label: 'Additional information requested (ADDITIONAL_INFO)',
-              value: SubmissionStatusEnum.ADDITIONAL_INFO,
-            },
-            { label: 'Refused / Rejected (REFUSED)', value: SubmissionStatusEnum.REFUSED },
-          ]}
-        />
+        <Select options={DECISION_OPTIONS} />
       </Form.Item>
 
       <Form.Item name="referenceNo" label="Official permit / Decision reference number">

@@ -1,45 +1,49 @@
 import { type FC, useState } from 'react';
-import { App, Input, Select } from 'antd';
+import { App, Input } from 'antd';
 import { Button, Callout, Checkbox, Panel } from '@/components/ui';
 import { useUpdateRegulationRule } from '@/hooks/regulation';
-import {
-  type DocumentScope,
-  DocumentScopeEnum,
-  type RegulationRule,
-  type RegulationRuleKind,
-  RegulationRuleKindEnum,
-} from '@/interfaces';
+import { type RegulationRule, type RegulationRuleKind, RegulationRuleKindEnum } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
-import { RULE_SHAPE_OPTIONS, SCOPE_OPTIONS } from './constants';
+import { RULE_SHAPE_OPTIONS, scopeLabel } from './constants';
 
-type Draft = {
-  kind: RegulationRuleKind;
-  days: string;
-  appliesTo: DocumentScope;
-  mandatory: boolean;
-  description: string;
-};
+type Draft = { kind: RegulationRuleKind; days: string; mandatory: boolean };
 
-const draftOf = (rule?: RegulationRule): Draft => ({
-  kind: rule?.ruleKind ?? RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE,
-  days: String(rule?.maxDays ?? rule?.minDays ?? 45),
-  appliesTo: rule?.documentType?.scope ?? DocumentScopeEnum.PER_HORSE,
-  mandatory: rule?.mandatory ?? true,
-  description: rule?.description ?? '',
+const draftOf = (rule: RegulationRule): Draft => ({
+  kind: rule.ruleKind,
+  days:
+    rule.maxDays !== undefined || rule.minDays !== undefined
+      ? String(rule.maxDays ?? rule.minDays)
+      : '',
+  mandatory: rule.mandatory,
 });
+
+type Props = {
+  rule?: RegulationRule;
+  /** Only a draft version's rules can change; a published version is immutable. */
+  editable: boolean;
+};
 
 /**
  * Edits one rule of the draft catalog. Keyed by the rule's id, so picking another rule starts from its
  * saved values; Cancel goes back to them.
  */
-const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
+const RuleEditor: FC<Props> = ({ rule, editable }) => {
+  if (!rule)
+    return (
+      <Panel title="Edit rule" className="lg:col-span-2">
+        <p className="type-body-s m-0 text-ink-3">This version has no document rules yet.</p>
+      </Panel>
+    );
+  return <RuleForm rule={rule} editable={editable} />;
+};
+
+const RuleForm: FC<{ rule: RegulationRule; editable: boolean }> = ({ rule, editable }) => {
   const { message } = App.useApp();
   const update = useUpdateRegulationRule();
   const [draft, setDraft] = useState<Draft>(() => draftOf(rule));
   const change = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
   const save = async () => {
-    if (!rule) return;
     try {
       await update.mutateAsync({
         ruleId: rule.id,
@@ -47,7 +51,6 @@ const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
           ruleKind: draft.kind,
           maxDays: draft.days ? parseInt(draft.days, 10) : undefined,
           mandatory: draft.mandatory,
-          description: draft.description,
         },
       });
       message.success('Rule parameters updated in draft catalog');
@@ -58,10 +61,16 @@ const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
 
   return (
     <Panel
-      title={`Edit rule · ${rule?.documentType?.name ?? 'EIA (Coggins) test'}`}
+      title={`Edit rule · ${rule.documentType?.name ?? 'Document'}`}
       className="flex flex-col gap-4 lg:col-span-2"
     >
       <div className="flex flex-col gap-4">
+        {!editable && (
+          <Callout tone="info" title="This is the published version">
+            Published rules don&apos;t change. Create a draft version to edit them.
+          </Callout>
+        )}
+
         <div className="flex flex-col gap-2">
           <span className="type-label-s font-medium text-ink-3">Rule shape</span>
           <div className="flex flex-wrap gap-2">
@@ -71,11 +80,12 @@ const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
                 <button
                   key={option.kind}
                   type="button"
+                  disabled={!editable}
                   onClick={() => change({ kind: option.kind })}
-                  className={`cursor-pointer rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors disabled:cursor-not-allowed ${
                     active
-                      ? 'border-blue-500 bg-blue-600/20 font-semibold text-blue-300'
-                      : 'border-line bg-card text-ink-2 hover:border-line-strong'
+                      ? 'border-info-line bg-info-soft font-semibold text-info'
+                      : 'border-line bg-card text-ink-2 enabled:hover:border-line-strong'
                   }`}
                 >
                   {option.label}
@@ -96,26 +106,22 @@ const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
             </label>
             <Input
               value={draft.days}
+              disabled={!editable || draft.kind === RegulationRuleKindEnum.PRESENCE_ONLY}
               onChange={(event) => change({ days: event.target.value })}
               placeholder="e.g. 45"
               className="rounded-md"
             />
-            <span className="type-body-s text-[12px] text-ink-3">
-              {/* FIXME(mock): the EIA hint is Figma copy, not the rule's real history. */}
-              {rule?.documentType?.code === 'EIA_TEST'
-                ? 'Was 60 in v7. Source: GDAHP notice 14/2026.'
-                : 'Evaluated against departure or arrival date.'}
+            <span className="type-body-s text-ink-3">
+              {rule.description || 'Evaluated against the departure or arrival date.'}
             </span>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="type-label-s font-medium text-ink-3">Applies to</label>
-            <Select
-              value={draft.appliesTo}
-              onChange={(appliesTo) => change({ appliesTo })}
-              options={SCOPE_OPTIONS}
-              className="w-full"
-            />
+            <span className="type-label-s font-medium text-ink-3">Applies to</span>
+            <span className="type-body-m text-ink">{scopeLabel(rule.documentType?.scope)}</span>
+            <span className="type-body-s text-ink-3">
+              Set by the document type, for every catalog.
+            </span>
           </div>
         </div>
 
@@ -123,24 +129,21 @@ const RuleEditor: FC<{ rule?: RegulationRule }> = ({ rule }) => {
           <Checkbox
             label="Blocks departure when not GREEN"
             checked={draft.mandatory}
+            disabled={!editable}
             onChange={(event) => change({ mandatory: event.target.checked })}
           />
         </div>
 
-        {/* FIXME(mock): the impact is Figma copy; nothing computes which open jobs a change affects. */}
-        <Callout tone="warn" title="Re-check impact: 2 open jobs">
-          CBRT-2026-041 and CBRT-2026-044 have Coggins tests older than 45 days at departure. After
-          publishing they are flagged for review; approved documents are not revoked automatically.
-        </Callout>
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={() => rule && setDraft(draftOf(rule))}>
-            Cancel
-          </Button>
-          <Button variant="secondary" onClick={save} disabled={update.isPending}>
-            Save to draft
-          </Button>
-        </div>
+        {editable && (
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setDraft(draftOf(rule))}>
+              Cancel
+            </Button>
+            <Button variant="secondary" onClick={save} disabled={update.isPending}>
+              Save to draft
+            </Button>
+          </div>
+        )}
       </div>
     </Panel>
   );

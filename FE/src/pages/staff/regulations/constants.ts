@@ -6,27 +6,18 @@ import {
   RegulationRuleKindEnum,
 } from '@/interfaces';
 
-/** A row in the destinations list: a country's catalog or a border crossing's. */
+/** A row in the destinations list: one country's regulation catalog. */
 export interface DestinationItem {
   id: string;
   code: string;
   label: string;
   version: string;
-  isCountry: boolean;
-  countryCode?: string;
   hasDraft?: boolean;
 }
 
-/**
- * FIXME(mock): the crossings and their versions are Figma placeholders, not loaded from the API.
- * Selecting one finds no catalog.
- */
-export const BORDER_CROSSINGS: DestinationItem[] = [
-  { id: 'bc-1', code: 'BRD', label: 'Mộc Bài – Bavet', version: 'v2', isCountry: false },
-  { id: 'bc-2', code: 'BRD', label: 'Poipet – Aranyaprathet', version: 'v3', isCountry: false },
-  { id: 'bc-3', code: 'BRD', label: 'Cầu Treo – Nam Phao', version: 'v1', isCountry: false },
-  { id: 'bc-4', code: 'BRD', label: 'Sadao – Bukit Kayu Hitam', version: 'v2', isCountry: false },
-];
+/** "Per horse", "Per shipment" or "Per crossing". */
+export const scopeLabel = (scope?: DocumentScope) =>
+  SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? 'Per horse';
 
 export const RULE_SHAPE_OPTIONS: { kind: RegulationRuleKind; label: string }[] = [
   { kind: RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE, label: 'Window before departure' },
@@ -52,3 +43,19 @@ export const SCOPE_OPTIONS: { label: string; value: DocumentScope }[] = [
 /** The rule the editor opens on: the EIA test when the catalog has one (as the Figma frame), else the first. */
 export const defaultRule = (rules: RegulationRule[]) =>
   rules.find((rule) => rule.documentType?.code === 'EIA_TEST') ?? rules[0];
+
+/** "3 changes", "1 change", or "no changes yet". */
+export const changesLabel = (count?: number | null) =>
+  !count ? 'no changes yet' : `${count} ${count === 1 ? 'change' : 'changes'}`;
+
+/** "The 3 jobs pinned to v8 keep v8.", "The 1 job … keeps v8." or "No jobs are pinned to v8." */
+export const pinnedJobsSentence = (count: number | null | undefined, versionNo: number) =>
+  !count
+    ? `No jobs are pinned to v${versionNo}.`
+    : `The ${count} ${count === 1 ? 'job' : 'jobs'} pinned to v${versionNo} ${count === 1 ? 'keeps' : 'keep'} v${versionNo}.`;
+
+/** "22 Sep 2026", or null when the version has no publish date. */
+export const formatDay = (iso?: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;

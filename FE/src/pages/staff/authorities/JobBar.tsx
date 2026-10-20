@@ -1,20 +1,23 @@
 import type { FC } from 'react';
-import { Select, Tag } from 'antd';
-import type { JobSummary } from '@/interfaces';
+import { Select } from 'antd';
+import { Chip } from '@/components/ui';
+import type { ClearanceJobSummary } from '@/interfaces';
 
 type Props = {
-  jobs: JobSummary[];
+  jobs: ClearanceJobSummary[];
   loading: boolean;
   jobId: string | null;
-  /** The job's code from its clearance status, for a job that isn't in the open list. */
-  fallbackCode?: string;
   onSelect: (jobId: string | null) => void;
   onSearch: (q: string) => void;
 };
 
-/** Picks the transport job the page works on and shows its crossing route. */
-const JobBar: FC<Props> = ({ jobs, loading, jobId, fallbackCode, onSelect, onSearch }) => {
-  const selected = jobs.find((job) => job.id === jobId);
+/** "Hà Nội → Phnom Penh", or null while the request lacks either place. */
+const routeOf = (job?: ClearanceJobSummary) =>
+  job?.originCity && job.destinationCity ? `${job.originCity} → ${job.destinationCity}` : null;
+
+/** Picks the transport job the page works on and shows its route. */
+const JobBar: FC<Props> = ({ jobs, loading, jobId, onSelect, onSearch }) => {
+  const route = routeOf(jobs.find((job) => job.id === jobId));
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -26,21 +29,20 @@ const JobBar: FC<Props> = ({ jobs, loading, jobId, fallbackCode, onSelect, onSea
           onChange={(value) => onSelect(value ?? null)}
           onSearch={onSearch}
           loading={loading}
+          filterOption={false}
           options={jobs.map((job) => ({
-            label: `${job.code} · ${job.clubName ? job.clubName + ' ' : ''}(${job.originCity} → ${job.destinationCity})`,
+            label: [job.code, job.clubName, routeOf(job)].filter(Boolean).join(' · '),
             value: job.id,
           }))}
           className="w-[380px] sm:w-[460px]"
           size="middle"
         />
       </div>
-      <div className="flex items-center gap-2 text-[13px] text-ink-2">
-        <span>Crossing route:</span>
-        <Tag color="cyan">
-          {selected
-            ? `${selected.originCity} → ${selected.destinationCity}`
-            : (fallbackCode ?? 'In transit')}
-        </Tag>
+      <div className="type-body-s flex items-center gap-2 text-ink-2">
+        <span>Route:</span>
+        <Chip tone="neutral" dot={false}>
+          {route ?? 'Not set on the request'}
+        </Chip>
       </div>
     </div>
   );
