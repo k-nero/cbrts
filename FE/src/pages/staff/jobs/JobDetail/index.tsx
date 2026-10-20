@@ -6,6 +6,7 @@ import { useJobDetail } from '@/hooks/useJob';
 
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
+import { CoordinatorTripView } from '@/pages/trip';
 
 const TABS = [
   { id: 'load-plan', label: 'Load plan', owner: 'Fleet & route coordinator' },
@@ -167,14 +168,7 @@ export default function JobDetailPage() {
           </p>
         </div>
       )}
-      {activeTab === 'trip' && (
-        <div className="rounded-lg border border-line bg-card p-8 text-center">
-          <h4 className="type-h4 text-ink">Trip Journey Log</h4>
-          <p className="type-body-s text-ink-3 mt-1">
-            Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
-          </p>
-        </div>
-      )}
+      {activeTab === 'trip' && <CoordinatorTripView jobCode={job.code} />}
     </div>
   );
 }
