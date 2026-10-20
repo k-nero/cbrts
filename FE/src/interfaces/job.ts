@@ -198,10 +198,19 @@ export interface JobDetail extends BaseEntity {
   crew: CrewMember[];
 }
 
+/** The Jobs list tabs (TransportJobService.search's filter). */
+export const JobFilterEnum = {
+  ALL: 'ALL',
+  NEEDS_ME: 'NEEDS_ME',
+  BLOCKED: 'BLOCKED',
+  IN_TRANSIT: 'IN_TRANSIT',
+} as const;
+export type JobFilter = (typeof JobFilterEnum)[keyof typeof JobFilterEnum];
+
 export interface JobListParams {
   q?: string;
   stage?: JobStage;
-  filter?: 'ALL' | 'NEEDS_ME' | 'BLOCKED' | 'IN_TRANSIT';
+  filter?: JobFilter;
   page?: number;
   size?: number;
   sort?: string;
