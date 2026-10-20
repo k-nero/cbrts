@@ -288,7 +288,7 @@ public class LoadPlanService {
         // 3. Nervous horses away from ramp
         // 4. Mares away from stallions
         Set<VehicleStall> availableStalls = new HashSet<>(stalls);
-        Map<Horse, VehicleStall> solution = solveArrangement(horses, availableStalls);
+        Map<Horse, VehicleStall> solution = solveArrangement(horses, availableStalls, getHorsesWithFoal(plan.getJob()));
 
         if (solution == null) {
             throw new BusinessException("Could not automatically find a placement satisfying all welfare rules");
@@ -409,6 +409,7 @@ public class LoadPlanService {
             LoadPlan plan, List<LoadPlanStall> assignments, List<Horse> allHorses) {
         List<LoadPlanConflictResponse> conflicts = new ArrayList<>();
         Vehicle vehicle = plan.getVehicle();
+        Set<UUID> maresWithFoal = getHorsesWithFoal(plan.getJob());
 
         int totalWeight = 0;
         for (LoadPlanStall lps : assignments) {
@@ -418,14 +419,33 @@ public class LoadPlanService {
                 totalWeight += h.getWeightKg();
             }
 
-            // Rule 1: Box stall requirement (stallion or aggressive horse)
-            boolean needsBox = (h.getSex() == HorseSex.STALLION
+            // Rule 1: Box stall requirement (stallion, aggressive horse, mare with foal, or XL size)
+            boolean travelsWithFoal = maresWithFoal.contains(h.getId());
+            boolean isLargeHorse = (h.getSizeClass() != null && h.getSizeClass().getWidthIn() >= 96);
+            boolean needsBox = (travelsWithFoal
+                    || isLargeHorse
+                    || h.getSex() == HorseSex.STALLION
                     || h.getSex() == HorseSex.COLT
                     || h.getTemperament() == Temperament.AGGRESSIVE
                     || h.getRequiredStall() == StallType.BOX);
             if (needsBox && s.getStallType() != StallType.BOX) {
+                String reason = travelsWithFoal
+                        ? "A mare with foal at foot takes a full box"
+                        : (isLargeHorse
+                                ? "Horse size class XL (96 in) requires a box stall"
+                                : "Needs a box stall (stallion or aggressive horse)");
+                conflicts.add(JobMapper.toConflictResponse(h, s, "BOX_REQUIRED", reason));
+            }
+
+            // Rule 1b: Horse width requirement vs stall width (US-F3-05)
+            if (h.getSizeClass() != null
+                    && h.getSizeClass().getWidthIn() > 32
+                    && s.getStallType() == StallType.STANDARD) {
                 conflicts.add(JobMapper.toConflictResponse(
-                        h, s, "BOX_REQUIRED", "Needs a box stall (stallion or aggressive horse)"));
+                        h,
+                        s,
+                        "WIDTH_EXCEEDED",
+                        "Horse width (" + h.getSizeClass().getWidthIn() + " in) exceeds standard stall width (32 in)"));
             }
 
             // Rule 2: Climate stall requirement
@@ -531,17 +551,34 @@ public class LoadPlanService {
         return Collections.emptyList();
     }
 
-    private Map<Horse, VehicleStall> solveArrangement(List<Horse> horses, Set<VehicleStall> availableStalls) {
+    private Set<UUID> getHorsesWithFoal(TransportJob job) {
+        Set<UUID> mares = new HashSet<>();
+        if (job != null && job.getRequest() != null && job.getRequest().getHorses() != null) {
+            for (RequestHorse rh : job.getRequest().getHorses()) {
+                if (rh.isWithFoal() && rh.getHorse() != null) {
+                    mares.add(rh.getHorse().getId());
+                }
+            }
+        }
+        return mares;
+    }
+
+    private Map<Horse, VehicleStall> solveArrangement(
+            List<Horse> horses, Set<VehicleStall> availableStalls, Set<UUID> maresWithFoal) {
         // Backtracking solver to find a 0-conflict placement
         Map<Horse, VehicleStall> assignment = new HashMap<>();
-        if (solveRecursive(0, horses, new ArrayList<>(availableStalls), assignment)) {
+        if (solveRecursive(0, horses, new ArrayList<>(availableStalls), assignment, maresWithFoal)) {
             return assignment;
         }
         return null;
     }
 
     private boolean solveRecursive(
-            int index, List<Horse> horses, List<VehicleStall> stalls, Map<Horse, VehicleStall> current) {
+            int index,
+            List<Horse> horses,
+            List<VehicleStall> stalls,
+            Map<Horse, VehicleStall> current,
+            Set<UUID> maresWithFoal) {
         if (index == horses.size()) {
             return true;
         }
@@ -555,11 +592,21 @@ public class LoadPlanService {
             }
 
             // Check hard constraints for this candidate stall:
-            boolean needsBox = (horse.getSex() == HorseSex.STALLION
+            boolean travelsWithFoal = maresWithFoal.contains(horse.getId());
+            boolean isLargeHorse =
+                    (horse.getSizeClass() != null && horse.getSizeClass().getWidthIn() >= 96);
+            boolean needsBox = (travelsWithFoal
+                    || isLargeHorse
+                    || horse.getSex() == HorseSex.STALLION
                     || horse.getSex() == HorseSex.COLT
                     || horse.getTemperament() == Temperament.AGGRESSIVE
                     || horse.getRequiredStall() == StallType.BOX);
             if (needsBox && stall.getStallType() != StallType.BOX) {
+                continue;
+            }
+            if (horse.getSizeClass() != null
+                    && horse.getSizeClass().getWidthIn() > 32
+                    && stall.getStallType() == StallType.STANDARD) {
                 continue;
             }
             if (horse.getRequiredStall() == StallType.CLIMATE && stall.getStallType() != StallType.CLIMATE) {
@@ -599,7 +646,7 @@ public class LoadPlanService {
             }
 
             current.put(horse, stall);
-            if (solveRecursive(index + 1, horses, stalls, current)) {
+            if (solveRecursive(index + 1, horses, stalls, current, maresWithFoal)) {
                 return true;
             }
             current.remove(horse);

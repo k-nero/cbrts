@@ -19,16 +19,17 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
 
     /**
      * The escort's upcoming and active trips (US-F4-01): closed jobs drop off the list.
+     * Trips are only released to the crew once signed off by the logistics manager (US-F3-08, US-F4-01).
      */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
                 (select max(r.occurredAt) from TripRecord r where r.job = j))
             from CrewAssignment c join c.job j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
-            where c.user.id = :userId and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+            where c.user.id = :userId and j.signedOffAt is not null and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
             """, countQuery = """
                     select count(c) from CrewAssignment c join c.job j
-                    where c.user.id = :userId and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+                    where c.user.id = :userId and j.signedOffAt is not null and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
                     """)
     Page<TripSummaryResponse> findTripSummariesByUserId(@Param("userId") UUID userId, Pageable pageable);
 

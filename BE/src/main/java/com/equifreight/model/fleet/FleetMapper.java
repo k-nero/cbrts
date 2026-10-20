@@ -3,6 +3,7 @@ package com.equifreight.model.fleet;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
+import com.equifreight.entity.enums.StallType;
 import java.util.List;
 
 public final class FleetMapper {
@@ -24,6 +25,8 @@ public final class FleetMapper {
     }
 
     public static VehicleStallResponse toStallResponse(VehicleStall stall) {
+        short widthIn = (short)
+                (stall.getStallType() == StallType.BOX ? 96 : (stall.getStallType() == StallType.CLIMATE ? 48 : 32));
         return VehicleStallResponse.builder()
                 .id(stall.getId())
                 .positionNo(stall.getPositionNo())
@@ -31,6 +34,7 @@ public final class FleetMapper {
                 .rowNo(stall.getRowNo())
                 .side(stall.getSide())
                 .nearRamp(stall.isNearRamp())
+                .widthIn(widthIn)
                 .build();
     }
 
@@ -39,6 +43,7 @@ public final class FleetMapper {
                 .id(booking.getId())
                 .vehicleId(booking.getVehicle().getId())
                 .vehicleCode(booking.getVehicle().getCode())
+                .vehicleKind(booking.getVehicle().getKind())
                 .jobId(booking.getJob() != null ? booking.getJob().getId() : null)
                 .jobCode(booking.getJob() != null ? booking.getJob().getCode() : null)
                 .kind(booking.getKind() != null ? booking.getKind().name() : "JOB")

@@ -5,6 +5,7 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CrewRole;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.CrewMemberResponse;
@@ -25,16 +26,19 @@ public class CrewAssignmentService {
     private final TransportJobRepository transportJobRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public CrewAssignmentService(
             CrewAssignmentRepository crewAssignmentRepository,
             TransportJobRepository transportJobRepository,
             UserRepository userRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            NotificationService notificationService) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -119,7 +123,7 @@ public class CrewAssignmentService {
                     && !crewAssignmentRepository
                             .findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt)
                             .isEmpty()) {
-                throw new com.equifreight.exception.ConflictException(
+                throw new ConflictException(
                         "CREW_OVERLAP",
                         "Crew member " + user.getFirstName() + " " + user.getLastName()
                                 + " is already assigned to another overlapping trip");
@@ -152,6 +156,19 @@ public class CrewAssignmentService {
                 null,
                 null,
                 "CREW_ASSIGNED");
+
+        // Notify assigned crew (US-F3-06)
+        if (notificationService != null) {
+            for (CrewAssignment ca : saved) {
+                notificationService.sendNotification(
+                        ca.getUser(),
+                        "CREW_ASSIGNED",
+                        "Assigned to trip " + job.getCode(),
+                        "You have been assigned as " + ca.getCrewRole() + " for trip " + job.getCode(),
+                        "TRANSPORT_JOB",
+                        job.getId());
+            }
+        }
 
         log.info("Assigned {} crew members to job {}", saved.size(), job.getCode());
         return saved.stream().map(JobMapper::toCrewMemberResponse).toList();

@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -11,6 +12,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.fleet.VehicleBookingRequest;
+import com.equifreight.model.fleet.VehicleBookingResponse;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
@@ -77,6 +79,9 @@ class Flow3ServiceTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @Mock
     private TransportRequestRepository transportRequestRepository;
@@ -160,7 +165,7 @@ class Flow3ServiceTest {
                 clearanceService,
                 auditService);
         crewAssignmentService = new CrewAssignmentService(
-                crewAssignmentRepository, transportJobRepository, userRepository, auditService);
+                crewAssignmentRepository, transportJobRepository, userRepository, auditService, notificationService);
         transportJobService = new TransportJobService(
                 transportJobRepository,
                 loadPlanService,
@@ -917,5 +922,126 @@ class Flow3ServiceTest {
             s.setRowNo((short) 1);
             return s;
         }
+    }
+
+    @Test
+    @DisplayName("A mare travelling with a foal at foot requires a full box (US-F3-05)")
+    void loadPlan_conflict_mareWithFoalRequiresBox() {
+        TransportJob job = readyJob();
+        Horse mare = job.getRequest().getHorses().getFirst().getHorse();
+        mare.setSex(HorseSex.MARE);
+        job.getRequest().getHorses().getFirst().setWithFoal(true);
+
+        LoadPlan plan = loadPlan(job);
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setRowNo((short) 1);
+
+        LoadPlanStall assignment = new LoadPlanStall();
+        assignment.setLoadPlan(plan);
+        assignment.setHorse(mare);
+        assignment.setVehicleStall(standardStall);
+
+        List<LoadPlanConflictResponse> conflicts =
+                loadPlanService.evaluateConflicts(plan, List.of(assignment), List.of(mare));
+
+        assertThat(conflicts)
+                .anyMatch(c -> "BOX_REQUIRED".equals(c.rule())
+                        && c.description().contains("mare with foal at foot takes a full box"));
+    }
+
+    @Test
+    @DisplayName("A horse wider than 32 in cannot be placed in a standard stall (US-F3-05)")
+    void loadPlan_conflict_horseWidthExceedsStandardStall() {
+        TransportJob job = readyJob();
+        Horse horse = job.getRequest().getHorses().getFirst().getHorse();
+        HorseSizeClass sizeL = new HorseSizeClass();
+        sizeL.setCode("L");
+        sizeL.setWidthIn((short) 48);
+        horse.setSizeClass(sizeL);
+
+        LoadPlan plan = loadPlan(job);
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setRowNo((short) 1);
+
+        LoadPlanStall assignment = new LoadPlanStall();
+        assignment.setLoadPlan(plan);
+        assignment.setHorse(horse);
+        assignment.setVehicleStall(standardStall);
+
+        List<LoadPlanConflictResponse> conflicts =
+                loadPlanService.evaluateConflicts(plan, List.of(assignment), List.of(horse));
+
+        assertThat(conflicts)
+                .anyMatch(c ->
+                        "WIDTH_EXCEEDED".equals(c.rule()) && c.description().contains("exceeds standard stall width"));
+    }
+
+    @Test
+    @DisplayName("Assigning crew sends in-app notifications to each assigned member (US-F3-06)")
+    void crewAssignment_notifiesAssignedCrew() {
+        TransportJob job = readyJob();
+        User escortA = user("khoi.do@equifreight.test", "ESCORT");
+        User escortB = user("yen.vu@equifreight.test", "ESCORT");
+
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(userRepository.findById(escortA.getId())).thenReturn(Optional.of(escortA));
+        when(userRepository.findById(escortB.getId())).thenReturn(Optional.of(escortB));
+        when(crewAssignmentRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssignCrewRequest req = crew(escortA, CrewRole.DRIVER, escortB, CrewRole.GROOM);
+        crewAssignmentService.assignCrew(job.getId(), req, escortA);
+
+        verify(notificationService, times(2))
+                .sendNotification(
+                        any(),
+                        eq("CREW_ASSIGNED"),
+                        contains("Assigned to trip"),
+                        any(),
+                        eq("TRANSPORT_JOB"),
+                        eq(job.getId()));
+    }
+
+    @Test
+    @DisplayName("Fleet calendar can be filtered by vehicle kind (US-F3-07)")
+    void fleetCalendar_filterByVehicleKind() {
+        Vehicle trailer = new Vehicle();
+        trailer.setId(UUID.randomUUID());
+        trailer.setKind(VehicleKind.TRAILER);
+        trailer.setCode("TR-01");
+
+        Vehicle truck = new Vehicle();
+        truck.setId(UUID.randomUUID());
+        truck.setKind(VehicleKind.TRUCK);
+        truck.setCode("TK-02");
+
+        VehicleBooking b1 = new VehicleBooking();
+        b1.setId(UUID.randomUUID());
+        b1.setVehicle(trailer);
+        b1.setKind(BookingKind.JOB);
+        b1.setStartsAt(Instant.now());
+        b1.setEndsAt(Instant.now().plusSeconds(3600));
+
+        VehicleBooking b2 = new VehicleBooking();
+        b2.setId(UUID.randomUUID());
+        b2.setVehicle(truck);
+        b2.setKind(BookingKind.MAINTENANCE);
+        b2.setStartsAt(Instant.now());
+        b2.setEndsAt(Instant.now().plusSeconds(3600));
+
+        Instant from = Instant.now().minusSeconds(100);
+        Instant to = Instant.now().plusSeconds(7200);
+
+        when(vehicleBookingRepository.findInDateRange(from, to)).thenReturn(List.of(b1, b2));
+
+        List<VehicleBookingResponse> trailersOnly = vehicleService.getFleetCalendar(from, to, VehicleKind.TRAILER);
+        assertThat(trailersOnly).hasSize(1);
+        assertThat(trailersOnly.getFirst().vehicleCode()).isEqualTo("TR-01");
+
+        List<VehicleBookingResponse> allVehicles = vehicleService.getFleetCalendar(from, to, null);
+        assertThat(allVehicles).hasSize(2);
     }
 }

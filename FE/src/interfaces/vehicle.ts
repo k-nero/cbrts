@@ -46,6 +46,7 @@ export interface Vehicle extends BaseEntity {
 export interface VehicleBooking extends BaseEntity {
   vehicleId: string;
   vehicleCode: string;
+  vehicleKind?: VehicleKind;
   jobId?: string | null;
   jobCode?: string | null;
   kind: 'JOB' | 'MAINTENANCE' | 'HOLD';

@@ -28,6 +28,7 @@ export const RouteStopKindEnum = {
   AIRPORT_OUT: 'AIRPORT_OUT',
   AIRPORT_IN: 'AIRPORT_IN',
   QUARANTINE: 'QUARANTINE',
+  REFUELLING: 'REFUELLING',
 } as const;
 export type RouteStopKind = (typeof RouteStopKindEnum)[keyof typeof RouteStopKindEnum];
 
