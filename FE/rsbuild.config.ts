@@ -12,7 +12,9 @@ export default defineConfig({
       splitChunks: true,
       fastRefresh: true,
     }),
-    pluginTailwindcss(),
+    pluginTailwindcss({
+      optimize: true,
+    }),
     pluginEslint({
       enable: false,
       eslintPluginOptions: {
