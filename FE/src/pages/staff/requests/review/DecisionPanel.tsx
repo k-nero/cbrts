@@ -4,11 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import type { AxiosError } from 'axios';
-import { z } from 'zod';
 
 import { afterReturn } from './afterReturn';
+import { NoteField } from './NoteField';
+import { type NoteForm, noteSchema } from './schema';
 
-import FormWrapper, { useFormCustom, useFormWrapperCtx } from '@/components/form/FormWrapper';
+import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
 import { useReturnRequest } from '@/hooks/staffRequest';
@@ -23,32 +24,6 @@ import {
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
-/** The server's rule (spec §4.2): a note, counted after trimming, of at most 500 characters. */
-const schema = z.object({
-  note: z
-    .string()
-    .trim()
-    .min(1, 'Write what the customer needs to add or change.')
-    .max(NOTE_MAX, `Keep the note to ${NOTE_MAX} characters.`),
-});
-type NoteForm = z.infer<typeof schema>;
-
-const NoteField: FC<{ club: string }> = ({ club }) => {
-  const { FormField } = useFormWrapperCtx<NoteForm>();
-  return (
-    <FormField
-      name="note"
-      label={`Note to ${club}`}
-      component="textarea"
-      componentProps={{
-        autoSize: { minRows: 4, maxRows: 10 },
-        instruction:
-          'Required. The customer sees it exactly as written; the request goes back to them with your note.',
-      }}
-    />
-  );
-};
-
 /**
  * The decision (spec §5.2): Ask for information is the one decision this slice has. After sending, the
  * page opens the next request the queue held before the return, or goes back to Requests.
@@ -58,7 +33,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const send = useReturnRequest();
   const qc = useQueryClient();
   const methods = useFormCustom<NoteForm>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(noteSchema),
     mode: 'onChange',
     defaultValues: { note: '' },
   });

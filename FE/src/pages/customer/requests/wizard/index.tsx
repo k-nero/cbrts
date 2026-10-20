@@ -12,7 +12,7 @@ import RouteStep from './RouteStep';
 import ServiceStep from './ServiceStep';
 import { wizardSchema } from './wizardSchema';
 
-import { RequestLoadState } from '@/components/request/RequestNotFound';
+import { RequestLoadState } from '@/components/request/RequestLoadState';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import PageHeader from '@/components/PageHeader';
 import { Callout, Steps } from '@/components/ui';
