@@ -83,7 +83,14 @@ export const RouteStrip: FC<Props> = ({ stops, gate, className }) => (
             </span>
             <span className="type-mono-label text-ink-3">{s.kind}</span>
             <span
-              className={cx('type-caption', s.state === 'held' ? 'text-bad' : s.state === 'current' ? 'text-info' : 'text-ink-3')}
+              className={cx(
+                'type-caption',
+                s.state === 'held'
+                  ? 'text-bad'
+                  : s.state === 'current'
+                    ? 'text-info'
+                    : 'text-ink-3',
+              )}
             >
               {s.time}
             </span>
