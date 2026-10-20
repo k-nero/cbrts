@@ -77,8 +77,9 @@ export function StaffTripPage() {
       )}
 
       {trips.length === 0 && !isPending && (
-        <Callout tone="neutral" title="No active trips in transit">
-          There are no trips currently departed or in transit. Trips will appear here once departure is recorded.
+        <Callout tone="info" title="No active trips in transit">
+          There are no trips currently departed or in transit. Trips will appear here once
+          departure is recorded.
         </Callout>
       )}
 

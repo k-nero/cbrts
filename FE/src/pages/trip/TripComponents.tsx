@@ -352,7 +352,7 @@ export const CabDock: FC<{
       {secondary && (
         <Button
           variant="secondary"
-          size="lg"
+          size="md"
           onClick={secondary.onClick}
           className="h-14 md:h-16 px-6"
         >
@@ -362,7 +362,7 @@ export const CabDock: FC<{
       {primary && (
         <Button
           variant="primary"
-          size="lg"
+          size="md"
           disabled={primary.disabled || primary.loading}
           onClick={primary.onClick}
           leadingIcon="check"

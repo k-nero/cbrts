@@ -23,6 +23,7 @@ import {
   formatTimeOnly,
   NextStopPanel,
   OnBoardPanel,
+  sentence,
   SignatureBox,
   TaskHead,
   Toggle48,
@@ -146,14 +147,16 @@ export function EscortCabSurface() {
 
   // Cab user info
   const escortUser = useMemo(() => {
-    const name = me?.name || 'Nguyễn Văn Minh';
-    const role = me?.role ? sentence(me.role) : 'Driver';
-    const parts = name.split(' ');
-    const initials =
-      parts.length > 1
-        ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-        : name.slice(0, 2).toUpperCase();
-    return { name, role, initials };
+    const fullName = me ? `${me.firstName} ${me.lastName}`.trim() : 'Nguyễn Văn Minh';
+    const roleName = me?.roles?.[0] ? sentence(me.roles[0]) : 'Driver';
+    const initials = me
+      ? `${me.firstName?.[0] || ''}${me.lastName?.[0] || ''}`.toUpperCase()
+      : 'NM';
+    return {
+      name: fullName || 'Nguyễn Văn Minh',
+      role: roleName,
+      initials: initials || 'NM',
+    };
   }, [me]);
 
   // Compute CabStrip stops
