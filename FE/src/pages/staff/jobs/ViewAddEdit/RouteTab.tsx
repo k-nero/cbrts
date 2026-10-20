@@ -1,4 +1,4 @@
-import { Button, Callout, Chip, TimelineStop, type StopKind } from '@/components/ui';
+import { Button, Callout, Chip, TimelineStop } from '@/components/ui';
 import { useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
@@ -88,7 +88,6 @@ export function RouteTab({ job }: Props) {
 
         <div className="flex flex-col gap-4">
           {stops.map((stop) => {
-            const kindLower = stop.kind.toLowerCase() as StopKind;
             const timeStr = stop.plannedAt
               ? new Date(stop.plannedAt).toLocaleTimeString('en-GB', {
                   hour: '2-digit',
@@ -104,7 +103,7 @@ export function RouteTab({ job }: Props) {
             return (
               <TimelineStop
                 key={stop.id}
-                kind={kindLower}
+                kind={stop.kind}
                 stop={stopName}
                 time={timeStr}
                 details={stop.details || undefined}

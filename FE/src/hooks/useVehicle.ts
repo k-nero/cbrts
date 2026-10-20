@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { vehicleApi } from '@/apis/vehicle';
 import type {
   CreateVehicleInput,
@@ -7,7 +8,7 @@ import type {
   VehicleKind,
 } from '@/interfaces';
 
-export const useVehicles = (params?: { page?: number; size?: number }) => {
+export const useVehicles = (params?: { page?: number; size?: number; sort?: string }) => {
   return useQuery({
     queryKey: ['vehicles', params],
     queryFn: () => vehicleApi.list(params),
@@ -17,10 +18,7 @@ export const useVehicles = (params?: { page?: number; size?: number }) => {
 export const useActiveVehicles = () => {
   return useQuery({
     queryKey: ['vehicles', 'active'],
-    queryFn: async () => {
-      const res = await vehicleApi.list({ size: 100 });
-      return (res.content ?? []).filter((v) => v.status === 'ACTIVE');
-    },
+    queryFn: () => vehicleApi.listActive(),
   });
 };
 
@@ -28,7 +26,7 @@ export const useVehicle = (id: string) => {
   return useQuery({
     queryKey: ['vehicle', id],
     queryFn: () => vehicleApi.get(id),
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 };
 
@@ -47,9 +45,9 @@ export const useUpdateVehicle = () => {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateVehicleInput }) =>
       vehicleApi.update(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle', variables.id] });
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
     },
   });
 };

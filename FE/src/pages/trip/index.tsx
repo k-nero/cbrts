@@ -4,7 +4,6 @@ import { Input, message, Select, Spin, Upload } from 'antd';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
-import type { StopKind } from '@/components/ui/TimelineStop';
 import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
@@ -170,7 +169,6 @@ function TripDetails({ trip }: { trip: TripView }) {
         ) : (
           <ol className="m-0 list-none space-y-3 p-0">
             {trip.stops.map((stop) => {
-              const stopKind = stop.kind.toLowerCase() as StopKind;
               const detail = [
                 stop.details,
                 stop.latestNote,
@@ -186,7 +184,7 @@ function TripDetails({ trip }: { trip: TripView }) {
               return (
                 <li key={stop.id}>
                   <TimelineStop
-                    kind={stopKind}
+                    kind={stop.kind}
                     stop={`${stop.sequence}. ${stop.name}`}
                     time={
                       stop.latestOccurredAt

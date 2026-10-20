@@ -421,9 +421,18 @@ public class LoadPlanService {
 
             // Rule 1: Box stall requirement
             if (requiresBox(h, maresWithFoal) && s.getStallType() != StallType.BOX) {
-                String reason = maresWithFoal.contains(h.getId())
-                        ? "A mare with foal at foot takes a full box"
-                        : "Needs a box stall (stallion or aggressive horse)";
+                String reason;
+                if (maresWithFoal.contains(h.getId())) {
+                    reason = "A mare with foal at foot takes a full box";
+                } else if (h.getSex() == HorseSex.STALLION || h.getSex() == HorseSex.COLT) {
+                    reason = "Needs a box stall (stallion)";
+                } else if (h.getTemperament() == Temperament.AGGRESSIVE) {
+                    reason = "Needs a box stall (aggressive horse)";
+                } else if (h.getRequiredStall() == StallType.BOX) {
+                    reason = "Needs a box stall (customer requested a box stall)";
+                } else {
+                    reason = "Needs a box stall";
+                }
                 conflicts.add(JobMapper.toConflictResponse(h, s, "BOX_REQUIRED", reason));
             }
 

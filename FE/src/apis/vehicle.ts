@@ -10,8 +10,10 @@ import type {
 } from '@/interfaces';
 
 export const vehicleApi = {
-  list: (params?: { page?: number; size?: number }) =>
+  list: (params?: { page?: number; size?: number; sort?: string }) =>
     client.get<PagedResponse<Vehicle>>('/staff/vehicles', { params }).then((r) => r.data),
+
+  listActive: () => client.get<Vehicle[]>('/staff/vehicles/active').then((r) => r.data),
 
   get: (id: string) => client.get<Vehicle>(`/staff/vehicles/${id}`).then((r) => r.data),
 

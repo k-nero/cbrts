@@ -9,8 +9,25 @@ export default function FleetCalendarPage() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  const fromIso = startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined;
-  const toIso = endDate ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined;
+  let fromIso: string | undefined;
+  let toIso: string | undefined;
+
+  if (startDate && endDate) {
+    fromIso = new Date(`${startDate}T00:00:00`).toISOString();
+    toIso = new Date(`${endDate}T23:59:59.999`).toISOString();
+  } else if (startDate) {
+    const start = new Date(`${startDate}T00:00:00`);
+    fromIso = start.toISOString();
+    const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+    end.setHours(23, 59, 59, 999);
+    toIso = end.toISOString();
+  } else if (endDate) {
+    const end = new Date(`${endDate}T23:59:59.999`);
+    toIso = end.toISOString();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    start.setHours(0, 0, 0, 0);
+    fromIso = start.toISOString();
+  }
   const kindParam = selectedKind !== 'ALL' ? selectedKind : undefined;
 
   const { data: vehiclesData } = useVehicles();

@@ -33,8 +33,12 @@ public class FleetCalendarController {
                     Instant to,
             @RequestParam(value = "vehicleKind", required = false) VehicleKind vehicleKind) {
 
-        Instant rangeStart = from != null ? from : Instant.now().minus(7, ChronoUnit.DAYS);
-        Instant rangeEnd = to != null ? to : Instant.now().plus(30, ChronoUnit.DAYS);
+        Instant rangeStart = from != null
+                ? from
+                : (to != null ? to.minus(30, ChronoUnit.DAYS) : Instant.now().minus(7, ChronoUnit.DAYS));
+        Instant rangeEnd = to != null
+                ? to
+                : (from != null ? from.plus(30, ChronoUnit.DAYS) : Instant.now().plus(30, ChronoUnit.DAYS));
 
         return vehicleService.getFleetCalendar(rangeStart, rangeEnd, vehicleKind);
     }

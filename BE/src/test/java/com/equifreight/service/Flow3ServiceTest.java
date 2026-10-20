@@ -1016,7 +1016,6 @@ class Flow3ServiceTest {
                         plan.getVehicle().getId()))
                 .thenReturn(List.of(standardStall, boxStall));
 
-        User coordinator = user("khoi.do@equifreight.test", "FLEET_COORDINATOR");
         loadPlanService.autoArrange(job.getId());
 
         verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
