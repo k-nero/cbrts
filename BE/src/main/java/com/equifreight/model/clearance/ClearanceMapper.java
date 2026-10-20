@@ -2,6 +2,7 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.DocumentVersion;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.RegulationCatalog;
 import com.equifreight.entity.RegulationVersion;
 import com.equifreight.entity.TransportJob;
@@ -22,12 +23,19 @@ public final class ClearanceMapper {
                 .dossierStatus(job.getDossierStatus())
                 .stage(job.getStage())
                 .clubName(job.getRequest().getClub().getName())
+                .originCity(cityOf(job.getRequest().getOriginPlace()))
+                .destinationCity(cityOf(job.getRequest().getDestinationPlace()))
                 .build();
+    }
+
+    private static String cityOf(Place place) {
+        return place == null ? null : place.getCity();
     }
 
     /** The clearance gate of a job, with the counts ClearanceService worked out. */
     public static ClearanceStatusResponse toStatusResponse(
             TransportJob job,
+            RegulationVersion destination,
             int totalChecklistItems,
             int mandatoryItems,
             int clearedMandatoryItems,
@@ -47,6 +55,9 @@ public final class ClearanceMapper {
                 .completedQuarantines(completedQuarantines)
                 .allQuarantinesCompleted(completedQuarantines == totalQuarantines)
                 .outstandingIssues(outstandingIssues)
+                .destination(
+                        destination == null ? null : destination.getCatalog().getName())
+                .quarantineMinDays(destination == null ? null : (int) destination.getQuarantineMinDays())
                 .build();
     }
 

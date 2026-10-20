@@ -10,7 +10,7 @@ import type {
   DocumentType,
   DocumentUploadRequest,
   DocumentVersion,
-  JobSummary,
+  ClearanceJobSummary,
   PagedResponse,
   QuarantinePeriod,
   RegulationCatalog,
@@ -23,7 +23,7 @@ import type {
 export const clearanceApi = {
   // Jobs
   getActiveJobs: (q: string) =>
-    client.get<PagedResponse<JobSummary>>('/staff/clearance/jobs', {
+    client.get<PagedResponse<ClearanceJobSummary>>('/staff/clearance/jobs', {
       params: { q: q || undefined, size: 20 },
     }),
 
