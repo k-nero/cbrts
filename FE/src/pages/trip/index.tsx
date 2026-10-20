@@ -9,6 +9,7 @@ import {
   Checkbox,
   Chip,
   Icon,
+  OptionCard,
   Panel,
   RouteStrip,
   StageMark,
@@ -72,7 +73,12 @@ const coordinatorKindsByStatus: Record<TripStatus, TripRecordKind[]> = {
   [TripStatusEnum.ARRIVED]: [TripRecordKindEnum.DELIVERED, TripRecordKindEnum.NOTE],
   [TripStatusEnum.DELIVERED]: [TripRecordKindEnum.HANDED_OVER, TripRecordKindEnum.NOTE],
 };
-const conditions = Object.values(HorseConditionEnum);
+const conditions: HorseCondition[] = [
+  HorseConditionEnum.STABLE,
+  HorseConditionEnum.OFF_FEED,
+  HorseConditionEnum.STRESSED,
+  HorseConditionEnum.CLIMATE_CHANGE,
+];
 const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
 const formatTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('en-GB', timeOptions) : 'Not recorded';
@@ -104,6 +110,19 @@ const kindTone = (kind: TripRecordKind) =>
     : kind === TripRecordKindEnum.CLEARED_BORDER || kind === TripRecordKindEnum.DELIVERED
       ? 'ok'
       : 'info';
+const conditionTone = (condition: HorseCondition | null | undefined) =>
+  condition === HorseConditionEnum.CONCERN
+    ? 'bad'
+    : condition === HorseConditionEnum.WATCH ||
+        condition === HorseConditionEnum.OFF_FEED ||
+        condition === HorseConditionEnum.STRESSED ||
+        condition === HorseConditionEnum.CLIMATE_CHANGE
+      ? 'warn'
+      : condition === HorseConditionEnum.STABLE || condition === HorseConditionEnum.SOUND
+        ? 'ok'
+        : 'neutral';
+const isStable = (condition: HorseCondition) =>
+  condition === HorseConditionEnum.STABLE || condition === HorseConditionEnum.SOUND;
 const stopKindLabel = (kind: string) =>
   kind === 'PICKUP'
     ? 'Pickup'
@@ -116,6 +135,10 @@ const stopKindLabel = (kind: string) =>
           : kind.replaceAll('_', ' ').toLowerCase();
 const lastRecord = (trip: TripView) =>
   [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+const lastCheckpointRecord = (trip: TripView) =>
+  [...trip.records]
+    .filter((record) => record.routeStopId !== null)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
 const lastConditionRecord = (trip: TripView) =>
   [...trip.records]
     .filter(
@@ -212,15 +235,7 @@ function TripRecords({ trip }: { trip: TripView }) {
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <strong className="type-h4">{condition.horseName}</strong>
-                    <Chip
-                      tone={
-                        condition.condition === HorseConditionEnum.CONCERN
-                          ? 'bad'
-                          : condition.condition === HorseConditionEnum.WATCH
-                            ? 'warn'
-                            : 'ok'
-                      }
-                    >
+                    <Chip tone={conditionTone(condition.condition)}>
                       {sentence(condition.condition)}
                     </Chip>
                   </div>
@@ -453,21 +468,21 @@ function ConditionRows({
   trip,
   observations,
   onChange,
-  onAllSound,
+  onAllStable,
   arrival = false,
 }: {
   trip: TripView;
   observations: Record<string, Observation>;
   onChange: (horseId: string, update: Partial<Observation>) => void;
-  onAllSound: () => void;
+  onAllStable: () => void;
   arrival?: boolean;
 }) {
   return (
     <div>
       {!arrival && (
         <div className="flex flex-wrap items-center gap-3 px-6 py-4">
-          <Button size="md" className="min-h-12" leadingIcon="check" onClick={onAllSound}>
-            All sound · drinking · eating
+          <Button size="md" className="min-h-12" leadingIcon="check" onClick={onAllStable}>
+            All stable · drinking · eating
           </Button>
           <span className="type-body-s text-ink-3">Then change only the horse that differs.</span>
         </div>
@@ -478,7 +493,7 @@ function ConditionRows({
           return (
             <section
               key={horse.id}
-              className={`grid gap-4 px-6 py-5 xl:grid-cols-[minmax(200px,1fr)_auto] ${observation.condition && observation.condition !== HorseConditionEnum.SOUND ? 'bg-raised' : ''}`}
+              className={`grid gap-4 px-6 py-5 xl:grid-cols-[minmax(200px,1fr)_auto] ${observation.condition && !isStable(observation.condition) ? 'bg-raised' : ''}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -504,10 +519,11 @@ function ConditionRows({
                 >
                   {conditions.map((condition) => {
                     const selected = observation.condition === condition;
+                    const tone = conditionTone(condition);
                     const toneClass =
-                      condition === HorseConditionEnum.CONCERN
+                      tone === 'bad'
                         ? 'border-bad-line bg-bad-soft text-bad'
-                        : condition === HorseConditionEnum.WATCH
+                        : tone === 'warn'
                           ? 'border-warn-line bg-warn-soft text-warn'
                           : 'border-ok-line bg-ok-soft text-ok';
                     return (
@@ -590,22 +606,20 @@ function ConditionRows({
 
 function CoordinatorTripContent({ trip }: { trip: TripView }) {
   const last = lastRecord(trip);
+  const lastCheckpoint = lastCheckpointRecord(trip);
   const welfare = lastConditionRecord(trip);
-  const mostRecentStop = last?.routeStopId
-    ? trip.stops.find((stop) => stop.id === last.routeStopId)
+  const mostRecentStop = lastCheckpoint?.routeStopId
+    ? trip.stops.find((stop) => stop.id === lastCheckpoint.routeStopId)
     : undefined;
   const next = trip.stops.find((stop) => !stop.latestOccurredAt);
   const delta = mostRecentStop
     ? minutesBetween(mostRecentStop.plannedAt, mostRecentStop.latestOccurredAt)
     : null;
-  const soundCount =
-    welfare?.conditions.filter((item) => item.condition === HorseConditionEnum.SOUND).length ?? 0;
-  const loaded = [...trip.records]
-    .filter((record) => record.kind === TripRecordKindEnum.LOADED)
-    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))[0];
-  const trailerMinutes = loaded
-    ? Math.floor((Date.now() - new Date(loaded.occurredAt).getTime()) / 60_000)
-    : null;
+  const stableCount = welfare?.conditions.filter((item) => isStable(item.condition)).length ?? 0;
+  const arrivalWindow =
+    trip.arrivalWindowStart && trip.arrivalWindowEnd
+      ? `${formatClock(trip.arrivalWindowStart)}–${formatClock(trip.arrivalWindowEnd)}`
+      : 'Not set';
   const horseCount = trip.horses.length;
   const lastChecks = new Map(welfare?.conditions.map((item) => [item.horseId, item]) ?? []);
   const crew = [...new Set(trip.records.map((record) => record.recordedBy).filter(Boolean))];
@@ -617,10 +631,12 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
           label={`Against plan at ${mostRecentStop?.name ?? 'last checkpoint'}`}
         />
         <StatTile
-          value={trailerMinutes === null ? '—' : elapsedLabel(trailerMinutes)}
-          label="Time on the trailer"
+          value={arrivalWindow}
+          label="Arrival window"
           lead={
-            loaded ? `Since loading · ${formatClock(loaded.occurredAt)}` : 'Loading not recorded'
+            trip.plannedArrivalAt
+              ? `Planned arrival · ${formatClock(trip.plannedArrivalAt)}`
+              : 'No planned arrival time'
           }
         />
         <StatTile
@@ -628,9 +644,9 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
           label={`Next checkpoint · ${next?.name ?? 'No remaining stop'}`}
         />
         <StatTile
-          tone={soundCount === horseCount && horseCount > 0 ? 'ok' : 'warn'}
-          value={`${soundCount} of ${horseCount}`}
-          label="Horses sound at last check"
+          tone={stableCount === horseCount && horseCount > 0 ? 'ok' : 'warn'}
+          value={`${stableCount} of ${horseCount}`}
+          label="Horses stable at last check"
           lead={welfare ? formatClock(welfare.occurredAt) : 'No condition check recorded'}
         />
       </div>
@@ -727,14 +743,7 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
             <div className="divide-y divide-line">
               {trip.horses.map((horse) => {
                 const condition = lastChecks.get(horse.id);
-                const tone =
-                  condition?.condition === HorseConditionEnum.CONCERN
-                    ? 'bad'
-                    : condition?.condition === HorseConditionEnum.WATCH
-                      ? 'warn'
-                      : condition
-                        ? 'ok'
-                        : 'neutral';
+                const tone = conditionTone(condition?.condition);
                 return (
                   <div key={horse.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
@@ -771,7 +780,7 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
           <Panel title="What the customer sees">
             <p className="type-body-s m-0 text-ink-2">
               {mostRecentStop
-                ? `Your horses ${eventLabels[last?.kind ?? TripRecordKindEnum.NOTE].toLowerCase()} at ${mostRecentStop.name} at ${formatClock(last?.occurredAt ?? null)}.`
+                ? `Your horses ${eventLabels[lastCheckpoint?.kind ?? TripRecordKindEnum.NOTE].toLowerCase()} at ${mostRecentStop.name} at ${formatClock(lastCheckpoint?.occurredAt ?? null)}.`
                 : 'The customer sees no trip position until the first checkpoint is recorded.'}
             </p>
             {next && (
@@ -788,8 +797,28 @@ function CoordinatorTripContent({ trip }: { trip: TripView }) {
 }
 
 function CustomerTripContent({ trip }: { trip: TripView }) {
-  const latest = lastRecord(trip);
+  const latest = lastCheckpointRecord(trip);
   const welfare = lastConditionRecord(trip);
+  const handoverRecorded = trip.records.some(
+    (record) => record.kind === TripRecordKindEnum.HANDED_OVER,
+  );
+  const tripStarted = trip.tripStatus !== TripStatusEnum.NOT_STARTED;
+  const tripDelivered = trip.tripStatus === TripStatusEnum.DELIVERED;
+  const stageStates = [
+    { label: 'Request', state: 'done' },
+    { label: 'Quotation', state: 'done' },
+    { label: 'Approval', state: 'done' },
+    { label: 'Documents', state: trip.clearanceReady ? 'done' : 'current' },
+    { label: 'Clearance', state: trip.clearanceReady ? 'done' : 'upcoming' },
+    {
+      label: 'Trip',
+      state: tripDelivered ? 'done' : tripStarted || trip.clearanceReady ? 'current' : 'upcoming',
+    },
+    {
+      label: 'Handover',
+      state: handoverRecorded ? 'done' : tripDelivered ? 'current' : 'upcoming',
+    },
+  ];
   const next = trip.stops.find((stop) => !stop.latestOccurredAt);
   const route = trip.stops.map((stop) => ({
     name: stop.name,
@@ -808,6 +837,64 @@ function CustomerTripContent({ trip }: { trip: TripView }) {
   }));
   return (
     <div className="flex flex-col gap-6">
+      <Panel title="Travel pass">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span className="type-data text-ink-2">{trip.jobCode}</span>
+            <h2 className="type-h2 m-0 mt-2 text-ink">
+              {trip.origin ?? 'Origin'} → {trip.destination ?? 'Destination'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <StageMark stage={trip.tripStatus === TripStatusEnum.DELIVERED ? 'Handover' : 'Trip'} />
+            <Chip tone={statusTone(trip.tripStatus)}>{sentence(trip.tripStatus)}</Chip>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <span className="type-body-s block text-ink-3">Departs</span>
+            <span className="type-data text-ink">{formatTime(trip.plannedDepartureAt)}</span>
+          </div>
+          <div>
+            <span className="type-body-s block text-ink-3">Arrival window</span>
+            <span className="type-data text-ink">
+              {trip.arrivalWindowStart && trip.arrivalWindowEnd
+                ? `${formatClock(trip.arrivalWindowStart)}–${formatClock(trip.arrivalWindowEnd)}`
+                : 'Not set'}
+            </span>
+          </div>
+          <div>
+            <span className="type-body-s block text-ink-3">Horses</span>
+            <span className="type-label-m text-ink">
+              {trip.horses.map((horse) => horse.name).join(' · ') || 'None listed'}
+            </span>
+          </div>
+          <div>
+            <span className="type-body-s block text-ink-3">Vehicle</span>
+            <span className="type-data text-ink">{trip.vehicleCode ?? 'Not assigned'}</span>
+          </div>
+        </div>
+      </Panel>
+      <Panel title="Journey stage">
+        <ol className="m-0 grid list-none gap-2 p-0 sm:grid-cols-4 xl:grid-cols-7">
+          {stageStates.map((stage, index) => (
+            <li
+              key={stage.label}
+              aria-current={stage.state === 'current' ? 'step' : undefined}
+              className={`rounded-lg border px-3 py-3 ${stage.state === 'done' ? 'border-ok-line bg-ok-soft/60' : stage.state === 'current' ? 'border-info-line bg-info-soft' : 'border-line bg-card'}`}
+            >
+              <span className="type-caption block text-ink-3">
+                {stage.state === 'done'
+                  ? 'Done'
+                  : stage.state === 'current'
+                    ? 'Current'
+                    : `Step ${index + 1}`}
+              </span>
+              <span className="type-label-m mt-1 block text-ink">{stage.label}</span>
+            </li>
+          ))}
+        </ol>
+      </Panel>
       <Panel
         title={
           trip.tripStatus === TripStatusEnum.HELD
@@ -882,15 +969,7 @@ function CustomerTripContent({ trip }: { trip: TripView }) {
               >
                 <div className="flex items-center justify-between gap-3">
                   <strong className="type-h4 text-ink">{condition.horseName}</strong>
-                  <Chip
-                    tone={
-                      condition.condition === HorseConditionEnum.CONCERN
-                        ? 'bad'
-                        : condition.condition === HorseConditionEnum.WATCH
-                          ? 'warn'
-                          : 'ok'
-                    }
-                  >
+                  <Chip tone={conditionTone(condition.condition)}>
                     {sentence(condition.condition)}
                   </Chip>
                 </div>
@@ -962,6 +1041,7 @@ function TripWorkspace({
     condition: null,
   });
   const uploadedPhotos = useRef(new Map<string, string>());
+  const seenCustomerRecords = useRef<{ code: string; ids: Set<string> } | null>(null);
   const mutation = useTripRecord(audience === 'staff' ? 'staff' : 'escort', selectedCode);
   const [messageApi, contextHolder] = message.useMessage();
   const setRecordTime = (value: string) => {
@@ -990,6 +1070,32 @@ function TripWorkspace({
       window.removeEventListener('offline', offline);
     };
   }, []);
+  useEffect(() => {
+    if (audience !== 'customer' || !trip) return;
+    const ids = new Set(trip.records.map((record) => record.id));
+    const previous = seenCustomerRecords.current;
+    if (!previous || previous.code !== selectedCode) {
+      seenCustomerRecords.current = { code: selectedCode, ids };
+      return;
+    }
+    const unseen = trip.records
+      .filter((record) => !previous.ids.has(record.id))
+      .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+    seenCustomerRecords.current = { code: selectedCode, ids };
+    unseen.forEach((record) => {
+      if (record.kind === TripRecordKindEnum.CLEARED_BORDER) {
+        messageApi.success(
+          `Customs cleared at ${record.checkpointName ?? 'the border'} · ${formatClock(record.occurredAt)}.`,
+        );
+      }
+      const stop = trip.stops.find((item) => item.id === record.routeStopId);
+      if (record.kind === TripRecordKindEnum.ARRIVED_AT_STOP && stop?.kind === 'DELIVERY') {
+        messageApi.info(
+          `Your horses arrived at the handover point, ${stop.name} · ${formatClock(record.occurredAt)}.`,
+        );
+      }
+    });
+  }, [audience, messageApi, selectedCode, trip]);
   const updateObservation = (horseId: string, update: Partial<Observation>) => {
     setConditionByHorse((current) => ({
       ...current,
@@ -1128,7 +1234,7 @@ function TripWorkspace({
     }
   };
 
-  const applyAllSound = () => {
+  const applyAllStable = () => {
     if (!trip) return;
     setConditionByHorse(
       Object.fromEntries(
@@ -1136,7 +1242,7 @@ function TripWorkspace({
           horse.id,
           {
             checked: true,
-            condition: HorseConditionEnum.SOUND,
+            condition: HorseConditionEnum.STABLE,
             drinking: true,
             eating: true,
             note: '',
@@ -1422,18 +1528,52 @@ function TripWorkspace({
                               }))}
                             />
                           </label>
-                          <label className="type-body-s flex flex-col gap-2 text-ink-2">
-                            Checkpoint status
-                            <Select
-                              size="large"
-                              value={kind}
-                              onChange={setKind}
-                              options={eventOptions.map((value) => ({
-                                value,
-                                label: eventLabels[value],
-                              }))}
-                            />
-                          </label>
+                          {selectedStop?.kind === 'BORDER' ? (
+                            <div className="flex flex-col gap-2 text-ink-2">
+                              <span className="type-body-s">Outcome</span>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {[
+                                  {
+                                    kind: TripRecordKindEnum.CLEARED_BORDER,
+                                    description:
+                                      'Record customs clearance and continue to the next checkpoint.',
+                                    icon: 'check' as const,
+                                  },
+                                  {
+                                    kind: TripRecordKindEnum.HELD,
+                                    description:
+                                      'Stop the trip here and record why the horses must wait.',
+                                    icon: 'alert' as const,
+                                  },
+                                ]
+                                  .filter((option) => eventOptions.includes(option.kind))
+                                  .map((option) => (
+                                    <OptionCard
+                                      key={option.kind}
+                                      selected={kind === option.kind}
+                                      title={eventLabels[option.kind]}
+                                      description={option.description}
+                                      icon={option.icon}
+                                      className="min-h-32"
+                                      onChange={(selected) => selected && setKind(option.kind)}
+                                    />
+                                  ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <label className="type-body-s flex flex-col gap-2 text-ink-2">
+                              Checkpoint status
+                              <Select
+                                size="large"
+                                value={kind}
+                                onChange={setKind}
+                                options={eventOptions.map((value) => ({
+                                  value,
+                                  label: eventLabels[value],
+                                }))}
+                              />
+                            </label>
+                          )}
                           <label className="type-body-s flex flex-col gap-2 text-ink-2">
                             Recorded time
                             <input
@@ -1527,7 +1667,7 @@ function TripWorkspace({
                                   })
                               : updateObservation
                           }
-                          onAllSound={applyAllSound}
+                          onAllStable={applyAllStable}
                           arrival={taskMode === 'delivery'}
                         />
                         {conditionLog && (

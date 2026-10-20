@@ -20,6 +20,10 @@ export const HorseConditionEnum = {
   SOUND: 'SOUND',
   WATCH: 'WATCH',
   CONCERN: 'CONCERN',
+  STABLE: 'STABLE',
+  OFF_FEED: 'OFF_FEED',
+  STRESSED: 'STRESSED',
+  CLIMATE_CHANGE: 'CLIMATE_CHANGE',
 } as const;
 export type HorseCondition = (typeof HorseConditionEnum)[keyof typeof HorseConditionEnum];
 

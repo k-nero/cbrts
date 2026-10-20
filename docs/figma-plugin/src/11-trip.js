@@ -33,10 +33,10 @@ function unloadBy() { return fromMin(toMin(INC40.loaded) + INC40.restEvery * 60)
 function onTrailer(now) { return durText(toMin(now) - toMin(INC40.loaded)); }
 function arrivesLate(t) { return 'About ' + t + ' · ' + durText(toMin(t) - toMin(INC40.planned)) + ' late'; }
 var ARRIVAL = [
-  ['Shadowfax', 'Stall 1 · standard', 'Sound', null, null, 'Ate on arrival.'],
-  ['Nightfall', 'Stall 4 · climate', 'Sound', null, null, 'Slight sweat at unloading, settled within 10 min.'],
-  ['Copper King', 'Stall 2 · box', 'Sound', null, null, 'Walked off calmly.'],
-  ['Silver Bell', 'Stall 6 · standard', 'Sound', null, null, 'Drinking well.']
+  ['Shadowfax', 'Stall 1 · standard', 'Stable', null, null, 'Ate on arrival.'],
+  ['Nightfall', 'Stall 4 · climate', 'Stable', null, null, 'Slight sweat at unloading, settled within 10 min.'],
+  ['Copper King', 'Stall 2 · box', 'Stable', null, null, 'Walked off calmly.'],
+  ['Silver Bell', 'Stall 6 · standard', 'Stable', null, null, 'Drinking well.']
 ];
 
 function tallBtn(variant, label, o) { var b = btn(variant, 'MD', label, o); b.resize(b.width, 56); return fillW(b); }
@@ -134,14 +134,14 @@ function customerSees(text) {
   addAll(p, [Tx('What the customer sees', 'Heading/H4'), Tx(text, 'Body/S', 'text/secondary', { fill: true })]);
   return p;
 }
-/* Sound / Watch / Concern at touch size. The chosen one is said three ways so it survives glare in a sunlit cab:
+/* Stable / Off feed / Stressed / Climate change at touch size. The chosen one is said three ways so it survives glare in a sunlit cab:
    a check before the word, a 1.5px border in the full status colour, and its tone fill */
 function conditionControl(pick) {
-  var tones = { Sound: 'Ok', Watch: 'Warn', Concern: 'Bad' };
+  var tones = { Stable: 'Ok', 'Off feed': 'Warn', Stressed: 'Warn', 'Climate change': 'Warn' };
   var s = H({ name: 'Condition', gap: 0, radius: 8, stroke: 'border/strong', clip: true });
-  ['Sound', 'Watch', 'Concern'].forEach(function (w, i) {
+  ['Stable', 'Off feed', 'Stressed', 'Climate change'].forEach(function (w, i) {
     var on = w === pick, tn = TONE[tones[w]];
-    var c = H({ name: w, gap: 6, w: 112, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
+    var c = H({ name: w, gap: 6, w: 122, h: 52, main: 'CENTER', cross: 'CENTER', fill: on ? tn.bg : null });
     if (on) { c.strokes = [P(tn.fg)]; c.strokeWeight = 1.5; c.strokeAlign = 'INSIDE'; add(c, Ic('check', 16, tn.fg)); }
     else if (i) { c.strokes = [P('border/strong')]; c.strokeAlign = 'INSIDE'; c.strokeTopWeight = 0; c.strokeBottomWeight = 0; c.strokeRightWeight = 0; c.strokeLeftWeight = 1; }
     add(c, Tx(w, 'Label/M', on ? tn.fg : 'text/secondary'));
@@ -162,7 +162,7 @@ function lineField(value, empty) {
 }
 /* one horse at a stop: name and stall, the condition word, 48 px toggles and a note */
 function conditionRow(c) {
-  var r = VV({ name: c[0], gap: 12, pad: [16, 24, 16, 24], fill: c[2] !== 'Sound' ? 'surface/raised' : null });
+  var r = VV({ name: c[0], gap: 12, pad: [16, 24, 16, 24], fill: c[2] !== 'Stable' ? 'surface/raised' : null });
   borderSide(r, 'border/default', 'top');
   var top = H({ name: 'Top', gap: 20, cross: 'CENTER' });
   var n = VV({ name: 'Horse', gap: 2 });
@@ -208,16 +208,16 @@ function scrTripCheckpoint() {
 
 /* ---------- 09:40 at Svay Rieng: each horse's condition ---------- */
 var TRIP_CONDITION = [
-  ['Shadowfax', 'Stall 1 · standard', 'Sound', true, true, 'Calm; ate hay straight away.'],
-  ['Nightfall', 'Stall 4 · climate', 'Watch', true, false, 'Light sweat on the neck again; drank about 8 L; settled within 10 minutes.'],
-  ['Copper King', 'Stall 2 · box', 'Sound', true, true, ''],
-  ['Silver Bell', 'Stall 6 · standard', 'Sound', true, true, '']
+  ['Shadowfax', 'Stall 1 · standard', 'Stable', true, true, 'Calm; ate hay straight away.'],
+  ['Nightfall', 'Stall 4 · climate', 'Off feed', true, false, 'Light sweat on the neck again; drank about 8 L; settled within 10 minutes.'],
+  ['Copper King', 'Stall 2 · box', 'Stressed', true, true, 'Restless during loading; settled after water.'],
+  ['Silver Bell', 'Stall 6 · standard', 'Climate change', true, true, 'Moved to the climate-controlled stall after the temperature changed.']
 ];
 function scrTripWelfare() {
   var task = panel('Condition of each horse', { gap: 0, pad: 0, clip: true });
-  add(task, fillW(taskHead('Condition of each horse', 'Check each horse in its stall before you leave. Concern on any horse opens an incident and alerts Yến.')));
+  add(task, fillW(taskHead('Condition of each horse', 'Record stable, off feed, stressed or climate change for each horse, then add the details and photos that explain what you observed.')));
   var quick = H({ name: 'Shortcut', gap: 16, pad: [0, 24, 18, 24], cross: 'CENTER' });
-  var q = btn('Secondary', 'MD', 'All sound · drinking · eating', { lead: 'check' }); q.resize(q.width, 52);
+  var q = btn('Secondary', 'MD', 'All stable · drinking · eating', { lead: 'check' }); q.resize(q.width, 52);
   addAll(quick, [q, Tx('Applied at 09:38. Then change only the horse that differs: Nightfall.', 'Body/S', 'text/secondary', { fill: true })]);
   add(task, fillW(quick));
   TRIP_CONDITION.forEach(function (c) { add(task, fillW(conditionRow(c))); });
@@ -227,7 +227,7 @@ function scrTripWelfare() {
     customerSees('Each horse’s word and your note, under “Latest condition log”. They read the word you chose.')]);
   return cabScreen('Escort · Welfare stop', bar041({ pill: 'Clear to depart', pillTone: 'Ok', synced: true, sync: 'All records sent', now: '09:40', user: STAFF.hoa }),
     stripAt(['Done', 'Done', 'Current', 'Upcoming'], ['06:05', '08:34', '09:36', '12:30'], ['Departed', 'Cleared', 'Arrived · 6 min late', 'Planned']),
-    task, right, cabDock('Leave in 41 min · by 10:21', '1 horse on watch, 3 sound. Saved on this tablet first; amend within 15 minutes.', 'Save condition log'));
+    task, right, cabDock('Leave in 41 min · by 10:21', '1 horse off feed, 1 stressed, 1 adapting to climate change, 1 stable. Saved on this tablet first; amend within 15 minutes.', 'Save condition log'));
 }
 
 /* ---------- 12:48 at Phnom Penh: hand over the horses ---------- */
@@ -321,7 +321,7 @@ function scrTripCoordinator() {
     fillW(stat('Neutral', againstPlan(last[2], last[3]), 'Against plan at ' + last[0])),
     fillW(stat('Neutral', JOB_WINDOW.from + '–' + JOB_WINDOW.until, 'Arrival window · plan arrives ' + TRIP_PLAN[3][2])),
     fillW(stat('Info', TRIP_PLAN[2][2], 'Next checkpoint · Svay Rieng')),
-    fillW(stat('Ok', '4 of 4', 'Horses sound at the last check, ' + log[log.length - 1][0]))
+    fillW(stat('Ok', '4 of 4', 'Horses stable at the last check, ' + log[log.length - 1][0]))
   ]);
 
   var stops = tbl('Checkpoints', [['Checkpoint', null], ['Planned', 90, null, 'Mono/Data'], ['Recorded', 280], ['Against plan', 110, 'RIGHT', 'Mono/Data'], ['Status', 110, 'RIGHT']], TRIP_PLAN.map(function (r) {
@@ -345,7 +345,7 @@ function scrTripCoordinator() {
   });
   var plan = titled('Checkpoints, planned against recorded', 'From the route plan you confirmed on 16 Oct; recorded times come from the cab.', stops, Tx('Updated ' + NOW041, 'Mono/Caption', 'text/tertiary'));
 
-  /* each horse's word from the last condition check, the same Sound / Watch / Concern the groom picks */
+  /* each horse's welfare category from the last condition check */
   var board = panel('On board', { gap: 0, pad: [20, 24, 12, 24] });
   var bh = VV({ name: 'Title', gap: 2, pad: [0, 0, 10, 0] });
   addAll(bh, [Tx('On board', 'Heading/H4'), Tx('Last condition check ' + log[log.length - 1][0] + ' by ' + log[log.length - 1][2] + '. Next at the welfare stop.', 'Body/S', 'text/tertiary', { fill: true })]);
@@ -357,7 +357,7 @@ function scrTripCoordinator() {
     var t = VV({ name: 'Text', gap: 2 });
     add(t, Tx(h[0], 'Label/M'));
     add(t, Tx(notes[h[0]] ? h[1] + ' · ' + notes[h[0]] : h[1], 'Body/S', 'text/tertiary', { fill: true }));
-    addAll(r, [fillW(t), chip('Ok', 'Sound')]);
+    addAll(r, [fillW(t), chip('Ok', 'Stable')]);
     add(board, fillW(r));
   });
   var crew = panel('Crew and vehicle', { gap: 12 });

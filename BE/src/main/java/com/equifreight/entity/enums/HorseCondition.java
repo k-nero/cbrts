@@ -6,5 +6,9 @@ package com.equifreight.entity.enums;
 public enum HorseCondition {
     SOUND,
     WATCH,
-    CONCERN
+    CONCERN,
+    STABLE,
+    OFF_FEED,
+    STRESSED,
+    CLIMATE_CHANGE
 }
