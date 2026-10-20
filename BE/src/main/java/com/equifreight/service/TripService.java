@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
@@ -9,6 +10,7 @@ import com.equifreight.model.trip.*;
 import com.equifreight.repository.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +47,8 @@ public class TripService {
      * Tablet and server clocks drift; anything further ahead than this is a wrong clock, not a record.
      */
     private static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
+    private static final DateTimeFormatter NOTIFICATION_TIME =
+            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(AppConstants.BUSINESS_ZONE);
 
     private final TransportJobRepository jobs;
     private final CrewAssignmentRepository crew;
@@ -54,6 +58,9 @@ public class TripService {
     private final RequestHorseRepository requestHorses;
     private final FileService files;
     private final AuditLogRepository audit;
+    private final UserRepository users;
+    private final NotificationService notifications;
+    private final ChecklistItemRepository checklistItems;
 
     public TripService(
             TransportJobRepository jobs,
@@ -63,7 +70,10 @@ public class TripService {
             LoadPlanRepository loads,
             RequestHorseRepository requestHorses,
             FileService files,
-            AuditLogRepository audit) {
+            AuditLogRepository audit,
+            UserRepository users,
+            NotificationService notifications,
+            ChecklistItemRepository checklistItems) {
         this.jobs = jobs;
         this.crew = crew;
         this.records = records;
@@ -72,6 +82,9 @@ public class TripService {
         this.requestHorses = requestHorses;
         this.files = files;
         this.audit = audit;
+        this.users = users;
+        this.notifications = notifications;
+        this.checklistItems = checklistItems;
     }
 
     private static ConflictException transitionConflict(TripStatus status, String reason) {
@@ -141,6 +154,9 @@ public class TripService {
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
             throw new BusinessException(
                     "CONDITION_LOG_REQUIRED", "A condition check must include at least one horse observation");
+        if (request.kind() == TripRecordKind.HELD && (request.text() == null || request.text().isBlank()))
+            throw new BusinessException(
+                    "HOLD_REASON_REQUIRED", "Describe why the trip is held before saving the hold.");
         if (request.kind() != TripRecordKind.CONDITION_CHECK && hasConditions)
             throw new BusinessException(
                     "CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
@@ -173,6 +189,15 @@ public class TripService {
                     .findFirst()
                     .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
         }
+        if (request.documentsShown() != null && !request.documentsShown().isEmpty()) {
+            if (request.kind() != TripRecordKind.CLEARED_BORDER
+                    || stop == null
+                    || stop.getKind() != RouteStopKind.BORDER)
+                throw new BusinessException(
+                        "DOCUMENTS_SHOWN_BORDER_ONLY", "Documents can only be recorded as shown at a border checkpoint.");
+            if (new HashSet<>(request.documentsShown()).size() != request.documentsShown().size())
+                throw new BusinessException("DUPLICATE_DOCUMENT", "A document can only be selected once per checkpoint.");
+        }
         TripRecord record = new TripRecord();
         record.setJob(job);
         record.setRouteStop(stop);
@@ -183,6 +208,12 @@ public class TripService {
         record.setRecordedBy(user);
         record.setChannel(channel);
         record.setText(request.text());
+        if (request.documentsShown() != null && !request.documentsShown().isEmpty()) {
+            List<ChecklistItem> shown = checklistItems.findByJobIdAndIdIn(job.getId(), request.documentsShown());
+            if (shown.size() != request.documentsShown().size())
+                throw ResourceNotFoundException.of("Trip document", request.documentsShown());
+            record.getDocumentsShown().addAll(shown);
+        }
         if (handedOver) {
             record.setReceiverName(request.receiverName().trim());
             record.setReceiverSignature(request.receiverSignature());
@@ -217,7 +248,56 @@ public class TripService {
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) updateJobStatus(job, request.kind(), request.occurredAt(), stop);
         writeAudit(saved, user, channel, stop);
+        notifyCustomerProgress(job, request.kind(), request.occurredAt(), stop, request.text());
         return TripMapper.toRecordResponse(saved);
+    }
+
+    private void notifyCustomerProgress(
+            TransportJob job, TripRecordKind kind, Instant occurredAt, RouteStop stop, String eventText) {
+        if (kind == TripRecordKind.HELD) {
+            String checkpoint = stop == null ? "during the trip" : "at " + TripMapper.stopName(stop);
+            String holdBody = "The trip is held "
+                    + checkpoint
+                    + " at "
+                    + NOTIFICATION_TIME.format(occurredAt)
+                    + ". "
+                    + eventText;
+            if (job.getRequest().getClub() != null) {
+                for (User customer : users.findByClubId(job.getRequest().getClub().getId())) {
+                    notifications.sendNotification(
+                            customer, kind.name(), job.getCode() + " is on hold", holdBody, "TRIP", job.getId());
+                }
+            }
+            for (User manager : users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE)) {
+                notifications.sendNotification(
+                        manager, kind.name(), job.getCode() + " needs attention", holdBody, "TRIP", job.getId());
+            }
+            return;
+        }
+        if (job.getRequest().getClub() == null) return;
+        String title;
+        String body;
+        if (kind == TripRecordKind.CLEARED_BORDER) {
+            title = job.getCode() + " cleared customs";
+            String checkpoint = stop == null ? "the border checkpoint" : TripMapper.stopName(stop);
+            body = "Customs clearance was recorded at "
+                    + checkpoint
+                    + " at "
+                    + NOTIFICATION_TIME.format(occurredAt)
+                    + ".";
+        } else if (kind == TripRecordKind.ARRIVED_AT_STOP && stop != null && stop.getKind() == RouteStopKind.DELIVERY) {
+            title = job.getCode() + " has arrived";
+            body = "Arrival was recorded at "
+                    + TripMapper.stopName(stop)
+                    + " at "
+                    + NOTIFICATION_TIME.format(occurredAt)
+                    + ".";
+        } else {
+            return;
+        }
+        for (User customer : users.findByClubId(job.getRequest().getClub().getId())) {
+            notifications.sendNotification(customer, kind.name(), title, body, "TRIP", job.getId());
+        }
     }
 
     /**
@@ -379,6 +459,8 @@ public class TripService {
         return TripMapper.toViewResponse(
                 job,
                 load == null ? null : load.getVehicle().getCode(),
+                crew.findByJobId(job.getId()),
+                checklistItems.findByJobId(job.getId()),
                 stops,
                 horses,
                 tripRecords.stream().map(TripMapper::toRecordResponse).toList());

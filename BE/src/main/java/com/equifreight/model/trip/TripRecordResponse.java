@@ -21,4 +21,5 @@ public record TripRecordResponse(
         String text,
         String receiverName,
         String receiverSignature,
+        List<TripDocumentResponse> documentsShown,
         List<TripConditionResponse> conditions) {}

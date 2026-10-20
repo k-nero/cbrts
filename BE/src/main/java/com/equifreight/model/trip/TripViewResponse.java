@@ -17,6 +17,8 @@ public record TripViewResponse(
         String origin,
         String destination,
         String vehicleCode,
+        List<String> crew,
+        List<TripDocumentResponse> documents,
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
         List<TripRecordResponse> records) {}

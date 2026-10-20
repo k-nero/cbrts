@@ -1,6 +1,8 @@
 package com.equifreight.model.trip;
 
+import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.ConditionLog;
+import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.LoadPlanStall;
 import com.equifreight.entity.RouteStop;
@@ -20,6 +22,8 @@ public final class TripMapper {
     public static TripViewResponse toViewResponse(
             TransportJob job,
             String vehicleCode,
+            List<CrewAssignment> crew,
+            List<ChecklistItem> documents,
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records) {
@@ -38,9 +42,26 @@ public final class TripMapper {
                         ? null
                         : job.getRequest().getDestinationPlace().getName(),
                 vehicleCode,
+                crew.stream()
+                        .map(assignment -> "%s · %s"
+                                .formatted(fullName(assignment.getUser()), assignment.getCrewRole()))
+                        .toList(),
+                documents.stream().map(TripMapper::toDocumentResponse).toList(),
                 stops,
                 horses,
                 records);
+    }
+
+    public static TripDocumentResponse toDocumentResponse(ChecklistItem item) {
+        return new TripDocumentResponse(
+                item.getId(),
+                item.getDocumentType().getName(),
+                item.getHorse() == null ? null : item.getHorse().getName(),
+                item.getCurrentVersion() == null || item.getCurrentVersion().getFile() == null
+                        ? null
+                        : item.getCurrentVersion().getFile().getFileName(),
+                item.getStatus(),
+                item.getValidity());
     }
 
     /** A stop of the confirmed route plan with the latest record made there, or null. */
@@ -89,6 +110,7 @@ public final class TripMapper {
                 record.getText(),
                 record.getReceiverName(),
                 record.getReceiverSignature(),
+                record.getDocumentsShown().stream().map(TripMapper::toDocumentResponse).toList(),
                 record.getConditionLogs().stream()
                         .map(TripMapper::toConditionResponse)
                         .toList());

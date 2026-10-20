@@ -5,7 +5,9 @@ import com.equifreight.entity.enums.TripRecordKind;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -77,4 +79,11 @@ public class TripRecord extends BaseEntity {
 
     @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.PERSIST)
     private List<ConditionLog> conditionLogs = new ArrayList<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "trip_record_documents",
+            joinColumns = @JoinColumn(name = "trip_record_id"),
+            inverseJoinColumns = @JoinColumn(name = "checklist_item_id"))
+    private Set<ChecklistItem> documentsShown = new HashSet<>();
 }

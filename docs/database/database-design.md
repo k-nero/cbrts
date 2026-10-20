@@ -526,7 +526,9 @@ erDiagram
 
 Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
 
-**`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
+**`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`STABLE`, `OFF_FEED`, `STRESSED`, `CLIMATE_CHANGE`; legacy `SOUND`, `WATCH`, `CONCERN` remain readable), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
+
+**`trip_record_documents`** (append-only): `(trip_record_id, checklist_item_id)`. Records which job documents the escort showed at a border checkpoint. A pair can appear once; links cannot be updated or deleted.
 
 **`condition_log_files`**: `(condition_log_id, file_id)`, the photos attached to one horse's condition entry. A file can be attached once; links are append-only and follow the same ownership checks as other job files.
 

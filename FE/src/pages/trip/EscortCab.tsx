@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Select, Spin, message } from 'antd';
+import { Select, Spin, Upload, message } from 'antd';
+import type { UploadFile } from 'antd';
 import { jwtDecode } from 'jwt-decode';
+import { fileApi } from '@/apis/file';
 import { tripApi } from '@/apis/trip';
 import { useAuth } from '@/hooks/auth';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
+import { HorseConditionEnum, TripConditionOptions, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 import type { HorseCondition, TripRecordInput, TripRecordKind, TripStop } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 import { selectAccessToken, useAuthStore } from '@/stores/authStore';
@@ -58,18 +60,20 @@ const allowedByStop: Record<string, TripRecordKind[]> = {
 
 type HorseDraft = {
   checked: boolean;
-  condition: HorseCondition;
+  condition: HorseCondition | null;
   drinking: boolean | null;
   eating: boolean | null;
   note: string;
+  photos: UploadFile[];
 };
 
 const initialDraft = (): HorseDraft => ({
   checked: false,
-  condition: HorseConditionEnum.SOUND,
+  condition: null,
   drinking: null,
   eating: null,
   note: '',
+  photos: [],
 });
 
 const fmtTime = (value?: string | null) =>
@@ -170,23 +174,27 @@ function HorseConditionRow({
         <p className="type-body-s m-0 text-ink-3">{horse.stall ?? 'Stall not assigned'}</p>
       </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label={`${horse.name} condition`}>
-        {Object.values(HorseConditionEnum).map((condition) => (
+        {TripConditionOptions.map((condition) => (
           <button
             key={condition}
             type="button"
             aria-pressed={value.condition === condition}
-            onClick={() => onChange({ checked: true, condition })}
+            onClick={() =>
+              onChange(
+                value.condition === condition
+                  ? { checked: false, condition: null }
+                  : { checked: true, condition },
+              )
+            }
             className={`min-h-12 rounded-md border px-4 type-label-m ${
               value.condition === condition
-                ? condition === 'CONCERN'
+                ? condition === HorseConditionEnum.OFF_FEED || condition === HorseConditionEnum.STRESSED || condition === HorseConditionEnum.CLIMATE_CHANGE
                   ? 'border-bad bg-bad-soft text-bad'
-                  : condition === 'WATCH'
-                    ? 'border-warn bg-warn-soft text-warn'
-                    : 'border-ok bg-ok-soft text-ok'
+                  : 'border-ok bg-ok-soft text-ok'
                 : 'border-line-strong bg-input text-ink-2'
             }`}
           >
-            {condition[0] + condition.slice(1).toLowerCase()}
+            {condition.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase())}
           </button>
         ))}
       </div>
@@ -200,6 +208,7 @@ function HorseConditionRow({
               type="checkbox"
               checked={value[item] === true}
               onChange={(event) => onChange({ checked: true, [item]: event.target.checked })}
+              className="size-6 accent-ink"
             />
             {item === 'drinking' ? 'Drinking' : 'Eating'}
           </label>
@@ -213,6 +222,18 @@ function HorseConditionRow({
           className="type-body-s h-12 min-w-48 flex-1 rounded-md border border-line-strong bg-input px-3 text-ink placeholder:text-ink-3"
         />
       </div>
+      <Upload
+        accept="image/jpeg,image/png,image/heic,image/heif"
+        multiple
+        maxCount={8}
+        fileList={value.photos}
+        beforeUpload={() => false}
+        onChange={({ fileList }) => onChange({ checked: true, photos: fileList })}
+      >
+        <Button type="button" size="sm" leadingIcon="upload">
+          Attach condition photos
+        </Button>
+      </Upload>
     </div>
   );
 }
@@ -239,6 +260,8 @@ export default function EscortCab() {
   const tripQuery = useTrip('escort', selectedCode);
   const trip = tripQuery.data;
   const [selectedStopId, setSelectedStopId] = useState<string>();
+  const [cabTask, setCabTask] = useState<'checkpoint' | 'condition'>('checkpoint');
+  const [shownDocumentIds, setShownDocumentIds] = useState<string[]>([]);
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [note, setNote] = useState('');
   const [drafts, setDrafts] = useState<Record<string, HorseDraft>>({});
@@ -247,9 +270,19 @@ export default function EscortCab() {
   const [pending, setPending] = useState<PendingCabRecord[]>(() => readPending(queueKey));
   const [holdCleared, setHoldCleared] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const [uploadingConditions, setUploadingConditions] = useState(false);
   const mutation = useTripRecord('escort', selectedCode);
   const requestRef = useRef<string | null>(null);
+  const uploadedPhotos = useRef(new Map<string, string>());
   const syncingQueue = useRef(false);
+
+  useEffect(() => {
+    setDrafts({});
+    setNote('');
+    setSelectedStopId(undefined);
+    setCabTask('checkpoint');
+    setHoldCleared(false);
+  }, [selectedCode]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -321,6 +354,9 @@ export default function EscortCab() {
     const next = trip.stops.find((stop) => !stop.latestStatus);
     return trip.stops.find((stop) => stop.id === selectedStopId) ?? next ?? trip.stops.at(-1);
   }, [trip, selectedStopId, latestHeld]);
+  useEffect(() => {
+    setShownDocumentIds([]);
+  }, [activeStop?.id, selectedCode]);
   const selectedKinds = eventKindsFor(trip?.tripStatus ?? '', activeStop);
   const selectedKind = selectedKinds.includes(kind) ? kind : selectedKinds[0];
   const loadedRecord = [...(trip?.records ?? [])]
@@ -363,8 +399,9 @@ export default function EscortCab() {
     conditions?: TripRecordInput['conditions'],
     textOverride?: string,
     receiver?: Pick<TripRecordInput, 'receiverName' | 'receiverSignature'>,
-  ) => {
-    if (!trip) return;
+    documentsShown?: string[],
+  ): Promise<boolean> => {
+    if (!trip) return false;
     requestRef.current ??= crypto.randomUUID();
     const input: TripRecordInput = {
       routeStopId: activeStop?.id ?? null,
@@ -373,6 +410,7 @@ export default function EscortCab() {
       clientRef: requestRef.current,
       text: textOverride?.trim() || note.trim() || undefined,
       conditions,
+      documentsShown,
       ...receiver,
     };
     if (!isOnline) {
@@ -382,7 +420,7 @@ export default function EscortCab() {
       setNote('');
       if (conditions) setDrafts({});
       messageApi.info('Saved on this tablet. It will send when the connection returns.');
-      return;
+      return true;
     }
     try {
       await mutation.mutateAsync(input);
@@ -390,34 +428,64 @@ export default function EscortCab() {
       setNote('');
       messageApi.success(`${labelByKind[recordKind]} saved.`);
       if (conditions) setDrafts({});
+      return true;
     } catch (error) {
       if (!navigator.onLine) {
         setPending((current) => [...current, { jobCode: selectedCode, input }]);
         requestRef.current = null;
         messageApi.info('Connection lost. Saved on this tablet and queued to send.');
-      } else messageApi.error(apiErrorMessage(error, 'The trip update could not be saved.'));
+        return true;
+      }
+      messageApi.error(apiErrorMessage(error, 'The trip update could not be saved.'));
+      return false;
     }
   };
 
-  const saveConditions = () => {
+  const saveConditions = async () => {
     if (checkedHorses.length === 0) {
       messageApi.error('Select each horse you actually checked before saving.');
       return;
     }
-    void persistRecord(
-      TripRecordKindEnum.CONDITION_CHECK,
-      checkedHorses.map((horse) => {
-        const draft = drafts[horse.id] ?? initialDraft();
-        return {
-          horseId: horse.id,
-          condition: draft.condition,
-          drinking: draft.drinking,
-          eating: draft.eating,
-          note: draft.note.trim() || undefined,
-          photoFileIds: [],
-        };
-      }),
-    );
+    if (!isOnline && checkedHorses.some((horse) => (drafts[horse.id]?.photos.length ?? 0) > 0)) {
+      messageApi.error('Photos need a connection to upload. Save the condition log without photos or reconnect first.');
+      return;
+    }
+    if (checkedHorses.some((horse) => !drafts[horse.id]?.condition)) {
+      messageApi.error('Choose Sound, Watch or Concern for each selected horse.');
+      return;
+    }
+    setUploadingConditions(true);
+    try {
+      const conditions = await Promise.all(
+        checkedHorses.map(async (horse) => {
+          const draft = drafts[horse.id] ?? initialDraft();
+          const photoFileIds = await Promise.all(
+            draft.photos.map(async (photo) => {
+              if (!photo.originFileObj) return undefined;
+              const existingId = uploadedPhotos.current.get(photo.uid);
+              if (existingId) return existingId;
+              const fileId = (await fileApi.upload(photo.originFileObj)).id;
+              uploadedPhotos.current.set(photo.uid, fileId);
+              return fileId;
+            }),
+          );
+          return {
+            horseId: horse.id,
+            condition: draft.condition!,
+            drinking: draft.drinking,
+            eating: draft.eating,
+            note: draft.note.trim() || undefined,
+            photoFileIds: photoFileIds.filter((id): id is string => Boolean(id)),
+          };
+        }),
+      );
+      const saved = await persistRecord(TripRecordKindEnum.CONDITION_CHECK, conditions);
+      if (saved) uploadedPhotos.current.clear();
+    } catch (error) {
+      messageApi.error(apiErrorMessage(error, 'Condition photos could not be uploaded.'));
+    } finally {
+      setUploadingConditions(false);
+    }
   };
 
   const applyAllSound = () => {
@@ -428,10 +496,11 @@ export default function EscortCab() {
           horse.id,
           {
             checked: true,
-            condition: HorseConditionEnum.SOUND,
+            condition: HorseConditionEnum.STABLE,
             drinking: true,
             eating: true,
             note: '',
+            photos: [],
           },
         ]),
       ),
@@ -451,6 +520,37 @@ export default function EscortCab() {
       return;
     }
     void persistRecord(selectedKind);
+  };
+
+  const conditionTask = welfareMode || baselineMode || (heldMode && Boolean(activeStop));
+  const departureEvent =
+    selectedKind === TripRecordKindEnum.DEPARTED ||
+    selectedKind === TripRecordKindEnum.FLIGHT_DEPARTED;
+  const dockLabel = conditionTask
+    && cabTask === 'condition'
+    ? `Save condition log · ${checkedHorses.length} checked`
+    : heldMode
+      ? holdCleared
+        ? 'Record leaving stop'
+        : 'Save a trip note'
+      : selectedKind
+        ? `${labelByKind[selectedKind]} · ${fmtTime(now.toISOString())}`
+        : 'No available trip action';
+  const dockDisabled = conditionTask && cabTask === 'condition'
+    ? mutation.isPending || uploadingConditions || checkedHorses.length === 0
+    : heldMode
+      ? mutation.isPending || !note.trim() || (holdCleared && !isOnline)
+      : mutation.isPending ||
+        !selectedKind ||
+        (departureEvent && !trip?.clearanceReady) ||
+        (selectedKind === TripRecordKindEnum.HELD && !note.trim());
+  const saveDockAction = () => {
+    if (conditionTask && cabTask === 'condition') void saveConditions();
+    else if (heldMode && holdCleared) void persistRecord(TripRecordKindEnum.LEFT_STOP);
+    else if (heldMode) void persistRecord(TripRecordKindEnum.NOTE);
+    else if (selectedKind === TripRecordKindEnum.CLEARED_BORDER)
+      void persistRecord(selectedKind, undefined, undefined, undefined, shownDocumentIds);
+    else saveCheckpoint();
   };
 
   if (summariesQuery.isPending)
@@ -596,7 +696,67 @@ export default function EscortCab() {
                   </label>
                 )}
 
-                {(welfareMode || baselineMode || (heldMode && activeStop)) && (
+                {activeStop?.kind === 'BORDER' && trip.documents.length > 0 && (
+                  <section className="mb-5 overflow-hidden rounded-lg border border-line">
+                    <div className="p-4">
+                      <h2 className="type-h4 m-0">Documents at the border</h2>
+                      <p className="type-body-s m-0 text-ink-3">
+                        Select the documents you show when recording that customs cleared the crossing.
+                      </p>
+                    </div>
+                    {trip.documents.map((document, index) => (
+                      <label
+                        key={`${document.name}-${document.horseName ?? 'shipment'}-${index}`}
+                        className="flex min-h-12 flex-wrap items-center gap-3 border-t border-line px-4 py-3 type-body-m has-[:disabled]:opacity-60"
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Shown at border: ${document.name}${document.horseName ? ` · ${document.horseName}` : ''}`}
+                          checked={shownDocumentIds.includes(document.id)}
+                          disabled={selectedKind !== TripRecordKindEnum.CLEARED_BORDER}
+                          onChange={(event) =>
+                            setShownDocumentIds((current) =>
+                              event.target.checked
+                                ? [...current, document.id]
+                                : current.filter((id) => id !== document.id),
+                            )
+                          }
+                          className="size-6 accent-ink"
+                        />
+                        <span className="type-body-m flex-1">
+                          {document.name}{document.horseName ? ` · ${document.horseName}` : ''}
+                          {document.reference ? ` · ${document.reference}` : ''}
+                        </span>
+                        <Chip tone={document.status === 'CLEARED' && document.validity === 'GREEN' ? 'ok' : document.status === 'REJECTED' || document.validity === 'RED' ? 'bad' : 'warn'}>
+                          {sentence(document.status)}{document.validity ? ` · ${sentence(document.validity)}` : ''}
+                        </Chip>
+                      </label>
+                    ))}
+                  </section>
+                )}
+
+                {conditionTask && (
+                  <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Cab task">
+                    <button
+                      type="button"
+                      aria-pressed={cabTask === 'checkpoint'}
+                      onClick={() => setCabTask('checkpoint')}
+                      className={`min-h-12 rounded-md border px-4 type-label-m ${cabTask === 'checkpoint' ? 'border-info bg-info-soft text-info' : 'border-line-strong bg-input text-ink-2'}`}
+                    >
+                      Checkpoint update
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={cabTask === 'condition'}
+                      onClick={() => setCabTask('condition')}
+                      className={`min-h-12 rounded-md border px-4 type-label-m ${cabTask === 'condition' ? 'border-info bg-info-soft text-info' : 'border-line-strong bg-input text-ink-2'}`}
+                    >
+                      Horse condition
+                    </button>
+                  </div>
+                )}
+
+                {(welfareMode || baselineMode || (heldMode && activeStop)) && cabTask === 'condition' && (
                   <section className="overflow-hidden rounded-lg border border-line">
                     <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                       <div>
@@ -604,12 +764,12 @@ export default function EscortCab() {
                           {baselineMode ? 'Loading baseline' : 'Horse condition'}
                         </h2>
                         <p className="type-body-s m-0 text-ink-3">
-                          Partial checks are allowed. Select the horses you examined.
+                          Select each horse you examined. Record stable, off feed, stressed or climate change, with a note if needed.
                         </p>
                       </div>
                       {!deliveryMode && (
                         <Button className="min-h-12" onClick={applyAllSound}>
-                          All sound · drinking · eating
+                          All stable · drinking · eating
                         </Button>
                       )}
                     </div>
@@ -636,18 +796,9 @@ export default function EscortCab() {
                         </label>
                       </div>
                     )}
-                    <div className="flex justify-end border-t border-line p-4">
-                      <Button
-                        variant={heldMode ? 'secondary' : 'primary'}
-                        className="min-h-16 min-w-60 text-base"
-                        disabled={mutation.isPending || !isOnline || checkedHorses.length === 0}
-                        onClick={saveConditions}
-                      >
-                        {mutation.isPending
-                          ? 'Saving…'
-                          : `Save condition log · ${checkedHorses.length} checked`}
-                      </Button>
-                    </div>
+                    <p className="type-body-s m-0 border-t border-line px-5 py-3 text-ink-3">
+                      Save this append-only condition record from the action dock at the bottom of the screen.
+                    </p>
                   </section>
                 )}
 
@@ -655,13 +806,16 @@ export default function EscortCab() {
                   <DeliveryTask
                     mode={handoverMode ? 'handover' : 'arrival'}
                     horses={trip.horses}
-                    canRecordDelivery={trip.records.some(
-                      (record) =>
-                        record.kind === TripRecordKindEnum.CONDITION_CHECK &&
-                        record.routeStopId === activeStop?.id,
+                    canRecordDelivery={trip.horses.every((horse) =>
+                      trip.records.some(
+                        (record) =>
+                          record.kind === TripRecordKindEnum.CONDITION_CHECK &&
+                          record.routeStopId === activeStop?.id &&
+                          record.conditions.some((condition) => condition.horseId === horse.id),
+                      ),
                     )}
                     onSaveConditions={(conditions) =>
-                      void persistRecord(TripRecordKindEnum.CONDITION_CHECK, conditions)
+                      persistRecord(TripRecordKindEnum.CONDITION_CHECK, conditions)
                     }
                     onRecordDelivery={() => void persistRecord(TripRecordKindEnum.DELIVERED)}
                     onSaveHandover={(receiverName, receiverSignature) =>
@@ -677,18 +831,27 @@ export default function EscortCab() {
                   />
                 )}
 
-                {!welfareMode && !deliveryMode && !heldMode && (
+                {!deliveryMode && !handoverMode && !heldMode && (!conditionTask || cabTask === 'checkpoint') && (
                   <section className="grid gap-4 md:grid-cols-2">
                     <label className="type-label-m flex flex-col gap-2">
                       Checkpoint event
-                      <Select
-                        value={selectedKind}
-                        onChange={setKind}
-                        options={selectedKinds.map((value) => ({
-                          value,
-                          label: labelByKind[value],
-                        }))}
-                      />
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Checkpoint outcome">
+                        {selectedKinds.map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            aria-pressed={selectedKind === value}
+                            onClick={() => setKind(value)}
+                            className={`min-h-12 rounded-md border px-4 type-label-m ${
+                              selectedKind === value
+                                ? 'border-info bg-info-soft text-info'
+                                : 'border-line-strong bg-input text-ink-2'
+                            }`}
+                          >
+                            {labelByKind[value]}
+                          </button>
+                        ))}
+                      </div>
                     </label>
                     <label className="type-label-m flex flex-col gap-2">
                       Recorded at
@@ -716,23 +879,6 @@ export default function EscortCab() {
                         className="type-body-s rounded-md border border-line-strong bg-input p-3 text-ink placeholder:text-ink-3"
                       />
                     </label>
-                    <div className="md:col-span-2">
-                      <Button
-                        variant={baselineMode ? 'secondary' : 'primary'}
-                        className="min-h-16 w-full text-base md:w-auto md:min-w-72"
-                        disabled={
-                          mutation.isPending ||
-                          !isOnline ||
-                          !selectedKind ||
-                          (selectedKind === TripRecordKindEnum.HELD && !note.trim())
-                        }
-                        onClick={saveCheckpoint}
-                      >
-                        {mutation.isPending
-                          ? 'Saving…'
-                          : `${selectedKind ? labelByKind[selectedKind] : 'No available event'} · ${fmtTime(now.toISOString())}`}
-                      </Button>
-                    </div>
                   </section>
                 )}
 
@@ -749,13 +895,6 @@ export default function EscortCab() {
                         className="type-body-s rounded-md border border-line-strong bg-input p-3 text-ink placeholder:text-ink-3"
                       />
                     </label>
-                    <Button
-                      className="min-h-12"
-                      disabled={!note.trim() || mutation.isPending || !isOnline}
-                      onClick={() => void persistRecord(TripRecordKindEnum.NOTE)}
-                    >
-                      Save a trip note
-                    </Button>
                     <label className="type-body-s flex min-h-12 items-center gap-2">
                       <input
                         type="checkbox"
@@ -764,13 +903,6 @@ export default function EscortCab() {
                       />
                       Yến has cleared this hold
                     </label>
-                    <Button
-                      className="min-h-12 md:col-span-2"
-                      disabled={!holdCleared || !note.trim() || mutation.isPending || !isOnline}
-                      onClick={() => void persistRecord(TripRecordKindEnum.LEFT_STOP)}
-                    >
-                      Record leaving stop
-                    </Button>
                   </section>
                 )}
               </Panel>
@@ -792,7 +924,9 @@ export default function EscortCab() {
                           </p>
                         </div>
                         <Chip>
-                          {drafts[horse.id]?.checked ? drafts[horse.id].condition : 'Not checked'}
+                          {drafts[horse.id]?.checked && drafts[horse.id].condition
+                            ? sentence(drafts[horse.id].condition)
+                            : 'Not checked'}
                         </Chip>
                       </li>
                     ))}
@@ -836,6 +970,28 @@ export default function EscortCab() {
           </div>
         )
       )}
+      {trip && !deliveryMode && !handoverMode && (
+        <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-card px-4 py-3 shadow-lg md:px-8">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="type-label-m m-0">{dockLabel}</p>
+              <p className="type-body-s m-0 text-ink-3">
+              {conditionTask && cabTask === 'condition'
+                  ? 'Append-only welfare record · saved locally when offline'
+                  : `Record for ${activeStop?.name ?? trip.destination ?? 'this trip'} · ${isOnline ? 'changes sync to the trip log' : 'will sync when connected'}`}
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              className="min-h-16 min-w-60 text-base"
+              disabled={dockDisabled}
+              onClick={saveDockAction}
+            >
+              {mutation.isPending || uploadingConditions ? 'Saving…' : dockLabel}
+            </Button>
+          </div>
+        </footer>
+      )}
     </main>
   );
 }
@@ -853,7 +1009,7 @@ function DeliveryTask({
   mode: 'arrival' | 'handover';
   horses: Array<{ id: string; name: string; stall: string | null }>;
   canRecordDelivery: boolean;
-  onSaveConditions: (conditions: TripRecordInput['conditions']) => void;
+  onSaveConditions: (conditions: TripRecordInput['conditions']) => Promise<boolean>;
   onRecordDelivery: () => void;
   onSaveHandover: (receiverName: string, receiverSignature: string) => void;
   saving: boolean;
@@ -864,16 +1020,11 @@ function DeliveryTask({
   const [receiver, setReceiver] = useState('');
   const [signatureReady, setSignatureReady] = useState(false);
   const [arrival, setArrival] = useState<Record<string, HorseDraft>>({});
+  const uploadedArrivalPhotos = useRef(new Map<string, string>());
   const [handed, setHanded] = useState<Record<string, boolean>>({});
   const checked = horses.filter((horse) => arrival[horse.id]?.checked);
-  const conditions = checked.map((horse) => ({
-    horseId: horse.id,
-    condition: arrival[horse.id]?.condition ?? HorseConditionEnum.SOUND,
-    drinking: arrival[horse.id]?.drinking ?? null,
-    eating: arrival[horse.id]?.eating ?? null,
-    note: arrival[horse.id]?.note || undefined,
-    photoFileIds: [],
-  }));
+  const [arrivalError, setArrivalError] = useState('');
+  const [uploadingArrivalPhotos, setUploadingArrivalPhotos] = useState(false);
   const signature = (event: PointerEvent<HTMLCanvasElement>, begin: boolean) => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
@@ -894,6 +1045,51 @@ function DeliveryTask({
       setSignatureReady(true);
     }
   };
+  const saveArrivalConditions = async () => {
+    if (!horses.every((horse) => arrival[horse.id]?.checked && arrival[horse.id]?.condition)) {
+      setArrivalError('Choose an arrival condition for every horse before saving.');
+      return;
+    }
+    if (!online && horses.some((horse) => (arrival[horse.id]?.photos.length ?? 0) > 0)) {
+      setArrivalError('Photos need a connection to upload. Reconnect before saving arrival photos.');
+      return;
+    }
+    setArrivalError('');
+    setUploadingArrivalPhotos(true);
+    try {
+      const conditions = await Promise.all(
+        horses.map(async (horse) => {
+          const value = arrival[horse.id] ?? initialDraft();
+          const photoFileIds = await Promise.all(
+            value.photos.map(async (photo) =>
+              {
+                if (!photo.originFileObj) return undefined;
+                const existingId = uploadedArrivalPhotos.current.get(photo.uid);
+                if (existingId) return existingId;
+                const fileId = (await fileApi.upload(photo.originFileObj)).id;
+                uploadedArrivalPhotos.current.set(photo.uid, fileId);
+                return fileId;
+              },
+            ),
+          );
+          return {
+            horseId: horse.id,
+            condition: value.condition!,
+            drinking: value.drinking,
+            eating: value.eating,
+            note: value.note.trim() || undefined,
+            photoFileIds: photoFileIds.filter((id): id is string => Boolean(id)),
+          };
+        }),
+      );
+      const saved = await onSaveConditions(conditions);
+      if (saved) uploadedArrivalPhotos.current.clear();
+    } catch (error) {
+      setArrivalError(apiErrorMessage(error, 'Arrival photos could not be uploaded.'));
+    } finally {
+      setUploadingArrivalPhotos(false);
+    }
+  };
   if (mode === 'arrival')
     return (
       <div className="mt-5 flex flex-col gap-5">
@@ -901,64 +1097,23 @@ function DeliveryTask({
           <div className="p-4">
             <h2 className="type-h4 m-0">Arrival condition</h2>
             <p className="type-body-s m-0 text-ink-3">
-              Record each horse as it comes off the trailer. Partial checks are allowed.
+              Record each horse’s condition as it comes off the trailer.
             </p>
           </div>
           {horses.map((horse) => {
             const value = arrival[horse.id] ?? initialDraft();
             return (
-              <div
+              <HorseConditionRow
                 key={horse.id}
-                className="grid gap-3 border-t border-line px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center"
-              >
-                <div>
-                  <strong className="type-body-m">{horse.name}</strong>
-                  <p className="type-body-s m-0 text-ink-3">
-                    {horse.stall ?? 'Stall not assigned'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {Object.values(HorseConditionEnum).map((condition) => (
-                    <button
-                      key={condition}
-                      type="button"
-                      aria-pressed={value.condition === condition}
-                      onClick={() =>
-                        setArrival((current) => ({
-                          ...current,
-                          [horse.id]: {
-                            ...initialDraft(),
-                            ...current[horse.id],
-                            checked: true,
-                            condition,
-                          },
-                        }))
-                      }
-                      className={`min-h-12 rounded-md border px-3 type-label-s ${value.condition === condition ? (condition === 'CONCERN' ? 'border-bad bg-bad-soft text-bad' : condition === 'WATCH' ? 'border-warn bg-warn-soft text-warn' : 'border-ok bg-ok-soft text-ok') : 'border-line-strong bg-input text-ink-2'}`}
-                    >
-                      {condition[0] + condition.slice(1).toLowerCase()}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  aria-label={`${horse.name} arrival note`}
-                  value={value.note}
-                  onChange={(event) =>
-                    setArrival((current) => ({
-                      ...current,
-                      [horse.id]: {
-                        ...initialDraft(),
-                        ...current[horse.id],
-                        checked: true,
-                        note: event.target.value,
-                      },
-                    }))
-                  }
-                  maxLength={500}
-                  placeholder="Arrival note (optional)"
-                  className="type-body-s h-11 rounded-md border border-line-strong bg-input px-3 text-ink placeholder:text-ink-3"
-                />
-              </div>
+                horse={horse}
+                value={value}
+                onChange={(patch) =>
+                  setArrival((current) => ({
+                    ...current,
+                    [horse.id]: { ...initialDraft(), ...current[horse.id], ...patch },
+                  }))
+                }
+              />
             );
           })}
         </div>
@@ -966,30 +1121,44 @@ function DeliveryTask({
           <span className="type-body-s text-ink-3">
             {checked.length} of {horses.length} horses checked
           </span>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              className="min-h-12"
-              disabled={!online || saving || checked.length === 0}
-              onClick={() => onSaveConditions(conditions)}
-            >
-              Save arrival condition
-            </Button>
-            <Button
-              variant="primary"
-              className="min-h-16"
-              disabled={!online || saving || !canRecordDelivery}
-              onClick={onRecordDelivery}
-            >
-              Record delivery ·{' '}
-              {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-            </Button>
-          </div>
         </div>
+        {arrivalError && <p role="alert" className="type-body-s m-0 text-bad">{arrivalError}</p>}
         {!canRecordDelivery && (
           <p className="type-body-s m-0 text-ink-3">
-            Save the arrival condition first. You can then record delivery.
+            Record every horse’s arrival condition. The cab dock will then let you record delivery.
           </p>
         )}
+        <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-card px-4 py-3 shadow-lg md:px-8">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="type-label-m m-0">
+                {canRecordDelivery ? 'Arrival condition recorded for every horse' : `${checked.length} of ${horses.length} horses checked`}
+              </p>
+              <p className="type-body-s m-0 text-ink-3">
+                {canRecordDelivery ? 'Record the arrival checkpoint to complete the trip.' : 'Condition entries and photos become append-only trip records.'}
+              </p>
+            </div>
+            {canRecordDelivery ? (
+              <Button
+                variant="primary"
+                className="min-h-16 min-w-60 text-base"
+                disabled={saving || !online}
+                onClick={onRecordDelivery}
+              >
+                Record delivery · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                className="min-h-16 min-w-60 text-base"
+                disabled={saving || uploadingArrivalPhotos || checked.length !== horses.length}
+                onClick={() => void saveArrivalConditions()}
+              >
+                {uploadingArrivalPhotos ? 'Uploading photos…' : 'Save arrival condition'}
+              </Button>
+            )}
+          </div>
+        </footer>
       </div>
     );
 
@@ -1067,24 +1236,33 @@ function DeliveryTask({
           </label>
         ))}
       </div>
-      <Button
-        variant="primary"
-        className="min-h-16 w-full text-base"
-        disabled={
-          !online ||
-          saving ||
-          !receiver.trim() ||
-          !signatureReady ||
-          !horses.every((horse) => handed[horse.id])
-        }
-        onClick={() =>
-          onSaveHandover(receiver.trim(), canvasRef.current?.toDataURL('image/png') ?? '')
-        }
-      >
-        {saving
-          ? 'Saving…'
-          : `Record handover · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}
-      </Button>
+      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-card px-4 py-3 shadow-lg md:px-8">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="type-label-m m-0">Hand over the horses</p>
+            <p className="type-body-s m-0 text-ink-3">
+              Receiver name, signature and every horse must be confirmed.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            className="min-h-16 min-w-60 text-base"
+            disabled={
+              saving ||
+              !receiver.trim() ||
+              !signatureReady ||
+              !horses.every((horse) => handed[horse.id])
+            }
+            onClick={() =>
+              onSaveHandover(receiver.trim(), canvasRef.current?.toDataURL('image/png') ?? '')
+            }
+          >
+            {saving
+              ? 'Saving…'
+              : `Record handover · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}
+          </Button>
+        </div>
+      </footer>
     </div>
   );
 }

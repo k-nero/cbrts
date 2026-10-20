@@ -59,6 +59,15 @@ class TripServiceTest {
     @Mock
     private AuditLogRepository audit;
 
+    @Mock
+    private UserRepository users;
+
+    @Mock
+    private ChecklistItemRepository checklistItems;
+
+    @Mock
+    private NotificationService notifications;
+
     @InjectMocks
     private TripService service;
 
@@ -68,7 +77,7 @@ class TripServiceTest {
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null, null);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
@@ -161,6 +170,162 @@ class TripServiceTest {
     }
 
     @Test
+    @DisplayName("Customs clearance notifies the customer's club")
+    void customsClearanceNotifiesCustomer() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        job.setStage(JobStage.TRIP);
+        job.setTripStatus(TripStatus.DEPARTED);
+        job.setDepartedAt(NOW.minusSeconds(3_600));
+        User customer = new User();
+        when(users.findByClubId(club.getId())).thenReturn(List.of(customer));
+
+        record(TripRecordKind.CLEARED_BORDER, NOW);
+
+        verify(notifications).sendNotification(
+                eq(customer),
+                eq("CLEARED_BORDER"),
+                contains(job.getCode()),
+                contains("Customs clearance"),
+                eq("TRIP"),
+                eq(job.getId()));
+    }
+
+    @Test
+    @DisplayName("A border clearance record keeps the documents the escort showed")
+    void borderClearanceStoresShownDocuments() {
+        departed();
+        RoutePlan plan = new RoutePlan();
+        plan.setJob(job);
+        plan.setStatus(RoutePlanStatus.CONFIRMED);
+        RouteStop border = new RouteStop();
+        border.setId(UUID.randomUUID());
+        border.setKind(RouteStopKind.BORDER);
+        border.setRoutePlan(plan);
+        plan.setStops(List.of(border));
+        when(routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(job.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+
+        UUID documentId = UUID.randomUUID();
+        DocumentType type = new DocumentType();
+        type.setName("Import permit");
+        ChecklistItem document = new ChecklistItem();
+        document.setId(documentId);
+        document.setDocumentType(type);
+        document.setStatus(ChecklistStatus.CLEARED);
+        when(checklistItems.findByJobIdAndIdIn(job.getId(), List.of(documentId))).thenReturn(List.of(document));
+        TripRecordRequest request = new TripRecordRequest(
+                border.getId(),
+                TripRecordKind.CLEARED_BORDER,
+                NOW,
+                UUID.randomUUID(),
+                null,
+                null,
+                List.of(documentId),
+                null,
+                null);
+
+        var result = service.addCoordinatorRecord(job.getCode(), coordinator, request);
+
+        assertEquals(documentId, result.documentsShown().getFirst().id());
+        assertEquals("Import permit", result.documentsShown().getFirst().name());
+    }
+
+    @Test
+    @DisplayName("Arrival at the delivery checkpoint notifies the customer's club")
+    void deliveryArrivalNotifiesCustomer() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        job.setStage(JobStage.TRIP);
+        job.setTripStatus(TripStatus.DEPARTED);
+        job.setDepartedAt(NOW.minusSeconds(3_600));
+        User customer = new User();
+        when(users.findByClubId(club.getId())).thenReturn(List.of(customer));
+        RoutePlan plan = new RoutePlan();
+        plan.setJob(job);
+        plan.setStatus(RoutePlanStatus.CONFIRMED);
+        RouteStop delivery = new RouteStop();
+        delivery.setId(UUID.randomUUID());
+        delivery.setKind(RouteStopKind.DELIVERY);
+        delivery.setRoutePlan(plan);
+        plan.setStops(List.of(delivery));
+        when(routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(job.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+
+        TripRecordRequest request = new TripRecordRequest(
+                delivery.getId(),
+                TripRecordKind.ARRIVED_AT_STOP,
+                NOW,
+                UUID.randomUUID(),
+                null,
+                null,
+                null,
+                null,
+                null);
+        service.addCoordinatorRecord(job.getCode(), coordinator, request);
+
+        verify(notifications).sendNotification(
+                eq(customer),
+                eq("ARRIVED_AT_STOP"),
+                contains(job.getCode()),
+                contains("Arrival was recorded"),
+                eq("TRIP"),
+                eq(job.getId()));
+        assertEquals(TripStatus.ARRIVED, job.getTripStatus());
+    }
+
+    @Test
+    @DisplayName("A hold requires a reason and alerts the logistics team and customer")
+    void holdRequiresReasonAndNotifiesPeople() {
+        departed();
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        User customer = new User();
+        User manager = new User();
+        when(users.findByClubId(club.getId())).thenReturn(List.of(customer));
+        when(users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE)).thenReturn(List.of(manager));
+
+        BusinessException missingReason = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(),
+                        coordinator,
+                        request(TripRecordKind.HELD, NOW, null)));
+        assertEquals("HOLD_REASON_REQUIRED", missingReason.getCode());
+        verify(records, never()).save(any());
+
+        TripRecordRequest hold = new TripRecordRequest(
+                null,
+                TripRecordKind.HELD,
+                NOW,
+                UUID.randomUUID(),
+                "The crossing is closed to heavy vehicles.",
+                null,
+                null,
+                null,
+                null);
+        service.addCoordinatorRecord(job.getCode(), coordinator, hold);
+
+        verify(notifications).sendNotification(
+                eq(customer),
+                eq("HELD"),
+                contains(job.getCode()),
+                contains("The crossing is closed to heavy vehicles."),
+                eq("TRIP"),
+                eq(job.getId()));
+        verify(notifications).sendNotification(
+                eq(manager),
+                eq("HELD"),
+                contains(job.getCode()),
+                contains("The crossing is closed to heavy vehicles."),
+                eq("TRIP"),
+                eq(job.getId()));
+    }
+
+    @Test
     @DisplayName("Landing keeps an air trip in transit so release, customs and the ground leg can follow")
     void flightLandingKeepsTheTripInTransit() {
         departed();
@@ -216,7 +381,8 @@ class TripServiceTest {
         job.setTripStatus(TripStatus.DELIVERED);
         job.setStage(JobStage.HANDOVER);
         TripRecordRequest request =
-                new TripRecordRequest(null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, null);
+                new TripRecordRequest(
+                        null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, null, null);
 
         BusinessException ex = assertThrows(
                 BusinessException.class, () -> service.addCoordinatorRecord(job.getCode(), coordinator, request));
@@ -232,7 +398,7 @@ class TripServiceTest {
         job.setStage(JobStage.HANDOVER);
         when(crew.existsByJob_IdAndUser_Id(job.getId(), coordinator.getId())).thenReturn(true);
         TripRecordRequest request = new TripRecordRequest(
-                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, "Sophea", null);
+                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, "Sophea", null);
 
         BusinessException ex = assertThrows(
                 BusinessException.class, () -> service.addEscortRecord(job.getCode(), coordinator, request));
@@ -249,7 +415,7 @@ class TripServiceTest {
         when(crew.existsByJob_IdAndUser_Id(job.getId(), coordinator.getId())).thenReturn(true);
         String signature = "data:image/png;base64,aGVsbG8=";
         TripRecordRequest request = new TripRecordRequest(
-                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, " Sophea ", signature);
+                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, " Sophea ", signature);
 
         service.addEscortRecord(job.getCode(), coordinator, request);
 
@@ -282,6 +448,38 @@ class TripServiceTest {
                         coordinator,
                         request(TripRecordKind.ARRIVED_AT_STOP, NOW, List.of(condition(shadowfax, List.of())))));
         assertEquals("CONDITION_CHECK_KIND_REQUIRED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Condition checks retain every Flow 4 welfare category")
+    void conditionCategoriesAreStored() {
+        departed();
+        List<HorseCondition> expected = List.of(
+                HorseCondition.STABLE,
+                HorseCondition.OFF_FEED,
+                HorseCondition.STRESSED,
+                HorseCondition.CLIMATE_CHANGE);
+        for (int index = 0; index < expected.size(); index++) {
+            Horse horse = horse("Horse " + index);
+            RequestHorse requestHorse = new RequestHorse();
+            requestHorse.setHorse(horse);
+            when(requestHorses.findByRequest_IdAndHorse_Id(job.getRequest().getId(), horse.getId()))
+                    .thenReturn(Optional.of(requestHorse));
+            TripConditionRequest observation = new TripConditionRequest(
+                    horse.getId(), expected.get(index), null, null, "Observed during the journey.", List.of());
+            service.addCoordinatorRecord(
+                    job.getCode(),
+                    coordinator,
+                    request(TripRecordKind.CONDITION_CHECK, NOW.plusSeconds(index), List.of(observation)));
+        }
+
+        var savedRecords = forClass(TripRecord.class);
+        verify(records, times(expected.size())).save(savedRecords.capture());
+        assertEquals(
+                expected,
+                savedRecords.getAllValues().stream()
+                        .map(record -> record.getConditionLogs().getFirst().getCondition())
+                        .toList());
     }
 
     @Test

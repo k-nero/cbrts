@@ -27,7 +27,7 @@ public class ConditionLog extends BaseEntity {
     private Horse horse;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     private HorseCondition condition;
 
     private Boolean drinking;

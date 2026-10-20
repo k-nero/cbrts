@@ -17,11 +17,21 @@ export const TripRecordKindEnum = {
 export type TripRecordKind = (typeof TripRecordKindEnum)[keyof typeof TripRecordKindEnum];
 
 export const HorseConditionEnum = {
+  STABLE: 'STABLE',
+  OFF_FEED: 'OFF_FEED',
+  STRESSED: 'STRESSED',
+  CLIMATE_CHANGE: 'CLIMATE_CHANGE',
   SOUND: 'SOUND',
   WATCH: 'WATCH',
   CONCERN: 'CONCERN',
 } as const;
 export type HorseCondition = (typeof HorseConditionEnum)[keyof typeof HorseConditionEnum];
+export const TripConditionOptions = [
+  HorseConditionEnum.STABLE,
+  HorseConditionEnum.OFF_FEED,
+  HorseConditionEnum.STRESSED,
+  HorseConditionEnum.CLIMATE_CHANGE,
+] as const;
 
 export const TripStatusEnum = {
   NOT_STARTED: 'NOT_STARTED',
@@ -60,6 +70,7 @@ export interface TripRecord {
   text: string | null;
   receiverName: string | null;
   receiverSignature: string | null;
+  documentsShown: TripDocument[];
   conditions: TripCondition[];
 }
 export interface TripStop {
@@ -79,6 +90,14 @@ export interface TripHorse {
   id: string;
   name: string;
   stall: string | null;
+}
+export interface TripDocument {
+  id: string;
+  name: string;
+  horseName: string | null;
+  reference: string | null;
+  status: string;
+  validity: string | null;
 }
 export interface TripSummary {
   jobCode: string;
@@ -105,6 +124,8 @@ export interface TripView {
   origin: string | null;
   destination: string | null;
   vehicleCode: string | null;
+  crew: string[];
+  documents: TripDocument[];
   stops: TripStop[];
   horses: TripHorse[];
   records: TripRecord[];
@@ -117,6 +138,7 @@ export interface TripRecordInput {
   text?: string;
   receiverName?: string;
   receiverSignature?: string;
+  documentsShown?: string[];
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;

@@ -2,6 +2,7 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.enums.ChecklistStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,8 @@ public interface ChecklistItemRepository
      * Lấy toàn bộ checklist của 1 chuyến vận chuyển.
      */
     List<ChecklistItem> findByJobId(UUID jobId);
+
+    List<ChecklistItem> findByJobIdAndIdIn(UUID jobId, Collection<UUID> ids);
 
     /**
      * Lấy checklist theo trạng thái (VD: lọc items đang IN_REVIEW).

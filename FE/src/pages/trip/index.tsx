@@ -3,14 +3,15 @@ import { Input, Select, Spin, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
+import { Button, Callout, Checkbox, Chip, Panel, RouteStrip, StageMark, TimelineStop } from '@/components/ui';
 import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
+import { HorseConditionEnum, TripConditionOptions, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 import type {
   HorseCondition,
+  TripCondition,
   TripPhoto,
   TripRecordKind,
   TripSummary,
@@ -94,7 +95,7 @@ const kindsByStop: Record<string, TripRecordKind[]> = {
     TripRecordKindEnum.NOTE,
   ],
 };
-const conditions = Object.values(HorseConditionEnum);
+const conditions = TripConditionOptions;
 const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
 const formatTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('en-GB', timeOptions) : 'Not recorded';
@@ -110,6 +111,15 @@ const sentence = (value: string) =>
   value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ');
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
+const conditionTone = (condition: HorseCondition) =>
+  condition === HorseConditionEnum.OFF_FEED ||
+  condition === HorseConditionEnum.STRESSED ||
+  condition === HorseConditionEnum.CLIMATE_CHANGE ||
+  condition === HorseConditionEnum.CONCERN
+    ? 'bad'
+    : condition === HorseConditionEnum.WATCH
+      ? 'warn'
+      : 'ok';
 const kindTone = (kind: TripRecordKind) =>
   kind === TripRecordKindEnum.HELD
     ? 'warn'
@@ -146,18 +156,17 @@ function TripRecords({ trip }: { trip: TripView }) {
                 <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
               </div>
               {record.text && <p className="type-body-s mb-2 mt-1 text-ink-2">{record.text}</p>}
+              {record.documentsShown.length > 0 && (
+                <p className="type-body-s mb-2 mt-1 text-ink-2">
+                  Documents shown: {record.documentsShown.map((document) => document.name).join(' · ')}
+                </p>
+              )}
               {record.conditions.map((condition) => (
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <strong className="type-h4">{condition.horseName}</strong>
                     <Chip
-                      tone={
-                        condition.condition === HorseConditionEnum.CONCERN
-                          ? 'bad'
-                          : condition.condition === HorseConditionEnum.WATCH
-                            ? 'warn'
-                            : 'ok'
-                      }
+                      tone={conditionTone(condition.condition)}
                     >
                       {sentence(condition.condition)}
                     </Chip>
@@ -278,6 +287,370 @@ function TripDetails({ trip }: { trip: TripView }) {
         </div>
       </Panel>
       <TripRecords trip={trip} />
+    </div>
+  );
+}
+
+function CustomerTrackingBoard({ trip }: { trip: TripView }) {
+  const orderedStops = [...trip.stops].sort((a, b) => a.sequence - b.sequence);
+  const records = [...trip.records].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const lastCheckpoint = [...records]
+    .reverse()
+    .find(
+      (record) =>
+        record.routeStopId &&
+        record.kind !== TripRecordKindEnum.NOTE &&
+        record.kind !== TripRecordKindEnum.CONDITION_CHECK,
+    );
+  const heldRecord =
+    trip.tripStatus === TripStatusEnum.HELD
+      ? [...records].reverse().find((record) => record.kind === TripRecordKindEnum.HELD)
+      : undefined;
+  const lastIndex = orderedStops.findIndex((stop) => stop.id === lastCheckpoint?.routeStopId);
+  const currentStop = heldRecord?.routeStopId
+    ? orderedStops.find((stop) => stop.id === heldRecord.routeStopId)
+    : lastCheckpoint?.kind === TripRecordKindEnum.ARRIVED_AT_STOP
+      ? orderedStops[lastIndex]
+      : orderedStops[lastIndex + 1] ?? orderedStops.find((stop) => !stop.latestStatus);
+  const departure = records.find(
+    (record) =>
+      record.kind === TripRecordKindEnum.DEPARTED ||
+      record.kind === TripRecordKindEnum.FLIGHT_DEPARTED,
+  );
+  const border = orderedStops.find((stop) => stop.kind === 'BORDER');
+  const routeStripStops = orderedStops.map((stop) => ({
+    name: stop.name,
+    kind: stop.kind.replaceAll('_', ' '),
+    time: stop.latestOccurredAt
+      ? formatTime(stop.latestOccurredAt)
+      : stop.plannedAt
+        ? `Planned ${formatTime(stop.plannedAt)}`
+        : 'Not recorded',
+    state:
+      stop.id === currentStop?.id
+        ? ('current' as const)
+        : stop.latestStatus
+          ? ('done' as const)
+          : ('upcoming' as const),
+  }));
+  const routeName = `${trip.origin ?? 'Origin not set'} → ${trip.destination ?? 'Destination not set'}`;
+  const checkpoints = records.filter(
+    (record) =>
+      record.routeStopId &&
+      record.kind !== TripRecordKindEnum.NOTE &&
+      record.kind !== TripRecordKindEnum.CONDITION_CHECK,
+  );
+  const stageIndex = trip.tripStatus === TripStatusEnum.DELIVERED ? 6 : 5;
+  const stages = ['Request', 'Quotation', 'Approval', 'Documents', 'Clearance', 'Trip', 'Handover'];
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Panel
+        title="Travel pass"
+        extra={
+          <div className="flex flex-wrap items-center gap-3">
+            <StageMark stage={trip.tripStatus === TripStatusEnum.DELIVERED ? 'Handover' : 'Trip'} />
+            <Chip tone={statusTone(trip.tripStatus)}>{sentence(trip.tripStatus)}</Chip>
+          </div>
+        }
+      >
+        <p className="type-data m-0 text-ink-3">{trip.jobCode}</p>
+        <h2 className="type-display-l mb-5 mt-2">{routeName}</h2>
+        <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <span className="type-body-s text-ink-3">Departed</span>
+            <p className="type-data m-0 mt-1">{departure ? formatTime(departure.occurredAt) : 'Not recorded'}</p>
+          </div>
+          <div>
+            <span className="type-body-s text-ink-3">Border checkpoint</span>
+            <p className="type-label-m m-0 mt-1">{border?.name ?? 'Not on route'}</p>
+          </div>
+          <div>
+            <span className="type-body-s text-ink-3">Horses</span>
+            <p className="type-label-m m-0 mt-1">{trip.horses.length}</p>
+          </div>
+          <div>
+            <span className="type-body-s text-ink-3">Planned arrival</span>
+            <p className="type-data m-0 mt-1">{formatTime(trip.plannedArrivalAt)}</p>
+          </div>
+        </div>
+        {trip.arrivalWindowStart && trip.arrivalWindowEnd && (
+          <p className="type-body-s mb-0 mt-4 text-ink-2">
+            Arrival window: {formatTime(trip.arrivalWindowStart)}–{formatTime(trip.arrivalWindowEnd)}
+          </p>
+        )}
+      </Panel>
+
+      {heldRecord && (
+        <Callout tone="bad" title={`Trip held${heldRecord.checkpointName ? ` at ${heldRecord.checkpointName}` : ''}`}>
+          {heldRecord.text || 'The escort recorded that the trip is on hold.'} · {formatTime(heldRecord.occurredAt)}
+        </Callout>
+      )}
+
+      <Panel title="Route progress">
+        {routeStripStops.length === 0 ? (
+          <p className="type-body-s m-0 text-ink-3">The confirmed route has no checkpoints yet.</p>
+        ) : (
+          <div className="overflow-x-auto pb-2">
+            <RouteStrip stops={routeStripStops} />
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Where it stands">
+        <ol className="m-0 grid list-none gap-2 p-0 sm:grid-cols-4 xl:grid-cols-7">
+          {stages.map((stage, index) => {
+            const done = index < stageIndex || (index === stageIndex && trip.tripStatus === TripStatusEnum.DELIVERED);
+            const current = index === stageIndex && trip.tripStatus !== TripStatusEnum.DELIVERED;
+            return (
+              <li
+                key={stage}
+                aria-current={current ? 'step' : undefined}
+                className={`rounded-md border p-3 ${
+                  current
+                    ? 'border-info-line bg-info-soft'
+                    : done
+                      ? 'border-ok-line bg-ok-soft'
+                      : 'border-line bg-card'
+                }`}
+              >
+                <span className="type-caption text-ink-3">{index + 1} of {stages.length}</span>
+                <p className="type-label-m m-0 mt-1">{stage}</p>
+                <p className="type-caption m-0 mt-1 text-ink-3">
+                  {done ? 'Complete' : current ? trip.tripStatus === TripStatusEnum.HELD ? 'Held · operations team alerted' : 'Escort records checkpoints' : index === 6 ? 'Customer confirms handover' : 'Complete'}
+                </p>
+              </li>
+            );
+          })}
+        </ol>
+      </Panel>
+
+      <Panel title="Recorded checkpoint log">
+        {checkpoints.length === 0 ? (
+          <p className="type-body-s m-0 text-ink-3">No checkpoint has been recorded yet. The route will update as the escort records progress.</p>
+        ) : (
+          <ol className="m-0 list-none divide-y divide-line p-0">
+            {[...checkpoints].reverse().map((record) => (
+              <li key={record.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
+                <div>
+                  <strong className="type-body-m">{record.checkpointName ?? 'Checkpoint'} · {eventLabels[record.kind]}</strong>
+                  {record.text && <p className="type-body-s mb-0 mt-1 text-ink-2">{record.text}</p>}
+                  <p className="type-body-s mb-0 mt-1 text-ink-3">Recorded by {record.recordedBy ?? 'trip crew'}</p>
+                </div>
+                <time className="type-data text-ink-3">{formatTime(record.occurredAt)}</time>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Panel>
+      <TripRecords trip={trip} />
+    </div>
+  );
+}
+
+function CoordinatorTripBoard({ trip }: { trip: TripView }) {
+  const orderedStops = [...trip.stops].sort((a, b) => a.sequence - b.sequence);
+  const records = [...trip.records].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const latestRecord = records.at(-1);
+  const heldRecord =
+    trip.tripStatus === TripStatusEnum.HELD
+      ? [...records].reverse().find((record) => record.kind === TripRecordKindEnum.HELD)
+      : undefined;
+  const lastCheckpoint = [...records]
+    .reverse()
+    .find(
+      (record) =>
+        record.routeStopId &&
+        record.kind !== TripRecordKindEnum.NOTE &&
+        record.kind !== TripRecordKindEnum.CONDITION_CHECK,
+    );
+  const lastStopIndex = orderedStops.findIndex((stop) => stop.id === lastCheckpoint?.routeStopId);
+  const heldStop = heldRecord?.routeStopId
+    ? orderedStops.find((stop) => stop.id === heldRecord.routeStopId)
+    : undefined;
+  const lastStop = lastCheckpoint?.routeStopId
+    ? orderedStops.find((stop) => stop.id === lastCheckpoint.routeStopId)
+    : undefined;
+  const activeStop =
+    heldStop ??
+    (lastCheckpoint?.kind === TripRecordKindEnum.ARRIVED_AT_STOP
+      ? lastStop
+      : orderedStops[lastStopIndex + 1] ?? orderedStops.find((stop) => !stop.latestStatus));
+  const lastConditionRecord = [...records]
+    .reverse()
+    .find((record) => record.conditions.length > 0);
+  const latestConditionByHorse = new Map<string, TripCondition>();
+  records.forEach((record) =>
+    record.conditions.forEach((condition) => latestConditionByHorse.set(condition.horseId, condition)),
+  );
+  const horseConditions = trip.horses.map((horse) => ({
+    horse,
+    condition: latestConditionByHorse.get(horse.id),
+  }));
+  const soundCount = (lastConditionRecord?.conditions ?? []).filter(
+    (condition) =>
+      condition.condition === HorseConditionEnum.STABLE || condition.condition === HorseConditionEnum.SOUND,
+  ).length;
+  const lastRecordedStop = lastStop;
+  const nextStop = activeStop;
+  const deltaMinutes =
+    lastRecordedStop?.plannedAt && lastRecordedStop.latestOccurredAt
+      ? Math.round((Date.parse(lastRecordedStop.latestOccurredAt) - Date.parse(lastRecordedStop.plannedAt)) / 60_000)
+      : null;
+  const delta =
+    deltaMinutes === null
+      ? '—'
+      : deltaMinutes === 0
+        ? 'On time'
+        : `${deltaMinutes > 0 ? '+' : '−'}${Math.floor(Math.abs(deltaMinutes) / 60)}h ${Math.abs(deltaMinutes) % 60}m`;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Panel title="Against plan at last checkpoint">
+          <p className="type-h3 m-0">{delta}</p>
+          <p className="type-body-s mb-0 mt-1 text-ink-3">{lastRecordedStop?.name ?? 'No checkpoint recorded'}</p>
+        </Panel>
+        <Panel title="Arrival window">
+          <p className="type-h3 m-0">
+            {trip.arrivalWindowStart && trip.arrivalWindowEnd
+              ? `${formatTime(trip.arrivalWindowStart)}–${formatTime(trip.arrivalWindowEnd)}`
+              : formatTime(trip.plannedArrivalAt)}
+          </p>
+          <p className="type-body-s mb-0 mt-1 text-ink-3">Planned arrival</p>
+        </Panel>
+        <Panel title="Next checkpoint">
+          <p className="type-h3 m-0">{nextStop?.name ?? 'Route complete'}</p>
+          <p className="type-body-s mb-0 mt-1 text-ink-3">
+            {heldStop ? 'Trip held here' : nextStop?.plannedAt ? `Planned ${formatTime(nextStop.plannedAt)}` : 'No estimate shown'}
+          </p>
+        </Panel>
+        <Panel title="Horses sound at latest check">
+          <p className="type-h3 m-0">{lastConditionRecord ? `${soundCount} of ${trip.horses.length}` : '—'}</p>
+          <p className="type-body-s mb-0 mt-1 text-ink-3">
+            {lastConditionRecord ? formatTime(lastConditionRecord.occurredAt) : 'No condition log yet'}
+          </p>
+        </Panel>
+      </div>
+      <p className="type-body-m m-0 rounded-lg border border-line bg-card px-4 py-3">
+        Current leg:{' '}
+        <strong>
+          {heldStop
+            ? `Held at ${heldStop.name}`
+            : lastCheckpoint?.kind === TripRecordKindEnum.ARRIVED_AT_STOP
+              ? `At ${lastStop?.name ?? 'checkpoint'}`
+              : `${lastStop?.name ?? trip.origin ?? 'Origin'} → ${activeStop?.name ?? trip.destination ?? 'Destination'}`}
+        </strong>
+      </p>
+
+      <Panel title="Checkpoints, planned against recorded">
+        {orderedStops.length === 0 ? (
+          <p className="type-body-s m-0 text-ink-3">The confirmed route has no checkpoints yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line text-ink-3">
+                  <th className="py-3 pr-4 type-label-s">Checkpoint</th>
+                  <th className="py-3 pr-4 type-label-s">Planned</th>
+                  <th className="py-3 pr-4 type-label-s">Recorded by</th>
+                  <th className="py-3 pr-4 type-label-s">Recorded</th>
+                  <th className="py-3 pr-4 type-label-s">Against plan</th>
+                  <th className="py-3 type-label-s">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedStops.map((stop) => {
+                  const minutes = stop.plannedAt && stop.latestOccurredAt
+                    ? Math.round((Date.parse(stop.latestOccurredAt) - Date.parse(stop.plannedAt)) / 60_000)
+                    : null;
+                  const variance = minutes === null ? '—' : minutes === 0 ? 'On time' : `${minutes > 0 ? '+' : '−'}${Math.floor(Math.abs(minutes) / 60)}h ${Math.abs(minutes) % 60}m`;
+                  return (
+                    <tr key={stop.id} className="border-b border-line last:border-0">
+                      <td className="py-3 pr-4">
+                        <strong className="type-body-m">{stop.name}</strong>
+                        <p className="type-body-s m-0 text-ink-3">{stop.kind.replaceAll('_', ' ')}</p>
+                      </td>
+                      <td className="py-3 pr-4 type-data">{formatTime(stop.plannedAt)}</td>
+                      <td className="py-3 pr-4 type-body-s">{stop.latestRecordedBy ?? '—'}</td>
+                      <td className="py-3 pr-4 type-data">{formatTime(stop.latestOccurredAt)}</td>
+                      <td className="py-3 pr-4 type-data">{variance}</td>
+                      <td className="py-3">
+                        {stop.latestStatus ? (
+                          <Chip tone={kindTone(stop.latestStatus)}>{eventLabels[stop.latestStatus]}</Chip>
+                        ) : stop.id === activeStop?.id ? (
+                          <Chip tone="info">Next</Chip>
+                        ) : (
+                          <Chip>Upcoming</Chip>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel title="Escort’s log">
+          {records.length === 0 ? (
+            <p className="type-body-s m-0 text-ink-3">No trip updates have been recorded yet.</p>
+          ) : (
+            <ol className="m-0 list-none divide-y divide-line p-0">
+              {[...records].reverse().map((record) => (
+                <li key={record.id} className="grid gap-1 py-3 sm:grid-cols-[5rem_minmax(0,1fr)_10rem]">
+                  <time className="type-data text-ink-3">{formatTime(record.occurredAt)}</time>
+                  <span className="type-body-s">
+                    {record.checkpointName ?? 'Trip update'} · {eventLabels[record.kind]}
+                    {record.text ? ` · ${record.text}` : ''}
+                  </span>
+                  <span className="type-body-s text-ink-3 sm:text-right">{record.recordedBy ?? 'Unknown recorder'}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+        <Panel title="On board · last condition check">
+          {horseConditions.length === 0 ? (
+            <p className="type-body-s m-0 text-ink-3">No horses are attached to this trip.</p>
+          ) : (
+            <div className="divide-y divide-line">
+              {horseConditions.map(({ horse, condition }) => (
+                <div key={horse.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                  <div>
+                    <strong className="type-body-m">{horse.name}</strong>
+                    <p className="type-body-s m-0 text-ink-3">
+                      {[horse.stall, condition?.note, condition?.drinking === null || condition?.drinking === undefined ? null : condition.drinking ? 'Drinking' : 'Not drinking', condition?.eating === null || condition?.eating === undefined ? null : condition.eating ? 'Eating' : 'Not eating'].filter(Boolean).join(' · ') || 'No condition recorded'}
+                    </p>
+                  </div>
+                  {condition ? (
+                    <Chip tone={conditionTone(condition.condition)}>
+                      {sentence(condition.condition)}
+                    </Chip>
+                  ) : <Chip>No check recorded</Chip>}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 border-t border-line pt-4">
+            <strong className="type-body-m">Crew and vehicle</strong>
+            <p className="type-body-s mb-0 mt-1 text-ink-3">
+              {trip.crew.length ? trip.crew.join(' · ') : 'Crew not assigned'} ·{' '}
+              {trip.vehicleCode ?? 'Vehicle not assigned'}
+            </p>
+          </div>
+        </Panel>
+      </div>
+      <Panel title="If the trip stops">
+        <p className="type-body-s m-0 text-ink-2">
+          A hold recorded by the cab is shown immediately in the trip status and journey log. The coordinator should contact the cab and follow the incident process for any issue that cannot be recorded there.
+        </p>
+      </Panel>
+      {latestRecord && (
+        <p className="type-caption m-0 text-right text-ink-3">Updated from the recorded trip log · {formatTime(latestRecord.occurredAt)}</p>
+      )}
     </div>
   );
 }
@@ -689,6 +1062,7 @@ function TripWorkspace({
               {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
               <div className="mt-4 flex flex-wrap justify-end gap-2">
                 <Button
+                  variant={audience === 'staff' ? 'secondary' : 'primary'}
                   disabled={
                     mutation.isPending ||
                     !selectedKind ||
@@ -715,7 +1089,14 @@ function TripWorkspace({
               </div>
             </Panel>
           )}
-          {trip && <TripDetails trip={trip} />}
+          {trip &&
+            (audience === 'staff' ? (
+              <CoordinatorTripBoard trip={trip} />
+            ) : audience === 'customer' ? (
+              <CustomerTrackingBoard trip={trip} />
+            ) : (
+              <TripDetails trip={trip} />
+            ))}
         </>
       )}
     </div>
