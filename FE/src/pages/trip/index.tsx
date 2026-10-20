@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConfigProvider, Input, Select, Spin, Upload, message } from 'antd';
+import { ConfigProvider, Input, message, Select, Spin, Upload } from 'antd';
 import type { UploadFile } from 'antd';
 import { Input, message, Select, Spin, Upload } from 'antd';
 import { fileApi } from '@/apis/file';
@@ -28,6 +28,7 @@ import type {
   TripSummary,
   TripView,
 } from '@/interfaces';
+import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 import { useThemeStore } from '@/stores/themeStore';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 
