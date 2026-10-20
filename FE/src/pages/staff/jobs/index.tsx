@@ -141,7 +141,7 @@ export default function JobsPage() {
                   onClick={() => navigate(`/staff/jobs/${job.id}`)}
                   className="cursor-pointer transition-colors hover:bg-sunken"
                 >
-                  <td className="type-data px-4 py-4 text-ink">{job.code}</td>
+                  <td className="type-label-s px-4 py-4 text-ink">{job.code}</td>
                   <td className="px-4 py-4">
                     <span className="type-label-s text-ink">
                       {job.originCity} → {job.destinationCity}
