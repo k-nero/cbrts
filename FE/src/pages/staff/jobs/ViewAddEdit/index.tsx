@@ -7,6 +7,7 @@ import { ClearanceGate, StageMark } from '@/components/ui';
 import { useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
+import { AuthoritiesTab } from './AuthoritiesTab';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 
@@ -40,11 +41,7 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       key: 'authorities',
       label: 'Authorities',
       owner: 'Transport specialist',
-      render: () => (
-        <Placeholder title="Authority Filings">
-          Owned by transport specialist. Export health certificates and import permits.
-        </Placeholder>
-      ),
+      render: (job) => <AuthoritiesTab job={job} />,
     },
     {
       key: 'trip',
