@@ -193,9 +193,10 @@ class TripServiceTest {
     }
 
     @Test
-    @DisplayName("A border clearance record keeps the documents the escort showed")
-    void borderClearanceStoresShownDocuments() {
+    @DisplayName("A held border can be cleared with the documents the escort showed")
+    void heldBorderClearanceStoresShownDocuments() {
         departed();
+        job.setTripStatus(TripStatus.HELD);
         RoutePlan plan = new RoutePlan();
         plan.setJob(job);
         plan.setStatus(RoutePlanStatus.CONFIRMED);
@@ -230,6 +231,7 @@ class TripServiceTest {
 
         assertEquals(documentId, result.documentsShown().getFirst().id());
         assertEquals("Import permit", result.documentsShown().getFirst().name());
+        assertEquals(TripStatus.DEPARTED, job.getTripStatus());
     }
 
     @Test

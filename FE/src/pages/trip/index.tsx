@@ -99,6 +99,11 @@ const conditions = TripConditionOptions;
 const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
 const formatTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('en-GB', timeOptions) : 'Not recorded';
+const elapsedTime = (value: string | null) => {
+  if (!value) return 'Not recorded';
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60_000));
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+};
 const datetimeLocal = () => {
   const date = new Date();
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -112,12 +117,11 @@ const sentence = (value: string) =>
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
 const conditionTone = (condition: HorseCondition) =>
-  condition === HorseConditionEnum.OFF_FEED ||
-  condition === HorseConditionEnum.STRESSED ||
-  condition === HorseConditionEnum.CLIMATE_CHANGE ||
-  condition === HorseConditionEnum.CONCERN
+  condition === HorseConditionEnum.OFF_FEED || condition === HorseConditionEnum.CONCERN
     ? 'bad'
-    : condition === HorseConditionEnum.WATCH
+    : condition === HorseConditionEnum.WATCH ||
+        condition === HorseConditionEnum.STRESSED ||
+        condition === HorseConditionEnum.CLIMATE_CHANGE
       ? 'warn'
       : 'ok';
 const kindTone = (kind: TripRecordKind) =>
@@ -487,10 +491,11 @@ function CoordinatorTripBoard({ trip }: { trip: TripView }) {
     horse,
     condition: latestConditionByHorse.get(horse.id),
   }));
-  const soundCount = (lastConditionRecord?.conditions ?? []).filter(
-    (condition) =>
-      condition.condition === HorseConditionEnum.STABLE || condition.condition === HorseConditionEnum.SOUND,
+  const stableCount = horseConditions.filter(
+    ({ condition }) =>
+      condition?.condition === HorseConditionEnum.STABLE || condition?.condition === HorseConditionEnum.SOUND,
   ).length;
+  const loadedRecord = records.find((record) => record.kind === TripRecordKindEnum.LOADED);
   const lastRecordedStop = lastStop;
   const nextStop = activeStop;
   const deltaMinutes =
@@ -511,13 +516,11 @@ function CoordinatorTripBoard({ trip }: { trip: TripView }) {
           <p className="type-h3 m-0">{delta}</p>
           <p className="type-body-s mb-0 mt-1 text-ink-3">{lastRecordedStop?.name ?? 'No checkpoint recorded'}</p>
         </Panel>
-        <Panel title="Arrival window">
-          <p className="type-h3 m-0">
-            {trip.arrivalWindowStart && trip.arrivalWindowEnd
-              ? `${formatTime(trip.arrivalWindowStart)}–${formatTime(trip.arrivalWindowEnd)}`
-              : formatTime(trip.plannedArrivalAt)}
+        <Panel title="Time on trailer since loading">
+          <p className="type-h3 m-0">{elapsedTime(loadedRecord?.occurredAt ?? null)}</p>
+          <p className="type-body-s mb-0 mt-1 text-ink-3">
+            {loadedRecord ? `Loaded ${formatTime(loadedRecord.occurredAt)}` : 'Loading time not recorded'}
           </p>
-          <p className="type-body-s mb-0 mt-1 text-ink-3">Planned arrival</p>
         </Panel>
         <Panel title="Next checkpoint">
           <p className="type-h3 m-0">{nextStop?.name ?? 'Route complete'}</p>
@@ -525,8 +528,8 @@ function CoordinatorTripBoard({ trip }: { trip: TripView }) {
             {heldStop ? 'Trip held here' : nextStop?.plannedAt ? `Planned ${formatTime(nextStop.plannedAt)}` : 'No estimate shown'}
           </p>
         </Panel>
-        <Panel title="Horses sound at latest check">
-          <p className="type-h3 m-0">{lastConditionRecord ? `${soundCount} of ${trip.horses.length}` : '—'}</p>
+        <Panel title="Horses stable at latest checks">
+          <p className="type-h3 m-0">{lastConditionRecord ? `${stableCount} of ${trip.horses.length}` : '—'}</p>
           <p className="type-body-s mb-0 mt-1 text-ink-3">
             {lastConditionRecord ? formatTime(lastConditionRecord.occurredAt) : 'No condition log yet'}
           </p>

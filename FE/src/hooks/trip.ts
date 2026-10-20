@@ -13,7 +13,7 @@ export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string)
     queryKey: ['trip', audience, code],
     queryFn: () => tripApi.get(audience, code),
     enabled: Boolean(code),
-    refetchInterval: audience === 'customer' ? 15_000 : false,
+    refetchInterval: audience === 'customer' || audience === 'staff' ? 15_000 : false,
   });
 
 export const useTripRecord = (audience: 'escort' | 'staff', code: string) => {

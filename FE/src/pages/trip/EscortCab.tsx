@@ -186,15 +186,21 @@ function HorseConditionRow({
                   : { checked: true, condition },
               )
             }
-            className={`min-h-12 rounded-md border px-4 type-label-m ${
+            className={`inline-flex min-h-12 items-center gap-2 rounded-md border px-4 type-label-m ${
               value.condition === condition
-                ? condition === HorseConditionEnum.OFF_FEED || condition === HorseConditionEnum.STRESSED || condition === HorseConditionEnum.CLIMATE_CHANGE
+                ? condition === HorseConditionEnum.OFF_FEED
                   ? 'border-bad bg-bad-soft text-bad'
-                  : 'border-ok bg-ok-soft text-ok'
+                  : condition === HorseConditionEnum.STABLE
+                    ? 'border-ok bg-ok-soft text-ok'
+                    : 'border-warn bg-warn-soft text-warn'
                 : 'border-line-strong bg-input text-ink-2'
             }`}
           >
-            {condition.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase())}
+            {value.condition === condition && <span aria-hidden="true">✓</span>}
+            {condition
+              .replaceAll('_', ' ')
+              .toLowerCase()
+              .replace(/^./, (letter) => letter.toUpperCase())}
           </button>
         ))}
       </div>
@@ -451,7 +457,7 @@ export default function EscortCab() {
       return;
     }
     if (checkedHorses.some((horse) => !drafts[horse.id]?.condition)) {
-      messageApi.error('Choose Sound, Watch or Concern for each selected horse.');
+      messageApi.error('Choose a condition for each selected horse.');
       return;
     }
     setUploadingConditions(true);
@@ -526,28 +532,41 @@ export default function EscortCab() {
   const departureEvent =
     selectedKind === TripRecordKindEnum.DEPARTED ||
     selectedKind === TripRecordKindEnum.FLIGHT_DEPARTED;
-  const dockLabel = conditionTask
-    && cabTask === 'condition'
-    ? `Save condition log · ${checkedHorses.length} checked`
-    : heldMode
-      ? holdCleared
-        ? 'Record leaving stop'
-        : 'Save a trip note'
-      : selectedKind
-        ? `${labelByKind[selectedKind]} · ${fmtTime(now.toISOString())}`
-        : 'No available trip action';
+  const heldBorder = heldMode && activeStop?.kind === 'BORDER';
+  const dockLabel =
+    conditionTask && cabTask === 'condition'
+      ? `Save condition log · ${checkedHorses.length} checked`
+      : heldMode
+        ? holdCleared
+          ? heldBorder
+            ? 'Record customs clearance'
+            : 'Record leaving stop'
+          : 'Save a trip note'
+        : selectedKind
+          ? `${labelByKind[selectedKind]} · ${fmtTime(now.toISOString())}`
+          : 'No available trip action';
   const dockDisabled = conditionTask && cabTask === 'condition'
     ? mutation.isPending || uploadingConditions || checkedHorses.length === 0
     : heldMode
-      ? mutation.isPending || !note.trim() || (holdCleared && !isOnline)
+      ? mutation.isPending || (holdCleared ? !isOnline : !note.trim())
       : mutation.isPending ||
         !selectedKind ||
         (departureEvent && !trip?.clearanceReady) ||
         (selectedKind === TripRecordKindEnum.HELD && !note.trim());
   const saveDockAction = () => {
     if (conditionTask && cabTask === 'condition') void saveConditions();
-    else if (heldMode && holdCleared) void persistRecord(TripRecordKindEnum.LEFT_STOP);
-    else if (heldMode) void persistRecord(TripRecordKindEnum.NOTE);
+    else if (heldMode && holdCleared) {
+      const recordKind = heldBorder
+        ? TripRecordKindEnum.CLEARED_BORDER
+        : TripRecordKindEnum.LEFT_STOP;
+      void persistRecord(
+        recordKind,
+        undefined,
+        undefined,
+        undefined,
+        recordKind === TripRecordKindEnum.CLEARED_BORDER ? shownDocumentIds : undefined,
+      );
+    } else if (heldMode) void persistRecord(TripRecordKindEnum.NOTE);
     else if (selectedKind === TripRecordKindEnum.CLEARED_BORDER)
       void persistRecord(selectedKind, undefined, undefined, undefined, shownDocumentIds);
     else saveCheckpoint();
@@ -701,7 +720,7 @@ export default function EscortCab() {
                     <div className="p-4">
                       <h2 className="type-h4 m-0">Documents at the border</h2>
                       <p className="type-body-s m-0 text-ink-3">
-                        Select the documents you show when recording that customs cleared the crossing.
+                        Select the documents you show when recording customs clearance at this crossing.
                       </p>
                     </div>
                     {trip.documents.map((document, index) => (
@@ -713,7 +732,10 @@ export default function EscortCab() {
                           type="checkbox"
                           aria-label={`Shown at border: ${document.name}${document.horseName ? ` · ${document.horseName}` : ''}`}
                           checked={shownDocumentIds.includes(document.id)}
-                          disabled={selectedKind !== TripRecordKindEnum.CLEARED_BORDER}
+                          disabled={
+                            selectedKind !== TripRecordKindEnum.CLEARED_BORDER &&
+                            !(heldMode && holdCleared && activeStop?.kind === 'BORDER')
+                          }
                           onChange={(event) =>
                             setShownDocumentIds((current) =>
                               event.target.checked
