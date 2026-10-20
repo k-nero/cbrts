@@ -55,4 +55,10 @@ export const queryKeys = {
     details: (corridorId?: string, versionId?: string) =>
       ['rates', 'details', corridorId ?? '', versionId ?? ''] as const,
   },
+  trips: {
+    /** Every trip list, for invalidation after a record is saved. */
+    lists: () => ['trips'] as const,
+    list: (audience: string, page: number) => ['trips', audience, page] as const,
+    one: (audience: string, code: string) => ['trip', audience, code] as const,
+  },
 } as const;

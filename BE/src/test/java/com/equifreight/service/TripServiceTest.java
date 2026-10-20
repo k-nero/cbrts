@@ -12,8 +12,10 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.repository.*;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -22,7 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -56,18 +58,31 @@ class TripServiceTest {
     private FileService files;
 
     @Mock
-    private AuditLogRepository audit;
+    private HandoverRepository handovers;
 
-    @InjectMocks
+    @Mock
+    private UserRepository users;
+
+    @Mock
+    private AuditService audit;
+
+    @Mock
+    private NotificationService notifications;
+
     private TripService service;
 
     private User coordinator;
+    private User escort;
     private TransportJob job;
     private Horse shadowfax;
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
+    }
+
+    private static TripRecordRequest handover(Instant at, String receiverName) {
+        return new TripRecordRequest(null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
@@ -94,6 +109,27 @@ class TripServiceTest {
         coordinator.setFirstName("Khôi");
         coordinator.setLastName("Đỗ");
         coordinator.setRoles(Set.of(role));
+        Role escortRole = new Role();
+        escortRole.setName(RoleName.ESCORT);
+        escort = new User();
+        escort.setId(UUID.randomUUID());
+        escort.setFirstName("Minh");
+        escort.setLastName("Trần");
+        escort.setRoles(Set.of(escortRole));
+
+        service = new TripService(
+                jobs,
+                crew,
+                records,
+                routes,
+                loads,
+                requestHorses,
+                handovers,
+                users,
+                files,
+                audit,
+                notifications,
+                Clock.fixed(NOW, ZoneOffset.UTC));
 
         TransportRequest request = new TransportRequest();
         request.setId(UUID.randomUUID());
@@ -105,6 +141,7 @@ class TripServiceTest {
         job.setTripStatus(TripStatus.NOT_STARTED);
         job.setDossierStatus(DossierStatus.CLEARANCE_READY);
         job.setClearanceReadyAt(NOW.minus(Duration.ofDays(1)));
+        job.setSignedOffAt(NOW.minus(Duration.ofHours(12)));
 
         shadowfax = horse("Shadowfax");
         nightfall = horse("Nightfall");
@@ -114,6 +151,9 @@ class TripServiceTest {
         when(records.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection()))
                 .thenReturn(Optional.empty());
+        when(crew.existsByJob_IdAndUser_Id(job.getId(), escort.getId())).thenReturn(true);
+        when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.empty());
+        when(handovers.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -253,6 +293,172 @@ class TripServiceTest {
                                 List.of(condition(shadowfax, List.of(photo)), condition(nightfall, List.of(photo))))));
         assertEquals("DUPLICATE_PHOTO", ex.getCode());
         verify(records, never()).save(any());
+    }
+
+    // ---------- sign-off gate (US-F3-08) ----------
+
+    @Test
+    @DisplayName("Departure is refused until the logistics manager signs off the trip plan")
+    void departureIsRefusedWithoutSignOff() {
+        job.setSignedOffAt(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> record(TripRecordKind.DEPARTED, NOW));
+        assertEquals("SIGN_OFF_REQUIRED", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("The next flight leg of a trip already on its way doesn't ask for the sign-off again")
+    void laterFlightLegSkipsTheSignOffGate() {
+        departed();
+        job.setSignedOffAt(null);
+
+        record(TripRecordKind.FLIGHT_DEPARTED, NOW);
+
+        verify(records).save(any());
+        assertEquals(NOW.minus(Duration.ofHours(6)), job.getDepartedAt());
+    }
+
+    // ---------- holds ----------
+
+    @Test
+    @DisplayName("The cab can't release a hold: it stays held until staff decide")
+    void escortCannotReleaseAHold() {
+        departed();
+        job.setTripStatus(TripStatus.HELD);
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addEscortRecord(
+                        job.getCode(), escort, request(TripRecordKind.CLEARED_BORDER, NOW, null)));
+        assertEquals("HOLD_RELEASE_BY_STAFF", ex.getCode());
+        assertEquals(TripStatus.HELD, job.getTripStatus());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("The cab can still log a note on a held trip")
+    void escortCanLogANoteWhileHeld() {
+        departed();
+        job.setTripStatus(TripStatus.HELD);
+
+        service.addEscortRecord(job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null));
+
+        verify(records).save(any());
+        assertEquals(TripStatus.HELD, job.getTripStatus());
+    }
+
+    @Test
+    @DisplayName("Staff release a hold and the trip is back on the road")
+    void coordinatorReleasesAHold() {
+        departed();
+        job.setTripStatus(TripStatus.HELD);
+
+        record(TripRecordKind.LEFT_STOP, NOW);
+
+        assertEquals(TripStatus.DEPARTED, job.getTripStatus());
+    }
+
+    @Test
+    @DisplayName("A hold alerts the logistics manager and the coordinator")
+    void holdAlertsTheDeciders() {
+        departed();
+        User manager = new User();
+        manager.setId(UUID.randomUUID());
+        when(users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE))
+                .thenReturn(List.of(manager));
+        when(users.findByRoleAndStatus(RoleName.FLEET_COORDINATOR, UserStatus.ACTIVE))
+                .thenReturn(List.of(coordinator));
+
+        service.addEscortRecord(
+                job.getCode(),
+                escort,
+                new TripRecordRequest(
+                        null, TripRecordKind.HELD, NOW, UUID.randomUUID(), "Vet check at the border", null, null));
+
+        assertEquals(TripStatus.HELD, job.getTripStatus());
+        verify(notifications)
+                .sendNotification(
+                        eq(manager),
+                        eq("TRIP_HELD"),
+                        eq("Trip CBRT-2026-041 held"),
+                        eq("Vet check at the border"),
+                        eq("TRANSPORT_JOB"),
+                        eq(job.getId()));
+        verify(notifications).sendNotification(eq(coordinator), eq("TRIP_HELD"), any(), any(), any(), any());
+    }
+
+    // ---------- handover ----------
+
+    @Test
+    @DisplayName("Delivery opens the job's handover row")
+    void deliveryOpensTheHandover() {
+        departed();
+        job.setTripStatus(TripStatus.ARRIVED);
+
+        record(TripRecordKind.DELIVERED, NOW);
+
+        ArgumentCaptor<Handover> saved = ArgumentCaptor.forClass(Handover.class);
+        verify(handovers).save(saved.capture());
+        assertEquals(job, saved.getValue().getJob());
+        assertEquals(NOW, saved.getValue().getDeliveredAt());
+    }
+
+    @Test
+    @DisplayName("Handover needs the receiver's name")
+    void handoverNeedsTheReceiver() {
+        delivered();
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(job.getCode(), coordinator, handover(NOW, "  ")));
+        assertEquals("RECEIVER_REQUIRED", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Handover keeps who received the horses and when the customer must confirm")
+    void handoverCompletesTheHandoverRow() {
+        delivered();
+        Handover open = new Handover();
+        open.setJob(job);
+        open.setDeliveredAt(NOW.minus(Duration.ofMinutes(30)));
+        when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.of(open));
+
+        service.addCoordinatorRecord(job.getCode(), coordinator, handover(NOW, " Sophea, receiving groom "));
+
+        assertEquals("Sophea, receiving groom", open.getReceivingName());
+        assertEquals(NOW.plus(Duration.ofDays(2)), open.getConfirmDueAt());
+        assertEquals(NOW.minus(Duration.ofMinutes(30)), open.getDeliveredAt());
+    }
+
+    // ---------- audit ----------
+
+    @Test
+    @DisplayName("Each record is audited through AuditService, in words and with the device's time")
+    void recordIsAuditedInWords() {
+        record(TripRecordKind.DEPARTED, NOW.minusSeconds(30));
+
+        verify(audit)
+                .recordFromDevice(
+                        eq(coordinator),
+                        eq(Channel.WEB),
+                        eq(NOW.minusSeconds(30)),
+                        eq("TRIP_RECORD_RECORDED"),
+                        eq("Departed recorded for CBRT-2026-041"),
+                        eq("TRIP_RECORD"),
+                        any(),
+                        eq(job.getCode()),
+                        argThat(after -> "DEPARTED".equals(after.get("kind")) && after.containsKey("routeStopId")));
+    }
+
+    private void delivered() {
+        departed();
+        job.setTripStatus(TripStatus.DELIVERED);
+        job.setStage(JobStage.HANDOVER);
+        job.setDeliveredAt(NOW.minus(Duration.ofMinutes(30)));
+        when(records.existsByJob_IdAndKind(job.getId(), TripRecordKind.HANDED_OVER))
+                .thenReturn(false);
     }
 
     private void record(TripRecordKind kind, Instant at) {
