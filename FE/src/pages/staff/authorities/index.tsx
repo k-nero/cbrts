@@ -44,6 +44,7 @@ import type {
   SubmissionStatus,
   UpdateAuthoritySubmissionRequest,
 } from '@/interfaces';
+import { SubmissionKindEnum, SubmissionStatusEnum } from '@/interfaces';
 
 const SUBMISSION_KIND_LABELS: Record<SubmissionKind, string> = {
   EXPORT_HEALTH_CERTS: 'Export Health Certificates (DAH / RAHO)',
@@ -130,10 +131,15 @@ const AuthoritiesPage: FC = () => {
   // Metrics
   const stats = useMemo(() => {
     const total = submissions.length;
-    const approved = submissions.filter((s) => s.status === 'ISSUED').length;
-    const overdueCount = submissions.filter((s) => s.isOverdue || s.status === 'REFUSED').length;
+    const approved = submissions.filter((s) => s.status === SubmissionStatusEnum.ISSUED).length;
+    const overdueCount = submissions.filter(
+      (s) => s.isOverdue || s.status === SubmissionStatusEnum.REFUSED,
+    ).length;
     const withAuthorities = submissions.filter(
-      (s) => s.status === 'FILED' || s.status === 'READY_TO_FILE' || s.status === 'ADDITIONAL_INFO',
+      (s) =>
+        s.status === SubmissionStatusEnum.FILED ||
+        s.status === SubmissionStatusEnum.READY_TO_FILE ||
+        s.status === SubmissionStatusEnum.ADDITIONAL_INFO,
     ).length;
     const completedQuarantines = quarantines.filter((q) => q.isCompleted).length;
     return { total, approved, overdueCount, withAuthorities, completedQuarantines };
@@ -150,7 +156,7 @@ const AuthoritiesPage: FC = () => {
   const handleOpenCreateModal = () => {
     createForm.resetFields();
     createForm.setFieldsValue({
-      kind: 'EXPORT_HEALTH_CERTS',
+      kind: SubmissionKindEnum.EXPORT_HEALTH_CERTS,
       expectedBy: dayjs().add(4, 'day'),
     });
     setCreateModalOpen(true);
@@ -416,7 +422,7 @@ const AuthoritiesPage: FC = () => {
                 sub.isOverdue ||
                 (sub.expectedBy &&
                   dayjs().isAfter(dayjs(sub.expectedBy)) &&
-                  sub.status !== 'ISSUED');
+                  sub.status !== SubmissionStatusEnum.ISSUED);
               const statusConfig = STATUS_CHIP_CONFIG[sub.status] ?? {
                 tone: 'neutral',
                 label: sub.status,
@@ -463,7 +469,7 @@ const AuthoritiesPage: FC = () => {
                         <span
                           className={`type-label-s ${isOverdue ? 'text-bad font-semibold' : 'text-ink'}`}
                         >
-                          {sub.status === 'ISSUED'
+                          {sub.status === SubmissionStatusEnum.ISSUED
                             ? 'Approved & Issued'
                             : isOverdue
                               ? 'Response overdue'
@@ -503,7 +509,7 @@ const AuthoritiesPage: FC = () => {
                       <span className="type-body-s text-ink">
                         {sub.resultFileName ? (
                           <span className="text-ok font-medium">{sub.resultFileName}</span>
-                        ) : sub.status === 'ISSUED' ? (
+                        ) : sub.status === SubmissionStatusEnum.ISSUED ? (
                           'Approved electronically'
                         ) : (
                           'Pending issuance'
@@ -531,9 +537,9 @@ const AuthoritiesPage: FC = () => {
                   {/* Card Actions Footer */}
                   <div className="flex items-center justify-between px-6 py-3 bg-card">
                     <span className="type-body-s text-ink-3">
-                      {sub.status === 'READY_TO_FILE'
+                      {sub.status === SubmissionStatusEnum.READY_TO_FILE
                         ? 'Record official submission reference once lodged with the authority.'
-                        : sub.status === 'ISSUED'
+                        : sub.status === SubmissionStatusEnum.ISSUED
                           ? 'Dossier approved and archived in the clearance gate.'
                           : 'Contact office liaison if additional documents or laboratory tests are requested.'}
                     </span>
@@ -754,13 +760,13 @@ const AuthoritiesPage: FC = () => {
           >
             <Select
               options={[
-                { label: 'Approved & Issued (ISSUED)', value: 'ISSUED' },
-                { label: 'With the authority (FILED)', value: 'FILED' },
+                { label: 'Approved & Issued (ISSUED)', value: SubmissionStatusEnum.ISSUED },
+                { label: 'With the authority (FILED)', value: SubmissionStatusEnum.FILED },
                 {
                   label: 'Additional information requested (ADDITIONAL_INFO)',
-                  value: 'ADDITIONAL_INFO',
+                  value: SubmissionStatusEnum.ADDITIONAL_INFO,
                 },
-                { label: 'Refused / Rejected (REFUSED)', value: 'REFUSED' },
+                { label: 'Refused / Rejected (REFUSED)', value: SubmissionStatusEnum.REFUSED },
               ]}
             />
           </Form.Item>
