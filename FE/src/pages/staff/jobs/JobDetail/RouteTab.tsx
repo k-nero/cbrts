@@ -151,7 +151,7 @@ export function RouteTab({ job }: Props) {
             {allVersions.map((v) => (
               <div key={v.id} className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <span className="type-mono-data text-ink font-semibold">v{v.versionNo}</span>
+                  <span className="type-data text-ink">v{v.versionNo}</span>
                   <Chip tone={v.status === 'CONFIRMED' ? 'ok' : 'neutral'}>{v.status}</Chip>
                   {v.changeReason && (
                     <span className="type-body-s text-ink-2 truncate max-w-md">
