@@ -16,7 +16,13 @@ import {
   useRegulationVersion,
   useUpdateRegulationRule,
 } from '@/hooks/regulation';
-import type { RegulationRule, RegulationRuleKind } from '@/interfaces';
+import {
+  CatalogStatusEnum,
+  DocumentScopeEnum,
+  RegulationRuleDiffEnum,
+  RegulationRuleKindEnum,
+} from '@/interfaces';
+import type { DocumentScope, RegulationRule, RegulationRuleKind } from '@/interfaces';
 
 interface DestinationItem {
   id: string;
@@ -36,10 +42,10 @@ const BORDER_CROSSINGS: DestinationItem[] = [
 ];
 
 const RULE_SHAPE_OPTIONS: { kind: RegulationRuleKind; label: string }[] = [
-  { kind: 'WINDOW_BEFORE_DEPARTURE', label: 'Window before departure' },
-  { kind: 'VALID_THROUGH_ARRIVAL_PLUS', label: 'Valid until' },
-  { kind: 'BOOSTER_WINDOW', label: 'Booster window' },
-  { kind: 'PRESENCE_ONLY', label: 'Presence only' },
+  { kind: RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE, label: 'Window before departure' },
+  { kind: RegulationRuleKindEnum.VALID_THROUGH_ARRIVAL_PLUS, label: 'Valid until' },
+  { kind: RegulationRuleKindEnum.BOOSTER_WINDOW, label: 'Booster window' },
+  { kind: RegulationRuleKindEnum.PRESENCE_ONLY, label: 'Presence only' },
 ];
 
 const RULE_SHAPE_LABELS: Record<RegulationRuleKind, string> = {
@@ -80,14 +86,16 @@ export const RegulationsPage: FC = () => {
 
   // Selected rule for edit form
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
-  const [editKind, setEditKind] = useState<RegulationRuleKind>('WINDOW_BEFORE_DEPARTURE');
+  const [editKind, setEditKind] = useState<RegulationRuleKind>(
+    RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE,
+  );
   const [editDays, setEditDays] = useState<string>('45');
-  const [editAppliesTo, setEditAppliesTo] = useState<string>('PER_HORSE');
+  const [editAppliesTo, setEditAppliesTo] = useState<DocumentScope>(DocumentScopeEnum.PER_HORSE);
   const [editMandatory, setEditMandatory] = useState<boolean>(true);
   const [editDescription, setEditDescription] = useState<string>('');
 
   // Active version info
-  const isDraft = versionDetail?.status === 'DRAFT';
+  const isDraft = versionDetail?.status === CatalogStatusEnum.DRAFT;
   const hasDraft = Boolean(selectedCatalog?.draftVersion);
   const draftVersionNo =
     selectedCatalog?.draftVersion?.versionNo ??
@@ -103,7 +111,7 @@ export const RegulationsPage: FC = () => {
         setSelectedRuleId(target.id);
         setEditKind(target.ruleKind);
         setEditDays(String(target.maxDays ?? target.minDays ?? 45));
-        setEditAppliesTo(target.documentType?.scope ?? 'PER_HORSE');
+        setEditAppliesTo(target.documentType?.scope ?? DocumentScopeEnum.PER_HORSE);
         setEditMandatory(target.mandatory);
         setEditDescription(target.description ?? '');
       }
@@ -115,7 +123,7 @@ export const RegulationsPage: FC = () => {
     setSelectedRuleId(rule.id);
     setEditKind(rule.ruleKind);
     setEditDays(String(rule.maxDays ?? rule.minDays ?? 45));
-    setEditAppliesTo(rule.documentType?.scope ?? 'PER_HORSE');
+    setEditAppliesTo(rule.documentType?.scope ?? DocumentScopeEnum.PER_HORSE);
     setEditMandatory(rule.mandatory);
     setEditDescription(rule.description ?? '');
   };
@@ -427,18 +435,18 @@ export const RegulationsPage: FC = () => {
                     <tbody>
                       {versionDetail?.rules.map((rule) => {
                         const isSelected = rule.id === selectedRuleId;
-                        const isChanged = rule.diffStatus === 'CHANGED';
-                        const isNew = rule.diffStatus === 'NEW';
+                        const isChanged = rule.diffStatus === RegulationRuleDiffEnum.CHANGED;
+                        const isNew = rule.diffStatus === RegulationRuleDiffEnum.NEW;
                         const isHighlighted = isChanged || isNew;
 
                         let scopeLabel = 'Per horse';
-                        if (rule.documentType?.scope === 'PER_SHIPMENT')
+                        if (rule.documentType?.scope === DocumentScopeEnum.PER_SHIPMENT)
                           scopeLabel = 'Per shipment';
-                        if (rule.documentType?.scope === 'PER_CROSSING')
+                        if (rule.documentType?.scope === DocumentScopeEnum.PER_CROSSING)
                           scopeLabel = 'Per crossing';
 
                         let blocksLabel = rule.mandatory ? 'Yes' : 'Optional';
-                        if (rule.documentType?.scope === 'PER_CROSSING')
+                        if (rule.documentType?.scope === DocumentScopeEnum.PER_CROSSING)
                           blocksLabel = 'Per crossing';
 
                         return (
@@ -538,9 +546,9 @@ export const RegulationsPage: FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1">
                         <label className="type-label-s text-ink-3 font-medium">
-                          {editKind === 'WINDOW_BEFORE_DEPARTURE'
+                          {editKind === RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE
                             ? 'Days before departure'
-                            : editKind === 'VALID_THROUGH_ARRIVAL_PLUS'
+                            : editKind === RegulationRuleKindEnum.VALID_THROUGH_ARRIVAL_PLUS
                               ? 'Days after arrival'
                               : 'Days window'}
                         </label>
@@ -563,9 +571,9 @@ export const RegulationsPage: FC = () => {
                           value={editAppliesTo}
                           onChange={setEditAppliesTo}
                           options={[
-                            { label: 'Per horse', value: 'PER_HORSE' },
-                            { label: 'Per shipment', value: 'PER_SHIPMENT' },
-                            { label: 'Per crossing', value: 'PER_CROSSING' },
+                            { label: 'Per horse', value: DocumentScopeEnum.PER_HORSE },
+                            { label: 'Per shipment', value: DocumentScopeEnum.PER_SHIPMENT },
+                            { label: 'Per crossing', value: DocumentScopeEnum.PER_CROSSING },
                           ]}
                           className="w-full"
                         />
