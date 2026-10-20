@@ -6,7 +6,7 @@ import { VersionsPanel } from '../components/VersionsPanel';
 
 import { RequestLoadState } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
-import { Button, OwedItem, Panel } from '@/components/ui';
+import { Button, Callout, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
 import { estimateStub, formatDate, fromRequest, latestRevision, passChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
@@ -122,12 +122,34 @@ const RequestSubmittedPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex flex-col gap-6">
-          <Panel title="Nothing needed from you right now">
-            <p className="type-body-m m-0 text-ink-2">
-              Next: a logistics manager checks the route, dates and capacity, usually within 1
-              business day. The itemised quotation arrives in My requests.
-            </p>
-          </Panel>
+          {request.quotation && (
+            <Callout
+              tone="info"
+              title={`Your quotation is ready: ${request.quotation.code} v${request.quotation.versionNo}.`}
+              action={
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    router.push(router.paths.get('request-quotation', { pathParams: [request.id] }))
+                  }
+                >
+                  Open quotation
+                </Button>
+              }
+            >
+              {request.quotation.validUntil
+                ? `It holds its price until ${formatDate(request.quotation.validUntil)}.`
+                : 'It is itemised, with the deposit and cancellation terms.'}
+            </Callout>
+          )}
+          {!request.quotation && (
+            <Panel title="Nothing needed from you right now">
+              <p className="type-body-m m-0 text-ink-2">
+                Next: a logistics manager checks the route, dates and capacity, usually within 1
+                business day. The itemised quotation arrives in My requests.
+              </p>
+            </Panel>
+          )}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.
           </p>

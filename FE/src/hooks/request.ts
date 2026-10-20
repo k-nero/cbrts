@@ -1,7 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { horsesApi } from '@/apis/horse';
-import { getEstimate, getRoutes, requestApi, requestListApi, submitRequest } from '@/apis/request';
+import {
+  getCustomerQuotation,
+  getEstimate,
+  getRoutes,
+  requestApi,
+  requestListApi,
+  submitRequest,
+} from '@/apis/request';
 import { queryKeys } from '@/constant/query';
 import type { RequestDraftInput, RequestSummary, TransportRequest } from '@/interfaces';
 
@@ -119,3 +126,12 @@ export const useEstimate = (input: RequestDraftInput, enabled: boolean) => {
   const stale = JSON.stringify(input) !== JSON.stringify(settled) || query.isPlaceholderData;
   return { ...query, stale };
 };
+
+/** The request's issued quotation, as the club reads it; a 404 means none is issued yet. */
+export const useCustomerQuotation = (id: string | undefined) =>
+  useQuery({
+    queryKey: queryKeys.requests.quotation(id ?? ''),
+    queryFn: () => getCustomerQuotation(id as string),
+    enabled: Boolean(id),
+    retry: false,
+  });

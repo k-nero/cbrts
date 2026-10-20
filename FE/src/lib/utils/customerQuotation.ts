@@ -1,0 +1,94 @@
+import { daysUntil, formatDate } from './time';
+
+import type { CancellationBand, CustomerQuotation, CustomerQuoteGroup } from '@/interfaces';
+
+export type MoneyRow = { code: string | null; name: string; amount: number; share: number };
+
+/**
+ * Where the money goes (DESIGN.md, Quotation page): one row per ledger group, plus one for everything
+ * added after the subtotal (fees, fuel and cover, less the volume break), largest first.
+ */
+export const moneyRows = (
+  groups: CustomerQuoteGroup[],
+  totals: { subtotal: number; total: number },
+): MoneyRow[] => {
+  const rows: MoneyRow[] = groups.map((g) => ({
+    code: g.code,
+    name: g.name,
+    amount: g.subtotal ?? 0,
+    share: (g.subtotal ?? 0) / totals.total,
+  }));
+  const added = totals.total - totals.subtotal;
+  if (added > 0)
+    rows.push({
+      code: null,
+      name: 'Fees, fuel and cover',
+      amount: added,
+      share: added / totals.total,
+    });
+  return rows.sort((a, b) => b.amount - a.amount);
+};
+
+/** "47%", or "<1%" under one percent. */
+export const shareText = (share: number): string =>
+  share > 0 && share < 0.01 ? '<1%' : `${Math.round(share * 100)}%`;
+
+/** The head of Where the money goes: "Air freight is 47% of the total". */
+export const moneyHead = (rows: MoneyRow[]): string =>
+  rows.length === 0 ? '' : `${rows[0].name} is ${shareText(rows[0].share)} of the total`;
+
+/** The quotation's largest line and its share of the total. */
+export const largestLine = (
+  groups: CustomerQuoteGroup[],
+  total: number,
+): { description: string; amount: number; share: number } | null => {
+  const lines = groups.flatMap((g) => g.lines).filter((l) => l.amount != null);
+  if (lines.length === 0) return null;
+  const top = lines.reduce((a, b) => ((b.amount ?? 0) > (a.amount ?? 0) ? b : a));
+  return {
+    description: top.description,
+    amount: top.amount ?? 0,
+    share: (top.amount ?? 0) / total,
+  };
+};
+
+/** Against your estimate: Inside (Ok) or Outside (Warn) the range kept at submission. */
+export const estimateVerdict = (
+  estimate: CustomerQuotation['estimate'],
+): { tone: 'ok' | 'warn'; label: string } | null =>
+  estimate == null
+    ? null
+    : estimate.inside
+      ? { tone: 'ok', label: 'Inside your range' }
+      : { tone: 'warn', label: 'Outside your range' };
+
+/** A cancellation band by notice period, in the catalog's own days: "14–29 days", "30 days or more". */
+export const noticeBandLabel = (band: Pick<CancellationBand, 'minDays' | 'maxDays'>): string => {
+  if (band.maxDays == null) return `${band.minDays} days or more`;
+  if (band.minDays === 0) return `Under ${band.maxDays + 1} days`;
+  return `${band.minDays}–${band.maxDays} days`;
+};
+
+/** The owed item's two-line deadline: "Due in 4 days" / "27 Oct 2026", "Due today", or "Expired". */
+export const deadlineText = (validUntil: string, now: string): { line1: string; line2: string } => {
+  const days = daysUntil(validUntil, now);
+  const line1 =
+    days < 0
+      ? 'Expired'
+      : days === 0
+        ? 'Due today'
+        : `Due in ${days} ${days === 1 ? 'day' : 'days'}`;
+  return { line1, line2: formatDate(validUntil) };
+};
+
+/** What the owed panel says: only an issued quotation waits for the club's answer. */
+export const owedKind = (
+  status: CustomerQuotation['status'],
+): 'answer' | 'expired' | 'accepted' | 'declined' =>
+  status === 'EXPIRED'
+    ? 'expired'
+    : status === 'ACCEPTED'
+      ? 'accepted'
+      : status === 'DECLINED'
+        ? 'declined'
+        : 'answer';

@@ -97,6 +97,13 @@ export const routesConfig = [
             breadcrumb: 'Submitted',
             name: 'request-submitted',
           },
+          {
+            path: '/quotation',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Quotation',
+            name: 'request-quotation',
+          },
         ],
       },
     ],

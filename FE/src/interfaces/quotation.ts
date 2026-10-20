@@ -176,3 +176,98 @@ export interface QuotationDraft {
   versions: QuotationVersion[];
   previous: PreviousVersion | null;
 }
+
+/* ---------- the customer's issued quotation (spec §6.1) ---------- */
+
+/** A horse as quoted; the coat draws its swatch on the quoted pass. */
+export interface QuotedHorse {
+  id: string;
+  name: string;
+  sex: string;
+  sizeClass: string | null;
+  coat: string | null;
+}
+
+/** A line as the customer reads it: amount is the override when there is one. */
+export interface CustomerQuoteLine {
+  description: string;
+  basisText: string | null;
+  quantity: number;
+  unitRate: number | null;
+  amount: number | null;
+  certainty: LineCertainty;
+  estimateNote: string | null;
+  overridden: boolean;
+  catalogAmount: number | null;
+  overrideReason: string | null;
+  manual: boolean;
+  manualReason: string | null;
+}
+
+export interface CustomerQuoteGroup {
+  code: string;
+  name: string;
+  subtotal: number | null;
+  lines: CustomerQuoteLine[];
+}
+
+export interface CancellationBand {
+  minDays: number;
+  maxDays: number | null;
+  pct: number;
+  current: boolean;
+}
+
+/** GET /customer/requests/{id}/quotation: the latest issued version, as a document. */
+export interface CustomerQuotation {
+  code: string;
+  versionNo: number;
+  status: QuotationStatus;
+  issuedAt: string | null;
+  validUntil: string | null;
+  currency: string;
+  pinnedVersionNo: number;
+  request: {
+    id: string;
+    code: string;
+    fromCity: string;
+    toCity: string;
+    mode: TransportMode;
+    trailer: TrailerType | null;
+    airClass: ServiceClass | null;
+    horses: QuotedHorse[];
+    departureDate: string | null;
+    dateFlexDays: number;
+    arrivalMode: 'ANY_TIME' | 'WINDOW' | null;
+    windowStart: string | null;
+    windowEnd: string | null;
+    insurance: InsuranceOption | null;
+    vetEscort: boolean;
+  };
+  groups: CustomerQuoteGroup[];
+  /** How the air stall was sized, under group C; null on road. */
+  stallNote: string | null;
+  totals: { subtotal: number | null; rows: QuoteTotalRow[]; total: number | null };
+  /** The range kept at submission against this total; null when none was kept. */
+  estimate: { low: number; high: number; inside: boolean } | null;
+  deposit: Deposit | null;
+  cancellation: { daysToDeparture: number; bands: CancellationBand[] };
+  latePenalty: { pctPerHour: number; capPct: number } | null;
+  preparedBy: { name: string; role: string } | null;
+  /** Every issued version, newest first. */
+  versions: {
+    versionNo: number;
+    status: QuotationStatus;
+    issuedAt: string | null;
+    validUntil: string | null;
+    supersededReason: string | null;
+  }[];
+}
+
+/** The request's latest issued quotation, on the request and its list row. */
+export interface QuotationIssuedRef {
+  code: string;
+  versionNo: number;
+  status: QuotationStatus;
+  validUntil: string | null;
+}

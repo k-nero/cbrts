@@ -112,6 +112,18 @@ const MyRequestsPage: FC = () => {
                 Answer
               </Button>
             </span>
+          ) : r.quotation ? (
+            <span className="flex justify-end">
+              <Button
+                size="sm"
+                variant={r.status === 'QUOTED' ? 'primary' : 'secondary'}
+                onClick={() =>
+                  router.push(router.paths.get('request-quotation', { pathParams: [r.id] }))
+                }
+              >
+                {r.status === 'QUOTED' ? 'Review quotation' : 'Open quotation'}
+              </Button>
+            </span>
           ) : null,
       },
     ],
