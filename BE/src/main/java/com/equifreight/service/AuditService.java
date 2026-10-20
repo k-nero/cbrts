@@ -61,6 +61,31 @@ public class AuditService {
         return logs.save(log);
     }
 
+    /**
+     * A person's record made on a device that may have been offline, such as the cab tablet: the row keeps
+     * the device's own time next to the server's, so a late sync shows as one.
+     */
+    @Transactional
+    public AuditLog recordFromDevice(
+            User actor,
+            Channel channel,
+            Instant deviceRecordedAt,
+            String action,
+            String summary,
+            String entityType,
+            UUID entityId,
+            String entityCode,
+            Map<String, ?> after) {
+        AuditLog log = base(action, summary, entityType, entityId, entityCode, null, null);
+        log.setAfter(after == null ? null : json.writeValueAsString(after));
+        log.setActor(actor);
+        log.setActorLabel(labelOf(actor));
+        log.setActorRole(roleOf(actor));
+        log.setChannel(channel);
+        log.setDeviceRecordedAt(deviceRecordedAt);
+        return logs.save(log);
+    }
+
     /** A check or change the system made on its own ("Lead time checked: …"). */
     @Transactional
     public AuditLog recordSystem(

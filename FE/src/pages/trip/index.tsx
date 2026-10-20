@@ -265,6 +265,7 @@ function TripWorkspace({
   const [stopId, setStopId] = useState<string>();
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
   const [text, setText] = useState('');
+  const [receiverName, setReceiverName] = useState('');
   const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
   const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
     checkpoint: null,
@@ -291,10 +292,13 @@ function TripWorkspace({
         occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
+        receiverName:
+          kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
+      setReceiverName('');
       setOccurredAt(datetimeLocal());
     } catch (error) {
       messageApi.error(errorMessage(error));
@@ -519,6 +523,17 @@ function TripWorkspace({
                     placeholder="What happened at this checkpoint?"
                   />
                 </label>
+                {kind === TripRecordKindEnum.HANDED_OVER && (
+                  <label className="type-body-s flex flex-col gap-2">
+                    Received by
+                    <Input
+                      value={receiverName}
+                      onChange={(event) => setReceiverName(event.target.value)}
+                      maxLength={120}
+                      placeholder="Name of the receiving person"
+                    />
+                  </label>
+                )}
               </div>
               {audience === 'escort' && (
                 <div className="mt-5 divide-y divide-line">
@@ -613,7 +628,8 @@ function TripWorkspace({
                     mutation.isPending ||
                     ((kind === TripRecordKindEnum.DEPARTED ||
                       kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                      !trip.clearanceReady)
+                      !trip.clearanceReady) ||
+                    (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
                   }
                   onClick={saveCheckpoint}
                 >
