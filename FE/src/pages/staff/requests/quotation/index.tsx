@@ -1,22 +1,42 @@
 import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 
-import { IssuePanel, Ledger, MissingCallout, StallChoice, TotalsPanel } from './parts';
+import type { RunWrite } from './LineEditor';
+import {
+  IssuePanel,
+  Ledger,
+  MissingCallout,
+  StallChoice,
+  StatusPanel,
+  TotalsPanel,
+  VersionChip,
+  VersionsPanel,
+} from './parts';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, Panel, StageMark } from '@/components/ui';
 import {
   useChangeQuotationClass,
+  useDiscardRevision,
+  useIssueQuotation,
   useQuotation,
   useRepriceQuotation,
+  useReviseQuotation,
   useStartQuotation,
 } from '@/hooks/staffRequest';
-import type { ServiceClass } from '@/interfaces';
+import type { QuotationDraft, ServiceClass } from '@/interfaces';
 import { queryKeys } from '@/constant/query';
-import { apiErrorMessage, conflictMessage, quoteSummary } from '@/lib/utils';
+import {
+  apiErrorMessage,
+  conflictMessage,
+  formatDate,
+  ict,
+  money,
+  quoteSummary,
+} from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -26,11 +46,17 @@ import { useCustomRouter } from '@/router/route.hook';
 const QuotationBuilderPage: FC = () => {
   const { id } = useParams();
   const router = useCustomRouter();
-  const { message } = App.useApp();
-  const query = useQuotation(id);
+  const { message, modal } = App.useApp();
+  const [params, setParams] = useSearchParams();
+  const version = Number(params.get('version')) || undefined;
+  const query = useQuotation(id, version);
   const start = useStartQuotation();
   const changeClass = useChangeQuotationClass();
   const reprice = useRepriceQuotation();
+  const issue = useIssueQuotation();
+  const revise = useReviseQuotation();
+  const discard = useDiscardRevision();
+  const showVersion = (v: number | null) => setParams(v == null ? {} : { version: String(v) });
   const starting = useRef(false);
   const qc = useQueryClient();
   const [conflict, setConflict] = useState<string | null>(null);
@@ -38,21 +64,26 @@ const QuotationBuilderPage: FC = () => {
     router.push(router.paths.get('request-review', { pathParams: [id ?? ''] }));
   const back = { label: 'Request review', onClick: toReview };
 
-  const write = async (run: () => Promise<unknown>, done: string) => {
+  const write: RunWrite = async (run, done) => {
     try {
-      await run();
+      const answer = await run();
       setConflict(null);
       message.success(done);
+      // An override whose line the catalog no longer quotes can't be carried: say which.
+      const dropped = (answer as Partial<QuotationDraft> | undefined)?.droppedOverrides ?? [];
+      if (dropped.length > 0) message.warning(`Override dropped. ${dropped.join(' ')}`);
+      return true;
     } catch (error) {
       const conflict = conflictMessage(error);
       if (!conflict) {
         message.error(apiErrorMessage(error, "That didn't go through. Try again."));
-        return;
+        return false;
       }
       // Someone returned the request or the draft moved on: say so, and show what is true now.
       setConflict(conflict);
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotation(id ?? '') });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotations(id ?? '') });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(id ?? ''), exact: true });
+      return false;
     }
   };
 
@@ -118,6 +149,49 @@ const QuotationBuilderPage: FC = () => {
       () => reprice.mutateAsync({ requestId: q.request.id, value: undefined }),
       'Quotation re-priced',
     );
+  const draft = q.status === 'DRAFT';
+  const latest = q.versions.length === 0 || q.versions[0].versionNo === q.versionNo;
+  const draftVersionNo = q.versions[0]?.status === 'DRAFT' ? q.versions[0].versionNo : null;
+  const onIssue = (changeNote: string | null) =>
+    modal.confirm({
+      title: `Issue ${q.code} v${q.versionNo} for ${q.totals.total == null ? '—' : money(q.totals.total)}?`,
+      content: `${q.request.club ?? 'The club'} can accept it until ${ict(new Date().toISOString())
+        .add(q.validityDays ?? 0, 'day')
+        .format(
+          'D MMM YYYY',
+        )}. An issued quotation is never edited; a change makes version ${q.versionNo + 1}.`,
+      okText: 'Issue quotation',
+      cancelText: 'Not yet',
+      onOk: async () => {
+        const ok = await write(
+          () => issue.mutateAsync({ requestId: q.request.id, value: changeNote }),
+          `${q.code} v${q.versionNo} issued`,
+        );
+        if (ok) showVersion(null);
+      },
+    });
+  const onRevise = () =>
+    void write(
+      () => revise.mutateAsync({ requestId: q.request.id, value: undefined }),
+      `Version ${q.versionNo + 1} drafted`,
+    ).then((ok) => ok && showVersion(null));
+  const onDiscard = () =>
+    modal.confirm({
+      title: `Discard draft v${q.versionNo}?`,
+      content: `Every change in it is lost. Version ${q.versionNo - 1} stands as issued.`,
+      okText: 'Discard draft',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep editing',
+      onOk: async () => {
+        try {
+          await discard.mutateAsync({ requestId: q.request.id });
+          message.success(`Draft v${q.versionNo} discarded`);
+          showVersion(null);
+        } catch (error) {
+          message.error(apiErrorMessage(error, "The draft wasn't discarded. Try again."));
+        }
+      },
+    });
 
   return (
     <div className="flex flex-col gap-7">
@@ -133,6 +207,7 @@ const QuotationBuilderPage: FC = () => {
         right={
           <span className="flex items-center gap-3">
             <StageMark stage="Quotation" />
+            <VersionChip status={q.status} />
             <Chip dot={false}>{`Rates v${q.pinnedVersion.versionNo} pinned`}</Chip>
           </span>
         }
@@ -144,20 +219,55 @@ const QuotationBuilderPage: FC = () => {
               The quotation has been reloaded to show where it stands now.
             </Callout>
           )}
-          <MissingCallout quotation={q} />
-          {q.repriceNeeded && (
+          {draft && <MissingCallout quotation={q} />}
+          {!draft && (
+            <Callout
+              tone="info"
+              title={`Version ${q.versionNo} was issued${q.issuedAt ? ` on ${formatDate(q.issuedAt)}` : ''}`}
+            >
+              An issued quotation is a document: it reads as it was issued and is never edited.
+            </Callout>
+          )}
+          {draft && q.repriceNeeded && (
             <Callout tone="warn" title="The request changed since this was priced">
               The lines below are as priced; re-price to work them out from the request as it is
               now.
             </Callout>
           )}
-          {q.request.mode === 'AIR' && (
+          {draft && q.request.mode === 'AIR' && (
             <StallChoice quotation={q} pending={changeClass.isPending} onChange={onClass} />
           )}
-          <Ledger quotation={q} />
+          <Ledger quotation={q} editable={q.status === 'DRAFT'} run={write} />
           <TotalsPanel quotation={q} />
         </div>
-        <IssuePanel quotation={q} repricing={reprice.isPending} onReprice={onReprice} />
+        <div className="flex flex-col gap-6">
+          {draft ? (
+            <IssuePanel
+              quotation={q}
+              repricing={reprice.isPending}
+              onReprice={onReprice}
+              issuing={issue.isPending}
+              onIssue={onIssue}
+              discarding={discard.isPending}
+              onDiscard={onDiscard}
+            />
+          ) : (
+            <StatusPanel
+              quotation={q}
+              latest={latest}
+              draftVersionNo={draftVersionNo}
+              revising={revise.isPending}
+              onRevise={onRevise}
+              onOpenDraft={() => showVersion(null)}
+            />
+          )}
+          {q.versions.length > 1 && (
+            <VersionsPanel
+              quotation={q}
+              onPick={(v) => showVersion(v === q.versions[0].versionNo ? null : v)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
