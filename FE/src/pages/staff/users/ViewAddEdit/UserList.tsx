@@ -25,6 +25,7 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
         title: 'Name',
         key: 'firstName',
         dataIndex: 'firstName',
+        width: 300,
         sorter: true,
         render: (_, r) => (
           <div className="flex flex-col">
@@ -36,6 +37,7 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       {
         title: 'Role',
         key: 'roles',
+        width: 200,
         dataIndex: 'roles',
         render: (roles: string[]) =>
           roles.map((r) => <Tag key={r}>{ROLE_LABEL[r as RoleName] ?? r}</Tag>),
