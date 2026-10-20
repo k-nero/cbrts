@@ -58,6 +58,8 @@ export interface TripRecord {
   recordedBy: string | null;
   channel: 'WEB' | 'CAB_TABLET' | 'SYSTEM';
   text: string | null;
+  receiverName: string | null;
+  receiverSignature: string | null;
   conditions: TripCondition[];
 }
 export interface TripStop {
@@ -113,6 +115,8 @@ export interface TripRecordInput {
   occurredAt: string;
   clientRef: string;
   text?: string;
+  receiverName?: string;
+  receiverSignature?: string;
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;

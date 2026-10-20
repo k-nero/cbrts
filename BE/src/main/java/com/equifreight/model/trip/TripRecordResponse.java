@@ -19,4 +19,6 @@ public record TripRecordResponse(
         String recordedBy,
         Channel channel,
         String text,
+        String receiverName,
+        String receiverSignature,
         List<TripConditionResponse> conditions) {}

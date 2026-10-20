@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentCaptor.forClass;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
@@ -67,7 +68,7 @@ class TripServiceTest {
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
@@ -207,6 +208,55 @@ class TripServiceTest {
         BusinessException ex =
                 assertThrows(BusinessException.class, () -> record(TripRecordKind.NOTE, NOW.plus(Duration.ofHours(1))));
         assertEquals("TRIP_RECORD_IN_FUTURE", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Coordinator handover must be confirmed from the escort cab")
+    void coordinatorCannotRecordHandover() {
+        job.setTripStatus(TripStatus.DELIVERED);
+        job.setStage(JobStage.HANDOVER);
+        TripRecordRequest request = new TripRecordRequest(
+                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, null, null);
+
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> service.addCoordinatorRecord(job.getCode(), coordinator, request));
+
+        assertEquals("HANDOVER_ESCORT_ONLY", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cab handover requires the receiver name and tablet signature")
+    void handoverRequiresReceiverSignature() {
+        job.setTripStatus(TripStatus.DELIVERED);
+        job.setStage(JobStage.HANDOVER);
+        when(crew.existsByJob_IdAndUser_Id(job.getId(), coordinator.getId())).thenReturn(true);
+        TripRecordRequest request = new TripRecordRequest(
+                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, "Sophea", null);
+
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> service.addEscortRecord(job.getCode(), coordinator, request));
+
+        assertEquals("HANDOVER_SIGNATURE_REQUIRED", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Handover keeps the receiver name and signature on its trip record")
+    void handoverStoresReceiverSignature() {
+        job.setTripStatus(TripStatus.DELIVERED);
+        job.setStage(JobStage.HANDOVER);
+        when(crew.existsByJob_IdAndUser_Id(job.getId(), coordinator.getId())).thenReturn(true);
+        String signature = "data:image/png;base64,aGVsbG8=";
+        TripRecordRequest request = new TripRecordRequest(
+                null, TripRecordKind.HANDED_OVER, NOW, UUID.randomUUID(), null, null, " Sophea ", signature);
+
+        service.addEscortRecord(job.getCode(), coordinator, request);
+
+        var saved = forClass(TripRecord.class);
+        verify(records).save(saved.capture());
+        assertEquals("Sophea", saved.getValue().getReceiverName());
+        assertEquals(signature, saved.getValue().getReceiverSignature());
     }
 
     // ---------- helpers ----------

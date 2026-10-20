@@ -16,4 +16,6 @@ public record TripRecordRequest(
         @NotNull Instant occurredAt,
         @NotNull UUID clientRef,
         @Size(max = 500) String text,
-        @Size(max = 100) List<@Valid TripConditionRequest> conditions) {}
+        @Size(max = 100) List<@Valid TripConditionRequest> conditions,
+        @Size(max = 120) String receiverName,
+        @Size(max = 200_000) String receiverSignature) {}

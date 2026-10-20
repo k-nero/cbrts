@@ -87,6 +87,8 @@ public final class TripMapper {
                 fullName(record.getRecordedBy()),
                 record.getChannel(),
                 record.getText(),
+                record.getReceiverName(),
+                record.getReceiverSignature(),
                 record.getConditionLogs().stream()
                         .map(TripMapper::toConditionResponse)
                         .toList());

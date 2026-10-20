@@ -69,6 +69,12 @@ public class TripRecord extends BaseEntity {
     @Column(length = 500)
     private String text;
 
+    @Column(name = "receiver_name", length = 120)
+    private String receiverName;
+
+    @Column(name = "receiver_signature", columnDefinition = "text")
+    private String receiverSignature;
+
     @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.PERSIST)
     private List<ConditionLog> conditionLogs = new ArrayList<>();
 }

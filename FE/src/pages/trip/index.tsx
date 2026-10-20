@@ -16,6 +16,7 @@ import type {
   TripSummary,
   TripView,
 } from '@/interfaces';
+import EscortCab from './EscortCab';
 
 const eventLabels: Record<TripRecordKind, string> = {
   [TripRecordKindEnum.LOADED]: 'Loaded',
@@ -35,6 +36,64 @@ const eventLabels: Record<TripRecordKind, string> = {
 };
 const eventKinds = Object.values(TripRecordKindEnum);
 const checkpointKinds = eventKinds.filter((kind) => kind !== TripRecordKindEnum.CONDITION_CHECK);
+const kindsByStatus: Record<string, TripRecordKind[]> = {
+  NOT_STARTED: [
+    TripRecordKindEnum.LOADED,
+    TripRecordKindEnum.NOTE,
+    TripRecordKindEnum.DEPARTED,
+    TripRecordKindEnum.FLIGHT_DEPARTED,
+  ],
+  DEPARTED: [
+    TripRecordKindEnum.ARRIVED_AT_STOP,
+    TripRecordKindEnum.CLEARED_BORDER,
+    TripRecordKindEnum.HELD,
+    TripRecordKindEnum.LEFT_STOP,
+    TripRecordKindEnum.ACCEPTED_BY_AIRLINE,
+    TripRecordKindEnum.FLIGHT_DEPARTED,
+    TripRecordKindEnum.FLIGHT_LANDED,
+    TripRecordKindEnum.RELEASED_BY_AIRLINE,
+    TripRecordKindEnum.NOTE,
+  ],
+  HELD: [TripRecordKindEnum.LEFT_STOP, TripRecordKindEnum.CLEARED_BORDER, TripRecordKindEnum.NOTE],
+  ARRIVED: [TripRecordKindEnum.DELIVERED, TripRecordKindEnum.NOTE],
+  DELIVERED: [TripRecordKindEnum.HANDED_OVER, TripRecordKindEnum.NOTE],
+};
+const kindsByStop: Record<string, TripRecordKind[]> = {
+  BORDER: [
+    TripRecordKindEnum.ARRIVED_AT_STOP,
+    TripRecordKindEnum.CLEARED_BORDER,
+    TripRecordKindEnum.HELD,
+    TripRecordKindEnum.LEFT_STOP,
+    TripRecordKindEnum.NOTE,
+  ],
+  WELFARE: [
+    TripRecordKindEnum.ARRIVED_AT_STOP,
+    TripRecordKindEnum.HELD,
+    TripRecordKindEnum.LEFT_STOP,
+    TripRecordKindEnum.NOTE,
+  ],
+  DELIVERY: [
+    TripRecordKindEnum.ARRIVED_AT_STOP,
+    TripRecordKindEnum.DELIVERED,
+    TripRecordKindEnum.NOTE,
+  ],
+  AIRPORT_OUT: [
+    TripRecordKindEnum.ACCEPTED_BY_AIRLINE,
+    TripRecordKindEnum.FLIGHT_DEPARTED,
+    TripRecordKindEnum.NOTE,
+  ],
+  AIRPORT_IN: [
+    TripRecordKindEnum.FLIGHT_LANDED,
+    TripRecordKindEnum.RELEASED_BY_AIRLINE,
+    TripRecordKindEnum.NOTE,
+  ],
+  QUARANTINE: [
+    TripRecordKindEnum.ARRIVED_AT_STOP,
+    TripRecordKindEnum.HELD,
+    TripRecordKindEnum.LEFT_STOP,
+    TripRecordKindEnum.NOTE,
+  ],
+};
 const conditions = Object.values(HorseConditionEnum);
 const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
 const formatTime = (value: string | null) =>
@@ -263,6 +322,20 @@ function TripWorkspace({
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [stopId, setStopId] = useState<string>();
+  const selectedSummary: TripSummary | undefined = summaries.find(
+    (item) => item.jobCode === selectedCode,
+  );
+  const latestHeldRecord = [...(trip?.records ?? [])]
+    .reverse()
+    .find((record) => record.kind === TripRecordKindEnum.HELD);
+  const selectedStop = trip?.stops.find((stop) => stop.id === stopId);
+  const availableCheckpointKinds: TripRecordKind[] = checkpointKinds.filter(
+    (value) =>
+      (audience !== 'staff' || value !== TripRecordKindEnum.HANDED_OVER) &&
+      (kindsByStatus[trip?.tripStatus ?? ''] ?? []).includes(value) &&
+      (!selectedStop || (kindsByStop[selectedStop.kind] ?? checkpointKinds).includes(value)),
+  );
+  const selectedKind = availableCheckpointKinds.includes(kind) ? kind : availableCheckpointKinds[0];
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
   const [text, setText] = useState('');
   const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
@@ -287,7 +360,7 @@ function TripWorkspace({
     try {
       await mutation.mutateAsync({
         routeStopId: stopId ?? null,
-        kind,
+        kind: selectedKind ?? kind,
         occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
@@ -345,7 +418,7 @@ function TripWorkspace({
       await mutation.mutateAsync({
         routeStopId: stopId ?? null,
         kind: TripRecordKindEnum.CONDITION_CHECK,
-        occurredAt: new Date(occurredAt).toISOString(),
+        occurredAt: new Date().toISOString(),
         clientRef,
         text: text || undefined,
         conditions,
@@ -366,10 +439,6 @@ function TripWorkspace({
     setCode('');
     setStopId(undefined);
   };
-  const selectedSummary: TripSummary | undefined = summaries.find(
-    (item) => item.jobCode === selectedCode,
-  );
-
   return (
     <div className="flex flex-col gap-6">
       {contextHolder}
@@ -482,6 +551,14 @@ function TripWorkspace({
                   Departure can be recorded once the transport specialist clears the dossier.
                 </Callout>
               )}
+              {audience === 'escort' && trip.tripStatus === TripStatusEnum.HELD && (
+                <Callout className="mb-4" tone="bad" title="Trip on hold">
+                  {latestHeldRecord?.text || 'The trip is on hold.'} ·{' '}
+                  {latestHeldRecord
+                    ? formatTime(latestHeldRecord.occurredAt)
+                    : 'Reason not recorded'}
+                </Callout>
+              )}
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="type-body-s flex flex-col gap-2">
                   Checkpoint
@@ -496,9 +573,12 @@ function TripWorkspace({
                 <label className="type-body-s flex flex-col gap-2">
                   Checkpoint status
                   <Select
-                    value={kind}
+                    value={selectedKind}
                     onChange={setKind}
-                    options={checkpointKinds.map((value) => ({ value, label: eventLabels[value] }))}
+                    options={availableCheckpointKinds.map((value) => ({
+                      value,
+                      label: eventLabels[value],
+                    }))}
                   />
                 </label>
                 <label className="type-body-s flex flex-col gap-2">
@@ -611,8 +691,9 @@ function TripWorkspace({
                 <Button
                   disabled={
                     mutation.isPending ||
-                    ((kind === TripRecordKindEnum.DEPARTED ||
-                      kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
+                    !selectedKind ||
+                    (((selectedKind ?? kind) === TripRecordKindEnum.DEPARTED ||
+                      (selectedKind ?? kind) === TripRecordKindEnum.FLIGHT_DEPARTED) &&
                       !trip.clearanceReady)
                   }
                   onClick={saveCheckpoint}
@@ -661,12 +742,5 @@ export function StaffTripPage() {
   );
 }
 export function EscortTripPage() {
-  return (
-    <TripWorkspace
-      audience="escort"
-      editable
-      title="Cab trip log"
-      summary="Record assigned trip checkpoints and each horse's observed condition."
-    />
-  );
+  return <EscortCab />;
 }

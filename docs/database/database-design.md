@@ -521,6 +521,8 @@ erDiagram
 | `recorded_by` | → `users` | Driver or groom. |
 | `channel` | varchar(12) | `CAB_TABLET`, `WEB`. |
 | `text` | varchar(500) | "Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet." |
+| `receiver_name` | varchar(120) | Required with `HANDED_OVER`; the person who received the horses. |
+| `receiver_signature` | text | Required PNG data URL captured on the cab tablet with `HANDED_OVER`; retained on the immutable trip record. Null for other record kinds. |
 
 Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
 

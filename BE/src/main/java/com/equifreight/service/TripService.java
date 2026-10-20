@@ -144,6 +144,20 @@ public class TripService {
         if (request.kind() != TripRecordKind.CONDITION_CHECK && hasConditions)
             throw new BusinessException(
                     "CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
+        boolean handedOver = request.kind() == TripRecordKind.HANDED_OVER;
+        if (handedOver && channel != Channel.CAB_TABLET)
+            throw new BusinessException(
+                    "HANDOVER_ESCORT_ONLY", "Handover must be confirmed by the escort in the cab.");
+        if (handedOver
+                && (request.receiverName() == null
+                        || request.receiverName().isBlank()
+                        || request.receiverSignature() == null
+                        || !request.receiverSignature().startsWith("data:image/png;base64,")))
+            throw new BusinessException(
+                    "HANDOVER_SIGNATURE_REQUIRED", "Enter the receiver's name and capture their signature on the tablet.");
+        if (!handedOver && (request.receiverName() != null || request.receiverSignature() != null))
+            throw new BusinessException(
+                    "HANDOVER_FIELDS_NOT_ALLOWED", "Receiver details can only be recorded with handover.");
         if ((request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
                 && (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
                         || job.getClearanceReadyAt() == null
@@ -169,6 +183,10 @@ public class TripService {
         record.setRecordedBy(user);
         record.setChannel(channel);
         record.setText(request.text());
+        if (handedOver) {
+            record.setReceiverName(request.receiverName().trim());
+            record.setReceiverSignature(request.receiverSignature());
+        }
         Set<UUID> seen = new HashSet<>();
         Set<UUID> attachedFiles = new HashSet<>();
         if (request.conditions() != null)
