@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { TableToolbarRefreshButton } from '@/components/table';
 import { Chip, Deadline, Icon, StageMark } from '@/components/ui';
 import { useJobs } from '@/hooks/useJob';
 import type { JobSummary } from '@/interfaces';
@@ -31,7 +32,7 @@ export default function JobsPage() {
   const [filter, setFilter] = useState<'ALL' | 'NEEDS_ME' | 'BLOCKED' | 'IN_TRANSIT'>('ALL');
   const [q, setQ] = useState('');
 
-  const { data, isLoading, isError, error } = useJobs({ filter, q });
+  const { data, isLoading, isFetching, isError, error, refetch } = useJobs({ filter, q });
   const jobs = data?.content ?? [];
 
   return (
@@ -64,27 +65,33 @@ export default function JobsPage() {
           })}
         </div>
 
-        <div className="relative min-w-64">
-          <svg
-            width={16}
-            height={16}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.75}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="absolute left-3 top-2.5 text-ink-3 pointer-events-none"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search code..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="focus-ring h-9 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-3"
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-64">
+            <svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-3 top-2.5 text-ink-3 pointer-events-none"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search code..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="focus-ring h-9 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-3"
+            />
+          </div>
+          <TableToolbarRefreshButton
+            onClick={() => void refetch()}
+            spin={isFetching && !isLoading}
           />
         </div>
       </div>

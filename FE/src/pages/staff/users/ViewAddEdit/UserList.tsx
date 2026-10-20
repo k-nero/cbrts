@@ -79,6 +79,8 @@ const UserList: FC<Props> = ({ crud, onEdit }) => {
       dataSource={listQuery.data?.content ?? []}
       // Spinner until the first page arrives, and while a new page or sort loads.
       loading={listQuery.isPending || listQuery.isFetching}
+      onRefresh={() => void listQuery.refetch()}
+      refreshing={listQuery.isFetching && !listQuery.isPending}
       ignoreKeys={['actions']}
       // Controlled, so the header highlight follows the page's sort and "Reset order" clears it.
       sorter={

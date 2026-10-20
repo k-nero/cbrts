@@ -4,6 +4,7 @@ import { Divider, Empty, Table as AntTable } from 'antd';
 
 import ColumnResizeOverlay from './columnResize/ColumnResizeOverlay';
 import ColumnSettingButton from './columnVisibility/ColumnSettingButton';
+import TableToolbarRefreshButton from './TableToolbarRefreshButton';
 import { TABLE_PAGINATION_RESERVED_HEIGHT_PX } from './core/constants';
 import { useApplyColumnWidths } from './hooks/useTableColumnLayoutEffects';
 import { useTableEnhancements } from './hooks/useTableEnhancements';
@@ -57,6 +58,8 @@ const Table = <T extends object = object>({
   id,
   columns = [],
   toolbar,
+  onRefresh,
+  refreshing = false,
   showTopDivider = false,
   ignoreKeys,
   resizableColumns,
@@ -185,7 +188,7 @@ const Table = <T extends object = object>({
     onWidthsApplied: () => measureOverlayRef.current(),
   });
 
-  const showToolbarRow = Boolean(toolbar) || showColumnSettings;
+  const showToolbarRow = Boolean(toolbar) || Boolean(onRefresh) || showColumnSettings;
 
   // When a `sorter` state is supplied, control each sortable column's `sortOrder`
   // so the highlight tracks that state (and clears when it is reset). Columns that
@@ -260,6 +263,7 @@ const Table = <T extends object = object>({
       {showToolbarRow && (
         <div className={`${TABLE_CSS_PREFIX}-toolbar`}>
           {toolbar ? <div className={`${TABLE_CSS_PREFIX}-toolbar-actions`}>{toolbar}</div> : null}
+          {onRefresh ? <TableToolbarRefreshButton onClick={onRefresh} spin={refreshing} /> : null}
           {showColumnSettings ? (
             <ColumnSettingButton
               columns={columns}
