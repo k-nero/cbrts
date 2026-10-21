@@ -24,6 +24,8 @@ type Props = {
   note?: ReactNode;
   /** Overridden: the catalog value, struck through. */
   catalogAmount?: ReactNode;
+  /** More under the description: a reason, "was $1,450.00" on a revision, the builder's line actions. */
+  extra?: ReactNode;
   className?: string;
 };
 
@@ -40,6 +42,7 @@ export const QuoteLine: FC<Props> = ({
   amount,
   note,
   catalogAmount,
+  extra,
   className,
 }) => (
   <div
@@ -56,6 +59,7 @@ export const QuoteLine: FC<Props> = ({
           {note}
         </span>
       )}
+      {extra}
     </span>
     <span className="type-data text-right text-ink-2">{qty}</span>
     <span className={cx('type-data text-right', rate === null ? 'text-bad' : 'text-ink-2')}>
