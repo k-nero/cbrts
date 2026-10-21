@@ -111,8 +111,14 @@ Where to look elsewhere:
   - Values a service works out, such as counts, conflicts, a lead-time check or a nested response from another area, are passed to the mapper as parameters. See `RequestMapper.toResponse(request, route, leadTime, blockers)`.
   - Add the method to the area's existing mapper. A new area gets one `XMapper`; don't start a second one beside it.
   - A response that comes from no entity, such as `TokenResponse` or `ApiError.of(...)`, can be built where it is made.
-- **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V18` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Enums** are native Postgres enum types named after the Java enum's simple name (`create type HorseCondition as enum (...)` in `V1__baseline_schema.sql`), with the values in Java declaration order. Any change to a Java enum needs a new Flyway migration:
+  - a new enum: `create type X as enum (...)`;
+  - a new value: `alter type X add value 'FOO'` (`before`/`after` to keep the Java order). Don't use the new value in the same migration, because Postgres can't use a value until the transaction that added it commits;
+  - a renamed value: `alter type X rename value 'OLD' to 'NEW'`;
+  - a removed or replaced set: create a new type, convert the column with `alter column ... type X_new using case ... end`, drop the old type and rename the new one.
+
+  There are no `CHECK (col IN (...))` constraints for enums any more; never add one. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
+- **Flyway.** Migrations are in `src/main/resources/db/migration`. The history was squashed into one baseline, `V1__baseline_schema.sql`; changes after it are `V2__description.sql`, `V3__…` and so on. Never edit a migration that has been merged; add the next `V{n}__description.sql`.
 - **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
   - It ratchets from `origin/main`: only the Java files your branch changes are checked and formatted, so run `git fetch origin` first if your `origin/main` is old.
   - It never touches `src/main/resources/db/migration`. If you use IntelliJ's Reformat Code on a directory, exclude `db/migration` (or reformat only the files you changed), because Flyway checksums every merged migration and even a whitespace change makes validation fail on databases that already ran it.
@@ -149,7 +155,7 @@ Where to look elsewhere:
 - **Dates are local calendar days.** Business rules that count days (validity windows, lead time, due dates, "in 5 days") work on dates in the business time zone, `Asia/Ho_Chi_Minh`, never UTC: a 06:00 departure on 18 Oct is still 17 Oct in UTC. Keep one shared constant for the zone instead of scattering `ZoneOffset.UTC`.
 - **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
-- **Seed data.** `DataSeeder` creates one account per role. The password is `app.seed.default.password` (env `APP_SEED_DEFAULT_PASSWORD`), `changeme123!` in the dev profile and in compose. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
+- **Seed data.** `DataSeeder` creates one account per role. The password is `app.seed.default.password` (env `APP_SEED_DEFAULT_PASSWORD`), `changeme123!` in the dev profile and in compose. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and values satisfy the enum types and check constraints.
 - **No N+1 queries.** A request runs a fixed number of queries, however many rows it returns. Never call a repository, or touch a lazy relation, inside a loop or a `stream().map(...)` over results; that is one query per row.
   - Load what a response needs in the query that loads the rows: a `join fetch` in a `@Query` (see `TransportJobRepository`, `join fetch j.request r join fetch r.club c`) or an `@EntityGraph`. A paged `join fetch` query needs its own `countQuery`.
   - For a collection on a page of rows, fetch the page first, then load the children for all the page's ids in one query (`findAllByJobIdIn(ids)`), and group them in memory.
@@ -254,13 +260,13 @@ Where to look elsewhere:
 - **Flow:** issue, then branch, then PR. Branch from `main` with a type prefix: `feat/`, `fix/`, `style/`, `chore/`, `docs/`, `design/`. Never commit straight to `main`; check `git branch --show-current` before you commit or push.
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
-- **CI runs format checks, typecheck and unit tests only.** `.github/workflows/checks.yml` runs `./gradlew spotlessCheck test` in `BE/`, and `bun run typecheck` and `bun run format:check` in `FE/`, on every pull request. A green check does not mean the app starts or the FE builds. Before opening or approving a PR, run `./gradlew check` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
+- **CI runs format checks, typecheck and unit tests only.** `.github/workflows/checks.yml` runs `./gradlew spotlessCheck test` in `BE/`, and `bun run typecheck` and `bun run format:check` in `FE/`, on every pull request. A green check does not mean the app starts or the FE builds. Before opening or approving a PR, run `./gradlew check` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring, enum types and check constraints only fail at startup or against a real database, never in mocked unit tests.
 - **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only. Never paste them into an AI chat either.
 
 ## Don't
 
 - Don't push to `main`, force-push shared branches, or rewrite merged history.
-- Don't edit a merged Flyway migration, or change an enum without its check-constraint migration.
+- Don't edit a merged Flyway migration, or change a Java enum without the migration that changes its Postgres enum type.
 - Don't show a single price before a quotation exists, or let a customer quote a route that is not in the catalog.
 - Don't overwrite a document, quotation, invoice, payment or catalog version. Create a new version or a correcting entry.
 - Don't weaken a legality block into a warning.
