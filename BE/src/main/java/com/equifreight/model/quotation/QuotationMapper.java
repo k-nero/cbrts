@@ -174,7 +174,7 @@ public final class QuotationMapper {
     }
 
     /**
-     * The line's key; a line stored before keys existed (V22) gets the one its price would write: the stall class's
+     * The line's key; a line stored before keys existed (V23) gets the one its price would write: the stall class's
      * STALL, or its catalog line's code (with the horse on a per-day line of one horse). A gap line has none.
      */
     public static String keyOf(QuotationLine l) {

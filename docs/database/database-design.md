@@ -329,6 +329,8 @@ The 3 hours in the check mirrors `ARRIVAL_WINDOW_MIN_HOURS`. If the catalog valu
 | `late_penalty_pct_per_hour`, `late_penalty_cap_pct` | numeric(5,2) | Copied from the pinned catalog when there is an arrival window; part of the contract. |
 | `accepted_at`, `accepted_by`, `declined_at`, `decline_reason` | | |
 | `superseded_reason` | varchar(300) | "Departure moved from 12 Nov to 20 Nov." |
+| `issued_snapshot` | jsonb | Set at issue: what the engine would otherwise re-derive (the totals' wording, the stall sizing, the request as quoted), so an issued version reads the same forever and is never re-priced. |
+| `reminder_sent_at` | timestamptz | Set when the club was reminded, a day before `valid_until`; the hourly expiry job reminds once, then expires. |
 
 Indexes and checks:
 - One accepted version per request: partial unique index on `(request_id) where status = 'ACCEPTED'`.
@@ -354,6 +356,8 @@ Indexes and checks:
 | `override_amount` | numeric(14,2) | |
 | `override_reason` | varchar(300) | Check: `override_amount is null or override_reason is not null` (mandatory reason). |
 | `line_total` | numeric(14,2) not null | `coalesce(override_amount, catalog_amount)`. Never entered. |
+| `line_key` | varchar(80) | The line's identity across re-prices and revisions, where catalog line ids change: the rate line's code (plus the horse for a per-day line of one horse), `STALL`, `MISSING:n` for a gap, `MANUAL:<uuid>` for an added line. Overrides and manual lines are carried by it. |
+| `manual_reason` | varchar(300) | Why the logistics manager added the line. Check: `manual_reason is null or (source = 'MANUAL' and unit_rate is not null)`. |
 
 Deposits, the final invoice and payments are in section 13A.
 

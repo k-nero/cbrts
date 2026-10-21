@@ -451,7 +451,7 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
 
     // --- slice 6: adjustments survive pricing ------------------------------------------------------------
 
-    /** A draft priced before V22: its lines have no keys. */
+    /** A draft priced before V23: its lines have no keys. */
     Quotation legacyDraftWithIds() {
         Quotation q = startedWithIds();
         q.getLines().forEach(l -> l.setLineKey(null));
