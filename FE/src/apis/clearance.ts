@@ -62,8 +62,7 @@ export const clearanceApi = {
   updateSubmission: (submissionId: string, data: UpdateAuthoritySubmissionRequest) =>
     client.put<AuthoritySubmission>(`/staff/clearance/submissions/${submissionId}`, data),
 
-  checkLateSubmissions: () =>
-    client.post<number>('/staff/clearance/submissions/check-late'),
+  checkLateSubmissions: () => client.post<number>('/staff/clearance/submissions/check-late'),
 
   getQuarantineFacilities: () =>
     client.get<Array<{ id: string; name: string; city?: string; countryCode?: string }>>(
