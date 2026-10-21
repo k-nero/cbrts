@@ -18,6 +18,9 @@ public final class UserMapper {
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
                 .roles(roles)
+                .staffCode(user.getStaffCode())
+                .status(user.getStatus())
+                .lastActiveAt(user.getLastActiveAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

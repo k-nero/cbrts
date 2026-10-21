@@ -1,6 +1,6 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
-import { Button, cx, Panel } from '@/components/ui';
+import { Button, Chip, cx, Panel } from '@/components/ui';
 import type { FieldStep, ReviewRow } from '@/lib/utils';
 
 type Props = {
@@ -8,14 +8,19 @@ type Props = {
   title?: string;
   /** With it, each row has an Edit link to the step that sets it. */
   onEdit?: (step: FieldStep) => void;
+  /** Labels of rows that differ from the previous version (Request review). */
+  changed?: string[];
+  /** The panel head's right side, such as the version tabs. */
+  extra?: ReactNode;
+  footer?: ReactNode;
 };
 
 /**
  * What a customer sent, in one order and with one set of labels (DESIGN.md, Request summary): the
  * wizard's Review, and later In review's "What you sent".
  */
-export const RequestSummary: FC<Props> = ({ rows, title, onEdit }) => (
-  <Panel title={title} flush>
+export const RequestSummary: FC<Props> = ({ rows, title, onEdit, changed, extra, footer }) => (
+  <Panel title={title} extra={extra} footer={footer} flush>
     <dl className="m-0">
       {rows.map((r, i) => (
         <div
@@ -27,7 +32,9 @@ export const RequestSummary: FC<Props> = ({ rows, title, onEdit }) => (
         >
           <dt className="type-body-s pt-0.5 text-ink-3">{r.label}</dt>
           <dd className={cx('m-0 text-ink', r.mono ? 'type-data' : 'type-body-m')}>{r.value}</dd>
-          {onEdit ? (
+          {changed?.includes(r.label) ? (
+            <Chip tone="info">Changed</Chip>
+          ) : onEdit ? (
             <Button size="sm" variant="ghost" onClick={() => onEdit(r.step)}>
               Edit
             </Button>

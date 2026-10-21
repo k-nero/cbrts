@@ -1,13 +1,21 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { jobApi } from '@/apis/job';
-import type { JobDetail, JobListParams, LoadPlan, MoveHorse } from '@/interfaces';
+import { jobApi, jobsListApi } from '@/apis/job';
+import { useCrudResource } from '@/hooks/crud';
+import {
+  type JobDetail,
+  type JobFilter,
+  JobFilterEnum,
+  type JobSummary,
+  type LoadPlan,
+  type MoveHorse,
+} from '@/interfaces';
 
-export const useJobs = (params?: JobListParams) => {
-  return useQuery({
-    queryKey: ['jobs', params],
-    queryFn: () => jobApi.list(params),
-  });
+/** The Jobs list's paging, sort and search (as Users & roles); `filter` is the active tab. */
+export const useJobList = (filter: JobFilter) => {
+  const extra = useMemo(() => (filter === JobFilterEnum.ALL ? undefined : { filter }), [filter]);
+  return useCrudResource<JobSummary, never>('jobs', jobsListApi, undefined, extra);
 };
 
 export const useJobDetail = (jobId: string, options?: { refetchInterval?: number | false }) => {

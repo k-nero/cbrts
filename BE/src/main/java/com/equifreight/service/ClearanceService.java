@@ -29,6 +29,7 @@ public class ClearanceService {
     private final ValidityEngine validityEngine;
     private final AuditService auditService;
     private final FileService fileService;
+    private final JobRegulationPinRepository pins;
 
     public ClearanceService(
             ChecklistItemRepository checklistItemRepository,
@@ -38,7 +39,8 @@ public class ClearanceService {
             AuthoritySubmissionRepository authoritySubmissionRepository,
             ValidityEngine validityEngine,
             AuditService auditService,
-            FileService fileService) {
+            FileService fileService,
+            JobRegulationPinRepository pins) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -47,6 +49,7 @@ public class ClearanceService {
         this.validityEngine = validityEngine;
         this.auditService = auditService;
         this.fileService = fileService;
+        this.pins = pins;
     }
 
     /**
@@ -309,7 +312,7 @@ public class ClearanceService {
 
         // If the trip has already departed, never modify the dossier state or clearance gate (Finding 2).
         if (job.getDepartedAt() != null) {
-            return gate.toResponse(job);
+            return gate.toResponse(job, destinationVersion(job.getId()).orElse(null));
         }
 
         DossierStatus previousStatus = job.getDossierStatus();
@@ -358,7 +361,7 @@ public class ClearanceService {
                     targetStatus.name());
         }
 
-        return gate.toResponse(job);
+        return gate.toResponse(job, destinationVersion(job.getId()).orElse(null));
     }
 
     /**
@@ -393,7 +396,7 @@ public class ClearanceService {
     @Transactional(readOnly = true)
     public ClearanceStatusResponse getClearanceStatus(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
-        return assess(job).toResponse(job);
+        return assess(job).toResponse(job, destinationVersion(job.getId()).orElse(null));
     }
 
     /**
@@ -421,10 +424,13 @@ public class ClearanceService {
                 String docName =
                         item.getDocumentType() != null ? item.getDocumentType().getName() : "Document";
                 String horseInfo =
-                        item.getHorse() != null ? " (Horse: " + item.getHorse().getName() + ")" : "";
-                outstandingIssues.add(String.format(
-                        "%s%s not cleared (Status: %s, Validity: %s)",
-                        docName, horseInfo, item.getStatus(), item.getValidity()));
+                        item.getHorse() != null ? " for " + item.getHorse().getName() : "";
+                outstandingIssues.add("%s%s is not cleared: %s, validity %s"
+                        .formatted(
+                                docName,
+                                horseInfo,
+                                ClearanceText.status(item.getStatus()),
+                                ClearanceText.validity(item.getValidity())));
             }
         }
 
@@ -433,8 +439,8 @@ public class ClearanceService {
             if (q.getCompletedAt() != null) {
                 completedQuarantines++;
             } else {
-                outstandingIssues.add(String.format(
-                        "Quarantine period pending (starts %s, ends %s)", q.getStartsOn(), q.getEndsOn()));
+                outstandingIssues.add("Quarantine from %s to %s is not signed off yet"
+                        .formatted(ClearanceText.day(q.getStartsOn()), ClearanceText.day(q.getEndsOn())));
             }
         }
 
@@ -442,22 +448,24 @@ public class ClearanceService {
         boolean hasPending = false;
         boolean hasAdditionalInfo = false;
         for (AuthoritySubmission s : submissions) {
-            String authName = s.getAuthority() != null ? s.getAuthority().getName() : "Authority";
+            String authName = s.getAuthority() != null ? s.getAuthority().getName() : "the authority";
+            String dossier = ClearanceText.submission(s.getKind());
             switch (s.getStatus()) {
                 case REFUSED -> {
                     hasRefused = true;
-                    outstandingIssues.add(
-                            String.format("Authority submission %s refused by %s", s.getKind(), authName));
+                    outstandingIssues.add("%s refused by %s".formatted(dossier, authName));
                 }
                 case ADDITIONAL_INFO -> {
                     hasAdditionalInfo = true;
-                    outstandingIssues.add(
-                            String.format("Additional info requested by %s for %s", authName, s.getKind()));
+                    outstandingIssues.add("%s: %s asked for more information".formatted(dossier, authName));
                 }
-                case READY_TO_FILE, FILED -> {
+                case READY_TO_FILE -> {
                     hasPending = true;
-                    outstandingIssues.add(String.format(
-                            "Authority submission %s pending with %s (%s)", s.getKind(), authName, s.getStatus()));
+                    outstandingIssues.add("%s not filed with %s yet".formatted(dossier, authName));
+                }
+                case FILED -> {
+                    hasPending = true;
+                    outstandingIssues.add("%s waiting on %s".formatted(dossier, authName));
                 }
                 case ISSUED -> {}
             }
@@ -499,6 +507,15 @@ public class ClearanceService {
                 .orElseThrow(() -> ResourceNotFoundException.of("TransportJob", jobId));
     }
 
+    /** The destination regulation version the job was pinned to at approval, if it has been. */
+    @Transactional(readOnly = true)
+    public Optional<RegulationVersion> destinationVersion(UUID jobId) {
+        return pins.findByJobId(jobId).stream()
+                .filter(pin -> pin.getRole() == RegulationRole.DESTINATION)
+                .map(JobRegulationPin::getRegulationVersion)
+                .findFirst();
+    }
+
     private ChecklistItem findChecklistItemOrThrow(UUID checklistItemId) {
         return checklistItemRepository
                 .findById(checklistItemId)
@@ -515,9 +532,10 @@ public class ClearanceService {
             boolean hasPending,
             boolean hasAdditionalInfo,
             List<String> outstandingIssues) {
-        ClearanceStatusResponse toResponse(TransportJob job) {
+        ClearanceStatusResponse toResponse(TransportJob job, RegulationVersion destination) {
             return ClearanceMapper.toStatusResponse(
                     job,
+                    destination,
                     totalItems,
                     mandatoryItems,
                     clearedMandatoryItems,

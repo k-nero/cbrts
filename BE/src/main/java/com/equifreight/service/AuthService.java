@@ -180,6 +180,9 @@ public class AuthService {
     }
 
     private RefreshToken createRefreshToken(User user) {
+        // Every sign-in and token refresh passes here, so this is the account's last activity (Users & roles).
+        // The callers are @Transactional, so the managed user is written on commit.
+        user.setLastActiveAt(Instant.now());
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setExpiryDate(Instant.now().plusSeconds(refreshTokenExpirationSeconds));

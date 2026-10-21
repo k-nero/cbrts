@@ -125,7 +125,10 @@ export interface TripRecordInput {
   occurredAt: string;
   clientRef: string;
   text?: string;
+  /** Checklist items recorded as presented at a border checkpoint. */
   documentsShown?: string[];
+  /** Who received the horses; required when kind is HANDED_OVER. */
+  receiverName?: string;
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;

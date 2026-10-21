@@ -169,6 +169,8 @@ export function TripWorkspace({
         clientRef,
         text: text || undefined,
         documentsShown,
+        receiverName:
+          kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
@@ -196,6 +198,7 @@ export function TripWorkspace({
         occurredAt: new Date().toISOString(),
         clientRef,
         text: `Received by ${name}.`,
+        receiverName: name,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Handover recorded.');
@@ -589,6 +592,17 @@ export function TripWorkspace({
                     placeholder="What happened at this checkpoint?"
                   />
                 </label>
+                {kind === TripRecordKindEnum.HANDED_OVER && (
+                  <label className="type-body-s flex flex-col gap-2 md:col-span-2">
+                    Receiving person
+                    <Input
+                      value={receiverName}
+                      onChange={(event) => setReceiverName(event.target.value)}
+                      maxLength={120}
+                      placeholder="Name of the person receiving the horses"
+                    />
+                  </label>
+                )}
               </div>
               <div className="mt-4 flex justify-end">
                 <Button
@@ -597,7 +611,8 @@ export function TripWorkspace({
                     mutation.isPending ||
                     ((kind === TripRecordKindEnum.DEPARTED ||
                       kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                      !trip.clearanceReady)
+                      !trip.clearanceReady) ||
+                    (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
                   }
                   onClick={saveCheckpoint}
                 >

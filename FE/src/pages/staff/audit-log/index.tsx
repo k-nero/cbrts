@@ -75,7 +75,6 @@ const AuditLedger = () => {
   const exportCsv = useExportAuditCsv();
   const { listQuery, search, setSearch, setPageState } = crud;
   const total = listQuery.data?.totalElements;
-  const isOffline = listQuery.isPending && listQuery.fetchStatus === 'paused';
   const filtered = Boolean(search || filters.actor || filters.action || filters.from || filters.to);
 
   const setFilter = (next: Partial<AuditFilters>) => {
@@ -228,38 +227,18 @@ const AuditLedger = () => {
           <span className="type-body-s ml-auto text-ink-3">{TIME_ZONE_NOTE}</span>
         </div>
 
-        {listQuery.isError ? (
-          <Callout
-            tone="bad"
-            title="Couldn’t load the audit log."
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void listQuery.refetch()}>
-                Try again
-              </Button>
-            }
-          >
-            {apiErrorMessage(
-              listQuery.error,
-              'The server didn’t answer. Check your connection, then try again.',
-            )}
-          </Callout>
-        ) : isOffline ? (
-          <Callout tone="warn" title="You’re offline.">
-            The entries load as soon as the connection is back.
-          </Callout>
-        ) : (
-          <div className="flex items-start gap-6">
-            <div className="min-w-0 flex-1">
-              <AuditList
-                crud={crud}
-                selectedId={selected?.id ?? null}
-                onSelect={setSelected}
-                empty={noResults}
-              />
-            </div>
-            {selected && <AuditEntryPanel entry={selected} onClose={() => setSelected(null)} />}
+        {/* Loading is the table's own spinner; a failed load goes to the error boundary. */}
+        <div className="flex items-start gap-6">
+          <div className="min-w-0 flex-1">
+            <AuditList
+              crud={crud}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+              empty={noResults}
+            />
           </div>
-        )}
+          {selected && <AuditEntryPanel entry={selected} onClose={() => setSelected(null)} />}
+        </div>
       </div>
     </div>
   );

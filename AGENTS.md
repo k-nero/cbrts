@@ -81,7 +81,7 @@ Where to look in the frontend (`FE/src/`):
 - **Staff menu:** `components/menu/StaffMenu`.
 - **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
 - **Helpers:** `lib/utils` (time, number, file, path, rbac, error) and `constant/`. Check them before writing a formatter or date helper.
-- **Page templates:** `pages/staff/users` (a list with an add/edit modal) and `pages/customer/home` (a composed customer page).
+- **Page templates:** `pages/staff/users` (a list with an add/edit modal), `pages/staff/jobs` (a list whose rows open a detail page with tabs) and `pages/customer/home` (a composed customer page). See "Frontend pages" below.
 
 Where to look elsewhere:
 
@@ -139,6 +139,12 @@ Where to look elsewhere:
 - **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
 - **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
+- **No N+1 queries.** A request runs a fixed number of queries, however many rows it returns. Never call a repository, or touch a lazy relation, inside a loop or a `stream().map(...)` over results; that is one query per row.
+  - Load what a response needs in the query that loads the rows: a `join fetch` in a `@Query` (see `TransportJobRepository`, `join fetch j.request r join fetch r.club c`) or an `@EntityGraph`. A paged `join fetch` query needs its own `countQuery`.
+  - For a collection on a page of rows, fetch the page first, then load the children for all the page's ids in one query (`findAllByJobIdIn(ids)`), and group them in memory.
+  - Counts, sums and "has any" per row come from one grouped query (`select x.id, count(y) … group by x.id`) or a subquery, never from `.size()` on a lazy collection or a `count` call per row.
+- **Joins happen in SQL.** Any join between tables is written in the query (JPQL `join`, a `Specification` with `root.join(...)`, or a native query), so the database filters, sorts and pages the joined result. Never load two lists and match them in Java, and never filter or sort a joined field in memory after fetching.
+- **Check the queries.** For a new or changed list or detail endpoint, run it with `spring.jpa.show-sql=true` (or Hibernate statistics) against seeded data and confirm the query count stays the same for 1 row and for 20.
 
 ## Frontend conventions (`FE/`)
 
@@ -151,17 +157,57 @@ Where to look elsewhere:
 - **Enums** are split into a value and a type: `export const XEnum = { ... } as const;` plus `export type X = (typeof XEnum)[keyof typeof XEnum];`. Use `XEnum.FOO` for values and `z.enum(XEnum)` in Zod schemas.
 - **Forms** use React Hook Form and Zod through `components/form` (`FormWrapper`, `FormField`, `fields/*`). Put conditional rules in `.superRefine`.
 - **UI components.** Build pages from the design-system components in `components/ui` (`import { … } from '@/components/ui'`) before reaching for Ant Design. Ant Design is for forms, tables, menus and overlays.
-  - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button or a native `<button>`.
+  - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button. A native `<button>` belongs only inside a `components/ui` component, never in a page.
   - Tokens live in `src/index.css`: `@theme` is Dark, `[data-theme='light']` is Light. Light is the default theme.
   - `constant/color.ts` mirrors the tokens for AntD.
   - The `/design-system` route shows every component variant; use it to check visuals.
 - **Data fetching** goes through TanStack Query hooks in `hooks/<domain>.ts` (`useQuery` and `useMutation`, invalidating the affected queries on success), never `useState` plus `useEffect` calling an API from a page. Pages own no server data state of their own.
-- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed request shows an error state or the server's `ApiError` message (`apiErrorMessage` from `lib/utils`), never an empty list or Axios's generic "Request failed with status code 400". Every list has a loading, an empty and an error state.
+- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed load goes to the error boundary (see "Frontend pages"); a failed action shows the server's `ApiError` message (`apiErrorMessage` from `lib/utils`), never an empty list or Axios's generic "Request failed with status code 400". Every list has a loading and an empty state.
 - **Styling uses the tokens.** Text uses the `type-*` utilities and colours use the token classes from `index.css`; no arbitrary values such as `text-[13px]`, `p-[7px]` or hex colours. Import design-system components from `@/components/ui`, not from their individual files.
 - **Real inputs.** A file is chosen with a file picker and uploaded, never pasted as a file id; a date uses a date field, and a choice from a fixed set uses a select or option cards.
 - **Files from the API need the token.** Never link to `/api/...` with `<a href>` or `<img src>`: the browser sends no access token and gets 401. Show a stored file with `useFileBlobUrl` (`hooks/file.ts`) and open one with `fileApi.viewFile`, which opens the tab inside the click (a `window.open` after an `await` is dropped by popup blockers).
 - **Retries are idempotent.** When an endpoint takes a client reference (`clientRef`), create it once per user action, keep it until the request succeeds, and send the same one on retry; a new one per attempt records the action twice.
 - **Checks.** Run `bun run typecheck`, `bun run format` (or `bun run format:check` to verify without writing) and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
+
+## Frontend pages: follow users and jobs
+
+`pages/staff/users` and `pages/staff/jobs` are the reference pages. Every new page copies their structure, and a page you touch is brought in line with them. A pull request that hand-builds what these pages get from shared components is sent back.
+
+- **No plain HTML controls.** Never build a control or widget out of raw elements and Tailwind. Use the component that exists:
+
+  | Need | Use | Never |
+  | --- | --- | --- |
+  | Button, link button | `ui` `Button`, or AntD `Button` without Tailwind | `<button>`, a clickable `<div>` or `<span>` |
+  | Text, number, date, choice in a form | `components/form` fields (`TextField`, `SelectField`, `DatePickerField`, …) | `<input>`, `<select>`, `<textarea>` |
+  | Search box or filter outside a form | AntD `Input.Search`, `Select` | `<input>`, `<select>` |
+  | List of records | `Table` from `@/components/table` | `<table>`, a grid of `<div>` rows |
+  | In-page views of a list | `Tabs` from `@/components/ui` (with `count`) | buttons styled as tabs |
+  | Sections of one record | AntD `Tabs` with `items` | CSS tabs, a row of buttons |
+  | Dialog | `BaseModal` (`components/modal`) | a positioned `<div>` overlay |
+  | Row actions | `TableActionDropdown`, `EditButton`, `DeleteButton` | a hand-made menu |
+  | Status, tone, stage | `Chip`, `StageMark`, `Callout` from `@/components/ui` | a coloured `<span>` |
+
+  Plain elements (`div`, `span`, `p`, `h1`–`h4`, `label`, `ul`) are for layout and text only. If nothing in the table fits, extend a `components/ui` component or add one there (see "Reuse before you build"); don't invent one inside a page.
+- **Every Figma component is already built.** Each component in the Figma file has its implementation in `components/ui`, exported from `components/ui/index.ts` and shown on `/design-system`: Button, Callout, Checkbox, Chip, ClearanceGate, Deadline, DocumentRow, DraftPass, EstimateCard, FactCell, HorseCard, Icon, LoadItem, Nameplate, NavItem, OptionCard, OwedItem, Panel, Perforation, PhotoPanel, Progress, QuoteLine, RouteStrip, StageMark, StallTile, StatTile, Steps, Tabs, TimelineStop and Toast. When a frame shows one, import it from `@/components/ui`. Never rebuild it in a page, copy its markup, or make a look-alike with Tailwind, even if you need only part of it; add a prop to the `ui` component instead.
+- **Plain HTML is the last resort.** Choose in this order, and go to the next step only when the one before has nothing that fits:
+  1. A `components/ui` component (anything drawn from a Figma component).
+  2. A shared kit component: `components/form`, `components/table`, `components/modal`, `components/buttons`, `PageHeader`.
+  3. An Ant Design component (`Select`, `Input`, `DatePicker`, `Tabs`, `Skeleton`, `Tooltip`, `Dropdown`, `Avatar`, `Badge`, `Empty`, `Flex`, `Space`, `Divider` and the rest). Search the AntD docs before deciding there is none.
+  4. Plain HTML, only for layout and text, or when steps 1–3 have no equivalent. Say in the PR which AntD component you looked for and why it didn't fit.
+- **Files.** A list page is `index.tsx` (the page shell), `XList.tsx` (the table), `useGeneratedColumn.tsx` (a `useGeneratedXColumn` hook returning the columns) and `ViewAddEdit/` (the add/edit modal and its Zod schema, or the detail page). Copy the folder you're closest to; don't put the table, columns and shell in one file.
+- **Data.** The API is `makeCrudApi` in `apis/<domain>.ts` and the hook wraps `useCrudResource` in `hooks/<domain>.ts` (`useUsers`, `useJobList`). Paging, sorting and search are server-side through `pageState`, `setPageState` and `setSearch`; never filter or sort a fetched page in the browser.
+- **Page shell.** `Flex vertical gap={28}`, then:
+  1. `PageHeader` with `title`, `summary` and the page's one primary action in `right`.
+  2. The view `Tabs`; changing a tab or filter resets `pageState.number` to 0.
+  3. Search (`Input.Search`, width 360) and filters, each with a visible `<label>`.
+  4. The count line: "6 accounts", the sort in words ("Sorted by name, A to Z"), and "Reset order" while a sort is set.
+  5. The list component.
+- **Table.** Pass the shared `Table` `loading={isPending || isFetching}`, `onRefresh` and `refreshing`, a controlled `sorter` from `pageState.sort`, `pagination` with `showTotal` ("1–20 of 46 jobs", singular for one), an `emptyText` that says what to do next, and an `onChange` that writes `pageState`. Only real entity fields are `sorter: true`. A row that opens a record uses `onRow` and navigates.
+- **Detail page.** As in `jobs/ViewAddEdit`: the open tab lives in the URL (`?tab=route`), the tabs are AntD `Tabs` with `items` and `destroyOnHidden`, and the tab's owner sits in `tabBarExtraContent`.
+- **Loading and errors belong to the shell, not the page.**
+  - A failed load, offline included, goes to `ErrorBoundaryHandling`. The query client throws a load that fails before any data arrives, so a page never checks `isError`, `navigator.onLine` or `isPaused`, and never draws its own "couldn't load" or offline message.
+  - A table shows its own spinner through `loading`. A page or section waiting for data renders AntD `<Skeleton active />` in the shape of what's coming; never "Loading…" text or a `Spin` in the page.
+  - Errors from actions (save, delete, upload, export) stay where the action is: a `Callout` with `apiErrorMessage` in the form or panel, or a toast.
 
 ## Design rules (when building UI)
 
@@ -176,6 +222,11 @@ Where to look elsewhere:
 - **Demo data.** All figures, names and statistics are demo placeholders; never present them as real.
 - **AI-generated images are drafts.** A generated picture is saved with a `draft-` prefix (as in `docs/design-assets/` and `FE/src/assets/photos/`) and is replaced with a licensed photograph before anything is shown outside the team. Never generate a picture of a real person, logo or brand.
 - **Match the frame.** When a Figma frame exists for the page you are building, match its structure, copy and states. Don't invent new patterns when one already exists in `components/ui` or the generator.
+- **Compare with Figma before and after coding.** Every UI change is checked against its Figma frame twice:
+  1. **Before you code,** open the frame of the same name (and its states: empty, error, each tab) and the page's section in `DESIGN.md`. Write down what it shows: layout, components, columns, copy, tabs, actions. Build to that list, not from memory or a description.
+  2. **After you code,** run the page with real seeded data at 1440 wide, in the Light theme, and put a screenshot beside the frame. Go through the same list: every block, column, label, tab, button and state is there, in the same order, using the same component and copy.
+  3. **Fix what differs, or say why it stays.** A difference that remains (the API doesn't return a field yet, the frame is out of date) is listed in the pull request with the reason. If the frame is wrong, update Figma and `docs/figma-plugin/src/` in the same change rather than leaving them apart.
+  - The pull request names the frame and attaches the after screenshot. A page with no frame says so and follows `DESIGN.md` and the nearest existing page.
 
 ## Figma generator (`docs/figma-plugin/`)
 
@@ -206,7 +257,12 @@ Where to look elsewhere:
 - Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
 - Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.
+- Don't write N+1 queries (a repository call or lazy load per row), or join, filter or sort related tables in Java instead of SQL.
 - Don't fetch data in a page with `useEffect`, hard-code ids or mock data, hide a failed request, or link to `/api/...` files directly.
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
+- Don't build a control out of plain HTML (`<button>`, `<input>`, `<select>`, `<table>`, CSS tabs, `<div>` overlays) in a page, or lay out a list page differently from `pages/staff/users` and `pages/staff/jobs`.
+- Don't re-create a Figma component that `components/ui` already has, or write plain HTML where an Ant Design component does the job.
+- Don't draw a page's own loading text, spinner, error or offline state; the table, `Skeleton` and the error boundary own those.
+- Don't start or finish a UI change without comparing it with its Figma frame, or open a UI pull request without the frame's name and a screenshot of the result.
