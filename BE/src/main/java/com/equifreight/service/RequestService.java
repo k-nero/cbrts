@@ -5,6 +5,7 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
@@ -14,6 +15,7 @@ import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
@@ -25,6 +27,7 @@ import com.equifreight.model.estimate.EstimateMapper;
 import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.LeadTimeResponse;
+import com.equifreight.model.request.QuotationIssuedRefResponse;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestHorseInput;
 import com.equifreight.model.request.RequestMapper;
@@ -35,6 +38,7 @@ import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.pricing.EstimateResult;
@@ -46,6 +50,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,6 +94,7 @@ public class RequestService {
     private final JsonMapper json;
     private final Clock clock;
     private final RequestEstimator estimator;
+    private final QuotationRepository quotations;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -102,7 +108,8 @@ public class RequestService {
             AuditLogRepository auditLogs,
             JsonMapper json,
             Clock clock,
-            RequestEstimator estimator) {
+            RequestEstimator estimator,
+            QuotationRepository quotations) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -115,6 +122,7 @@ public class RequestService {
         this.json = json;
         this.clock = clock;
         this.estimator = estimator;
+        this.quotations = quotations;
     }
 
     @Transactional(readOnly = true)
@@ -128,7 +136,17 @@ public class RequestService {
             requests.countHorses(page.map(TransportRequest::getId).getContent())
                     .forEach(c -> counts.put(c.getRequestId(), c.getHorses()));
         }
-        return page.map(r -> RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)));
+        Map<UUID, Quotation> issued = new HashMap<>();
+        if (!page.isEmpty()) {
+            quotations
+                    .findByRequestIdInAndStatusNot(
+                            page.map(TransportRequest::getId).getContent(), QuotationStatus.DRAFT)
+                    .forEach(q -> issued.merge(
+                            q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
+        }
+        return page.map(r -> RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)).toBuilder()
+                .quotation(issued.containsKey(r.getId()) ? issuedRef(issued.get(r.getId())) : null)
+                .build());
     }
 
     @Transactional(readOnly = true)
@@ -136,7 +154,16 @@ public class RequestService {
         Club club = clubs.requireClub(user);
         TransportRequest request = requests.findByIdAndClubId(id, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
-        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null);
+        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null).toBuilder()
+                .quotation(quotations
+                        .findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT)
+                        .map(RequestService::issuedRef)
+                        .orElse(null))
+                .build();
+    }
+
+    private static QuotationIssuedRefResponse issuedRef(Quotation q) {
+        return new QuotationIssuedRefResponse(q.getCode(), q.getVersionNo(), q.getStatus(), q.getValidUntil());
     }
 
     @Transactional

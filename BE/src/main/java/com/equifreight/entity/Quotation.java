@@ -130,6 +130,18 @@ public class Quotation extends BaseEntity {
     @Column(length = 300)
     private String supersededReason;
 
+    /**
+     * Written once at issue: the totals rows with their bases, the stall sizing and the request as quoted, as JSON.
+     * Every read of an issued version is built from the rows and this, never from the engine.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String issuedSnapshot;
+
+    /**
+     * When the club was reminded that the quotation expires within a day.
+     */
+    private Instant reminderSentAt;
+
     @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("groupCode, position")
     private List<QuotationLine> lines = new ArrayList<>();

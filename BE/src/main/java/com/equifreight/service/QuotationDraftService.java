@@ -1,50 +1,40 @@
 package com.equifreight.service;
 
+import static com.equifreight.service.pricing.PricingText.money;
+
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateCatalogVersion;
-import com.equifreight.entity.RateLine;
-import com.equifreight.entity.RateServiceClass;
-import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.entity.enums.LineCertainty;
+import com.equifreight.entity.enums.LineSource;
 import com.equifreight.entity.enums.QuotationStatus;
-import com.equifreight.entity.enums.RatePolicyKey;
+import com.equifreight.entity.enums.RateBasis;
+import com.equifreight.entity.enums.RateCertainty;
 import com.equifreight.entity.enums.RequestStatus;
-import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
-import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.ManualLineRequest;
+import com.equifreight.model.quotation.OverrideRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
-import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
-import com.equifreight.service.pricing.CatalogRows;
-import com.equifreight.service.pricing.PricedLine;
-import com.equifreight.service.pricing.PricedQuote;
-import com.equifreight.service.pricing.PricedTotals;
-import com.equifreight.service.pricing.PricingInputs;
-import com.equifreight.service.pricing.QuotePricer;
-import com.equifreight.service.pricing.RateSet;
-import com.equifreight.service.pricing.RateSetLoader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,10 +54,8 @@ public class QuotationDraftService {
     private final TransportRequestRepository requests;
     private final QuotationRepository quotations;
     private final RateCatalogVersionRepository versions;
-    private final RateSetLoader loader;
-    private final PricingInputs inputs;
+    private final QuotationPricing pricing;
     private final CodeService codes;
-    private final UserRepository users;
     private final AuditService audit;
     private final Clock clock;
 
@@ -75,19 +63,15 @@ public class QuotationDraftService {
             TransportRequestRepository requests,
             QuotationRepository quotations,
             RateCatalogVersionRepository versions,
-            RateSetLoader loader,
-            PricingInputs inputs,
+            QuotationPricing pricing,
             CodeService codes,
-            UserRepository users,
             AuditService audit,
             Clock clock) {
         this.requests = requests;
         this.quotations = quotations;
         this.versions = versions;
-        this.loader = loader;
-        this.inputs = inputs;
+        this.pricing = pricing;
         this.codes = codes;
-        this.users = users;
         this.audit = audit;
         this.clock = clock;
     }
@@ -104,11 +88,11 @@ public class QuotationDraftService {
         Optional<Quotation> existing = quotations.findFirstByRequestIdOrderByVersionNoDesc(requestId);
         if (existing.isPresent()) {
             Quotation q = existing.get();
-            requireDraft(q);
+            QuotationRules.requireDraft(q);
             if (request.getStatus() == RequestStatus.SUBMITTED) {
                 underReview(manager, request, "Quotation " + q.getCode() + " v" + q.getVersionNo() + " resumed");
             }
-            return new StartResult(toResponse(q, request), false);
+            return new StartResult(pricing.toResponse(q, request, List.of()), false);
         }
         RateCatalogVersion published = latestPublished();
 
@@ -121,7 +105,7 @@ public class QuotationDraftService {
         q.setCurrency(CURRENCY);
         q.setPreparedBy(manager);
         q.setAirClass(request.getMode() == TransportMode.AIR ? request.getAirClass() : null);
-        price(q, request);
+        pricing.price(q, request);
         try {
             q = quotations.saveAndFlush(q);
         } catch (DataIntegrityViolationException e) {
@@ -147,53 +131,244 @@ public class QuotationDraftService {
                 null,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + request.getStatus() + "\"}");
-        return new StartResult(toResponse(q, request), true);
+        return new StartResult(pricing.toResponse(q, request, List.of()), true);
     }
 
     @Transactional(readOnly = true)
     public QuotationDraftResponse get(UUID requestId) {
+        return get(requestId, null);
+    }
+
+    /** One version of the request's quotation, or the latest when {@code version} is null. */
+    @Transactional(readOnly = true)
+    public QuotationDraftResponse get(UUID requestId, Short version) {
         TransportRequest request =
                 requests.findById(requestId).orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
-        Quotation q = quotations
-                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+        Quotation q = (version == null
+                        ? quotations.findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                        : quotations.findByRequestIdAndVersionNo(requestId, version))
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        return toResponse(q, request);
+        return pricing.toResponse(q, request, List.of());
     }
 
     /** Prices the draft with another air class, on the version it already pins. */
     @Transactional
     public QuotationDraftResponse changeClass(User manager, UUID requestId, ServiceClass airClass) {
-        TransportRequest request = lockedInReview(requestId);
-        Quotation q = draftOf(requestId);
+        Draft d = draftForWrite(requestId);
+        TransportRequest request = d.request();
+        Quotation q = d.quotation();
         if (request.getMode() != TransportMode.AIR) {
             throw new BusinessException("NOT_AN_AIR_REQUEST", "Only an air move has a service class.");
         }
         q.setAirClass(airClass);
-        price(q, request);
-        return toResponse(quotations.save(q), request);
+        List<String> dropped = pricing.price(q, request);
+        return pricing.toResponse(quotations.save(q), request, dropped);
     }
 
     /** Pins the latest published catalog and prices the draft again from the request as it is now. */
     @Transactional
     public QuotationDraftResponse reprice(User manager, UUID requestId) {
-        TransportRequest request = lockedInReview(requestId);
-        Quotation q = draftOf(requestId);
+        Draft d = draftForWrite(requestId);
+        TransportRequest request = d.request();
+        Quotation q = d.quotation();
         RateCatalogVersion published = latestPublished();
         q.setRateCatalogVersion(published);
-        price(q, request);
+        List<String> dropped = pricing.price(q, request);
         Quotation saved = quotations.save(q);
+        String summary = "Quotation " + q.getCode() + " v" + q.getVersionNo() + " re-priced on rate catalog v"
+                + published.getVersionNo();
+        for (String gone : dropped) {
+            summary += "; override on " + gone.substring(0, gone.indexOf(':')) + " dropped";
+        }
         audit.recordDecision(
                 manager,
                 "QUOTATION_REPRICED",
-                AuditText.fit("Quotation " + q.getCode() + " v" + q.getVersionNo() + " re-priced on rate catalog v"
-                        + published.getVersionNo()),
+                AuditText.fit(summary),
                 ENTITY_TYPE,
                 request.getId(),
                 request.getCode(),
                 null,
                 null,
                 null);
-        return toResponse(saved, request);
+        return pricing.toResponse(saved, request, dropped);
+    }
+
+    // --- overrides and added lines (US-Q-02, US-F1-05) ---------------------------------------------------------
+
+    /** Replaces a priced line's amount, with the manager's reason. The totals are worked out again. */
+    @Transactional
+    public QuotationDraftResponse override(User manager, UUID requestId, UUID lineId, OverrideRequest body) {
+        Draft d = draftForWrite(requestId);
+        QuotationLine line = lineOf(d.quotation(), lineId);
+        if (line.getCatalogAmount() == null) {
+            throw new ConflictException(
+                    "NO_RATE_TO_OVERRIDE",
+                    "A line without a rate can't be overridden. Ask " + ownerName()
+                            + " to add the rate, then re-price.");
+        }
+        if (line.getManualReason() != null) {
+            throw new ConflictException("NOT_A_CATALOG_LINE", "Edit a line you added instead of overriding it.");
+        }
+        BigDecimal amount = cents(body.amount());
+        String reason = body.reason().strip();
+        BigDecimal was = line.getOverrideAmount() != null ? line.getOverrideAmount() : line.getCatalogAmount();
+        line.setOverrideAmount(amount);
+        line.setOverrideReason(reason);
+        String summary = label(d.quotation()) + " · " + line.getDescription() + ": " + money(was) + " → "
+                + money(amount) + " · " + reason;
+        return saved(manager, d, "QUOTATION_LINE_OVERRIDDEN", summary, reason);
+    }
+
+    /** Puts the catalog amount back. */
+    @Transactional
+    public QuotationDraftResponse removeOverride(User manager, UUID requestId, UUID lineId) {
+        Draft d = draftForWrite(requestId);
+        QuotationLine line = lineOf(d.quotation(), lineId);
+        if (line.getOverrideAmount() == null) {
+            throw new ConflictException("NOT_OVERRIDDEN", "This line has no override to remove.");
+        }
+        String summary = label(d.quotation()) + " · " + line.getDescription() + ": back to "
+                + money(line.getCatalogAmount()) + " from " + money(line.getOverrideAmount());
+        line.setOverrideAmount(null);
+        line.setOverrideReason(null);
+        return saved(manager, d, "QUOTATION_OVERRIDE_REMOVED", summary, null);
+    }
+
+    /** Adds a line the catalog doesn't know, at the end of its group. */
+    @Transactional
+    public QuotationDraftResponse addLine(User manager, UUID requestId, ManualLineRequest body) {
+        Draft d = draftForWrite(requestId);
+        checkNote(body);
+        Quotation q = d.quotation();
+        QuotationLine line = new QuotationLine();
+        line.setQuotation(q);
+        line.setLineKey("MANUAL:" + UUID.randomUUID());
+        line.setSource(LineSource.MANUAL);
+        line.setBasis(RateBasis.PER_SHIPMENT);
+        line.setBasisText(AuditText.fit("added by " + manager.displayName()));
+        line.setPosition(nextPosition(q, body.group()));
+        fill(line, body);
+        q.getLines().add(line);
+        String reason = line.getManualReason();
+        return saved(
+                manager,
+                d,
+                "QUOTATION_LINE_ADDED",
+                label(q) + " · " + line.getDescription() + ", " + money(line.getCatalogAmount()) + " · " + reason,
+                reason);
+    }
+
+    /** Changes a line the manager added. */
+    @Transactional
+    public QuotationDraftResponse editLine(User manager, UUID requestId, UUID lineId, ManualLineRequest body) {
+        Draft d = draftForWrite(requestId);
+        QuotationLine line = manualLineOf(d.quotation(), lineId);
+        checkNote(body);
+        if (!line.getGroupCode().equals(body.group())) {
+            line.setPosition(nextPosition(d.quotation(), body.group()));
+        }
+        fill(line, body);
+        String reason = line.getManualReason();
+        return saved(
+                manager,
+                d,
+                "QUOTATION_LINE_EDITED",
+                label(d.quotation()) + " · " + line.getDescription() + ", " + money(line.getCatalogAmount()) + " · "
+                        + reason,
+                reason);
+    }
+
+    /** Removes a line the manager added; a catalog line is never removed, only overridden. */
+    @Transactional
+    public QuotationDraftResponse removeLine(User manager, UUID requestId, UUID lineId) {
+        Draft d = draftForWrite(requestId);
+        QuotationLine line = manualLineOf(d.quotation(), lineId);
+        d.quotation().getLines().remove(line);
+        return saved(
+                manager,
+                d,
+                "QUOTATION_LINE_REMOVED",
+                label(d.quotation()) + " · " + line.getDescription() + ", " + money(line.getCatalogAmount())
+                        + " removed",
+                null);
+    }
+
+    /**
+     * Totals the draft over its lines as they now stand, saves it and audits the write. The lines are not priced
+     * again, so their ids hold and a request changed since pricing still asks for a re-price.
+     */
+    private QuotationDraftResponse saved(User manager, Draft d, String action, String summary, String reason) {
+        TransportRequest request = d.request();
+        pricing.retotal(d.quotation(), request);
+        Quotation saved = quotations.saveAndFlush(d.quotation());
+        audit.recordDecision(
+                manager,
+                action,
+                AuditText.fit(summary),
+                ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                reason,
+                null,
+                null);
+        return pricing.toResponse(saved, request, List.of());
+    }
+
+    private static void fill(QuotationLine line, ManualLineRequest body) {
+        line.setGroupCode(body.group());
+        line.setDescription(body.description().strip());
+        line.setQuantity(body.quantity());
+        line.setUnitRate(cents(body.unitRate()));
+        line.setCatalogAmount(cents(body.quantity().multiply(body.unitRate())));
+        boolean estimated = body.certainty() == RateCertainty.ESTIMATED;
+        line.setCertainty(estimated ? LineCertainty.ESTIMATED : LineCertainty.FIXED);
+        line.setEstimateNote(estimated ? body.estimateNote().strip() : null);
+        line.setManualReason(body.reason().strip());
+    }
+
+    private static void checkNote(ManualLineRequest body) {
+        if (body.certainty() == RateCertainty.ESTIMATED
+                && (body.estimateNote() == null || body.estimateNote().isBlank())) {
+            throw new BusinessException("ESTIMATE_NOTE", "Say why this line may vary.");
+        }
+    }
+
+    private static short nextPosition(Quotation q, String group) {
+        return (short) (q.getLines().stream()
+                        .filter(l -> l.getGroupCode().equals(group))
+                        .mapToInt(QuotationLine::getPosition)
+                        .max()
+                        .orElse(0)
+                + 1);
+    }
+
+    private static QuotationLine lineOf(Quotation q, UUID lineId) {
+        return q.getLines().stream()
+                .filter(l -> lineId.equals(l.getId()))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Quotation line", lineId));
+    }
+
+    private static QuotationLine manualLineOf(Quotation q, UUID lineId) {
+        QuotationLine line = lineOf(q, lineId);
+        if (line.getManualReason() == null) {
+            throw new ConflictException(
+                    "NOT_A_MANUAL_LINE", "Only a line you added can be edited. Override a catalog line instead.");
+        }
+        return line;
+    }
+
+    private String ownerName() {
+        String owner = pricing.catalogOwner();
+        return owner == null ? "the transport specialist" : owner;
+    }
+
+    private static String label(Quotation q) {
+        return q.getCode() + " v" + q.getVersionNo();
+    }
+
+    private static BigDecimal cents(BigDecimal amount) {
+        return amount.setScale(2, RoundingMode.HALF_UP);
     }
 
     // --- helpers -----------------------------------------------------------------------------------------------
@@ -214,19 +389,17 @@ public class QuotationDraftService {
                 "{\"status\":\"" + RequestStatus.UNDER_REVIEW + "\"}");
     }
 
-    private TransportRequest lockedInReview(UUID requestId) {
+    private record Draft(TransportRequest request, Quotation quotation) {}
+
+    /** Locks the request row, then reads its latest version, which must be a draft the request can still take. */
+    private Draft draftForWrite(UUID requestId) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
-        requireInReview(request);
-        return request;
-    }
-
-    private Quotation draftOf(UUID requestId) {
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        requireDraft(q);
-        return q;
+        QuotationRules.requireWritable(request, q);
+        return new Draft(request, q);
     }
 
     private static void requireInReview(TransportRequest request) {
@@ -235,90 +408,8 @@ public class QuotationDraftService {
         }
     }
 
-    private static void requireDraft(Quotation q) {
-        if (q.getStatus() != QuotationStatus.DRAFT) {
-            throw new ConflictException(
-                    "QUOTATION_NOT_DRAFT", "This quotation has been issued and can't be re-priced.");
-        }
-    }
-
     private RateCatalogVersion latestPublished() {
         return versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
                 .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
-    }
-
-    /** Replaces the draft's lines and totals with the engine's answer on its pinned version. */
-    private void price(Quotation q, TransportRequest request) {
-        q.setAirClass(pricedClass(q, request));
-        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
-        RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        PricedQuote priced = QuotePricer.price(inputs.inputFor(request, q.getAirClass()), rates);
-
-        Map<UUID, RateLine> rateLines =
-                rows.lines().stream().collect(Collectors.toMap(RateLine::getId, Function.identity()));
-        Map<UUID, RateServiceClass> stalls =
-                rows.classes().stream().collect(Collectors.toMap(RateServiceClass::getId, Function.identity()));
-        Map<UUID, RequestHorse> horses = request.getHorses().stream()
-                .collect(Collectors.toMap(rh -> rh.getHorse().getId(), Function.identity(), (a, b) -> a));
-        Map<String, Short> positions = new HashMap<>();
-
-        q.getLines().clear();
-        for (PricedLine p : priced.lines()) {
-            QuotationLine line = new QuotationLine();
-            line.setQuotation(q);
-            line.setGroupCode(p.group());
-            line.setPosition(positions.merge(p.group(), (short) 1, (a, b) -> (short) (a + b)));
-            line.setDescription(p.description());
-            line.setBasisText(p.basisText());
-            line.setBasis(p.basis());
-            line.setQuantity(p.quantity());
-            line.setUnitRate(p.unitRate());
-            line.setSource(p.source());
-            line.setRateLine(p.rateLineId() == null ? null : rateLines.get(p.rateLineId()));
-            line.setRateServiceClass(p.rateServiceClassId() == null ? null : stalls.get(p.rateServiceClassId()));
-            RequestHorse horse = p.horseId() == null ? null : horses.get(p.horseId());
-            line.setHorse(horse == null ? null : horse.getHorse());
-            line.setCertainty(p.certainty());
-            line.setEstimateNote(p.estimateNote());
-            line.setCatalogAmount(p.amount());
-            q.getLines().add(line);
-        }
-        PricedTotals totals = priced.totals();
-        q.setSubtotal(totals.subtotal());
-        q.setVolumeBreak(totals.volumeBreak());
-        q.setArrivalWindowSurcharge(totals.arrivalWindow());
-        q.setFuel(totals.fuel());
-        q.setInsurance(totals.insurance());
-        q.setContingency(totals.contingency());
-        q.setServiceFee(totals.serviceFee());
-        q.setTotal(totals.total());
-    }
-
-    /**
-     * The class to price with: none for a road move; for air, the class the manager chose, else the customer's.
-     * The request's mode can change while it is back with the customer, so this follows the request as it is now.
-     */
-    private static ServiceClass pricedClass(Quotation q, TransportRequest request) {
-        if (request.getMode() != TransportMode.AIR) {
-            return null;
-        }
-        return q.getAirClass() != null ? q.getAirClass() : request.getAirClass();
-    }
-
-    private QuotationDraftResponse toResponse(Quotation q, TransportRequest request) {
-        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
-        RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        ServiceClass airClass = pricedClass(q, request);
-        PricedQuote now = QuotePricer.price(inputs.inputFor(request, airClass), rates);
-        BigDecimal validity = rates.policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS);
-        Integer latest = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
-                .map(RateCatalogVersion::getVersionNo)
-                .orElse(null);
-        String owner = users.findByRoleAndStatus(RoleName.TRANSPORT_SPECIALIST, UserStatus.ACTIVE).stream()
-                .findFirst()
-                .map(User::displayName)
-                .orElse(null);
-        return QuotationMapper.toDraftResponse(
-                q, request, airClass, now, latest, validity == null ? null : validity.intValue(), owner);
     }
 }

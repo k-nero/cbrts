@@ -4,13 +4,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.equifreight.configuration.ControllerAdvise;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.model.quotation.CustomerQuotationResponse;
+import com.equifreight.model.quotation.DepositResponse;
+import com.equifreight.service.CustomerQuotationService;
 import com.equifreight.service.RequestService;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,12 +29,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class RequestControllerTest {
 
     RequestService service;
+    CustomerQuotationService quotations;
     MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(RequestService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new RequestController(service))
+        quotations = mock(CustomerQuotationService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new RequestController(service, quotations))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
                 .build();
@@ -91,5 +98,28 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.status").value("NOT_READY"))
                 .andExpect(jsonPath("$.message").value("Choose the route and horses to see an estimate."))
                 .andExpect(jsonPath("$.options.mode").isArray());
+    }
+
+    @Test
+    void theCustomerReadsTheIssuedQuotation() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(quotations.get(any(), eq(id)))
+                .thenReturn(CustomerQuotationResponse.builder()
+                        .code("Q-2026-0192")
+                        .versionNo((short) 2)
+                        .estimate(new CustomerQuotationResponse.Estimate(
+                                new BigDecimal("7400"), new BigDecimal("10100"), true))
+                        .deposit(new DepositResponse(new BigDecimal("30"), new BigDecimal("2627.02")))
+                        .cancellation(new CustomerQuotationResponse.Cancellation(
+                                37, List.of(new CustomerQuotationResponse.Band(30, null, new BigDecimal("10"), true))))
+                        .versions(List.of(new CustomerQuotationResponse.Version((short) 2, null, null, null, null)))
+                        .build());
+
+        mvc.perform(get("/api/v1/customer/requests/" + id + "/quotation"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("Q-2026-0192"))
+                .andExpect(jsonPath("$.estimate.inside").value(true))
+                .andExpect(jsonPath("$.cancellation.bands[0].current").value(true))
+                .andExpect(jsonPath("$.versions[0].versionNo").value(2));
     }
 }

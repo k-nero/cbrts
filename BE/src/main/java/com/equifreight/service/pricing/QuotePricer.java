@@ -51,10 +51,12 @@ public final class QuotePricer {
             expand(in, rates, row, lines);
         }
         List<MissingRate> missing = RequiredRates.forRequest(in, rates);
-        for (MissingRate gap : missing) {
+        for (int i = 0; i < missing.size(); i++) {
+            MissingRate gap = missing.get(i);
             if (gap.group() != null) {
                 lines.add(new PricedLine(
                         gap.group(),
+                        "MISSING:" + (i + 1),
                         gap.description(),
                         RateBasis.PER_SHIPMENT,
                         "No rate in the catalog",
@@ -72,6 +74,18 @@ public final class QuotePricer {
         lines.sort(Comparator.comparing(PricedLine::group));
         boolean complete = missing.isEmpty() && (fit == null || fit.refusal() == null);
         return new PricedQuote(List.copyOf(lines), missing, fit, totals(in, rates, lines, complete));
+    }
+
+    /**
+     * The totals in the fixed order over lines the manager adjusted: overridden amounts in place and added lines
+     * included. Over the engine's own lines it gives exactly {@link #price}'s totals.
+     */
+    public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines) {
+        StallFit fit = fit(in, rates);
+        boolean complete = lines.stream().allMatch(l -> l.amount() != null)
+                && RequiredRates.forRequest(in, rates).isEmpty()
+                && (fit == null || fit.refusal() == null);
+        return totals(in, rates, lines, complete);
     }
 
     /** How the horses fit the priced air class; null for road, or when the class has no row in the catalog. */
@@ -126,6 +140,7 @@ public final class QuotePricer {
         BigDecimal quantity = BigDecimal.valueOf(fit.positions());
         return new PricedLine(
                 "C",
+                "STALL",
                 PricingText.fitDescription(
                         "Air stall position " + in.fromCity() + " → " + in.toCity() + ", " + classWord(in.airClass())),
                 RateBasis.PER_POSITION,
@@ -202,6 +217,7 @@ public final class QuotePricer {
         }
         return new PricedLine(
                 row.group(),
+                row.code(),
                 description(row),
                 row.basis(),
                 basis,
@@ -252,8 +268,10 @@ public final class QuotePricer {
 
     private static PricedLine line(
             RateRow row, String basis, BigDecimal quantity, UUID horseId, LineCertainty certainty) {
+        String key = row.basis() == RateBasis.PER_DAY && horseId != null ? row.code() + ":" + horseId : row.code();
         return new PricedLine(
                 row.group(),
+                key,
                 description(row),
                 row.basis(),
                 basis,
@@ -401,7 +419,7 @@ public final class QuotePricer {
     }
 
     /** The arrival-window surcharge applies to a road move with a private trailer and a window (AGENTS.md). */
-    static boolean windowApplies(PricingInput in) {
+    public static boolean windowApplies(PricingInput in) {
         return in.mode() == TransportMode.ROAD && in.trailer() == TrailerType.PRIVATE && in.arrivalWindow();
     }
 
