@@ -101,6 +101,17 @@ const MyRequestsPage: FC = () => {
                 Discard
               </Button>
             </span>
+          ) : r.status === 'INFO_REQUIRED' ? (
+            <span className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={() =>
+                  router.push(router.paths.get('request-submitted', { pathParams: [r.id] }))
+                }
+              >
+                Answer
+              </Button>
+            </span>
           ) : null,
       },
     ],

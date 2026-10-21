@@ -24,6 +24,12 @@ export const queryKeys = {
     /** Under 'horses', so a horse saved or archived refreshes the pick cards. */
     wizardHorses: () => ['horses', 'wizard'] as const,
   },
+  staffRequests: {
+    all: () => ['staff-requests'] as const,
+    queues: () => ['staff-requests', 'queue'] as const,
+    queue: (page: number) => ['staff-requests', 'queue', page] as const,
+    one: (id: string) => ['staff-requests', id] as const,
+  },
   audit: {
     all: () => ['admin-audit-log'] as const,
     actors: () => ['admin-audit-log', 'actors'] as const,

@@ -8,6 +8,8 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
+import com.equifreight.model.user.UserGroup;
+import com.equifreight.model.user.UserGroupCounts;
 import com.equifreight.model.user.UserMapper;
 import com.equifreight.model.user.UserResponse;
 import com.equifreight.repository.RefreshTokenRepository;
@@ -79,10 +81,11 @@ public class UserService {
      * Removed (DISABLED) accounts are left out: they stay only so their past records keep a name.
      */
     @Transactional(readOnly = true)
-    public Page<UserResponse> search(String q, String roleName, Pageable pageable) {
+    public Page<UserResponse> search(String q, String roleName, UserGroup group, Pageable pageable) {
         Specification<User> spec = (root, cq, cb) -> {
             var predicates = new ArrayList<Predicate>();
             predicates.add(cb.notEqual(root.get("status"), UserStatus.DISABLED));
+            if (group != null) predicates.add(inGroup(group).toPredicate(root, cq, cb));
             if (roleName != null && !roleName.isBlank()) {
                 // A user with several roles would otherwise appear once per role row.
                 if (cq != null) {
@@ -101,6 +104,38 @@ public class UserService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         return userRepository.findAll(spec, pageable).map(UserMapper::toResponse);
+    }
+
+    /** How many accounts each Users &amp; roles tab holds, ignoring the search and role filters. */
+    @Transactional(readOnly = true)
+    public UserGroupCounts countGroups() {
+        return new UserGroupCounts(
+                countGroup(UserGroup.STAFF), countGroup(UserGroup.CUSTOMERS), countGroup(UserGroup.INVITES));
+    }
+
+    private long countGroup(UserGroup group) {
+        Specification<User> notDisabled = (root, cq, cb) -> cb.notEqual(root.get("status"), UserStatus.DISABLED);
+        return userRepository.count(notDisabled.and(inGroup(group)));
+    }
+
+    /**
+     * Customers are accounts holding the CUSTOMER role; staff are everyone else, invited or active; pending
+     * invites are staff whose invite hasn't been accepted.
+     */
+    private static Specification<User> inGroup(UserGroup group) {
+        return (root, cq, cb) -> {
+            var customers = cq.subquery(UUID.class);
+            var customer = customers.from(User.class);
+            customers
+                    .select(customer.get("id"))
+                    .where(cb.equal(customer.join("roles").get("name"), RoleName.CUSTOMER));
+            var isCustomer = root.get("id").in(customers);
+            return switch (group) {
+                case CUSTOMERS -> isCustomer;
+                case STAFF -> cb.not(isCustomer);
+                case INVITES -> cb.and(cb.not(isCustomer), cb.equal(root.get("status"), UserStatus.INVITED));
+            };
+        };
     }
 
     @Transactional(readOnly = true)

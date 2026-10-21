@@ -55,6 +55,9 @@ class TripServiceTest {
     private RequestHorseRepository requestHorses;
 
     @Mock
+    private ChecklistItemRepository checklistItems;
+
+    @Mock
     private FileService files;
 
     @Mock
@@ -78,11 +81,12 @@ class TripServiceTest {
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null);
     }
 
     private static TripRecordRequest handover(Instant at, String receiverName) {
-        return new TripRecordRequest(null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName);
+        return new TripRecordRequest(
+                null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName, null);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
@@ -124,6 +128,7 @@ class TripServiceTest {
                 routes,
                 loads,
                 requestHorses,
+                checklistItems,
                 handovers,
                 users,
                 files,
@@ -374,7 +379,14 @@ class TripServiceTest {
                 job.getCode(),
                 escort,
                 new TripRecordRequest(
-                        null, TripRecordKind.HELD, NOW, UUID.randomUUID(), "Vet check at the border", null, null));
+                        null,
+                        TripRecordKind.HELD,
+                        NOW,
+                        UUID.randomUUID(),
+                        "Vet check at the border",
+                        null,
+                        null,
+                        null));
 
         assertEquals(TripStatus.HELD, job.getTripStatus());
         verify(notifications)

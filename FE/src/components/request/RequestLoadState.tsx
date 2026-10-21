@@ -1,30 +1,18 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { Skeleton } from 'antd';
 import type { AxiosError } from 'axios';
 
-import { Button, Callout } from '@/components/ui';
-import { useCustomRouter } from '@/router/route.hook';
+import { RequestNotFound } from './RequestNotFound';
 
-/** A missing request, a discarded draft, or another club's (the API answers 404 for all three). */
-export const RequestNotFound: FC = () => {
-  const router = useCustomRouter();
-  return (
-    <div className="flex flex-col items-start gap-3 pt-[46px]">
-      <h1 className="type-display-m m-0 text-ink">We couldn’t find this request</h1>
-      <p className="type-body-m m-0 text-ink-2">
-        It may have been discarded, or it belongs to another club.
-      </p>
-      <Button onClick={() => router.push(router.paths.get('my-requests'))}>
-        Back to My requests
-      </Button>
-    </div>
-  );
-};
+import { Button, Callout } from '@/components/ui';
 
 type LoadQuery = { isPending: boolean; error: unknown; refetch: () => unknown };
 
 /** Loading, not found or failed: what a request page shows until its request arrives. */
-export const RequestLoadState: FC<{ query: LoadQuery }> = ({ query }) => {
+export const RequestLoadState: FC<{ query: LoadQuery; notFound?: ReactNode }> = ({
+  query,
+  notFound,
+}) => {
   if (query.isPending) {
     return (
       <div className="flex flex-col gap-6 pt-[46px]" aria-busy>
@@ -36,7 +24,8 @@ export const RequestLoadState: FC<{ query: LoadQuery }> = ({ query }) => {
       </div>
     );
   }
-  if ((query.error as AxiosError | null)?.response?.status === 404) return <RequestNotFound />;
+  if ((query.error as AxiosError | null)?.response?.status === 404)
+    return <>{notFound ?? <RequestNotFound />}</>;
   return (
     <div className="pt-[46px]">
       <Callout

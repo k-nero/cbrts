@@ -21,8 +21,10 @@ import DocumentsPage from '@/pages/staff/documents';
 import AuthoritiesPage from '@/pages/staff/authorities';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
-import JobDetailPage from '@/pages/staff/jobs/JobDetail';
+import JobDetailPage from '@/pages/staff/jobs/ViewAddEdit';
 import AuditLogPage from '@/pages/staff/audit-log';
+import RequestsPage from '@/pages/staff/requests';
+import RequestReviewPage from '@/pages/staff/requests/review';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
 import CustomerNotesPage from '@/pages/staff/customer-notes';
@@ -82,7 +84,8 @@ export const router = createBrowserRouter([
           { path: 'jobs/:id', element: <JobDetailPage /> },
           { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
-          { path: 'requests', element: todo('Requests') },
+          { path: 'requests', element: <RequestsPage /> },
+          { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'incidents', element: todo('Incidents') },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: <AuditLogPage /> },

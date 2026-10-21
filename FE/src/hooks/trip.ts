@@ -7,6 +7,7 @@ export const useTrips = (audience: 'escort' | 'staff' | 'customer', page: number
   useQuery({
     queryKey: queryKeys.trips.list(audience, page),
     queryFn: () => tripApi.list(audience, page),
+    refetchInterval: audience === 'escort' ? false : 15_000,
   });
 
 export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string) =>
@@ -16,7 +17,8 @@ export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string)
     enabled: Boolean(code),
     // The customer follows a trip on the road; once it's delivered nothing moves, so stop polling.
     refetchInterval: (query) =>
-      audience === 'customer' && query.state.data?.tripStatus !== TripStatusEnum.DELIVERED
+      audience === 'staff' ||
+      (audience === 'customer' && query.state.data?.tripStatus !== TripStatusEnum.DELIVERED)
         ? 15_000
         : false,
   });
