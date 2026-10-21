@@ -2,6 +2,7 @@ import client from '@/config/axios';
 import { makeCrudApi } from './crudFactory';
 
 import type {
+  Estimate,
   PagedResponse,
   Place,
   RequestDraftInput,
@@ -33,3 +34,7 @@ export const getRoutes = (from: string, to?: string): Promise<Route[]> =>
   client
     .get<Route[]>('/customer/routes', { params: to ? { from, to } : { from } })
     .then((r) => r.data);
+
+/** The instant estimate for the wizard's current values; nothing is saved (US-Q-05). */
+export const getEstimate = (input: RequestDraftInput): Promise<Estimate> =>
+  client.post<Estimate>(`${BASE}/estimate`, input).then((r) => r.data);

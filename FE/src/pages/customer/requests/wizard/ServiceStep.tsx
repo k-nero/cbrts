@@ -6,8 +6,15 @@ import { Group, StepRefusal } from './parts';
 import type { StepProps } from '.';
 
 import { Button, Checkbox, Icon, OptionCard, Panel } from '@/components/ui';
-import type { RequestHorse, Route, ServiceClass } from '@/interfaces';
-import { formatValue, groomsFor, pronouns, serviceLine, type WizardValues } from '@/lib/utils';
+import type { Estimate, RequestHorse, Route, ServiceClass } from '@/interfaces';
+import {
+  formatValue,
+  groomsFor,
+  optionMeta,
+  pronouns,
+  serviceLine,
+  type WizardValues,
+} from '@/lib/utils';
 
 const CLASSES: { value: ServiceClass; title: string }[] = [
   { value: 'ECONOMY', title: 'Economy' },
@@ -84,6 +91,7 @@ const stallRow = (h: RequestHorse, i: number) => {
 
 /** Step 3 (spec §5.4): how the horses travel, the stalls their profiles set, extras, insurance. */
 const ServiceStep: FC<StepProps> = ({
+  estimate,
   saved,
   live,
   routes,
@@ -94,6 +102,9 @@ const ServiceStep: FC<StepProps> = ({
   onBack,
 }) => {
   const { control, setValue } = useFormContext<WizardValues>();
+  /** How a choice moves the estimate, for its card's Meta line (DESIGN.md, Service step). */
+  const fx = (group: keyof Estimate['options'], value: string) =>
+    estimate?.options[group].find((o) => o.value === value);
   const values = useWatch({ control }) as WizardValues;
   const { errors } = useFormState({ control, name: 'mode' });
   const set = <K extends keyof WizardValues>(name: K, value: WizardValues[K]) =>
@@ -145,7 +156,7 @@ const ServiceStep: FC<StepProps> = ({
             onChange={() => chooseMode('ROAD')}
             title="Road"
             description={roadLine(road)}
-            meta={roadReason}
+            meta={optionMeta(fx('mode', 'ROAD'), roadReason)}
           />
           <OptionCard
             name="mode"
@@ -156,7 +167,7 @@ const ServiceStep: FC<StepProps> = ({
             onChange={() => chooseMode('AIR')}
             title="Air"
             description={airLine(air)}
-            meta={airReason}
+            meta={optionMeta(fx('mode', 'AIR'), airReason)}
           />
         </div>
       </Group>
@@ -176,7 +187,10 @@ const ServiceStep: FC<StepProps> = ({
               onChange={() => set('trailer', 'SHARED')}
               title="Shared load"
               description="Shares a trailer with other consignments on set departures."
-              meta={window ? 'Your arrival window needs a private trailer.' : undefined}
+              meta={optionMeta(
+                fx('trailer', 'SHARED'),
+                window ? 'Your arrival window needs a private trailer.' : undefined,
+              )}
             />
             <OptionCard
               name="trailer"
@@ -185,6 +199,7 @@ const ServiceStep: FC<StepProps> = ({
               onChange={() => set('trailer', 'PRIVATE')}
               title="Private trailer"
               description="Your own trailer and your own departure time."
+              meta={optionMeta(fx('trailer', 'PRIVATE'))}
             />
           </div>
         </Group>
@@ -201,6 +216,7 @@ const ServiceStep: FC<StepProps> = ({
                 selected={values.airClass === c.value}
                 onChange={() => set('airClass', c.value)}
                 title={c.title}
+                meta={optionMeta(fx('airClass', c.value))}
               />
             ))}
           </div>
@@ -252,6 +268,7 @@ const ServiceStep: FC<StepProps> = ({
             selected={values.insurance === 'EQUIFREIGHT'}
             onChange={() => set('insurance', 'EQUIFREIGHT')}
             title="Through EquiFreight"
+            meta={optionMeta(fx('insurance', 'EQUIFREIGHT'))}
             description={`Insured for the declared value (${formatValue(declared)}), on the quotation as its own line.`}
           />
           <OptionCard
@@ -261,6 +278,7 @@ const ServiceStep: FC<StepProps> = ({
             selected={values.insurance === 'OWN_POLICY'}
             onChange={() => set('insurance', 'OWN_POLICY')}
             title="Your own policy"
+            meta={optionMeta(fx('insurance', 'OWN_POLICY'))}
             description="You upload it with your documents; it’s checked against your travel dates plus 2 days. No charge from us."
           />
         </div>

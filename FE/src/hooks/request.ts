@@ -1,11 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isEqual } from 'lodash-es';
 
 import { horsesApi } from '@/apis/horse';
-import { getRoutes, requestApi, requestListApi, submitRequest } from '@/apis/request';
+import { getEstimate, getRoutes, requestApi, requestListApi, submitRequest } from '@/apis/request';
 import { queryKeys } from '@/constant/query';
 import type { RequestDraftInput, RequestSummary, TransportRequest } from '@/interfaces';
 
 import { useCrudResource } from './crud';
+import { useDebouncedValue } from './useDebouncedValue';
 
 /** One page of the club's requests, newest first, 20 per page. */
 export const useRequests = () =>
@@ -98,3 +100,25 @@ export const useWizardHorses = () =>
       horsesApi.list({ archived: false, size: 100, sort: 'name,asc' }).then((page) => page.content),
     staleTime: 60_000,
   });
+
+/**
+ * The instant estimate for the wizard's values (US-Q-05), asked 400 ms after the last change. The key is
+ * the settled values, so an older answer never replaces a newer one, and the last range stays on screen
+ * while the next one loads. A failure stays on the draft pass ("The estimate didn't load"): the estimate is
+ * a guide, so it never sends the wizard to the error boundary.
+ */
+export const useEstimate = (input: RequestDraftInput, enabled: boolean) => {
+  const settled = useDebouncedValue(input, 400);
+  const query = useQuery({
+    queryKey: queryKeys.requests.estimate(settled),
+    queryFn: () => getEstimate(settled),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    retry: false,
+    throwOnError: false,
+  });
+  /** The answer on hand is for older values: the debounce or the next request is still running. */
+  const stale = !isEqual(input, settled) || query.isPlaceholderData;
+  return { ...query, stale };
+};

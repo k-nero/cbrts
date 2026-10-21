@@ -36,6 +36,8 @@ type Props = {
   notRun: boolean;
   horses: Horse[];
   chip?: { tone: Tone; label: string };
+  /** The indicative range ("$31,900 – $43,300"); null or absent shows a dash. */
+  range?: string | null;
   rangeSub?: string;
   className?: string;
 };
@@ -48,6 +50,7 @@ export const RequestPass: FC<Props> = ({
   notRun,
   horses,
   chip,
+  range,
   rangeSub,
   className,
 }) => {
@@ -67,6 +70,7 @@ export const RequestPass: FC<Props> = ({
           : { label: 'Horses', value: null, step: 1 },
         ...passRows(values, live, route, notRun),
       ]}
+      range={notRun ? null : (range ?? null)}
       rangeSub={
         notRun && from && to
           ? `No range: we don't run ${from} → ${to} yet.`

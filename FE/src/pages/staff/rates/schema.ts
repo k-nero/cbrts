@@ -141,6 +141,7 @@ export const POLICY_FIELDS: { key: RatePolicyKey; label: string; max?: number; s
   { key: 'SERVICE_FEE_PCT', label: 'Service fee, % after contingency', max: 100, step: 0.5 },
   { key: 'DEPOSIT_PCT', label: 'Deposit, %', max: 100, step: 1 },
   { key: 'QUOTE_VALIDITY_DAYS', label: 'Quote validity, days', max: 30, step: 1 },
+  { key: 'ESTIMATE_BAND_PCT', label: 'Estimate band, %', max: 100, step: 1 },
   { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet from, horses', step: 1 },
   { key: 'HIGH_VALUE_THRESHOLD', label: 'High value threshold, USD', step: 1000 },
 ];
