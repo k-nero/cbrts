@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -47,12 +48,16 @@ export const useReturnRequest = () => {
 };
 
 /** The request's draft quotation; a 404 means it hasn't been started. */
+/** The request's quotation draft. A 404 means none has been started: the builder offers Start, so only
+ * other failures go to the error boundary. */
 export const useQuotation = (requestId: string | undefined) =>
   useQuery({
     queryKey: queryKeys.staffRequests.quotation(requestId ?? ''),
     queryFn: () => getQuotation(requestId as string),
     enabled: Boolean(requestId),
     retry: false,
+    throwOnError: (error, query) =>
+      query.state.data === undefined && (error as AxiosError).response?.status !== 404,
   });
 
 /** A quotation write: its answer becomes the builder's data, and the review reloads (status, quotation). */

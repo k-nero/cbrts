@@ -265,7 +265,7 @@ describe('lineScopeWarning', () => {
 
   test('unticking every corridor on an every-corridor line warns that the others lose it', () => {
     expect(lineScopeWarning(every, false, 'RD HAN → VTE')).toBe(
-      'Saving moves this line to HAN → VTE only: every other corridor loses it.',
+      'Saving adds a line for HAN → VTE that replaces this one here; every other corridor keeps it.',
     );
   });
 

@@ -25,7 +25,14 @@ import type {
   ServiceClassRow,
   TrailerType,
 } from '@/interfaces';
-import { bandRefusal, bandsSave, editorRefusal, lineScopeWarning } from '@/lib/utils';
+import {
+  bandRefusal,
+  bandsSave,
+  editorRefusal,
+  lineScopeWarning,
+  SERVICE_CLASS_LABELS,
+  TRAILER_LABELS,
+} from '@/lib/utils';
 
 import {
   type BandsForm,
@@ -67,19 +74,16 @@ const SEXES: Opt<HorseSex>[] = [
   opt('COLT', 'Colt'),
   opt('FILLY', 'Filly'),
 ];
-const TRAILERS: Opt<TrailerType>[] = [
-  opt('SHARED', 'Shared load'),
-  opt('PRIVATE', 'Private trailer'),
-];
+const TRAILERS: Opt<TrailerType>[] = (Object.keys(TRAILER_LABELS) as TrailerType[]).map((t) =>
+  opt(t, TRAILER_LABELS[t]),
+);
 const CERTAINTIES: Opt<'FIXED' | 'ESTIMATED'>[] = [
   opt('FIXED', 'Fixed'),
   opt('ESTIMATED', 'Estimated'),
 ];
-const CLASSES: Opt<ServiceClass>[] = [
-  opt('ECONOMY', 'Economy'),
-  opt('BUSINESS', 'Business'),
-  opt('FIRST', 'First'),
-];
+const CLASSES: Opt<ServiceClass>[] = (Object.keys(SERVICE_CLASS_LABELS) as ServiceClass[]).map(
+  (c) => opt(c, SERVICE_CLASS_LABELS[c]),
+);
 
 /** A modal's save failed: the page handles a vanished draft, the form shows everything else. */
 type OnDraftGone = (error: unknown) => boolean;
@@ -153,9 +157,12 @@ export const LineModal: FC<{
   const scopeWarning = lineScopeWarning(editing, everyCorridor, view.corridor.code);
 
   const onSubmit = methods.handleSubmit(async (v) => {
+    // Unticking a shared line adds this corridor's own line, which replaces the shared one here only;
+    // changing the shared row itself would take it away from every other corridor.
+    const ownCopy = Boolean(editing?.everyCorridor) && !v.everyCorridor;
     try {
       await save.mutateAsync({
-        lineId: editing?.id ?? null,
+        lineId: ownCopy ? null : (editing?.id ?? null),
         view: view.corridor.id,
         body: {
           corridorId: v.everyCorridor ? null : view.corridor.id,
@@ -172,7 +179,13 @@ export const LineModal: FC<{
           estimateNote: v.estimateNote.trim() || null,
         },
       });
-      message.success(editing ? 'Line saved to the draft' : 'Line added to the draft');
+      message.success(
+        ownCopy
+          ? `Line added for ${view.corridor.code}`
+          : editing
+            ? 'Line saved to the draft'
+            : 'Line added to the draft',
+      );
       onClose();
     } catch (error) {
       if (onDraftGone(error)) return onClose();

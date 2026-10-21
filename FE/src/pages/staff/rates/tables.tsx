@@ -9,16 +9,11 @@ import {
   basisWords,
   corridorShort,
   money,
+  SERVICE_CLASS_LABELS,
   pctText,
   policyRows,
   rowActionLabels,
 } from '@/lib/utils';
-
-const CLASS_WORDS: Record<ServiceClass, string> = {
-  ECONOMY: 'Economy',
-  BUSINESS: 'Business',
-  FIRST: 'First',
-};
 
 /** Row actions shown only while a draft is open. */
 export type RowActions<T> = { onEdit: (row: T) => void; onRemove: (row: T) => void } | null;
@@ -66,7 +61,7 @@ export const ClassTable: FC<{
       title: 'Class',
       width: 130,
       render: (_, r) => (
-        <span className="type-label-m text-ink">{CLASS_WORDS[r.serviceClass]}</span>
+        <span className="type-label-m text-ink">{SERVICE_CLASS_LABELS[r.serviceClass]}</span>
       ),
     },
     {
@@ -96,7 +91,7 @@ export const ClassTable: FC<{
       align: 'right',
       render: (_, r) => <span className="type-data text-ink-2">{money(r.perHorse)}</span>,
     },
-    ...actionsColumn(actions, (r) => CLASS_WORDS[r.serviceClass]),
+    ...actionsColumn(actions, (r) => SERVICE_CLASS_LABELS[r.serviceClass]),
   ];
   return (
     <Panel

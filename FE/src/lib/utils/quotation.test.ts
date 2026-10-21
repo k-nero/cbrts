@@ -113,7 +113,7 @@ describe('quoteSummary', () => {
 
   test('an air quotation names the priced class', () => {
     expect(quoteSummary(draft({}, 'BUSINESS'))).toBe(
-      'v1 draft · Saigon Turf Club · 2 horses · air, business · departs 20 Nov 2026',
+      'v1 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026',
     );
   });
 

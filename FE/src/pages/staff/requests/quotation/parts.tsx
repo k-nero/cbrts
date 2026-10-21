@@ -30,7 +30,9 @@ export const Ledger: FC<{ quotation: QuotationDraft }> = ({ quotation }) => (
             {g.code}
           </span>
           <span className="type-h4 flex-1 text-ink">{g.name}</span>
-          <span className="type-data text-ink-2">{moneyOrDash(g.subtotal)}</span>
+          <span className="type-data text-ink-2">
+            {moneyOrDash(g.subtotal, quotation.currency)}
+          </span>
         </div>
         {g.lines.map((l, i) => (
           <QuoteLine
@@ -39,8 +41,8 @@ export const Ledger: FC<{ quotation: QuotationDraft }> = ({ quotation }) => (
             description={l.description}
             basis={l.basisText}
             qty={qty(l.quantity)}
-            rate={l.unitRate == null ? null : money(l.unitRate)}
-            amount={l.amount == null ? null : money(l.amount)}
+            rate={l.unitRate == null ? null : money(l.unitRate, quotation.currency)}
+            amount={l.amount == null ? null : money(l.amount, quotation.currency)}
             note={l.estimateNote ?? undefined}
           />
         ))}
@@ -52,6 +54,10 @@ export const Ledger: FC<{ quotation: QuotationDraft }> = ({ quotation }) => (
 /** Totals in the fixed order, each percentage row naming its base. */
 export const TotalsPanel: FC<{ quotation: QuotationDraft }> = ({ quotation }) => {
   const t = quotation.totals;
+  const currency = quotation.currency;
+  // A request that changed since pricing has no agreed total: the server drops the totals rows, so the
+  // subtotal and total read "—" with them until the draft is re-priced.
+  const stale = quotation.repriceNeeded;
   return (
     <Panel title="Totals">
       <div className="flex flex-col gap-3">
@@ -62,7 +68,9 @@ export const TotalsPanel: FC<{ quotation: QuotationDraft }> = ({ quotation }) =>
             </span>
             <span className="type-caption text-ink-3">Groups A–H</span>
           </span>
-          <span className="type-data text-ink">{money(t.subtotal ?? t.pricedLines)}</span>
+          <span className="type-data text-ink">
+            {stale ? '—' : money(t.subtotal ?? t.pricedLines, currency)}
+          </span>
         </div>
         {t.rows.map((r) => (
           <div key={r.key} className="flex items-center justify-between gap-4">
@@ -71,13 +79,17 @@ export const TotalsPanel: FC<{ quotation: QuotationDraft }> = ({ quotation }) =>
               <span className="type-caption text-ink-3">{r.baseText}</span>
             </span>
             <span className="type-data text-ink">
-              {r.amount == null ? '—' : `${r.key === 'VOLUME_BREAK' ? '−' : ''}${money(r.amount)}`}
+              {r.amount == null
+                ? '—'
+                : `${r.key === 'VOLUME_BREAK' ? '−' : ''}${money(r.amount, currency)}`}
             </span>
           </div>
         ))}
         <div className="flex items-center justify-between gap-4 border-t border-line pt-3">
           <span className="type-h3 text-ink">{`Total, ${quotation.currency}`}</span>
-          <span className="type-display-m text-ink">{moneyOrDash(t.total)}</span>
+          <span className="type-display-m text-ink">
+            {stale ? '—' : moneyOrDash(t.total, currency)}
+          </span>
         </div>
         <p className="type-body-s m-0 text-ink-3">
           {`Applied in a fixed order: the volume break on air and ground lines, fuel on the discounted air lines, insurance on declared value, then contingency, then the service fee. Rate catalog v${quotation.pinnedVersion.versionNo} is pinned to this quotation.`}
@@ -150,7 +162,11 @@ export const IssuePanel: FC<{
         <span className="type-h4 text-ink">{`Issue version ${quotation.versionNo}`}</span>
         <div className="flex items-center justify-between gap-4">
           <span className="type-body-s text-ink-2">Total</span>
-          <span className="type-data text-ink">{moneyOrDash(quotation.totals.total)}</span>
+          <span className="type-data text-ink">
+            {quotation.repriceNeeded
+              ? '—'
+              : moneyOrDash(quotation.totals.total, quotation.currency)}
+          </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="type-body-s text-ink-2">Validity</span>

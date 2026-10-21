@@ -2,7 +2,6 @@ import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
 import { useParams } from 'react-router-dom';
-import type { AxiosError } from 'axios';
 
 import { IssuePanel, Ledger, MissingCallout, StallChoice, TotalsPanel } from './parts';
 
@@ -74,35 +73,22 @@ const QuotationBuilderPage: FC = () => {
     );
   }
 
-  if (query.isError) {
-    const notStarted = (query.error as AxiosError | undefined)?.response?.status === 404;
+  // Any other failure went to the error boundary (useQuotation): no data here means none was started.
+  if (!query.data) {
     return (
       <div className="flex flex-col gap-7">
         <PageHeader back={back} title="Quotation" />
-        {notStarted ? (
-          <Panel title="No quotation yet">
-            <div className="flex flex-col items-start gap-3">
-              <p className="type-body-m m-0 text-ink-2">
-                Start the quotation to price this request from the published rate catalog.
-              </p>
-              <Button variant="secondary" disabled={start.isPending} onClick={() => void onStart()}>
-                Start quotation
-              </Button>
-            </div>
-          </Panel>
-        ) : (
-          <Callout
-            tone="bad"
-            title="The quotation didn't load."
-            action={
-              <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>
-                Try again
-              </Button>
-            }
-          >
-            Nothing has changed. Check your connection and try again.
-          </Callout>
-        )}
+        {conflict && <Callout tone="bad" title={conflict} />}
+        <Panel title="No quotation yet">
+          <div className="flex flex-col items-start gap-3">
+            <p className="type-body-m m-0 text-ink-2">
+              Start the quotation to price this request from the published rate catalog.
+            </p>
+            <Button variant="secondary" disabled={start.isPending} onClick={() => void onStart()}>
+              Start quotation
+            </Button>
+          </div>
+        </Panel>
       </div>
     );
   }

@@ -220,10 +220,14 @@ const RatesPage: FC = () => {
     return true;
   };
 
-  const confirmRemove = (what: string, remove: () => Promise<unknown>) =>
+  const confirmRemove = (what: string, remove: () => Promise<unknown>, everyCorridor = false) =>
     modal.confirm({
-      title: `Remove ${what} from the draft?`,
-      content: 'It stays in the published version until the draft is published.',
+      title: everyCorridor
+        ? `Remove ${what} from every corridor?`
+        : `Remove ${what} from the draft?`,
+      content: everyCorridor
+        ? 'This line applies to every corridor, so removing it removes it from all of them. It stays in the published version until the draft is published.'
+        : 'It stays in the published version until the draft is published.',
       okText: 'Remove',
       okButtonProps: { danger: true },
       cancelText: 'Keep it',
@@ -254,8 +258,10 @@ const RatesPage: FC = () => {
           onAddLine: () => setModalOpen({ kind: 'line', row: null }),
           onEditLine: (row) => setModalOpen({ kind: 'line', row }),
           onRemoveLine: (row) =>
-            confirmRemove(row.description, () =>
-              deleteLine.mutateAsync({ lineId: row.id, view: view.corridor.id }),
+            confirmRemove(
+              row.description,
+              () => deleteLine.mutateAsync({ lineId: row.id, view: view.corridor.id }),
+              row.everyCorridor,
             ),
           onEditBreaks: () => setModalOpen({ kind: 'breaks' }),
           onEditPolicies: () => setModalOpen({ kind: 'policies' }),
