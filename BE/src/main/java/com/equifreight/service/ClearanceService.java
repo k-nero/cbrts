@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,10 @@ public class ClearanceService {
     private final ValidityEngine validityEngine;
     private final AuditService auditService;
     private final FileService fileService;
+    private final JobRegulationPinRepository jobRegulationPinRepository;
+    private final RegulationCatalogRepository regulationCatalogRepository;
+    private final RegulationVersionRepository regulationVersionRepository;
+    private final RegulationRuleRepository regulationRuleRepository;
 
     public ClearanceService(
             ChecklistItemRepository checklistItemRepository,
@@ -38,7 +44,11 @@ public class ClearanceService {
             AuthoritySubmissionRepository authoritySubmissionRepository,
             ValidityEngine validityEngine,
             AuditService auditService,
-            FileService fileService) {
+            FileService fileService,
+            JobRegulationPinRepository jobRegulationPinRepository,
+            RegulationCatalogRepository regulationCatalogRepository,
+            RegulationVersionRepository regulationVersionRepository,
+            RegulationRuleRepository regulationRuleRepository) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -47,6 +57,10 @@ public class ClearanceService {
         this.validityEngine = validityEngine;
         this.auditService = auditService;
         this.fileService = fileService;
+        this.jobRegulationPinRepository = jobRegulationPinRepository;
+        this.regulationCatalogRepository = regulationCatalogRepository;
+        this.regulationVersionRepository = regulationVersionRepository;
+        this.regulationRuleRepository = regulationRuleRepository;
     }
 
     /**
@@ -69,25 +83,31 @@ public class ClearanceService {
 
     /**
      * Retrieve all checklist items for a transport job.
+     * If the checklist is not yet generated, generates it automatically from the route and pinned regulations (BR-F2-01).
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChecklistItemResponse> getChecklist(UUID jobId) {
         findJobOrThrow(jobId);
-        return checklistItemRepository.findByJobId(jobId).stream()
-                .map(ClearanceMapper::toItemResponse)
-                .toList();
+        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
+        if (items.isEmpty()) {
+            return generateChecklist(jobId, null);
+        }
+        return items.stream().map(ClearanceMapper::toItemResponse).toList();
     }
 
     /**
      * Customer-scoped checklist: checks that the job belongs to the authenticated customer's club.
+     * If the checklist is not yet generated, generates it automatically.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChecklistItemResponse> getCustomerChecklist(UUID jobId, User customer) {
         TransportJob job = findJobOrThrow(jobId);
         assertClubOwnsJob(job, customer);
-        return checklistItemRepository.findByJobId(jobId).stream()
-                .map(ClearanceMapper::toItemResponse)
-                .toList();
+        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
+        if (items.isEmpty()) {
+            return generateChecklist(jobId, customer);
+        }
+        return items.stream().map(ClearanceMapper::toItemResponse).toList();
     }
 
     /**
@@ -503,6 +523,206 @@ public class ClearanceService {
         return checklistItemRepository
                 .findById(checklistItemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", checklistItemId));
+    }
+
+    /**
+     * BR-F2-01: Automatically generate the document checklist for a job based on the route and destination country.
+     * Pins destination and origin country regulation catalogs to the job if not already pinned,
+     * then creates the required checklist items according to document scope (PER_HORSE, PER_SHIPMENT, PER_CROSSING).
+     */
+    @Transactional
+    public List<ChecklistItemResponse> generateChecklist(UUID jobId, User specialist) {
+        TransportJob job = findJobOrThrow(jobId);
+
+        String destCountryCode = null;
+        String originCountryCode = null;
+        if (job.getRequest() != null) {
+            if (job.getRequest().getDestinationPlace() != null
+                    && job.getRequest().getDestinationPlace().getCountry() != null) {
+                destCountryCode =
+                        job.getRequest().getDestinationPlace().getCountry().getCode();
+            }
+            if (job.getRequest().getOriginPlace() != null
+                    && job.getRequest().getOriginPlace().getCountry() != null) {
+                originCountryCode =
+                        job.getRequest().getOriginPlace().getCountry().getCode();
+            }
+            if (destCountryCode == null && job.getRequest().getCorridor() != null) {
+                List<CorridorCrossing> crossings =
+                        job.getRequest().getCorridor().getCrossings();
+                if (crossings != null && !crossings.isEmpty()) {
+                    BorderCrossing lastCrossing =
+                            crossings.get(crossings.size() - 1).getBorderCrossing();
+                    if (lastCrossing != null && lastCrossing.getToCountry() != null) {
+                        destCountryCode = lastCrossing.getToCountry().getCode();
+                    }
+                }
+            }
+        }
+        if (destCountryCode == null) {
+            destCountryCode = "KH";
+        }
+
+        pinCountryCatalogIfMissing(job, destCountryCode, RegulationRole.DESTINATION);
+        if (originCountryCode != null && !originCountryCode.equalsIgnoreCase(destCountryCode)) {
+            pinCountryCatalogIfMissing(job, originCountryCode, RegulationRole.ORIGIN);
+        }
+
+        List<JobRegulationPin> pins = jobRegulationPinRepository.findByJobId(job.getId());
+        List<ChecklistItem> existingItems = checklistItemRepository.findByJobId(job.getId());
+
+        List<RequestHorse> requestHorses =
+                job.getRequest() != null && job.getRequest().getHorses() != null
+                        ? job.getRequest().getHorses()
+                        : List.of();
+
+        List<CorridorCrossing> crossings =
+                job.getRequest() != null && job.getRequest().getCorridor() != null
+                        ? job.getRequest().getCorridor().getCrossings()
+                        : List.of();
+
+        int generatedCount = 0;
+        for (JobRegulationPin pin : pins) {
+            RegulationVersion version = pin.getRegulationVersion();
+            if (version == null) {
+                continue;
+            }
+            List<RegulationRule> rules = regulationRuleRepository.findByVersionId(version.getId());
+            for (RegulationRule rule : rules) {
+                DocumentType docType = rule.getDocumentType();
+                if (docType == null) {
+                    continue;
+                }
+
+                DocumentScope scope = docType.getScope();
+                if (scope == DocumentScope.PER_HORSE) {
+                    for (RequestHorse rh : requestHorses) {
+                        Horse h = rh.getHorse();
+                        if (h == null) {
+                            continue;
+                        }
+                        boolean exists = existingItems.stream()
+                                .anyMatch(ci -> ci.getDocumentType().getId().equals(docType.getId())
+                                        && ci.getHorse() != null
+                                        && ci.getHorse().getId().equals(h.getId()));
+                        if (!exists) {
+                            ChecklistItem item = createChecklistItem(job, docType, rule, h, null);
+                            existingItems.add(checklistItemRepository.save(item));
+                            generatedCount++;
+                        }
+                    }
+                } else if (scope == DocumentScope.PER_SHIPMENT) {
+                    boolean exists = existingItems.stream()
+                            .anyMatch(ci ->
+                                    ci.getDocumentType().getId().equals(docType.getId()) && ci.getHorse() == null);
+                    if (!exists) {
+                        ChecklistItem item = createChecklistItem(job, docType, rule, null, null);
+                        existingItems.add(checklistItemRepository.save(item));
+                        generatedCount++;
+                    }
+                } else if (scope == DocumentScope.PER_CROSSING) {
+                    for (CorridorCrossing cc : crossings) {
+                        BorderCrossing bc = cc.getBorderCrossing();
+                        if (bc == null) {
+                            continue;
+                        }
+                        boolean exists = existingItems.stream()
+                                .anyMatch(ci -> ci.getDocumentType().getId().equals(docType.getId())
+                                        && ci.getBorderCrossing() != null
+                                        && ci.getBorderCrossing().getId().equals(bc.getId()));
+                        if (!exists) {
+                            ChecklistItem item = createChecklistItem(job, docType, rule, null, bc);
+                            existingItems.add(checklistItemRepository.save(item));
+                            generatedCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (generatedCount > 0) {
+            evaluateClearanceGate(job.getId());
+            auditService.recordDecision(
+                    specialist,
+                    "CHECKLIST_GENERATED",
+                    String.format(
+                            "Generated %d checklist items for job %s from pinned regulations.",
+                            generatedCount, job.getCode()),
+                    "TRANSPORT_JOB",
+                    job.getId(),
+                    job.getCode(),
+                    null,
+                    null,
+                    "OPEN");
+        }
+
+        return checklistItemRepository.findByJobId(job.getId()).stream()
+                .map(ClearanceMapper::toItemResponse)
+                .toList();
+    }
+
+    private ChecklistItem createChecklistItem(
+            TransportJob job, DocumentType docType, RegulationRule rule, Horse horse, BorderCrossing borderCrossing) {
+        ChecklistItem item = new ChecklistItem();
+        item.setJob(job);
+        item.setDocumentType(docType);
+        item.setRegulationRule(rule);
+        item.setHorse(horse);
+        item.setBorderCrossing(borderCrossing);
+        boolean customerProvided = docType.getProvidedBy() == DocumentProvider.CUSTOMER;
+        item.setStatus(customerProvided ? ChecklistStatus.AWAITING_UPLOAD : ChecklistStatus.NOT_ISSUED);
+        item.setHolder(customerProvided ? ChecklistHolder.CUSTOMER : ChecklistHolder.SPECIALIST);
+        item.setDueDate(calculateDueDate(job, rule));
+        return item;
+    }
+
+    private LocalDate calculateDueDate(TransportJob job, RegulationRule rule) {
+        LocalDate departure = null;
+        if (job != null && job.getPlannedDepartureAt() != null) {
+            departure = job.getPlannedDepartureAt()
+                    .atZone(AppConstants.BUSINESS_ZONE)
+                    .toLocalDate();
+        }
+        if (departure == null) {
+            return LocalDate.now(AppConstants.BUSINESS_ZONE).plusDays(14);
+        }
+        if (rule != null && rule.getMinDays() != null) {
+            return departure.minusDays(rule.getMinDays());
+        }
+        return departure.minusDays(7);
+    }
+
+    private void pinCountryCatalogIfMissing(TransportJob job, String countryCode, RegulationRole role) {
+        if (countryCode == null) {
+            return;
+        }
+        List<JobRegulationPin> existingPins = jobRegulationPinRepository.findByJobId(job.getId());
+        boolean alreadyPinned = existingPins.stream()
+                .anyMatch(p -> p.getRole() == role
+                        || (p.getRegulationVersion() != null
+                                && p.getRegulationVersion().getCatalog() != null
+                                && countryCode.equalsIgnoreCase(p.getRegulationVersion()
+                                        .getCatalog()
+                                        .getCountry()
+                                        .getCode())));
+        if (alreadyPinned) {
+            return;
+        }
+
+        regulationCatalogRepository.findByCountryCode(countryCode.toUpperCase()).ifPresent(cat -> {
+            List<RegulationVersion> published =
+                    regulationVersionRepository.findByCatalogIdAndStatusOrdered(cat.getId(), CatalogStatus.PUBLISHED);
+            if (!published.isEmpty()) {
+                RegulationVersion v = published.get(0);
+                JobRegulationPin pin = new JobRegulationPin();
+                pin.setJob(job);
+                pin.setRegulationVersion(v);
+                pin.setRole(role);
+                pin.getId().setJobId(job.getId());
+                pin.getId().setRegulationVersionId(v.getId());
+                jobRegulationPinRepository.save(pin);
+            }
+        });
     }
 
     private record GateAssessment(

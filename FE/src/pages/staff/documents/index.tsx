@@ -19,6 +19,7 @@ import {
   useClearanceJobs,
   useClearanceStatus,
   useEvaluateClearanceGate,
+  useGenerateChecklist,
   useJobChecklist,
   usePendingReviews,
   useReviewDocument,
@@ -91,6 +92,7 @@ const DocumentsPage: FC = () => {
   const reviewMutation = useReviewDocument(selectedJobId);
   const uploadMutation = useUploadDocumentVersion(selectedJobId);
   const evaluateGateMutation = useEvaluateClearanceGate(selectedJobId);
+  const generateChecklistMutation = useGenerateChecklist();
 
   const handleSelectJob = (jobId: string | null) => {
     setSelectedJobId(jobId);
@@ -326,9 +328,28 @@ const DocumentsPage: FC = () => {
               ]}
             />
             {selectedJobId && (
-              <Button variant="secondary" size="sm" onClick={() => handleSelectJob(null)}>
-                Clear
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    generateChecklistMutation.mutate(selectedJobId, {
+                      onSuccess: () => {
+                        void messageApi.success('Checklist generated from pinned regulations.');
+                      },
+                      onError: (err: unknown) => {
+                        void messageApi.error(apiErrorMessage(err, 'Failed to generate checklist.'));
+                      },
+                    });
+                  }}
+                  loading={generateChecklistMutation.isPending}
+                >
+                  Generate checklist
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => handleSelectJob(null)}>
+                  Clear
+                </Button>
+              </>
             )}
           </div>
 

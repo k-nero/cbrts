@@ -151,6 +151,33 @@ export const useEvaluateClearanceGate = (jobId?: string | null) => {
 };
 
 /**
+ * Auto-generate document checklist from route and pinned regulations (BR-F2-01).
+ */
+export const useGenerateChecklist = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => clearanceApi.generateChecklist(jobId).then((r) => r.data),
+    onSuccess: (_, jobId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+    },
+  });
+};
+
+/**
+ * Check and alert manager on late authority dossiers (Flow 2: Alert manager on late dossiers).
+ */
+export const useCheckLateSubmissions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clearanceApi.checkLateSubmissions().then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.all });
+    },
+  });
+};
+
+/**
  * Recognised authorities list.
  */
 export const useAuthorities = (params?: { countryCode?: string; kind?: AuthorityKind }) => {

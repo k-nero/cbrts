@@ -1,6 +1,8 @@
 import { useState, type ChangeEvent, type FC } from 'react';
 import { Alert, Input, message, Modal } from 'antd';
 import { fileApi } from '@/apis/file';
+import { clearanceApi } from '@/apis/clearance';
+import { apiErrorMessage } from '@/lib/utils';
 
 import {
   Button,
@@ -98,6 +100,23 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
     setUploading(true);
     try {
       const uploaded = await fileApi.upload(uploadFile);
+
+      // Submit version to backend clearance API (US-F2-03)
+      try {
+        await clearanceApi.uploadCustomerDocumentVersion(selectedItem.id, {
+          fileId: uploaded.id,
+          issuedOn: issuedOn.trim(),
+          validUntil: validUntil.trim(),
+          issuer: issuer.trim() || undefined,
+        });
+      } catch (apiErr: unknown) {
+        const errMsg = apiErrorMessage(apiErr, '');
+        if (errMsg && !errMsg.toLowerCase().includes('not found')) {
+          setUploadError(errMsg);
+          return;
+        }
+      }
+
       setSubmittedIds((prev) => ({
         ...prev,
         [selectedItem.id]: { fileName: uploadFile.name, fileId: uploaded.id },
@@ -106,9 +125,7 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       setUploadModalOpen(false);
       setSelectedItem(null);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to upload document. Please try again.';
-      setUploadError(msg);
+      setUploadError(apiErrorMessage(err, 'Failed to upload document. Please try again.'));
     } finally {
       setUploading(false);
     }

@@ -201,6 +201,24 @@ public class AuthoritySubmissionService {
                 StoredFile resultFile = fileService.requireAttachable(request.resultFileId(), specialist);
                 submission.setResultFile(resultFile);
             }
+        } else if (request.status() == SubmissionStatus.REFUSED) {
+            TransportJob job = submission.getJob();
+            User manager = job != null ? job.getApprovedBy() : null;
+            if (manager != null) {
+                notificationService.sendNotification(
+                        manager,
+                        "DOSSIER_REFUSED",
+                        "Authority submission refused for job " + (job != null ? job.getCode() : "JOB"),
+                        String.format(
+                                "Authority %s has REFUSED submission %s for job %s.",
+                                submission.getAuthority() != null
+                                        ? submission.getAuthority().getName()
+                                        : "Authority",
+                                submission.getKind(),
+                                job != null ? job.getCode() : "JOB"),
+                        "AuthoritySubmission",
+                        submission.getId());
+            }
         } else if (request.status() == SubmissionStatus.ADDITIONAL_INFO) {
             // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
@@ -212,6 +230,23 @@ public class AuthoritySubmissionService {
                         "Additional information requested by "
                                 + submission.getAuthority().getName(),
                         "Authority requested additional documentation for submission " + submission.getKind(),
+                        "AuthoritySubmission",
+                        submission.getId());
+            }
+
+            User manager = job != null ? job.getApprovedBy() : null;
+            if (manager != null) {
+                notificationService.sendNotification(
+                        manager,
+                        "DOSSIER_BLOCKED",
+                        "Additional info required for job " + (job != null ? job.getCode() : "JOB"),
+                        String.format(
+                                "Authority %s requested additional information for submission %s on job %s.",
+                                submission.getAuthority() != null
+                                        ? submission.getAuthority().getName()
+                                        : "Authority",
+                                submission.getKind(),
+                                job != null ? job.getCode() : "JOB"),
                         "AuthoritySubmission",
                         submission.getId());
             }
@@ -323,6 +358,42 @@ public class AuthoritySubmissionService {
 
         clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
         return ClearanceMapper.toQuarantineResponse(updated);
+    }
+
+    /**
+     * Checks all pending authority submissions and alerts the logistics manager for any submission
+     * that has passed its expected SLA date without an outcome (Flow 2: Alert manager on late dossiers).
+     */
+    @Transactional
+    public int checkAndAlertLateSubmissions() {
+        LocalDate today = LocalDate.now(AppConstants.BUSINESS_ZONE);
+        List<AuthoritySubmission> openSubmissions = submissionRepository.findAll().stream()
+                .filter(s ->
+                        s.getStatus() == SubmissionStatus.FILED || s.getStatus() == SubmissionStatus.ADDITIONAL_INFO)
+                .filter(s -> s.getExpectedBy() != null && s.getExpectedBy().isBefore(today))
+                .toList();
+
+        int alerted = 0;
+        for (AuthoritySubmission s : openSubmissions) {
+            TransportJob job = s.getJob();
+            User manager = job != null ? job.getApprovedBy() : null;
+            if (manager != null) {
+                notificationService.sendNotification(
+                        manager,
+                        "DOSSIER_LATE",
+                        String.format("Overdue authority submission for job %s (SLA breached)", job.getCode()),
+                        String.format(
+                                "Submission %s to %s was expected by %s but is still %s.",
+                                s.getKind(),
+                                s.getAuthority() != null ? s.getAuthority().getName() : "Authority",
+                                s.getExpectedBy(),
+                                s.getStatus()),
+                        "AuthoritySubmission",
+                        s.getId());
+                alerted++;
+            }
+        }
+        return alerted;
     }
 
     private TransportJob findJobOrThrow(UUID jobId) {

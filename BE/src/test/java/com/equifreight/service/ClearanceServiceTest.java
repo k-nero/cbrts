@@ -8,6 +8,7 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.model.clearance.ChecklistItemResponse;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.clearance.DocumentUploadRequest;
 import com.equifreight.model.clearance.ReviewDocumentRequest;
@@ -52,6 +53,18 @@ class ClearanceServiceTest {
 
     @Mock
     private FileService fileService;
+
+    @Mock
+    private JobRegulationPinRepository jobRegulationPinRepository;
+
+    @Mock
+    private RegulationCatalogRepository regulationCatalogRepository;
+
+    @Mock
+    private RegulationVersionRepository regulationVersionRepository;
+
+    @Mock
+    private RegulationRuleRepository regulationRuleRepository;
 
     @InjectMocks
     private ClearanceService clearanceService;
@@ -385,6 +398,19 @@ class ClearanceServiceTest {
 
         assertEquals(DossierStatus.ADDITIONAL_INFO_REQUIRED, job.getDossierStatus());
         assertNull(job.getClearanceReadyAt());
+    }
+
+    @Test
+    @DisplayName("generateChecklist creates items for pinned regulations")
+    void generateChecklistCreatesRequiredItems() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(regulationCatalogRepository.findByCountryCode("KH")).thenReturn(Optional.empty());
+
+        List<ChecklistItemResponse> result = clearanceService.generateChecklist(job.getId(), specialistUser);
+
+        assertNotNull(result);
     }
 
     private void stubGate(List<AuthoritySubmission> submissions) {

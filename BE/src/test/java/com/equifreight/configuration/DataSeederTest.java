@@ -74,6 +74,9 @@ class DataSeederTest {
                 mock(QuarantinePeriodRepository.class),
                 mock(NoteRepository.class),
                 mock(NoteReplyRepository.class),
+                mock(ChecklistItemRepository.class),
+                mock(DocumentVersionRepository.class),
+                mock(StoredFileRepository.class),
                 mock(CatalogSeeder.class));
 
         Club club = new Club();

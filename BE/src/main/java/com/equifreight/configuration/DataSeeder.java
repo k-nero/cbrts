@@ -143,6 +143,9 @@ public class DataSeeder implements ApplicationRunner {
     private final QuarantinePeriodRepository quarantinePeriodRepository;
     private final NoteRepository noteRepository;
     private final NoteReplyRepository noteReplyRepository;
+    private final ChecklistItemRepository checklistItemRepository;
+    private final DocumentVersionRepository documentVersionRepository;
+    private final StoredFileRepository storedFileRepository;
     private final CatalogSeeder catalogSeeder;
 
     public DataSeeder(
@@ -180,6 +183,9 @@ public class DataSeeder implements ApplicationRunner {
             QuarantinePeriodRepository quarantinePeriodRepository,
             NoteRepository noteRepository,
             NoteReplyRepository noteReplyRepository,
+            ChecklistItemRepository checklistItemRepository,
+            DocumentVersionRepository documentVersionRepository,
+            StoredFileRepository storedFileRepository,
             CatalogSeeder catalogSeeder) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
@@ -215,6 +221,9 @@ public class DataSeeder implements ApplicationRunner {
         this.quarantinePeriodRepository = quarantinePeriodRepository;
         this.noteRepository = noteRepository;
         this.noteReplyRepository = noteReplyRepository;
+        this.checklistItemRepository = checklistItemRepository;
+        this.documentVersionRepository = documentVersionRepository;
+        this.storedFileRepository = storedFileRepository;
         this.catalogSeeder = catalogSeeder;
     }
 
@@ -1087,6 +1096,130 @@ public class DataSeeder implements ApplicationRunner {
         User lan = userRepository.getByEmail("lan.nguyen@equifreight.vn");
         User customer = userRepository.getByEmail("bookings@saigonturf.vn");
         Club saigonClub = clubRepository.findByName("Saigon Turf Club").orElse(null);
+
+        // 0. Seed canonical checklist items and document versions for CBRT-2026-041
+        if (checklistItemRepository.findByJobId(job.getId()).isEmpty()) {
+            DocumentType passport =
+                    documentTypeRepository.findByCode("EQUINE_PASSPORT").orElse(null);
+            DocumentType flu =
+                    documentTypeRepository.findByCode("INFLUENZA_VACCINATION").orElse(null);
+            DocumentType eia = documentTypeRepository.findByCode("EIA_TEST").orElse(null);
+            DocumentType ownership =
+                    documentTypeRepository.findByCode("PROOF_OF_OWNERSHIP").orElse(null);
+            DocumentType insurance =
+                    documentTypeRepository.findByCode("TRANSIT_INSURANCE").orElse(null);
+
+            Horse copperKing = horseRepository.findByName("Copper King").orElse(null);
+
+            StoredFile passportFile = new StoredFile();
+            passportFile.setStorageKey("demo/passport-copper-king.pdf");
+            passportFile.setFileName("Passport-CopperKing.pdf");
+            passportFile.setContentType("application/pdf");
+            passportFile.setSizeBytes(1024L * 512L);
+            passportFile.setSha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+            passportFile.setUploadedBy(customer);
+            StoredFile savedPassportFile = storedFileRepository.save(passportFile);
+
+            StoredFile ownershipFile = new StoredFile();
+            ownershipFile.setStorageKey("demo/bill-of-sale-copper-king.pdf");
+            ownershipFile.setFileName("BillOfSale-CopperKing.pdf");
+            ownershipFile.setContentType("application/pdf");
+            ownershipFile.setSizeBytes(1024L * 256L);
+            ownershipFile.setSha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b856");
+            ownershipFile.setUploadedBy(customer);
+            StoredFile savedOwnershipFile = storedFileRepository.save(ownershipFile);
+
+            if (eia != null && copperKing != null) {
+                ChecklistItem ciEia = new ChecklistItem();
+                ciEia.setJob(job);
+                ciEia.setDocumentType(eia);
+                ciEia.setHorse(copperKing);
+                ciEia.setStatus(ChecklistStatus.AWAITING_UPLOAD);
+                ciEia.setValidity(Validity.RED);
+                ciEia.setValidityNote("Valid today, but 77 days old at departure (limit 60 days).");
+                ciEia.setHolder(ChecklistHolder.CUSTOMER);
+                ciEia.setDueDate(LocalDate.parse("2026-10-04"));
+                checklistItemRepository.save(ciEia);
+            }
+
+            if (ownership != null && copperKing != null) {
+                ChecklistItem ciOwnership = new ChecklistItem();
+                ciOwnership.setJob(job);
+                ciOwnership.setDocumentType(ownership);
+                ciOwnership.setHorse(copperKing);
+                ciOwnership.setStatus(ChecklistStatus.REJECTED);
+                ciOwnership.setValidity(Validity.RED);
+                ciOwnership.setValidityNote("Rejected 24 Sep by Lan: bill of sale is unsigned. Upload signed copy.");
+                ciOwnership.setHolder(ChecklistHolder.CUSTOMER);
+                ciOwnership.setDueDate(LocalDate.parse("2026-09-25"));
+                ChecklistItem savedOwnership = checklistItemRepository.save(ciOwnership);
+
+                DocumentVersion vOwnership = new DocumentVersion();
+                vOwnership.setChecklistItem(savedOwnership);
+                vOwnership.setVersionNo((short) 1);
+                vOwnership.setFile(savedOwnershipFile);
+                vOwnership.setUploadedBy(customer);
+                vOwnership.setUploadedAt(Instant.now().minus(java.time.Duration.ofDays(26)));
+                vOwnership.setReview(DocumentReview.REJECTED);
+                vOwnership.setReviewedBy(lan != null ? lan : yen);
+                vOwnership.setReviewedAt(Instant.now().minus(java.time.Duration.ofDays(25)));
+                vOwnership.setRejectReason("Bill of sale is unsigned. Upload signed copy.");
+                DocumentVersion savedVOwnership = documentVersionRepository.save(vOwnership);
+                savedOwnership.setCurrentVersion(savedVOwnership);
+                checklistItemRepository.save(savedOwnership);
+            }
+
+            if (insurance != null) {
+                ChecklistItem ciInsurance = new ChecklistItem();
+                ciInsurance.setJob(job);
+                ciInsurance.setDocumentType(insurance);
+                ciInsurance.setStatus(ChecklistStatus.AWAITING_UPLOAD);
+                ciInsurance.setValidity(Validity.AMBER);
+                ciInsurance.setValidityNote("Policy ends 15 Oct, before arrival plus 2 days (20 Oct).");
+                ciInsurance.setHolder(ChecklistHolder.CUSTOMER);
+                ciInsurance.setDueDate(LocalDate.parse("2026-09-30"));
+                checklistItemRepository.save(ciInsurance);
+            }
+
+            if (flu != null && copperKing != null) {
+                ChecklistItem ciFlu = new ChecklistItem();
+                ciFlu.setJob(job);
+                ciFlu.setDocumentType(flu);
+                ciFlu.setHorse(copperKing);
+                ciFlu.setStatus(ChecklistStatus.AWAITING_UPLOAD);
+                ciFlu.setValidity(Validity.RED);
+                ciFlu.setValidityNote("Booster lapsed on 16 Sep. Give new booster at least 7 days before departure.");
+                ciFlu.setHolder(ChecklistHolder.CUSTOMER);
+                ciFlu.setDueDate(LocalDate.parse("2026-10-11"));
+                checklistItemRepository.save(ciFlu);
+            }
+
+            if (passport != null && copperKing != null) {
+                ChecklistItem ciPassport = new ChecklistItem();
+                ciPassport.setJob(job);
+                ciPassport.setDocumentType(passport);
+                ciPassport.setHorse(copperKing);
+                ciPassport.setStatus(ChecklistStatus.IN_REVIEW);
+                ciPassport.setValidity(Validity.GREEN);
+                ciPassport.setValidityNote("Passport uploaded and valid. Awaiting specialist verification.");
+                ciPassport.setHolder(ChecklistHolder.SPECIALIST);
+                ciPassport.setDueDate(LocalDate.parse("2026-10-15"));
+                ChecklistItem savedPassport = checklistItemRepository.save(ciPassport);
+
+                DocumentVersion vPassport = new DocumentVersion();
+                vPassport.setChecklistItem(savedPassport);
+                vPassport.setVersionNo((short) 1);
+                vPassport.setFile(savedPassportFile);
+                vPassport.setUploadedBy(customer);
+                vPassport.setUploadedAt(Instant.now().minus(java.time.Duration.ofDays(2)));
+                vPassport.setReview(DocumentReview.PENDING);
+                DocumentVersion savedVPassport = documentVersionRepository.save(vPassport);
+                savedPassport.setCurrentVersion(savedVPassport);
+                checklistItemRepository.save(savedPassport);
+            }
+
+            log.info("Seeded canonical checklist items and versions for CBRT-2026-041");
+        }
 
         // Authority Submissions
         if (authoritySubmissionRepository.count() == 0) {

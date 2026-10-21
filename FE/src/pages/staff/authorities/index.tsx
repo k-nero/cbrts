@@ -34,6 +34,7 @@ import {
   useCompleteQuarantine,
   useClearanceStatus,
   useEvaluateClearanceGate,
+  useCheckLateSubmissions,
 } from '@/hooks/clearance';
 import type {
   JobSummary,
@@ -101,6 +102,7 @@ const AuthoritiesPage: FC = () => {
   const createQuarantineMutation = useCreateQuarantine(jobId);
   const completeQuarantineMutation = useCompleteQuarantine(jobId);
   const evaluateGateMutation = useEvaluateClearanceGate(jobId);
+  const checkLateMutation = useCheckLateSubmissions();
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
@@ -388,9 +390,29 @@ const AuthoritiesPage: FC = () => {
               against its SLA response window.
             </p>
           </div>
-          <span className="type-mono-caption text-ink-3">
-            {submissions.length} relevant authorities
-          </span>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                checkLateMutation.mutate(undefined, {
+                  onSuccess: (count) => {
+                    void message.success(
+                      count > 0
+                        ? `Alerted logistics manager for ${count} overdue dossier(s).`
+                        : 'All submissions are currently within their SLA.',
+                    );
+                  },
+                });
+              }}
+              loading={checkLateMutation.isPending}
+            >
+              Check SLA alerts
+            </Button>
+            <span className="type-mono-caption text-ink-3">
+              {submissions.length} relevant authorities
+            </span>
+          </div>
         </div>
 
         {loadingSubmissions ? (
