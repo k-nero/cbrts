@@ -202,6 +202,13 @@ public class AuthoritySubmissionService {
                 StoredFile resultFile = fileService.requireAttachable(request.resultFileId(), specialist);
                 submission.setResultFile(resultFile);
             }
+        } else if (request.status() == SubmissionStatus.REFUSED) {
+            alertManager(
+                    submission,
+                    "DOSSIER_REFUSED",
+                    submission.getAuthority().getName() + " refused " + submission.getKind() + " for "
+                            + submission.getJob().getCode(),
+                    "Reschedule or re-file before the departure slot is lost.");
         } else if (request.status() == SubmissionStatus.ADDITIONAL_INFO) {
             // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
@@ -216,6 +223,12 @@ public class AuthoritySubmissionService {
                         "AuthoritySubmission",
                         submission.getId());
             }
+            alertManager(
+                    submission,
+                    "DOSSIER_BLOCKED",
+                    submission.getAuthority().getName() + " asked for more information on " + submission.getKind()
+                            + " for " + job.getCode(),
+                    "The dossier is blocked until the customer sends it.");
         }
 
         AuthoritySubmission updated = submissionRepository.save(submission);
@@ -334,6 +347,39 @@ public class AuthoritySubmissionService {
 
         clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
         return ClearanceMapper.toQuarantineResponse(updated);
+    }
+
+    /**
+     * US-F2-07: alerts the logistics manager who approved the job about every submission still open after the
+     * day the authority was expected to answer (an SLA breach). Run once a day, so a breach is repeated daily
+     * until the authority answers. Returns how many alerts were sent.
+     */
+    @Transactional
+    public int alertLateSubmissions(LocalDate today) {
+        List<AuthoritySubmission> late = submissionRepository.findByStatusInAndExpectedByBefore(
+                List.of(SubmissionStatus.FILED, SubmissionStatus.ADDITIONAL_INFO), today);
+        int alerted = 0;
+        for (AuthoritySubmission s : late) {
+            if (alertManager(
+                    s,
+                    "DOSSIER_LATE",
+                    s.getKind() + " for " + s.getJob().getCode() + " is late",
+                    s.getAuthority().getName() + " was expected to answer by " + s.getExpectedBy()
+                            + " and the submission is still " + s.getStatus() + ".")) {
+                alerted++;
+            }
+        }
+        return alerted;
+    }
+
+    /** Notifies the logistics manager who approved the submission's job; false when no one approved it. */
+    private boolean alertManager(AuthoritySubmission submission, String type, String title, String body) {
+        User manager = submission.getJob().getApprovedBy();
+        if (manager == null) {
+            return false;
+        }
+        notificationService.sendNotification(manager, type, title, body, "AuthoritySubmission", submission.getId());
+        return true;
     }
 
     private TransportJob findJobOrThrow(UUID jobId) {

@@ -1,11 +1,13 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.ChecklistItem;
+import com.equifreight.entity.Corridor;
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RegulationCatalog;
 import com.equifreight.entity.RegulationVersion;
 import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.DossierStatus;
 import java.util.List;
@@ -17,19 +19,23 @@ public final class ClearanceMapper {
 
     /** A job on the transport specialist's picker. */
     public static JobSummaryResponse toJobSummaryResponse(TransportJob job) {
+        TransportRequest request = job.getRequest();
+        Corridor corridor = request.getCorridor();
         return JobSummaryResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
                 .dossierStatus(job.getDossierStatus())
                 .stage(job.getStage())
-                .clubName(job.getRequest().getClub().getName())
-                .originCity(cityOf(job.getRequest().getOriginPlace()))
-                .destinationCity(cityOf(job.getRequest().getDestinationPlace()))
+                .clubName(request.getClub().getName())
+                .originCity(cityOf(request.getOriginPlace(), corridor == null ? null : corridor.getOriginCity()))
+                .destinationCity(
+                        cityOf(request.getDestinationPlace(), corridor == null ? null : corridor.getDestinationCity()))
                 .build();
     }
 
-    private static String cityOf(Place place) {
-        return place == null ? null : place.getCity();
+    /** The place's city, else the corridor's (a request typed as free text has no place). */
+    private static String cityOf(Place place, String corridorCity) {
+        return place != null ? place.getCity() : corridorCity;
     }
 
     /** The clearance gate of a job, with the counts ClearanceService worked out. */

@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FC, useState } from 'react';
 import { Alert, Input, message, Modal } from 'antd';
 import { fileApi } from '@/apis/file';
+import { apiErrorMessage } from '@/lib/utils';
 
 import { Button, Chip, OwedItem } from '@/components/ui';
 import type { CustomerHome } from '@/interfaces';
@@ -82,9 +83,7 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       setUploadModalOpen(false);
       setSelectedItem(null);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to upload document. Please try again.';
-      setUploadError(msg);
+      setUploadError(apiErrorMessage(err, 'Failed to upload document. Please try again.'));
     } finally {
       setUploading(false);
     }

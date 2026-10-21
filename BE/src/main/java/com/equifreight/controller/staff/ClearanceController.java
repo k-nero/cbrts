@@ -45,6 +45,12 @@ public class ClearanceController {
         return ResponseEntity.ok(clearanceService.getChecklist(jobId));
     }
 
+    @PostMapping("/jobs/{jobId}/generate-checklist")
+    public ResponseEntity<List<ChecklistItemResponse>> generateChecklist(
+            @PathVariable UUID jobId, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(clearanceService.generateChecklist(jobId, user));
+    }
+
     @GetMapping("/jobs/{jobId}/status")
     public ResponseEntity<ClearanceStatusResponse> getClearanceStatus(@PathVariable UUID jobId) {
         return ResponseEntity.ok(clearanceService.getClearanceStatus(jobId));

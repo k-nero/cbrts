@@ -2,8 +2,11 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.AuthoritySubmission;
 import com.equifreight.entity.enums.SubmissionStatus;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -48,4 +51,10 @@ public interface AuthoritySubmissionRepository
             WHERE s.job.id = :jobId AND s.status = com.equifreight.entity.enums.SubmissionStatus.REFUSED
             """)
     boolean hasRefusedSubmission(@Param("jobId") UUID jobId);
+
+    /**
+     * Submissions in these statuses whose answer was due before {@code day}, with what the alert names.
+     */
+    @EntityGraph(attributePaths = {"job", "job.approvedBy", "authority"})
+    List<AuthoritySubmission> findByStatusInAndExpectedByBefore(Collection<SubmissionStatus> statuses, LocalDate day);
 }

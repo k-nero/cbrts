@@ -3,6 +3,7 @@ package com.equifreight.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
@@ -172,5 +173,36 @@ class AuthoritySubmissionServiceTest {
                         specialist));
         assertEquals("QUARANTINE_TOO_SHORT", ex.getCode());
         verify(quarantinePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Late submissions alert the manager who approved the job; one with no approver is skipped")
+    void alertLateSubmissionsNotifiesTheApprovingManager() {
+        User manager = new User();
+        manager.setId(UUID.randomUUID());
+        job.setApprovedBy(manager);
+        AuthoritySubmission late = new AuthoritySubmission();
+        late.setId(UUID.randomUUID());
+        late.setJob(job);
+        late.setAuthority(customs);
+        late.setKind(SubmissionKind.IMPORT_PERMIT);
+        late.setStatus(SubmissionStatus.FILED);
+        late.setExpectedBy(LocalDate.of(2026, 10, 20));
+        TransportJob unapproved = new TransportJob();
+        unapproved.setCode("CBRT-2026-042");
+        AuthoritySubmission orphan = new AuthoritySubmission();
+        orphan.setJob(unapproved);
+        orphan.setAuthority(customs);
+        LocalDate today = LocalDate.of(2026, 10, 21);
+        when(submissionRepository.findByStatusInAndExpectedByBefore(
+                        List.of(SubmissionStatus.FILED, SubmissionStatus.ADDITIONAL_INFO), today))
+                .thenReturn(List.of(late, orphan));
+
+        assertEquals(1, service.alertLateSubmissions(today));
+
+        verify(notificationService)
+                .sendNotification(
+                        eq(manager), eq("DOSSIER_LATE"), any(), any(), eq("AuthoritySubmission"), eq(late.getId()));
+        verifyNoMoreInteractions(notificationService);
     }
 }
