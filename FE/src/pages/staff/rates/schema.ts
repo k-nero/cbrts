@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { RateBasis } from '@/interfaces';
+import type { RateBasis, RatePolicyKey } from '@/interfaces';
 
 const option = z.object({ label: z.string(), value: z.string() });
 
@@ -133,3 +133,24 @@ export const bandsSchema = z.object({
   ),
 });
 export type BandsForm = z.infer<typeof bandsSchema>;
+
+export const POLICY_FIELDS: { key: RatePolicyKey; label: string; max?: number; step: number }[] = [
+  { key: 'FUEL_PCT', label: 'Fuel surcharge, % of air lines', max: 100, step: 0.5 },
+  { key: 'INSURANCE_PCT', label: 'Insurance, % of declared value', max: 100, step: 0.1 },
+  { key: 'CONTINGENCY_PCT', label: 'Contingency, %', max: 100, step: 0.5 },
+  { key: 'SERVICE_FEE_PCT', label: 'Service fee, % after contingency', max: 100, step: 0.5 },
+  { key: 'DEPOSIT_PCT', label: 'Deposit, %', max: 100, step: 1 },
+  { key: 'QUOTE_VALIDITY_DAYS', label: 'Quote validity, days', max: 30, step: 1 },
+  { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet from, horses', step: 1 },
+  { key: 'HIGH_VALUE_THRESHOLD', label: 'High value threshold, USD', step: 1000 },
+];
+
+export const policySchema = z.object(
+  Object.fromEntries(
+    POLICY_FIELDS.map((f) => [
+      f.key,
+      z.number({ error: 'Enter a value.' }).min(0, "It can't be negative."),
+    ]),
+  ) as Record<RatePolicyKey, z.ZodNumber>,
+);
+export type PolicyForm = z.infer<typeof policySchema>;

@@ -5,12 +5,15 @@ import { useSearchParams } from 'react-router-dom';
 
 import { CorridorList } from './CorridorList';
 import { DraftPanel } from './DraftPanel';
-import { BreaksModal, ClassModal, LineModal, PoliciesModal } from './editors';
-import { BreaksPanel, ClassTable, LineTable, PolicyPanel } from './tables';
+import { BreaksModal } from './BreaksModal';
+import { ClassModal } from './ClassModal';
+import { LineModal } from './LineModal';
+import { PoliciesModal } from './PoliciesModal';
 import { VersionsPanel } from './VersionsPanel';
+import { CorridorRates, type Editing } from './CorridorRates';
 
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Panel, StatTile } from '@/components/ui';
+import { Button, Callout, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
 import {
   useDeleteRateLine,
@@ -18,153 +21,8 @@ import {
   useRateCatalog,
   useRateCorridor,
 } from '@/hooks/rates';
-import type { RateCatalog, RateCorridorView, RateLine, ServiceClassRow } from '@/interfaces';
-import {
-  apiErrorMessage,
-  corridorShort,
-  draftRefusal,
-  formatDate,
-  pickCorridor,
-} from '@/lib/utils';
-
-const LoadError: FC<{ what: string; onRetry: () => void }> = ({ what, onRetry }) => (
-  <Callout
-    tone="bad"
-    title={`The ${what} didn't load.`}
-    action={
-      <Button size="sm" variant="secondary" onClick={onRetry}>
-        Try again
-      </Button>
-    }
-  >
-    Nothing has changed. Check your connection and try again.
-  </Callout>
-);
-
-const Loading: FC = () => (
-  <Panel>
-    <Skeleton active title={false} paragraph={{ rows: 6 }} />
-  </Panel>
-);
-
-/** The four facts about the corridor and the version it is read from. */
-const Tiles: FC<{ catalog: RateCatalog; view: RateCorridorView }> = ({ catalog, view }) => {
-  const current = catalog.versions.find((v) => v.id === catalog.currentVersionId);
-  return (
-    <div className="grid grid-cols-4 gap-4">
-      <StatTile
-        value={
-          view.corridor.distanceKm == null
-            ? '—'
-            : `${view.corridor.distanceKm.toLocaleString('en-US')} km`
-        }
-        label="Distance"
-      />
-      <StatTile value={view.corridor.crossingCount} label="Border crossings" />
-      <StatTile
-        tone="info"
-        value={current?.quotationsPinned ?? 0}
-        label={current ? `Quotes pinned to v${current.versionNo}` : 'Quotes pinned'}
-      />
-      <StatTile
-        value={current?.publishedAt ? formatDate(current.publishedAt) : '—'}
-        label="Last published"
-      />
-    </div>
-  );
-};
-
-type Editing = {
-  onAddClass: () => void;
-  onEditClass: (row: ServiceClassRow) => void;
-  onRemoveClass: (row: ServiceClassRow) => void;
-  onAddLine: () => void;
-  onEditLine: (row: RateLine) => void;
-  onRemoveLine: (row: RateLine) => void;
-  onEditBreaks: () => void;
-  onEditPolicies: () => void;
-};
-
-/** The corridor's rates as the catalog shows them; with a draft open, every table can be edited. */
-const CorridorRates: FC<{
-  catalog: RateCatalog;
-  view: RateCorridorView;
-  editing: Editing | null;
-}> = ({ catalog, view, editing }) => (
-  <div className="flex flex-col gap-6">
-    <Tiles catalog={catalog} view={view} />
-    {view.missing.length > 0 && (
-      <Callout
-        tone="bad"
-        title={`${corridorShort(view.corridor.code)} has ${view.missing.length} missing ${view.missing.length === 1 ? 'rate' : 'rates'}`}
-      >
-        <span className="flex flex-col gap-1">
-          {view.missing.map((m) => (
-            <span key={m.description}>{m.why}</span>
-          ))}
-          <span>Quotations on this corridor can&apos;t be issued until they are filled in.</span>
-        </span>
-      </Callout>
-    )}
-    {view.corridor.mode === 'AIR' && (
-      <ClassTable
-        view={view}
-        actions={editing && { onEdit: editing.onEditClass, onRemove: editing.onRemoveClass }}
-        add={
-          editing &&
-          view.serviceClasses.length < 3 && (
-            <Button size="sm" variant="secondary" leadingIcon="plus" onClick={editing.onAddClass}>
-              Add class
-            </Button>
-          )
-        }
-      />
-    )}
-    <div className="grid grid-cols-2 items-start gap-6">
-      <BreaksPanel
-        view={view}
-        edit={
-          editing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Edit volume breaks"
-              onClick={editing.onEditBreaks}
-            >
-              Edit
-            </Button>
-          )
-        }
-      />
-      <PolicyPanel
-        view={view}
-        edit={
-          editing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Edit percentages and policy"
-              onClick={editing.onEditPolicies}
-            >
-              Edit
-            </Button>
-          )
-        }
-      />
-    </div>
-    <LineTable
-      view={view}
-      actions={editing && { onEdit: editing.onEditLine, onRemove: editing.onRemoveLine }}
-      add={
-        editing && (
-          <Button size="sm" variant="secondary" leadingIcon="plus" onClick={editing.onAddLine}>
-            Add line
-          </Button>
-        )
-      }
-    />
-  </div>
-);
+import type { RateLine, ServiceClassRow } from '@/interfaces';
+import { apiErrorMessage, draftRefusal, pickCorridor } from '@/lib/utils';
 
 /**
  * Rate catalog (US-Q-10, spec §7.1): rates for each corridor and service class, read from the draft when
@@ -268,16 +126,21 @@ const RatesPage: FC = () => {
         }
       : null;
 
+  // A failed first load goes to the error boundary; a section still waiting shows its skeleton.
+  const loading = (
+    <Panel>
+      <Skeleton active title={false} paragraph={{ rows: 6 }} />
+    </Panel>
+  );
+
   return (
     <div className="flex flex-col gap-7">
       <PageHeader
         title="Rate catalog"
         summary="Rates for each corridor and service class. A quotation pins the version it was built from, so later changes never alter an issued quote."
       />
-      {catalogQuery.isError ? (
-        <LoadError what="rate catalog" onRetry={() => void catalogQuery.refetch()} />
-      ) : !catalog ? (
-        <Loading />
+      {!catalog ? (
+        loading
       ) : !versionId ? (
         <Panel title="No rate catalog yet">
           <p className="type-body-m m-0 text-ink-2">
@@ -327,12 +190,10 @@ const RatesPage: FC = () => {
                   has one.
                 </p>
               </Panel>
-            ) : viewQuery.isError ? (
-              <LoadError what="corridor's rates" onRetry={() => void viewQuery.refetch()} />
             ) : viewQuery.data ? (
               <CorridorRates catalog={catalog} view={viewQuery.data} editing={editing} />
             ) : (
-              <Loading />
+              loading
             )}
           </div>
         </div>

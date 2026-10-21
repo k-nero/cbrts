@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { bandsSchema, classSchema, LINE_FIELDS, type LineForm, lineSchema } from './schemas';
+import { bandsSchema, classSchema, LINE_FIELDS, type LineForm, lineSchema } from './schema';
 
 const o = (value: string) => ({ value, label: value });
 

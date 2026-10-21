@@ -3,7 +3,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
 import { useParams } from 'react-router-dom';
 
-import { IssuePanel, Ledger, MissingCallout, StallChoice, TotalsPanel } from './parts';
+import { IssuePanel } from './IssuePanel';
+import { Ledger } from './Ledger';
+import { MissingCallout } from './MissingCallout';
+import { StallChoice } from './StallChoice';
+import { TotalsPanel } from './TotalsPanel';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, Panel, StageMark } from '@/components/ui';
