@@ -342,9 +342,9 @@ const DocumentsPage: FC = () => {
                       },
                     });
                   }}
-                  loading={generateChecklistMutation.isPending}
+                  disabled={generateChecklistMutation.isPending}
                 >
-                  Generate checklist
+                  {generateChecklistMutation.isPending ? 'Generating...' : 'Generate checklist'}
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => handleSelectJob(null)}>
                   Clear

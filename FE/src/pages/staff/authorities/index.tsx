@@ -405,9 +405,9 @@ const AuthoritiesPage: FC = () => {
                   },
                 });
               }}
-              loading={checkLateMutation.isPending}
+              disabled={checkLateMutation.isPending}
             >
-              Check SLA alerts
+              {checkLateMutation.isPending ? 'Checking...' : 'Check SLA alerts'}
             </Button>
             <span className="type-mono-caption text-ink-3">
               {submissions.length} relevant authorities

@@ -172,7 +172,7 @@ export const useCheckLateSubmissions = () => {
   return useMutation({
     mutationFn: () => clearanceApi.checkLateSubmissions().then((r) => r.data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.all() });
     },
   });
 };
