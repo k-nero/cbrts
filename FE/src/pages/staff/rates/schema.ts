@@ -155,3 +155,13 @@ export const policySchema = z.object(
   ) as Record<RatePolicyKey, z.ZodNumber>,
 );
 export type PolicyForm = z.infer<typeof policySchema>;
+
+export const CHANGE_NOTE_MAX = 500;
+export const publishSchema = z.object({
+  changeNote: z
+    .string()
+    .trim()
+    .min(1, 'Say what changed in this version.')
+    .max(CHANGE_NOTE_MAX, `The change note must be ${CHANGE_NOTE_MAX} characters or fewer.`),
+});
+export type PublishForm = z.infer<typeof publishSchema>;

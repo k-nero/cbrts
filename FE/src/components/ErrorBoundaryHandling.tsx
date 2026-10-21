@@ -5,31 +5,11 @@ import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Button, Result } from 'antd';
 import { isAxiosError } from 'axios';
 
+import { NotFoundFallback } from './NotFoundFallback';
+
 import environment from '@/config/environment';
 import { useAuth } from '@/hooks/auth';
 import { useCustomRouter } from '@/router/route.hook';
-
-const NotFoundFallback: FC<{ resetErrorBoundary: () => void }> = ({ resetErrorBoundary }) => {
-  const router = useCustomRouter();
-  return (
-    <Result
-      status="404"
-      title="404"
-      subTitle="This page doesn’t exist, or the record was removed."
-      extra={
-        <Button
-          type="primary"
-          onClick={() => {
-            resetErrorBoundary();
-            router.back({ force: true });
-          }}
-        >
-          Go back
-        </Button>
-      }
-    />
-  );
-};
 
 const ErrorBoundaryHandling: FC<{ children: React.ReactNode; isAuthenticated?: boolean }> = ({
   children,

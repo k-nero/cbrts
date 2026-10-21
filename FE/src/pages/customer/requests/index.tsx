@@ -2,33 +2,16 @@ import { type FC, useMemo, useState } from 'react';
 import type { TableColumnsType } from 'antd';
 
 import DiscardDraftModal from './DiscardDraftModal';
+import { RouteCell } from './RouteCell';
 
 import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
 import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { useMe } from '@/hooks/auth';
 import { useRequests } from '@/hooks/request';
-import type { Endpoint, RequestSummary } from '@/interfaces';
+import type { RequestSummary } from '@/interfaces';
 import { formatDay, ict, requestStatusChip } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
-
-const cityOf = (e: Endpoint | null) => (e ? (e.placeId ? e.city : e.text) : null);
-
-/** The route as the pass reads it, the place names beneath. */
-const RouteCell: FC<{ row: RequestSummary }> = ({ row }) => {
-  const from = cityOf(row.origin);
-  const to = cityOf(row.destination);
-  if (!from && !to) return <span className="type-body-s text-ink-3">Route not set</span>;
-  const places = [row.origin?.name, row.destination?.name].filter(Boolean).join(' → ');
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span className="type-label-s text-ink">
-        {from ?? '—'} → {to ?? '—'}
-      </span>
-      {places && <span className="type-body-s text-ink-3">{places}</span>}
-    </span>
-  );
-};
 
 /** My requests (spec §7): the club's requests, and a way back into a draft. */
 const MyRequestsPage: FC = () => {

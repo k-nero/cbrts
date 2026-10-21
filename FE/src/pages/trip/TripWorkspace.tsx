@@ -1,219 +1,36 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { UploadFile } from 'antd';
 import { Input, message, Select, Spin, Upload } from 'antd';
+
+import { TripDetails } from './TripDetails';
+import { eventLabels, formatTime, sentence } from './tripFormat';
+
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Checkbox, Chip, Panel, TimelineStop } from '@/components/ui';
+import { Button, Callout, Checkbox, Chip, Panel } from '@/components/ui';
 import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
-import { useFileBlobUrl } from '@/hooks/file';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import type {
-  HorseCondition,
-  TripPhoto,
-  TripRecordKind,
-  TripSummary,
-  TripView,
-} from '@/interfaces';
+import type { HorseCondition, TripRecordKind, TripSummary } from '@/interfaces';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 
-const eventLabels: Record<TripRecordKind, string> = {
-  [TripRecordKindEnum.LOADED]: 'Loaded',
-  [TripRecordKindEnum.DEPARTED]: 'Departed',
-  [TripRecordKindEnum.ARRIVED_AT_STOP]: 'Arrived at checkpoint',
-  [TripRecordKindEnum.CLEARED_BORDER]: 'Customs cleared',
-  [TripRecordKindEnum.HELD]: 'On hold',
-  [TripRecordKindEnum.LEFT_STOP]: 'Left checkpoint',
-  [TripRecordKindEnum.CONDITION_CHECK]: 'Condition check',
-  [TripRecordKindEnum.ACCEPTED_BY_AIRLINE]: 'Accepted by airline',
-  [TripRecordKindEnum.FLIGHT_DEPARTED]: 'Flight departed',
-  [TripRecordKindEnum.FLIGHT_LANDED]: 'Flight landed',
-  [TripRecordKindEnum.RELEASED_BY_AIRLINE]: 'Released by airline',
-  [TripRecordKindEnum.DELIVERED]: 'Delivered',
-  [TripRecordKindEnum.HANDED_OVER]: 'Handed over',
-  [TripRecordKindEnum.NOTE]: 'Update',
-};
 const eventKinds = Object.values(TripRecordKindEnum);
+
 const checkpointKinds = eventKinds.filter((kind) => kind !== TripRecordKindEnum.CONDITION_CHECK);
+
 const conditions = Object.values(HorseConditionEnum);
-const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
-const formatTime = (value: string | null) =>
-  value ? new Date(value).toLocaleString('en-GB', timeOptions) : 'Not recorded';
+
 const datetimeLocal = () => {
   const date = new Date();
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 16);
 };
+
 const errorMessage = (error: unknown) =>
   apiErrorMessage(error, 'The trip update could not be saved.');
-/** Status in words (DESIGN.md: a tone plus a word, never a raw enum). */
-const sentence = (value: string) =>
-  value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ');
+
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
-const kindTone = (kind: TripRecordKind) =>
-  kind === TripRecordKindEnum.HELD
-    ? 'warn'
-    : kind === TripRecordKindEnum.CLEARED_BORDER || kind === TripRecordKindEnum.DELIVERED
-      ? 'ok'
-      : 'info';
-
-function Photo({ photo }: { photo: TripPhoto }) {
-  const image = useFileBlobUrl(photo.id);
-  return image.url ? (
-    <a href={image.url} target="_blank" rel="noreferrer">
-      <img src={image.url} alt={photo.fileName} className="size-20 rounded-md object-cover" />
-    </a>
-  ) : null;
-}
-
-function TripRecords({ trip }: { trip: TripView }) {
-  const records = useMemo(
-    () => [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
-    [trip.records],
-  );
-  return (
-    <Panel title="Trip journey log">
-      {records.length === 0 ? (
-        <p className="type-body-s m-0 text-ink-3">No trip updates have been recorded yet.</p>
-      ) : (
-        <ol className="m-0 list-none divide-y divide-line p-0">
-          {records.map((record) => (
-            <li key={record.id} className="py-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <strong className="type-body-m">
-                  {record.checkpointName ?? 'Trip update'} · {eventLabels[record.kind]}
-                </strong>
-                <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
-              </div>
-              {record.text && <p className="type-body-s mb-2 mt-1 text-ink-2">{record.text}</p>}
-              {record.conditions.map((condition) => (
-                <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <strong className="type-h4">{condition.horseName}</strong>
-                    <Chip
-                      tone={
-                        condition.condition === HorseConditionEnum.CONCERN
-                          ? 'bad'
-                          : condition.condition === HorseConditionEnum.WATCH
-                            ? 'warn'
-                            : 'ok'
-                      }
-                    >
-                      {sentence(condition.condition)}
-                    </Chip>
-                  </div>
-                  <p className="type-body-s mb-0 mt-1 text-ink-2">
-                    {[
-                      condition.drinking === null
-                        ? null
-                        : condition.drinking
-                          ? 'Drinking'
-                          : 'Not drinking',
-                      condition.eating === null ? null : condition.eating ? 'Eating' : 'Not eating',
-                      condition.note,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                  {condition.photos.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {condition.photos.map((photo) => (
-                        <Photo key={photo.id} photo={photo} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </li>
-          ))}
-        </ol>
-      )}
-    </Panel>
-  );
-}
-
-function TripDetails({ trip }: { trip: TripView }) {
-  const lastRecord = [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <Panel title="Trip status">
-          <div className="type-h3">{sentence(trip.tripStatus)}</div>
-          <p className="type-body-s mb-0 mt-2 text-ink-3">
-            Last update:{' '}
-            {lastRecord
-              ? `${lastRecord.checkpointName ?? 'Trip'} · ${formatTime(lastRecord.occurredAt)}`
-              : 'No checkpoint update yet'}
-          </p>
-        </Panel>
-        <Panel title="Planned journey">
-          <p className="type-body-m m-0">
-            {trip.origin ?? 'Origin not set'} → {trip.destination ?? 'Destination not set'}
-          </p>
-          <p className="type-body-s mb-0 mt-2 text-ink-3">
-            Departure {formatTime(trip.plannedDepartureAt)} · Arrival{' '}
-            {formatTime(trip.plannedArrivalAt)}
-          </p>
-        </Panel>
-        <Panel title="Transport">
-          <p className="type-body-m m-0">{trip.vehicleCode ?? 'Vehicle not assigned'}</p>
-          <p className="type-body-s mb-0 mt-2 text-ink-3">
-            {trip.clearanceReady ? 'Clearance ready' : 'Departure is waiting for clearance'}
-          </p>
-        </Panel>
-      </div>
-      <Panel title="Route progress">
-        {trip.stops.length === 0 ? (
-          <p className="type-body-s m-0 text-ink-3">The confirmed route has no checkpoints yet.</p>
-        ) : (
-          <ol className="m-0 list-none space-y-3 p-0">
-            {trip.stops.map((stop) => {
-              const detail = [
-                stop.details,
-                stop.latestNote,
-                stop.latestRecordedBy ? `Recorded by ${stop.latestRecordedBy}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ');
-              const status = stop.latestStatus ? (
-                <Chip tone={kindTone(stop.latestStatus)}>{eventLabels[stop.latestStatus]}</Chip>
-              ) : (
-                <Chip>Waiting for update</Chip>
-              );
-              return (
-                <li key={stop.id}>
-                  <TimelineStop
-                    kind={stop.kind}
-                    stop={`${stop.sequence}. ${stop.name}`}
-                    time={
-                      stop.latestOccurredAt
-                        ? formatTime(stop.latestOccurredAt)
-                        : `Planned ${formatTime(stop.plannedAt)}`
-                    }
-                    details={detail || stop.kind.replaceAll('_', ' ')}
-                    status={status}
-                  />
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Panel>
-      <Panel title="Horses on this trip">
-        <div className="divide-y divide-line">
-          {trip.horses.map((horse) => (
-            <div key={horse.id} className="flex justify-between gap-2 py-3">
-              <strong className="type-h4">{horse.name}</strong>
-              <span className="type-body-s text-ink-3">{horse.stall ?? 'Stall not assigned'}</span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-      <TripRecords trip={trip} />
-    </div>
-  );
-}
 
 type Observation = {
   checked: boolean;
@@ -223,6 +40,7 @@ type Observation = {
   note: string;
   photos: UploadFile[];
 };
+
 const emptyObservation = (): Observation => ({
   checked: false,
   condition: null,
@@ -232,7 +50,7 @@ const emptyObservation = (): Observation => ({
   photos: [],
 });
 
-function TripWorkspace({
+export function TripWorkspace({
   audience,
   title,
   summary,
@@ -646,35 +464,5 @@ function TripWorkspace({
         </>
       )}
     </div>
-  );
-}
-
-export function CustomerTripPage() {
-  return (
-    <TripWorkspace
-      audience="customer"
-      title="Trip tracking"
-      summary="Follow recorded checkpoints and horse condition updates for your club's trips."
-    />
-  );
-}
-export function StaffTripPage() {
-  return (
-    <TripWorkspace
-      audience="staff"
-      editable
-      title="Trip progress"
-      summary="Track journeys and record progress by confirmed route checkpoint."
-    />
-  );
-}
-export function EscortTripPage() {
-  return (
-    <TripWorkspace
-      audience="escort"
-      editable
-      title="Cab trip log"
-      summary="Record assigned trip checkpoints and each horse's observed condition."
-    />
   );
 }

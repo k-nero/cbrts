@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { fromHorse, type HorseFormValues, makeHorseSchema, toHorseInput } from './horseSchema';
+import { fromHorse, type HorseFormValues, makeHorseSchema, toHorseInput } from './schema';
 
 import type { Horse } from '@/interfaces';
 

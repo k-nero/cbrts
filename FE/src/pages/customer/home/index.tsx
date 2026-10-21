@@ -1,7 +1,11 @@
 import type { FC } from 'react';
 import { Skeleton } from 'antd';
 
-import { NothingOwed, OnTheRoad, OwedPanel, YourHorses, YourMoves } from './sections';
+import { NothingOwed } from './NothingOwed';
+import { OnTheRoad } from './OnTheRoad';
+import { OwedPanel } from './OwedPanel';
+import { YourHorses } from './YourHorses';
+import { YourMoves } from './YourMoves';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout } from '@/components/ui';
