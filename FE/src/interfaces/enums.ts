@@ -19,3 +19,12 @@ export const ROLE_LABEL: Record<RoleName, string> = {
 
 /** What RequiredPermission and TableActionDropdown check: a role, or '*' for anyone signed in. */
 export type Permission = RoleName | '*';
+
+/** An account's state (entity/enums/UserStatus.java). */
+export const UserStatusEnum = {
+  INVITED: 'INVITED',
+  ACTIVE: 'ACTIVE',
+  LOCKED: 'LOCKED',
+  DISABLED: 'DISABLED',
+} as const;
+export type UserStatus = (typeof UserStatusEnum)[keyof typeof UserStatusEnum];

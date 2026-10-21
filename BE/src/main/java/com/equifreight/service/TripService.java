@@ -7,6 +7,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.*;
 import com.equifreight.repository.*;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -42,9 +43,19 @@ public class TripService {
             TripRecordKind.ACCEPTED_BY_AIRLINE,
             TripRecordKind.RELEASED_BY_AIRLINE);
     /**
+     * The events that end a hold. Staff decide them (DESIGN.md, escort cab: "until Yến decides"); from the
+     * cab a held trip takes notes and welfare checks only.
+     */
+    private static final Set<TripRecordKind> HOLD_RELEASES =
+            EnumSet.of(TripRecordKind.LEFT_STOP, TripRecordKind.CLEARED_BORDER);
+    /**
      * Tablet and server clocks drift; anything further ahead than this is a wrong clock, not a record.
      */
     private static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
+    /**
+     * The customer confirms the handover within 2 days (database-design.md, handovers.confirm_due_at).
+     */
+    private static final Duration CONFIRM_WINDOW = Duration.ofDays(2);
 
     private final TransportJobRepository jobs;
     private final CrewAssignmentRepository crew;
@@ -52,8 +63,12 @@ public class TripService {
     private final RoutePlanRepository routes;
     private final LoadPlanRepository loads;
     private final RequestHorseRepository requestHorses;
+    private final HandoverRepository handovers;
+    private final UserRepository users;
     private final FileService files;
-    private final AuditLogRepository audit;
+    private final AuditService audit;
+    private final NotificationService notifications;
+    private final Clock clock;
 
     public TripService(
             TransportJobRepository jobs,
@@ -62,16 +77,24 @@ public class TripService {
             RoutePlanRepository routes,
             LoadPlanRepository loads,
             RequestHorseRepository requestHorses,
+            HandoverRepository handovers,
+            UserRepository users,
             FileService files,
-            AuditLogRepository audit) {
+            AuditService audit,
+            NotificationService notifications,
+            Clock clock) {
         this.jobs = jobs;
         this.crew = crew;
         this.records = records;
         this.routes = routes;
         this.loads = loads;
         this.requestHorses = requestHorses;
+        this.handovers = handovers;
+        this.users = users;
         this.files = files;
         this.audit = audit;
+        this.notifications = notifications;
+        this.clock = clock;
     }
 
     private static ConflictException transitionConflict(TripStatus status, String reason) {
@@ -135,7 +158,7 @@ public class TripService {
                         "TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
             return TripMapper.toRecordResponse(existing.get());
         }
-        boolean late = validateTransition(job, request.kind(), request.occurredAt());
+        boolean late = validateTransition(job, request.kind(), request.occurredAt(), channel);
         boolean hasConditions =
                 request.conditions() != null && !request.conditions().isEmpty();
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
@@ -144,12 +167,12 @@ public class TripService {
         if (request.kind() != TripRecordKind.CONDITION_CHECK && hasConditions)
             throw new BusinessException(
                     "CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
-        if ((request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
-                && (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
-                        || job.getClearanceReadyAt() == null
-                        || job.getClearanceReadyAt().isAfter(request.occurredAt())))
-            throw new BusinessException(
-                    "CLEARANCE_REQUIRED", "Departure cannot be recorded before the dossier is CLEARANCE_READY");
+        String receiverName =
+                request.receiverName() == null ? "" : request.receiverName().strip();
+        if (request.kind() == TripRecordKind.HANDED_OVER && receiverName.isEmpty())
+            throw new BusinessException("RECEIVER_REQUIRED", "Enter the name of the person who received the horses");
+        if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
+            requireDepartureAllowed(job, request.occurredAt());
         RouteStop stop = null;
         if (request.routeStopId() != null) {
             RoutePlan plan = routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(job.getId(), RoutePlanStatus.CONFIRMED)
@@ -164,7 +187,7 @@ public class TripService {
         record.setRouteStop(stop);
         record.setKind(request.kind());
         record.setOccurredAt(request.occurredAt());
-        record.setReceivedAt(Instant.now());
+        record.setReceivedAt(Instant.now(clock));
         record.setClientRef(request.clientRef());
         record.setRecordedBy(user);
         record.setChannel(channel);
@@ -197,9 +220,29 @@ public class TripService {
             }
         TripRecord saved = records.save(record);
         // A record synced late from the cab joins the log in time order but never moves the status back.
-        if (!late) updateJobStatus(job, request.kind(), request.occurredAt(), stop);
+        if (!late) {
+            updateJobStatus(job, request.kind(), request.occurredAt(), stop);
+            recordHandover(job, request.kind(), request.occurredAt(), receiverName);
+            if (request.kind() == TripRecordKind.HELD) alertHold(job, stop, request.text());
+        }
         writeAudit(saved, user, channel, stop);
         return TripMapper.toRecordResponse(saved);
+    }
+
+    /**
+     * The first departure needs the cleared dossier and the manager's sign-off of the trip plan (US-F2-08,
+     * US-F3-08). A later FLIGHT_DEPARTED, the next leg of a trip already on its way, only re-checks the gate.
+     */
+    private static void requireDepartureAllowed(TransportJob job, Instant occurredAt) {
+        if (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
+                || job.getClearanceReadyAt() == null
+                || job.getClearanceReadyAt().isAfter(occurredAt))
+            throw new BusinessException(
+                    "CLEARANCE_REQUIRED", "Departure cannot be recorded before the dossier is CLEARANCE_READY");
+        if (job.getDepartedAt() == null && job.getSignedOffAt() == null)
+            throw new BusinessException(
+                    "SIGN_OFF_REQUIRED",
+                    "Departure cannot be recorded until the logistics manager signs off the trip plan");
     }
 
     /**
@@ -208,9 +251,9 @@ public class TripService {
      * log but don't change the status; lifecycle steps (loading, departure, hold, delivery, handover) must
      * still arrive in order.
      */
-    private boolean validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt) {
+    private boolean validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt, Channel channel) {
         TripStatus status = job.getTripStatus();
-        if (occurredAt.isAfter(Instant.now().plus(CLOCK_SKEW)))
+        if (occurredAt.isAfter(Instant.now(clock).plus(CLOCK_SKEW)))
             throw new BusinessException(
                     "TRIP_RECORD_IN_FUTURE",
                     "A trip update can't be recorded for a time that hasn't happened yet. Check the device clock.");
@@ -226,9 +269,15 @@ public class TripService {
                 throw transitionConflict(
                         status,
                         "This %s is older than the trip's latest status update; record it as a note instead."
-                                .formatted(kind));
+                                .formatted(TripMapper.label(kind)));
             return true;
         }
+
+        if (status == TripStatus.HELD && channel == Channel.CAB_TABLET && HOLD_RELEASES.contains(kind))
+            throw new BusinessException(
+                    "HOLD_RELEASE_BY_STAFF",
+                    "The trip is held: the coordinator or the logistics manager decides when it moves on. "
+                            + "Record a note or a welfare check meanwhile.");
 
         if (job.getStage() == JobStage.HANDOVER
                 && (status != TripStatus.DELIVERED
@@ -278,7 +327,8 @@ public class TripService {
                 EnumSet.of(TripRecordKind.HANDED_OVER, TripRecordKind.NOTE).contains(kind);
         };
         if (!allowed)
-            throw transitionConflict(status, "A %s can't be recorded at this point of the trip.".formatted(kind));
+            throw transitionConflict(
+                    status, "%s can't be recorded at this point of the trip.".formatted(TripMapper.label(kind)));
         return false;
     }
 
@@ -313,27 +363,55 @@ public class TripService {
         }
     }
 
+    /**
+     * The job's handover row: opened by the delivery, completed by the handover with who received the horses
+     * and when the customer's confirmation is due. Late minutes and the penalty are Flow 5's to fill.
+     */
+    private void recordHandover(TransportJob job, TripRecordKind kind, Instant at, String receiverName) {
+        if (kind != TripRecordKind.DELIVERED && kind != TripRecordKind.HANDED_OVER) return;
+        Handover handover = handovers.findByJob_Id(job.getId()).orElseGet(() -> {
+            Handover created = new Handover();
+            created.setJob(job);
+            return created;
+        });
+        if (kind == TripRecordKind.DELIVERED) {
+            handover.setDeliveredAt(at);
+        } else {
+            if (handover.getDeliveredAt() == null) handover.setDeliveredAt(job.getDeliveredAt());
+            handover.setReceivingName(receiverName);
+            handover.setConfirmDueAt(at.plus(CONFIRM_WINDOW));
+        }
+        handovers.save(handover);
+    }
+
+    /** A hold stops the horses on the road: tell the people who decide when it moves on. */
+    private void alertHold(TransportJob job, RouteStop stop, String reason) {
+        String place = stop == null ? "" : " at " + TripMapper.stopName(stop);
+        String title = "Trip %s held%s".formatted(job.getCode(), place);
+        String body = reason == null || reason.isBlank() ? "No reason was given from the cab." : reason.strip();
+        for (String role : List.of(RoleName.LOGISTICS_MANAGER, RoleName.FLEET_COORDINATOR))
+            for (User recipient : users.findByRoleAndStatus(role, UserStatus.ACTIVE))
+                notifications.sendNotification(recipient, "TRIP_HELD", title, body, "TRANSPORT_JOB", job.getId());
+    }
+
     private void writeAudit(TripRecord record, User user, Channel channel, RouteStop stop) {
-        AuditLog entry = new AuditLog();
-        entry.setOccurredAt(Instant.now());
-        entry.setActor(user);
-        entry.setActorLabel(user.displayName());
-        entry.setActorRole(
-                user.getRoles().stream().map(Role::getName).findFirst().orElse(null));
-        entry.setChannel(channel);
-        entry.setDeviceRecordedAt(record.getOccurredAt());
-        entry.setAction("TRIP_RECORD_RECORDED");
-        entry.setSummary("Recorded %s for %s%s"
-                .formatted(
-                        record.getKind(),
-                        record.getJob().getCode(),
-                        stop == null ? "" : " at " + TripMapper.stopName(stop)));
-        entry.setEntityType("TRIP_RECORD");
-        entry.setEntityId(record.getId());
-        entry.setEntityCode(record.getJob().getCode());
-        entry.setAfter("{\"kind\":\"%s\",\"routeStopId\":%s}"
-                .formatted(record.getKind(), stop == null ? "null" : "\"" + stop.getId() + "\""));
-        audit.save(entry);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("kind", record.getKind().name());
+        after.put("routeStopId", stop == null ? null : stop.getId());
+        audit.recordFromDevice(
+                user,
+                channel,
+                record.getOccurredAt(),
+                "TRIP_RECORD_RECORDED",
+                AuditText.fit("%s recorded for %s%s"
+                        .formatted(
+                                TripMapper.label(record.getKind()),
+                                record.getJob().getCode(),
+                                stop == null ? "" : " at " + TripMapper.stopName(stop))),
+                "TRIP_RECORD",
+                record.getId(),
+                record.getJob().getCode(),
+                after);
     }
 
     private TripViewResponse view(TransportJob job) {

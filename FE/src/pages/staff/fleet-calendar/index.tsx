@@ -21,8 +21,8 @@ export default function FleetCalendarPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="type-h1 text-ink">Fleet Calendar</h1>
-          <p className="type-body text-ink-2">
+          <h1 className="type-display-m text-ink">Fleet Calendar</h1>
+          <p className="type-body-m text-ink-2">
             Schedule of vehicle deployments, transport jobs, and planned maintenance windows.
           </p>
         </div>
@@ -108,7 +108,7 @@ export default function FleetCalendarPage() {
                     </div>
 
                     <div className="flex flex-col items-end">
-                      <span className="type-mono-data text-ink font-medium">
+                      <span className="type-data text-ink">
                         {sDate} → {eDate}
                       </span>
                       <span className="type-caption text-ink-3">Local Indochina Time</span>

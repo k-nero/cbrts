@@ -10,6 +10,7 @@ import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -303,6 +304,16 @@ public class AuthoritySubmissionService {
         if (request.endsOn().isBefore(request.startsOn())) {
             throw new BusinessException("Quarantine end date cannot precede start date.");
         }
+        // The pinned destination catalog sets the minimum stay; a shorter one is refused, not warned about.
+        clearanceService.destinationVersion(jobId).ifPresent(destination -> {
+            long days = ChronoUnit.DAYS.between(request.startsOn(), request.endsOn());
+            if (days < destination.getQuarantineMinDays())
+                throw new BusinessException(
+                        "QUARANTINE_TOO_SHORT",
+                        "%s requires at least %d days of quarantine; this period is %d."
+                                .formatted(
+                                        destination.getCatalog().getName(), destination.getQuarantineMinDays(), days));
+        });
 
         QuarantinePeriod quarantine = new QuarantinePeriod();
         quarantine.setJob(job);

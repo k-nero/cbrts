@@ -7,7 +7,7 @@ import lombok.Builder;
 
 @Builder
 public record CreateQuarantinePeriodRequest(
-        /**
+        /*
          * null means the whole load/shipment.
          */
         UUID horseId,

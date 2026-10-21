@@ -96,6 +96,8 @@ const AuditList: FC<Props> = ({ crud, selectedId, onSelect, empty }) => {
       columns={columns}
       dataSource={listQuery.data?.content ?? []}
       loading={listQuery.isPending || listQuery.isFetching}
+      onRefresh={() => void listQuery.refetch()}
+      refreshing={listQuery.isFetching && !listQuery.isPending}
       ignoreKeys={['open']}
       // Fixed widths from the frame; Action takes the rest (the resize kit would give it to From).
       resizableColumns={false}

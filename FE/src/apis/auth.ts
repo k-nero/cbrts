@@ -1,21 +1,6 @@
 import client from '@/config/axios';
 import type { User } from '@/interfaces';
-
-export interface TokenResponse {
-  accessToken: string;
-  refreshToken: string;
-}
-
-/** Create a club account (POST /auth/register): the club, the person who signs in for it. */
-export interface RegisterRequest {
-  clubName: string;
-  countryCode: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  password: string;
-}
+import { RegisterRequest, TokenResponse } from '@/interfaces';
 
 export const authApi = {
   login: (email: string, password: string): Promise<TokenResponse> =>

@@ -209,6 +209,11 @@ public class RoutePlanService {
         if (plan.getStops().size() < 2) {
             throw new BusinessException("A route plan must contain at least 2 stops (pickup and delivery)");
         }
+        // The trip reaches ARRIVED only at a DELIVERY stop, so a plan without one could never be delivered.
+        if (plan.getStops().getFirst().getKind() != RouteStopKind.PICKUP
+                || plan.getStops().getLast().getKind() != RouteStopKind.DELIVERY) {
+            throw new BusinessException("A route plan must start with the pickup and end with the delivery stop");
+        }
 
         // Arrival window check: if the job has an arrival window, delivery stop plannedAt must be before windowEnd
         if (job.getWindowEnd() != null) {

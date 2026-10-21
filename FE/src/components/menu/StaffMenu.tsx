@@ -101,7 +101,16 @@ const StaffMenu: FC = () => {
     return [`/${segments.slice(0, 2).join('/')}`];
   }, [pathname]);
 
-  return <MenuAntd mode="inline" items={items} selectedKeys={selectedKeys} />;
+  return (
+    <MenuAntd
+      mode="inline"
+      style={{
+        fontSize: '18px',
+      }}
+      items={items}
+      selectedKeys={selectedKeys}
+    />
+  );
 };
 
 export default StaffMenu;

@@ -101,6 +101,17 @@ const MyRequestsPage: FC = () => {
                 Discard
               </Button>
             </span>
+          ) : r.status === 'INFO_REQUIRED' ? (
+            <span className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={() =>
+                  router.push(router.paths.get('request-submitted', { pathParams: [r.id] }))
+                }
+              >
+                Answer
+              </Button>
+            </span>
           ) : null,
       },
     ],
@@ -181,6 +192,8 @@ const MyRequestsPage: FC = () => {
             columns={columns}
             dataSource={listQuery.data?.content ?? []}
             loading={listQuery.isPending || listQuery.isFetching}
+            onRefresh={() => void listQuery.refetch()}
+            refreshing={listQuery.isFetching && !listQuery.isPending}
             ignoreKeys={['actions']}
             pagination={{
               current: pageState.number + 1,

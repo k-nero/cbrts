@@ -1,5 +1,5 @@
-import { useState, useMemo, type FC } from 'react';
-import { Button, Chip, Panel, Icon, cx } from '@/components/ui';
+import { type FC, useMemo, useState } from 'react';
+import { Button, Chip, cx, Icon, Panel } from '@/components/ui';
 import { useCustomerNotes, useReplyCustomerNote } from '@/hooks/customerNote';
 import type { CustomerNote } from '@/interfaces';
 

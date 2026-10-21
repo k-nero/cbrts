@@ -9,7 +9,7 @@ import type {
   CreateQuarantinePeriodRequest,
   DocumentUploadRequest,
   DocumentVersion,
-  JobSummary,
+  ClearanceJobSummary,
   ReviewDocumentRequest,
   UpdateAuthoritySubmissionRequest,
 } from '@/interfaces';
@@ -21,7 +21,7 @@ import type {
 export const useClearanceJobs = (q: string) => {
   return useQuery({
     queryKey: queryKeys.clearance.jobs(q),
-    queryFn: async (): Promise<JobSummary[]> => {
+    queryFn: async (): Promise<ClearanceJobSummary[]> => {
       const res = await clearanceApi.getActiveJobs(q);
       return res.data.content;
     },

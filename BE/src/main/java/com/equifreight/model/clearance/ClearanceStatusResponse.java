@@ -19,4 +19,7 @@ public record ClearanceStatusResponse(
         boolean allQuarantinesCompleted,
         int totalQuarantines,
         int completedQuarantines,
-        List<String> outstandingIssues) {}
+        List<String> outstandingIssues,
+        // The pinned destination catalog ("Cambodia import") and its quarantine minimum; null before approval.
+        String destination,
+        Integer quarantineMinDays) {}

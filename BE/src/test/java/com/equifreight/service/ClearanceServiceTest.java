@@ -37,6 +37,9 @@ class ClearanceServiceTest {
     private DocumentVersionRepository documentVersionRepository;
 
     @Mock
+    private JobRegulationPinRepository pins;
+
+    @Mock
     private TransportJobRepository transportJobRepository;
 
     @Mock
@@ -328,7 +331,9 @@ class ClearanceServiceTest {
 
         assertFalse(resp.clearanceReady());
         assertNotEquals(DossierStatus.CLEARANCE_READY, resp.dossierStatus());
-        assertTrue(resp.outstandingIssues().stream().anyMatch(i -> i.contains("refused by Customs Department")));
+        assertTrue(resp.outstandingIssues().contains("Import permit refused by Customs Department"));
+        // The gate's sentences are read as written: no raw enum names.
+        assertTrue(resp.outstandingIssues().stream().noneMatch(i -> i.matches(".*\\b[A-Z]+_[A-Z_]+\\b.*")));
     }
 
     @Test

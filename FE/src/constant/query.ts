@@ -24,6 +24,12 @@ export const queryKeys = {
     /** Under 'horses', so a horse saved or archived refreshes the pick cards. */
     wizardHorses: () => ['horses', 'wizard'] as const,
   },
+  staffRequests: {
+    all: () => ['staff-requests'] as const,
+    queues: () => ['staff-requests', 'queue'] as const,
+    queue: (page: number) => ['staff-requests', 'queue', page] as const,
+    one: (id: string) => ['staff-requests', id] as const,
+  },
   audit: {
     all: () => ['admin-audit-log'] as const,
     actors: () => ['admin-audit-log', 'actors'] as const,
@@ -54,5 +60,11 @@ export const queryKeys = {
     corridors: () => ['rates', 'corridors'] as const,
     details: (corridorId?: string, versionId?: string) =>
       ['rates', 'details', corridorId ?? '', versionId ?? ''] as const,
+  },
+  trips: {
+    /** Every trip list, for invalidation after a record is saved. */
+    lists: () => ['trips'] as const,
+    list: (audience: string, page: number) => ['trips', audience, page] as const,
+    one: (audience: string, code: string) => ['trip', audience, code] as const,
   },
 } as const;

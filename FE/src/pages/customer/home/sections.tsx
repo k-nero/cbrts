@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FC } from 'react';
+import { type ChangeEvent, type FC, useState } from 'react';
 import { Alert, Input, message, Modal } from 'antd';
 import { fileApi } from '@/apis/file';
 import { clearanceApi } from '@/apis/clearance';
@@ -15,8 +15,8 @@ import {
   Perforation,
   RouteStrip,
   StageMark,
-  TONE_FG,
   type Tone,
+  TONE_FG,
 } from '@/components/ui';
 import type { CustomerHome, MoveEntry, NextEvent, TripNow } from '@/interfaces';
 import {

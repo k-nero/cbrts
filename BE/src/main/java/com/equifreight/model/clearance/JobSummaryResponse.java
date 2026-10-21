@@ -15,5 +15,6 @@ public record JobSummaryResponse(
         DossierStatus dossierStatus,
         JobStage stage,
         String clubName,
+        // The route, for the picker; a request may still lack either place.
         String originCity,
         String destinationCity) {}

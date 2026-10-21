@@ -9,6 +9,7 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TripRecord;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.TripRecordKind;
 import java.util.List;
 import java.util.Locale;
 
@@ -118,6 +119,26 @@ public final class TripMapper {
                 : stop.getPlace() == null
                         ? stop.getKind().name()
                         : stop.getPlace().getName();
+    }
+
+    /** The record kind in words, as the cab and the tracking page say it (audit lines and notifications). */
+    public static String label(TripRecordKind kind) {
+        return switch (kind) {
+            case LOADED -> "Loaded";
+            case DEPARTED -> "Departed";
+            case ARRIVED_AT_STOP -> "Arrived at checkpoint";
+            case CLEARED_BORDER -> "Customs cleared";
+            case HELD -> "On hold";
+            case LEFT_STOP -> "Left checkpoint";
+            case CONDITION_CHECK -> "Condition check";
+            case ACCEPTED_BY_AIRLINE -> "Accepted by airline";
+            case FLIGHT_DEPARTED -> "Flight departed";
+            case FLIGHT_LANDED -> "Flight landed";
+            case RELEASED_BY_AIRLINE -> "Released by airline";
+            case DELIVERED -> "Delivered";
+            case HANDED_OVER -> "Handed over";
+            case NOTE -> "Update";
+        };
     }
 
     private static String fullName(User user) {

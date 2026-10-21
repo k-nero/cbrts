@@ -4,7 +4,6 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { AxiosError } from 'axios';
 
-import { RequestLoadState } from '../components/RequestNotFound';
 import { RequestPass } from '../components/RequestPass';
 
 import HorsesStep from './HorsesStep';
@@ -13,30 +12,33 @@ import RouteStep from './RouteStep';
 import ServiceStep from './ServiceStep';
 import { wizardSchema } from './wizardSchema';
 
+import { RequestLoadState } from '@/components/request/RequestLoadState';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import PageHeader from '@/components/PageHeader';
-import { Steps } from '@/components/ui';
+import { Callout, Steps } from '@/components/ui';
 import { useRequest, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/request';
 import type { ApiError, Blocker, Horse, Route, TransportRequest } from '@/interfaces';
 import {
   apiErrorView,
+  blockerFieldErrors,
+  editable,
   EMPTY_WIZARD,
+  type FieldStep,
   firstOpenStep,
-  formatDate,
   formRefusal,
   fromRequest,
   holdsStep,
-  blockerFieldErrors,
   liveBlockers,
+  passChip,
   retiredRefusals,
   revealSelector,
+  savedLine,
   roadRuns,
   shownBlockers,
   STEP_FIELDS,
   stepOfBlocker,
   toDraftInput,
   WIZARD_STEPS,
-  type FieldStep,
   type WizardStep,
   type WizardValues,
 } from '@/lib/utils';
@@ -291,6 +293,7 @@ const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> 
           route={route}
           notRun={notRun}
           horses={horsesQuery.data ?? []}
+          chip={saved ? passChip(saved.status) : undefined}
           rangeSub={
             step === 'review'
               ? 'Not a quote. Once you approve the quotation, this becomes your travel pass.'
@@ -311,7 +314,7 @@ const RequestWizardPage: FC = () => {
   const saved = query.data;
 
   if (id && !saved) return <RequestLoadState query={query} />;
-  if (saved && saved.status !== 'DRAFT')
+  if (saved && !editable(saved.status))
     return (
       <Navigate to={router.paths.get('request-submitted', { pathParams: [saved.id] })} replace />
     );
@@ -328,8 +331,13 @@ const RequestWizardPage: FC = () => {
       <PageHeader
         back={{ label: 'My requests', onClick: () => router.push(router.paths.get('my-requests')) }}
         title="Request transport"
-        summary={`${saved ? `Draft saved ${formatDate(saved.updatedAt)}. ` : ''}Your move fills in on the right as you go; the binding price comes as an itemised quotation.`}
+        summary={`${saved ? `${savedLine(saved)} ` : ''}Your move fills in on the right as you go; the binding price comes as an itemised quotation.`}
       />
+      {saved?.status === 'INFO_REQUIRED' && saved.infoRequiredNote && (
+        <Callout tone="warn" title="The logistics manager asked:">
+          <span className="whitespace-pre-line">{saved.infoRequiredNote}</span>
+        </Callout>
+      )}
       <Steps steps={STEP_LABELS} current={WIZARD_STEPS.indexOf(step)} />
       <WizardForm key={saved?.id ?? 'new'} saved={saved} step={step} />
     </div>

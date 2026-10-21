@@ -9,11 +9,14 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.clearance.CreateAuthoritySubmissionRequest;
+import com.equifreight.model.clearance.CreateQuarantinePeriodRequest;
 import com.equifreight.model.clearance.UpdateAuthoritySubmissionRequest;
 import com.equifreight.repository.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -144,5 +147,30 @@ class AuthoritySubmissionServiceTest {
         assertEquals(DossierStatus.CLEARANCE_READY, job.getDossierStatus(), "the service must not set it directly");
         verify(transportJobRepository, never()).save(any());
         verify(clearanceService).evaluateClearanceGate(job.getId());
+    }
+
+    @Test
+    @DisplayName("A quarantine shorter than the destination catalog's minimum is refused")
+    void quarantineShorterThanTheDestinationMinimumIsRefused() {
+        RegulationCatalog catalog = new RegulationCatalog();
+        catalog.setName("Cambodia import");
+        RegulationVersion destination = new RegulationVersion();
+        destination.setCatalog(catalog);
+        destination.setQuarantineMinDays((short) 7);
+        Place station = new Place();
+        station.setId(UUID.randomUUID());
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        when(clearanceService.destinationVersion(job.getId())).thenReturn(Optional.of(destination));
+
+        LocalDate start = LocalDate.of(2026, 10, 20);
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.createQuarantine(
+                        job.getId(),
+                        new CreateQuarantinePeriodRequest(null, station.getId(), start, start.plusDays(5)),
+                        specialist));
+        assertEquals("QUARANTINE_TOO_SHORT", ex.getCode());
+        verify(quarantinePeriodRepository, never()).save(any());
     }
 }

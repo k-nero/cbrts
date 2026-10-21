@@ -112,8 +112,8 @@ export default function VehiclesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="type-h1 text-ink">Vehicles & Fleet</h1>
-          <p className="type-body text-ink-2">
+          <h1 className="type-display-m text-ink">Vehicles & Fleet</h1>
+          <p className="type-body-m text-ink-2">
             Specialised horse trailers, rigid trucks and stall configurations.
           </p>
         </div>
