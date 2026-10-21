@@ -62,9 +62,10 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
-tasks.named('test') {
+tasks.named('test', Test) {
     useJUnitPlatform()
 }
 
@@ -86,7 +87,7 @@ spotless {
     // Only files changed since origin/main are checked and formatted, so #108's reformat isn't repeated repo-wide.
     ratchetFrom 'origin/main'
     // ./gradlew check (and build) runs spotlessCheck.
-    enforceCheck true
+    enforceCheck = true
 
     // Java sources only. Never format src/main/resources/db/migration: Flyway checksums merged migrations,
     // so even a whitespace change fails validation on databases that already ran them.

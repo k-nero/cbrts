@@ -1,6 +1,5 @@
 package com.equifreight.repository;
 
-import com.equifreight.entity.Club;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.UserStatus;
 import java.util.List;
@@ -18,12 +17,6 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.roles WHERE u.email = :email")
     Optional<User> findByEmailWithRoles(@Param("email") String email);
-
-    /**
-     * The customer's club; empty for staff and for a customer not yet linked to one.
-     */
-    @Query("select u.club from User u where u.id = :userId")
-    Optional<Club> findClubByUserId(@Param("userId") UUID userId);
 
     /** The club's account (one per club), to notify it of a request's progress. */
     List<User> findByClubId(UUID clubId);

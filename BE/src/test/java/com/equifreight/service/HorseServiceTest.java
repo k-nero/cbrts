@@ -44,15 +44,13 @@ class HorseServiceTest {
             sizeClass("XL", 96, "17.3"));
 
     private HorseRepository horses;
-    private HorseSizeClassRepository sizeClasses;
     private RequestHorseRepository requestHorses;
-    private ClubService clubs;
     private HorseService service;
     private User user;
     private Club club;
 
     private static HorseRequest requestFrom(Horse horse) {
-        HorseRequest request = HorseRequest.builder()
+        return HorseRequest.builder()
                 .name(horse.getName())
                 .sex(horse.getSex())
                 .coat(horse.getCoat())
@@ -65,7 +63,6 @@ class HorseServiceTest {
                 .declaredValue(horse.getDeclaredValue())
                 .requiredStall(horse.getRequiredStall())
                 .build();
-        return request;
     }
 
     private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
@@ -83,7 +80,7 @@ class HorseServiceTest {
     }
 
     private static HorseRequest nightfallRequest() {
-        HorseRequest request = HorseRequest.builder()
+        return HorseRequest.builder()
                 .name("Nightfall")
                 .sex(HorseSex.MARE)
                 .heightHh(new BigDecimal("16.0"))
@@ -92,7 +89,6 @@ class HorseServiceTest {
                 .declaredValue(new BigDecimal("240000"))
                 .requiredStall(StallType.CLIMATE)
                 .build();
-        return request;
     }
 
     private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
@@ -107,9 +103,9 @@ class HorseServiceTest {
     @BeforeEach
     void setUp() {
         horses = mock(HorseRepository.class);
-        sizeClasses = mock(HorseSizeClassRepository.class);
+        HorseSizeClassRepository sizeClasses = mock(HorseSizeClassRepository.class);
         requestHorses = mock(RequestHorseRepository.class);
-        clubs = mock(ClubService.class);
+        ClubService clubs = mock(ClubService.class);
         service = new HorseService(horses, sizeClasses, requestHorses, clubs);
 
         club = new Club();
