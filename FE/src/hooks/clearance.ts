@@ -165,19 +165,6 @@ export const useGenerateChecklist = () => {
 };
 
 /**
- * Check and alert manager on late authority dossiers (Flow 2: Alert manager on late dossiers).
- */
-export const useCheckLateSubmissions = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => clearanceApi.checkLateSubmissions().then((r) => r.data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.all() });
-    },
-  });
-};
-
-/**
  * Recognised authorities list.
  */
 export const useAuthorities = (params?: { countryCode?: string; kind?: AuthorityKind }) => {

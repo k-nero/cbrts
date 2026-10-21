@@ -7,25 +7,18 @@ import {
   type Modifier,
   PointerSensor,
   type UniqueIdentifier,
-  useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { Select, Skeleton } from 'antd';
 
-import {
-  Button,
-  Callout,
-  Chip,
-  Icon,
-  LoadItem,
-  Panel,
-  Progress,
-  StallTile,
-  StatTile,
-} from '@/components/ui';
+import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
+import { QueueColumn } from './QueueColumn';
+import { QueueHorse } from './QueueHorse';
+import { StallSlot } from './StallSlot';
+
+import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
   useAutoArrange,
   useConfirmLoadPlan,
@@ -43,31 +36,14 @@ interface Props {
 }
 
 /** A horse picked up by drag or by click: where it was is the move's precondition. */
-interface Picked {
+export interface Picked {
   horse: JobHorse;
   /** The stall it stands in; null when it is waiting to load. */
   fromStallId: string | null;
 }
 
-/** The "To load" column is a drop target too: dropping a placed horse there unloads it. */
-const QUEUE_DROP_ID = 'queue';
-
 /** How often an open draft plan refetches, so a plan someone else changed doesn't stay stale. */
 const POLL_MS = 10_000;
-
-const horseMeta = (h: JobHorse) =>
-  `${h.sex || ''} · ${h.weightKg ? h.weightKg + ' kg' : ''} · ${h.breed || ''}`;
-
-const stallMeta = (h: JobHorse) => `${h.sex} · ${h.weightKg} kg · ${h.temperament}`;
-
-const temperamentChip = (h: JobHorse) =>
-  h.temperament ? (
-    <Chip
-      tone={h.temperament === 'AGGRESSIVE' ? 'bad' : h.temperament === 'NERVOUS' ? 'warn' : 'ok'}
-    >
-      {h.temperament}
-    </Chip>
-  ) : undefined;
 
 /** Pins the drag card's top-left just past the cursor, wherever on the source it was grabbed. */
 const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
@@ -78,8 +54,6 @@ const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
     y: transform.y + activatorEvent.clientY - draggingNodeRect.top + 12,
   };
 };
-
-const stallType = (s: LoadPlanStall) => s.stallType.toLowerCase() as 'standard' | 'box' | 'climate';
 
 export function LoadPlanTab({ job }: Props) {
   const loadPlan = job.loadPlan;
@@ -542,140 +516,5 @@ export function LoadPlanTab({ job }: Props) {
         )}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-/** The "To load" list. While a placed horse is dragged it also takes the drop that unloads it. */
-function QueueColumn({
-  count,
-  unloading,
-  disabled,
-  children,
-}: {
-  count: number;
-  unloading: JobHorse | null;
-  disabled: boolean;
-  children: ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: QUEUE_DROP_ID, disabled });
-  return (
-    <div ref={setNodeRef} className="flex flex-col gap-3">
-      <span className="type-label-s text-ink-2">To load · {count}</span>
-      {unloading && (
-        <div
-          className={
-            isOver
-              ? 'rounded-md border border-dashed border-gold bg-gold-soft p-4 text-center'
-              : 'rounded-md border border-dashed border-line-strong p-4 text-center'
-          }
-        >
-          <span className={isOver ? 'type-label-s text-gold-ink' : 'type-body-s text-ink-3'}>
-            Drop here to take {unloading.name} off the vehicle
-          </span>
-        </div>
-      )}
-      {children}
-    </div>
-  );
-}
-
-/** A horse waiting to load: drag it onto a stall, or select it and choose one. */
-function QueueHorse({
-  horse,
-  selected,
-  disabled,
-  onSelect,
-}: {
-  horse: JobHorse;
-  selected: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-}) {
-  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
-    id: `horse:${horse.id}`,
-    data: { horse, fromStallId: null } satisfies Picked,
-    disabled,
-  });
-  return (
-    <LoadItem
-      ref={setNodeRef}
-      {...listeners}
-      aria-describedby={attributes['aria-describedby']}
-      horse={horse.name}
-      meta={horseMeta(horse)}
-      selected={selected}
-      onClick={onSelect}
-      tag={temperamentChip(horse)}
-      className={isDragging ? 'opacity-40' : undefined}
-    />
-  );
-}
-
-/** One stall: a drop target, and the drag source of the horse standing in it. */
-function StallSlot({
-  stall,
-  selected,
-  dragging,
-  interactive,
-  disabled,
-  onClick,
-}: {
-  stall: LoadPlanStall;
-  selected: Picked | null;
-  dragging: Picked | null;
-  /** False on a confirmed plan: the tile is read-only. */
-  interactive: boolean;
-  /** True while a move is pending: no new drag starts. */
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const horse = stall.horse ?? null;
-  const drop = useDroppable({ id: stall.stallId, disabled: !interactive });
-  const drag = useDraggable({
-    id: horse ? `horse:${horse.id}` : `empty:${stall.stallId}`,
-    data: horse ? ({ horse, fromStallId: stall.stallId } satisfies Picked) : undefined,
-    disabled: !interactive || disabled || !horse,
-  });
-
-  const picked = dragging ?? selected;
-  const isSource = picked?.fromStallId === stall.stallId;
-  let state: 'empty' | 'occupied' | 'conflict' | 'target' = 'empty';
-  let targetHint: string | undefined;
-  if (dragging && drop.isOver && !isSource) {
-    state = 'target';
-    targetHint = !horse
-      ? `Place ${dragging.horse.name} here`
-      : dragging.fromStallId
-        ? `Swap ${dragging.horse.name} and ${horse.name}`
-        : `Place ${dragging.horse.name} here. ${horse.name} goes back to the list.`;
-  } else if (stall.issue) {
-    state = 'conflict';
-  } else if (horse) {
-    state = 'occupied';
-  } else if (selected) {
-    state = 'target';
-    targetHint = `Place ${selected.horse.name} here`;
-  }
-
-  return (
-    <div
-      ref={(node) => {
-        drop.setNodeRef(node);
-        drag.setNodeRef(node);
-      }}
-      {...drag.listeners}
-      className={drag.isDragging ? 'opacity-40' : undefined}
-    >
-      <StallTile
-        type={stallType(stall)}
-        state={state}
-        stall={`Stall ${stall.positionNo}`}
-        horse={horse?.name}
-        meta={horse ? stallMeta(horse) : undefined}
-        issue={stall.issue}
-        targetHint={targetHint}
-        onClick={interactive ? onClick : undefined}
-      />
-    </div>
   );
 }

@@ -105,7 +105,7 @@ const StaffMenu: FC = () => {
     <MenuAntd
       mode="inline"
       style={{
-        fontSize: '18px',
+        fontSize: '15px',
       }}
       items={items}
       selectedKeys={selectedKeys}

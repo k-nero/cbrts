@@ -52,4 +52,6 @@ public record RequestResponse(
         /** Every submitted version, oldest first; empty for a draft. */
         List<RevisionSummaryResponse> revisions,
         /** The customer's club; set on staff views only. */
-        String club) {}
+        String club,
+        /** The latest issued quotation; set on the customer's read of the request, null until one is issued. */
+        QuotationIssuedRefResponse quotation) {}

@@ -1,4 +1,8 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, useState } from 'react';
+
+import { QuoteLineDemo } from './QuoteLineDemo';
+import { Row } from './Row';
+import { Section } from './Section';
 
 import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
@@ -28,7 +32,6 @@ import {
   Perforation,
   PhotoPanel,
   Progress,
-  QuoteLine as QL,
   Radio,
   StageMark,
   StallTile,
@@ -41,28 +44,8 @@ import {
 } from '@/components/ui';
 
 const TONES: Tone[] = ['neutral', 'ok', 'warn', 'bad', 'info'];
+
 const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'ghost', 'danger'];
-
-const Section: FC<{ title: string; description: string; children: ReactNode }> = ({
-  title,
-  description,
-  children,
-}) => (
-  <section className="flex flex-col gap-5 rounded-xl border border-line bg-card p-10">
-    <div className="flex flex-col gap-2">
-      <h2 className="type-display-m m-0 text-ink">{title}</h2>
-      <p className="type-body-m m-0 max-w-225 text-ink-2">{description}</p>
-    </div>
-    {children}
-  </section>
-);
-
-const Row: FC<{ label?: string; children: ReactNode }> = ({ label, children }) => (
-  <div className="flex flex-col gap-2.5">
-    {label && <span className="type-body-s text-ink-3">{label}</span>}
-    <div className="flex flex-wrap items-center gap-3">{children}</div>
-  </div>
-);
 
 /**
  * Every component of the library in its variants, on the active theme (the toggle flips it).
@@ -709,46 +692,5 @@ const DesignSystemPage: FC = () => {
     </div>
   );
 };
-
-/** Kept apart so the quotation demo reads as one ledger. */
-const QuoteLineDemo: FC = () => (
-  <>
-    <QL
-      certainty="fixed"
-      description="Road transport, private trailer"
-      basis="per km · 960 km"
-      qty="960"
-      rate="$4.20"
-      amount="$4,032.00"
-    />
-    <QL
-      certainty="estimated"
-      description="Border waiting time"
-      basis="per started hour"
-      qty="2"
-      rate="$95.00"
-      amount="$190.00"
-      note="Billed on the actual wait; queues at Mộc Bài run 1 to 3 hours."
-    />
-    <QL
-      certainty="overridden"
-      description="Pre-export isolation · Nightfall"
-      basis="per day · 14 days"
-      qty="14"
-      rate="$18.00"
-      amount="$252.00"
-      catalogAmount="$300.00"
-      note="Club's own isolation barn, inspected 1 Oct."
-    />
-    <QL
-      certainty="fixed"
-      description="Flight vet"
-      basis="per shipment"
-      qty="1"
-      rate={null}
-      amount={null}
-    />
-  </>
-);
 
 export default DesignSystemPage;

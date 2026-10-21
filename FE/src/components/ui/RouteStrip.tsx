@@ -2,6 +2,8 @@ import type { FC, ReactNode } from 'react';
 
 import { Icon } from './Icon';
 import { cx } from './tone';
+import { Leg } from './Leg';
+import { Marker } from './Marker';
 
 export type RouteStopState = 'done' | 'current' | 'upcoming';
 
@@ -20,26 +22,6 @@ type Props = {
   gate?: 'locked' | 'clear';
   className?: string;
 };
-
-/* A leg turns green only between confirmed checkpoints: positions come from recorded checkpoints, never a guess. */
-const Leg: FC<{ confirmed: boolean }> = ({ confirmed }) => (
-  <span aria-hidden className="flex-1 pt-[9px]">
-    <span className={cx('block h-0.5 w-full', confirmed ? 'bg-ok' : 'bg-line-strong')} />
-  </span>
-);
-
-const Marker: FC<{ state: RouteStopState }> = ({ state }) => (
-  <span className="grid size-5 place-items-center">
-    <span
-      className={cx(
-        'block rounded-full',
-        state === 'done' && 'size-3.5 bg-ok',
-        state === 'current' && 'size-5 border-2 border-info bg-info-soft',
-        state === 'upcoming' && 'size-3.5 border-2 border-line-strong bg-canvas',
-      )}
-    />
-  </span>
-);
 
 /**
  * The schematic route (DESIGN.md, Stage Row and Route Stop): circular stops joined by 2 px legs,

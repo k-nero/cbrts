@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, CrewAssignment.Key> {
+public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, UUID> {
     List<CrewAssignment> findByJobId(UUID jobId);
 
     void deleteByJobId(UUID jobId);

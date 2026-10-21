@@ -1,23 +1,17 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 
 import { changeRows, fromLabel, recordedLabel, roleLabel, stampLabel } from './format';
+import { Row } from './Row';
 
 import { Button, Icon, Panel } from '@/components/ui';
 import type { AuditEntry } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 
-const Row: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
-  <div className="flex items-baseline justify-between gap-4">
-    <span className="type-body-s shrink-0 text-ink-3">{label}</span>
-    <span className="min-w-0 text-right break-all">{children}</span>
-  </div>
-);
-
 type Props = { entry: AuditEntry; onClose: () => void };
 
 /**
  * One entry opened beside the table (DESIGN.md, Audit log): the action, the stamp, what changed
- * as before → after, the reason as written, the linked record and the entry number.
+ * as before → after, the reason as written, the linked record, and the entry number.
  */
 const AuditEntryPanel: FC<Props> = ({ entry, onClose }) => {
   const router = useCustomRouter();

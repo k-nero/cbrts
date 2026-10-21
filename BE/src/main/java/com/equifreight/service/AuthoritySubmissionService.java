@@ -203,23 +203,12 @@ public class AuthoritySubmissionService {
                 submission.setResultFile(resultFile);
             }
         } else if (request.status() == SubmissionStatus.REFUSED) {
-            TransportJob job = submission.getJob();
-            User manager = job != null ? job.getApprovedBy() : null;
-            if (manager != null) {
-                notificationService.sendNotification(
-                        manager,
-                        "DOSSIER_REFUSED",
-                        "Authority submission refused for job " + (job != null ? job.getCode() : "JOB"),
-                        String.format(
-                                "Authority %s has REFUSED submission %s for job %s.",
-                                submission.getAuthority() != null
-                                        ? submission.getAuthority().getName()
-                                        : "Authority",
-                                submission.getKind(),
-                                job != null ? job.getCode() : "JOB"),
-                        "AuthoritySubmission",
-                        submission.getId());
-            }
+            alertManager(
+                    submission,
+                    "DOSSIER_REFUSED",
+                    submission.getAuthority().getName() + " refused " + submission.getKind() + " for "
+                            + submission.getJob().getCode(),
+                    "Reschedule or re-file before the departure slot is lost.");
         } else if (request.status() == SubmissionStatus.ADDITIONAL_INFO) {
             // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
@@ -234,23 +223,12 @@ public class AuthoritySubmissionService {
                         "AuthoritySubmission",
                         submission.getId());
             }
-
-            User manager = job != null ? job.getApprovedBy() : null;
-            if (manager != null) {
-                notificationService.sendNotification(
-                        manager,
-                        "DOSSIER_BLOCKED",
-                        "Additional info required for job " + (job != null ? job.getCode() : "JOB"),
-                        String.format(
-                                "Authority %s requested additional information for submission %s on job %s.",
-                                submission.getAuthority() != null
-                                        ? submission.getAuthority().getName()
-                                        : "Authority",
-                                submission.getKind(),
-                                job != null ? job.getCode() : "JOB"),
-                        "AuthoritySubmission",
-                        submission.getId());
-            }
+            alertManager(
+                    submission,
+                    "DOSSIER_BLOCKED",
+                    submission.getAuthority().getName() + " asked for more information on " + submission.getKind()
+                            + " for " + job.getCode(),
+                    "The dossier is blocked until the customer sends it.");
         }
 
         AuthoritySubmission updated = submissionRepository.save(submission);
@@ -372,39 +350,36 @@ public class AuthoritySubmissionService {
     }
 
     /**
-     * Checks all pending authority submissions and alerts the logistics manager for any submission
-     * that has passed its expected SLA date without an outcome (Flow 2: Alert manager on late dossiers).
+     * US-F2-07: alerts the logistics manager who approved the job about every submission still open after the
+     * day the authority was expected to answer (an SLA breach). Run once a day, so a breach is repeated daily
+     * until the authority answers. Returns how many alerts were sent.
      */
     @Transactional
-    public int checkAndAlertLateSubmissions() {
-        LocalDate today = LocalDate.now(AppConstants.BUSINESS_ZONE);
-        List<AuthoritySubmission> openSubmissions = submissionRepository.findAll().stream()
-                .filter(s ->
-                        s.getStatus() == SubmissionStatus.FILED || s.getStatus() == SubmissionStatus.ADDITIONAL_INFO)
-                .filter(s -> s.getExpectedBy() != null && s.getExpectedBy().isBefore(today))
-                .toList();
-
+    public int alertLateSubmissions(LocalDate today) {
+        List<AuthoritySubmission> late = submissionRepository.findByStatusInAndExpectedByBefore(
+                List.of(SubmissionStatus.FILED, SubmissionStatus.ADDITIONAL_INFO), today);
         int alerted = 0;
-        for (AuthoritySubmission s : openSubmissions) {
-            TransportJob job = s.getJob();
-            User manager = job != null ? job.getApprovedBy() : null;
-            if (manager != null) {
-                notificationService.sendNotification(
-                        manager,
-                        "DOSSIER_LATE",
-                        String.format("Overdue authority submission for job %s (SLA breached)", job.getCode()),
-                        String.format(
-                                "Submission %s to %s was expected by %s but is still %s.",
-                                s.getKind(),
-                                s.getAuthority() != null ? s.getAuthority().getName() : "Authority",
-                                s.getExpectedBy(),
-                                s.getStatus()),
-                        "AuthoritySubmission",
-                        s.getId());
+        for (AuthoritySubmission s : late) {
+            if (alertManager(
+                    s,
+                    "DOSSIER_LATE",
+                    s.getKind() + " for " + s.getJob().getCode() + " is late",
+                    s.getAuthority().getName() + " was expected to answer by " + s.getExpectedBy()
+                            + " and the submission is still " + s.getStatus() + ".")) {
                 alerted++;
             }
         }
         return alerted;
+    }
+
+    /** Notifies the logistics manager who approved the submission's job; false when no one approved it. */
+    private boolean alertManager(AuthoritySubmission submission, String type, String title, String body) {
+        User manager = submission.getJob().getApprovedBy();
+        if (manager == null) {
+            return false;
+        }
+        notificationService.sendNotification(manager, type, title, body, "AuthoritySubmission", submission.getId());
+        return true;
     }
 
     private TransportJob findJobOrThrow(UUID jobId) {

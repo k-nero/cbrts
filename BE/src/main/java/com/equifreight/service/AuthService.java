@@ -104,7 +104,7 @@ public class AuthService {
                     "EMAIL_IN_USE", "An account already uses this email. Sign in, or reset your password.");
         }
         Country country = countryRepository
-                .findById(request.countryCode())
+                .findByCode(request.countryCode())
                 .orElseThrow(() -> new BusinessException("We don't serve that country yet."));
         Role customer = roleRepository
                 .findByName(RoleName.CUSTOMER)

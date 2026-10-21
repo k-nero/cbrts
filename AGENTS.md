@@ -127,10 +127,19 @@ Where to look elsewhere:
 - **Records belong to someone.** Customer endpoints (`/api/v1/customer/**`) only read or change records of the signed-in user's club; check ownership in the service and answer 404 for anyone else's record. Never trust an id in the path to belong to the caller.
 - **Mirror the database's rules.** When `database-design.md` puts a rule in a check constraint or trigger (append-only versions, one review decision, required reasons), the service enforces the same rule first, with a clear message. Never write code that relies on the database to reject it, and never contradict it.
 - **Validate, then write.** Check every rule before saving anything; don't save a change and throw afterwards.
-- **One writer per status.** Each derived status has one place that sets it, and everything else asks that place to re-evaluate instead of writing the column:
+- **A repository returns its own entity.** `XRepository` returns `X`, a projection of `X`'s rows, or plain values (ids, codes, counts). A query may join other tables to answer a question about its own rows (`RequestHorseRepository.findSubmittedRequestCodes`), but it never returns another entity: a user's club comes from `ClubRepository`, not `UserRepository`.
+- **Derived queries first.** Write a repository method as a Spring Data derived query whenever its name can say it: `findByVersionIdAndMandatoryTrue`, `findByCatalogIdAndStatusOrderByVersionNoDesc`, `findFirstByJobIdOrderByCreatedAtDesc`, `existsByCode`, `countByStatus`. Use `…IgnoreCase` instead of `lower(...)`, and put `@Lock` or `@EntityGraph` on the derived method when it needs a row lock or fetched relations.
+  - Write an `@Query` only when a name can't say it: a projection that reads joined tables, an aggregate (`count`, `sum`, `group by`), an `exists` subquery, a `join fetch` that `@EntityGraph` can't express, a bulk `@Modifying` update or delete, or native SQL.
+  - Also use `@Query` when the name would stop being readable: `and` mixed with `or` groups, an optional parameter (`:x is null or …`), or more than about four conditions.
+- **Only the owning area writes an aggregate.** A root entity (`TransportRequest`, `Quotation`, `TransportJob`, `ChecklistItem`, …) and its children are changed and saved only by that area's service.
+  - Another service may read the root's repository, but to change it, it calls a method on the owning service, such as `TransportJobService` for a job.
+  - Children (`QuotationLine`, `RequestRevision`, `RouteStop`, …) are saved through their root or in the root's service, never from another area.
+- **One writer per status.** Each status has one method that changes it. That method checks the current status allows the move and refuses the rest with a clear message, and every other service calls it instead of setting the column:
+  - `transport_requests.status`: the request's own service moves it (submitted, under review, quoted, info required, expired); quotation and review services ask it to.
   - `transport_jobs.dossier_status` and `clearance_ready_at`: only `ClearanceService.evaluateClearanceGate`, which also leaves a departed job alone.
   - The job stage moves to `TRIP` only when the departure is recorded (`TripService`), never at planning or sign-off.
-  - A change to a plan that was signed off (route, load or crew) clears the sign-off.
+  - A change to a plan that was signed off (route, load or crew) clears the sign-off, through one method in the job's service rather than in each planning service.
+- **Scheduled jobs only find and trigger.** A class in `job/` finds the rows that are due and calls one service method per row. The rules, status changes, audit entries and notifications live in that service method, so a person's action and the job run the same code.
 - **Transactions.**
   - A read-only transaction (`@Transactional(readOnly = true)`) and a `GET` endpoint never create data; a missing record is created by an explicit `POST`.
   - Hibernate flushes inserts before deletes. To replace rows covered by a unique constraint in one transaction, delete them with a bulk `@Modifying @Query` (it runs at once), not `deleteAll(entities)` or a derived `deleteBy…`.
@@ -140,7 +149,7 @@ Where to look elsewhere:
 - **Dates are local calendar days.** Business rules that count days (validity windows, lead time, due dates, "in 5 days") work on dates in the business time zone, `Asia/Ho_Chi_Minh`, never UTC: a 06:00 departure on 18 Oct is still 17 Oct in UTC. Keep one shared constant for the zone instead of scattering `ZoneOffset.UTC`.
 - **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
-- **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
+- **Seed data.** `DataSeeder` creates one account per role. The password is `app.seed.default.password` (env `APP_SEED_DEFAULT_PASSWORD`), `changeme123!` in the dev profile and in compose. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
 - **No N+1 queries.** A request runs a fixed number of queries, however many rows it returns. Never call a repository, or touch a lazy relation, inside a loop or a `stream().map(...)` over results; that is one query per row.
   - Load what a response needs in the query that loads the rows: a `join fetch` in a `@Query` (see `TransportJobRepository`, `join fetch j.request r join fetch r.club c`) or an `@EntityGraph`. A paged `join fetch` query needs its own `countQuery`.
   - For a collection on a page of rows, fetch the page first, then load the children for all the page's ids in one query (`findAllByJobIdIn(ids)`), and group them in memory.
@@ -258,6 +267,8 @@ Where to look elsewhere:
 - Don't give a role a permission its story doesn't, or let a customer reach another club's records.
 - Don't save first and validate after, or skip the audit entry for a decision.
 - Don't write a status another service owns (the dossier status, the trip stage), or create data from a `GET` or a read-only transaction.
+- Don't return another entity from a repository, save an aggregate from outside its area, or put business rules in a scheduled job.
+- Don't write an `@Query` for what a derived method name (`findByXAndY`, `existsBy…`, `countBy…`) already expresses.
 - Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
 - Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.

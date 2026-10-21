@@ -1,13 +1,10 @@
 import type { FC, ReactNode } from 'react';
 
 import { cx } from './tone';
+import { Screw } from './Screw';
 
 /* Brass is a material: the same in both themes (DESIGN.md, Domain colours). */
 const BRASS = 'linear-gradient(180deg, #EAD08C 0%, #C9AA5A 55%, #9C7C33 100%)';
-
-const Screw: FC = () => (
-  <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-brass-dark" />
-);
 
 type Props = { name: ReactNode; subtitle?: ReactNode; className?: string };
 

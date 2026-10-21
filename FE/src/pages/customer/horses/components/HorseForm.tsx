@@ -1,24 +1,20 @@
 import { type FC, type ReactNode, useMemo } from 'react';
-import { type Resolver, useController, type UseFormReturn, useWatch } from 'react-hook-form';
+import { type Resolver, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
 
-import { fromHorse, type HorseFormValues, makeHorseSchema, toHorseInput } from './horseSchema';
+import { fromHorse, type HorseFormValues, makeHorseSchema, toHorseInput } from './schema';
+import { Section } from './Section';
+import { Side } from './Side';
+import { SizeLine } from './SizeLine';
+import { StallTicks } from './StallTicks';
+import { TemperamentCards } from './TemperamentCards';
 
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
-import { Checkbox, Chip, OptionCard } from '@/components/ui';
-import { useSizeClasses } from '@/hooks/horse';
-import {
-  type Horse,
-  HorseCoatEnum,
-  type HorseInput,
-  HorseSexEnum,
-  type Temperament,
-  TemperamentEnum,
-} from '@/interfaces';
-import { apiErrorView, formatHeight, formRefusal, ict, sexLabel, sizeClassFor } from '@/lib/utils';
+import { type Horse, HorseCoatEnum, type HorseInput, HorseSexEnum } from '@/interfaces';
+import { apiErrorView, formRefusal, ict, sexLabel } from '@/lib/utils';
 
 type Option = { label: string; value: string };
 
@@ -32,38 +28,14 @@ const SEX_OPTIONS: Option[] = Object.values(HorseSexEnum).map((s) => ({
   label: sexLabel(s),
   value: s,
 }));
+
 const COAT_OPTIONS: Option[] = Object.values(HorseCoatEnum).map((c) => ({
   label: c.charAt(0) + c.slice(1).toLowerCase(),
   value: c,
 }));
+
 const optionFor = (options: Option[], value: string | null | undefined) =>
   options.find((o) => o.value === value) ?? null;
-
-const TEMPERAMENT_CARDS: {
-  value: Temperament;
-  title: string;
-  description: string;
-  meta: string;
-}[] = [
-  {
-    value: TemperamentEnum.CALM,
-    title: 'Calm',
-    description: 'Loads with a standard team.',
-    meta: 'Standard stall',
-  },
-  {
-    value: TemperamentEnum.NERVOUS,
-    title: 'Nervous',
-    description: 'Loaded slowly, away from the ramp.',
-    meta: 'Quiet position',
-  },
-  {
-    value: TemperamentEnum.AGGRESSIVE,
-    title: 'Aggressive',
-    description: 'Experienced handlers only.',
-    meta: 'Box stall',
-  },
-];
 
 /** Where the API's refusals land (spec §3.5). */
 const FIELDS_BY_CODE = {
@@ -76,6 +48,7 @@ const FIELDS_BY_CODE = {
 
 /** The fields in the order the form shows them; a locked horse doesn't show the first six. */
 const IDENTITY_FIELDS = ['name', 'microchip', 'passportNo', 'sex', 'breed', 'dateOfBirth', 'coat'];
+
 const OTHER_FIELDS = [
   'heightHh',
   'weightKg',
@@ -84,6 +57,7 @@ const OTHER_FIELDS = [
   'handlingNotes',
   'declaredValue',
 ];
+
 const LOCKED_HIDDEN = new Set(['name', 'microchip', 'sex', 'breed', 'dateOfBirth', 'coat']);
 
 const EMPTY: HorseFormShape = {
@@ -107,98 +81,6 @@ const toShape = (values: HorseFormValues): HorseFormShape => ({
   sex: optionFor(SEX_OPTIONS, values.sex),
   coat: optionFor(COAT_OPTIONS, values.coat),
 });
-
-/** One section of the form: its title, why it asks, then its fields. */
-const Section: FC<{ title: string; sub?: string; first?: boolean; children: ReactNode }> = ({
-  title,
-  sub,
-  first,
-  children,
-}) => (
-  <section
-    className={first ? 'flex flex-col gap-3.5' : 'flex flex-col gap-3.5 border-t border-line pt-5'}
-  >
-    <div className="flex flex-col gap-0.5">
-      <h4 className="type-h4 m-0 text-ink">{title}</h4>
-      {sub && <p className="type-body-s m-0 text-ink-3">{sub}</p>}
-    </div>
-    {children}
-  </section>
-);
-
-/** "Size M · 32 in. Worked out from 16.0 hh." */
-const SizeLine: FC = () => {
-  const heightHh = useWatch<HorseFormShape, 'heightHh'>({ name: 'heightHh' });
-  const requiredStall = useWatch<HorseFormShape, 'requiredStall'>({ name: 'requiredStall' });
-  const { data: classes } = useSizeClasses();
-  const size = sizeClassFor(heightHh, requiredStall ?? 'STANDARD', classes ?? []);
-  return (
-    <div className="flex items-center gap-3 rounded-sm bg-sunken px-4 py-3">
-      {size ? (
-        <>
-          <Chip tone="neutral">
-            Size {size.code} · {size.widthIn} in
-          </Chip>
-          <span className="type-body-s text-ink-2">
-            Worked out from {formatHeight(heightHh)}. It decides the stall width and the air
-            position.
-          </span>
-        </>
-      ) : (
-        <span className="type-body-s text-ink-3">
-          Your horse&apos;s size class appears when you enter a height.
-        </span>
-      )}
-    </div>
-  );
-};
-
-/** Calm, Nervous or Aggressive, as radio option cards. */
-const TemperamentCards: FC = () => {
-  const { field } = useController<HorseFormShape, 'temperament'>({ name: 'temperament' });
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {TEMPERAMENT_CARDS.map((card) => (
-        <OptionCard
-          key={card.value}
-          type="radio"
-          name="temperament"
-          value={card.value}
-          selected={field.value === card.value}
-          onChange={(selected) => selected && field.onChange(card.value)}
-          title={card.title}
-          description={card.description}
-          meta={card.meta}
-        />
-      ))}
-    </div>
-  );
-};
-
-/** Climate-controlled and box stall: one value in the API, so ticking one unticks the other. */
-const StallTicks: FC = () => {
-  const { field } = useController<HorseFormShape, 'requiredStall'>({ name: 'requiredStall' });
-  return (
-    <div className="flex gap-6">
-      <Checkbox
-        label="Climate-controlled stall"
-        checked={field.value === 'CLIMATE'}
-        onChange={(e) => field.onChange(e.target.checked ? 'CLIMATE' : 'STANDARD')}
-      />
-      <Checkbox
-        label="Box stall only"
-        checked={field.value === 'BOX'}
-        onChange={(e) => field.onChange(e.target.checked ? 'BOX' : 'STANDARD')}
-      />
-    </div>
-  );
-};
-
-/** The form's values as the side column reads them ("How he'll appear"). */
-const Side: FC<{ render: (values: HorseFormShape) => ReactNode }> = ({ render }) => {
-  const values = useWatch<HorseFormShape>() as HorseFormShape;
-  return <>{render(values)}</>;
-};
 
 type Props = {
   /** A saved horse for Edit; empty for Add. */

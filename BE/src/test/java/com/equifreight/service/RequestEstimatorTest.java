@@ -138,7 +138,8 @@ class RequestEstimatorTest {
 
     void policy(RatePolicyKey key, String value) {
         RatePolicy p = new RatePolicy();
-        p.setId(new RatePolicy.Key(v5.getId(), key));
+        p.setVersion(v5);
+        p.setKey(key);
         p.setValue(new BigDecimal(value));
         policies.add(p);
     }

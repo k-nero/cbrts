@@ -78,15 +78,6 @@ public class AuthoritySubmissionController {
     }
 
     /**
-     * Check and alert the manager for overdue authority dossiers (Flow 2: Alert manager on late dossiers).
-     */
-    @PostMapping("/submissions/check-late")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
-    public int checkLateSubmissions() {
-        return submissionService.checkAndAlertLateSubmissions();
-    }
-
-    /**
      * List quarantine periods scheduled or completed for a transport job.
      */
     @GetMapping("/jobs/{jobId}/quarantines")

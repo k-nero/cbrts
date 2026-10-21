@@ -4,9 +4,9 @@ import { Skeleton } from 'antd';
 
 import { horseChips } from '../../horses/components/horseCardProps';
 
-import { StepRefusal } from './parts';
+import { StepRefusal } from './StepRefusal';
 
-import type { StepProps } from '.';
+import type { StepProps } from './WizardForm';
 
 import { Button, Callout, Checkbox, Chip, COAT_SWATCH, cx, OptionCard } from '@/components/ui';
 import type { useWizardHorses } from '@/hooks/request';

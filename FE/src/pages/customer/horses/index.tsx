@@ -4,32 +4,16 @@ import { Pagination, Skeleton } from 'antd';
 
 import { archivedChip, horseCardProps } from './components/horseCardProps';
 import FirstRun from './FirstRun';
+import { AddHorseCard } from './AddHorseCard';
 
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, HorseCard, Icon, Tabs } from '@/components/ui';
+import { Button, Callout, HorseCard, Tabs } from '@/components/ui';
 import { useMe } from '@/hooks/auth';
 import { useHorseCount, useHorses } from '@/hooks/horse';
 import { ict } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 type Tab = 'active' | 'archived';
-
-/** The dashed card that closes the Active grid (frame: My horses). */
-const AddHorseCard: FC<{ onClick: () => void }> = ({ onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line-strong bg-transparent p-8 text-center"
-  >
-    <span className="flex size-11 items-center justify-center rounded-full bg-muted text-ink-2">
-      <Icon name="plus" size={22} />
-    </span>
-    <span className="type-h4 text-ink">Add a horse</span>
-    <span className="type-body-s max-w-[260px] text-ink-3">
-      Name, sex, size class and microchip are needed for quotes and border checks.
-    </span>
-  </button>
-);
 
 /** My horses (spec §4): the club's horses as cards, in Active and Archived tabs. */
 const MyHorsesPage: FC = () => {

@@ -170,7 +170,8 @@ class RateCatalogServiceTest {
                 RatePolicyKey.SERVICE_FEE_PCT,
                 RatePolicyKey.ESTIMATE_BAND_PCT)) {
             RatePolicy p = new RatePolicy();
-            p.setId(new RatePolicy.Key(v.getId(), key));
+            p.setVersion(v);
+            p.setKey(key);
             p.setValue(BigDecimal.TEN);
             list.add(p);
         }

@@ -8,7 +8,6 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
-import com.equifreight.model.clearance.ChecklistItemResponse;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.clearance.DocumentUploadRequest;
 import com.equifreight.model.clearance.ReviewDocumentRequest;
@@ -402,17 +401,195 @@ class ClearanceServiceTest {
         assertNull(job.getClearanceReadyAt());
     }
 
+    /** A job to Cambodia with two horses. */
+    private void routeToCambodia() {
+        Country cambodia = new Country();
+        cambodia.setId(UUID.randomUUID());
+        cambodia.setCode("KH");
+        cambodia.setName("Cambodia");
+        Place phnomPenh = new Place();
+        phnomPenh.setCountry(cambodia);
+        TransportRequest request = new TransportRequest();
+        request.setDestinationPlace(phnomPenh);
+        for (String name : List.of("Shadowfax", "Nightfall")) {
+            Horse horse = new Horse();
+            horse.setId(UUID.randomUUID());
+            horse.setName(name);
+            RequestHorse rh = new RequestHorse();
+            rh.setHorse(horse);
+            request.getHorses().add(rh);
+        }
+        job.setRequest(request);
+    }
+
+    /** A version of Cambodia's catalog with a 21-day lead time; nothing is stubbed. */
+    private static RegulationVersion cambodiaCatalog() {
+        RegulationCatalog catalog = new RegulationCatalog();
+        catalog.setId(UUID.randomUUID());
+        catalog.setName("Cambodia");
+        RegulationVersion version = new RegulationVersion();
+        version.setId(UUID.randomUUID());
+        version.setCatalog(catalog);
+        version.setLeadTimeDays((short) 21);
+        return version;
+    }
+
+    /** Cambodia's catalog, with that version published. */
+    private RegulationVersion publishedCambodiaCatalog() {
+        RegulationVersion version = cambodiaCatalog();
+        when(regulationCatalogRepository.findByCountryCode("KH")).thenReturn(Optional.of(version.getCatalog()));
+        when(regulationVersionRepository.findByCatalogIdAndStatus(
+                        version.getCatalog().getId(), CatalogStatus.PUBLISHED))
+                .thenReturn(Optional.of(version));
+        return version;
+    }
+
+    private static RegulationRule rule(RegulationVersion version, DocumentScope scope, DocumentProvider provider) {
+        DocumentType type = new DocumentType();
+        type.setId(UUID.randomUUID());
+        type.setScope(scope);
+        type.setProvidedBy(provider);
+        RegulationRule rule = new RegulationRule();
+        rule.setVersion(version);
+        rule.setDocumentType(type);
+        return rule;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ChecklistItem> savedItems() {
+        org.mockito.ArgumentCaptor<List<ChecklistItem>> items = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(checklistItemRepository).saveAll(items.capture());
+        return items.getValue();
+    }
+
     @Test
-    @DisplayName("generateChecklist creates items for pinned regulations")
-    void generateChecklistCreatesRequiredItems() {
+    @DisplayName("Generating a checklist pins the destination catalog and adds an item per horse and per shipment")
+    void generateChecklistAddsItemsFromThePinnedCatalog() {
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
-        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of());
-        when(regulationCatalogRepository.findByCountryCode("KH")).thenReturn(Optional.empty());
+        routeToCambodia();
+        RegulationVersion version = publishedCambodiaCatalog();
+        RegulationRule passport = rule(version, DocumentScope.PER_HORSE, DocumentProvider.CUSTOMER);
+        RegulationRule permit = rule(version, DocumentScope.PER_SHIPMENT, DocumentProvider.AUTHORITY);
+        when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(regulationRuleRepository.findByVersionIdIn(Set.of(version.getId())))
+                .thenReturn(List.of(passport, permit));
+        // 08:00 on 15 Dec in Vietnam: the departure day is 15 Dec, so items are due 21 days earlier.
+        job.setPlannedDepartureAt(Instant.parse("2026-12-15T01:00:00Z"));
 
-        List<ChecklistItemResponse> result = clearanceService.generateChecklist(job.getId(), specialistUser);
+        clearanceService.generateChecklist(job.getId(), specialistUser);
 
-        assertNotNull(result);
+        List<ChecklistItem> items = savedItems();
+        assertEquals(3, items.size());
+        assertEquals(
+                2, items.stream().filter(i -> i.getRegulationRule() == passport).count());
+        ChecklistItem permitItem = items.stream()
+                .filter(i -> i.getRegulationRule() == permit)
+                .findFirst()
+                .orElseThrow();
+        assertNull(permitItem.getHorse());
+        assertEquals(ChecklistStatus.NOT_ISSUED, permitItem.getStatus());
+        assertEquals(ChecklistHolder.SPECIALIST, permitItem.getHolder());
+        ChecklistItem passportItem = items.stream()
+                .filter(i -> i.getRegulationRule() == passport)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(ChecklistStatus.AWAITING_UPLOAD, passportItem.getStatus());
+        assertEquals(ChecklistHolder.CUSTOMER, passportItem.getHolder());
+        assertEquals(LocalDate.of(2026, 11, 24), passportItem.getDueDate());
+        verify(auditService)
+                .recordDecision(
+                        eq(specialistUser),
+                        eq("CHECKLIST_GENERATED"),
+                        anyString(),
+                        eq("TRANSPORT_JOB"),
+                        eq(job.getId()),
+                        eq(job.getCode()),
+                        isNull(),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    @DisplayName("A re-run adds only the missing items, and without a planned departure no due date is guessed")
+    void generateChecklistAddsOnlyMissingItemsAndLeavesDueDateEmptyWithoutDeparture() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        routeToCambodia();
+        RegulationVersion version = cambodiaCatalog();
+        RegulationRule passport = rule(version, DocumentScope.PER_HORSE, DocumentProvider.CUSTOMER);
+        JobRegulationPin pin = new JobRegulationPin();
+        pin.setRole(RegulationRole.DESTINATION);
+        pin.setRegulationVersion(version);
+        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+        when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(regulationRuleRepository.findByVersionIdIn(Set.of(version.getId())))
+                .thenReturn(List.of(passport));
+        ChecklistItem existing = new ChecklistItem();
+        existing.setDocumentType(passport.getDocumentType());
+        existing.setHorse(job.getRequest().getHorses().getFirst().getHorse());
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(existing));
+
+        clearanceService.generateChecklist(job.getId(), specialistUser);
+
+        List<ChecklistItem> items = savedItems();
+        assertEquals(1, items.size(), "the first horse already has its passport item");
+        assertEquals(
+                job.getRequest().getHorses().get(1).getHorse(), items.getFirst().getHorse());
+        assertNull(items.getFirst().getDueDate());
+        verify(regulationCatalogRepository, never()).findByCountryCode(any());
+    }
+
+    @Test
+    @DisplayName("Generating a checklist refuses a destination with no country instead of guessing one")
+    void generateChecklistRefusesWithoutDestinationCountry() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        job.setRequest(new TransportRequest());
+
+        BusinessException e = assertThrows(
+                BusinessException.class, () -> clearanceService.generateChecklist(job.getId(), specialistUser));
+
+        assertEquals("CHECKLIST_NO_DESTINATION", e.getCode());
+        verify(jobRegulationPinRepository, never()).saveAll(anyList());
+        verify(checklistItemRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("Generating a checklist refuses a destination with no published catalog, before pinning anything")
+    void generateChecklistRefusesWithoutPublishedCatalog() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        routeToCambodia();
+        RegulationCatalog draftOnly = cambodiaCatalog().getCatalog();
+        when(regulationCatalogRepository.findByCountryCode("KH")).thenReturn(Optional.of(draftOnly));
+
+        BusinessException e = assertThrows(
+                BusinessException.class, () -> clearanceService.generateChecklist(job.getId(), specialistUser));
+
+        assertEquals("CHECKLIST_NO_CATALOG", e.getCode());
+        verify(jobRegulationPinRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("The gate's audit reason keeps whole issues within 500 characters and counts the rest")
+    void issuesTextFitsTheAuditReasonColumn() {
+        List<String> issues = java.util.stream.IntStream.range(0, 20)
+                .mapToObj(i -> "Export health certificate for horse " + i + " is not uploaded")
+                .toList();
+
+        String text = ClearanceService.issuesText(issues);
+
+        assertTrue(text.length() <= 500, text.length() + " characters");
+        assertTrue(text.matches(".*; and \\d+ more"), text);
+        assertEquals("a; b", ClearanceService.issuesText(List.of("a", "b")));
+    }
+
+    @Test
+    @DisplayName("Reading a checklist never creates one")
+    void getChecklistDoesNotGenerate() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+
+        assertTrue(clearanceService.getChecklist(job.getId()).isEmpty());
+
+        verify(checklistItemRepository, never()).saveAll(anyList());
+        verifyNoInteractions(jobRegulationPinRepository, regulationCatalogRepository);
     }
 
     private void stubGate(List<AuthoritySubmission> submissions) {

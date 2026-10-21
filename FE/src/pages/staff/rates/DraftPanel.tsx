@@ -1,7 +1,8 @@
 import { type FC, useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
-import { z } from 'zod';
+
+import { CHANGE_NOTE_MAX, publishSchema, type PublishForm } from './schema';
 
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -11,16 +12,6 @@ import { Button, Panel } from '@/components/ui';
 import { useCreateRateDraft, useDiscardRateDraft, usePublishRateDraft } from '@/hooks/rates';
 import type { RateCatalog } from '@/interfaces';
 import { apiErrorMessage, formatDayTime } from '@/lib/utils';
-
-const NOTE_MAX = 500;
-const schema = z.object({
-  changeNote: z
-    .string()
-    .trim()
-    .min(1, 'Say what changed in this version.')
-    .max(NOTE_MAX, `The change note must be ${NOTE_MAX} characters or fewer.`),
-});
-type PublishForm = z.infer<typeof schema>;
 
 type Props = {
   catalog: RateCatalog;
@@ -38,7 +29,7 @@ export const DraftPanel: FC<Props> = ({ catalog, onDraftGone }) => {
   const discard = useDiscardRateDraft();
   const publish = usePublishRateDraft();
   const [publishing, setPublishing] = useState(false);
-  const methods = useFormCustom<PublishForm>({ resolver: zodResolver(schema) });
+  const methods = useFormCustom<PublishForm>({ resolver: zodResolver(publishSchema) });
 
   const draft = catalog.versions.find((v) => v.id === catalog.draftVersionId);
   const current = catalog.versions.find((v) => v.id === catalog.currentVersionId);
@@ -156,7 +147,7 @@ export const DraftPanel: FC<Props> = ({ catalog, onDraftGone }) => {
                 name="changeNote"
                 label="What changed"
                 component="textarea"
-                componentProps={{ isRequired: true, maxLength: NOTE_MAX, rows: 3 }}
+                componentProps={{ isRequired: true, maxLength: CHANGE_NOTE_MAX, rows: 3 }}
               />
               <Flex justify="end" gap={8}>
                 <CancelButton label="Cancel" />

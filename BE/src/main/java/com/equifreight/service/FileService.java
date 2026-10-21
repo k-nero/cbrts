@@ -13,11 +13,9 @@ import com.equifreight.model.file.FileResponse;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.FileStorage;
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -154,36 +152,7 @@ public class FileService {
     @Transactional(readOnly = true)
     public FileContent open(UUID id, User user) {
         StoredFile file = findReadable(id, user);
-        try {
-            return new FileContent(file, fileStorage.open(file.getStorageKey()));
-        } catch (StorageException e) {
-            if (file.getStorageKey() != null && file.getStorageKey().startsWith("demo/")) {
-                byte[] mockPdf = createMockPdf(file.getFileName(), file.getSizeBytes());
-                return new FileContent(file, new ByteArrayInputStream(mockPdf));
-            }
-            throw e;
-        }
-    }
-
-    private byte[] createMockPdf(String fileName, long targetSize) {
-        String title = fileName == null ? "EquiFreight Document" : fileName;
-        String content = "%PDF-1.4\n"
-                + "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
-                + "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
-                + "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
-                + "4 0 obj\n<< /Length 160 >>\nstream\nBT\n/F1 20 Tf\n72 720 Td\n(" + title
-                + ") Tj\n0 -30 Td\n/F1 12 Tf\n(EquiFreight Clearance Verification Document) Tj\nET\nendstream\nendobj\n"
-                + "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
-                + "xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000229 00000 n \n0000000442 00000 n \n"
-                + "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n511\n%%EOF\n";
-        byte[] base = content.getBytes(StandardCharsets.US_ASCII);
-        int size = (int) Math.max(targetSize, base.length);
-        byte[] result = new byte[size];
-        System.arraycopy(base, 0, result, 0, base.length);
-        for (int i = base.length; i < size; i++) {
-            result[i] = 0x20;
-        }
-        return result;
+        return new FileContent(file, fileStorage.open(file.getStorageKey()));
     }
 
     /**

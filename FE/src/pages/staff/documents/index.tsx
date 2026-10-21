@@ -46,7 +46,6 @@ const DocumentsPage: FC = () => {
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.pendingReviews() });
-
     if (jobId) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });

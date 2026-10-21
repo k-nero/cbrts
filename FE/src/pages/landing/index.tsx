@@ -1,7 +1,12 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 
-import { Corridors, RouteMap } from './routeMap';
-import { QuoteVisual, TravelPass, WidthVisual, WindowVisual } from './visuals';
+import { Corridors } from './Corridors';
+import { RouteMap } from './RouteMap';
+import { QuoteVisual } from './QuoteVisual';
+import { TravelPass } from './TravelPass';
+import { WidthVisual } from './WidthVisual';
+import { WindowVisual } from './WindowVisual';
+import { Section } from './Section';
 
 import heroPhoto from '@/assets/photos/draft-hero-loading-dawn.jpg';
 import Brand from '@/components/Brand';
@@ -88,23 +93,6 @@ const FEATURES = [
     body: 'Every line shows its basis. Lines that can change on the final invoice, such as waiting time, are marked before you accept.',
   },
 ];
-
-const Section: FC<{ id: string; title: string; summary?: string; children: ReactNode }> = ({
-  id,
-  title,
-  summary,
-  children,
-}) => (
-  <section aria-labelledby={id} className="flex scroll-mt-6 flex-col gap-8 pt-20">
-    <header className="flex flex-col gap-2.5">
-      <h2 id={id} className="type-display-l m-0 text-ink">
-        {title}
-      </h2>
-      {summary && <p className="type-body-m m-0 max-w-[680px] text-ink-2">{summary}</p>}
-    </header>
-    {children}
-  </section>
-);
 
 /**
  * The signed-out landing page (DESIGN.md, Landing): what EquiFreight does, the services and how

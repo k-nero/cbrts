@@ -14,7 +14,7 @@ import lombok.Setter;
 public class RegulationCatalog extends BaseEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code", nullable = false, unique = true)
+    @JoinColumn(name = "country_id", nullable = false, unique = true)
     private Country country;
 
     @Column(nullable = false, length = 120)

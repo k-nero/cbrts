@@ -2,16 +2,30 @@ import type { AxiosError } from 'axios';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  addLine,
   changeQuotationClass,
+  discardRevision,
+  editLine,
   getQueue,
   getQuotation,
   getReview,
+  issueQuotation,
+  overrideLine,
+  removeLine,
+  removeOverride,
   repriceQuotation,
   returnForInformation,
+  reviseQuotation,
   startQuotation,
 } from '@/apis/staffRequest';
 import { queryKeys } from '@/constant/query';
-import type { QuotationDraft, RequestReview, ServiceClass } from '@/interfaces';
+import type {
+  ManualLineInput,
+  OverrideInput,
+  QuotationDraft,
+  RequestReview,
+  ServiceClass,
+} from '@/interfaces';
 
 /** One page of the review queue, oldest first, refetched every minute so the ages keep moving. */
 export const useReviewQueue = (page: number) =>
@@ -47,13 +61,14 @@ export const useReturnRequest = () => {
   });
 };
 
-/** The request's draft quotation; a 404 means it hasn't been started. */
-/** The request's quotation draft. A 404 means none has been started: the builder offers Start, so only
- * other failures go to the error boundary. */
-export const useQuotation = (requestId: string | undefined) =>
+/**
+ * The request's quotation, the latest or one version. A 404 means none has been started: the builder offers
+ * Start, so only other failures go to the error boundary.
+ */
+export const useQuotation = (requestId: string | undefined, version?: number) =>
   useQuery({
-    queryKey: queryKeys.staffRequests.quotation(requestId ?? ''),
-    queryFn: () => getQuotation(requestId as string),
+    queryKey: queryKeys.staffRequests.quotation(requestId ?? '', version),
+    queryFn: () => getQuotation(requestId as string, version),
     enabled: Boolean(requestId),
     retry: false,
     throwOnError: (error, query) =>
@@ -66,7 +81,14 @@ const useQuotationWrite = <V>(write: (requestId: string, value: V) => Promise<Qu
   return useMutation<QuotationDraft, unknown, { requestId: string; value: V }>({
     mutationFn: ({ requestId, value }) => write(requestId, value),
     onSuccess: (draft, { requestId }) => {
-      qc.setQueryData(queryKeys.staffRequests.quotation(requestId), draft);
+      const latest = queryKeys.staffRequests.quotation(requestId);
+      qc.setQueryData(latest, draft);
+      // Every other version's view can change (a revision supersedes, an issue moves the latest on). Not the
+      // latest: it was just set from the answer, so refetching it would be a wasted GET.
+      void qc.invalidateQueries({
+        queryKey: queryKeys.staffRequests.quotations(requestId),
+        predicate: (q) => q.queryKey[3] !== latest[3],
+      });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(requestId), exact: true });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
     },
@@ -79,3 +101,39 @@ export const useChangeQuotationClass = () =>
   useQuotationWrite<ServiceClass>((id, airClass) => changeQuotationClass(id, airClass));
 
 export const useRepriceQuotation = () => useQuotationWrite<void>((id) => repriceQuotation(id));
+
+export const useOverrideLine = () =>
+  useQuotationWrite<{ lineId: string; body: OverrideInput }>((id, v) =>
+    overrideLine(id, v.lineId, v.body),
+  );
+
+export const useRemoveOverride = () =>
+  useQuotationWrite<string>((id, lineId) => removeOverride(id, lineId));
+
+export const useAddLine = () => useQuotationWrite<ManualLineInput>((id, body) => addLine(id, body));
+
+export const useEditLine = () =>
+  useQuotationWrite<{ lineId: string; body: ManualLineInput }>((id, v) =>
+    editLine(id, v.lineId, v.body),
+  );
+
+export const useRemoveLine = () =>
+  useQuotationWrite<string>((id, lineId) => removeLine(id, lineId));
+
+export const useIssueQuotation = () =>
+  useQuotationWrite<string | null>((id, changeNote) => issueQuotation(id, changeNote));
+
+export const useReviseQuotation = () => useQuotationWrite<void>((id) => reviseQuotation(id));
+
+/** Discard a revision: the latest version is the one it came from again, so every view reloads. */
+export const useDiscardRevision = () => {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { requestId: string }>({
+    mutationFn: ({ requestId }) => discardRevision(requestId),
+    onSuccess: (_, { requestId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotations(requestId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(requestId), exact: true });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
+    },
+  });
+};

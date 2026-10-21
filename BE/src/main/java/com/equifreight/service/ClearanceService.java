@@ -83,31 +83,25 @@ public class ClearanceService {
 
     /**
      * Retrieve all checklist items for a transport job.
-     * If the checklist is not yet generated, generates it automatically from the route and pinned regulations (BR-F2-01).
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ChecklistItemResponse> getChecklist(UUID jobId) {
         findJobOrThrow(jobId);
-        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
-        if (items.isEmpty()) {
-            return generateChecklist(jobId, null);
-        }
-        return items.stream().map(ClearanceMapper::toItemResponse).toList();
+        return checklistItemRepository.findByJobId(jobId).stream()
+                .map(ClearanceMapper::toItemResponse)
+                .toList();
     }
 
     /**
      * Customer-scoped checklist: checks that the job belongs to the authenticated customer's club.
-     * If the checklist is not yet generated, generates it automatically.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ChecklistItemResponse> getCustomerChecklist(UUID jobId, User customer) {
         TransportJob job = findJobOrThrow(jobId);
         assertClubOwnsJob(job, customer);
-        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
-        if (items.isEmpty()) {
-            return generateChecklist(jobId, customer);
-        }
-        return items.stream().map(ClearanceMapper::toItemResponse).toList();
+        return checklistItemRepository.findByJobId(jobId).stream()
+                .map(ClearanceMapper::toItemResponse)
+                .toList();
     }
 
     /**
@@ -373,7 +367,7 @@ public class ClearanceService {
                     "TRANSPORT_JOB",
                     job.getId(),
                     job.getCode(),
-                    String.join("; ", gate.outstandingIssues()),
+                    issuesText(gate.outstandingIssues()),
                     previousStatus != null ? previousStatus.name() : "OPEN",
                     targetStatus.name());
         }
@@ -540,203 +534,190 @@ public class ClearanceService {
     }
 
     /**
-     * BR-F2-01: Automatically generate the document checklist for a job based on the route and destination country.
-     * Pins destination and origin country regulation catalogs to the job if not already pinned,
-     * then creates the required checklist items according to document scope (PER_HORSE, PER_SHIPMENT, PER_CROSSING).
+     * BR-F2-01: the job's checklist from the published regulation catalogs of the countries on its route. The
+     * first run pins the destination's published version (and the origin's, when it is another country with a
+     * published catalog); later runs reuse those pins and add only the items that are missing, so a re-run
+     * never duplicates an item or undoes a change the specialist made.
+     *
+     * <p>Each item is due the pinned version's lead time before the planned departure; with no departure
+     * planned yet, the due date stays empty until there is one.
      */
     @Transactional
     public List<ChecklistItemResponse> generateChecklist(UUID jobId, User specialist) {
         TransportJob job = findJobOrThrow(jobId);
+        TransportRequest request = job.getRequest();
+        Country destination = destinationCountry(request);
+        if (destination == null) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_DESTINATION",
+                    "The job's destination has no country. Set the destination place on the request first.");
+        }
+        Country origin = request.getOriginPlace() == null
+                ? null
+                : request.getOriginPlace().getCountry();
 
-        String destCountryCode = null;
-        String originCountryCode = null;
-        if (job.getRequest() != null) {
-            if (job.getRequest().getDestinationPlace() != null
-                    && job.getRequest().getDestinationPlace().getCountry() != null) {
-                destCountryCode =
-                        job.getRequest().getDestinationPlace().getCountry().getCode();
-            }
-            if (job.getRequest().getOriginPlace() != null
-                    && job.getRequest().getOriginPlace().getCountry() != null) {
-                originCountryCode =
-                        job.getRequest().getOriginPlace().getCountry().getCode();
-            }
-            if (destCountryCode == null && job.getRequest().getCorridor() != null) {
-                List<CorridorCrossing> crossings =
-                        job.getRequest().getCorridor().getCrossings();
-                if (crossings != null && !crossings.isEmpty()) {
-                    BorderCrossing lastCrossing =
-                            crossings.get(crossings.size() - 1).getBorderCrossing();
-                    if (lastCrossing != null && lastCrossing.getToCountry() != null) {
-                        destCountryCode = lastCrossing.getToCountry().getCode();
-                    }
-                }
+        // Validate, then write: the destination must have a published catalog before anything is pinned.
+        List<JobRegulationPin> pins = new ArrayList<>(jobRegulationPinRepository.findByJobId(jobId));
+        List<JobRegulationPin> newPins = new ArrayList<>();
+        if (!isPinned(pins, RegulationRole.DESTINATION)) {
+            RegulationVersion version = publishedVersion(destination)
+                    .orElseThrow(() -> new BusinessException(
+                            "CHECKLIST_NO_CATALOG",
+                            "There is no published regulation catalog for " + destination.getName()
+                                    + ". Publish one on the Regulations page first."));
+            newPins.add(pin(job, version, RegulationRole.DESTINATION));
+        }
+        if (origin != null && !origin.getId().equals(destination.getId()) && !isPinned(pins, RegulationRole.ORIGIN)) {
+            publishedVersion(origin).ifPresent(v -> newPins.add(pin(job, v, RegulationRole.ORIGIN)));
+        }
+        pins.addAll(jobRegulationPinRepository.saveAll(newPins));
+
+        Map<UUID, RegulationVersion> versionById = new HashMap<>();
+        pins.forEach(p -> versionById.put(p.getRegulationVersion().getId(), p.getRegulationVersion()));
+        List<RegulationRule> rules = regulationRuleRepository.findByVersionIdIn(versionById.keySet());
+
+        Set<String> existing = new HashSet<>();
+        checklistItemRepository
+                .findByJobId(jobId)
+                .forEach(i -> existing.add(itemKey(
+                        i.getDocumentType().getId(),
+                        i.getHorse() == null ? null : i.getHorse().getId(),
+                        i.getBorderCrossing() == null
+                                ? null
+                                : i.getBorderCrossing().getId())));
+        List<Horse> horses =
+                request.getHorses().stream().map(RequestHorse::getHorse).toList();
+        List<BorderCrossing> crossings = request.getCorridor() == null
+                ? List.of()
+                : request.getCorridor().getCrossings().stream()
+                        .map(CorridorCrossing::getBorderCrossing)
+                        .toList();
+
+        List<ChecklistItem> created = new ArrayList<>();
+        for (RegulationRule rule : rules) {
+            DocumentType type = rule.getDocumentType();
+            LocalDate due = dueDate(job, versionById.get(rule.getVersion().getId()));
+            switch (type.getScope()) {
+                case PER_HORSE -> horses.forEach(h -> addItem(created, existing, job, rule, due, h, null));
+                case PER_SHIPMENT -> addItem(created, existing, job, rule, due, null, null);
+                case PER_CROSSING -> crossings.forEach(c -> addItem(created, existing, job, rule, due, null, c));
             }
         }
-        if (destCountryCode == null) {
-            destCountryCode = "KH";
-        }
+        checklistItemRepository.saveAll(created);
 
-        pinCountryCatalogIfMissing(job, destCountryCode, RegulationRole.DESTINATION);
-        if (originCountryCode != null && !originCountryCode.equalsIgnoreCase(destCountryCode)) {
-            pinCountryCatalogIfMissing(job, originCountryCode, RegulationRole.ORIGIN);
-        }
-
-        List<JobRegulationPin> pins = jobRegulationPinRepository.findByJobId(job.getId());
-        List<ChecklistItem> existingItems = checklistItemRepository.findByJobId(job.getId());
-
-        List<RequestHorse> requestHorses =
-                job.getRequest() != null && job.getRequest().getHorses() != null
-                        ? job.getRequest().getHorses()
-                        : List.of();
-
-        List<CorridorCrossing> crossings =
-                job.getRequest() != null && job.getRequest().getCorridor() != null
-                        ? job.getRequest().getCorridor().getCrossings()
-                        : List.of();
-
-        int generatedCount = 0;
-        for (JobRegulationPin pin : pins) {
-            RegulationVersion version = pin.getRegulationVersion();
-            if (version == null) {
-                continue;
-            }
-            List<RegulationRule> rules = regulationRuleRepository.findByVersionId(version.getId());
-            for (RegulationRule rule : rules) {
-                DocumentType docType = rule.getDocumentType();
-                if (docType == null) {
-                    continue;
-                }
-
-                DocumentScope scope = docType.getScope();
-                if (scope == DocumentScope.PER_HORSE) {
-                    for (RequestHorse rh : requestHorses) {
-                        Horse h = rh.getHorse();
-                        if (h == null) {
-                            continue;
-                        }
-                        boolean exists = existingItems.stream()
-                                .anyMatch(ci -> ci.getDocumentType().getId().equals(docType.getId())
-                                        && ci.getHorse() != null
-                                        && ci.getHorse().getId().equals(h.getId()));
-                        if (!exists) {
-                            ChecklistItem item = createChecklistItem(job, docType, rule, h, null);
-                            existingItems.add(checklistItemRepository.save(item));
-                            generatedCount++;
-                        }
-                    }
-                } else if (scope == DocumentScope.PER_SHIPMENT) {
-                    boolean exists = existingItems.stream()
-                            .anyMatch(ci ->
-                                    ci.getDocumentType().getId().equals(docType.getId()) && ci.getHorse() == null);
-                    if (!exists) {
-                        ChecklistItem item = createChecklistItem(job, docType, rule, null, null);
-                        existingItems.add(checklistItemRepository.save(item));
-                        generatedCount++;
-                    }
-                } else if (scope == DocumentScope.PER_CROSSING) {
-                    for (CorridorCrossing cc : crossings) {
-                        BorderCrossing bc = cc.getBorderCrossing();
-                        if (bc == null) {
-                            continue;
-                        }
-                        boolean exists = existingItems.stream()
-                                .anyMatch(ci -> ci.getDocumentType().getId().equals(docType.getId())
-                                        && ci.getBorderCrossing() != null
-                                        && ci.getBorderCrossing().getId().equals(bc.getId()));
-                        if (!exists) {
-                            ChecklistItem item = createChecklistItem(job, docType, rule, null, bc);
-                            existingItems.add(checklistItemRepository.save(item));
-                            generatedCount++;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (generatedCount > 0) {
-            evaluateClearanceGate(job.getId());
+        if (!created.isEmpty() || !newPins.isEmpty()) {
+            evaluateClearanceGate(jobId);
             auditService.recordDecision(
                     specialist,
                     "CHECKLIST_GENERATED",
-                    String.format(
-                            "Generated %d checklist items for job %s from pinned regulations.",
-                            generatedCount, job.getCode()),
+                    "Generated " + created.size() + " checklist " + (created.size() == 1 ? "item" : "items") + " for "
+                            + job.getCode() + " from the pinned regulation catalogs.",
                     "TRANSPORT_JOB",
                     job.getId(),
                     job.getCode(),
                     null,
                     null,
-                    "OPEN");
+                    null);
         }
 
-        return checklistItemRepository.findByJobId(job.getId()).stream()
+        return checklistItemRepository.findByJobId(jobId).stream()
                 .map(ClearanceMapper::toItemResponse)
                 .toList();
     }
 
-    private ChecklistItem createChecklistItem(
-            TransportJob job, DocumentType docType, RegulationRule rule, Horse horse, BorderCrossing borderCrossing) {
+    /** audit_log.reason holds 500 characters. */
+    private static final int REASON_MAX = 500;
+
+    /**
+     * The gate's outstanding issues for the audit reason: whole issues while they fit in the column, then
+     * "and N more", so a long checklist never fails the gate run that records it.
+     */
+    static String issuesText(List<String> issues) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < issues.size(); i++) {
+            String next = (text.isEmpty() ? "" : "; ") + issues.get(i);
+            String more = "; and " + (issues.size() - i) + " more";
+            boolean last = i == issues.size() - 1;
+            if (text.length() + next.length() + (last ? 0 : more.length()) > REASON_MAX) {
+                return text.isEmpty() ? issues.size() + " outstanding issues" : text + more;
+            }
+            text.append(next);
+        }
+        return text.toString();
+    }
+
+    /** The destination place's country, else the country the corridor's last crossing leads into. */
+    private static Country destinationCountry(TransportRequest request) {
+        if (request.getDestinationPlace() != null
+                && request.getDestinationPlace().getCountry() != null) {
+            return request.getDestinationPlace().getCountry();
+        }
+        if (request.getCorridor() == null
+                || request.getCorridor().getCrossings().isEmpty()) {
+            return null;
+        }
+        List<CorridorCrossing> crossings = request.getCorridor().getCrossings();
+        return crossings.getLast().getBorderCrossing().getToCountry();
+    }
+
+    private static boolean isPinned(List<JobRegulationPin> pins, RegulationRole role) {
+        return pins.stream().anyMatch(p -> p.getRole() == role);
+    }
+
+    private Optional<RegulationVersion> publishedVersion(Country country) {
+        return regulationCatalogRepository
+                .findByCountryCode(country.getCode())
+                .flatMap(c -> regulationVersionRepository.findByCatalogIdAndStatus(c.getId(), CatalogStatus.PUBLISHED));
+    }
+
+    private static JobRegulationPin pin(TransportJob job, RegulationVersion version, RegulationRole role) {
+        JobRegulationPin pin = new JobRegulationPin();
+        pin.setJob(job);
+        pin.setRegulationVersion(version);
+        pin.setRole(role);
+        return pin;
+    }
+
+    private static String itemKey(UUID documentTypeId, UUID horseId, UUID crossingId) {
+        return documentTypeId + "|" + horseId + "|" + crossingId;
+    }
+
+    /** Adds the item unless the job already has one for this document, horse and crossing. */
+    private static void addItem(
+            List<ChecklistItem> created,
+            Set<String> existing,
+            TransportJob job,
+            RegulationRule rule,
+            LocalDate due,
+            Horse horse,
+            BorderCrossing crossing) {
+        DocumentType type = rule.getDocumentType();
+        String key =
+                itemKey(type.getId(), horse == null ? null : horse.getId(), crossing == null ? null : crossing.getId());
+        if (!existing.add(key)) {
+            return;
+        }
+        boolean customerProvides = type.getProvidedBy() == DocumentProvider.CUSTOMER;
         ChecklistItem item = new ChecklistItem();
         item.setJob(job);
-        item.setDocumentType(docType);
+        item.setDocumentType(type);
         item.setRegulationRule(rule);
         item.setHorse(horse);
-        item.setBorderCrossing(borderCrossing);
-        boolean customerProvided = docType.getProvidedBy() == DocumentProvider.CUSTOMER;
-        item.setStatus(customerProvided ? ChecklistStatus.AWAITING_UPLOAD : ChecklistStatus.NOT_ISSUED);
-        item.setHolder(customerProvided ? ChecklistHolder.CUSTOMER : ChecklistHolder.SPECIALIST);
-        item.setDueDate(calculateDueDate(job, rule));
-        return item;
+        item.setBorderCrossing(crossing);
+        item.setStatus(customerProvides ? ChecklistStatus.AWAITING_UPLOAD : ChecklistStatus.NOT_ISSUED);
+        item.setHolder(customerProvides ? ChecklistHolder.CUSTOMER : ChecklistHolder.SPECIALIST);
+        item.setDueDate(due);
+        created.add(item);
     }
 
-    private LocalDate calculateDueDate(TransportJob job, RegulationRule rule) {
-        LocalDate departure = null;
-        if (job != null && job.getPlannedDepartureAt() != null) {
-            departure = job.getPlannedDepartureAt()
-                    .atZone(AppConstants.BUSINESS_ZONE)
-                    .toLocalDate();
+    /** The pinned version's lead time before the planned departure day; empty until a departure is planned. */
+    private static LocalDate dueDate(TransportJob job, RegulationVersion version) {
+        if (job.getPlannedDepartureAt() == null) {
+            return null;
         }
-        if (departure == null) {
-            return LocalDate.now(AppConstants.BUSINESS_ZONE).plusDays(14);
-        }
-        if (rule != null && rule.getMinDays() != null) {
-            return departure.minusDays(rule.getMinDays());
-        }
-        return departure.minusDays(7);
-    }
-
-    private void pinCountryCatalogIfMissing(TransportJob job, String countryCode, RegulationRole role) {
-        if (countryCode == null) {
-            return;
-        }
-        List<JobRegulationPin> existingPins = jobRegulationPinRepository.findByJobId(job.getId());
-        boolean alreadyPinned = existingPins.stream()
-                .anyMatch(p -> p.getRole() == role
-                        || (p.getRegulationVersion() != null
-                                && p.getRegulationVersion().getCatalog() != null
-                                && countryCode.equalsIgnoreCase(p.getRegulationVersion()
-                                        .getCatalog()
-                                        .getCountry()
-                                        .getCode())));
-        if (alreadyPinned) {
-            return;
-        }
-
-        regulationCatalogRepository.findByCountryCode(countryCode.toUpperCase()).ifPresent(cat -> {
-            List<RegulationVersion> published =
-                    regulationVersionRepository.findByCatalogIdAndStatusOrdered(cat.getId(), CatalogStatus.PUBLISHED);
-            if (!published.isEmpty()) {
-                RegulationVersion v = published.get(0);
-                JobRegulationPin pin = new JobRegulationPin();
-                pin.setJob(job);
-                pin.setRegulationVersion(v);
-                pin.setRole(role);
-                pin.getId().setJobId(job.getId());
-                pin.getId().setRegulationVersionId(v.getId());
-                jobRegulationPinRepository.save(pin);
-            }
-        });
+        LocalDate departure =
+                job.getPlannedDepartureAt().atZone(AppConstants.BUSINESS_ZONE).toLocalDate();
+        return departure.minusDays(version.getLeadTimeDays());
     }
 
     private record GateAssessment(

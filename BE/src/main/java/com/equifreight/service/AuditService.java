@@ -57,7 +57,7 @@ public class AuditService {
         log.setActorLabel(actor == null ? SYSTEM : labelOf(actor));
         log.setActorRole(actor == null ? SYSTEM_ROLE : roleOf(actor));
         log.setChannel(Channel.WEB);
-        log.setReason(truncate(reason, 500));
+        log.setReason(reason);
         return logs.save(log);
     }
 
@@ -129,6 +129,7 @@ public class AuditService {
         return log;
     }
 
+    /** A summary is built by the code, so an over-long one is cut rather than failing the decision it records. */
     private static String truncate(String text, int max) {
         if (text == null || text.length() <= max) {
             return text;

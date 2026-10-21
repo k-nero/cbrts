@@ -1,6 +1,7 @@
 import type { ChangeEvent, FC, ReactNode } from 'react';
 
-import { CheckMark, RadioMark } from './Checkbox';
+import { CheckMark } from './CheckMark';
+import { RadioMark } from './RadioMark';
 import { Icon, type IconName } from './Icon';
 import { cx } from './tone';
 

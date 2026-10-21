@@ -138,7 +138,7 @@ public class RateCatalogSeeder {
         policies.saveAll(POLICIES.entrySet().stream()
                 .map(e -> {
                     RatePolicy p = new RatePolicy();
-                    p.setId(new RatePolicy.Key(draft.getId(), e.getKey()));
+                    p.setKey(e.getKey());
                     p.setVersion(draft);
                     p.setValue(new BigDecimal(e.getValue()));
                     return p;

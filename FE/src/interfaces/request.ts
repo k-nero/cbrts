@@ -1,4 +1,5 @@
 import type { HorseSex } from './horse';
+import type { QuotationIssuedRef } from './quotation';
 import type { TransportMode } from './job';
 import type { StallType } from './vehicle';
 
@@ -115,6 +116,8 @@ export interface TransportRequest {
   /** The range shown at the latest submission (US-Q-05); null for a draft or when there was none. */
   estimateLow: number | null;
   estimateHigh: number | null;
+  /** The latest issued quotation, on the customer's read; null until one is issued. */
+  quotation?: QuotationIssuedRef | null;
   /** Null until submitted. */
   code: string | null;
   status: RequestStatus;
@@ -164,6 +167,8 @@ export interface RequestSummary {
   horseCount: number;
   createdAt: string;
   submittedAt: string | null;
+  /** The latest issued quotation; null until one is issued. */
+  quotation: QuotationIssuedRef | null;
 }
 
 /** The body of POST and PUT /customer/requests, sent whole: a field left out is cleared. */

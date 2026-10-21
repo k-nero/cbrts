@@ -134,9 +134,10 @@ class RateSetLoaderTest {
     @Test
     void policiesBecomeAMap() {
         RatePolicy fuel = new RatePolicy();
-        fuel.setId(new RatePolicy.Key(version.getId(), RatePolicyKey.FUEL_PCT));
+        fuel.setVersion(version);
+        fuel.setKey(RatePolicyKey.FUEL_PCT);
         fuel.setValue(new BigDecimal("18.000"));
-        when(policies.findByIdVersionId(version.getId())).thenReturn(List.of(fuel));
+        when(policies.findByVersionId(version.getId())).thenReturn(List.of(fuel));
 
         assertThat(loader.load(version.getId()).forCorridor(pnhHkg.getId()).policies())
                 .containsEntry(RatePolicyKey.FUEL_PCT, new BigDecimal("18.000"));
