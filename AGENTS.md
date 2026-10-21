@@ -128,6 +128,9 @@ Where to look elsewhere:
 - **Mirror the database's rules.** When `database-design.md` puts a rule in a check constraint or trigger (append-only versions, one review decision, required reasons), the service enforces the same rule first, with a clear message. Never write code that relies on the database to reject it, and never contradict it.
 - **Validate, then write.** Check every rule before saving anything; don't save a change and throw afterwards.
 - **A repository returns its own entity.** `XRepository` returns `X`, a projection of `X`'s rows, or plain values (ids, codes, counts). A query may join other tables to answer a question about its own rows (`RequestHorseRepository.findSubmittedRequestCodes`), but it never returns another entity: a user's club comes from `ClubRepository`, not `UserRepository`.
+- **Derived queries first.** Write a repository method as a Spring Data derived query whenever its name can say it: `findByVersionIdAndMandatoryTrue`, `findByCatalogIdAndStatusOrderByVersionNoDesc`, `findFirstByJobIdOrderByCreatedAtDesc`, `existsByCode`, `countByStatus`. Use `…IgnoreCase` instead of `lower(...)`, and put `@Lock` or `@EntityGraph` on the derived method when it needs a row lock or fetched relations.
+  - Write an `@Query` only when a name can't say it: a projection that reads joined tables, an aggregate (`count`, `sum`, `group by`), an `exists` subquery, a `join fetch` that `@EntityGraph` can't express, a bulk `@Modifying` update or delete, or native SQL.
+  - Also use `@Query` when the name would stop being readable: `and` mixed with `or` groups, an optional parameter (`:x is null or …`), or more than about four conditions.
 - **Only the owning area writes an aggregate.** A root entity (`TransportRequest`, `Quotation`, `TransportJob`, `ChecklistItem`, …) and its children are changed and saved only by that area's service.
   - Another service may read the root's repository, but to change it, it calls a method on the owning service, such as `TransportJobService` for a job.
   - Children (`QuotationLine`, `RequestRevision`, `RouteStop`, …) are saved through their root or in the root's service, never from another area.
@@ -265,6 +268,7 @@ Where to look elsewhere:
 - Don't save first and validate after, or skip the audit entry for a decision.
 - Don't write a status another service owns (the dossier status, the trip stage), or create data from a `GET` or a read-only transaction.
 - Don't return another entity from a repository, save an aggregate from outside its area, or put business rules in a scheduled job.
+- Don't write an `@Query` for what a derived method name (`findByXAndY`, `existsBy…`, `countBy…`) already expresses.
 - Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
 - Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.
