@@ -66,13 +66,16 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
     return againstPlanText(lastPassedStop.plannedAt, lastPassedStop.latestOccurredAt);
   }, [lastPassedStop]);
 
-  // Sound horses count at last check
+  // Sound/stable horse count at last condition check
   const soundHorseCount = useMemo(() => {
     if (!trip?.horses.length) return 0;
     const lastConditionRecord = records.find((r) => r.conditions.length > 0);
-    if (!lastConditionRecord) return trip.horses.length;
-    return lastConditionRecord.conditions.filter((c) => c.condition === HorseConditionEnum.SOUND)
-      .length;
+    if (!lastConditionRecord) return 0;
+    return lastConditionRecord.conditions.filter(
+      (c) =>
+        c.condition === HorseConditionEnum.SOUND ||
+        c.condition === HorseConditionEnum.STABLE,
+    ).length;
   }, [trip?.horses, records]);
 
   // Handle coordinator saving office checkpoint
@@ -113,7 +116,7 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
   const arrivalWindowText =
     trip.arrivalWindowStart && trip.arrivalWindowEnd
       ? `${formatTimeOnly(trip.arrivalWindowStart)}–${formatTimeOnly(trip.arrivalWindowEnd)}`
-      : '11:00–14:00';
+      : 'Not set';
 
   const plannedArrivalText = formatTimeOnly(trip.plannedArrivalAt);
 
@@ -149,8 +152,8 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
         <StatTile
           tone={soundHorseCount === trip.horses.length ? 'ok' : 'warn'}
           value={`${soundHorseCount} of ${trip.horses.length}`}
-          label={`Horses sound at the last check, ${
-            lastRecord ? formatTimeOnly(lastRecord.occurredAt) : '08:40'
+          label={`Horses sound at the last check${
+            lastRecord ? `, ${formatTimeOnly(lastRecord.occurredAt)}` : ''
           }`}
         />
       </div>
@@ -161,7 +164,7 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
         extra={
           <div className="flex items-center gap-3">
             <span className="type-mono-caption text-ink-3">
-              Updated {lastRecord ? formatTimeOnly(lastRecord.occurredAt) : 'just now'}
+              {lastRecord ? `Updated ${formatTimeOnly(lastRecord.occurredAt)}` : 'No updates yet'}
             </span>
             <Button
               variant="secondary"
@@ -317,7 +320,7 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
                       )}
                     </div>
                     <span className="type-body-s w-32 shrink-0 text-right text-ink-3">
-                      {r.recordedBy || 'Minh, driver'}
+                      {r.recordedBy ?? 'Crew'}
                     </span>
                   </div>
                 ))}
@@ -345,7 +348,9 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
             title="On board"
             extra={
               <span className="type-body-s text-ink-3">
-                Last check {lastRecord ? formatTimeOnly(lastRecord.occurredAt) : '08:40'}
+                {lastRecord
+                  ? `Last check ${formatTimeOnly(lastRecord.occurredAt)}`
+                  : 'No condition check recorded'}
               </span>
             }
           >
@@ -355,25 +360,32 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
                   .flatMap((r) => r.conditions)
                   .find((c) => c.horseId === horse.id);
 
-                const tone =
-                  lastCond?.condition === 'SOUND'
-                    ? 'ok'
-                    : lastCond?.condition === 'WATCH'
-                      ? 'warn'
-                      : lastCond?.condition === 'CONCERN'
-                        ? 'bad'
-                        : 'ok';
 
                 return (
                   <div key={horse.id} className="flex items-center justify-between py-3">
                     <div className="flex flex-col">
                       <strong className="type-label-m text-ink">{horse.name}</strong>
                       <span className="type-body-s text-ink-3">
-                        {horse.stall || 'Standard stall'}
+                        {horse.stall ?? 'Stall not assigned'}
                         {lastCond?.note ? ` · ${lastCond.note}` : ''}
                       </span>
                     </div>
-                    <Chip tone={tone}>{lastCond ? sentence(lastCond.condition) : 'Sound'}</Chip>
+                    <Chip
+                      tone={
+                        lastCond?.condition === 'SOUND' || lastCond?.condition === 'STABLE'
+                          ? 'ok'
+                          : lastCond?.condition === 'WATCH' ||
+                              lastCond?.condition === 'OFF_FEED' ||
+                              lastCond?.condition === 'STRESSED' ||
+                              lastCond?.condition === 'CLIMATE_CHANGE'
+                            ? 'warn'
+                            : lastCond?.condition === 'CONCERN'
+                              ? 'bad'
+                              : 'neutral'
+                      }
+                    >
+                      {lastCond ? sentence(lastCond.condition) : 'Not checked'}
+                    </Chip>
                   </div>
                 );
               })}
@@ -386,28 +398,30 @@ export function CoordinatorTripView({ jobCode }: CoordinatorTripViewProps) {
               <div className="flex justify-between py-1.5 border-b border-line">
                 <span className="type-body-s text-ink-3">Vehicle</span>
                 <strong className="type-mono-data text-ink">
-                  {trip.vehicleCode ? `Trailer ${trip.vehicleCode}` : 'Trailer TX-447'}
+                  {trip.vehicleCode ?? 'Not assigned'}
                 </strong>
               </div>
               <div className="flex justify-between py-1.5 border-b border-line">
-                <span className="type-body-s text-ink-3">Driver</span>
-                <span className="type-body-s text-ink font-medium">Nguyễn Văn Minh</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-line">
-                <span className="type-body-s text-ink-3">Grooms</span>
-                <span className="type-body-s text-ink font-medium">Lê Thị Hoa, Phạm Quốc Tuấn</span>
+                <span className="type-body-s text-ink-3">Crew seen in records</span>
+                <span className="type-body-s text-ink font-medium">
+                  {[...new Set(trip.records.map((r) => r.recordedBy).filter(Boolean))].join(
+                    ', ',
+                  ) || 'No records yet'}
+                </span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="type-body-s text-ink-3">Records</span>
+                <span className="type-body-s text-ink-3">Last update</span>
                 <span className="type-body-s text-ink-2">
-                  All sent · last {lastRecord ? formatTimeOnly(lastRecord.occurredAt) : '08:40'}
+                  {lastRecord
+                    ? `${formatTimeOnly(lastRecord.occurredAt)} · ${lastRecord.recordedBy ?? 'Crew'}`
+                    : 'Not recorded'}
                 </span>
               </div>
 
               <Button
                 variant="secondary"
                 leadingIcon="phone"
-                onClick={() => messageApi.info('Calling escort cab: +84 90 123 4567')}
+                onClick={() => messageApi.info('Use the job\'s assigned escort contact.')}
                 className="mt-2 w-full"
               >
                 Call the cab

@@ -396,13 +396,13 @@ export const NextStopPanel: FC<{
 export const OnBoardPanel: FC<{
   horses: Array<{ name: string; stall: string | null }>;
   crewText?: string;
-}> = ({ horses, crewText = 'Minh, driver · Hoa and Tuấn, grooms' }) => (
+}> = ({ horses, crewText }) => (
   <Panel title="On board">
     <div className="divide-y divide-line">
       {horses.map((h) => (
         <div key={h.name} className="flex items-center justify-between py-2.5">
           <span className="type-label-m text-ink">{h.name}</span>
-          <span className="type-body-s text-ink-3">{h.stall ?? 'Standard stall'}</span>
+          <span className="type-body-s text-ink-3">{h.stall ?? 'Stall not assigned'}</span>
         </div>
       ))}
       <div className="flex items-center justify-between pt-2.5">
