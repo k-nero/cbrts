@@ -1,7 +1,7 @@
 import { type FC, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 
-import type { StepProps } from '.';
+import type { StepProps } from './WizardForm';
 
 import { RequestSummary } from '@/components/request/RequestSummary';
 import { Button, Callout, Panel } from '@/components/ui';

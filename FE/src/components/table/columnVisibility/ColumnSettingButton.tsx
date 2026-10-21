@@ -5,6 +5,7 @@ import { Button, Checkbox, Popover, Space, Tooltip } from 'antd';
 import { resolveColumnKey } from '../core/columns';
 import type { ColumnSettingsLabels } from '../types';
 import { TABLE_CSS_PREFIX } from '../types';
+import { ColumnsIcon } from './ColumnsIcon';
 
 const DEFAULT_COLUMN_SETTINGS_LABELS: Required<ColumnSettingsLabels> = {
   showAll: 'Show All',
@@ -36,22 +37,8 @@ export interface IColumnSettingButtonProps<T> {
 }
 
 type FlatColumnEntry = { key: string; title: React.ReactNode; index: number };
-type AnyColumn<T> = TableColumnsType<T>[number];
 
-const ColumnsIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    style={{ display: 'block' }}
-  >
-    <rect x="0" y="0" width="5" height="16" rx="0.5" fill="currentColor" />
-    <rect x="5.5" y="0" width="5" height="16" rx="0.5" fill="currentColor" />
-    <rect x="11" y="0" width="5" height="16" rx="0.5" fill="currentColor" />
-  </svg>
-);
+type AnyColumn<T> = TableColumnsType<T>[number];
 
 const flattenColumns = <T,>(columns: TableColumnsType<T>): FlatColumnEntry[] => {
   const flat: FlatColumnEntry[] = [];

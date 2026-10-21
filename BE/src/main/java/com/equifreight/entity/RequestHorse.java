@@ -3,34 +3,30 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
+import java.math.BigDecimal;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.io.Serializable;
-import java.math.BigDecimal;
-import java.util.UUID;
-
-/** A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it. */
+/**
+ * A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it.
+ */
 @Setter
 @Getter
 @Entity
-@Table(name = "request_horses")
-public class RequestHorse {
+@Table(
+        name = "request_horses",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "request_horses_request_id_horse_id_key",
+                        columnNames = {"request_id", "horse_id"}))
+public class RequestHorse extends BaseEntity {
 
-    @EmbeddedId
-    private Key id = new Key();
-
-    @MapsId("requestId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "request_id")
+    @JoinColumn(name = "request_id", nullable = false)
     private TransportRequest request;
 
-    @MapsId("horseId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "horse_id")
+    @JoinColumn(name = "horse_id", nullable = false)
     private Horse horse;
 
     @Column(nullable = false, precision = 14, scale = 2)
@@ -47,14 +43,7 @@ public class RequestHorse {
     @Column(nullable = false, length = 20)
     private StallType requiredStall;
 
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    @Embeddable
-    public static class Key implements Serializable {
-        private UUID requestId;
-        private UUID horseId;
-    }
+    /** A mare travelling with a foal at foot, on this trip. */
+    @Column(nullable = false)
+    private boolean withFoal;
 }

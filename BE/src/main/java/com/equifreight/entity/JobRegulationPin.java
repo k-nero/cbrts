@@ -2,47 +2,32 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RegulationRole;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.io.Serializable;
-import java.util.UUID;
-
-/** The regulation versions a job's checklist was built from (BR-F2-01). */
+/**
+ * The regulation versions a job's checklist was built from (BR-F2-01).
+ */
 @Setter
 @Getter
 @Entity
-@Table(name = "job_regulation_pins")
-public class JobRegulationPin {
+@Table(
+        name = "job_regulation_pins",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "job_regulation_pins_job_id_regulation_version_id_key",
+                        columnNames = {"job_id", "regulation_version_id"}))
+public class JobRegulationPin extends BaseEntity {
 
-    @EmbeddedId
-    private Key id = new Key();
-
-    @MapsId("jobId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id")
+    @JoinColumn(name = "job_id", nullable = false)
     private TransportJob job;
 
-    @MapsId("regulationVersionId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "regulation_version_id")
+    @JoinColumn(name = "regulation_version_id", nullable = false)
     private RegulationVersion regulationVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private RegulationRole role;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    @Embeddable
-    public static class Key implements Serializable {
-        private UUID jobId;
-        private UUID regulationVersionId;
-    }
 }

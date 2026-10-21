@@ -125,7 +125,7 @@ export const routesConfig = [
       { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
       {
         path: '/trips',
-        roles: [FRC],
+        roles: [FRC, LM],
         type: 'authenticated',
         breadcrumb: 'Trip progress',
         name: 'staff-trips',

@@ -1,10 +1,11 @@
 import type { FC, ReactNode } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { components, type InputProps } from 'react-select';
 
-import { Group, StepRefusal } from './parts';
+import { Group } from './Group';
+import { StepRefusal } from './StepRefusal';
 
-import type { StepProps } from '.';
+import type { StepProps } from './WizardForm';
+import { CappedInput } from './CappedInput';
 
 import { useFormWrapperCtx } from '@/components/form/FormWrapper';
 import { Button, Callout, Checkbox, OptionCard, Panel, RouteStrip } from '@/components/ui';
@@ -14,6 +15,7 @@ import type { Route } from '@/interfaces';
 import {
   alsoByLine,
   formatDay,
+  optionMeta,
   type PlaceOption,
   roadRuns,
   routePlanLine,
@@ -22,7 +24,6 @@ import {
   windowLength,
   windowMinutes,
   type WizardValues,
-  optionMeta,
 } from '@/lib/utils';
 
 /** Every half hour of the day, for the window's From and Until. */
@@ -34,7 +35,7 @@ const TIMES = Array.from({ length: 48 }, (_, i) => {
 const PENALTY =
   'The penalty is 10% of the job total for each started hour after the window closes, up to 30%, credited on the final invoice. The clock stops while a border authority holds the trailer or a vet stops it for a horse’s welfare. Your quotation states the exact terms.';
 
-type PlaceChoice = PlaceOption & { country?: string };
+export type PlaceChoice = PlaceOption & { country?: string };
 
 /** Pickup and delivery points whose name or city matches what is typed. */
 const loadPlaces = (q: string): Promise<PlaceChoice[]> =>
@@ -54,11 +55,6 @@ const typedCity = async (text: string): Promise<PlaceChoice> => ({
   city: text,
   __isNew__: true,
 });
-
-/** The search box stops at the server's 160 characters for a typed city. */
-const CappedInput = (props: InputProps<PlaceChoice, false>) => (
-  <components.Input {...props} maxLength={160} />
-);
 
 const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }): ReactNode =>
   context === 'menu' && o.country ? (

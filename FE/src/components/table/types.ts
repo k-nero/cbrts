@@ -38,6 +38,9 @@ export type TableLabels = {
 export type TableComponentProps<T extends object = object> = TableProps<T> & {
   id: string;
   toolbar?: React.ReactNode;
+  /** Shows a refresh button in the toolbar row; `refreshing` spins its icon while data reloads. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
   showTopDivider?: boolean;
   ignoreKeys?: string[];
   resizableColumns?: boolean | ResizableColumnsConfig;

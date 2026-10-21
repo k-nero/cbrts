@@ -81,7 +81,9 @@ Where to look in the frontend (`FE/src/`):
 - **Staff menu:** `components/menu/StaffMenu`.
 - **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
 - **Helpers:** `lib/utils` (time, number, file, path, rbac, error) and `constant/`. Check them before writing a formatter or date helper.
-- **Page templates:** `pages/staff/users` (a list with an add/edit modal) and `pages/customer/home` (a composed customer page).
+  - General-purpose utilities (debounce, throttle, deep equality, cloning, grouping, picking, sorting by key and the like) come from `lodash-es`, with named imports: `import { debounce, isEqual } from 'lodash-es'`. Use `lodash-es`, not `lodash`, so the bundle keeps only what is imported. `lib/utils` holds what is specific to EquiFreight (its wording, formats and rules), built on lodash where a general utility is needed.
+  - Replace a hand-written general-purpose helper with its lodash equivalent when you touch it.
+- **Page templates:** `pages/staff/users` (a list with an add/edit modal), `pages/staff/jobs` (a list whose rows open a detail page with tabs) and `pages/customer/home` (a composed customer page). See "Frontend pages" below.
 
 Where to look elsewhere:
 
@@ -96,8 +98,25 @@ Where to look elsewhere:
 
 - **Packages** live under `com.equifreight`: `controller` (with `controller/admin` for staff admin), `service`, `repository`, `entity` (`entity/enums`), `model` (request and response DTOs per area), `exception`, `configuration`, `job`.
 - **Entities** extend `BaseEntity`, which provides a UUIDv7 `id`, `createdAt` and `updatedAt`. Use Lombok `@Getter`/`@Setter`.
+- **Models are records with `@Builder`.** Every request and response DTO in `model/` is a Java `record` annotated with Lombok `@Builder`; never a class with `@Getter`/`@Setter`/`@Data`. Build them with `X.builder()…build()` (or the canonical constructor for a short one), and read them with the record accessors (`x.name()`, not `x.getName()`).
+  - A default for a missing JSON field goes in the compact constructor (`stops = stops == null ? List.of() : stops;`); `@Builder.Default` and field initialisers don't work on records.
+  - Request records use wrapper types (`Short`, `Integer`, `Boolean`), never primitives: Jackson 3 refuses a body that leaves out a primitive record component with a 400. Give the wrapper its default in the compact constructor when the field is optional. Response records may use primitives.
+  - To change one field of an existing record, add `toBuilder = true` and use `x.toBuilder().field(v).build()`; never add a setter or a mutable wrapper.
+  - Validation annotations go on the components (`@NotBlank String name`); nested request parts are nested records.
+  - A record component is its JSON name: `boolean isOverdue` is sent as `isOverdue` (a Lombok getter made it `overdue`). Name components after the JSON the frontend reads.
+  - Mappers (`XMapper`) stay `final` classes with static methods; they are not models.
+- **Map in the model's mapper.** Turning an entity into a response belongs in its area's mapper in `model/<area>/` (`RoleMapper`, `ClearanceMapper`, `RequestMapper`, …), never in a service, controller or job.
+  - A mapper is a `final` class with a private constructor and `public static` methods named `toResponse`, `toSummary` or `to<Part>Response`. It reads only what it is given: no repositories, services or clock.
+  - Services and controllers call the mapper. They never build a response from entity fields with `X.builder()`, and response records carry no `of(Entity)` factory.
+  - Values a service works out, such as counts, conflicts, a lead-time check or a nested response from another area, are passed to the mapper as parameters. See `RequestMapper.toResponse(request, route, leadTime, blockers)`.
+  - Add the method to the area's existing mapper. A new area gets one `XMapper`; don't start a second one beside it.
+  - A response that comes from no entity, such as `TokenResponse` or `ApiError.of(...)`, can be built where it is made.
 - **Enums** are stored as `varchar` with a `CHECK (col IN (...))` constraint matching the Java enum. Adding an enum value always needs a new Flyway migration that drops and recreates that check. Changing only the Java enum makes inserts fail at runtime, and DB-free tests will not catch it.
-- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V15` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Flyway.** Migrations are in `src/main/resources/db/migration` (`V1` … `V18` today). Never edit a migration that has been merged; add the next `V{n}__description.sql`.
+- **Formatting.** Spotless with palantir-java-format (4 spaces, 120 columns) formats the Java sources, whatever IDE you use. Run `./gradlew spotlessApply` in `BE/` before committing a backend change, and `./gradlew spotlessCheck` to verify; `./gradlew check` runs it too.
+  - It ratchets from `origin/main`: only the Java files your branch changes are checked and formatted, so run `git fetch origin` first if your `origin/main` is old.
+  - It never touches `src/main/resources/db/migration`. If you use IntelliJ's Reformat Code on a directory, exclude `db/migration` (or reformat only the files you changed), because Flyway checksums every merged migration and even a whitespace change makes validation fail on databases that already ran it.
+  - IntelliJ users can install the palantir-java-format plugin so Reformat Code matches Spotless. The root `.editorconfig` sets indent, line length and line endings for every editor.
 - **Logging.** Use Lombok `@Log4j2`, not slf4j `LoggerFactory`.
 - **Injection.** Use constructor injection.
 - **JSON is Jackson 3.** Spring Boot 4 registers `tools.jackson.databind.json.JsonMapper`; inject that. Jackson 2's `com.fasterxml.jackson.databind.ObjectMapper` is on the classpath through other libraries, so code that injects it compiles and passes mocked tests, but the application fails to start.
@@ -121,7 +140,13 @@ Where to look elsewhere:
 - **Dates are local calendar days.** Business rules that count days (validity windows, lead time, due dates, "in 5 days") work on dates in the business time zone, `Asia/Ho_Chi_Minh`, never UTC: a 06:00 departure on 18 Oct is still 17 Oct in UTC. Keep one shared constant for the zone instead of scattering `ZoneOffset.UTC`.
 - **Tests.** Every business rule (`BR-…`) a change implements gets a unit test, including the refusals: the wrong role is refused, a missing reason is refused, a RED document can't be approved. Name tests after the behaviour, in English.
 - **Spring AOT.** The Docker image runs with Spring AOT, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
-- **Seed data.** `DataSeeder` creates one account per role. The password is `SEED_PASSWORD`, which defaults to `changeme123!`. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
+- **Seed data.** `DataSeeder` creates one account per role. The password is `app.seed.default.password` (env `APP_SEED_DEFAULT_PASSWORD`), `changeme123!` in the dev profile and in compose. Demo records it creates follow every rule real ones do: codes advance `code_counters`, and statuses satisfy the check constraints.
+- **No N+1 queries.** A request runs a fixed number of queries, however many rows it returns. Never call a repository, or touch a lazy relation, inside a loop or a `stream().map(...)` over results; that is one query per row.
+  - Load what a response needs in the query that loads the rows: a `join fetch` in a `@Query` (see `TransportJobRepository`, `join fetch j.request r join fetch r.club c`) or an `@EntityGraph`. A paged `join fetch` query needs its own `countQuery`.
+  - For a collection on a page of rows, fetch the page first, then load the children for all the page's ids in one query (`findAllByJobIdIn(ids)`), and group them in memory.
+  - Counts, sums and "has any" per row come from one grouped query (`select x.id, count(y) … group by x.id`) or a subquery, never from `.size()` on a lazy collection or a `count` call per row.
+- **Joins happen in SQL.** Any join between tables is written in the query (JPQL `join`, a `Specification` with `root.join(...)`, or a native query), so the database filters, sorts and pages the joined result. Never load two lists and match them in Java, and never filter or sort a joined field in memory after fetching.
+- **Check the queries.** For a new or changed list or detail endpoint, run it with `spring.jpa.show-sql=true` (or Hibernate statistics) against seeded data and confirm the query count stays the same for 1 row and for 20.
 
 ## Frontend conventions (`FE/`)
 
@@ -131,20 +156,62 @@ Where to look elsewhere:
   - `hooks/`: TanStack Query hooks per domain.
   - `interfaces/`: types and enums.
   - `router/route.config.ts`: every page with its roles and a route `name`. Navigate with `useCustomRouter().paths.get('<name>')`, never a literal path.
+- **One component per file.** A `.tsx` file holds one component, named like the file (`SentPanel.tsx` exports `SentPanel`). A second component is allowed only when it is declared inside another component's body. Sibling panels, cards, tables, modals and form fields each get their own file in the page's folder, and what they share (option lists, a column helper, a refusal helper) goes in a plain `.ts` module beside them, such as `editorOptions.ts`. An older file that holds several components is split when you next change it.
 - **Enums** are split into a value and a type: `export const XEnum = { ... } as const;` plus `export type X = (typeof XEnum)[keyof typeof XEnum];`. Use `XEnum.FOO` for values and `z.enum(XEnum)` in Zod schemas.
 - **Forms** use React Hook Form and Zod through `components/form` (`FormWrapper`, `FormField`, `fields/*`). Put conditional rules in `.superRefine`.
+  - Zod schemas live in a `schema.ts` beside the form, never in a component file. It exports each schema with its `z.infer` type (`noteSchema` and `NoteForm`), and a folder with several forms keeps all of their schemas in that one file, along with field lists a schema is built from (`rates/schema.ts` holds `POLICY_FIELDS`).
 - **UI components.** Build pages from the design-system components in `components/ui` (`import { … } from '@/components/ui'`) before reaching for Ant Design. Ant Design is for forms, tables, menus and overlays.
-  - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button or a native `<button>`.
+  - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button. A native `<button>` belongs only inside a `components/ui` component, never in a page.
   - Tokens live in `src/index.css`: `@theme` is Dark, `[data-theme='light']` is Light. Light is the default theme.
   - `constant/color.ts` mirrors the tokens for AntD.
   - The `/design-system` route shows every component variant; use it to check visuals.
 - **Data fetching** goes through TanStack Query hooks in `hooks/<domain>.ts` (`useQuery` and `useMutation`, invalidating the affected queries on success), never `useState` plus `useEffect` calling an API from a page. Pages own no server data state of their own.
-- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed request shows an error state or the server's `ApiError` message (`apiErrorMessage` from `lib/utils`), never an empty list or Axios's generic "Request failed with status code 400". Every list has a loading, an empty and an error state.
+- **No fake data, no swallowed errors.** No hard-coded ids, mock records or "demo fallback" branches in app code; demo data belongs in `DataSeeder`. A failed load goes to the error boundary (see "Frontend pages"); a failed action shows the server's `ApiError` message (`apiErrorMessage` from `lib/utils`), never an empty list or Axios's generic "Request failed with status code 400". Every list has a loading and an empty state.
 - **Styling uses the tokens.** Text uses the `type-*` utilities and colours use the token classes from `index.css`; no arbitrary values such as `text-[13px]`, `p-[7px]` or hex colours. Import design-system components from `@/components/ui`, not from their individual files.
 - **Real inputs.** A file is chosen with a file picker and uploaded, never pasted as a file id; a date uses a date field, and a choice from a fixed set uses a select or option cards.
 - **Files from the API need the token.** Never link to `/api/...` with `<a href>` or `<img src>`: the browser sends no access token and gets 401. Show a stored file with `useFileBlobUrl` (`hooks/file.ts`) and open one with `fileApi.viewFile`, which opens the tab inside the click (a `window.open` after an `await` is dropped by popup blockers).
 - **Retries are idempotent.** When an endpoint takes a client reference (`clientRef`), create it once per user action, keep it until the request succeeds, and send the same one on retry; a new one per attempt records the action twice.
-- **Checks.** Run `bun run typecheck`, `bun run format` and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
+- **Checks.** Run `bun run typecheck`, `bun run format` (or `bun run format:check` to verify without writing) and `bun run build`. `bun run lint` currently crashes because TypeScript 7 isn't supported by typescript-eslint, so rely on typecheck and Prettier until TypeScript is pinned back.
+
+## Frontend pages: follow users and jobs
+
+`pages/staff/users` and `pages/staff/jobs` are the reference pages. Every new page copies their structure, and a page you touch is brought in line with them. A pull request that hand-builds what these pages get from shared components is sent back.
+
+- **No plain HTML controls.** Never build a control or widget out of raw elements and Tailwind. Use the component that exists:
+
+  | Need | Use | Never |
+  | --- | --- | --- |
+  | Button, link button | `ui` `Button`, or AntD `Button` without Tailwind | `<button>`, a clickable `<div>` or `<span>` |
+  | Text, number, date, choice in a form | `components/form` fields (`TextField`, `SelectField`, `DatePickerField`, …) | `<input>`, `<select>`, `<textarea>` |
+  | Search box or filter outside a form | AntD `Input.Search`, `Select` | `<input>`, `<select>` |
+  | List of records | `Table` from `@/components/table` | `<table>`, a grid of `<div>` rows |
+  | In-page views of a list | `Tabs` from `@/components/ui` (with `count`) | buttons styled as tabs |
+  | Sections of one record | AntD `Tabs` with `items` | CSS tabs, a row of buttons |
+  | Dialog | `BaseModal` (`components/modal`) | a positioned `<div>` overlay |
+  | Row actions | `TableActionDropdown`, `EditButton`, `DeleteButton` | a hand-made menu |
+  | Status, tone, stage | `Chip`, `StageMark`, `Callout` from `@/components/ui` | a coloured `<span>` |
+
+  Plain elements (`div`, `span`, `p`, `h1`–`h4`, `label`, `ul`) are for layout and text only. If nothing in the table fits, extend a `components/ui` component or add one there (see "Reuse before you build"); don't invent one inside a page.
+- **Every Figma component is already built.** Each component in the Figma file has its implementation in `components/ui`, exported from `components/ui/index.ts` and shown on `/design-system`: Button, Callout, Checkbox, Chip, ClearanceGate, Deadline, DocumentRow, DraftPass, EstimateCard, FactCell, HorseCard, Icon, LoadItem, Nameplate, NavItem, OptionCard, OwedItem, Panel, Perforation, PhotoPanel, Progress, QuoteLine, RouteStrip, StageMark, StallTile, StatTile, Steps, Tabs, TimelineStop and Toast. When a frame shows one, import it from `@/components/ui`. Never rebuild it in a page, copy its markup, or make a look-alike with Tailwind, even if you need only part of it; add a prop to the `ui` component instead.
+- **Plain HTML is the last resort.** Choose in this order, and go to the next step only when the one before has nothing that fits:
+  1. A `components/ui` component (anything drawn from a Figma component).
+  2. A shared kit component: `components/form`, `components/table`, `components/modal`, `components/buttons`, `PageHeader`.
+  3. An Ant Design component (`Select`, `Input`, `DatePicker`, `Tabs`, `Skeleton`, `Tooltip`, `Dropdown`, `Avatar`, `Badge`, `Empty`, `Flex`, `Space`, `Divider` and the rest). Search the AntD docs before deciding there is none.
+  4. Plain HTML, only for layout and text, or when steps 1–3 have no equivalent. Say in the PR which AntD component you looked for and why it didn't fit.
+- **Files.** A list page is `index.tsx` (the page shell), `XList.tsx` (the table), `useGeneratedColumn.tsx` (a `useGeneratedXColumn` hook returning the columns) and `ViewAddEdit/` (the add/edit modal and its Zod schema, or the detail page). Copy the folder you're closest to; don't put the table, columns and shell in one file.
+- **Data.** The API is `makeCrudApi` in `apis/<domain>.ts` and the hook wraps `useCrudResource` in `hooks/<domain>.ts` (`useUsers`, `useJobList`). Paging, sorting and search are server-side through `pageState`, `setPageState` and `setSearch`; never filter or sort a fetched page in the browser.
+- **Page shell.** `Flex vertical gap={28}`, then:
+  1. `PageHeader` with `title`, `summary` and the page's one primary action in `right`.
+  2. The view `Tabs`; changing a tab or filter resets `pageState.number` to 0.
+  3. Search (`Input.Search`, width 360) and filters, each with a visible `<label>`.
+  4. The count line: "6 accounts", the sort in words ("Sorted by name, A to Z"), and "Reset order" while a sort is set.
+  5. The list component.
+- **Table.** Pass the shared `Table` `loading={isPending || isFetching}`, `onRefresh` and `refreshing`, a controlled `sorter` from `pageState.sort`, `pagination` with `showTotal` ("1–20 of 46 jobs", singular for one), an `emptyText` that says what to do next, and an `onChange` that writes `pageState`. Only real entity fields are `sorter: true`. A row that opens a record uses `onRow` and navigates.
+- **Detail page.** As in `jobs/ViewAddEdit`: the open tab lives in the URL (`?tab=route`), the tabs are AntD `Tabs` with `items` and `destroyOnHidden`, and the tab's owner sits in `tabBarExtraContent`.
+- **Loading and errors belong to the shell, not the page.**
+  - A failed load, offline included, goes to `ErrorBoundaryHandling`. The query client throws a load that fails before any data arrives, so a page never checks `isError`, `navigator.onLine` or `isPaused`, and never draws its own "couldn't load" or offline message.
+  - A table shows its own spinner through `loading`. A page or section waiting for data renders AntD `<Skeleton active />` in the shape of what's coming; never "Loading…" text or a `Spin` in the page.
+  - Errors from actions (save, delete, upload, export) stay where the action is: a `Callout` with `apiErrorMessage` in the form or panel, or a toast.
 
 ## Design rules (when building UI)
 
@@ -159,6 +226,11 @@ Where to look elsewhere:
 - **Demo data.** All figures, names and statistics are demo placeholders; never present them as real.
 - **AI-generated images are drafts.** A generated picture is saved with a `draft-` prefix (as in `docs/design-assets/` and `FE/src/assets/photos/`) and is replaced with a licensed photograph before anything is shown outside the team. Never generate a picture of a real person, logo or brand.
 - **Match the frame.** When a Figma frame exists for the page you are building, match its structure, copy and states. Don't invent new patterns when one already exists in `components/ui` or the generator.
+- **Compare with Figma before and after coding.** Every UI change is checked against its Figma frame twice:
+  1. **Before you code,** open the frame of the same name (and its states: empty, error, each tab) and the page's section in `DESIGN.md`. Write down what it shows: layout, components, columns, copy, tabs, actions. Build to that list, not from memory or a description.
+  2. **After you code,** run the page with real seeded data at 1440 wide, in the Light theme, and put a screenshot beside the frame. Go through the same list: every block, column, label, tab, button and state is there, in the same order, using the same component and copy.
+  3. **Fix what differs, or say why it stays.** A difference that remains (the API doesn't return a field yet, the frame is out of date) is listed in the pull request with the reason. If the frame is wrong, update Figma and `docs/figma-plugin/src/` in the same change rather than leaving them apart.
+  - The pull request names the frame and attaches the after screenshot. A page with no frame says so and follows `DESIGN.md` and the nearest existing page.
 
 ## Figma generator (`docs/figma-plugin/`)
 
@@ -173,7 +245,7 @@ Where to look elsewhere:
 - **Flow:** issue, then branch, then PR. Branch from `main` with a type prefix: `feat/`, `fix/`, `style/`, `chore/`, `docs/`, `design/`. Never commit straight to `main`; check `git branch --show-current` before you commit or push.
 - **Commits** use the conventional form: `feat(be): …`, `fix(fe): …`, `docs: …`. Say what changed and why. Don't add tool-generated trailers or footers to commits or PR descriptions.
 - **Project board.** Add every new issue and PR to GitHub Project #4: `gh project item-add 4 --owner k-nero --url <issue-or-pr-url>`.
-- **No CI build or test gate.** A green check does not mean it compiles. Before opening or approving a PR, run `./gradlew test` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
+- **CI runs format checks, typecheck and unit tests only.** `.github/workflows/checks.yml` runs `./gradlew spotlessCheck test` in `BE/`, and `bun run typecheck` and `bun run format:check` in `FE/`, on every pull request. A green check does not mean the app starts or the FE builds. Before opening or approving a PR, run `./gradlew check` in `BE/`, and `bun run typecheck` and `bun run build` in `FE/`. For a backend change, also start the app (`docker compose up --build db storage backend`) and call the endpoints you changed: migrations, entity mappings, JPQL queries, bean wiring and check constraints only fail at startup or against a real database, never in mocked unit tests.
 - **Secrets.** Never commit `.env`, secrets, API keys or JWT secrets. `.env.example` holds placeholders only. Never paste them into an AI chat either.
 
 ## Don't
@@ -189,7 +261,14 @@ Where to look elsewhere:
 - Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
 - Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.
+- Don't write N+1 queries (a repository call or lazy load per row), or join, filter or sort related tables in Java instead of SQL.
 - Don't fetch data in a page with `useEffect`, hard-code ids or mock data, hide a failed request, or link to `/api/...` files directly.
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
+- Don't hand-write a general-purpose utility (debounce, throttle, deep equality, grouping) that `lodash-es` already has.
+- Don't build a control out of plain HTML (`<button>`, `<input>`, `<select>`, `<table>`, CSS tabs, `<div>` overlays) in a page, or lay out a list page differently from `pages/staff/users` and `pages/staff/jobs`.
+- Don't re-create a Figma component that `components/ui` already has, or write plain HTML where an Ant Design component does the job.
+- Don't put two sibling components in one file, or a Zod schema in a component file.
+- Don't draw a page's own loading text, spinner, error or offline state; the table, `Skeleton` and the error boundary own those.
+- Don't start or finish a UI change without comparing it with its Figma frame, or open a UI pull request without the frame's name and a screenshot of the result.

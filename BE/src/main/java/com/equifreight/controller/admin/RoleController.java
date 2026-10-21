@@ -2,11 +2,10 @@ package com.equifreight.controller.admin;
 
 import com.equifreight.model.role.RoleResponse;
 import com.equifreight.service.RoleService;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/roles")

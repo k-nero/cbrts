@@ -1,10 +1,11 @@
 package com.equifreight.model.trip;
 
 import com.equifreight.entity.enums.HorseCondition;
-
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record TripConditionResponse(
         UUID horseId,
         String horseName,
@@ -12,5 +13,4 @@ public record TripConditionResponse(
         Boolean drinking,
         Boolean eating,
         String note,
-        List<TripPhotoResponse> photos
-) {}
+        List<TripPhotoResponse> photos) {}

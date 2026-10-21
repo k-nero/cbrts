@@ -12,12 +12,6 @@ import com.equifreight.model.file.FileMapper;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.repository.StoredFileRepository;
 import com.equifreight.service.storage.FileStorage;
-import lombok.extern.log4j.Log4j2;
-import org.apache.tika.Tika;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +24,11 @@ import java.time.ZonedDateTime;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
+import lombok.extern.log4j.Log4j2;
+import org.apache.tika.Tika;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Uploads and downloads of files: horse papers and medical records, incident photos, filing results.
@@ -45,12 +44,14 @@ public class FileService {
 
     public static final long MAX_SIZE_BYTES = 25L * 1024 * 1024;
 
-    /** PDFs for papers and records; photos from cameras and phones (iPhones save HEIC). */
-    static final Set<String> ALLOWED_TYPES = Set.of(
-            "application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif");
+    /**
+     * PDFs for papers and records; photos from cameras and phones (iPhones save HEIC).
+     */
+    static final Set<String> ALLOWED_TYPES =
+            Set.of("application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif");
 
-    private static final Set<String> STAFF_ROLES = Set.of(
-            RoleName.LOGISTICS_MANAGER, RoleName.TRANSPORT_SPECIALIST, RoleName.FLEET_COORDINATOR);
+    private static final Set<String> STAFF_ROLES =
+            Set.of(RoleName.LOGISTICS_MANAGER, RoleName.TRANSPORT_SPECIALIST, RoleName.FLEET_COORDINATOR);
 
     private final StoredFileRepository storedFileRepository;
     private final FileStorage fileStorage;
@@ -61,8 +62,52 @@ public class FileService {
         this.fileStorage = fileStorage;
     }
 
-    /** An open file's metadata and bytes. The caller closes {@code content}. */
-    public record FileContent(StoredFile file, InputStream content) {}
+    private static boolean isUploader(StoredFile file, User user) {
+        return file.getUploadedBy() != null && file.getUploadedBy().getId().equals(user.getId());
+    }
+
+    private static boolean hasAnyRole(User user, Set<String> roles) {
+        return user.getRoles().stream().map(Role::getName).anyMatch(roles::contains);
+    }
+
+    /**
+     * {@code files/2026/10/<uuid>}: unique per upload, so a key is never written twice.
+     */
+    private static String newStorageKey() {
+        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+        return "files/%d/%02d/%s".formatted(now.getYear(), now.getMonthValue(), UUID.randomUUID());
+    }
+
+    /**
+     * Keeps the base name the user chose, minus any path and control characters, at most 255 characters.
+     */
+    static String cleanFileName(String original) {
+        if (original == null) {
+            return "file";
+        }
+        String name = original.substring(Math.max(original.lastIndexOf('/'), original.lastIndexOf('\\')) + 1)
+                .replaceAll("\\p{Cntrl}", "")
+                .strip();
+        if (name.isEmpty()) {
+            return "file";
+        }
+        return name.length() <= 255 ? name : name.substring(name.length() - 255);
+    }
+
+    /**
+     * A separate pass over the upload (Tomcat has it on disk), so storage retries can't skew the digest.
+     */
+    private static String sha256Of(MultipartFile upload) {
+        try (DigestInputStream in =
+                new DigestInputStream(upload.getInputStream(), MessageDigest.getInstance("SHA-256"))) {
+            in.transferTo(OutputStream.nullOutputStream());
+            return HexFormat.of().formatHex(in.getMessageDigest().digest());
+        } catch (IOException e) {
+            throw new StorageException("Could not read the upload", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is always available", e);
+        }
+    }
 
     /**
      * Validates and stores an upload. The bytes are written first and the row second; if the row
@@ -117,7 +162,8 @@ public class FileService {
      */
     @Transactional(readOnly = true)
     public StoredFile requireAttachable(UUID id, User user) {
-        StoredFile file = storedFileRepository.findById(id)
+        StoredFile file = storedFileRepository
+                .findById(id)
                 .filter(f -> isUploader(f, user))
                 .orElseThrow(() -> ResourceNotFoundException.of("File", id));
         if (storedFileRepository.isAttached(id)) {
@@ -127,7 +173,8 @@ public class FileService {
     }
 
     private StoredFile findReadable(UUID id, User user) {
-        return storedFileRepository.findById(id)
+        return storedFileRepository
+                .findById(id)
                 .filter(f -> canRead(f, user))
                 .orElseThrow(() -> ResourceNotFoundException.of("File", id));
     }
@@ -136,48 +183,24 @@ public class FileService {
         if (hasAnyRole(user, STAFF_ROLES) || isUploader(file, user)) {
             return true;
         }
-        if (hasAnyRole(user, Set.of(RoleName.CUSTOMER)) && user.getClub() != null
+        if (hasAnyRole(user, Set.of(RoleName.CUSTOMER))
+                && user.getClub() != null
                 && storedFileRepository.isOnClubJob(file.getId(), user.getClub().getId())) {
             return true;
         }
-        return hasAnyRole(user, Set.of(RoleName.ESCORT)) && storedFileRepository.isOnCrewJob(file.getId(), user.getId());
+        return hasAnyRole(user, Set.of(RoleName.ESCORT))
+                && storedFileRepository.isOnCrewJob(file.getId(), user.getId());
     }
 
-    private static boolean isUploader(StoredFile file, User user) {
-        return file.getUploadedBy() != null && file.getUploadedBy().getId().equals(user.getId());
-    }
-
-    private static boolean hasAnyRole(User user, Set<String> roles) {
-        return user.getRoles().stream().map(Role::getName).anyMatch(roles::contains);
-    }
-
-    /** Sniffs the type from the leading bytes only; the file name and the browser's Content-Type are ignored. */
+    /**
+     * Sniffs the type from the leading bytes only; the file name and the browser's Content-Type are ignored.
+     */
     private String detectType(MultipartFile upload) {
         try (InputStream in = new BufferedInputStream(upload.getInputStream())) {
             return tika.detect(in);
         } catch (IOException e) {
             throw new StorageException("Could not read the upload", e);
         }
-    }
-
-    /** {@code files/2026/10/<uuid>}: unique per upload, so a key is never written twice. */
-    private static String newStorageKey() {
-        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-        return "files/%d/%02d/%s".formatted(now.getYear(), now.getMonthValue(), UUID.randomUUID());
-    }
-
-    /** Keeps the base name the user chose, minus any path and control characters, at most 255 characters. */
-    static String cleanFileName(String original) {
-        if (original == null) {
-            return "file";
-        }
-        String name = original.substring(Math.max(original.lastIndexOf('/'), original.lastIndexOf('\\')) + 1)
-                .replaceAll("\\p{Cntrl}", "")
-                .strip();
-        if (name.isEmpty()) {
-            return "file";
-        }
-        return name.length() <= 255 ? name : name.substring(name.length() - 255);
     }
 
     private void deleteQuietly(String key) {
@@ -189,15 +212,8 @@ public class FileService {
         }
     }
 
-    /** A separate pass over the upload (Tomcat has it on disk), so storage retries can't skew the digest. */
-    private static String sha256Of(MultipartFile upload) {
-        try (InputStream in = new DigestInputStream(upload.getInputStream(), MessageDigest.getInstance("SHA-256"))) {
-            in.transferTo(OutputStream.nullOutputStream());
-            return HexFormat.of().formatHex(((DigestInputStream) in).getMessageDigest().digest());
-        } catch (IOException e) {
-            throw new StorageException("Could not read the upload", e);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is always available", e);
-        }
-    }
+    /**
+     * An open file's metadata and bytes. The caller closes {@code content}.
+     */
+    public record FileContent(StoredFile file, InputStream content) {}
 }

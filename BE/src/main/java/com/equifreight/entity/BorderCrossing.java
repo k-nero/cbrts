@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** "Mộc Bài – Bavet", "Poipet – Aranyaprathet". */
+/**
+ * "Mộc Bài – Bavet", "Poipet – Aranyaprathet".
+ */
 @Setter
 @Getter
 @Entity
@@ -15,11 +17,11 @@ public class BorderCrossing extends BaseEntity {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "from_country", nullable = false)
+    @JoinColumn(name = "from_country_id", nullable = false)
     private Country fromCountry;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "to_country", nullable = false)
+    @JoinColumn(name = "to_country_id", nullable = false)
     private Country toCountry;
 
     @Column(nullable = false)

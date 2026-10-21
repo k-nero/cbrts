@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "db3958675f62b64fcb54b215236aa6ceecd232a3",
+    "indexed_at": "2026-10-21T09:41:19Z",
+    "project": "Users-nero-Documents-schools-fpt",
+    "nodes": 9430,
+    "edges": 52378,
+    "original_size": 44433408,
+    "compressed_size": 7730297,
+    "compression_level": 3
+}

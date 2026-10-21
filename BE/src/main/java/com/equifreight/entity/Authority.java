@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** "Cambodia's GDAHP", "Dept. of Animal Health (VN)", "Customs, Mộc Bài". */
+/*
+ * "Cambodia's GDAHP", "Dept. of Animal Health (VN)", "Customs, Mộc Bài".
+ */
 @Setter
 @Getter
 @Entity
@@ -16,7 +18,7 @@ public class Authority extends BaseEntity {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code", nullable = false)
+    @JoinColumn(name = "country_id", nullable = false)
     private Country country;
 
     @Enumerated(EnumType.STRING)

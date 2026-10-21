@@ -2,19 +2,16 @@ import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Skeleton } from 'antd';
 import { useParams, useSearchParams } from 'react-router-dom';
-import type { AxiosError } from 'axios';
 
-import type { RunWrite } from './LineEditor';
-import {
-  IssuePanel,
-  Ledger,
-  MissingCallout,
-  StallChoice,
-  StatusPanel,
-  TotalsPanel,
-  VersionChip,
-  VersionsPanel,
-} from './parts';
+import type { RunWrite } from './editorOptions';
+import { IssuePanel } from './IssuePanel';
+import { Ledger } from './Ledger';
+import { MissingCallout } from './MissingCallout';
+import { StallChoice } from './StallChoice';
+import { StatusPanel } from './StatusPanel';
+import { TotalsPanel } from './TotalsPanel';
+import { VersionChip } from './VersionChip';
+import { VersionsPanel } from './VersionsPanel';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, Panel, StageMark } from '@/components/ui';
@@ -106,35 +103,40 @@ const QuotationBuilderPage: FC = () => {
     );
   }
 
-  if (query.isError) {
-    const notStarted = (query.error as AxiosError | undefined)?.response?.status === 404;
+  // Any other failure went to the error boundary (useQuotation): no data here means none was started, or
+  // the version in the address doesn't exist.
+  if (!query.data && version) {
     return (
       <div className="flex flex-col gap-7">
         <PageHeader back={back} title="Quotation" />
-        {notStarted ? (
-          <Panel title="No quotation yet">
-            <div className="flex flex-col items-start gap-3">
-              <p className="type-body-m m-0 text-ink-2">
-                Start the quotation to price this request from the published rate catalog.
-              </p>
-              <Button variant="secondary" disabled={start.isPending} onClick={() => void onStart()}>
-                Start quotation
-              </Button>
-            </div>
-          </Panel>
-        ) : (
-          <Callout
-            tone="bad"
-            title="The quotation didn't load."
-            action={
-              <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>
-                Try again
-              </Button>
-            }
-          >
-            Nothing has changed. Check your connection and try again.
-          </Callout>
-        )}
+        <Callout
+          tone="info"
+          title={`This quotation has no version ${version}.`}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => showVersion(null)}>
+              Open the latest
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!query.data) {
+    return (
+      <div className="flex flex-col gap-7">
+        <PageHeader back={back} title="Quotation" />
+        {conflict && <Callout tone="bad" title={conflict} />}
+        <Panel title="No quotation yet">
+          <div className="flex flex-col items-start gap-3">
+            <p className="type-body-m m-0 text-ink-2">
+              Start the quotation to price this request from the published rate catalog.
+            </p>
+            <Button variant="secondary" disabled={start.isPending} onClick={() => void onStart()}>
+              Start quotation
+            </Button>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -154,7 +156,7 @@ const QuotationBuilderPage: FC = () => {
   const actions = statusActions(q);
   const onIssue = (changeNote: string | null) =>
     modal.confirm({
-      title: `Issue ${q.code} v${q.versionNo} for ${q.totals.total == null ? '—' : money(q.totals.total)}?`,
+      title: `Issue ${q.code} v${q.versionNo} for ${q.totals.total == null ? '—' : money(q.totals.total, q.currency)}?`,
       content: `${q.request.club ?? 'The club'} can accept it until ${ict(new Date().toISOString())
         .add(q.validityDays ?? 0, 'day')
         .format(

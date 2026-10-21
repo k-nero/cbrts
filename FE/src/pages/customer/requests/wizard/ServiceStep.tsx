@@ -1,11 +1,15 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 import { useFormContext, useFormState, useWatch } from 'react-hook-form';
 
-import { Group, StepRefusal } from './parts';
+import { Group } from './Group';
+import { StepRefusal } from './StepRefusal';
 
-import type { StepProps } from '.';
+import type { StepProps } from './WizardForm';
+import { FactRow } from './FactRow';
+import { Fixed } from './Fixed';
+import { Lock } from './Lock';
 
-import { Button, Checkbox, Icon, OptionCard, Panel } from '@/components/ui';
+import { Button, Checkbox, OptionCard, Panel } from '@/components/ui';
 import type { Estimate, RequestHorse, Route, ServiceClass } from '@/interfaces';
 import {
   formatValue,
@@ -36,34 +40,6 @@ const roadLine = (r: Route | undefined) => {
 
 const airLine = (r: Route | undefined) =>
   r?.distanceKm ? `By air · ~${r.distanceKm.toLocaleString('en-US')} km.` : 'By air.';
-
-/** A row that is set by a profile or a rule, not chosen: a lock or a fixed tick, then the rule. */
-const FactRow: FC<{ lead: ReactNode; title: string; sub: string; first?: boolean }> = ({
-  lead,
-  title,
-  sub,
-  first,
-}) => (
-  <div className={`flex items-center gap-3.5 px-4.5 py-3.5 ${first ? '' : 'border-t border-line'}`}>
-    {lead}
-    <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="type-label-m text-ink">{title}</span>
-      <span className="type-body-s text-ink-3">{sub}</span>
-    </span>
-  </div>
-);
-
-const Lock = () => (
-  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-ink-2">
-    <Icon name="lock" size={14} />
-  </span>
-);
-
-const Fixed = () => (
-  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-ok-soft text-ok">
-    <Icon name="check" size={14} />
-  </span>
-);
 
 const stallRow = (h: RequestHorse, i: number) => {
   const name = `${h.name}${h.withFoal ? ', with foal at foot' : ''}`;

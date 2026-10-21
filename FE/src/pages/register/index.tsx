@@ -1,8 +1,9 @@
-import { type FC, type ReactNode, useId } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isAxiosError } from 'axios';
 import { Flex } from 'antd';
-import { z } from 'zod';
+
+import { FormGroup } from './FormGroup';
+import { PASSWORD_MIN, type RegisterForm, registerSchema } from './schema';
 
 import Brand from '@/components/Brand';
 import Footer from '@/components/Footer';
@@ -25,37 +26,6 @@ const COUNTRIES = [
   { label: 'Hong Kong', value: 'HK' },
 ];
 
-const PASSWORD_MIN = 12;
-
-const schema = z
-  .object({
-    clubName: z.string().trim().min(1, 'Enter the club or owner name.'),
-    country: z.object({ label: z.string(), value: z.string() }).nullable(),
-    lastName: z.string().trim().min(1, 'Enter your family name.'),
-    firstName: z.string().trim().min(1, 'Enter your given name.'),
-    email: z.email('Enter the email you’ll sign in with.'),
-    phone: z.string().trim().max(20, 'At most 20 characters.'),
-    password: z.string(),
-    terms: z.boolean(),
-  })
-  .superRefine((val, ctx) => {
-    if (val.country === null) {
-      ctx.addIssue({ code: 'custom', path: ['country'], message: 'Pick the club’s country.' });
-    }
-    // Name the rule and the value (DESIGN.md, Access).
-    if (val.password.length < PASSWORD_MIN) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['password'],
-        message: `At least ${PASSWORD_MIN} characters. Yours has ${val.password.length}.`,
-      });
-    }
-    if (!val.terms) {
-      ctx.addIssue({ code: 'custom', path: ['terms'], message: 'Agree to the terms to continue.' });
-    }
-  });
-type RegisterForm = z.infer<typeof schema>;
-
 /* What happens after sign-up, in order; the first step is this page. */
 const NEXT_STEPS: [string, string][] = [
   [
@@ -69,22 +39,6 @@ const NEXT_STEPS: [string, string][] = [
   ],
 ];
 
-const FormGroup: FC<{ title: string; children: ReactNode }> = ({ title, children }) => {
-  const id = useId();
-  return (
-    <div
-      role="group"
-      aria-labelledby={id}
-      className="flex flex-col gap-3.5 border-t border-line pt-[18px]"
-    >
-      <h2 id={id} className="type-h4 m-0 text-ink">
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-};
-
 /**
  * Create a club account (DESIGN.md, Access): for racing clubs and horse owners only; staff
  * accounts come by invite. The new account is signed in and lands on its home.
@@ -93,7 +47,7 @@ const RegisterPage = () => {
   const router = useCustomRouter();
   const register = useRegister();
   const methods = useFormCustom<RegisterForm>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       clubName: '',
       country: null,

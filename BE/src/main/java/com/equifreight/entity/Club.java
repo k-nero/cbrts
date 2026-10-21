@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** A racing club or horse owner: the customer. One account per club ({@code users.club_id}). */
+/**
+ * A racing club or horse owner: the customer. One account per club ({@code users.club_id}).
+ */
 @Setter
 @Getter
 @Entity
@@ -21,6 +23,6 @@ public class Club extends BaseEntity {
     private String phone;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code")
+    @JoinColumn(name = "country_id")
     private Country country;
 }

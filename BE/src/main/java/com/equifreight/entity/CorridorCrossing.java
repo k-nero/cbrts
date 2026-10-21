@@ -1,42 +1,32 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 import lombok.Setter;
 
-import java.io.Serializable;
-import java.util.UUID;
-
-/** The border crossings of a corridor, in order. */
+/**
+ * The border crossings of a corridor, in order.
+ */
 @Setter
 @Getter
 @Entity
-@Table(name = "corridor_crossings")
-public class CorridorCrossing {
+@Table(
+        name = "corridor_crossings",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "corridor_crossings_corridor_id_seq_key",
+                        columnNames = {"corridor_id", "seq"}))
+public class CorridorCrossing extends BaseEntity {
 
-    @EmbeddedId
-    private Key id = new Key();
-
-    @MapsId("corridorId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "corridor_id")
+    @JoinColumn(name = "corridor_id", nullable = false)
     private Corridor corridor;
+
+    /** The crossing's place in the corridor, from 1. */
+    @Column(nullable = false)
+    private short seq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "border_crossing_id", nullable = false)
     private BorderCrossing borderCrossing;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    @Embeddable
-    public static class Key implements Serializable {
-        private UUID corridorId;
-        private short seq;
-    }
 }

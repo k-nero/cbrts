@@ -1,10 +1,7 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Club;
-import com.equifreight.entity.Country;
-import com.equifreight.entity.RefreshToken;
-import com.equifreight.entity.Role;
-import com.equifreight.entity.User;
+import com.equifreight.configuration.JwtConfiguration;
+import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
@@ -13,12 +10,12 @@ import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
-import com.equifreight.repository.ClubRepository;
-import com.equifreight.repository.CountryRepository;
-import com.equifreight.repository.RefreshTokenRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
-import com.equifreight.configuration.JwtConfiguration;
+import com.equifreight.repository.*;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,15 +26,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-
 @Service
 @Log4j2
 public class AuthService {
+    static final String REMOVED_MESSAGE =
+            "This account was removed. Ask your logistics manager if you need access again.";
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final ClubRepository clubRepository;
@@ -46,7 +39,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
 
-    AuthService(UserRepository userRepository,
+    @Value("${jwt.expirationMs}")
+    private long jwtExpirationMs;
+
+    @Value("${refreshToken.expirationSeconds}")
+    private int refreshTokenExpirationSeconds;
+
+    AuthService(
+            UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
             ClubRepository clubRepository,
             CountryRepository countryRepository,
@@ -62,24 +62,33 @@ public class AuthService {
         this.jwtEncoder = jwtEncoder;
     }
 
-    @Value("${jwt.expirationMs}")
-    private long jwtExpirationMs;
+    /**
+     * A removed staff account is disabled, never deleted; it can't sign in or refresh a session.
+     */
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            log.info("Sign-in refused for removed account {}", user.getEmail());
+            throw new UnauthorizedException(REMOVED_MESSAGE);
+        }
+    }
 
-    @Value("${refreshToken.expirationSeconds}")
-    private int refreshTokenExpirationSeconds;
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 
     @Transactional
     public TokenResponse login(LoginRequest request, String ipAddress) {
-        User user = userRepository.getByEmail(request.getEmail());
+        User user = userRepository.getByEmail(request.email());
         // One message for an unknown email and a wrong password, so sign-in never reveals
         // whether an address has an account.
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.info("Sign-in failed for {} from {}", request.getEmail(), ipAddress);
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            log.info("Sign-in failed for {} from {}", request.email(), ipAddress);
             throw new UnauthorizedException("Email or password doesn't match.");
         }
         // Checked after the password, so only the account's holder learns it was removed.
         requireNotRemoved(user);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     /**
@@ -89,55 +98,44 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse register(RegisterRequest request) {
-        String email = request.getEmail().trim();
+        String email = request.email().trim();
         if (userRepository.getByEmail(email) != null) {
-            throw new ConflictException("EMAIL_IN_USE",
-                    "An account already uses this email. Sign in, or reset your password.");
+            throw new ConflictException(
+                    "EMAIL_IN_USE", "An account already uses this email. Sign in, or reset your password.");
         }
-        Country country = countryRepository.findById(request.getCountryCode())
+        Country country = countryRepository
+                .findByCode(request.countryCode())
                 .orElseThrow(() -> new BusinessException("We don't serve that country yet."));
-        Role customer = roleRepository.findByName(RoleName.CUSTOMER)
+        Role customer = roleRepository
+                .findByName(RoleName.CUSTOMER)
                 .orElseThrow(() -> new IllegalStateException("The CUSTOMER role is not seeded."));
 
         Club club = new Club();
-        club.setName(request.getClubName().trim());
+        club.setName(request.clubName().trim());
         club.setBookingEmail(email);
-        club.setPhone(blankToNull(request.getPhone()));
+        club.setPhone(blankToNull(request.phone()));
         club.setCountry(country);
         club = clubRepository.save(club);
 
         User user = new User();
         user.setEmail(email);
-        user.setFirstName(request.getFirstName().trim());
-        user.setLastName(request.getLastName().trim());
-        user.setPhone(blankToNull(request.getPhone()));
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.firstName().trim());
+        user.setLastName(request.lastName().trim());
+        user.setPhone(blankToNull(request.phone()));
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setClub(club);
         user.setRoles(new HashSet<>(Set.of(customer)));
         user = userRepository.save(user);
 
         log.info("Club account created for {} ({})", club.getName(), email);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
-    }
-
-    /** A removed staff account is disabled, never deleted; it can't sign in or refresh a session. */
-    private static void requireNotRemoved(User user) {
-        if (user.getStatus() == UserStatus.DISABLED) {
-            log.info("Sign-in refused for removed account {}", user.getEmail());
-            throw new UnauthorizedException(REMOVED_MESSAGE);
-        }
-    }
-
-    static final String REMOVED_MESSAGE =
-            "This account was removed. Ask your logistics manager if you need access again.";
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     @Transactional
     public TokenResponse refreshToken(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByToken(token)
                 .orElseThrow(() -> new UnauthorizedException("Refresh token is not found."));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiryDate().isBefore(Instant.now())) {
@@ -149,7 +147,8 @@ public class AuthService {
         User user = refreshToken.getUser();
         requireNotRemoved(user);
         refreshTokenRepository.delete(refreshToken);
-        return new TokenResponse(generateAccessToken(user), createRefreshToken(user).getToken());
+        return new TokenResponse(
+                generateAccessToken(user), createRefreshToken(user).getToken());
     }
 
     /**
@@ -161,7 +160,8 @@ public class AuthService {
         if (token == null || token.isBlank()) {
             return;
         }
-        refreshTokenRepository.findByToken(token)
+        refreshTokenRepository
+                .findByToken(token)
                 .ifPresent(refreshToken -> refreshTokenRepository.deleteByUser(refreshToken.getUser()));
     }
 
@@ -180,6 +180,9 @@ public class AuthService {
     }
 
     private RefreshToken createRefreshToken(User user) {
+        // Every sign-in and token refresh passes here, so this is the account's last activity (Users & roles).
+        // The callers are @Transactional, so the managed user is written on commit.
+        user.setLastActiveAt(Instant.now());
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setExpiryDate(Instant.now().plusSeconds(refreshTokenExpirationSeconds));

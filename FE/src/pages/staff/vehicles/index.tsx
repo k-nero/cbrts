@@ -112,8 +112,8 @@ export default function VehiclesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="type-h1 text-ink">Vehicles & Fleet</h1>
-          <p className="type-body text-ink-2">
+          <h1 className="type-display-m text-ink">Vehicles & Fleet</h1>
+          <p className="type-body-m text-ink-2">
             Specialised horse trailers, rigid trucks and stall configurations.
           </p>
         </div>
@@ -185,15 +185,15 @@ export default function VehiclesPage() {
                   <div className="flex items-center gap-3 pt-2">
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-standard" />
-                      <span className="type-caption text-ink-3">{standardCount} Std</span>
+                      <span className="type-caption text-ink-3">{standardCount} Std (32″)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-box" />
-                      <span className="type-caption text-ink-3">{boxCount} Box</span>
+                      <span className="type-caption text-ink-3">{boxCount} Box (96″)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-climate" />
-                      <span className="type-caption text-ink-3">{climateCount} Climate</span>
+                      <span className="type-caption text-ink-3">{climateCount} Climate (48″)</span>
                     </div>
                   </div>
                 </div>

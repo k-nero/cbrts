@@ -1,12 +1,13 @@
 package com.equifreight.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-
-/** A discount band by number of horses. The application rejects overlapping bands. */
+/**
+ * A discount band by number of horses. The application rejects overlapping bands.
+ */
 @Setter
 @Getter
 @Entity

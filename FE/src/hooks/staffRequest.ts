@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -26,12 +27,13 @@ import type {
   ServiceClass,
 } from '@/interfaces';
 
-/** One page of the review queue, oldest first. */
+/** One page of the review queue, oldest first, refetched every minute so the ages keep moving. */
 export const useReviewQueue = (page: number) =>
   useQuery({
     queryKey: queryKeys.staffRequests.queue(page),
     queryFn: () => getQueue(page),
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
   });
 
 export const useRequestReview = (id: string | undefined) =>
@@ -49,19 +51,28 @@ export const useReturnRequest = () => {
     mutationFn: ({ id, note }) => returnForInformation(id, note),
     onSuccess: (review, { id }) => {
       qc.setQueryData(queryKeys.staffRequests.one(id), review);
-      // Only the queue: the review was just set from the answer, so refetching it would be a wasted GET.
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
+      // The queue and every other cached review: their positions moved. Not this review: it was just set
+      // from the answer, so refetching it would be a wasted GET.
+      void qc.invalidateQueries({
+        queryKey: queryKeys.staffRequests.all(),
+        predicate: (q) => q.queryKey[1] !== id,
+      });
     },
   });
 };
 
-/** The request's quotation, latest or one version; a 404 means it hasn't been started. */
+/**
+ * The request's quotation, the latest or one version. A 404 means none has been started: the builder offers
+ * Start, so only other failures go to the error boundary.
+ */
 export const useQuotation = (requestId: string | undefined, version?: number) =>
   useQuery({
     queryKey: queryKeys.staffRequests.quotation(requestId ?? '', version),
     queryFn: () => getQuotation(requestId as string, version),
     enabled: Boolean(requestId),
     retry: false,
+    throwOnError: (error, query) =>
+      query.state.data === undefined && (error as AxiosError).response?.status !== 404,
   });
 
 /** A quotation write: its answer becomes the builder's data, and the review reloads (status, quotation). */
@@ -70,9 +81,14 @@ const useQuotationWrite = <V>(write: (requestId: string, value: V) => Promise<Qu
   return useMutation<QuotationDraft, unknown, { requestId: string; value: V }>({
     mutationFn: ({ requestId, value }) => write(requestId, value),
     onSuccess: (draft, { requestId }) => {
-      // Every version's view can change (a revision supersedes, a discard brings the last one back).
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotations(requestId) });
-      qc.setQueryData(queryKeys.staffRequests.quotation(requestId), draft);
+      const latest = queryKeys.staffRequests.quotation(requestId);
+      qc.setQueryData(latest, draft);
+      // Every other version's view can change (a revision supersedes, an issue moves the latest on). Not the
+      // latest: it was just set from the answer, so refetching it would be a wasted GET.
+      void qc.invalidateQueries({
+        queryKey: queryKeys.staffRequests.quotations(requestId),
+        predicate: (q) => q.queryKey[3] !== latest[3],
+      });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(requestId), exact: true });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
     },
@@ -117,6 +133,7 @@ export const useDiscardRevision = () => {
     onSuccess: (_, { requestId }) => {
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotations(requestId) });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(requestId), exact: true });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
     },
   });
 };

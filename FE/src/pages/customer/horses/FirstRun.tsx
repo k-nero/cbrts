@@ -1,6 +1,8 @@
 import type { FC } from 'react';
 
-import { Button, Nameplate, Panel } from '@/components/ui';
+import { GhostHorse } from './GhostHorse';
+
+import { Button, Panel } from '@/components/ui';
 
 const STEPS: [string, string][] = [
   ['Add your horses', 'Name, microchip, size and temperament. About 3 minutes each.'],
@@ -17,22 +19,6 @@ const READY: [string, string][] = [
   ['A declared value', 'Used for insurance if you insure through us.'],
   ['Handling needs', 'Nervous loaders, box stall only, a climate stall.'],
 ];
-
-/** The horse the club is about to make: an empty brass nameplate on a dashed band. */
-const GhostHorse: FC = () => (
-  <div className="flex w-[272px] shrink-0 flex-col gap-2.5">
-    <div className="relative h-[148px] rounded-lg border border-dashed border-line-strong bg-muted">
-      <Nameplate
-        name="Your first horse"
-        subtitle="Breed · sex"
-        className="absolute bottom-5 left-5"
-      />
-    </div>
-    <p className="type-body-s m-0 text-ink-3">
-      Each horse gets a brass nameplate on its coat colour, and every request starts from it.
-    </p>
-  </div>
-);
 
 /** A club with no horse yet (DESIGN.md, First run): the order of things and what to have ready. */
 const FirstRun: FC<{ onAdd: () => void }> = ({ onAdd }) => (

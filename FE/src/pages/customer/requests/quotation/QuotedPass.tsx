@@ -1,29 +1,17 @@
 import type { FC } from 'react';
 
-import { COAT_SWATCH, cx, DraftPass } from '@/components/ui';
-import type { CustomerQuotation, HorseCoat } from '@/interfaces';
-import { coatOf, departsText, formatDate, formatDayTime, formatTime, money } from '@/lib/utils';
+import { QuotedHorses } from './QuotedHorses';
 
-/** The horses as coat swatches with their names, as on the pass. */
-const Horses: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => (
-  <span className="flex items-center justify-end gap-2">
-    <span className="flex -space-x-1.5">
-      {quotation.request.horses.slice(0, 6).map((h) => (
-        <span
-          key={h.id}
-          aria-hidden
-          className={cx(
-            'size-4 rounded-full border-2 border-card',
-            COAT_SWATCH[coatOf(h.coat as HorseCoat | null)],
-          )}
-        />
-      ))}
-    </span>
-    <span className="type-label-s text-ink">
-      {quotation.request.horses.map((h) => h.name).join(', ')}
-    </span>
-  </span>
-);
+import { DraftPass } from '@/components/ui';
+import type { CustomerQuotation } from '@/interfaces';
+import {
+  departsText,
+  formatDate,
+  formatDayTime,
+  formatTime,
+  money,
+  serviceParts,
+} from '@/lib/utils';
 
 const service = (q: CustomerQuotation): string => {
   const r = q.request;
@@ -37,9 +25,8 @@ const service = (q: CustomerQuotation): string => {
 };
 
 const mode = (q: CustomerQuotation): string => {
-  const r = q.request;
-  if (r.mode === 'AIR') return `Air · ${(r.airClass ?? 'business').toLowerCase()}`;
-  return `Road · ${r.trailer === 'PRIVATE' ? 'private trailer' : 'shared load'}`;
+  const p = serviceParts(q.request.mode, q.request.trailer, q.request.airClass);
+  return p.detail ? `${p.mode} · ${p.detail}` : p.mode;
 };
 
 const arrival = (q: CustomerQuotation): string => {
@@ -63,7 +50,7 @@ export const QuotedPass: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
       to={r.toCity}
       mode={r.mode === 'AIR' ? 'air' : 'road'}
       rows={[
-        { label: 'Horses', value: <Horses quotation={quotation} /> },
+        { label: 'Horses', value: <QuotedHorses quotation={quotation} /> },
         {
           label: 'Departs',
           value: departsText(r.departureDate, r.dateFlexDays),
@@ -74,7 +61,9 @@ export const QuotedPass: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
         { label: 'Service', value: service(quotation) },
       ]}
       stubLabel="Quoted total"
-      range={quotation.totals.total == null ? null : money(quotation.totals.total)}
+      range={
+        quotation.totals.total == null ? null : money(quotation.totals.total, quotation.currency)
+      }
       rangeSub={
         quotation.status === 'EXPIRED'
           ? `Expired ${quotation.validUntil ? formatDate(quotation.validUntil) : ''}. It is re-priced from the rate catalog in force now.`

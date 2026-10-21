@@ -115,6 +115,12 @@ export const quotationCallout = (
       title: `Your quotation ${label} expired${until ? ` on ${until}` : ''}.`,
       body: 'A logistics manager can re-price it from the rate catalog in force now.',
     };
+  if (ref.status === 'DECLINED')
+    return {
+      tone: 'info',
+      title: `You declined quotation ${label}.`,
+      body: 'A logistics manager can re-price it if you change your mind.',
+    };
   if (ref.status === 'ACCEPTED')
     return {
       tone: 'ok',

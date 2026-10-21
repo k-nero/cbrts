@@ -1,12 +1,16 @@
 import type { FC } from 'react';
 import { Skeleton } from 'antd';
 
-import { NothingOwed, OnTheRoad, OwedPanel, YourHorses, YourMoves } from './sections';
+import { NothingOwed } from './NothingOwed';
+import { OnTheRoad } from './OnTheRoad';
+import { OwedPanel } from './OwedPanel';
+import { YourHorses } from './YourHorses';
+import { YourMoves } from './YourMoves';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout } from '@/components/ui';
 import { useCustomerHome } from '@/hooks/home';
-import type { CustomerHome } from '@/interfaces';
+import type { CustomerHome, MoveEntry } from '@/interfaces';
 import { formatTime, ict } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -29,8 +33,18 @@ const summaryOf = (h: CustomerHome) => {
 const CustomerHomePage: FC = () => {
   const router = useCustomRouter();
   const { data: home, isPending, isError, refetch } = useCustomerHome();
-  const toRequests = () => router.push(router.paths.get('my-requests'));
-  const toHorses = () => router.push(router.paths.get('my-horses'));
+  const toRequests = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    router.push(router.paths.get('my-requests'));
+  };
+  const toHorses = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    router.push(router.paths.get('my-horses'));
+  };
+  const handleOpenMove = (m: MoveEntry) => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    router.push(`${router.paths.get('my-requests')}?code=${encodeURIComponent(m.requestCode)}`);
+  };
 
   if (isPending) {
     return (
@@ -69,7 +83,7 @@ const CustomerHomePage: FC = () => {
       )}
       {home.trip && <OnTheRoad trip={home.trip} />}
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
-        <YourMoves home={home} onOpen={toRequests} onAll={toRequests} />
+        <YourMoves home={home} onOpen={handleOpenMove} onAll={toRequests} />
         <YourHorses home={home} onAll={toHorses} />
       </div>
     </div>

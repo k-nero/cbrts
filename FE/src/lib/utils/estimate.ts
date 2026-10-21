@@ -1,7 +1,9 @@
+import { money } from './quotation';
+
 import type { Estimate, OptionEffect } from '@/interfaces';
 
-const dollars = (n: number): string =>
-  `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.abs(n))}`;
+/** "$2,400": the estimate's figures are whole dollars, and the sign is written separately. */
+const dollars = (n: number): string => money(Math.abs(n), 'USD', 0);
 
 const MINUS = '−';
 

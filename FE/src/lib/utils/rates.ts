@@ -1,5 +1,6 @@
 import { apiErrorView, formRefusal } from './error';
 import { money } from './quotation';
+import { TRAILER_LABELS } from './request';
 
 import type {
   ApiError,
@@ -11,8 +12,6 @@ import type {
   VolumeBreakInput,
 } from '@/interfaces';
 import type { AxiosError } from 'axios';
-
-const TRAILER_WORDS = { SHARED: 'shared load', PRIVATE: 'private trailer' } as const;
 
 /** "18%", "1.5%". */
 export const pctText = (value: number): string => `${Number(value.toFixed(3))}%`;
@@ -45,7 +44,7 @@ export const basisWords = (
     }
     case 'PER_KM': {
       const parts = ['per km'];
-      if (line.appliesToTrailer) parts.push(TRAILER_WORDS[line.appliesToTrailer]);
+      if (line.appliesToTrailer) parts.push(TRAILER_LABELS[line.appliesToTrailer].toLowerCase());
       if (line.minCharge != null) parts.push(`min ${money(line.minCharge)}`);
       return parts.join(' · ');
     }
@@ -241,7 +240,7 @@ export const lineScopeWarning = (
   const here = corridorShort(corridorCode);
   return everyCorridor
     ? `Saving makes this line apply to every corridor, not only ${here}.`
-    : `Saving moves this line to ${here} only: every other corridor loses it.`;
+    : `Saving adds a line for ${here} that replaces this one here; every other corridor keeps it.`;
 };
 
 /**

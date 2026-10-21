@@ -1,43 +1,33 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.DocumentReview;
-import lombok.*;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class DocumentVersionResponse {
-    private UUID id;
-    private UUID checklistItemId;
-    private short versionNo;
-
-    // File info
-    private UUID fileId;
-    private String fileName;
-    private String contentType;
-    private long sizeBytes;
-
-    // Document validity fields
-    private LocalDate issuedOn;
-    private LocalDate sampledOn;
-    private LocalDate validUntil;
-    private String issuer;
-
-    // Uploader info
-    private UUID uploadedById;
-    private String uploadedByName;
-    private Instant uploadedAt;
-
-    // Review info
-    private DocumentReview review;
-    private UUID reviewedById;
-    private String reviewedByName;
-    private Instant reviewedAt;
-    private String rejectReason;
-}
+public record DocumentVersionResponse(
+        UUID id,
+        UUID checklistItemId,
+        short versionNo,
+        // File info
+        UUID fileId,
+        String fileName,
+        String contentType,
+        long sizeBytes,
+        // Document validity fields
+        LocalDate issuedOn,
+        LocalDate sampledOn,
+        LocalDate validUntil,
+        String issuer,
+        // Uploader info
+        UUID uploadedById,
+        String uploadedByName,
+        Instant uploadedAt,
+        // Review info
+        DocumentReview review,
+        UUID reviewedById,
+        String reviewedByName,
+        Instant reviewedAt,
+        String rejectReason) {}

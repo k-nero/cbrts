@@ -2,8 +2,8 @@ import { createContext, use, useEffect, useId, useMemo, useRef } from 'react';
 import { FieldValues, FormProvider, useForm, UseFormProps, useFormState } from 'react-hook-form';
 import { Alert, Flex, Form } from 'antd';
 
-import FormField from './FormField';
-import { FormContextType, FormFieldProps, FormWrapperProps } from './types';
+import { FormContextType, FormWrapperProps } from './types';
+import { FormFieldWithType } from './FormFieldWithType';
 
 import { useLayoutStore } from '@/stores/layout';
 
@@ -16,10 +16,6 @@ export const useFormCustom = <T extends FieldValues, TContext = any, TTransforme
   params: UseFormProps<T, TContext, TTransformedValues>,
 ) => {
   return useForm<T & { form_error?: unknown }, TContext, TTransformedValues>(params);
-};
-
-const FormFieldWithType = <T extends FieldValues>(props: FormFieldProps<T>) => {
-  return <FormField<T> {...props} />;
 };
 
 // Create static context value to prevent re-renders

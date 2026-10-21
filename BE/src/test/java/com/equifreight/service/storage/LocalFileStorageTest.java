@@ -1,20 +1,19 @@
 package com.equifreight.service.storage;
 
-import com.equifreight.exception.StorageException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.springframework.core.io.ByteArrayResource;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.equifreight.exception.StorageException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.io.ByteArrayResource;
 
 class LocalFileStorageTest {
 
@@ -63,7 +62,8 @@ class LocalFileStorageTest {
     @Test
     void refusesKeysOutsideTheRoot() {
         assertThatThrownBy(() -> storage.open("../outside.pdf")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> storage.delete("files/../../outside.pdf")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> storage.delete("files/../../outside.pdf"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -82,7 +82,8 @@ class LocalFileStorageTest {
 
     private long leftoverTempFiles() throws IOException {
         try (Stream<Path> paths = Files.walk(dir)) {
-            return paths.filter(p -> p.getFileName().toString().endsWith(".tmp")).count();
+            return paths.filter(p -> p.getFileName().toString().endsWith(".tmp"))
+                    .count();
         }
     }
 }

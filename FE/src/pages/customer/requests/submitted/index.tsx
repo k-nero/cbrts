@@ -4,7 +4,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
 
-import { RequestLoadState } from '@/components/request/RequestNotFound';
+import { RequestLoadState } from '@/components/request/RequestLoadState';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
@@ -34,6 +34,7 @@ const RequestSubmittedPage: FC = () => {
     return <Navigate to={router.paths.get('request-edit', { pathParams: [request.id] })} replace />;
 
   const latest = latestRevision(request);
+  const callout = request.quotation ? quotationCallout(request.quotation) : null;
   const toList = () => router.push(router.paths.get('my-requests'));
   const back = { label: 'My requests', onClick: toList };
   const pass = (chip: ReturnType<typeof passChip>) => (
@@ -129,10 +130,10 @@ const RequestSubmittedPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex flex-col gap-6">
-          {request.quotation && (
+          {callout ? (
             <Callout
-              tone={quotationCallout(request.quotation).tone}
-              title={quotationCallout(request.quotation).title}
+              tone={callout.tone}
+              title={callout.title}
               action={
                 <Button
                   size="sm"
@@ -144,10 +145,9 @@ const RequestSubmittedPage: FC = () => {
                 </Button>
               }
             >
-              {quotationCallout(request.quotation).body}
+              {callout.body}
             </Callout>
-          )}
-          {!request.quotation && (
+          ) : (
             <Panel title="Nothing needed from you right now">
               <p className="type-body-m m-0 text-ink-2">
                 Next: a logistics manager checks the route, dates and capacity, usually within 1

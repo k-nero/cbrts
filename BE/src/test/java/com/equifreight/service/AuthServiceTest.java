@@ -1,10 +1,10 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Club;
-import com.equifreight.entity.Country;
-import com.equifreight.entity.RefreshToken;
-import com.equifreight.entity.Role;
-import com.equifreight.entity.User;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
@@ -13,11 +13,10 @@ import com.equifreight.exception.UnauthorizedException;
 import com.equifreight.model.auth.LoginRequest;
 import com.equifreight.model.auth.RegisterRequest;
 import com.equifreight.model.auth.TokenResponse;
-import com.equifreight.repository.ClubRepository;
-import com.equifreight.repository.CountryRepository;
-import com.equifreight.repository.RefreshTokenRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.repository.*;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,33 +32,57 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AuthServiceTest {
 
-    @Mock private UserRepository users;
-    @Mock private RefreshTokenRepository refreshTokens;
-    @Mock private ClubRepository clubs;
-    @Mock private CountryRepository countries;
-    @Mock private RoleRepository roles;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private JwtEncoder jwtEncoder;
+    @Mock
+    private UserRepository users;
+
+    @Mock
+    private RefreshTokenRepository refreshTokens;
+
+    @Mock
+    private ClubRepository clubs;
+
+    @Mock
+    private CountryRepository countries;
+
+    @Mock
+    private RoleRepository roles;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtEncoder jwtEncoder;
 
     @InjectMocks
     private AuthService service;
 
     private Country vietnam;
     private Role customer;
+
+    private static RegisterRequest request() {
+        RegisterRequest r = RegisterRequest.builder()
+                .clubName("  Đà Lạt Highland Stables ")
+                .countryCode("VN")
+                .firstName("Minh Đức")
+                .lastName("Phạm")
+                .email(" duc@dalathighland.vn ")
+                .phone("")
+                .password("correct-horse-battery")
+                .build();
+        return r;
+    }
+
+    private static LoginRequest login(String password) {
+        LoginRequest r = LoginRequest.builder()
+                .email("minh.tran@equifreight.vn")
+                .password(password)
+                .build();
+        return r;
+    }
 
     @BeforeEach
     void setUp() {
@@ -69,7 +92,7 @@ class AuthServiceTest {
         customer = new Role();
         customer.setName(RoleName.CUSTOMER);
 
-        when(countries.findById("VN")).thenReturn(Optional.of(vietnam));
+        when(countries.findByCode("VN")).thenReturn(Optional.of(vietnam));
         when(roles.findByName(RoleName.CUSTOMER)).thenReturn(Optional.of(customer));
         when(passwordEncoder.encode(any())).thenReturn("hashed");
         when(clubs.save(any(Club.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -79,21 +102,13 @@ class AuthServiceTest {
             return u;
         });
         when(refreshTokens.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
-        Jwt jwt = Jwt.withTokenValue("access").header("alg", "HS256").subject("x")
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        Jwt jwt = Jwt.withTokenValue("access")
+                .header("alg", "HS256")
+                .subject("x")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
         when(jwtEncoder.encode(any(JwtEncoderParameters.class))).thenReturn(jwt);
-    }
-
-    private static RegisterRequest request() {
-        RegisterRequest r = new RegisterRequest();
-        r.setClubName("  Đà Lạt Highland Stables ");
-        r.setCountryCode("VN");
-        r.setFirstName("Minh Đức");
-        r.setLastName("Phạm");
-        r.setEmail(" duc@dalathighland.vn ");
-        r.setPhone("");
-        r.setPassword("correct-horse-battery");
-        return r;
     }
 
     @Test
@@ -116,8 +131,8 @@ class AuthServiceTest {
         assertEquals("duc@dalathighland.vn", club.getBookingEmail());
         assertSame(vietnam, club.getCountry());
 
-        assertEquals("access", tokens.getAccessToken());
-        assertNotNull(tokens.getRefreshToken());
+        assertEquals("access", tokens.accessToken());
+        assertNotNull(tokens.refreshToken());
     }
 
     @Test
@@ -134,9 +149,8 @@ class AuthServiceTest {
     @Test
     @DisplayName("register refuses a country EquiFreight doesn't serve")
     void registerRefusesUnknownCountry() {
-        RegisterRequest r = request();
-        r.setCountryCode("FR");
-        when(countries.findById("FR")).thenReturn(Optional.empty());
+        RegisterRequest r = request().toBuilder().countryCode("FR").build();
+        when(countries.findByCode("FR")).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> service.register(r));
         verify(clubs, never()).save(any());
@@ -154,13 +168,6 @@ class AuthServiceTest {
         when(users.getByEmail("minh.tran@equifreight.vn")).thenReturn(u);
         when(passwordEncoder.matches("right", "hashed")).thenReturn(true);
         return u;
-    }
-
-    private static LoginRequest login(String password) {
-        LoginRequest r = new LoginRequest();
-        r.setEmail("minh.tran@equifreight.vn");
-        r.setPassword(password);
-        return r;
     }
 
     @Test
@@ -191,7 +198,7 @@ class AuthServiceTest {
 
         TokenResponse tokens = service.login(login("right"), "127.0.0.1");
 
-        assertEquals("access", tokens.getAccessToken());
+        assertEquals("access", tokens.accessToken());
     }
 
     @Test

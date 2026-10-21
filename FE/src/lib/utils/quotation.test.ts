@@ -121,7 +121,7 @@ describe('quoteSummary', () => {
 
   test('an air quotation names the priced class', () => {
     expect(quoteSummary(draft({}, 'BUSINESS'))).toBe(
-      'v1 draft · Saigon Turf Club · 2 horses · air, business · departs 20 Nov 2026',
+      'v1 draft · Saigon Turf Club · 2 horses · air, business class · departs 20 Nov 2026',
     );
   });
 
@@ -261,6 +261,9 @@ describe('changedSince', () => {
       'was $1,450.00',
     );
   });
+  test("what it was reads in the quotation's currency", () => {
+    expect(changedSince(line({ amount: 1200 }), previous, 'EUR')).toBe('was €1,450.00');
+  });
   test('a line the previous version did not have is new', () => {
     expect(changedSince(line({ lineKey: 'MANUAL:abc' }), previous)).toBe('new');
   });
@@ -291,6 +294,9 @@ describe('depositText', () => {
   });
   test('a draft shows the percentage of the total to come', () => {
     expect(depositText(null)).toBe('—');
+  });
+  test("in the quotation's currency", () => {
+    expect(depositText({ pct: 30, amount: 2627.02 }, 'EUR')).toBe('30% · €2,627.02');
   });
 });
 

@@ -5,11 +5,6 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>EquiFreight</title>
-        <!-- paste this BEFORE any scripts -->
-        <script
-          crossOrigin="anonymous"
-          src="//unpkg.com/react-scan/dist/auto.global.js"
-        ></script>
         <script>
             // Pick the theme before first paint so the page never flashes the wrong mode. Light is the
             // presented theme; Dark only when picked. stores/themeStore.ts owns it from here; keep
@@ -24,8 +19,6 @@
                 document.documentElement.style.colorScheme = mode;
             })();
         </script>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
             href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Outfit:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap"
             rel="stylesheet"

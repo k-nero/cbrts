@@ -1,3 +1,4 @@
+import type { RouteStopKind } from './job';
 export const TripRecordKindEnum = {
   LOADED: 'LOADED',
   DEPARTED: 'DEPARTED',
@@ -63,7 +64,7 @@ export interface TripRecord {
 export interface TripStop {
   id: string;
   sequence: number;
-  kind: string;
+  kind: RouteStopKind;
   name: string;
   plannedAt: string | null;
   plannedStayMin: number | null;
@@ -113,6 +114,8 @@ export interface TripRecordInput {
   occurredAt: string;
   clientRef: string;
   text?: string;
+  /** Who received the horses; required when kind is HANDED_OVER. */
+  receiverName?: string;
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;

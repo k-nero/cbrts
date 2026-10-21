@@ -5,31 +5,11 @@ import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Button, Result } from 'antd';
 import { isAxiosError } from 'axios';
 
+import { NotFoundFallback } from './NotFoundFallback';
+
 import environment from '@/config/environment';
 import { useAuth } from '@/hooks/auth';
 import { useCustomRouter } from '@/router/route.hook';
-
-const NotFoundFallback: FC<{ resetErrorBoundary: () => void }> = ({ resetErrorBoundary }) => {
-  const router = useCustomRouter();
-  return (
-    <Result
-      status="404"
-      title="404"
-      subTitle="This page doesn’t exist, or the record was removed."
-      extra={
-        <Button
-          type="primary"
-          onClick={() => {
-            resetErrorBoundary();
-            router.back({ force: true });
-          }}
-        >
-          Go back
-        </Button>
-      }
-    />
-  );
-};
 
 const ErrorBoundaryHandling: FC<{ children: React.ReactNode; isAuthenticated?: boolean }> = ({
   children,
@@ -64,6 +44,26 @@ const ErrorBoundaryHandling: FC<{ children: React.ReactNode; isAuthenticated?: b
           // (e.g. a 404 mid-delete) can't strand the user.
           resetKeys={[pathname]}
           fallbackRender={({ resetErrorBoundary, error }) => {
+            // No response at all: the device is offline (or the server is unreachable).
+            if (isAxiosError(error) && !error.response) {
+              return (
+                <Result
+                  status="warning"
+                  title={navigator.onLine ? 'Can’t reach the server' : 'You’re offline'}
+                  subTitle={
+                    navigator.onLine
+                      ? 'The server didn’t answer. Check your connection, then try again.'
+                      : 'This page loads as soon as the connection is back.'
+                  }
+                  extra={
+                    <Button type="primary" onClick={() => resetErrorBoundary()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              );
+            }
+
             // 401: the session is gone
             if (isAxiosError(error) && error.response?.status === 401 && isAuthenticated) {
               logout();

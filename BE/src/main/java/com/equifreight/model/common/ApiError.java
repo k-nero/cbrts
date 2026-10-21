@@ -1,24 +1,11 @@
 package com.equifreight.model.common;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.List;
+import lombok.Builder;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class ApiError {
-    private Instant timestamp;
-    private int status;
-    private String error;
-    private String message;
-    private List<String> details;
-
+@Builder
+public record ApiError(Instant timestamp, int status, String error, String message, List<String> details) {
     public static ApiError of(int status, String error, String message) {
         return new ApiError(Instant.now(), status, error, message, null);
     }

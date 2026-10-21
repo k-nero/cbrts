@@ -164,4 +164,9 @@ describe('quotationCallout', () => {
       'You accepted quotation Q-2026-0189 v2.',
     );
   });
+  test('a declined one says so, not that it is ready', () => {
+    expect(quotationCallout({ ...ref, status: 'DECLINED' }).title).toBe(
+      'You declined quotation Q-2026-0189 v2.',
+    );
+  });
 });

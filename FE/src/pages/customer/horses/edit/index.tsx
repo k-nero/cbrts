@@ -5,7 +5,7 @@ import { App } from 'antd';
 import HorseForm from '../components/HorseForm';
 import HorseHeader from '../components/HorseHeader';
 import PassportPanel from '../components/PassportPanel';
-import { HorseLoadState } from '../profile';
+import { HorseLoadState } from '../profile/HorseLoadState';
 
 import { useHorse, useSaveHorse } from '@/hooks/horse';
 import { useCustomRouter } from '@/router/route.hook';

@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
@@ -16,6 +21,10 @@ import com.equifreight.model.horse.HorseResponse;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.HorseSizeClassRepository;
 import com.equifreight.repository.RequestHorseRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -24,28 +33,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class HorseServiceTest {
 
@@ -64,6 +51,59 @@ class HorseServiceTest {
     private User user;
     private Club club;
 
+    private static HorseRequest requestFrom(Horse horse) {
+        HorseRequest request = HorseRequest.builder()
+                .name(horse.getName())
+                .sex(horse.getSex())
+                .coat(horse.getCoat())
+                .breed(horse.getBreed())
+                .dateOfBirth(horse.getDateOfBirth())
+                .heightHh(horse.getHeightHh())
+                .weightKg(horse.getWeightKg())
+                .microchip(horse.getMicrochip())
+                .passportNo(horse.getPassportNo())
+                .declaredValue(horse.getDeclaredValue())
+                .requiredStall(horse.getRequiredStall())
+                .build();
+        return request;
+    }
+
+    private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
+        return new RequestHorseRepository.HorseUse() {
+            @Override
+            public String getCode() {
+                return code;
+            }
+
+            @Override
+            public RequestStatus getStatus() {
+                return status;
+            }
+        };
+    }
+
+    private static HorseRequest nightfallRequest() {
+        HorseRequest request = HorseRequest.builder()
+                .name("Nightfall")
+                .sex(HorseSex.MARE)
+                .heightHh(new BigDecimal("16.0"))
+                .microchip("250259600223311")
+                .passportNo("VN-PP-2022-0188")
+                .declaredValue(new BigDecimal("240000"))
+                .requiredStall(StallType.CLIMATE)
+                .build();
+        return request;
+    }
+
+    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
+        HorseSizeClass sizeClass = new HorseSizeClass();
+        sizeClass.setId(UUID.randomUUID());
+        sizeClass.setCode(code);
+        sizeClass.setWidthIn((short) widthIn);
+        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
+        return sizeClass;
+    }
+
     @BeforeEach
     void setUp() {
         horses = mock(HorseRepository.class);
@@ -81,7 +121,8 @@ class HorseServiceTest {
         when(clubs.requireClub(user)).thenReturn(club);
         when(sizeClasses.findAllByOrderByMinHeightHhAsc()).thenReturn(CLASSES);
         when(horses.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(any(), anyString())).thenReturn(Optional.empty());
+        when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(any(), anyString()))
+                .thenReturn(Optional.empty());
         when(horses.findByMicrochip(anyString())).thenReturn(Optional.empty());
         when(requestHorses.findHorseIdsOnSubmittedRequests(any())).thenReturn(Set.of());
     }
@@ -90,14 +131,14 @@ class HorseServiceTest {
     void createDerivesTheSizeClassFromHeight() {
         HorseResponse response = service.create(user, nightfallRequest());
 
-        assertThat(response.getSizeClass().getCode()).isEqualTo("M");
-        assertThat(response.getSizeClass().getWidthIn()).isEqualTo((short) 32);
+        assertThat(response.sizeClass().code()).isEqualTo("M");
+        assertThat(response.sizeClass().widthIn()).isEqualTo((short) 32);
     }
 
     @Test
     void createStoresTheMicrochipWithoutSpaces() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("250 259 600 223 311").build();
 
         service.create(user, request);
 
@@ -106,15 +147,16 @@ class HorseServiceTest {
 
     @Test
     void createRefusesAMicrochipThatIsNot15Digits() {
-        HorseRequest shortChip = nightfallRequest();
-        shortChip.setMicrochip("25025960022331");
+        HorseRequest shortChip =
+                nightfallRequest().toBuilder().microchip("25025960022331").build();
         assertThatThrownBy(() -> service.create(user, shortChip))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; 25025960022331 has 14.")
-                .extracting("code").isEqualTo("INVALID_MICROCHIP");
+                .extracting("code")
+                .isEqualTo("INVALID_MICROCHIP");
 
-        HorseRequest letters = nightfallRequest();
-        letters.setMicrochip("25025960022331X");
+        HorseRequest letters =
+                nightfallRequest().toBuilder().microchip("25025960022331X").build();
         assertThatThrownBy(() -> service.create(user, letters))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; 25025960022331X has letters or symbols.");
@@ -122,19 +164,20 @@ class HorseServiceTest {
 
     @Test
     void createRefusesAMicrochipWithNonAsciiDigits() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("２５０２５９６００２２３３１１");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("２５０２５９６００２２３３１１").build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A microchip is 15 digits; ２５０２５９６００２２３３１１ has letters or symbols.")
-                .extracting("code").isEqualTo("INVALID_MICROCHIP");
+                .extracting("code")
+                .isEqualTo("INVALID_MICROCHIP");
     }
 
     @Test
     void createStripsNonBreakingSpacesFromTheMicrochip() {
-        HorseRequest request = nightfallRequest();
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request =
+                nightfallRequest().toBuilder().microchip("250 259 600 223 311").build();
 
         service.create(user, request);
 
@@ -146,14 +189,16 @@ class HorseServiceTest {
         Horse existing = horse("Nightfall", "250259600223311");
         when(horses.findFirstByClubIdAndNameIgnoreCaseAndArchivedAtIsNull(CLUB_ID, "NIGHTFALL"))
                 .thenReturn(Optional.of(existing));
-        HorseRequest request = nightfallRequest();
-        request.setName("NIGHTFALL");
-        request.setMicrochip("111222333444555");
+        HorseRequest request = nightfallRequest().toBuilder()
+                .name("NIGHTFALL")
+                .microchip("111222333444555")
+                .build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Saigon Turf Club already has an active horse named Nightfall.")
-                .extracting("code").isEqualTo("HORSE_NAME_TAKEN");
+                .extracting("code")
+                .isEqualTo("HORSE_NAME_TAKEN");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -170,28 +215,32 @@ class HorseServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Microchip 250259600223311 is already registered. Check it against the passport, "
                         + "or contact us if the horse changed owners.")
-                .extracting("code").isEqualTo("MICROCHIP_REGISTERED");
+                .extracting("code")
+                .isEqualTo("MICROCHIP_REGISTERED");
         verify(horses, never()).saveAndFlush(any());
     }
 
     @Test
     void createRefusesADateOfBirthAfterToday() {
-        HorseRequest request = nightfallRequest();
-        request.setDateOfBirth(LocalDate.of(2999, 1, 1));
+        HorseRequest request = nightfallRequest().toBuilder()
+                .dateOfBirth(LocalDate.of(2999, 1, 1))
+                .build();
 
         assertThatThrownBy(() -> service.create(user, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("The date of birth 1 Jan 2999 is after today.")
-                .extracting("code").isEqualTo("INVALID_DATE_OF_BIRTH");
+                .extracting("code")
+                .isEqualTo("INVALID_DATE_OF_BIRTH");
     }
 
     @Test
     void createTrimsTextAndDefaultsStallAndCurrency() {
-        HorseRequest request = nightfallRequest();
-        request.setName(" Nightfall ");
-        request.setBreed("   ");
-        request.setPassportNo(" VN-PP-2022-0188 ");
-        request.setRequiredStall(null);
+        HorseRequest request = nightfallRequest().toBuilder()
+                .name(" Nightfall ")
+                .breed("   ")
+                .passportNo(" VN-PP-2022-0188 ")
+                .requiredStall(null)
+                .build();
 
         service.create(user, request);
 
@@ -212,7 +261,8 @@ class HorseServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Another horse with this name or microchip was saved at the same moment. "
                         + "Reload your horses and try again.")
-                .extracting("code").isEqualTo("HORSE_DUPLICATE");
+                .extracting("code")
+                .isEqualTo("HORSE_DUPLICATE");
     }
 
     @Test
@@ -229,7 +279,7 @@ class HorseServiceTest {
         when(horses.findByIdAndClubId(nightfall.getId(), CLUB_ID)).thenReturn(Optional.of(nightfall));
         when(requestHorses.findHorseIdsOnSubmittedRequests(any())).thenReturn(Set.of(nightfall.getId()));
 
-        assertThat(service.get(user, nightfall.getId()).isIdentityLocked()).isTrue();
+        assertThat(service.get(user, nightfall.getId()).identityLocked()).isTrue();
     }
 
     @Test
@@ -243,16 +293,17 @@ class HorseServiceTest {
 
         List<HorseResponse> page = service.list(user, null, false, pageable).getContent();
 
-        assertThat(page).extracting(HorseResponse::isIdentityLocked).containsExactly(true, false);
-        verify(requestHorses, times(1)).findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
-                ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
+        assertThat(page).extracting(HorseResponse::identityLocked).containsExactly(true, false);
+        verify(requestHorses, times(1))
+                .findHorseIdsOnSubmittedRequests(argThat((Collection<UUID> ids) ->
+                        ids.size() == 2 && ids.contains(nightfall.getId()) && ids.contains(shadowfax.getId())));
     }
 
     @Test
     void identityFieldsCanChangeBeforeAnySubmittedRequest() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setName("Nightfall II");
+        HorseRequest request =
+                requestFrom(nightfall).toBuilder().name("Nightfall II").build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -263,15 +314,17 @@ class HorseServiceTest {
     void changingIdentityAfterASubmittedRequestIsRefused() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setName("Nightfall II");
-        request.setSex(HorseSex.FILLY);
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .name("Nightfall II")
+                .sex(HorseSex.FILLY)
+                .build();
 
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Name and sex can't be changed: Nightfall travelled on REQ-2026-0193. "
                         + "Ask the transport specialist to correct them against her passport.")
-                .extracting("code").isEqualTo("HORSE_IDENTITY_LOCKED");
+                .extracting("code")
+                .isEqualTo("HORSE_IDENTITY_LOCKED");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -281,8 +334,8 @@ class HorseServiceTest {
         nightfall.setCoat(HorseCoat.BLACK);
         owned(nightfall);
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setCoat(HorseCoat.BAY);
+        HorseRequest request =
+                requestFrom(nightfall).toBuilder().coat(HorseCoat.BAY).build();
 
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), request))
                 .isInstanceOf(ConflictException.class)
@@ -294,23 +347,25 @@ class HorseServiceTest {
     void resendingTheSameIdentityInADifferentFormatPassesWhenLocked() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setMicrochip("250 259 600 223 311");
-        request.setName("Nightfall ");
-        request.setWeightKg((short) 480);
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .microchip("250 259 600 223 311")
+                .name("Nightfall ")
+                .weightKg((short) 480)
+                .build();
 
         HorseResponse response = service.update(user, nightfall.getId(), request);
 
         assertThat(savedHorse().getWeightKg()).isEqualTo((short) 480);
-        assertThat(response.isIdentityLocked()).isTrue();
+        assertThat(response.identityLocked()).isTrue();
     }
 
     @Test
     void aLockedMicrochipResentWithNonBreakingSpacesPasses() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setMicrochip("250 259 600 223 311");
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .microchip("250 259 600 223 311")
+                .build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -321,9 +376,10 @@ class HorseServiceTest {
     void nonIdentityFieldsStayEditableWhenLocked() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
-        HorseRequest request = requestFrom(nightfall);
-        request.setDeclaredValue(new BigDecimal("250000"));
-        request.setHandlingNotes("Kicks at the partition when the trailer stops.");
+        HorseRequest request = requestFrom(nightfall).toBuilder()
+                .declaredValue(new BigDecimal("250000"))
+                .handlingNotes("Kicks at the partition when the trailer stops.")
+                .build();
 
         service.update(user, nightfall.getId(), request);
 
@@ -341,7 +397,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.update(user, nightfall.getId(), requestFrom(nightfall)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Nightfall is archived. Archived horses can't be edited.")
-                .extracting("code").isEqualTo("HORSE_ARCHIVED");
+                .extracting("code")
+                .isEqualTo("HORSE_ARCHIVED");
     }
 
     @Test
@@ -365,7 +422,8 @@ class HorseServiceTest {
         assertThatThrownBy(() -> service.archive(user, nightfall.getId()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Nightfall is on REQ-2026-0193, which is in review. Archive her after it ends.")
-                .extracting("code").isEqualTo("HORSE_IN_USE");
+                .extracting("code")
+                .isEqualTo("HORSE_IN_USE");
         verify(horses, never()).saveAndFlush(any());
     }
 
@@ -387,9 +445,16 @@ class HorseServiceTest {
 
         service.archive(user, nightfall.getId());
 
-        verify(requestHorses).findActiveUses(eq(nightfall.getId()), argThat((Collection<RequestStatus> statuses) ->
-                Set.copyOf(statuses).equals(EnumSet.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW,
-                        RequestStatus.INFO_REQUIRED, RequestStatus.QUOTED, RequestStatus.CUSTOMER_ACCEPTED))));
+        verify(requestHorses)
+                .findActiveUses(
+                        eq(nightfall.getId()),
+                        argThat((Collection<RequestStatus> statuses) -> Set.copyOf(statuses)
+                                .equals(EnumSet.of(
+                                        RequestStatus.SUBMITTED,
+                                        RequestStatus.UNDER_REVIEW,
+                                        RequestStatus.INFO_REQUIRED,
+                                        RequestStatus.QUOTED,
+                                        RequestStatus.CUSTOMER_ACCEPTED))));
     }
 
     @Test
@@ -399,7 +464,7 @@ class HorseServiceTest {
         HorseResponse response = service.archive(user, nightfall.getId());
 
         assertThat(savedHorse().getArchivedAt()).isNotNull();
-        assertThat(response.getArchivedAt()).isNotNull();
+        assertThat(response.archivedAt()).isNotNull();
     }
 
     @Test
@@ -411,43 +476,13 @@ class HorseServiceTest {
 
         HorseResponse response = service.archive(user, nightfall.getId());
 
-        assertThat(response.getArchivedAt()).isEqualTo(archivedAt);
+        assertThat(response.archivedAt()).isEqualTo(archivedAt);
         verify(horses, never()).saveAndFlush(any());
     }
 
     private Horse owned(Horse horse) {
         when(horses.findByIdAndClubId(horse.getId(), CLUB_ID)).thenReturn(Optional.of(horse));
         return horse;
-    }
-
-    private static HorseRequest requestFrom(Horse horse) {
-        HorseRequest request = new HorseRequest();
-        request.setName(horse.getName());
-        request.setSex(horse.getSex());
-        request.setCoat(horse.getCoat());
-        request.setBreed(horse.getBreed());
-        request.setDateOfBirth(horse.getDateOfBirth());
-        request.setHeightHh(horse.getHeightHh());
-        request.setWeightKg(horse.getWeightKg());
-        request.setMicrochip(horse.getMicrochip());
-        request.setPassportNo(horse.getPassportNo());
-        request.setDeclaredValue(horse.getDeclaredValue());
-        request.setRequiredStall(horse.getRequiredStall());
-        return request;
-    }
-
-    private static RequestHorseRepository.HorseUse use(String code, RequestStatus status) {
-        return new RequestHorseRepository.HorseUse() {
-            @Override
-            public String getCode() {
-                return code;
-            }
-
-            @Override
-            public RequestStatus getStatus() {
-                return status;
-            }
-        };
     }
 
     private Horse savedHorse() {
@@ -468,26 +503,5 @@ class HorseServiceTest {
         horse.setPassportNo("VN-PP-2022-0188");
         horse.setDeclaredValue(new BigDecimal("240000"));
         return horse;
-    }
-
-    private static HorseRequest nightfallRequest() {
-        HorseRequest request = new HorseRequest();
-        request.setName("Nightfall");
-        request.setSex(HorseSex.MARE);
-        request.setHeightHh(new BigDecimal("16.0"));
-        request.setMicrochip("250259600223311");
-        request.setPassportNo("VN-PP-2022-0188");
-        request.setDeclaredValue(new BigDecimal("240000"));
-        request.setRequiredStall(StallType.CLIMATE);
-        return request;
-    }
-
-    private static HorseSizeClass sizeClass(String code, int widthIn, String minHeightHh) {
-        HorseSizeClass sizeClass = new HorseSizeClass();
-        sizeClass.setId(UUID.randomUUID());
-        sizeClass.setCode(code);
-        sizeClass.setWidthIn((short) widthIn);
-        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
-        return sizeClass;
     }
 }
