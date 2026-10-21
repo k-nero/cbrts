@@ -8,7 +8,8 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
 import type { AxiosError } from 'axios';
-import { z } from 'zod';
+
+import { type LoginForm, loginSchema } from './schema';
 
 import signInPhoto from '@/assets/photos/draft-signin-grey-window.jpg';
 import Brand from '@/components/Brand';
@@ -21,12 +22,6 @@ import { useLogin } from '@/hooks/auth';
 import type { ApiError } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
-
-const schema = z.object({
-  email: z.email('Enter the email you sign in with.'),
-  password: z.string().min(1, 'Enter your password.'),
-});
-type LoginForm = z.infer<typeof schema>;
 
 /**
  * What the account keeps for a club (the Access design's aside). On the photograph only the titles
@@ -45,7 +40,7 @@ const LoginPage = () => {
   const location = useLocation();
   const login = useLogin();
   const methods = useFormCustom<LoginForm>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 

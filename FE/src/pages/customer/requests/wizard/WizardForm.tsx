@@ -1,0 +1,312 @@
+import { type FC, useEffect, useRef, useState } from 'react';
+import { type Resolver, useFormState, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { AxiosError } from 'axios';
+
+import { RequestPass } from '../components/RequestPass';
+
+import HorsesStep from './HorsesStep';
+import ReviewStep from './ReviewStep';
+import RouteStep from './RouteStep';
+import ServiceStep from './ServiceStep';
+import { wizardSchema } from './schema';
+
+import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
+import { useEstimate, useRoutes, useSaveRequest, useWizardHorses } from '@/hooks/request';
+import type { ApiError, Blocker, Estimate, Horse, Route, TransportRequest } from '@/interfaces';
+import {
+  apiErrorView,
+  blockerFieldErrors,
+  EMPTY_WIZARD,
+  estimateStub,
+  type FieldStep,
+  formRefusal,
+  fromRequest,
+  holdsStep,
+  liveBlockers,
+  liveEstimate,
+  passChip,
+  retiredRefusals,
+  revealSelector,
+  roadRuns,
+  shownBlockers,
+  STEP_FIELDS,
+  stepOfBlocker,
+  toDraftInput,
+  WIZARD_STEPS,
+  type WizardStep,
+  type WizardValues,
+} from '@/lib/utils';
+import { useCustomRouter } from '@/router/route.hook';
+
+/** What every step is given by the page (spec §5.1). */
+export type StepProps = {
+  /** The last saved draft; undefined on /requests/new. */
+  saved: TransportRequest | undefined;
+  /** The saved blockers still standing: a change to a step retires its blockers. */
+  live: Blocker[];
+  /** The club's active horses. */
+  horses: Horse[];
+  /** The corridors between the two places ([] until both are places). */
+  routes: Route[];
+  /** The corridor shown: the draft's mode's, else road's, else the only one. */
+  route: Route | null;
+  notRun: boolean;
+  saving: boolean;
+  /** A live blocker keeps the customer on this step until its field changes. */
+  held: boolean;
+  /** The step's callout sentence after a refused save. */
+  refusal: string | null;
+  onContinue: () => void;
+  onBack: () => void;
+  goTo: (step: WizardStep) => void;
+  /** A ready estimate for the values on screen (US-Q-05); undefined while it is older or has no range. */
+  estimate: Estimate | undefined;
+};
+
+/** Refusals that belong on a field; everything else is the step's callout (spec §5.6). */
+const FIELDS_BY_CODE: Record<string, string> = {
+  SAME_PLACE: 'destination',
+  PLACE_OR_TEXT: 'destination',
+  DATE_FLEX: 'departureDate',
+  ARRIVAL_WINDOW: 'arriveOn',
+  MODE_OPTIONS: 'mode',
+};
+
+const SHOWN_FIELDS = Object.values(STEP_FIELDS).flat() as string[];
+
+const errorCode = (error: unknown): string | undefined =>
+  (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data?.error;
+
+/**
+ * The kit's inputs give React Hook Form no focusable ref: bring the refusal into view instead, a
+ * step-level one at its callout above the footer. Two frames, so the callout has rendered.
+ */
+const revealRefusal = (stepLevel: boolean) =>
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const target = document.querySelector(revealSelector(stepLevel));
+      if (target) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }),
+  );
+
+export const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardStep }> = ({
+  saved,
+  step,
+}) => {
+  const router = useCustomRouter();
+  const save = useSaveRequest();
+  const horsesQuery = useWizardHorses();
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState<FieldStep[]>([]);
+  /** Counts saves: a save's form reset clears every error, so the blockers go back on after it. */
+  const [saves, setSaves] = useState(0);
+  const methods = useFormCustom<WizardValues>({
+    resolver: zodResolver(wizardSchema) as unknown as Resolver<WizardValues>,
+    defaultValues: saved ? fromRequest(saved) : EMPTY_WIZARD,
+  });
+  const values = useWatch({ control: methods.control }) as WizardValues;
+  const { dirtyFields } = useFormState({ control: methods.control });
+  const changed = Object.keys(dirtyFields) as (keyof WizardValues)[];
+  const live = shownBlockers(liveBlockers(saved?.blockers ?? [], changed), attempted);
+
+  const placeId = (o: WizardValues['origin']) => (o && !o.__isNew__ ? o.value : null);
+  const routesQuery = useRoutes(placeId(values.origin), placeId(values.destination));
+  const routes = routesQuery.data ?? [];
+  const route =
+    routes.find((r) => r.mode === values.mode) ??
+    routes.find((r) => r.mode === 'ROAD') ??
+    routes[0] ??
+    null;
+  const notRun =
+    (routesQuery.isSuccess && routes.length === 0) ||
+    live.some((b) => b.code === 'ROUTE_NOT_RUN' && b.field === 'destination');
+
+  /** The fields a refused save put its sentence on, and the values it sent. */
+  const refused = useRef<{ fields: (keyof WizardValues)[]; sent: WizardValues } | null>(null);
+  /** A step move in flight: a second click queued behind the first sends nothing. */
+  const moving = useRef(false);
+
+  // A refusal is about the values that were sent: any change retires the step's, as FormWrapper
+  // does, and a change to the values a field refusal was about retires that one.
+  const valuesKey = JSON.stringify(values);
+  useEffect(() => {
+    setRefusal(null);
+    if (!refused.current) return;
+    const { fields, sent } = refused.current;
+    const retired = retiredRefusals(fields, sent, values);
+    if (retired.length === 0) return;
+    methods.clearErrors(retired);
+    refused.current.fields = fields.filter((f) => !retired.includes(f));
+    // `values` is rebuilt every render; its key says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valuesKey]);
+
+  // A window needs road: when the pair runs only by air, the arrival goes back to any time, so
+  // Service doesn't open with both mode cards disabled.
+  const strandedWindow = values.arrivalMode === 'WINDOW' && !roadRuns(routes);
+  useEffect(() => {
+    if (strandedWindow) methods.setValue('arrivalMode', 'ANY_TIME', { shouldDirty: true });
+  }, [strandedWindow, methods]);
+
+  // A standing blocker sits on its field, in the server's sentence; re-applied after every save,
+  // because the save's reset clears errors even when the blockers didn't change.
+  const fieldErrors = blockerFieldErrors(live);
+  const fieldKey = JSON.stringify(fieldErrors);
+  const shownOnFields = useRef<(keyof WizardValues)[]>([]);
+  useEffect(() => {
+    methods.clearErrors(shownOnFields.current);
+    shownOnFields.current = [];
+    for (const [field, message] of Object.entries(fieldErrors) as [keyof WizardValues, string][]) {
+      methods.setError(field, { type: 'server', message });
+      shownOnFields.current.push(field);
+    }
+    // `fieldErrors` is rebuilt every render; its key says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldKey, saves, methods]);
+
+  const index = WIZARD_STEPS.indexOf(step);
+  const goTo = (target: WizardStep, id = saved?.id, replace = false) => {
+    if (!id) return;
+    const href = router.paths.get('request-edit', {
+      pathParams: [id],
+      queryParams: { step: target },
+    });
+    if (replace) router.replace(href, { force: true });
+    else router.push(href, { force: true });
+  };
+
+  /** PUT (or POST) the whole form; the answer becomes the form's new baseline. */
+  const persist = async (): Promise<TransportRequest | null> => {
+    setRefusal(null);
+    refused.current = null;
+    try {
+      const response = await save.mutateAsync({
+        id: saved?.id,
+        input: toDraftInput(methods.getValues()),
+      });
+      methods.reset(fromRequest(response));
+      setSaves((n) => n + 1);
+      return response;
+    } catch (error) {
+      if (errorCode(error) === 'REQUEST_NOT_DRAFT' && saved) {
+        router.replace(router.paths.get('request-submitted', { pathParams: [saved.id] }), {
+          force: true,
+        });
+        return null;
+      }
+      const view = formRefusal(
+        apiErrorView(
+          error,
+          FIELDS_BY_CODE,
+          "Your draft wasn't saved. Check your connection and try again.",
+        ),
+        SHOWN_FIELDS,
+      );
+      Object.entries(view.fields).forEach(([field, message]) =>
+        methods.setError(field as keyof WizardValues, { message }),
+      );
+      refused.current = {
+        fields: Object.keys(view.fields) as (keyof WizardValues)[],
+        sent: JSON.parse(JSON.stringify(methods.getValues())) as WizardValues,
+      };
+      setRefusal(view.form);
+      revealRefusal(view.form !== null && view.focus === null);
+      return null;
+    }
+  };
+
+  /** Runs one step move at a time. */
+  const once = (move: () => Promise<void>) => async () => {
+    if (moving.current) return;
+    moving.current = true;
+    try {
+      await move();
+    } finally {
+      moving.current = false;
+    }
+  };
+
+  const onContinue = once(async () => {
+    if (step === 'review') return;
+    if (step === 'horses' && !saved && methods.getValues('horses').length === 0) {
+      setRefusal('Pick at least one horse.');
+      revealRefusal(false);
+      return;
+    }
+    setAttempted((done) => (done.includes(step) ? done : [...done, step]));
+    if (!(await methods.trigger(STEP_FIELDS[step]))) {
+      revealRefusal(false);
+      return;
+    }
+    const response = await persist();
+    if (!response) return;
+    const holds = (response.blockers ?? []).some((b) => stepOfBlocker(b) === step && holdsStep(b));
+    if (!saved) {
+      // The first save made the draft: from now on the wizard works on its own address.
+      goTo(holds ? 'horses' : 'route', response.id, true);
+      return;
+    }
+    if (holds) revealRefusal(false);
+    else goTo(WIZARD_STEPS[index + 1]);
+  });
+
+  const onBack = once(async () => {
+    if (index === 0) return;
+    if (methods.formState.isDirty && !(await persist())) return;
+    goTo(WIZARD_STEPS[index - 1]);
+  });
+
+  const estimateQuery = useEstimate(
+    toDraftInput(values),
+    !saved || saved.status === 'DRAFT' || saved.status === 'INFO_REQUIRED',
+  );
+  const stub = estimateStub({
+    estimate: estimateQuery.data,
+    loading: estimateQuery.isFetching,
+    error: estimateQuery.isError,
+    stored: null,
+    step,
+  });
+
+  const props: StepProps = {
+    estimate: liveEstimate(estimateQuery.data, estimateQuery.stale),
+    saved,
+    live,
+    horses: horsesQuery.data ?? [],
+    routes,
+    route,
+    notRun,
+    saving: save.isPending,
+    held: live.some((b) => stepOfBlocker(b) === step && holdsStep(b)),
+    refusal,
+    onContinue: () => void onContinue(),
+    onBack: () => void onBack(),
+    goTo: (target) => goTo(target),
+  };
+
+  return (
+    <FormWrapper methods={methods} isSubmitting={save.isPending} layout="vertical">
+      <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
+          {step === 'horses' && <HorsesStep {...props} query={horsesQuery} />}
+          {step === 'route' && <RouteStep {...props} />}
+          {step === 'service' && <ServiceStep {...props} />}
+          {step === 'review' && <ReviewStep {...props} />}
+        </div>
+        <RequestPass
+          className="sticky top-6"
+          values={values}
+          live={live}
+          route={route}
+          notRun={notRun}
+          horses={horsesQuery.data ?? []}
+          chip={saved ? passChip(saved.status) : undefined}
+          range={stub.range}
+          rangeSub={stub.rangeSub}
+        />
+      </div>
+    </FormWrapper>
+  );
+};

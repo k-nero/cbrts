@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { wizardSchema } from './wizardSchema';
+import { wizardSchema } from './schema';
 
 import { EMPTY_WIZARD, type WizardValues } from '@/lib/utils';
 

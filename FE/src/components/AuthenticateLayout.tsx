@@ -1,27 +1,20 @@
 import { FC } from 'react';
 import { useLocation } from 'react-router-dom';
-import { DownOutlined, LogoutOutlined } from '@ant-design/icons';
-import { Dropdown, Flex, Layout } from 'antd';
+import { Flex, Layout } from 'antd';
 import dayjs from 'dayjs';
 
 import Brand from './Brand';
-import Breadcrumb from './Breadscrumb';
+import Breadcrumb from './Breadcrumb';
 import ErrorBoundaryHandling from './ErrorBoundaryHandling';
 import Footer from './Footer';
 import Header from './Header';
 import ThemeToggle from './ThemeToggle';
+import { SideUser } from './SideUser';
 
 import { COLOR_BG_CANVAS, COLOR_BG_SUNKEN, COLOR_BORDER, ZINDEX_MENU } from '@/constant/color';
-import { useAuth, useMe } from '@/hooks/auth';
 import { ROLE_LABEL } from '@/interfaces';
 import { primaryRole, useAuthStore } from '@/stores/authStore';
 
-const USER_BUTTON = [
-  'flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md border-0',
-  'bg-transparent px-2 text-left hover:bg-muted',
-].join(' ');
-const AVATAR =
-  'grid size-8 place-items-center rounded-full bg-muted text-[13px] font-medium text-ink-2';
 const ROLE_TAG = [
   'w-fit rounded-full border border-line-strong bg-muted px-2.5 py-1',
   'font-mono text-[11px] tracking-wide text-ink-2 uppercase',
@@ -33,32 +26,6 @@ type Props = {
   children: React.ReactNode;
   /** The staff sidebar's items. Without it the layout is the customer portal (top header). */
   menu?: React.ReactNode;
-};
-
-/** Vietnamese names put the family name first: "Vũ Hải Yến" → "VY". */
-const initialsOf = (first: string, last: string) =>
-  `${last.at(0) ?? ''}${first.split(' ').at(-1)?.at(0) ?? ''}`.toUpperCase();
-
-const SideUser: FC = () => {
-  const { logout } = useAuth();
-  const me = useMe().data;
-  return (
-    <Dropdown
-      trigger={['click']}
-      placement="topLeft"
-      menu={{
-        items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', onClick: logout }],
-      }}
-    >
-      <button type="button" className={USER_BUTTON}>
-        <span className={AVATAR}>{me ? initialsOf(me.firstName, me.lastName) : '?'}</span>
-        <span className="flex-1 truncate text-[13px] font-medium text-ink">
-          {me ? `${me.lastName} ${me.firstName}` : 'Loading…'}
-        </span>
-        <DownOutlined style={{ fontSize: 10, color: 'var(--color-ink-3)' }} />
-      </button>
-    </Dropdown>
-  );
 };
 
 const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
