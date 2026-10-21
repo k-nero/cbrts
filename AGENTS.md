@@ -81,6 +81,8 @@ Where to look in the frontend (`FE/src/`):
 - **Staff menu:** `components/menu/StaffMenu`.
 - **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
 - **Helpers:** `lib/utils` (time, number, file, path, rbac, error) and `constant/`. Check them before writing a formatter or date helper.
+  - General-purpose utilities (debounce, throttle, deep equality, cloning, grouping, picking, sorting by key and the like) come from `lodash-es`, with named imports: `import { debounce, isEqual } from 'lodash-es'`. Use `lodash-es`, not `lodash`, so the bundle keeps only what is imported. `lib/utils` holds what is specific to EquiFreight (its wording, formats and rules), built on lodash where a general utility is needed.
+  - Replace a hand-written general-purpose helper with its lodash equivalent when you touch it.
 - **Page templates:** `pages/staff/users` (a list with an add/edit modal), `pages/staff/jobs` (a list whose rows open a detail page with tabs) and `pages/customer/home` (a composed customer page). See "Frontend pages" below.
 
 Where to look elsewhere:
@@ -262,6 +264,7 @@ Where to look elsewhere:
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
+- Don't hand-write a general-purpose utility (debounce, throttle, deep equality, grouping) that `lodash-es` already has.
 - Don't build a control out of plain HTML (`<button>`, `<input>`, `<select>`, `<table>`, CSS tabs, `<div>` overlays) in a page, or lay out a list page differently from `pages/staff/users` and `pages/staff/jobs`.
 - Don't re-create a Figma component that `components/ui` already has, or write plain HTML where an Ant Design component does the job.
 - Don't draw a page's own loading text, spinner, error or offline state; the table, `Skeleton` and the error boundary own those.
