@@ -85,7 +85,7 @@ create table public.corridors
     created_at       timestamp(6) with time zone default now() not null,
     updated_at       timestamp(6) with time zone               not null,
     mode             TransportMode                             not null,
-    id               uuid                                      not null
+    id               uuid                     default uuidv7() not null
         primary key,
     code             varchar(40)                               not null
         unique,
@@ -135,7 +135,7 @@ create table public.border_crossings
     from_country_id uuid                                      not null
         constraint border_crossings_from_country_id_fkey
             references public.countries,
-    id              uuid                                      not null
+    id              uuid                     default uuidv7() not null
         primary key,
     to_country_id   uuid                                      not null
         constraint border_crossings_to_country_id_fkey
@@ -154,7 +154,7 @@ create table public.clubs
     country_id    uuid
         constraint clubs_country_id_fkey
             references public.countries,
-    id            uuid                                      not null
+    id            uuid                     default uuidv7() not null
         primary key,
     phone         varchar(20),
     name          varchar(160)                              not null,
@@ -175,7 +175,7 @@ create table public.corridor_crossings
     corridor_id        uuid                                      not null
         constraint corridor_crossings_corridor_id_fkey
             references public.corridors on delete cascade,
-    id                 uuid                                      not null
+    id                 uuid                     default uuidv7() not null
         primary key,
     unique (corridor_id, seq)
 );
@@ -187,7 +187,7 @@ create table public.document_types
 (
     created_at  timestamp(6) with time zone default now() not null,
     updated_at  timestamp(6) with time zone               not null,
-    id          uuid                                      not null
+    id          uuid                     default uuidv7() not null
         primary key,
     provided_by DocumentProvider                          not null,
     scope       DocumentScope                             not null,
@@ -208,7 +208,7 @@ create table public.horse_size_classes
     width_in      smallint                                  not null,
     created_at    timestamp(6) with time zone default now() not null,
     updated_at    timestamp(6) with time zone               not null,
-    id            uuid                                      not null
+    id            uuid                     default uuidv7() not null
         primary key
 );
 
@@ -229,7 +229,7 @@ create table public.horses
     club_id        uuid                                           not null
         constraint horses_club_id_fkey
             references public.clubs,
-    id             uuid                                           not null
+    id             uuid                          default uuidv7() not null
         primary key,
     size_class_id  uuid                                           not null
         constraint horses_size_class_id_fkey
@@ -253,7 +253,7 @@ create table public.incident_options
     position    smallint                                  not null,
     created_at  timestamp(6) with time zone default now() not null,
     updated_at  timestamp(6) with time zone               not null,
-    id          uuid                                      not null
+    id          uuid                     default uuidv7() not null
         primary key,
     incident_id uuid                                      not null,
     title       varchar(160)                              not null,
@@ -302,7 +302,7 @@ create table public.roles
 (
     created_at  timestamp(6) with time zone default now() not null,
     updated_at  timestamp(6) with time zone               not null,
-    id          uuid                                      not null
+    id          uuid                     default uuidv7() not null
         primary key,
     description varchar(255),
     name        varchar(255)                              not null
@@ -324,7 +324,7 @@ create table public.users
     club_id           uuid
         constraint users_club_id_fkey
             references public.clubs,
-    id                uuid                                         not null
+    id                uuid                        default uuidv7() not null
         primary key,
     invited_by        uuid
         constraint users_invited_by_fkey
@@ -373,7 +373,7 @@ create table public.audit_log
         constraint audit_log_actor_id_fkey
             references public.users,
     entity_id          uuid,
-    id                 uuid                                      not null
+    id                 uuid                     default uuidv7() not null
         primary key,
     entity_code        varchar(20),
     actor_role         varchar(30),
@@ -394,7 +394,7 @@ create table public.files
     created_at   timestamp(6) with time zone default now() not null,
     size_bytes   bigint                                    not null,
     updated_at   timestamp(6) with time zone               not null,
-    id           uuid                                      not null
+    id           uuid                     default uuidv7() not null
         primary key,
     uploaded_by  uuid
         constraint files_uploaded_by_fkey
@@ -416,7 +416,7 @@ create table public.notifications
     read_at     timestamp(6) with time zone,
     updated_at  timestamp(6) with time zone               not null,
     entity_id   uuid,
-    id          uuid                                      not null
+    id          uuid                     default uuidv7() not null
         primary key,
     user_id     uuid                                      not null
         constraint notifications_user_id_fkey
@@ -438,7 +438,7 @@ create table public.rate_catalog_versions
     published_at   timestamp(6) with time zone,
     updated_at     timestamp(6) with time zone                 not null,
     status         CatalogStatus               default 'DRAFT' not null,
-    id             uuid                                        not null
+    id             uuid                       default uuidv7() not null
         primary key,
     last_edited_by uuid
         constraint rate_catalog_versions_last_edited_by_fkey
@@ -484,7 +484,7 @@ create table public.rate_lines
     corridor_id        uuid
         constraint rate_lines_corridor_id_fkey
             references public.corridors,
-    id                 uuid                                         not null
+    id                 uuid                        default uuidv7() not null
         primary key,
     version_id         uuid                        default uuidv7() not null
         constraint rate_lines_version_id_fkey
@@ -526,7 +526,7 @@ create table public.rate_service_classes
     corridor_id         uuid                        default uuidv7() not null
         constraint rate_service_classes_corridor_id_fkey
             references public.corridors,
-    id                  uuid                                         not null
+    id                  uuid                        default uuidv7() not null
         primary key,
     version_id          uuid                                         not null
         constraint rate_service_classes_version_id_fkey
@@ -546,7 +546,7 @@ create table public.rate_volume_breaks
     corridor_id  uuid
         constraint rate_volume_breaks_corridor_id_fkey
             references public.corridors,
-    id           uuid                                      not null
+    id           uuid                     default uuidv7() not null
         primary key,
     version_id   uuid                                      not null
         constraint rate_volume_breaks_version_id_fkey
@@ -562,7 +562,7 @@ create table public.refresh_tokens
     created_at  timestamp(6) with time zone default now() not null,
     expiry_date timestamp(6) with time zone               not null,
     updated_at  timestamp(6) with time zone               not null,
-    id          uuid                                      not null
+    id          uuid                     default uuidv7() not null
         primary key,
     user_id     uuid                                      not null
         constraint refresh_tokens_user_id_fkey
@@ -588,7 +588,7 @@ create table public.regulation_versions
     catalog_id              uuid                                        not null
         constraint regulation_versions_catalog_id_fkey
             references public.regulation_catalogs,
-    id                      uuid                                        not null
+    id                      uuid                       default uuidv7() not null
         primary key,
     published_by            uuid
         constraint regulation_versions_published_by_fkey
@@ -608,7 +608,7 @@ create table public.regulation_rules
     document_type_id uuid                                      not null
         constraint regulation_rules_document_type_id_fkey
             references public.document_types,
-    id               uuid                                      not null
+    id               uuid                     default uuidv7() not null
         primary key,
     version_id       uuid                                      not null
         constraint regulation_rules_version_id_fkey
@@ -626,7 +626,7 @@ create table public.sign_in_attempts
     attempted_at timestamp(6) with time zone default now() not null,
     created_at   timestamp(6) with time zone default now() not null,
     updated_at   timestamp(6) with time zone               not null,
-    id           uuid                                      not null
+    id           uuid                     default uuidv7() not null
         primary key,
     user_id      uuid
         constraint sign_in_attempts_user_id_fkey
@@ -671,7 +671,7 @@ create table public.transport_requests
     destination_place_id      uuid
         constraint transport_requests_destination_place_id_fkey
             references public.places,
-    id                        uuid                                           not null
+    id                        uuid                          default uuidv7() not null
         primary key,
     lead_time_override_by     uuid
         constraint transport_requests_lead_time_override_by_fkey
@@ -721,7 +721,7 @@ create table public.quotations
     accepted_by               uuid
         constraint quotations_accepted_by_fkey
             references public.users,
-    id                        uuid                                        not null
+    id                        uuid                       default uuidv7() not null
         primary key,
     prepared_by               uuid
         constraint quotations_prepared_by_fkey
@@ -757,7 +757,7 @@ create table public.quotation_lines
     horse_id              uuid
         constraint quotation_lines_horse_id_fkey
             references public.horses,
-    id                    uuid                                        not null
+    id                    uuid                       default uuidv7() not null
         primary key,
     quotation_id          uuid                                        not null
         constraint quotation_lines_quotation_id_fkey
@@ -791,7 +791,7 @@ create table public.request_horses
     horse_id        uuid                                      not null
         constraint request_horses_horse_id_fkey
             references public.horses,
-    id              uuid                                      not null
+    id              uuid                     default uuidv7() not null
         primary key,
     request_id      uuid                                      not null
         constraint request_horses_request_id_fkey
@@ -809,7 +809,7 @@ create table public.request_revisions
     created_at   timestamp(6) with time zone default now() not null,
     submitted_at timestamp(6) with time zone               not null,
     updated_at   timestamp(6) with time zone               not null,
-    id           uuid                                      not null
+    id           uuid                     default uuidv7() not null
         primary key,
     request_id   uuid                                      not null
         constraint request_revisions_request_id_fkey
@@ -842,7 +842,7 @@ create table public.transport_jobs
     approved_by          uuid                                              not null
         constraint transport_jobs_approved_by_fkey
             references public.users,
-    id                   uuid                                              not null
+    id                   uuid                             default uuidv7() not null
         primary key,
     quotation_id         uuid                        default uuidv7()      not null
         constraint transport_jobs_quotation_id_fkey
@@ -873,7 +873,7 @@ create table public.authority_submissions
     filed_by       uuid
         constraint authority_submissions_filed_by_fkey
             references public.users,
-    id             uuid                                                not null
+    id             uuid                               default uuidv7() not null
         primary key,
     job_id         uuid                        default uuidv7()        not null
         constraint authority_submissions_job_id_fkey
@@ -907,7 +907,7 @@ create table public.checklist_items
     horse_id           uuid
         constraint checklist_items_horse_id_fkey
             references public.horses,
-    id                 uuid                                             not null
+    id                 uuid                            default uuidv7() not null
         primary key,
     job_id             uuid                                             not null
         constraint checklist_items_job_id_fkey
@@ -972,7 +972,7 @@ create table public.document_versions
     file_id           uuid                                          not null
         constraint document_versions_file_id_fkey
             references public.files,
-    id                uuid                                          not null
+    id                uuid                         default uuidv7() not null
         primary key,
     reviewed_by       uuid
         constraint document_versions_reviewed_by_fkey
@@ -1003,7 +1003,7 @@ create table public.handovers
     confirmed_by     uuid
         constraint handovers_confirmed_by_fkey
             references public.users,
-    id               uuid                                      not null
+    id               uuid                     default uuidv7() not null
         primary key,
     job_id           uuid                                      not null
         unique
@@ -1037,7 +1037,7 @@ create table public.invoices
     corrects_invoice_id uuid
         constraint invoices_corrects_invoice_id_fkey
             references public.invoices,
-    id                  uuid                                        not null
+    id                  uuid                       default uuidv7() not null
         primary key,
     issued_by           uuid
         constraint invoices_issued_by_fkey
@@ -1063,7 +1063,7 @@ create table public.invoice_lines
     unit_rate         numeric(14, 2),
     created_at        timestamp(6) with time zone default now() not null,
     updated_at        timestamp(6) with time zone               not null,
-    id                uuid                                      not null
+    id                uuid                     default uuidv7() not null
         primary key,
     invoice_id        uuid                                      not null
         constraint invoice_lines_invoice_id_fkey
@@ -1084,7 +1084,7 @@ create table public.job_regulation_pins
     created_at            timestamp(6) with time zone default now() not null,
     updated_at            timestamp(6) with time zone               not null,
     role                  RegulationRole                            not null,
-    id                    uuid                                      not null
+    id                    uuid                     default uuidv7() not null
         primary key,
     job_id                uuid                                      not null
         constraint job_regulation_pins_job_id_fkey
@@ -1116,7 +1116,7 @@ create table public.notes
     created_by        uuid                                       not null
         constraint notes_created_by_fkey
             references public.users,
-    id                uuid                                       not null
+    id                uuid                      default uuidv7() not null
         primary key,
     job_id            uuid
         constraint notes_job_id_fkey
@@ -1158,7 +1158,7 @@ create table public.payments
     received_at timestamp(6) with time zone                   not null,
     updated_at  timestamp(6) with time zone                   not null,
     status      PaymentStatus               default 'PENDING' not null,
-    id          uuid                                          not null
+    id          uuid                         default uuidv7() not null
         primary key,
     invoice_id  uuid                                          not null
         constraint payments_invoice_id_fkey
@@ -1183,7 +1183,7 @@ create table public.quarantine_periods
     horse_id     uuid
         constraint quarantine_periods_horse_id_fkey
             references public.horses,
-    id           uuid                                      not null
+    id           uuid                     default uuidv7() not null
         primary key,
     job_id       uuid                                      not null
         constraint quarantine_periods_job_id_fkey
@@ -1209,7 +1209,7 @@ create table public.route_plans
     confirmed_by  uuid
         constraint route_plans_confirmed_by_fkey
             references public.users,
-    id            uuid                                        not null
+    id            uuid                       default uuidv7() not null
         primary key,
     job_id        uuid                                        not null
         constraint route_plans_job_id_fkey
@@ -1231,7 +1231,7 @@ create table public.route_stops
     border_crossing_id uuid
         constraint route_stops_border_crossing_id_fkey
             references public.border_crossings,
-    id                 uuid                                      not null
+    id                 uuid                     default uuidv7() not null
         primary key,
     place_id           uuid
         constraint route_stops_place_id_fkey
@@ -1254,7 +1254,7 @@ create table public.trip_records
     channel       Channel                                   not null,
     client_ref    uuid
         unique,
-    id            uuid                                      not null
+    id            uuid                     default uuidv7() not null
         primary key,
     job_id        uuid                                      not null
         constraint trip_records_job_id_fkey
@@ -1282,7 +1282,7 @@ create table public.condition_logs
     horse_id       uuid                                      not null
         constraint condition_logs_horse_id_fkey
             references public.horses,
-    id             uuid                                      not null
+    id             uuid                     default uuidv7() not null
         primary key,
     trip_record_id uuid                                      not null
         constraint condition_logs_trip_record_id_fkey
@@ -1326,7 +1326,7 @@ create table public.incidents
     decided_option_id   uuid
         constraint incidents_decided_option_id_fkey
             references public.incident_options,
-    id                  uuid                                       not null
+    id                  uuid                      default uuidv7() not null
         primary key,
     job_id              uuid                                       not null
         constraint incidents_job_id_fkey
@@ -1402,7 +1402,7 @@ create table public.load_plans
     confirmed_by uuid
         constraint load_plans_confirmed_by_fkey
             references public.users,
-    id           uuid                                        not null
+    id           uuid                       default uuidv7() not null
         primary key,
     job_id       uuid                                        not null
         constraint load_plans_job_id_fkey
@@ -1426,7 +1426,7 @@ create table public.route_legs
     from_stop_id  uuid                                      not null
         constraint route_legs_from_stop_id_fkey
             references public.route_stops,
-    id            uuid                                      not null
+    id            uuid                     default uuidv7() not null
         primary key,
     route_plan_id uuid                                      not null
         constraint route_legs_route_plan_id_fkey
@@ -1453,7 +1453,7 @@ create table public.flights
     updated_at             timestamp(6) with time zone               not null,
     service_class          ServiceClass,
     flight_no              varchar(12)                               not null,
-    id                     uuid                                      not null
+    id                     uuid                     default uuidv7() not null
         primary key,
     route_leg_id           uuid                                      not null
         unique
@@ -1495,7 +1495,7 @@ create table public.vehicle_stalls
     side        StallSide                                      not null,
     created_at  timestamp(6) with time zone default now()      not null,
     updated_at  timestamp(6) with time zone                    not null,
-    id          uuid                                           not null
+    id          uuid                          default uuidv7() not null
         primary key,
     vehicle_id  uuid                                           not null
         constraint vehicle_stalls_vehicle_id_fkey
@@ -1513,7 +1513,7 @@ create table public.load_plan_stalls
     horse_id         uuid                        default uuidv7() not null
         constraint load_plan_stalls_horse_id_fkey
             references public.horses,
-    id               uuid                                         not null
+    id               uuid                        default uuidv7() not null
         primary key,
     load_plan_id     uuid                                         not null
         constraint load_plan_stalls_load_plan_id_fkey

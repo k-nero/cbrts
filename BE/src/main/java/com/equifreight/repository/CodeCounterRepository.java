@@ -16,8 +16,8 @@ import org.springframework.data.repository.query.Param;
 public interface CodeCounterRepository extends JpaRepository<CodeCounter, UUID> {
 
     @Query(
-            value = "insert into code_counters (id, created_at, updated_at, prefix, year, last_value)"
-                    + " values (uuidv7(), now(), now(), cast(:prefix as CodePrefix), :year, 1)"
+            value = "insert into code_counters (created_at, updated_at, prefix, year, last_value)"
+                    + " values (now(), now(), cast(:prefix as CodePrefix), :year, 1)"
                     + " on conflict (prefix, year) do update set last_value = code_counters.last_value + 1"
                     + " returning last_value",
             nativeQuery = true)
