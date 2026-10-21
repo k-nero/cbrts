@@ -3,11 +3,10 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 @Setter
 @Getter
@@ -15,7 +14,9 @@ import java.util.List;
 @Table(name = "vehicles")
 public class Vehicle extends BaseEntity {
 
-    /** TX-447. */
+    /**
+     * TX-447.
+     */
     @Column(nullable = false, unique = true, length = 20)
     private String code;
 

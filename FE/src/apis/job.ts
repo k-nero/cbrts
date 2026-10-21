@@ -1,4 +1,6 @@
 import client from '@/config/axios';
+
+import { makeCrudApi } from './crudFactory';
 import type {
   CrewMember,
   JobDetail,
@@ -6,14 +8,10 @@ import type {
   JobSummary,
   LoadPlan,
   MoveHorse,
-  PagedResponse,
   RoutePlan,
 } from '@/interfaces';
 
 export const jobApi = {
-  list: (params?: JobListParams) =>
-    client.get<PagedResponse<JobSummary>>('/staff/jobs', { params }).then((r) => r.data),
-
   getDetail: (id: string) => client.get<JobDetail>(`/staff/jobs/${id}`).then((r) => r.data),
 
   getLoadPlan: (jobId: string) =>
@@ -57,3 +55,9 @@ export const jobApi = {
   signOff: (jobId: string) =>
     client.post<JobDetail>(`/staff/jobs/${jobId}/sign-off`).then((r) => r.data),
 };
+
+/**
+ * The jobs list as a CRUD resource, so the Jobs page pages, sorts and searches the way Users & roles does.
+ * Jobs are created by approving a request and change on the job page, so only `list` is ever called.
+ */
+export const jobsListApi = makeCrudApi<JobSummary, never, JobListParams>('/staff/jobs');

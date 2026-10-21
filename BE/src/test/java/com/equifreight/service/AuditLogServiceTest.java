@@ -1,5 +1,10 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.User;
@@ -9,31 +14,21 @@ import com.equifreight.model.audit.AuditLogFilter;
 import com.equifreight.model.audit.AuditLogResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.TransportJobRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
+import org.springframework.data.jpa.domain.Specification;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AuditLogServiceTest {
@@ -42,14 +37,29 @@ class AuditLogServiceTest {
 
     @Mock
     private AuditLogRepository auditLogRepository;
+
     @Mock
     private TransportJobRepository transportJobRepository;
 
     private AuditLogService service;
 
+    private static AuditLog entry(String code) {
+        AuditLog log = new AuditLog();
+        log.setId(UUID.randomUUID());
+        log.setOccurredAt(Instant.parse("2026-09-26T04:31:00Z"));
+        log.setActorLabel("System");
+        log.setActorRole("SYSTEM");
+        log.setChannel(Channel.SYSTEM);
+        log.setAction("DOCUMENT_REJECTED");
+        log.setSummary("Summary");
+        log.setEntityCode(code);
+        return log;
+    }
+
     @BeforeEach
     void setUp() {
-        service = new AuditLogService(auditLogRepository, transportJobRepository, JsonMapper.builder().build());
+        service = new AuditLogService(
+                auditLogRepository, transportJobRepository, JsonMapper.builder().build());
     }
 
     @Test
@@ -84,7 +94,8 @@ class AuditLogServiceTest {
 
         assertEquals(2, sorted.getPageNumber());
         assertEquals(20, sorted.getPageSize());
-        assertEquals(Sort.by(Sort.Direction.DESC, "occurredAt").and(Sort.by(Sort.Direction.DESC, "id")), sorted.getSort());
+        assertEquals(
+                Sort.by(Sort.Direction.DESC, "occurredAt").and(Sort.by(Sort.Direction.DESC, "id")), sorted.getSort());
     }
 
     @Test
@@ -92,14 +103,15 @@ class AuditLogServiceTest {
     void oldestFirstIsAllowed() {
         Pageable sorted = AuditLogService.newestFirst(PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "occurredAt")));
 
-        assertEquals(Sort.Direction.ASC, sorted.getSort().getOrderFor("occurredAt").getDirection());
+        assertEquals(
+                Sort.Direction.ASC, sorted.getSort().getOrderFor("occurredAt").getDirection());
     }
 
     @Test
     @DisplayName("Sorting by any column other than When is refused")
     void sortingByAnotherColumnIsRefused() {
-        var e = assertThrows(BusinessException.class,
-                () -> AuditLogService.newestFirst(PageRequest.of(0, 20, Sort.by("action"))));
+        var e = assertThrows(
+                BusinessException.class, () -> AuditLogService.newestFirst(PageRequest.of(0, 20, Sort.by("action"))));
 
         assertTrue(e.getMessage().contains("action"), e.getMessage());
     }
@@ -146,7 +158,8 @@ class AuditLogServiceTest {
         when(auditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(log)));
 
-        AuditLogResponse response = service.search(NO_FILTER, PageRequest.of(0, 20)).getContent().getFirst();
+        AuditLogResponse response =
+                service.search(NO_FILTER, PageRequest.of(0, 20)).getContent().getFirst();
 
         assertEquals("PENDING", response.before().get("status").asString());
         assertEquals("APPROVED", response.after().get("status").asString());
@@ -176,7 +189,8 @@ class AuditLogServiceTest {
         log.setSummary("Rejected Silver Bell’s proof of ownership: \"the bill of sale is unsigned\"");
         log.setOccurredAt(Instant.parse("2026-09-24T09:02:00Z"));
         when(auditLogRepository.count(any(Specification.class))).thenReturn(1L);
-        when(auditLogRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(log));
+        when(auditLogRepository.findAll(any(Specification.class), any(Sort.class)))
+                .thenReturn(List.of(log));
 
         String csv = new String(service.exportCsv(NO_FILTER), StandardCharsets.UTF_8);
         String[] lines = csv.split("\n");
@@ -191,18 +205,5 @@ class AuditLogServiceTest {
     void formulaCellsAreDefused() {
         assertEquals("\"'=HYPERLINK(\"\"x\"\")\"", AuditLogService.cell("=HYPERLINK(\"x\")"));
         assertEquals("", AuditLogService.cell(null));
-    }
-
-    private static AuditLog entry(String code) {
-        AuditLog log = new AuditLog();
-        log.setId(UUID.randomUUID());
-        log.setOccurredAt(Instant.parse("2026-09-26T04:31:00Z"));
-        log.setActorLabel("System");
-        log.setActorRole("SYSTEM");
-        log.setChannel(Channel.SYSTEM);
-        log.setAction("DOCUMENT_REJECTED");
-        log.setSummary("Summary");
-        log.setEntityCode(code);
-        return log;
     }
 }

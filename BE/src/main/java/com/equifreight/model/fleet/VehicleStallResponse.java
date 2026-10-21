@@ -2,20 +2,9 @@ package com.equifreight.model.fleet;
 
 import com.equifreight.entity.enums.StallSide;
 import com.equifreight.entity.enums.StallType;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-public class VehicleStallResponse {
-    private UUID id;
-    private short positionNo;
-    private StallType stallType;
-    private short rowNo;
-    private StallSide side;
-    private boolean nearRamp;
-}
+public record VehicleStallResponse(
+        UUID id, short positionNo, StallType stallType, short rowNo, StallSide side, boolean nearRamp, short widthIn) {}

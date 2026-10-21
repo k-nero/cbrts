@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.InvoiceLineKind;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.math.BigDecimal;
 
 @Setter
 @Getter
@@ -20,7 +19,9 @@ public class InvoiceLine extends BaseEntity {
     @Column(nullable = false)
     private short position;
 
-    /** The quoted line this settles, if any. */
+    /**
+     * The quoted line this settles, if any.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quotation_line_id")
     private QuotationLine quotationLine;
@@ -38,11 +39,15 @@ public class InvoiceLine extends BaseEntity {
     @Column(precision = 14, scale = 2)
     private BigDecimal unitRate;
 
-    /** Negative for credits and deductions. */
+    /**
+     * Negative for credits and deductions.
+     */
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal amount;
 
-    /** Required for ACTUALISED and ADJUSTMENT: "Flight delayed: waited 3 h, quoted 2 h". */
+    /**
+     * Required for ACTUALISED and ADJUSTMENT: "Flight delayed: waited 3 h, quoted 2 h".
+     */
     @Column(length = 300)
     private String note;
 }

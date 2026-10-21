@@ -382,14 +382,16 @@ export const shortDay = (day: string): string => {
   return `${d} ${MONTHS[m - 1]}`;
 };
 
-export const TRAILER_WORDS: Record<TrailerType, string> = {
-  SHARED: 'shared load',
-  PRIVATE: 'private trailer',
+/** "Shared load": a trailer type as a label (option lists, table cells). */
+export const TRAILER_LABELS: Record<TrailerType, string> = {
+  SHARED: 'Shared load',
+  PRIVATE: 'Private trailer',
 };
-export const CLASS_WORDS: Record<ServiceClass, string> = {
-  ECONOMY: 'economy class',
-  BUSINESS: 'business class',
-  FIRST: 'first class',
+/** "Economy": a service class as a label (option lists, table cells). */
+export const SERVICE_CLASS_LABELS: Record<ServiceClass, string> = {
+  ECONOMY: 'Economy',
+  BUSINESS: 'Business',
+  FIRST: 'First',
 };
 
 /** "Road · shared load", "Air · business class". */
@@ -398,10 +400,26 @@ const serviceWords = (
   trailer: TrailerType | null,
   airClass: ServiceClass | null,
 ): string | null => {
-  if (mode === 'ROAD') return trailer ? `Road · ${TRAILER_WORDS[trailer]}` : 'Road';
-  if (mode === 'AIR') return airClass ? `Air · ${CLASS_WORDS[airClass]}` : 'Air';
-  return null;
+  if (!mode) return null;
+  const parts = serviceParts(mode, trailer, airClass);
+  return parts.detail ? `${parts.mode} · ${parts.detail}` : parts.mode;
 };
+
+/**
+ * The service as its words, `{ mode: 'Road', detail: 'shared load' }`, for a line that joins them
+ * its own way.
+ */
+export const serviceParts = (
+  mode: TransportMode,
+  trailer: TrailerType | null,
+  airClass: ServiceClass | null,
+): { mode: string; detail: string | null } =>
+  mode === 'AIR'
+    ? {
+        mode: 'Air',
+        detail: airClass ? `${SERVICE_CLASS_LABELS[airClass].toLowerCase()} class` : null,
+      }
+    : { mode: 'Road', detail: trailer ? TRAILER_LABELS[trailer].toLowerCase() : null };
 
 /** A window always books road and a private trailer (toDraftInput sends them). */
 const effectiveService = (v: WizardValues) =>
@@ -581,11 +599,24 @@ export const versionLine = (v: RevisionSummary): string =>
 export const submitLabel = (r: TransportRequest): string =>
   r.status === 'INFO_REQUIRED' ? `Send version ${latestRevision(r) + 1}` : 'Submit request';
 
+/**
+ * The return itself bumps `updatedAt` a moment after the audit row that dates it, so a save counts as the
+ * customer's only when it lands well after the return.
+ */
+const RETURN_SAVE_SLACK_MS = 5_000;
+
 /** The wizard header's first sentence. */
-export const savedLine = (r: TransportRequest): string =>
-  r.status === 'INFO_REQUIRED'
-    ? `Changes saved ${formatDate(r.updatedAt)}. Send them as version ${latestRevision(r) + 1} from Review.`
-    : `Draft saved ${formatDate(r.updatedAt)}.`;
+export const savedLine = (r: TransportRequest): string => {
+  if (r.status !== 'INFO_REQUIRED') return `Draft saved ${formatDate(r.updatedAt)}.`;
+  const next = latestRevision(r) + 1;
+  const returnedAt = r.revisions.findLast((v) => v.returnedAt)?.returnedAt;
+  if (
+    returnedAt &&
+    new Date(r.updatedAt).getTime() - new Date(returnedAt).getTime() <= RETURN_SAVE_SLACK_MS
+  )
+    return `Returned ${formatDate(returnedAt)}. Send your answer as version ${next} from Review.`;
+  return `Changes saved ${formatDate(r.updatedAt)}. Send them as version ${next} from Review.`;
+};
 
 /** The draft pass's chip: a returned request is waiting on the customer (spec §6.2, §6.3). */
 export const passChip = (status: RequestStatus): { tone: Tone; label: string } =>

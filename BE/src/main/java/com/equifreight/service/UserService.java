@@ -8,12 +8,15 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.user.CreateUserRequest;
 import com.equifreight.model.user.UpdateUserRequest;
+import com.equifreight.model.user.UserGroup;
+import com.equifreight.model.user.UserGroupCounts;
 import com.equifreight.model.user.UserMapper;
 import com.equifreight.model.user.UserResponse;
 import com.equifreight.repository.RefreshTokenRepository;
 import com.equifreight.repository.RoleRepository;
 import com.equifreight.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
+import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,16 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 @Service
 public class UserService {
+    private static final String ENTITY_TYPE = "USER";
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -39,11 +35,13 @@ public class UserService {
     private final JsonMapper jsonMapper;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    private static final String ENTITY_TYPE = "USER";
-
-    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-                       AuditService auditService, JsonMapper jsonMapper,
-                       RefreshTokenRepository refreshTokenRepository) {
+    public UserService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            AuditService auditService,
+            JsonMapper jsonMapper,
+            RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,15 +50,42 @@ public class UserService {
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
+    private static void requireNotRemoved(User user) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BusinessException(
+                    "%s's account was removed, so it can't be changed.".formatted(user.displayName()));
+        }
+    }
+
+    /**
+     * "transport specialist", "fleet & route coordinator and escort".
+     */
+    private static String roleList(Set<Role> roles) {
+        List<String> labels = roleNames(roles).stream()
+                .map(n -> RoleName.label(n).toLowerCase())
+                .toList();
+        if (labels.isEmpty()) {
+            return "no role";
+        }
+        return labels.size() == 1
+                ? labels.getFirst()
+                : String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
+    }
+
+    private static List<String> roleNames(Set<Role> roles) {
+        return roles.stream().map(Role::getName).sorted().toList();
+    }
+
     /**
      * q matches email, name or phone; roleName (optional) narrows to accounts holding that role.
      * Removed (DISABLED) accounts are left out: they stay only so their past records keep a name.
      */
     @Transactional(readOnly = true)
-    public Page<UserResponse> search(String q, String roleName, Pageable pageable) {
+    public Page<UserResponse> search(String q, String roleName, UserGroup group, Pageable pageable) {
         Specification<User> spec = (root, cq, cb) -> {
             var predicates = new ArrayList<Predicate>();
             predicates.add(cb.notEqual(root.get("status"), UserStatus.DISABLED));
+            if (group != null) predicates.add(inGroup(group).toPredicate(root, cq, cb));
             if (roleName != null && !roleName.isBlank()) {
                 // A user with several roles would otherwise appear once per role row.
                 if (cq != null) {
@@ -74,12 +99,43 @@ public class UserService {
                         cb.like(cb.lower(root.get("email")), like),
                         cb.like(cb.lower(root.get("firstName")), like),
                         cb.like(cb.lower(root.get("lastName")), like),
-                        cb.like(cb.lower(root.get("phone")), like)
-                ));
+                        cb.like(cb.lower(root.get("phone")), like)));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         return userRepository.findAll(spec, pageable).map(UserMapper::toResponse);
+    }
+
+    /** How many accounts each Users &amp; roles tab holds, ignoring the search and role filters. */
+    @Transactional(readOnly = true)
+    public UserGroupCounts countGroups() {
+        return new UserGroupCounts(
+                countGroup(UserGroup.STAFF), countGroup(UserGroup.CUSTOMERS), countGroup(UserGroup.INVITES));
+    }
+
+    private long countGroup(UserGroup group) {
+        Specification<User> notDisabled = (root, cq, cb) -> cb.notEqual(root.get("status"), UserStatus.DISABLED);
+        return userRepository.count(notDisabled.and(inGroup(group)));
+    }
+
+    /**
+     * Customers are accounts holding the CUSTOMER role; staff are everyone else, invited or active; pending
+     * invites are staff whose invite hasn't been accepted.
+     */
+    private static Specification<User> inGroup(UserGroup group) {
+        return (root, cq, cb) -> {
+            var customers = cq.subquery(UUID.class);
+            var customer = customers.from(User.class);
+            customers
+                    .select(customer.get("id"))
+                    .where(cb.equal(customer.join("roles").get("name"), RoleName.CUSTOMER));
+            var isCustomer = root.get("id").in(customers);
+            return switch (group) {
+                case CUSTOMERS -> isCustomer;
+                case STAFF -> cb.not(isCustomer);
+                case INVITES -> cb.and(cb.not(isCustomer), cb.equal(root.get("status"), UserStatus.INVITED));
+            };
+        };
     }
 
     @Transactional(readOnly = true)
@@ -87,42 +143,51 @@ public class UserService {
         return UserMapper.toResponse(findOrThrow(id));
     }
 
-    /** Invites a staff account; the actor is the signed-in logistics manager (audited, BR-F1-08). */
+    /**
+     * Invites a staff account; the actor is the signed-in logistics manager (audited, BR-F1-08).
+     */
     @Transactional
     public UserResponse create(CreateUserRequest request, User actor) {
-        if (userRepository.getByEmail(request.getEmail()) != null) {
+        if (userRepository.getByEmail(request.email()) != null) {
             throw new BusinessException("Email already in use");
         }
-        Set<Role> roles = resolveRoles(request.getRoles());
+        Set<Role> roles = resolveRoles(request.roles());
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhone(request.getPhone());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.email());
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setPhone(request.phone());
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setRoles(roles);
         User saved = userRepository.save(user);
-        auditService.recordDecision(actor, "USER_INVITED",
+        auditService.recordDecision(
+                actor,
+                "USER_INVITED",
                 "Invited %s as %s".formatted(saved.displayName(), roleList(saved.getRoles())),
-                ENTITY_TYPE, saved.getId(), saved.getStaffCode(), null,
-                null, snapshot(saved));
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getStaffCode(),
+                null,
+                null,
+                snapshot(saved));
         return UserMapper.toResponse(saved);
     }
 
-    /** Changes a staff account's name, phone or roles; writes one audit row with what changed. */
+    /**
+     * Changes a staff account's name, phone or roles; writes one audit row with what changed.
+     */
     @Transactional
     public UserResponse update(UUID id, UpdateUserRequest request, User actor) {
         User user = findOrThrow(id);
         requireNotRemoved(user);
-        Set<Role> roles = request.getRoles() != null && !request.getRoles().isEmpty()
-                ? resolveRoles(request.getRoles())
-                : user.getRoles();
+        Set<Role> roles =
+                request.roles() != null && !request.roles().isEmpty() ? resolveRoles(request.roles()) : user.getRoles();
         String before = snapshot(user);
         String oldName = user.displayName();
         List<String> oldRoles = roleNames(user.getRoles());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPhone(request.getPhone());
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setPhone(request.phone());
         user.setRoles(roles);
         User saved = userRepository.save(user);
         String after = snapshot(saved);
@@ -134,8 +199,16 @@ public class UserService {
             if (!oldName.equals(name)) {
                 summary += " (was " + oldName + ")";
             }
-            auditService.recordDecision(actor, "USER_UPDATED", summary,
-                    ENTITY_TYPE, saved.getId(), saved.getStaffCode(), null, before, after);
+            auditService.recordDecision(
+                    actor,
+                    "USER_UPDATED",
+                    summary,
+                    ENTITY_TYPE,
+                    saved.getId(),
+                    saved.getStaffCode(),
+                    null,
+                    before,
+                    after);
         }
         return UserMapper.toResponse(saved);
     }
@@ -152,33 +225,21 @@ public class UserService {
         user.setStatus(UserStatus.DISABLED);
         userRepository.save(user);
         refreshTokenRepository.deleteByUser(user);
-        auditService.recordDecision(actor, "USER_REMOVED",
+        auditService.recordDecision(
+                actor,
+                "USER_REMOVED",
                 "Removed %s (%s)".formatted(user.displayName(), roleList(user.getRoles())),
-                ENTITY_TYPE, user.getId(), user.getStaffCode(), null,
-                before, snapshot(user));
+                ENTITY_TYPE,
+                user.getId(),
+                user.getStaffCode(),
+                null,
+                before,
+                snapshot(user));
     }
 
-    private static void requireNotRemoved(User user) {
-        if (user.getStatus() == UserStatus.DISABLED) {
-            throw new BusinessException("%s's account was removed, so it can't be changed.".formatted(user.displayName()));
-        }
-    }
-
-    /** "transport specialist", "fleet & route coordinator and escort". */
-    private static String roleList(Set<Role> roles) {
-        List<String> labels = roleNames(roles).stream().map(n -> RoleName.label(n).toLowerCase()).toList();
-        if (labels.isEmpty()) {
-            return "no role";
-        }
-        return labels.size() == 1 ? labels.getFirst()
-                : String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
-    }
-
-    private static List<String> roleNames(Set<Role> roles) {
-        return roles.stream().map(Role::getName).sorted().toList();
-    }
-
-    /** The audited fields as JSON: name, email, phone, role names and status (never the password). */
+    /**
+     * The audited fields as JSON: name, email, phone, role names and status (never the password).
+     */
     private String snapshot(User user) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("name", user.displayName());
@@ -196,8 +257,8 @@ public class UserService {
     private Set<Role> resolveRoles(Set<String> roleNames) {
         Set<Role> roles = new HashSet<>();
         for (String name : roleNames) {
-            roles.add(roleRepository.findByName(name)
-                    .orElseThrow(() -> new BusinessException("Unknown role: " + name)));
+            roles.add(
+                    roleRepository.findByName(name).orElseThrow(() -> new BusinessException("Unknown role: " + name)));
         }
         return roles;
     }

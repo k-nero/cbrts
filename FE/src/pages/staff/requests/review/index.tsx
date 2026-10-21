@@ -1,14 +1,17 @@
 import type { FC } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { ChecksPanel } from './ChecksPanel';
 import { DecisionPanel } from './DecisionPanel';
-import { ChecksPanel, HistoryPanel, SentPanel } from './panels';
+import { HistoryPanel } from './HistoryPanel';
+import { SentPanel } from './SentPanel';
 
-import { RequestLoadState, RequestNotFound } from '@/components/request/RequestNotFound';
+import { RequestLoadState } from '@/components/request/RequestLoadState';
+import { RequestNotFound } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui';
 import { useRequestReview } from '@/hooks/staffRequest';
-import { queueWords, reviewSubject, reviewSummary } from '@/lib/utils';
+import { inReview, queueWords, reviewSubject, reviewSummary } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -83,7 +86,7 @@ const RequestReviewPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-6">
-          <ChecksPanel checks={review.checks} />
+          <ChecksPanel checks={review.checks} inReview={inReview(request.status)} />
           <SentPanel key={request.id} revisions={review.revisions} />
           <HistoryPanel history={review.history} />
         </div>

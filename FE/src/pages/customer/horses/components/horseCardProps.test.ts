@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { type HorseCardSource, horseCardProps } from './horseCardProps';
+import { horseCardProps, type HorseCardSource } from './horseCardProps';
 
 const TODAY = '2026-10-17';
 

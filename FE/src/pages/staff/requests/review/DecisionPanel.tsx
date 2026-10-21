@@ -1,85 +1,29 @@
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, useRef, useState } from 'react';
 import { useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import type { AxiosError } from 'axios';
 
 import { afterReturn } from './afterReturn';
+import { NoteField } from './NoteField';
+import { QuotationAction } from './QuotationAction';
+import { type NoteForm, noteSchema } from './schema';
 
-import FormWrapper, { useFormCustom, useFormWrapperCtx } from '@/components/form/FormWrapper';
+import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
-import { useReturnRequest, useStartQuotation } from '@/hooks/staffRequest';
+import { useReturnRequest } from '@/hooks/staffRequest';
 import type { ApiError, RequestReview } from '@/interfaces';
 import {
   apiErrorMessage,
   formatDate,
+  inReview,
   NOTE_MAX,
   noteState,
-  quotationAction,
   requestStatusChip,
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
-
-type NoteForm = { note: string };
-
-const NoteField: FC<{ club: string }> = ({ club }) => {
-  const { FormField } = useFormWrapperCtx<NoteForm>();
-  return (
-    <FormField
-      name="note"
-      label={`Note to ${club}`}
-      component="textarea"
-      componentProps={{
-        autoSize: { minRows: 4, maxRows: 10 },
-        instruction:
-          'Required. The customer sees it exactly as written; the request goes back to them with your note.',
-      }}
-    />
-  );
-};
-
-/**
- * Start quotation, or open the one already started (pricing slice, spec §7.3). A double click sends one
- * start; the builder opens once it answers.
- */
-const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
-  const router = useCustomRouter();
-  const start = useStartQuotation();
-  const qc = useQueryClient();
-  const starting = useRef(false);
-  const id = review.request.id;
-  const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));
-
-  const action = quotationAction(review.request.status, review.quotation);
-  if (action === null) return null;
-  if (action === 'open' && review.quotation) {
-    return (
-      <Button variant="secondary" block onClick={open}>
-        {`Open quotation ${review.quotation.code} · v${review.quotation.versionNo}`}
-      </Button>
-    );
-  }
-  const onStart = async () => {
-    if (starting.current) return;
-    starting.current = true;
-    try {
-      await start.mutateAsync({ requestId: id, value: undefined });
-      open();
-    } catch (error) {
-      message.error(apiErrorMessage(error, "The quotation wasn't started. Try again."));
-      // The request may have moved on (returned, or started by someone else): show where it stands.
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(id), exact: true });
-    } finally {
-      starting.current = false;
-    }
-  };
-  return (
-    <Button variant="secondary" block disabled={start.isPending} onClick={() => void onStart()}>
-      Start quotation
-    </Button>
-  );
-};
 
 /**
  * The decision (spec §5.2): Ask for information is the one decision this slice has. After sending, the
@@ -89,19 +33,20 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const router = useCustomRouter();
   const send = useReturnRequest();
   const qc = useQueryClient();
-  const methods = useFormCustom<NoteForm>({ defaultValues: { note: '' } });
+  const methods = useFormCustom<NoteForm>({
+    resolver: zodResolver(noteSchema),
+    mode: 'onChange',
+    defaultValues: { note: '' },
+  });
   const note = useWatch({ control: methods.control, name: 'note' }) ?? '';
   /** A 409's sentence and the note that wasn't sent, kept after the refetch turns the panel read-only. */
   const [conflict, setConflict] = useState<{ sentence: string; unsent: string } | null>(null);
+  /** A send that got no answer: whether it landed is the refetch's to say, so this shows only while open. */
+  const [failure, setFailure] = useState<string | null>(null);
   /** A send in flight: a second click queued behind the first sends nothing. */
   const sending = useRef(false);
   const { request } = review;
   const state = noteState(note);
-
-  // A server refusal on the note is about the text that was sent: any change retires it.
-  useEffect(() => {
-    if (methods.getFieldState('note').error?.type === 'server') methods.clearErrors('note');
-  }, [note, methods]);
 
   const conflictCallout = conflict && (
     <Callout tone="bad" title={conflict.sentence}>
@@ -114,11 +59,14 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
     </Callout>
   );
 
-  if (request.status !== 'SUBMITTED' && request.status !== 'UNDER_REVIEW') {
+  if (!inReview(request.status)) {
     const chip = requestStatusChip(request.status);
     const returned = review.revisions[review.revisions.length - 1];
     return (
-      <Panel title="Waiting for the customer" extra={<Chip tone={chip.tone}>{chip.label}</Chip>}>
+      <Panel
+        title={request.status === 'INFO_REQUIRED' ? 'Waiting for the customer' : 'Not in review'}
+        extra={<Chip tone={chip.tone}>{chip.label}</Chip>}
+      >
         <div className="flex flex-col gap-4">
           {conflictCallout}
           {request.infoRequiredNote ? (
@@ -141,13 +89,14 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
     );
   }
 
-  const onSend = async () => {
-    if (sending.current || !state.ok) return;
+  const onSend = async ({ note: sent }: NoteForm) => {
+    if (sending.current) return;
     sending.current = true;
     setConflict(null);
+    setFailure(null);
     const next = afterReturn(review.queue?.nextId);
     try {
-      await send.mutateAsync({ id: request.id, note: note.trim() });
+      await send.mutateAsync({ id: request.id, note: sent });
       void message.success(`Returned ${request.code} to ${request.club}.`);
       methods.reset({ note: '' });
       if (next.to === 'request-review')
@@ -156,17 +105,21 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
         });
       else router.push(router.paths.get('requests'), { force: true });
     } catch (error) {
-      const data = (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data;
+      const response = (error as AxiosError<Partial<ApiError>> | undefined)?.response;
       const sentence = apiErrorMessage(
         error,
         "The request wasn't returned. Check your connection and try again.",
       );
-      if (data?.error === 'NOTE_REQUIRED' || data?.error === 'NOTE_TOO_LONG') {
+      if (response?.data?.error === 'NOTE_REQUIRED' || response?.data?.error === 'NOTE_TOO_LONG') {
         methods.setError('note', { type: 'server', message: sentence });
-      } else {
-        setConflict({ sentence, unsent: note.trim() });
-        void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(request.id) });
+        return;
       }
+      // Someone else decided first: the note certainly wasn't sent. Without an answer it may have been,
+      // so the refetched status says which: read-only if it landed, the note still here if not.
+      if (response?.status === 409) setConflict({ sentence, unsent: sent });
+      else setFailure(sentence);
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(request.id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
     } finally {
       sending.current = false;
     }
@@ -179,6 +132,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
           Ask the customer before quoting, or start the quotation.
         </p>
         {conflictCallout}
+        {failure && <Callout tone="bad" title={failure} />}
         <div className="flex flex-col gap-3 rounded-md border border-line-strong bg-raised p-4">
           <span className="type-label-m text-ink">Ask for information</span>
           <FormWrapper methods={methods} isSubmitting={send.isPending} layout="vertical">
@@ -193,7 +147,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
             variant="primary"
             trailingIcon="arrow-right"
             disabled={!state.ok || send.isPending}
-            onClick={() => void onSend()}
+            onClick={() => void methods.handleSubmit(onSend)()}
           >
             Send to customer
           </Button>

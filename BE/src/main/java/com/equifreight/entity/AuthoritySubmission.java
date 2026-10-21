@@ -3,15 +3,16 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.Getter;
+import lombok.Setter;
 
-/** The offline filing step the specialist records. */
+/**
+ * The offline filing step the specialist records.
+ */
 @Setter
 @Getter
 @Entity
@@ -40,26 +41,33 @@ public class AuthoritySubmission extends BaseEntity {
     @JoinColumn(name = "filed_by")
     private User filedBy;
 
-    /** "ref KH-IP-2026-3381". */
+    /**
+     * "ref KH-IP-2026-3381".
+     */
     @Column(length = 60)
     private String referenceNo;
 
-    /** SLA; "Overdue" is computed from it. */
+    /**
+     * SLA; "Overdue" is computed from it.
+     */
     private LocalDate expectedBy;
 
     private Instant issuedAt;
 
-    /** The permit or certificate, attached to the job. */
+    /**
+     * The permit or certificate, attached to the job.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "result_file_id")
     private StoredFile resultFile;
 
-    /** The documents the dossier carries. */
+    /**
+     * The documents the dossier carries.
+     */
     @ManyToMany
     @JoinTable(
             name = "authority_submission_items",
             joinColumns = @JoinColumn(name = "submission_id"),
-            inverseJoinColumns = @JoinColumn(name = "checklist_item_id")
-    )
+            inverseJoinColumns = @JoinColumn(name = "checklist_item_id"))
     private Set<ChecklistItem> checklistItems = new HashSet<>();
 }

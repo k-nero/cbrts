@@ -4,6 +4,8 @@ import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.User;
 import com.equifreight.model.file.FileResponse;
 import com.equifreight.service.FileService;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -12,9 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 /**
  * Upload a file, then attach it by id to the record it belongs to. Any signed-in user may upload;
@@ -31,7 +30,9 @@ public class FileController {
         this.fileService = fileService;
     }
 
-    /** PDF, JPEG, PNG or HEIC, at most 25 MB, sent as the multipart part {@code file}. */
+    /**
+     * PDF, JPEG, PNG or HEIC, at most 25 MB, sent as the multipart part {@code file}.
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public FileResponse upload(@RequestPart("file") MultipartFile file, @AuthenticationPrincipal User user) {
         return fileService.upload(file, user);
@@ -42,7 +43,9 @@ public class FileController {
         return fileService.get(id, user);
     }
 
-    /** The file's bytes. {@code inline=true} lets the browser show a PDF or photo instead of saving it. */
+    /**
+     * The file's bytes. {@code inline=true} lets the browser show a PDF or photo instead of saving it.
+     */
     @GetMapping("/{id}/content")
     public ResponseEntity<InputStreamResource> content(
             @PathVariable UUID id,

@@ -1,12 +1,11 @@
 package com.equifreight.model.clearance;
 
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegulationCatalogResponse {
@@ -14,4 +13,6 @@ public class RegulationCatalogResponse {
     private String countryCode;
     private String name;
     private RegulationVersionResponse activeVersion;
+    private RegulationVersionResponse draftVersion;
+    private java.util.List<RegulationVersionResponse> versions;
 }

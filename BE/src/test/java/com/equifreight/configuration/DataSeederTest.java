@@ -1,32 +1,22 @@
 package com.equifreight.configuration;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.Club;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
-import com.equifreight.repository.ClubRepository;
 import com.equifreight.repository.*;
-import com.equifreight.repository.HorseRepository;
-import com.equifreight.repository.HorseSizeClassRepository;
-import com.equifreight.repository.RoleRepository;
-import com.equifreight.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 class DataSeederTest {
 
@@ -35,6 +25,13 @@ class DataSeederTest {
     private HorseRepository horses;
     private DataSeeder seeder;
 
+    private static HorseSizeClass sizeClass(String code, String minHeightHh) {
+        HorseSizeClass sizeClass = new HorseSizeClass();
+        sizeClass.setCode(code);
+        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
+        return sizeClass;
+    }
+
     @BeforeEach
     void setUp() {
         RoleRepository roles = mock(RoleRepository.class);
@@ -42,14 +39,42 @@ class DataSeederTest {
         ClubRepository clubs = mock(ClubRepository.class);
         HorseSizeClassRepository sizeClasses = mock(HorseSizeClassRepository.class);
         horses = mock(HorseRepository.class);
-        seeder = new DataSeeder(roles, users, mock(PasswordEncoder.class), "changeme123!",
-                mock(CountryRepository.class), mock(PlaceRepository.class), mock(BorderCrossingRepository.class),
-                mock(CorridorRepository.class), clubs, sizeClasses, horses, mock(VehicleRepository.class),
-                mock(VehicleStallRepository.class), mock(RateCatalogVersionRepository.class),
-                mock(TransportRequestRepository.class), mock(QuotationRepository.class),
-                mock(TransportJobRepository.class), mock(LoadPlanRepository.class), mock(LoadPlanStallRepository.class),
-                mock(RoutePlanRepository.class), mock(RouteStopRepository.class), mock(RouteLegRepository.class),
-                mock(CrewAssignmentRepository.class), mock(CodeCounterRepository.class));
+        seeder = new DataSeeder(
+                roles,
+                users,
+                mock(PasswordEncoder.class),
+                "changeme123!",
+                mock(CountryRepository.class),
+                mock(PlaceRepository.class),
+                mock(BorderCrossingRepository.class),
+                mock(CorridorRepository.class),
+                clubs,
+                sizeClasses,
+                horses,
+                mock(VehicleRepository.class),
+                mock(VehicleStallRepository.class),
+                mock(RateCatalogVersionRepository.class),
+                mock(TransportRequestRepository.class),
+                mock(QuotationRepository.class),
+                mock(TransportJobRepository.class),
+                mock(LoadPlanRepository.class),
+                mock(LoadPlanStallRepository.class),
+                mock(RoutePlanRepository.class),
+                mock(RouteStopRepository.class),
+                mock(RouteLegRepository.class),
+                mock(CrewAssignmentRepository.class),
+                mock(CodeCounterRepository.class),
+                mock(RegulationCatalogRepository.class),
+                mock(RegulationVersionRepository.class),
+                mock(RegulationRuleRepository.class),
+                mock(DocumentTypeRepository.class),
+                mock(JobRegulationPinRepository.class),
+                mock(AuthorityRepository.class),
+                mock(AuthoritySubmissionRepository.class),
+                mock(QuarantinePeriodRepository.class),
+                mock(NoteRepository.class),
+                mock(NoteReplyRepository.class),
+                mock(CatalogSeeder.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);
@@ -59,8 +84,12 @@ class DataSeederTest {
         when(roles.findByName(anyString())).thenReturn(Optional.of(new Role()));
         when(users.getByEmail(anyString())).thenReturn(customer);
         when(clubs.findByBookingEmail("bookings@saigonturf.vn")).thenReturn(Optional.of(club));
-        when(sizeClasses.findAllByOrderByMinHeightHhAsc()).thenReturn(List.of(
-                sizeClass("S", "10.0"), sizeClass("M", "14.3"), sizeClass("L", "16.3"), sizeClass("XL", "17.3")));
+        when(sizeClasses.findAllByOrderByMinHeightHhAsc())
+                .thenReturn(List.of(
+                        sizeClass("S", "10.0"),
+                        sizeClass("M", "14.3"),
+                        sizeClass("L", "16.3"),
+                        sizeClass("XL", "17.3")));
         // A demo horse whose microchip was edited is no longer found by its seeded microchip.
         when(horses.findByMicrochip(anyString())).thenReturn(Optional.empty());
     }
@@ -81,12 +110,5 @@ class DataSeederTest {
         seeder.run(mock(ApplicationArguments.class));
 
         verify(horses, times(4)).save(any());
-    }
-
-    private static HorseSizeClass sizeClass(String code, String minHeightHh) {
-        HorseSizeClass sizeClass = new HorseSizeClass();
-        sizeClass.setCode(code);
-        sizeClass.setMinHeightHh(new BigDecimal(minHeightHh));
-        return sizeClass;
     }
 }

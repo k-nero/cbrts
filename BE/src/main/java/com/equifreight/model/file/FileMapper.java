@@ -12,7 +12,8 @@ public final class FileMapper {
                 .contentType(file.getContentType())
                 .sizeBytes(file.getSizeBytes())
                 .sha256(file.getSha256())
-                .uploadedById(file.getUploadedBy() != null ? file.getUploadedBy().getId() : null)
+                .uploadedById(
+                        file.getUploadedBy() != null ? file.getUploadedBy().getId() : null)
                 .uploadedAt(file.getCreatedAt())
                 .build();
     }
