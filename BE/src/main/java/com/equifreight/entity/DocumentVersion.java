@@ -2,11 +2,10 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.DocumentReview;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.time.LocalDate;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * An uploaded version of a checklist document. Append-only (BR-F2-05): a trigger allows only the one review
@@ -29,14 +28,18 @@ public class DocumentVersion extends BaseEntity {
     @JoinColumn(name = "file_id", nullable = false)
     private StoredFile file;
 
-    /** What the validity rule reads. */
+    /**
+     * What the validity rule reads.
+     */
     private LocalDate issuedOn;
 
     private LocalDate sampledOn;
 
     private LocalDate validUntil;
 
-    /** "PVI Insurance", "Dept. of Animal Health". */
+    /**
+     * "PVI Insurance", "Dept. of Animal Health".
+     */
     @Column(length = 120)
     private String issuer;
 
@@ -57,7 +60,9 @@ public class DocumentVersion extends BaseEntity {
 
     private Instant reviewedAt;
 
-    /** Required when REJECTED, visible to the customer (BR-F2-07). */
+    /**
+     * Required when REJECTED, visible to the customer (BR-F2-07).
+     */
     @Column(length = 500)
     private String rejectReason;
 }

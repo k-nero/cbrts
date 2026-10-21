@@ -1,11 +1,25 @@
 package com.equifreight.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.equifreight.entity.*;
-import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.SubmissionKind;
+import com.equifreight.entity.enums.SubmissionStatus;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.clearance.CreateAuthoritySubmissionRequest;
+import com.equifreight.model.clearance.CreateQuarantinePeriodRequest;
 import com.equifreight.model.clearance.UpdateAuthoritySubmissionRequest;
 import com.equifreight.repository.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,29 +28,41 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class AuthoritySubmissionServiceTest {
 
-    @Mock private AuthorityRepository authorityRepository;
-    @Mock private AuthoritySubmissionRepository submissionRepository;
-    @Mock private QuarantinePeriodRepository quarantinePeriodRepository;
-    @Mock private TransportJobRepository transportJobRepository;
-    @Mock private ChecklistItemRepository checklistItemRepository;
-    @Mock private PlaceRepository placeRepository;
-    @Mock private HorseRepository horseRepository;
-    @Mock private FileService fileService;
-    @Mock private AuditService auditService;
-    @Mock private ClearanceService clearanceService;
-    @Mock private NotificationService notificationService;
+    @Mock
+    private AuthorityRepository authorityRepository;
+
+    @Mock
+    private AuthoritySubmissionRepository submissionRepository;
+
+    @Mock
+    private QuarantinePeriodRepository quarantinePeriodRepository;
+
+    @Mock
+    private TransportJobRepository transportJobRepository;
+
+    @Mock
+    private ChecklistItemRepository checklistItemRepository;
+
+    @Mock
+    private PlaceRepository placeRepository;
+
+    @Mock
+    private HorseRepository horseRepository;
+
+    @Mock
+    private FileService fileService;
+
+    @Mock
+    private AuditService auditService;
+
+    @Mock
+    private ClearanceService clearanceService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private AuthoritySubmissionService service;
@@ -65,9 +91,10 @@ class AuthoritySubmissionServiceTest {
         when(authorityRepository.findById(customs.getId())).thenReturn(Optional.of(customs));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        CreateAuthoritySubmissionRequest request = new CreateAuthoritySubmissionRequest();
-        request.setAuthorityId(customs.getId());
-        request.setKind(SubmissionKind.IMPORT_PERMIT);
+        CreateAuthoritySubmissionRequest request = CreateAuthoritySubmissionRequest.builder()
+                .authorityId(customs.getId())
+                .kind(SubmissionKind.IMPORT_PERMIT)
+                .build();
 
         service.createSubmission(job.getId(), request, specialist);
 
@@ -88,10 +115,11 @@ class AuthoritySubmissionServiceTest {
         when(authorityRepository.findById(customs.getId())).thenReturn(Optional.of(customs));
         when(checklistItemRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
 
-        CreateAuthoritySubmissionRequest request = new CreateAuthoritySubmissionRequest();
-        request.setAuthorityId(customs.getId());
-        request.setKind(SubmissionKind.IMPORT_PERMIT);
-        request.setChecklistItemIds(List.of(foreign.getId()));
+        CreateAuthoritySubmissionRequest request = CreateAuthoritySubmissionRequest.builder()
+                .authorityId(customs.getId())
+                .kind(SubmissionKind.IMPORT_PERMIT)
+                .checklistItemIds(List.of(foreign.getId()))
+                .build();
 
         assertThrows(ConflictException.class, () -> service.createSubmission(job.getId(), request, specialist));
         verify(submissionRepository, never()).save(any());
@@ -110,13 +138,39 @@ class AuthoritySubmissionServiceTest {
         when(submissionRepository.findById(submission.getId())).thenReturn(Optional.of(submission));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAuthoritySubmissionRequest request = new UpdateAuthoritySubmissionRequest();
-        request.setStatus(SubmissionStatus.ADDITIONAL_INFO);
+        UpdateAuthoritySubmissionRequest request = UpdateAuthoritySubmissionRequest.builder()
+                .status(SubmissionStatus.ADDITIONAL_INFO)
+                .build();
 
         service.updateSubmission(submission.getId(), request, specialist);
 
         assertEquals(DossierStatus.CLEARANCE_READY, job.getDossierStatus(), "the service must not set it directly");
         verify(transportJobRepository, never()).save(any());
         verify(clearanceService).evaluateClearanceGate(job.getId());
+    }
+
+    @Test
+    @DisplayName("A quarantine shorter than the destination catalog's minimum is refused")
+    void quarantineShorterThanTheDestinationMinimumIsRefused() {
+        RegulationCatalog catalog = new RegulationCatalog();
+        catalog.setName("Cambodia import");
+        RegulationVersion destination = new RegulationVersion();
+        destination.setCatalog(catalog);
+        destination.setQuarantineMinDays((short) 7);
+        Place station = new Place();
+        station.setId(UUID.randomUUID());
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        when(clearanceService.destinationVersion(job.getId())).thenReturn(Optional.of(destination));
+
+        LocalDate start = LocalDate.of(2026, 10, 20);
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.createQuarantine(
+                        job.getId(),
+                        new CreateQuarantinePeriodRequest(null, station.getId(), start, start.plusDays(5)),
+                        specialist));
+        assertEquals("QUARANTINE_TOO_SHORT", ex.getCode());
+        verify(quarantinePeriodRepository, never()).save(any());
     }
 }

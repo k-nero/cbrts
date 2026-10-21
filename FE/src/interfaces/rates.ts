@@ -1,3 +1,4 @@
+import type { CatalogStatus } from './clearance';
 import type { HorseSex } from './horse';
 import type { TransportMode } from './job';
 import type { ServiceClass, TrailerType } from './request';
@@ -19,13 +20,6 @@ export type RateBasis = (typeof RateBasisEnum)[keyof typeof RateBasisEnum];
 
 export const RateCertaintyEnum = { FIXED: 'FIXED', ESTIMATED: 'ESTIMATED' } as const;
 export type RateCertainty = (typeof RateCertaintyEnum)[keyof typeof RateCertaintyEnum];
-
-export const CatalogStatusEnum = {
-  DRAFT: 'DRAFT',
-  PUBLISHED: 'PUBLISHED',
-  RETIRED: 'RETIRED',
-} as const;
-export type CatalogStatus = (typeof CatalogStatusEnum)[keyof typeof CatalogStatusEnum];
 
 export const RatePolicyKeyEnum = {
   FUEL_PCT: 'FUEL_PCT',

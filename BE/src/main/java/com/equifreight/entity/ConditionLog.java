@@ -2,14 +2,15 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.HorseCondition;
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Immutable;
 
-import java.util.HashSet;
-import java.util.Set;
-
-/** A horse's condition at a trip record. Append-only (trigger). */
+/**
+ * A horse's condition at a trip record. Append-only (trigger).
+ */
 @Setter
 @Getter
 @Entity
@@ -36,12 +37,13 @@ public class ConditionLog extends BaseEntity {
     @Column(length = 500)
     private String note;
 
-    /** Photos attached to this condition entry; the join table is append-only. */
+    /**
+     * Photos attached to this condition entry; the join table is append-only.
+     */
     @ManyToMany
     @JoinTable(
             name = "condition_log_files",
             joinColumns = @JoinColumn(name = "condition_log_id"),
-            inverseJoinColumns = @JoinColumn(name = "file_id")
-    )
+            inverseJoinColumns = @JoinColumn(name = "file_id"))
     private Set<StoredFile> files = new HashSet<>();
 }

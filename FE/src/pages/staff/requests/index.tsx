@@ -98,7 +98,7 @@ const RequestsPage: FC = () => {
         ),
       },
     ],
-    // `now` moves every render; the ages only need to be as fresh as the last render.
+    // `now` moves every render; the ages only need to be as fresh as the last fetch (every minute).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [query.dataUpdatedAt],
   );

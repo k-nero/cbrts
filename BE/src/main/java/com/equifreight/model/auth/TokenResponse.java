@@ -1,14 +1,6 @@
 package com.equifreight.model.auth;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Builder;
 
-@Getter
-@Setter
-@AllArgsConstructor
-public class TokenResponse {
-    private String accessToken;
-    private String refreshToken;
-}
-
+@Builder
+public record TokenResponse(String accessToken, String refreshToken) {}

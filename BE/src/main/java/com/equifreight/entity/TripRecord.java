@@ -3,14 +3,13 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.TripRecordKind;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.Immutable;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.Immutable;
 
 /**
  * The escort's log and the only source of positions. Append-only (trigger). A DEPARTED record is refused unless the
@@ -27,7 +26,9 @@ public class TripRecord extends BaseEntity {
     @JoinColumn(name = "job_id", nullable = false)
     private TransportJob job;
 
-    /** The checkpoint, if any. */
+    /**
+     * The checkpoint, if any.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_stop_id")
     private RouteStop routeStop;
@@ -36,15 +37,21 @@ public class TripRecord extends BaseEntity {
     @Column(nullable = false, length = 20)
     private TripRecordKind kind;
 
-    /** The cab's clock. */
+    /**
+     * The cab's clock.
+     */
     @Column(nullable = false)
     private Instant occurredAt;
 
-    /** The server's clock; the gap shows records sent late from the cab. */
+    /**
+     * The server's clock; the gap shows records sent late from the cab.
+     */
     @Column(nullable = false)
     private Instant receivedAt = Instant.now();
 
-    /** Generated on the tablet, so a record re-sent after a lost connection is stored once. */
+    /**
+     * Generated on the tablet, so a record re-sent after a lost connection is stored once.
+     */
     @Column(unique = true)
     private UUID clientRef;
 
@@ -52,7 +59,9 @@ public class TripRecord extends BaseEntity {
     @JoinColumn(name = "recorded_by")
     private User recordedBy;
 
-    /** CAB_TABLET or WEB. */
+    /**
+     * CAB_TABLET or WEB.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private Channel channel;

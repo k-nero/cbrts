@@ -3,13 +3,14 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.PaymentMethod;
 import com.equifreight.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-
-/** Recorded by hand by staff, like authority steps. Online card payment is not designed. */
+/**
+ * Recorded by hand by staff, like authority steps. Online card payment is not designed.
+ */
 @Setter
 @Getter
 @Entity

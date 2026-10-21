@@ -3,17 +3,14 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.UUID;
+import lombok.*;
 
-/** A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it. */
+/**
+ * A horse on a request, with a snapshot of the fields that price it, so later edits to the horse don't change it.
+ */
 @Setter
 @Getter
 @Entity
@@ -46,6 +43,10 @@ public class RequestHorse {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StallType requiredStall;
+
+    /** A mare travelling with a foal at foot, on this trip. */
+    @Column(nullable = false)
+    private boolean withFoal;
 
     @Getter
     @Setter

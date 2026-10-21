@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** "Cambodia import": one regulation catalog per country, versioned. */
+/**
+ * "Cambodia import": one regulation catalog per country, versioned.
+ */
 @Setter
 @Getter
 @Entity

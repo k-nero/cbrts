@@ -1,6 +1,10 @@
 package com.equifreight.entity.enums;
 
-/** {@code invoices.kind}. */
+/**
+ * {@code invoices.kind}.
+ */
 public enum InvoiceKind {
-    DEPOSIT, FINAL, CREDIT_NOTE
+    DEPOSIT,
+    FINAL,
+    CREDIT_NOTE
 }

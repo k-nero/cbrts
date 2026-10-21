@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { authApi, type RegisterRequest } from '@/apis/auth';
+import { authApi } from '@/apis/auth';
 import { queryKeys } from '@/constant/query';
 import type { User } from '@/interfaces';
 import { selectAccessToken, useAuthStore } from '@/stores/authStore';
+import { RegisterRequest } from '@/interfaces/auth.ts';
 
 /**
  * Loads the current user via `/me` and caches it in React Query. Skips the

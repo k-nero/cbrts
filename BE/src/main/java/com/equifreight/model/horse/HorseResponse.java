@@ -4,42 +4,34 @@ import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.Temperament;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import lombok.Builder;
 
-@Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class HorseResponse {
-    private UUID id;
-    private String name;
-    private HorseCoat coat;
-    private String breed;
-    private HorseSex sex;
-    private LocalDate dateOfBirth;
-    private BigDecimal heightHh;
-    private Short weightKg;
-    private SizeClassResponse sizeClass;
-    private String microchip;
-    private String passportNo;
-    private BigDecimal declaredValue;
-    private String valueCurrency;
-    private Temperament temperament;
-    private StallType requiredStall;
-    private String handlingNotes;
-    private Instant archivedAt;
-    /** Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request. */
-    private boolean identityLocked;
-    private Instant createdAt;
-    private Instant updatedAt;
-}
+public record HorseResponse(
+        UUID id,
+        String name,
+        HorseCoat coat,
+        String breed,
+        HorseSex sex,
+        LocalDate dateOfBirth,
+        BigDecimal heightHh,
+        Short weightKg,
+        SizeClassResponse sizeClass,
+        String microchip,
+        String passportNo,
+        BigDecimal declaredValue,
+        String valueCurrency,
+        Temperament temperament,
+        StallType requiredStall,
+        String handlingNotes,
+        Instant archivedAt,
+        /*
+         * Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request.
+         */
+        boolean identityLocked,
+        Instant createdAt,
+        Instant updatedAt) {}

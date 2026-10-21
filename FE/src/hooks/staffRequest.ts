@@ -12,12 +12,13 @@ import {
 import { queryKeys } from '@/constant/query';
 import type { QuotationDraft, RequestReview, ServiceClass } from '@/interfaces';
 
-/** One page of the review queue, oldest first. */
+/** One page of the review queue, oldest first, refetched every minute so the ages keep moving. */
 export const useReviewQueue = (page: number) =>
   useQuery({
     queryKey: queryKeys.staffRequests.queue(page),
     queryFn: () => getQueue(page),
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
   });
 
 export const useRequestReview = (id: string | undefined) =>
@@ -35,8 +36,12 @@ export const useReturnRequest = () => {
     mutationFn: ({ id, note }) => returnForInformation(id, note),
     onSuccess: (review, { id }) => {
       qc.setQueryData(queryKeys.staffRequests.one(id), review);
-      // Only the queue: the review was just set from the answer, so refetching it would be a wasted GET.
-      void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.queues() });
+      // The queue and every other cached review: their positions moved. Not this review: it was just set
+      // from the answer, so refetching it would be a wasted GET.
+      void qc.invalidateQueries({
+        queryKey: queryKeys.staffRequests.all(),
+        predicate: (q) => q.queryKey[1] !== id,
+      });
     },
   });
 };

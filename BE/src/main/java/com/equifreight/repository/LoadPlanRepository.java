@@ -3,19 +3,23 @@ package com.equifreight.repository;
 import com.equifreight.entity.LoadPlan;
 import com.equifreight.entity.enums.LoadPlanStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
+@Repository
 public interface LoadPlanRepository extends JpaRepository<LoadPlan, UUID> {
     List<LoadPlan> findByJobId(UUID jobId);
+
     Optional<LoadPlan> findByJobIdAndStatus(UUID jobId, LoadPlanStatus status);
+
     Optional<LoadPlan> findFirstByJobIdOrderByCreatedAtDesc(UUID jobId);
+
     Optional<LoadPlan> findTopByJob_IdAndStatusOrderByConfirmedAtDesc(UUID jobId, LoadPlanStatus status);
 
     /**

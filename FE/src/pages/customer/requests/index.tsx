@@ -192,6 +192,8 @@ const MyRequestsPage: FC = () => {
             columns={columns}
             dataSource={listQuery.data?.content ?? []}
             loading={listQuery.isPending || listQuery.isFetching}
+            onRefresh={() => void listQuery.refetch()}
+            refreshing={listQuery.isFetching && !listQuery.isPending}
             ignoreKeys={['actions']}
             pagination={{
               current: pageState.number + 1,

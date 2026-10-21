@@ -13,7 +13,9 @@ public final class RoleName {
 
     private RoleName() {}
 
-    /** The role as the UI writes it, e.g. "Fleet & route coordinator" (FE interfaces/enums.ts, ROLE_LABEL). */
+    /**
+     * The role as the UI writes it, e.g. "Fleet & route coordinator" (FE interfaces/enums.ts, ROLE_LABEL).
+     */
     public static String label(String name) {
         return switch (name) {
             case CUSTOMER -> "Customer";

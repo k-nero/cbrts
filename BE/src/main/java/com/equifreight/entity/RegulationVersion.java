@@ -2,14 +2,15 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CatalogStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
-/** Immutable once published; a job pins the versions its checklist was built from (BR-F2-01). */
+/**
+ * Immutable once published; a job pins the versions its checklist was built from (BR-F2-01).
+ */
 @Setter
 @Getter
 @Entity
@@ -33,9 +34,15 @@ public class RegulationVersion extends BaseEntity {
     @JoinColumn(name = "published_by")
     private User publishedBy;
 
-    /** 21 cross-border, 3 domestic (BR-F1-01). */
+    /**
+     * The cross-border lead time into this country: 21 days, Laos 30 in the demo (BR-F1-01).
+     */
     @Column(nullable = false)
     private short leadTimeDays;
+
+    /** The lead time for a move within this country: 3 days (BR-F1-01). */
+    @Column(nullable = false)
+    private short domesticLeadTimeDays = 3;
 
     @Column(nullable = false)
     private short quarantineMinDays;

@@ -6,7 +6,7 @@ import {
   checkTally,
   checkTone,
   departsWords,
-  historyWhen,
+  inReview,
   noteState,
   queueRoute,
   quotationAction,
@@ -14,6 +14,7 @@ import {
   reviewSubject,
   reviewSummary,
 } from './review';
+import { formatDayTime } from './time';
 
 import type { QueueRow, RequestReview, ReviewCheck, TransportRequest } from '@/interfaces';
 
@@ -143,8 +144,17 @@ describe('the review page', () => {
 
 describe('times in business time', () => {
   test('a history line at 18:30 UTC is already the next day in ICT', () => {
-    expect(historyWhen('2026-09-29T18:30:00Z')).toBe('30 Sep · 01:30');
-    expect(historyWhen('2026-09-28T02:41:00Z')).toBe('28 Sep · 09:41');
+    expect(formatDayTime('2026-09-29T18:30:00Z')).toBe('30 Sep, 01:30');
+    expect(formatDayTime('2026-09-28T02:41:00Z')).toBe('28 Sep, 09:41');
+  });
+});
+
+describe('in review', () => {
+  test('only a sent request waiting on the manager is in review', () => {
+    expect(inReview('SUBMITTED')).toBe(true);
+    expect(inReview('UNDER_REVIEW')).toBe(true);
+    expect(inReview('INFO_REQUIRED')).toBe(false);
+    expect(inReview('REJECTED')).toBe(false);
   });
 });
 
