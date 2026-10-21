@@ -8,8 +8,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * S, M, L, XL: the stall width one horse of the class takes. Seeded by V2; V16 adds the height bands
- * the server derives a horse's class from (HorseSizing).
+ * S, M, L, XL: the stall width one horse of the class takes, and the height bands the server derives a
+ * horse's class from (HorseSizing). Seeded by DataSeeder.
  */
 @Setter
 @Getter

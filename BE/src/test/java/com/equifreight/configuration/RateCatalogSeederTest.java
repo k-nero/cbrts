@@ -155,10 +155,10 @@ class RateCatalogSeederTest {
         ArgumentCaptor<List<RatePolicy>> seededPolicies = listCaptor();
         verify(policies).saveAll(seededPolicies.capture());
         assertThat(seededPolicies.getValue())
-                .extracting(p -> p.getId().getKey())
+                .extracting(p -> p.getKey())
                 .containsExactlyInAnyOrder(RatePolicyKey.values());
         assertThat(seededPolicies.getValue())
-                .filteredOn(p -> p.getId().getKey() == RatePolicyKey.ESTIMATE_BAND_PCT)
+                .filteredOn(p -> p.getKey() == RatePolicyKey.ESTIMATE_BAND_PCT)
                 .singleElement()
                 .satisfies(p -> assertThat(p.getValue()).isEqualByComparingTo("15"));
         verify(breaks).saveAll(anyList());

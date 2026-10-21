@@ -18,7 +18,7 @@ public class Authority extends BaseEntity {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code", nullable = false)
+    @JoinColumn(name = "country_id", nullable = false)
     private Country country;
 
     @Enumerated(EnumType.STRING)

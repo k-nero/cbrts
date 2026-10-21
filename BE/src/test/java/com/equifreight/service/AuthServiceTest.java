@@ -92,7 +92,7 @@ class AuthServiceTest {
         customer = new Role();
         customer.setName(RoleName.CUSTOMER);
 
-        when(countries.findById("VN")).thenReturn(Optional.of(vietnam));
+        when(countries.findByCode("VN")).thenReturn(Optional.of(vietnam));
         when(roles.findByName(RoleName.CUSTOMER)).thenReturn(Optional.of(customer));
         when(passwordEncoder.encode(any())).thenReturn("hashed");
         when(clubs.save(any(Club.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -150,7 +150,7 @@ class AuthServiceTest {
     @DisplayName("register refuses a country EquiFreight doesn't serve")
     void registerRefusesUnknownCountry() {
         RegisterRequest r = request().toBuilder().countryCode("FR").build();
-        when(countries.findById("FR")).thenReturn(Optional.empty());
+        when(countries.findByCode("FR")).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> service.register(r));
         verify(clubs, never()).save(any());

@@ -7,10 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.*;
 import org.hibernate.id.uuid.UuidVersion7Strategy;
 
 @Setter
@@ -22,6 +19,7 @@ public abstract class BaseEntity {
     @Id
     @UuidGenerator(algorithm = UuidVersion7Strategy.class)
     @Column(name = "id", nullable = false, updatable = false, unique = true)
+    @ColumnDefault("uuidv7()")
     private UUID id;
 
     @CreationTimestamp

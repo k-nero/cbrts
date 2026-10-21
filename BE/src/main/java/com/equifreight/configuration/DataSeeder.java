@@ -29,6 +29,53 @@ import org.springframework.transaction.annotation.Transactional;
 @Log4j2
 public class DataSeeder implements ApplicationRunner {
 
+    /**
+     * ISO 3166-1 alpha-2 code, name: the countries we serve.
+     */
+    private static final String[][] COUNTRIES = {
+        {"VN", "Vietnam"},
+        {"KH", "Cambodia"},
+        {"TH", "Thailand"},
+        {"LA", "Laos"},
+        {"MY", "Malaysia"},
+        {"HK", "Hong Kong"}
+    };
+
+    /**
+     * The stall width each class takes, and the height bands HorseSizing derives a horse's class from.
+     */
+    private static final List<SizeClass> SIZE_CLASSES = List.of(
+            new SizeClass("S", 32, "10.0"),
+            new SizeClass("M", 32, "14.3"),
+            new SizeClass("L", 48, "16.3"),
+            new SizeClass("XL", 96, "17.3"));
+
+    private static final List<DocType> DOCUMENT_TYPES = List.of(
+            new DocType("EQUINE_PASSPORT", "Equine passport", DocumentScope.PER_HORSE, DocumentProvider.CUSTOMER),
+            new DocType(
+                    "INFLUENZA_VACCINATION",
+                    "Equine influenza vaccination record",
+                    DocumentScope.PER_HORSE,
+                    DocumentProvider.CUSTOMER),
+            new DocType("EIA_TEST", "EIA (Coggins) test result", DocumentScope.PER_HORSE, DocumentProvider.CUSTOMER),
+            new DocType(
+                    "EXPORT_HEALTH_CERT",
+                    "Export health certificate",
+                    DocumentScope.PER_HORSE,
+                    DocumentProvider.AUTHORITY),
+            new DocType("PROOF_OF_OWNERSHIP", "Proof of ownership", DocumentScope.PER_HORSE, DocumentProvider.CUSTOMER),
+            new DocType("IMPORT_PERMIT", "Import permit", DocumentScope.PER_SHIPMENT, DocumentProvider.AUTHORITY),
+            new DocType(
+                    "TRANSIT_INSURANCE",
+                    "Transit insurance certificate",
+                    DocumentScope.PER_SHIPMENT,
+                    DocumentProvider.CUSTOMER),
+            new DocType(
+                    "CUSTOMS_VALUE_DECLARATION",
+                    "Customs value declaration",
+                    DocumentScope.PER_SHIPMENT,
+                    DocumentProvider.CUSTOMER));
+
     private static final String[][] ROLES = {
         {RoleName.CUSTOMER, "Racing club or horse owner"},
         {RoleName.LOGISTICS_MANAGER, "Reviews requests, issues quotations, owns escalations"},
@@ -221,6 +268,10 @@ public class DataSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(@NonNull ApplicationArguments args) {
+        // Reference data the rest of the seed (and the app itself) looks up by code.
+        seedCountries();
+        seedHorseSizeClasses();
+        seedDocumentTypes();
         seedRolesAndUsers();
         seedHorses(seedClub());
         seedPlacesAndCorridors();
@@ -232,6 +283,45 @@ public class DataSeeder implements ApplicationRunner {
         seedRegulations();
         seedAuthoritiesAndQuarantinePlaces();
         seedClearanceSubmissionsAndNotes();
+    }
+
+    private void seedCountries() {
+        for (String[] c : COUNTRIES) {
+            if (countryRepository.findByCode(c[0]).isEmpty()) {
+                Country country = new Country();
+                country.setCode(c[0]);
+                country.setName(c[1]);
+                countryRepository.save(country);
+                log.info("Seeded country {}", c[0]);
+            }
+        }
+    }
+
+    private void seedHorseSizeClasses() {
+        for (SizeClass s : SIZE_CLASSES) {
+            if (horseSizeClassRepository.findByCode(s.code()).isEmpty()) {
+                HorseSizeClass sizeClass = new HorseSizeClass();
+                sizeClass.setCode(s.code());
+                sizeClass.setWidthIn((short) s.widthIn());
+                sizeClass.setMinHeightHh(new BigDecimal(s.minHeightHh()));
+                horseSizeClassRepository.save(sizeClass);
+                log.info("Seeded horse size class {}", s.code());
+            }
+        }
+    }
+
+    private void seedDocumentTypes() {
+        for (DocType d : DOCUMENT_TYPES) {
+            if (!documentTypeRepository.existsByCode(d.code())) {
+                DocumentType type = new DocumentType();
+                type.setCode(d.code());
+                type.setName(d.name());
+                type.setScope(d.scope());
+                type.setProvidedBy(d.providedBy());
+                documentTypeRepository.save(type);
+                log.info("Seeded document type {}", d.code());
+            }
+        }
     }
 
     private void seedRolesAndUsers() {
@@ -267,7 +357,7 @@ public class DataSeeder implements ApplicationRunner {
             Club created = new Club();
             created.setName(CLUB_NAME);
             created.setBookingEmail(CLUB_EMAIL);
-            created.setCountry(countryRepository.getReferenceById("VN"));
+            created.setCountry(countryRepository.findByCode("VN").orElse(null));
             log.info("Seeded club {}", CLUB_NAME);
             return clubRepository.save(created);
         });
@@ -316,11 +406,11 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private void seedPlacesAndCorridors() {
-        Country vn = countryRepository.findById("VN").orElse(null);
-        Country kh = countryRepository.findById("KH").orElse(null);
-        Country th = countryRepository.findById("TH").orElse(null);
-        Country la = countryRepository.findById("LA").orElse(null);
-        Country my = countryRepository.findById("MY").orElse(null);
+        Country vn = countryRepository.findByCode("VN").orElse(null);
+        Country kh = countryRepository.findByCode("KH").orElse(null);
+        Country th = countryRepository.findByCode("TH").orElse(null);
+        Country la = countryRepository.findByCode("LA").orElse(null);
+        Country my = countryRepository.findByCode("MY").orElse(null);
         if (vn == null || kh == null) return;
 
         createPlaceIfAbsent(
@@ -459,7 +549,7 @@ public class DataSeeder implements ApplicationRunner {
             return;
         }
 
-        Country vn = countryRepository.findById("VN").orElse(null);
+        Country vn = countryRepository.findByCode("VN").orElse(null);
         if (vn == null) return;
 
         Club club = clubRepository.findByName("Saigon Turf Club").orElseGet(() -> {
@@ -703,8 +793,6 @@ public class DataSeeder implements ApplicationRunner {
         rh.setSex(horse.getSex());
         rh.setSizeClassCode(horse.getSizeClass().getCode());
         rh.setRequiredStall(horse.getRequiredStall());
-        rh.getId().setRequestId(req.getId());
-        rh.getId().setHorseId(horse.getId());
         req.getHorses().add(rh);
     }
 
@@ -755,8 +843,6 @@ public class DataSeeder implements ApplicationRunner {
         ca.setJob(job);
         ca.setUser(user);
         ca.setCrewRole(role);
-        ca.getId().setJobId(job.getId());
-        ca.getId().setUserId(user.getId());
         crewAssignmentRepository.save(ca);
     }
 
@@ -890,8 +976,6 @@ public class DataSeeder implements ApplicationRunner {
             pin.setJob(job);
             pin.setRegulationVersion(version);
             pin.setRole(RegulationRole.DESTINATION);
-            pin.getId().setJobId(job.getId());
-            pin.getId().setRegulationVersionId(version.getId());
             jobRegulationPinRepository.save(pin);
         });
     }
@@ -967,7 +1051,7 @@ public class DataSeeder implements ApplicationRunner {
         }
         Authority a = new Authority();
         a.setName(name);
-        a.setCountry(countryRepository.getReferenceById(countryCode));
+        a.setCountry(countryRepository.findByCode(countryCode).orElse(null));
         a.setKind(kind);
         a.setSlaDays(slaDays);
         authorityRepository.save(a);
@@ -981,7 +1065,7 @@ public class DataSeeder implements ApplicationRunner {
         p.setName(name);
         p.setKind(kind);
         p.setCity(city);
-        p.setCountry(countryRepository.getReferenceById(countryCode));
+        p.setCountry(countryRepository.findByCode(countryCode).orElse(null));
         p.setAddress(address);
         placeRepository.save(p);
     }
@@ -1086,13 +1170,15 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private void advanceCodeCounter(CodePrefix prefix, short year, int value) {
-        CodeCounter.Key key = new CodeCounter.Key(prefix, year);
-        CodeCounter counter = codeCounterRepository.findById(key).orElseGet(() -> {
-            CodeCounter c = new CodeCounter();
-            c.setId(key);
-            c.setLastValue(0);
-            return c;
-        });
+        CodeCounter counter = codeCounterRepository
+                .findByPrefixAndYear(prefix, year)
+                .orElseGet(() -> {
+                    CodeCounter c = new CodeCounter();
+                    c.setPrefix(prefix);
+                    c.setYear(year);
+                    c.setLastValue(0);
+                    return c;
+                });
         if (counter.getLastValue() < value) {
             counter.setLastValue(value);
             codeCounterRepository.save(counter);
@@ -1113,4 +1199,8 @@ public class DataSeeder implements ApplicationRunner {
             String microchip,
             String passportNo,
             String notes) {}
+
+    private record SizeClass(String code, int widthIn, String minHeightHh) {}
+
+    private record DocType(String code, String name, DocumentScope scope, DocumentProvider providedBy) {}
 }

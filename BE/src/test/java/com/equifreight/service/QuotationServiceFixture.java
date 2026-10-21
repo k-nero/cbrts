@@ -207,7 +207,8 @@ abstract class QuotationServiceFixture {
                 RatePolicyKey.QUOTE_VALIDITY_DAYS,
                 RatePolicyKey.DEPOSIT_PCT)) {
             RatePolicy p = new RatePolicy();
-            p.setId(new RatePolicy.Key(v.getId(), key));
+            p.setVersion(v);
+            p.setKey(key);
             p.setValue(
                     switch (key) {
                         case QUOTE_VALIDITY_DAYS -> new BigDecimal("7");
@@ -258,7 +259,8 @@ abstract class QuotationServiceFixture {
         road.setCertainty(RateCertainty.FIXED);
         List<RatePolicy> policies = new ArrayList<>(base.policies());
         RatePolicy window = new RatePolicy();
-        window.setId(new RatePolicy.Key(v.getId(), RatePolicyKey.ARRIVAL_WINDOW_PCT));
+        window.setVersion(v);
+        window.setKey(RatePolicyKey.ARRIVAL_WINDOW_PCT);
         window.setValue(new BigDecimal("20"));
         policies.add(window);
         List<RateLine> lines = new ArrayList<>(base.lines());

@@ -141,8 +141,8 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
     void noValidityOrDepositBlocksIssue() {
         CatalogRows rows = rows(v2, true);
         rows.policies()
-                .removeIf(p -> p.getId().getKey() == RatePolicyKey.QUOTE_VALIDITY_DAYS
-                        || p.getId().getKey() == RatePolicyKey.DEPOSIT_PCT);
+                .removeIf(p ->
+                        p.getKey() == RatePolicyKey.QUOTE_VALIDITY_DAYS || p.getKey() == RatePolicyKey.DEPOSIT_PCT);
         when(loader.load(v2.getId())).thenReturn(rows);
         startedWithIds();
 
@@ -265,7 +265,8 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
 
     RatePolicy policy(RatePolicyKey key, String value) {
         RatePolicy p = new RatePolicy();
-        p.setId(new RatePolicy.Key(v2.getId(), key));
+        p.setVersion(v2);
+        p.setKey(key);
         p.setValue(new BigDecimal(value));
         return p;
     }

@@ -23,6 +23,6 @@ public class Club extends BaseEntity {
     private String phone;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code")
+    @JoinColumn(name = "country_id")
     private Country country;
 }
