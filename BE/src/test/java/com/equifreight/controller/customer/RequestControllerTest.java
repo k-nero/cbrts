@@ -76,4 +76,20 @@ class RequestControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
     }
+
+    @Test
+    void theCustomerAsksForAnEstimate() throws Exception {
+        when(service.estimate(any(), any()))
+                .thenReturn(com.equifreight.model.estimate.EstimateMapper.notReady(
+                        com.equifreight.service.pricing.EstimateStatus.NOT_READY,
+                        "Choose the route and horses to see an estimate."));
+
+        mvc.perform(post("/api/v1/customer/requests/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NOT_READY"))
+                .andExpect(jsonPath("$.message").value("Choose the route and horses to see an estimate."))
+                .andExpect(jsonPath("$.options.mode").isArray());
+    }
 }

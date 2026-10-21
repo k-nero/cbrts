@@ -7,6 +7,7 @@ import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.route.RouteResponse;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,6 +41,9 @@ public record RequestResponse(
         ServiceClass airClass,
         InsuranceOption insurance,
         boolean vetEscort,
+        /** The range shown at the latest submission (US-Q-05); null for a draft or when there was none. */
+        BigDecimal estimateLow,
+        BigDecimal estimateHigh,
         RouteResponse route,
         LeadTimeResponse leadTime,
         List<Blocker> blockers,

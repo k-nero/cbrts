@@ -15,5 +15,7 @@ public enum RatePolicyKey {
     ARRIVAL_WINDOW_PCT,
     ARRIVAL_WINDOW_MIN_HOURS,
     LATE_PENALTY_PCT_PER_HOUR,
-    LATE_PENALTY_CAP_PCT
+    LATE_PENALTY_CAP_PCT,
+    /** The estimate's minimum half-width in percent; the band is never narrower than the ESTIMATED share (BR-Q-11). */
+    ESTIMATE_BAND_PCT
 }

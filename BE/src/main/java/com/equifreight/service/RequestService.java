@@ -21,6 +21,8 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.estimate.EstimateMapper;
+import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.LeadTimeResponse;
 import com.equifreight.model.request.RequestDraftRequest;
@@ -35,6 +37,8 @@ import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.pricing.EstimateResult;
+import com.equifreight.service.pricing.EstimateStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -84,6 +88,7 @@ public class RequestService {
     private final AuditLogRepository auditLogs;
     private final JsonMapper json;
     private final Clock clock;
+    private final RequestEstimator estimator;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -96,7 +101,8 @@ public class RequestService {
             AuditService audit,
             AuditLogRepository auditLogs,
             JsonMapper json,
-            Clock clock) {
+            Clock clock,
+            RequestEstimator estimator) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -108,6 +114,7 @@ public class RequestService {
         this.auditLogs = auditLogs;
         this.json = json;
         this.clock = clock;
+        this.estimator = estimator;
     }
 
     @Transactional(readOnly = true)
@@ -157,6 +164,37 @@ public class RequestService {
     }
 
     /**
+     * The customer's instant estimate (US-Q-05) for the wizard's current values. The body is checked and written
+     * onto a request that is never saved; a value the save would refuse answers why instead of a 400, so the
+     * wizard keeps working while the customer types (BR-Q-10: nothing is stored).
+     */
+    @Transactional(readOnly = true)
+    public EstimateResponse estimate(User user, RequestDraftRequest body) {
+        Club club = clubs.requireClub(user);
+        boolean noHorses = body.horses() == null || body.horses().isEmpty();
+        boolean noOrigin = body.originPlaceId() == null && clean(body.originText()) == null;
+        boolean noDestination = body.destinationPlaceId() == null && clean(body.destinationText()) == null;
+        if (noHorses || noOrigin || noDestination) {
+            return EstimateMapper.notReady(EstimateStatus.NOT_READY, "Choose the route and horses to see an estimate.");
+        }
+        Draft draft;
+        try {
+            draft = validate(club, body, Set.of());
+        } catch (BusinessException | ConflictException e) {
+            return EstimateMapper.notReady(EstimateStatus.UNAVAILABLE, e.getMessage());
+        }
+        TransportRequest request = new TransportRequest();
+        request.setClub(club);
+        request.setStatus(RequestStatus.DRAFT);
+        RouteResolution resolution = write(request, draft);
+        if (resolution.corridor() == null && resolution.modesRun().isEmpty()) {
+            return EstimateMapper.notReady(
+                    EstimateStatus.NOT_RUN, "We don't run this route yet, so there's no estimate.");
+        }
+        return EstimateMapper.toResponse(estimator.estimate(request, resolution));
+    }
+
+    /**
      * R-07, in one transaction with the request row locked, so a double click can't issue two codes: re-run
      * the blockers, refresh the horse snapshots, issue the REQ code, set SUBMITTED, and keep revision 1 and the
      * audit trail (BR-F1-08).
@@ -194,6 +232,11 @@ public class RequestService {
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
+        // The range shown at this submission is kept to compare the quotation against; never a quotation itself.
+        EstimateResult estimate = estimator.rangeFor(request);
+        boolean ranged = estimate.status() == EstimateStatus.READY;
+        request.setEstimateLow(ranged ? estimate.low() : null);
+        request.setEstimateHigh(ranged ? estimate.high() : null);
         Instant now = Instant.now(clock);
         if (!resubmission) {
             request.setCode(codes.next(CodePrefix.REQ, today.getYear()));

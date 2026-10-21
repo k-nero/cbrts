@@ -198,4 +198,13 @@ class PricingInputsTest {
 
         assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).distanceKm()).isNull();
     }
+
+    @Test
+    void aWindowRequestPricesTheWindow() {
+        TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).arrivalWindow()).isFalse();
+
+        r.setArrivalMode(com.equifreight.entity.enums.ArrivalMode.WINDOW);
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).arrivalWindow()).isTrue();
+    }
 }

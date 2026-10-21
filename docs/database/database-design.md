@@ -221,6 +221,7 @@ erDiagram
 | `ARRIVAL_WINDOW_MIN_HOURS` | 3 | |
 | `LATE_PENALTY_PCT_PER_HOUR` | 10 | Of the job total, per started hour after the window closes. |
 | `LATE_PENALTY_CAP_PCT` | 30 | |
+| `ESTIMATE_BAND_PCT` | 15 | The customer estimate's minimum half-width; the band is never narrower than the share of ESTIMATED lines (BR-Q-11). |
 
 **`rate_fee_bands`**: `version_id`, `kind` (`CANCELLATION`, `SHORT_NOTICE`), `min_days`, `max_days null`, `value numeric(6,3)`.
 - Cancellation (value is the fee %): more than 30 days → 10, 15–30 → 25, 7–14 → 50, under 7 → 100.

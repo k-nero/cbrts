@@ -8,6 +8,7 @@ public record PricedTotals(
         BigDecimal pricedLines,
         BigDecimal subtotal,
         BigDecimal volumeBreak,
+        BigDecimal arrivalWindow,
         BigDecimal fuel,
         BigDecimal insurance,
         BigDecimal contingency,
