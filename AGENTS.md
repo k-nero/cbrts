@@ -81,6 +81,8 @@ Where to look in the frontend (`FE/src/`):
 - **Staff menu:** `components/menu/StaffMenu`.
 - **Data:** `apis/crudFactory.ts` (`makeCrudApi`) and `hooks/crud.ts` (`useCrudResource`, `useReadOnlyResource`). Add a domain file next to `apis/user.ts` and `hooks/user.ts` rather than calling axios from a page.
 - **Helpers:** `lib/utils` (time, number, file, path, rbac, error) and `constant/`. Check them before writing a formatter or date helper.
+  - General-purpose utilities (debounce, throttle, deep equality, cloning, grouping, picking, sorting by key and the like) come from `lodash-es`, with named imports: `import { debounce, isEqual } from 'lodash-es'`. Use `lodash-es`, not `lodash`, so the bundle keeps only what is imported. `lib/utils` holds what is specific to EquiFreight (its wording, formats and rules), built on lodash where a general utility is needed.
+  - Replace a hand-written general-purpose helper with its lodash equivalent when you touch it.
 - **Page templates:** `pages/staff/users` (a list with an add/edit modal), `pages/staff/jobs` (a list whose rows open a detail page with tabs) and `pages/customer/home` (a composed customer page). See "Frontend pages" below.
 
 Where to look elsewhere:
@@ -154,8 +156,10 @@ Where to look elsewhere:
   - `hooks/`: TanStack Query hooks per domain.
   - `interfaces/`: types and enums.
   - `router/route.config.ts`: every page with its roles and a route `name`. Navigate with `useCustomRouter().paths.get('<name>')`, never a literal path.
+- **One component per file.** A `.tsx` file holds one component, named like the file (`SentPanel.tsx` exports `SentPanel`). A second component is allowed only when it is declared inside another component's body. Sibling panels, cards, tables, modals and form fields each get their own file in the page's folder, and what they share (option lists, a column helper, a refusal helper) goes in a plain `.ts` module beside them, such as `editorOptions.ts`. An older file that holds several components is split when you next change it.
 - **Enums** are split into a value and a type: `export const XEnum = { ... } as const;` plus `export type X = (typeof XEnum)[keyof typeof XEnum];`. Use `XEnum.FOO` for values and `z.enum(XEnum)` in Zod schemas.
 - **Forms** use React Hook Form and Zod through `components/form` (`FormWrapper`, `FormField`, `fields/*`). Put conditional rules in `.superRefine`.
+  - Zod schemas live in a `schema.ts` beside the form, never in a component file. It exports each schema with its `z.infer` type (`noteSchema` and `NoteForm`), and a folder with several forms keeps all of their schemas in that one file, along with field lists a schema is built from (`rates/schema.ts` holds `POLICY_FIELDS`).
 - **UI components.** Build pages from the design-system components in `components/ui` (`import { … } from '@/components/ui'`) before reaching for Ant Design. Ant Design is for forms, tables, menus and overlays.
   - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button. A native `<button>` belongs only inside a `components/ui` component, never in a page.
   - Tokens live in `src/index.css`: `@theme` is Dark, `[data-theme='light']` is Light. Light is the default theme.
@@ -262,7 +266,9 @@ Where to look elsewhere:
 - Don't present demo figures as real data.
 - Don't write code comments, UI text, commit messages or docs in any language other than English.
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
+- Don't hand-write a general-purpose utility (debounce, throttle, deep equality, grouping) that `lodash-es` already has.
 - Don't build a control out of plain HTML (`<button>`, `<input>`, `<select>`, `<table>`, CSS tabs, `<div>` overlays) in a page, or lay out a list page differently from `pages/staff/users` and `pages/staff/jobs`.
 - Don't re-create a Figma component that `components/ui` already has, or write plain HTML where an Ant Design component does the job.
+- Don't put two sibling components in one file, or a Zod schema in a component file.
 - Don't draw a page's own loading text, spinner, error or offline state; the table, `Skeleton` and the error boundary own those.
 - Don't start or finish a UI change without comparing it with its Figma frame, or open a UI pull request without the frame's name and a screenshot of the result.

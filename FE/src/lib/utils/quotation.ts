@@ -11,13 +11,16 @@ import type { AxiosError } from 'axios';
 import { formatDay } from './horse';
 import { SERVICE_CLASS_LABELS, serviceParts } from './request';
 
-/** "$16,800.00": every money figure on the builder and the Rates page, in the figure's own currency. */
-export const money = (amount: number, currency = 'USD'): string =>
+/**
+ * "$16,800.00": every money figure on the builder and the Rates page, in the figure's own currency.
+ * Whole-dollar figures, such as the customer's estimate, pass 0 decimals: "$31,900".
+ */
+export const money = (amount: number, currency = 'USD', decimals = 2): string =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(amount);
 
 /** A missing amount (a line with no rate, a total that can't be worked out) reads as a dash. */

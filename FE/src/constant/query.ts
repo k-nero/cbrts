@@ -17,6 +17,8 @@ export const queryKeys = {
     /** The list pages (useCrudResource keys them [resource, 'page', params]). */
     pages: () => ['requests', 'page'] as const,
     one: (id: string) => ['requests', id] as const,
+    /** The instant estimate for one set of wizard values. */
+    estimate: (input: unknown) => ['requests', 'estimate', input] as const,
     /** The corridors between two places. */
     routes: (from: string, to: string) => ['routes', 'pair', from, to] as const,
     /** The corridors touching one place's city (the alternatives on a route we don't run). */

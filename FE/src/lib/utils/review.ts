@@ -61,6 +61,8 @@ export const reviewSummary = (r: TransportRequest & { club: string }): string =>
 /** What reviewRows reads, so a version sent before a field existed still renders. */
 const BLANK: TransportRequest = {
   id: '',
+  estimateLow: null,
+  estimateHigh: null,
   code: null,
   status: 'SUBMITTED',
   createdAt: '',
