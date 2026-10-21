@@ -764,4 +764,13 @@ class RateCatalogServiceWriteTest {
         order.verify(versions).lockByStatus(CatalogStatus.PUBLISHED);
         order.verify(versions).findByStatus(CatalogStatus.DRAFT);
     }
+
+    @Test
+    void theEstimateBandIsAPercentage() {
+        assertRefused(
+                () -> service.putPolicies(
+                        lan, Map.of(RatePolicyKey.ESTIMATE_BAND_PCT, new BigDecimal("101")), pnhHkg.getId()),
+                "ESTIMATE_BAND_PCT",
+                "Estimate band must be between 0 and 100%.");
+    }
 }

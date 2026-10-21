@@ -167,7 +167,8 @@ class RateCatalogServiceTest {
                 RatePolicyKey.FUEL_PCT,
                 RatePolicyKey.INSURANCE_PCT,
                 RatePolicyKey.CONTINGENCY_PCT,
-                RatePolicyKey.SERVICE_FEE_PCT)) {
+                RatePolicyKey.SERVICE_FEE_PCT,
+                RatePolicyKey.ESTIMATE_BAND_PCT)) {
             RatePolicy p = new RatePolicy();
             p.setId(new RatePolicy.Key(v.getId(), key));
             p.setValue(BigDecimal.TEN);

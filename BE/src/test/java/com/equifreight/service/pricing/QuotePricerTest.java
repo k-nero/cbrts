@@ -13,6 +13,7 @@ import static com.equifreight.service.pricing.PricingFixtures.pnhHkgRates;
 import static com.equifreight.service.pricing.PricingFixtures.rates;
 import static com.equifreight.service.pricing.PricingFixtures.road;
 import static com.equifreight.service.pricing.PricingFixtures.sexLine;
+import static com.equifreight.service.pricing.PricingFixtures.withWindow;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.equifreight.entity.enums.HorseSex;
@@ -78,7 +79,8 @@ class QuotePricerTest {
                 in.insurance(),
                 true,
                 in.quarantineDays(),
-                in.horses());
+                in.horses(),
+                in.arrivalWindow());
     }
 
     private static PricingInput withDays(PricingInput in, Integer days) {
@@ -95,7 +97,8 @@ class QuotePricerTest {
                 in.insurance(),
                 in.vetEscort(),
                 days,
-                in.horses());
+                in.horses(),
+                in.arrivalWindow());
     }
 
     private static PricingInput withInsurance(PricingInput in, InsuranceOption insurance) {
@@ -112,7 +115,8 @@ class QuotePricerTest {
                 insurance,
                 in.vetEscort(),
                 in.quarantineDays(),
-                in.horses());
+                in.horses(),
+                in.arrivalWindow());
     }
 
     @Test
@@ -390,7 +394,8 @@ class QuotePricerTest {
                 InsuranceOption.EQUIFREIGHT,
                 true,
                 30,
-                seven);
+                seven,
+                false);
 
         PricedQuote refused = QuotePricer.price(in, rates(List.of(), pnhHkgLines()));
         PricingInput first = new PricingInput(
@@ -406,7 +411,8 @@ class QuotePricerTest {
                 InsuranceOption.EQUIFREIGHT,
                 true,
                 30,
-                seven);
+                seven,
+                false);
         PricedQuote priced = QuotePricer.price(first, pnhHkgRates());
 
         for (PricedQuote quote : List.of(refused, priced)) {
@@ -453,7 +459,8 @@ class QuotePricerTest {
                 InsuranceOption.EQUIFREIGHT,
                 false,
                 14,
-                pnhHkgBusiness().horses());
+                pnhHkgBusiness().horses(),
+                false);
 
         PricedQuote quote = QuotePricer.price(in, rates(List.of(), pnhHkgLines()));
 
@@ -491,5 +498,83 @@ class QuotePricerTest {
         assertThat(find(quote, "Road freight")).isNull();
         assertThat(quote.missing()).extracting(MissingRate::description).contains("Corridor distance");
         assertThat(quote.totals().total()).isNull();
+    }
+
+    // --- arrival window (US-Q-05 slice) ------------------------------------------------------------------
+
+    private static PricingInput privateWindowMove() {
+        return withWindow(
+                road(TrailerType.PRIVATE, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"))));
+    }
+
+    private static RateSet privateRoadRates() {
+        return roadRates(kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400"));
+    }
+
+    @Test
+    void aPrivateRoadMoveWithAWindowPaysTheSurchargeOnGroundLines() {
+        PricedQuote quote = QuotePricer.price(privateWindowMove(), privateRoadRates());
+
+        TotalRow window = row(quote, "ARRIVAL_WINDOW");
+        assertThat(window).isNotNull();
+        assertThat(window.label()).isEqualTo("Arrival window");
+        // Road freight 700 km x $3.60 = $2,520.00 is the only ground line; one horse has no break.
+        assertThat(window.amount()).isEqualByComparingTo("504.00");
+        assertThat(window.baseText()).isEqualTo("20% of ground lines (A, C, G) after the volume break · $2,520.00");
+        assertThat(quote.totals().arrivalWindow()).isEqualByComparingTo("504.00");
+        assertThat(quote.totals().rows())
+                .extracting(TotalRow::key)
+                .containsExactly("ARRIVAL_WINDOW", "CONTINGENCY", "SERVICE_FEE");
+    }
+
+    @Test
+    void theSurchargeIsInTheContingencyAndServiceFeeBases() {
+        PricedQuote quote = QuotePricer.price(privateWindowMove(), privateRoadRates());
+
+        // Groom $480 + isolation 7 d x $70 = $490 + freight $2,520 = $3,490; plus the $504 surcharge.
+        assertThat(row(quote, "CONTINGENCY").baseText()).isEqualTo("5% of $3,994.00");
+        assertThat(quote.totals().total())
+                .isEqualByComparingTo(new java.math.BigDecimal("3994")
+                        .add(new java.math.BigDecimal("199.70"))
+                        .add(new java.math.BigDecimal("503.24")));
+    }
+
+    @Test
+    void noSurchargeWithoutAWindowOnASharedLoadOrByAir() {
+        PricingInput noWindow =
+                road(TrailerType.PRIVATE, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+        assertThat(row(QuotePricer.price(noWindow, privateRoadRates()), "ARRIVAL_WINDOW"))
+                .isNull();
+
+        PricingInput shared = withWindow(
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"))));
+        RateSet sharedRates =
+                roadRates(kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"));
+        assertThat(row(QuotePricer.price(shared, sharedRates), "ARRIVAL_WINDOW"))
+                .isNull();
+
+        PricedQuote air = QuotePricer.price(withWindow(pnhHkgBusiness()), pnhHkgRates());
+        assertThat(row(air, "ARRIVAL_WINDOW")).isNull();
+        assertThat(air.totals().arrivalWindow()).isNull();
+    }
+
+    @Test
+    void aWindowWithoutItsPolicyIsMissing() {
+        java.util.Map<com.equifreight.entity.enums.RatePolicyKey, java.math.BigDecimal> policies =
+                new java.util.EnumMap<>(PricingFixtures.standardPolicies());
+        policies.remove(com.equifreight.entity.enums.RatePolicyKey.ARRIVAL_WINDOW_PCT);
+        RateSet base = privateRoadRates();
+        RateSet noPolicy = new RateSet(base.versionNo(), base.classes(), base.lines(), base.breaks(), policies);
+
+        PricedQuote quote = QuotePricer.price(privateWindowMove(), noPolicy);
+
+        assertThat(quote.missing())
+                .contains(new MissingRate(
+                        null, "Arrival window surcharge", "Rate catalog v2 has no arrival window surcharge value."));
+        assertThat(quote.totals().total()).isNull();
+
+        PricingInput noWindow =
+                road(TrailerType.PRIVATE, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+        assertThat(QuotePricer.price(noWindow, noPolicy).missing()).isEmpty();
     }
 }

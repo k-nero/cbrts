@@ -157,6 +157,10 @@ class RateCatalogSeederTest {
         assertThat(seededPolicies.getValue())
                 .extracting(p -> p.getId().getKey())
                 .containsExactlyInAnyOrder(RatePolicyKey.values());
+        assertThat(seededPolicies.getValue())
+                .filteredOn(p -> p.getId().getKey() == RatePolicyKey.ESTIMATE_BAND_PCT)
+                .singleElement()
+                .satisfies(p -> assertThat(p.getValue()).isEqualByComparingTo("15"));
         verify(breaks).saveAll(anyList());
         verify(feeBands).saveAll(anyList());
     }

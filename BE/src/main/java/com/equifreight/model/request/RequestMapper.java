@@ -54,6 +54,8 @@ public final class RequestMapper {
                 .airClass(r.getAirClass())
                 .insurance(r.getInsurance())
                 .vetEscort(r.isVetEscort())
+                .estimateLow(r.getEstimateLow())
+                .estimateHigh(r.getEstimateHigh())
                 .route(route)
                 .leadTime(leadTime)
                 .blockers(blockers)
