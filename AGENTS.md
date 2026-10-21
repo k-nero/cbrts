@@ -154,8 +154,10 @@ Where to look elsewhere:
   - `hooks/`: TanStack Query hooks per domain.
   - `interfaces/`: types and enums.
   - `router/route.config.ts`: every page with its roles and a route `name`. Navigate with `useCustomRouter().paths.get('<name>')`, never a literal path.
+- **One component per file.** A `.tsx` file holds one component, named like the file (`SentPanel.tsx` exports `SentPanel`). A second component is allowed only when it is declared inside another component's body. Sibling panels, cards, tables, modals and form fields each get their own file in the page's folder, and what they share (option lists, a column helper, a refusal helper) goes in a plain `.ts` module beside them, such as `editorOptions.ts`. An older file that holds several components is split when you next change it.
 - **Enums** are split into a value and a type: `export const XEnum = { ... } as const;` plus `export type X = (typeof XEnum)[keyof typeof XEnum];`. Use `XEnum.FOO` for values and `z.enum(XEnum)` in Zod schemas.
 - **Forms** use React Hook Form and Zod through `components/form` (`FormWrapper`, `FormField`, `fields/*`). Put conditional rules in `.superRefine`.
+  - Zod schemas live in a `schema.ts` beside the form, never in a component file. It exports each schema with its `z.infer` type (`noteSchema` and `NoteForm`), and a folder with several forms keeps all of their schemas in that one file, along with field lists a schema is built from (`rates/schema.ts` holds `POLICY_FIELDS`).
 - **UI components.** Build pages from the design-system components in `components/ui` (`import { … } from '@/components/ui'`) before reaching for Ant Design. Ant Design is for forms, tables, menus and overlays.
   - Don't style an AntD `<Button>` with Tailwind; its runtime CSS overrides Tailwind classes. Use the `ui` Button. A native `<button>` belongs only inside a `components/ui` component, never in a page.
   - Tokens live in `src/index.css`: `@theme` is Dark, `[data-theme='light']` is Light. Light is the default theme.
@@ -264,5 +266,6 @@ Where to look elsewhere:
 - Don't create a new component, hook, helper or pattern when an existing one does the job or can be extended to.
 - Don't build a control out of plain HTML (`<button>`, `<input>`, `<select>`, `<table>`, CSS tabs, `<div>` overlays) in a page, or lay out a list page differently from `pages/staff/users` and `pages/staff/jobs`.
 - Don't re-create a Figma component that `components/ui` already has, or write plain HTML where an Ant Design component does the job.
+- Don't put two sibling components in one file, or a Zod schema in a component file.
 - Don't draw a page's own loading text, spinner, error or offline state; the table, `Skeleton` and the error boundary own those.
 - Don't start or finish a UI change without comparing it with its Figma frame, or open a UI pull request without the frame's name and a screenshot of the result.
