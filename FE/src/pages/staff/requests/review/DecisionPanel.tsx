@@ -7,6 +7,7 @@ import type { AxiosError } from 'axios';
 
 import { afterReturn } from './afterReturn';
 import { NoteField } from './NoteField';
+import { QuotationAction } from './QuotationAction';
 import { type NoteForm, noteSchema } from './schema';
 
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -82,6 +83,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               This request isn&apos;t waiting for review.
             </p>
           )}
+          <QuotationAction review={review} />
         </div>
       </Panel>
     );
@@ -127,7 +129,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
     <Panel title="Your decision">
       <div className="flex flex-col gap-4">
         <p className="type-body-s m-0 text-ink-2">
-          Ask the customer before quoting, or wait for the quotation step.
+          Ask the customer before quoting, or start the quotation.
         </p>
         {conflictCallout}
         {failure && <Callout tone="bad" title={failure} />}
@@ -150,11 +152,10 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
             Send to customer
           </Button>
         </div>
-        <div className="flex flex-col gap-1 border-t border-line pt-4">
+        <div className="flex flex-col gap-2 border-t border-line pt-4">
           <span className="type-label-s text-ink-2">Other outcomes</span>
-          <p className="type-body-s m-0 text-ink-3">
-            Start quotation and Reject come with the quotation and approval steps.
-          </p>
+          <QuotationAction review={review} />
+          <p className="type-body-s m-0 text-ink-3">Reject comes with the approval step.</p>
         </div>
       </div>
     </Panel>

@@ -12,3 +12,5 @@ export * from './audit';
 export * from './horse';
 export * from './request';
 export * from './staffRequest';
+export * from './rates';
+export * from './quotation';

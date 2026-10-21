@@ -29,6 +29,15 @@ export const queryKeys = {
     queues: () => ['staff-requests', 'queue'] as const,
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
+    quotation: (id: string) => ['staff-requests', id, 'quotation'] as const,
+  },
+  rates: {
+    all: () => ['rates'] as const,
+    catalog: () => ['rates', 'catalog'] as const,
+    /** Every corridor's view of one version: policies, global bands and shared lines appear in all of them. */
+    versionViews: (versionId: string) => ['rates', 'view', versionId] as const,
+    view: (versionId: string, corridorId: string) =>
+      ['rates', 'view', versionId, corridorId] as const,
   },
   audit: {
     all: () => ['admin-audit-log'] as const,
@@ -54,12 +63,6 @@ export const queryKeys = {
     catalogs: () => ['regulations', 'catalogs'] as const,
     version: (id: string) => ['regulations', 'version', id] as const,
     documentTypes: () => ['regulations', 'document-types'] as const,
-  },
-  rates: {
-    all: () => ['rates'] as const,
-    corridors: () => ['rates', 'corridors'] as const,
-    details: (corridorId?: string, versionId?: string) =>
-      ['rates', 'details', corridorId ?? '', versionId ?? ''] as const,
   },
   trips: {
     /** Every trip list, for invalidation after a record is saved. */
