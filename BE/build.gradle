@@ -15,7 +15,7 @@ description = 'Cross-Border Racehorse Transport System (CBRTS) API'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of((project.findProperty('javaVersion') ?: 25) as int)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
