@@ -127,10 +127,16 @@ Where to look elsewhere:
 - **Records belong to someone.** Customer endpoints (`/api/v1/customer/**`) only read or change records of the signed-in user's club; check ownership in the service and answer 404 for anyone else's record. Never trust an id in the path to belong to the caller.
 - **Mirror the database's rules.** When `database-design.md` puts a rule in a check constraint or trigger (append-only versions, one review decision, required reasons), the service enforces the same rule first, with a clear message. Never write code that relies on the database to reject it, and never contradict it.
 - **Validate, then write.** Check every rule before saving anything; don't save a change and throw afterwards.
-- **One writer per status.** Each derived status has one place that sets it, and everything else asks that place to re-evaluate instead of writing the column:
+- **A repository returns its own entity.** `XRepository` returns `X`, a projection of `X`'s rows, or plain values (ids, codes, counts). A query may join other tables to answer a question about its own rows (`RequestHorseRepository.findSubmittedRequestCodes`), but it never returns another entity: a user's club comes from `ClubRepository`, not `UserRepository`.
+- **Only the owning area writes an aggregate.** A root entity (`TransportRequest`, `Quotation`, `TransportJob`, `ChecklistItem`, …) and its children are changed and saved only by that area's service.
+  - Another service may read the root's repository, but to change it, it calls a method on the owning service, such as `TransportJobService` for a job.
+  - Children (`QuotationLine`, `RequestRevision`, `RouteStop`, …) are saved through their root or in the root's service, never from another area.
+- **One writer per status.** Each status has one method that changes it. That method checks the current status allows the move and refuses the rest with a clear message, and every other service calls it instead of setting the column:
+  - `transport_requests.status`: the request's own service moves it (submitted, under review, quoted, info required, expired); quotation and review services ask it to.
   - `transport_jobs.dossier_status` and `clearance_ready_at`: only `ClearanceService.evaluateClearanceGate`, which also leaves a departed job alone.
   - The job stage moves to `TRIP` only when the departure is recorded (`TripService`), never at planning or sign-off.
-  - A change to a plan that was signed off (route, load or crew) clears the sign-off.
+  - A change to a plan that was signed off (route, load or crew) clears the sign-off, through one method in the job's service rather than in each planning service.
+- **Scheduled jobs only find and trigger.** A class in `job/` finds the rows that are due and calls one service method per row. The rules, status changes, audit entries and notifications live in that service method, so a person's action and the job run the same code.
 - **Transactions.**
   - A read-only transaction (`@Transactional(readOnly = true)`) and a `GET` endpoint never create data; a missing record is created by an explicit `POST`.
   - Hibernate flushes inserts before deletes. To replace rows covered by a unique constraint in one transaction, delete them with a bulk `@Modifying @Query` (it runs at once), not `deleteAll(entities)` or a derived `deleteBy…`.
@@ -258,6 +264,7 @@ Where to look elsewhere:
 - Don't give a role a permission its story doesn't, or let a customer reach another club's records.
 - Don't save first and validate after, or skip the audit entry for a decision.
 - Don't write a status another service owns (the dossier status, the trip stage), or create data from a `GET` or a read-only transaction.
+- Don't return another entity from a repository, save an aggregate from outside its area, or put business rules in a scheduled job.
 - Don't inject Jackson 2's `ObjectMapper`, or attach a file without `FileService.requireAttachable`.
 - Don't default a missing business date to `now()`.
 - Don't count calendar days in UTC.
