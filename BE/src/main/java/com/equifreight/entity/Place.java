@@ -22,7 +22,7 @@ public class Place extends BaseEntity {
     private String city;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "country_code", nullable = false)
+    @JoinColumn(name = "country_id", nullable = false)
     private Country country;
 
     @Column(length = 300)

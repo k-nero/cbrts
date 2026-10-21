@@ -11,7 +11,7 @@ type Props = { entry: AuditEntry; onClose: () => void };
 
 /**
  * One entry opened beside the table (DESIGN.md, Audit log): the action, the stamp, what changed
- * as before → after, the reason as written, the linked record and the entry number.
+ * as before → after, the reason as written, the linked record, and the entry number.
  */
 const AuditEntryPanel: FC<Props> = ({ entry, onClose }) => {
   const router = useCustomRouter();

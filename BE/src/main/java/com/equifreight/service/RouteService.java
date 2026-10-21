@@ -143,7 +143,7 @@ public class RouteService {
     private Described describeFrom(Corridor corridor, Place origin, Place destination) {
         boolean reversed = isReversed(corridor, origin);
         List<CorridorCrossing> ordered = new ArrayList<>(corridor.getCrossings());
-        ordered.sort(Comparator.comparingInt(cc -> cc.getId().getSeq()));
+        ordered.sort(Comparator.comparingInt(CorridorCrossing::getSeq));
         if (reversed) {
             Collections.reverse(ordered);
         }

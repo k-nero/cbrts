@@ -62,7 +62,7 @@ public record CatalogRows(
 
     public Map<RatePolicyKey, BigDecimal> policyMap() {
         Map<RatePolicyKey, BigDecimal> map = new EnumMap<>(RatePolicyKey.class);
-        policies.forEach(p -> map.put(p.getId().getKey(), p.getValue()));
+        policies.forEach(p -> map.put(p.getKey(), p.getValue()));
         return map;
     }
 

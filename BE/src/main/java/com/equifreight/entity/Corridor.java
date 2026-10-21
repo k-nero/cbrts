@@ -39,6 +39,6 @@ public class Corridor extends BaseEntity {
     private short dateFlexDays = 3;
 
     @OneToMany(mappedBy = "corridor", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("id.seq")
+    @OrderBy("seq")
     private List<CorridorCrossing> crossings = new ArrayList<>();
 }

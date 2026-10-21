@@ -19,7 +19,7 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 /**
  * Picks the {@link FileStorage} from {@code app.storage.type} when the app starts. This is a plain
  * branch, not {@code @ConditionalOnProperty}: with Spring AOT (the Docker image) conditions are fixed
- * at build time, so a conditional bean would ignore STORAGE_TYPE at runtime.
+ * at build time, so a conditional bean would ignore an app.storage.type set at runtime.
  *
  * <p>Neither store connects to anything here, so the app (and the AOT cache training run in the
  * Dockerfile) starts without the store being reachable.

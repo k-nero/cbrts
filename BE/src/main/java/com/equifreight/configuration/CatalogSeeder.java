@@ -201,7 +201,7 @@ public class CatalogSeeder {
         for (int i = 0; i < demo.crossings().size(); i++) {
             String name = demo.crossings().get(i);
             CorridorCrossing link = new CorridorCrossing();
-            link.getId().setSeq((short) (i + 1));
+            link.setSeq((short) (i + 1));
             link.setCorridor(corridor);
             link.setBorderCrossing(crossingsByName.get(name));
             corridor.getCrossings().add(link);
@@ -235,6 +235,8 @@ public class CatalogSeeder {
     }
 
     private Country country(String code) {
-        return countries.getReferenceById(code);
+        return countries
+                .findByCode(code)
+                .orElseThrow(() -> new IllegalStateException("Country " + code + " is not seeded."));
     }
 }

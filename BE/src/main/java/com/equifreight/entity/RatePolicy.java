@@ -2,10 +2,9 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RatePolicyKey;
 import jakarta.persistence.*;
-import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.UUID;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * One value per key and catalog version (fuel %, deposit %, quote validity days, …).
@@ -13,31 +12,22 @@ import lombok.*;
 @Setter
 @Getter
 @Entity
-@Table(name = "rate_policies")
-public class RatePolicy {
+@Table(
+        name = "rate_policies",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "rate_policies_version_id_key_key",
+                        columnNames = {"version_id", "key"}))
+public class RatePolicy extends BaseEntity {
 
-    @EmbeddedId
-    private Key id = new Key();
-
-    @MapsId("versionId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "version_id")
+    @JoinColumn(name = "version_id", nullable = false)
     private RateCatalogVersion version;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "key", nullable = false, length = 40)
+    private RatePolicyKey key;
 
     @Column(nullable = false, precision = 14, scale = 3)
     private BigDecimal value;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    @Embeddable
-    public static class Key implements Serializable {
-        private UUID versionId;
-
-        @Enumerated(EnumType.STRING)
-        @Column(name = "key", length = 40)
-        private RatePolicyKey key;
-    }
 }

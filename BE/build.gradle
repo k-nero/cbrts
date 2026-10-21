@@ -1,3 +1,11 @@
+// The Flyway Gradle plugin runs on the build script's classpath, not the app's: since Flyway 10 it needs the
+// PostgreSQL module here too, or every flyway* task fails with "No Flyway database plugin found".
+buildscript {
+    dependencies {
+        classpath 'org.flywaydb:flyway-database-postgresql:13.10.3'
+    }
+}
+
 plugins {
     id 'java'
     id 'war'
@@ -7,6 +15,7 @@ plugins {
     id 'org.springframework.boot.aot' version '4.1.1'
     // Format check that runs the same from any IDE: ./gradlew spotlessApply, ./gradlew spotlessCheck
     id 'com.diffplug.spotless' version '8.10.4'
+    id 'org.flywaydb.flyway' version '13.10.3'
 }
 
 group = 'com.equifreight'
@@ -57,6 +66,20 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Local schema tasks: ./gradlew flywayInfo, flywayMigrate, and flywayClean then flywayMigrate to reset a dev database.
+// Same connection as the app's dev profile, overridden the same way: SPRING_DATASOURCE_URL, _USERNAME, _PASSWORD.
+def devProfile = new Properties()
+file('src/main/resources/application-dev.properties').withInputStream { devProfile.load(it) }
+flyway {
+    url = System.getenv('SPRING_DATASOURCE_URL') ?: devProfile['spring.datasource.url']
+    user = System.getenv('SPRING_DATASOURCE_USERNAME') ?: devProfile['spring.datasource.username']
+    password = System.getenv('SPRING_DATASOURCE_PASSWORD') ?: devProfile['spring.datasource.password']
+    schemas = ['public']
+    locations = ['filesystem:src/main/resources/db/migration']
+    // Flyway 10+ refuses clean by default. These tasks only ever point at a developer's own database.
+    cleanDisabled = false
 }
 
 spotless {
