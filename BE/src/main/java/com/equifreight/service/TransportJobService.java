@@ -33,6 +33,7 @@ public class TransportJobService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final ClearanceService clearanceService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -43,7 +44,8 @@ public class TransportJobService {
             RoutePlanRepository routePlanRepository,
             CrewAssignmentRepository crewAssignmentRepository,
             ClearanceService clearanceService,
-            AuditService auditService) {
+            AuditService auditService,
+            NotificationService notificationService) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -53,6 +55,7 @@ public class TransportJobService {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.clearanceService = clearanceService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -210,6 +213,9 @@ public class TransportJobService {
             }
         }
 
+        boolean previouslySignedOff = job.getTripStatus() != com.equifreight.entity.enums.TripStatus.NOT_STARTED
+                || auditService.hasAction("TRANSPORT_JOB", job.getId(), "SIGN_OFF_TRIP_PLAN");
+
         // The stage stays where it is: recording the departure moves the job to TRIP (TripService).
         job.setSignedOffAt(Instant.now());
         job.setSignedOffBy(currentUser);
@@ -223,8 +229,20 @@ public class TransportJobService {
                 job.getId(),
                 job.getCode(),
                 null,
-                "NOT_SIGNED_OFF",
+                previouslySignedOff ? "SIGNED_OFF" : "NOT_SIGNED_OFF",
                 "SIGNED_OFF");
+
+        String notifTitle =
+                previouslySignedOff ? "Trip plan updated: " + job.getCode() : "Trip plan signed off: " + job.getCode();
+        String notifBody = previouslySignedOff
+                ? "The trip plan for job " + job.getCode()
+                        + " has been updated and re-signed off. Please re-check the route and stall assignments."
+                : "The trip plan for job " + job.getCode() + " has been signed off and released.";
+
+        for (CrewAssignment member : crewAssignments) {
+            notificationService.sendNotification(
+                    member.getUser(), "TRIP_RELEASED", notifTitle, notifBody, "TRANSPORT_JOB", job.getId());
+        }
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);

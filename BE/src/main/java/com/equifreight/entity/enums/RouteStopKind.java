@@ -10,5 +10,6 @@ public enum RouteStopKind {
     DELIVERY,
     AIRPORT_OUT,
     AIRPORT_IN,
-    QUARANTINE
+    QUARANTINE,
+    REFUELLING
 }

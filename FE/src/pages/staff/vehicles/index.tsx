@@ -185,15 +185,15 @@ export default function VehiclesPage() {
                   <div className="flex items-center gap-3 pt-2">
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-standard" />
-                      <span className="type-caption text-ink-3">{standardCount} Std</span>
+                      <span className="type-caption text-ink-3">{standardCount} Std (32″)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-box" />
-                      <span className="type-caption text-ink-3">{boxCount} Box</span>
+                      <span className="type-caption text-ink-3">{boxCount} Box (96″)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-xs bg-stall-climate" />
-                      <span className="type-caption text-ink-3">{climateCount} Climate</span>
+                      <span className="type-caption text-ink-3">{climateCount} Climate (48″)</span>
                     </div>
                   </div>
                 </div>

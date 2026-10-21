@@ -288,7 +288,7 @@ public class LoadPlanService {
         // 3. Nervous horses away from ramp
         // 4. Mares away from stallions
         Set<VehicleStall> availableStalls = new HashSet<>(stalls);
-        Map<Horse, VehicleStall> solution = solveArrangement(horses, availableStalls);
+        Map<Horse, VehicleStall> solution = solveArrangement(horses, availableStalls, getHorsesWithFoal(plan.getJob()));
 
         if (solution == null) {
             throw new BusinessException("Could not automatically find a placement satisfying all welfare rules");
@@ -409,6 +409,7 @@ public class LoadPlanService {
             LoadPlan plan, List<LoadPlanStall> assignments, List<Horse> allHorses) {
         List<LoadPlanConflictResponse> conflicts = new ArrayList<>();
         Vehicle vehicle = plan.getVehicle();
+        Set<UUID> maresWithFoal = getHorsesWithFoal(plan.getJob());
 
         int totalWeight = 0;
         for (LoadPlanStall lps : assignments) {
@@ -418,14 +419,32 @@ public class LoadPlanService {
                 totalWeight += h.getWeightKg();
             }
 
-            // Rule 1: Box stall requirement (stallion or aggressive horse)
-            boolean needsBox = (h.getSex() == HorseSex.STALLION
-                    || h.getSex() == HorseSex.COLT
-                    || h.getTemperament() == Temperament.AGGRESSIVE
-                    || h.getRequiredStall() == StallType.BOX);
-            if (needsBox && s.getStallType() != StallType.BOX) {
+            // Rule 1: Box stall requirement
+            if (requiresBox(h, maresWithFoal) && s.getStallType() != StallType.BOX) {
+                String reason;
+                if (maresWithFoal.contains(h.getId())) {
+                    reason = "A mare with foal at foot takes a full box";
+                } else if (h.getSex() == HorseSex.STALLION || h.getSex() == HorseSex.COLT) {
+                    reason = "Needs a box stall (stallion)";
+                } else if (h.getTemperament() == Temperament.AGGRESSIVE) {
+                    reason = "Needs a box stall (aggressive horse)";
+                } else if (h.getRequiredStall() == StallType.BOX) {
+                    reason = "Needs a box stall (customer requested a box stall)";
+                } else {
+                    reason = "Needs a box stall";
+                }
+                conflicts.add(JobMapper.toConflictResponse(h, s, "BOX_REQUIRED", reason));
+            }
+
+            // Rule 1b: Horse width requirement vs stall width (US-F3-05)
+            if (h.getSizeClass() != null
+                    && h.getSizeClass().getWidthIn() > s.getStallType().getWidthIn()) {
                 conflicts.add(JobMapper.toConflictResponse(
-                        h, s, "BOX_REQUIRED", "Needs a box stall (stallion or aggressive horse)"));
+                        h,
+                        s,
+                        "WIDTH_EXCEEDED",
+                        "Horse width (" + h.getSizeClass().getWidthIn() + " in) exceeds stall width ("
+                                + s.getStallType().getWidthIn() + " in)"));
             }
 
             // Rule 2: Climate stall requirement
@@ -531,17 +550,59 @@ public class LoadPlanService {
         return Collections.emptyList();
     }
 
-    private Map<Horse, VehicleStall> solveArrangement(List<Horse> horses, Set<VehicleStall> availableStalls) {
+    private boolean requiresBox(Horse horse, Set<UUID> maresWithFoal) {
+        return maresWithFoal.contains(horse.getId())
+                || horse.getSex() == HorseSex.STALLION
+                || horse.getSex() == HorseSex.COLT
+                || horse.getTemperament() == Temperament.AGGRESSIVE
+                || horse.getRequiredStall() == StallType.BOX;
+    }
+
+    private boolean fitsStall(Horse horse, VehicleStall stall, Set<UUID> maresWithFoal) {
+        if (requiresBox(horse, maresWithFoal) && stall.getStallType() != StallType.BOX) {
+            return false;
+        }
+        if (horse.getSizeClass() != null
+                && horse.getSizeClass().getWidthIn() > stall.getStallType().getWidthIn()) {
+            return false;
+        }
+        if (horse.getRequiredStall() == StallType.CLIMATE && stall.getStallType() != StallType.CLIMATE) {
+            return false;
+        }
+        if (horse.getTemperament() == Temperament.NERVOUS && stall.isNearRamp()) {
+            return false;
+        }
+        return true;
+    }
+
+    private Set<UUID> getHorsesWithFoal(TransportJob job) {
+        Set<UUID> mares = new HashSet<>();
+        if (job != null && job.getRequest() != null && job.getRequest().getHorses() != null) {
+            for (RequestHorse rh : job.getRequest().getHorses()) {
+                if (rh.isWithFoal() && rh.getHorse() != null) {
+                    mares.add(rh.getHorse().getId());
+                }
+            }
+        }
+        return mares;
+    }
+
+    private Map<Horse, VehicleStall> solveArrangement(
+            List<Horse> horses, Set<VehicleStall> availableStalls, Set<UUID> maresWithFoal) {
         // Backtracking solver to find a 0-conflict placement
         Map<Horse, VehicleStall> assignment = new HashMap<>();
-        if (solveRecursive(0, horses, new ArrayList<>(availableStalls), assignment)) {
+        if (solveRecursive(0, horses, new ArrayList<>(availableStalls), assignment, maresWithFoal)) {
             return assignment;
         }
         return null;
     }
 
     private boolean solveRecursive(
-            int index, List<Horse> horses, List<VehicleStall> stalls, Map<Horse, VehicleStall> current) {
+            int index,
+            List<Horse> horses,
+            List<VehicleStall> stalls,
+            Map<Horse, VehicleStall> current,
+            Set<UUID> maresWithFoal) {
         if (index == horses.size()) {
             return true;
         }
@@ -555,17 +616,7 @@ public class LoadPlanService {
             }
 
             // Check hard constraints for this candidate stall:
-            boolean needsBox = (horse.getSex() == HorseSex.STALLION
-                    || horse.getSex() == HorseSex.COLT
-                    || horse.getTemperament() == Temperament.AGGRESSIVE
-                    || horse.getRequiredStall() == StallType.BOX);
-            if (needsBox && stall.getStallType() != StallType.BOX) {
-                continue;
-            }
-            if (horse.getRequiredStall() == StallType.CLIMATE && stall.getStallType() != StallType.CLIMATE) {
-                continue;
-            }
-            if (horse.getTemperament() == Temperament.NERVOUS && stall.isNearRamp()) {
+            if (!fitsStall(horse, stall, maresWithFoal)) {
                 continue;
             }
 
@@ -599,7 +650,7 @@ public class LoadPlanService {
             }
 
             current.put(horse, stall);
-            if (solveRecursive(index + 1, horses, stalls, current)) {
+            if (solveRecursive(index + 1, horses, stalls, current, maresWithFoal)) {
                 return true;
             }
             current.remove(horse);

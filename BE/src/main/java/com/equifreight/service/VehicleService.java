@@ -7,11 +7,18 @@ import com.equifreight.entity.VehicleStall;
 import com.equifreight.entity.enums.BookingKind;
 import com.equifreight.entity.enums.StallSide;
 import com.equifreight.entity.enums.StallType;
+import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
-import com.equifreight.model.fleet.*;
+import com.equifreight.model.fleet.CreateVehicleRequest;
+import com.equifreight.model.fleet.CreateVehicleStallRequest;
+import com.equifreight.model.fleet.FleetMapper;
+import com.equifreight.model.fleet.UpdateVehicleRequest;
+import com.equifreight.model.fleet.VehicleBookingRequest;
+import com.equifreight.model.fleet.VehicleBookingResponse;
+import com.equifreight.model.fleet.VehicleResponse;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import com.equifreight.repository.VehicleRepository;
@@ -181,7 +188,14 @@ public class VehicleService {
 
     @Transactional(readOnly = true)
     public List<VehicleBookingResponse> getFleetCalendar(Instant rangeStart, Instant rangeEnd) {
+        return getFleetCalendar(rangeStart, rangeEnd, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehicleBookingResponse> getFleetCalendar(
+            Instant rangeStart, Instant rangeEnd, VehicleKind vehicleKind) {
         return vehicleBookingRepository.findInDateRange(rangeStart, rangeEnd).stream()
+                .filter(b -> vehicleKind == null || b.getVehicle().getKind() == vehicleKind)
                 .map(FleetMapper::toBookingResponse)
                 .toList();
     }
