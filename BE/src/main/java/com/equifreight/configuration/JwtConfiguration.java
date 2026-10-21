@@ -35,7 +35,8 @@ public class JwtConfiguration {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(ALGORITHM).build();
+        NimbusJwtDecoder decoder =
+                NimbusJwtDecoder.withSecretKey(key).macAlgorithm(ALGORITHM).build();
         // One server issues and checks the tokens, so no clock skew: expired means expired.
         decoder.setJwtValidator(new JwtTimestampValidator(Duration.ZERO));
         return decoder;

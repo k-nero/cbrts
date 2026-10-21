@@ -7,4 +7,4 @@ import lombok.Builder;
 
 @Builder
 public record VehicleStallResponse(
-        UUID id, short positionNo, StallType stallType, short rowNo, StallSide side, boolean nearRamp) {}
+        UUID id, short positionNo, StallType stallType, short rowNo, StallSide side, boolean nearRamp, short widthIn) {}

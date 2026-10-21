@@ -382,14 +382,16 @@ export const shortDay = (day: string): string => {
   return `${d} ${MONTHS[m - 1]}`;
 };
 
-const TRAILER_WORDS: Record<TrailerType, string> = {
-  SHARED: 'shared load',
-  PRIVATE: 'private trailer',
+/** "Shared load": a trailer type as a label (option lists, table cells). */
+export const TRAILER_LABELS: Record<TrailerType, string> = {
+  SHARED: 'Shared load',
+  PRIVATE: 'Private trailer',
 };
-const CLASS_WORDS: Record<ServiceClass, string> = {
-  ECONOMY: 'economy class',
-  BUSINESS: 'business class',
-  FIRST: 'first class',
+/** "Economy": a service class as a label (option lists, table cells). */
+export const SERVICE_CLASS_LABELS: Record<ServiceClass, string> = {
+  ECONOMY: 'Economy',
+  BUSINESS: 'Business',
+  FIRST: 'First',
 };
 
 /** "Road · shared load", "Air · business class". */
@@ -413,8 +415,11 @@ export const serviceParts = (
   airClass: ServiceClass | null,
 ): { mode: string; detail: string | null } =>
   mode === 'AIR'
-    ? { mode: 'Air', detail: airClass ? CLASS_WORDS[airClass] : null }
-    : { mode: 'Road', detail: trailer ? TRAILER_WORDS[trailer] : null };
+    ? {
+        mode: 'Air',
+        detail: airClass ? `${SERVICE_CLASS_LABELS[airClass].toLowerCase()} class` : null,
+      }
+    : { mode: 'Road', detail: trailer ? TRAILER_LABELS[trailer].toLowerCase() : null };
 
 /** A window always books road and a private trailer (toDraftInput sends them). */
 const effectiveService = (v: WizardValues) =>

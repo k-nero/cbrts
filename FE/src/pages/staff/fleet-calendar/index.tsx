@@ -1,12 +1,37 @@
 import { useState } from 'react';
 import { Chip, Icon, Panel } from '@/components/ui';
 import { useFleetCalendar, useVehicles } from '@/hooks/useVehicle';
+import { type VehicleKind, VehicleKindEnum } from '@/interfaces';
 
 export default function FleetCalendarPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('ALL');
+  const [selectedKind, setSelectedKind] = useState<VehicleKind | 'ALL'>('ALL');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  let fromIso: string | undefined;
+  let toIso: string | undefined;
+
+  if (startDate && endDate) {
+    fromIso = new Date(`${startDate}T00:00:00`).toISOString();
+    toIso = new Date(`${endDate}T23:59:59.999`).toISOString();
+  } else if (startDate) {
+    const start = new Date(`${startDate}T00:00:00`);
+    fromIso = start.toISOString();
+    const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+    end.setHours(23, 59, 59, 999);
+    toIso = end.toISOString();
+  } else if (endDate) {
+    const end = new Date(`${endDate}T23:59:59.999`);
+    toIso = end.toISOString();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    start.setHours(0, 0, 0, 0);
+    fromIso = start.toISOString();
+  }
+  const kindParam = selectedKind !== 'ALL' ? selectedKind : undefined;
 
   const { data: vehiclesData } = useVehicles();
-  const { data: bookings, isLoading } = useFleetCalendar();
+  const { data: bookings, isLoading } = useFleetCalendar(fromIso, toIso, kindParam);
 
   const vehicles = vehiclesData?.content ?? [];
   const allBookings = bookings ?? [];
@@ -27,21 +52,59 @@ export default function FleetCalendarPage() {
           </p>
         </div>
 
-        {/* Vehicle filter */}
-        <div className="flex items-center gap-2">
-          <span className="type-label-s text-ink-3">Vehicle:</span>
-          <select
-            value={selectedVehicleId}
-            onChange={(e) => setSelectedVehicleId(e.target.value)}
-            className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
-          >
-            <option value="ALL">All vehicles</option>
-            {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.code} ({v.kind.toLowerCase()})
-              </option>
-            ))}
-          </select>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="type-label-s text-ink-3">Type:</span>
+            <select
+              value={selectedKind}
+              onChange={(e) => setSelectedKind(e.target.value as VehicleKind | 'ALL')}
+              className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
+            >
+              <option value="ALL">All types</option>
+              {Object.values(VehicleKindEnum).map((k) => (
+                <option key={k} value={k}>
+                  {k === 'TRAILER' ? 'Trailer' : 'Rigid Truck'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="type-label-s text-ink-3">Vehicle:</span>
+            <select
+              value={selectedVehicleId}
+              onChange={(e) => setSelectedVehicleId(e.target.value)}
+              className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
+            >
+              <option value="ALL">All vehicles</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.code} ({v.kind.toLowerCase()})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="type-label-s text-ink-3">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="type-label-s text-ink-3">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
+            />
+          </div>
         </div>
       </div>
 

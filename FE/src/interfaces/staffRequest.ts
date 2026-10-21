@@ -1,4 +1,5 @@
 import type { TransportMode } from './job';
+import type { QuotationRef } from './quotation';
 import type { TransportRequest } from './request';
 
 /** One row of the logistics manager's review queue (US-F1-03, GET /staff/requests). */
@@ -58,4 +59,6 @@ export interface RequestReview {
   revisions: ReviewRevision[];
   history: HistoryEntry[];
   queue: QueuePosition | null;
+  /** The request's quotation once started; null before. */
+  quotation: QuotationRef | null;
 }

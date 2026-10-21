@@ -123,7 +123,9 @@ public class TripService {
     @Transactional(readOnly = true)
     public TripViewResponse escortTrip(String code, User user) {
         TransportJob job = job(code);
-        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId())) throw ResourceNotFoundException.of("Trip", code);
+        boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
+        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId()) || !released)
+            throw ResourceNotFoundException.of("Trip", code);
         return view(job);
     }
 
@@ -144,7 +146,9 @@ public class TripService {
     @Transactional
     public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request) {
         TransportJob job = jobForUpdate(code);
-        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId())) throw ResourceNotFoundException.of("Trip", code);
+        boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
+        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId()) || !released)
+            throw ResourceNotFoundException.of("Trip", code);
         return addRecord(job, user, request, Channel.CAB_TABLET);
     }
 

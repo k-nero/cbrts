@@ -3,6 +3,7 @@ import { reviewRows, serviceParts, shortDay } from './request';
 
 import type { Tone } from '@/components/ui/tone';
 import type {
+  QuotationRef,
   QueuePosition,
   QueueRow,
   RequestReview,
@@ -118,4 +119,16 @@ export const noteState = (note: string): { length: number; ok: boolean; count: s
 export const reviewSubject = (review: RequestReview): RequestReview['request'] => {
   const latest = review.revisions[review.revisions.length - 1];
   return latest ? { ...asSent(latest.payload), club: review.request.club } : review.request;
+};
+
+/**
+ * The quotation button on the decision panel: start one while the request is in review, open the one
+ * started whatever the request's status (the builder reads it in any status), else none.
+ */
+export const quotationAction = (
+  status: RequestStatus,
+  quotation: QuotationRef | null,
+): 'start' | 'open' | null => {
+  if (quotation) return 'open';
+  return status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'start' : null;
 };
