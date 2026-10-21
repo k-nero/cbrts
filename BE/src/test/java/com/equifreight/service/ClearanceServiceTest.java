@@ -37,9 +37,6 @@ class ClearanceServiceTest {
     private DocumentVersionRepository documentVersionRepository;
 
     @Mock
-    private JobRegulationPinRepository pins;
-
-    @Mock
     private TransportJobRepository transportJobRepository;
 
     @Mock
