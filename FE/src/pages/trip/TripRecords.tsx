@@ -1,17 +1,11 @@
 import { useMemo } from 'react';
-import { Chip, Panel } from '@/components/ui';
-import { useFileBlobUrl } from '@/hooks/file';
-import type { TripPhoto, TripView } from '@/interfaces';
-import { conditionTone, eventLabels, formatTime, sentence } from './trip-utils';
 
-export function Photo({ photo }: { photo: TripPhoto }) {
-  const image = useFileBlobUrl(photo.id);
-  return image.url ? (
-    <a href={image.url} target="_blank" rel="noreferrer">
-      <img src={image.url} alt={photo.fileName} className="size-20 rounded-md object-cover" />
-    </a>
-  ) : null;
-}
+import { Photo } from './Photo';
+import { eventLabels, formatTime, sentence } from './tripFormat';
+
+import { Chip, Panel } from '@/components/ui';
+import type { TripView } from '@/interfaces';
+import { HorseConditionEnum } from '@/interfaces';
 
 export function TripRecords({ trip }: { trip: TripView }) {
   const records = useMemo(
@@ -33,25 +27,19 @@ export function TripRecords({ trip }: { trip: TripView }) {
                 <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
               </div>
               {record.text && <p className="type-body-s mb-2 mt-1 text-ink-2">{record.text}</p>}
-              {record.documentsShown.length > 0 && (
-                <p className="type-body-s mb-2 mt-1 text-ink-2">
-                  Documents shown:{' '}
-                  {record.documentsShown
-                    .map(
-                      (id) =>
-                        trip.stops
-                          .flatMap((stop) => stop.borderDocuments)
-                          .find((document) => document.id === id)?.label,
-                    )
-                    .filter(Boolean)
-                    .join(', ')}
-                </p>
-              )}
               {record.conditions.map((condition) => (
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <strong className="type-h4">{condition.horseName}</strong>
-                    <Chip tone={conditionTone(condition.condition)}>
+                    <Chip
+                      tone={
+                        condition.condition === HorseConditionEnum.CONCERN
+                          ? 'bad'
+                          : condition.condition === HorseConditionEnum.WATCH
+                            ? 'warn'
+                            : 'ok'
+                      }
+                    >
                       {sentence(condition.condition)}
                     </Chip>
                   </div>

@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface RequestHorseRepository extends JpaRepository<RequestHorse, RequestHorse.Key> {
+public interface RequestHorseRepository extends JpaRepository<RequestHorse, UUID> {
 
     /**
      * Of these horses, the ones that were ever on a submitted request: their identity is locked (H-07),

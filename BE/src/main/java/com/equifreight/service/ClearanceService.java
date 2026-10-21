@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,7 +31,10 @@ public class ClearanceService {
     private final ValidityEngine validityEngine;
     private final AuditService auditService;
     private final FileService fileService;
-    private final JobRegulationPinRepository pins;
+    private final JobRegulationPinRepository jobRegulationPinRepository;
+    private final RegulationCatalogRepository regulationCatalogRepository;
+    private final RegulationVersionRepository regulationVersionRepository;
+    private final RegulationRuleRepository regulationRuleRepository;
 
     public ClearanceService(
             ChecklistItemRepository checklistItemRepository,
@@ -40,7 +45,10 @@ public class ClearanceService {
             ValidityEngine validityEngine,
             AuditService auditService,
             FileService fileService,
-            JobRegulationPinRepository pins) {
+            JobRegulationPinRepository jobRegulationPinRepository,
+            RegulationCatalogRepository regulationCatalogRepository,
+            RegulationVersionRepository regulationVersionRepository,
+            RegulationRuleRepository regulationRuleRepository) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -49,7 +57,10 @@ public class ClearanceService {
         this.validityEngine = validityEngine;
         this.auditService = auditService;
         this.fileService = fileService;
-        this.pins = pins;
+        this.jobRegulationPinRepository = jobRegulationPinRepository;
+        this.regulationCatalogRepository = regulationCatalogRepository;
+        this.regulationVersionRepository = regulationVersionRepository;
+        this.regulationRuleRepository = regulationRuleRepository;
     }
 
     /**
@@ -356,7 +367,7 @@ public class ClearanceService {
                     "TRANSPORT_JOB",
                     job.getId(),
                     job.getCode(),
-                    String.join("; ", gate.outstandingIssues()),
+                    issuesText(gate.outstandingIssues()),
                     previousStatus != null ? previousStatus.name() : "OPEN",
                     targetStatus.name());
         }
@@ -510,7 +521,7 @@ public class ClearanceService {
     /** The destination regulation version the job was pinned to at approval, if it has been. */
     @Transactional(readOnly = true)
     public Optional<RegulationVersion> destinationVersion(UUID jobId) {
-        return pins.findByJobId(jobId).stream()
+        return jobRegulationPinRepository.findByJobId(jobId).stream()
                 .filter(pin -> pin.getRole() == RegulationRole.DESTINATION)
                 .map(JobRegulationPin::getRegulationVersion)
                 .findFirst();
@@ -520,6 +531,193 @@ public class ClearanceService {
         return checklistItemRepository
                 .findById(checklistItemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("ChecklistItem", checklistItemId));
+    }
+
+    /**
+     * BR-F2-01: the job's checklist from the published regulation catalogs of the countries on its route. The
+     * first run pins the destination's published version (and the origin's, when it is another country with a
+     * published catalog); later runs reuse those pins and add only the items that are missing, so a re-run
+     * never duplicates an item or undoes a change the specialist made.
+     *
+     * <p>Each item is due the pinned version's lead time before the planned departure; with no departure
+     * planned yet, the due date stays empty until there is one.
+     */
+    @Transactional
+    public List<ChecklistItemResponse> generateChecklist(UUID jobId, User specialist) {
+        TransportJob job = findJobOrThrow(jobId);
+        TransportRequest request = job.getRequest();
+        Country destination = destinationCountry(request);
+        if (destination == null) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_DESTINATION",
+                    "The job's destination has no country. Set the destination place on the request first.");
+        }
+        Country origin = request.getOriginPlace() == null
+                ? null
+                : request.getOriginPlace().getCountry();
+
+        // Validate, then write: the destination must have a published catalog before anything is pinned.
+        List<JobRegulationPin> pins = new ArrayList<>(jobRegulationPinRepository.findByJobId(jobId));
+        List<JobRegulationPin> newPins = new ArrayList<>();
+        if (!isPinned(pins, RegulationRole.DESTINATION)) {
+            RegulationVersion version = publishedVersion(destination)
+                    .orElseThrow(() -> new BusinessException(
+                            "CHECKLIST_NO_CATALOG",
+                            "There is no published regulation catalog for " + destination.getName()
+                                    + ". Publish one on the Regulations page first."));
+            newPins.add(pin(job, version, RegulationRole.DESTINATION));
+        }
+        if (origin != null && !origin.getId().equals(destination.getId()) && !isPinned(pins, RegulationRole.ORIGIN)) {
+            publishedVersion(origin).ifPresent(v -> newPins.add(pin(job, v, RegulationRole.ORIGIN)));
+        }
+        pins.addAll(jobRegulationPinRepository.saveAll(newPins));
+
+        Map<UUID, RegulationVersion> versionById = new HashMap<>();
+        pins.forEach(p -> versionById.put(p.getRegulationVersion().getId(), p.getRegulationVersion()));
+        List<RegulationRule> rules = regulationRuleRepository.findByVersionIdIn(versionById.keySet());
+
+        Set<String> existing = new HashSet<>();
+        checklistItemRepository
+                .findByJobId(jobId)
+                .forEach(i -> existing.add(itemKey(
+                        i.getDocumentType().getId(),
+                        i.getHorse() == null ? null : i.getHorse().getId(),
+                        i.getBorderCrossing() == null
+                                ? null
+                                : i.getBorderCrossing().getId())));
+        List<Horse> horses =
+                request.getHorses().stream().map(RequestHorse::getHorse).toList();
+        List<BorderCrossing> crossings = request.getCorridor() == null
+                ? List.of()
+                : request.getCorridor().getCrossings().stream()
+                        .map(CorridorCrossing::getBorderCrossing)
+                        .toList();
+
+        List<ChecklistItem> created = new ArrayList<>();
+        for (RegulationRule rule : rules) {
+            DocumentType type = rule.getDocumentType();
+            LocalDate due = dueDate(job, versionById.get(rule.getVersion().getId()));
+            switch (type.getScope()) {
+                case PER_HORSE -> horses.forEach(h -> addItem(created, existing, job, rule, due, h, null));
+                case PER_SHIPMENT -> addItem(created, existing, job, rule, due, null, null);
+                case PER_CROSSING -> crossings.forEach(c -> addItem(created, existing, job, rule, due, null, c));
+            }
+        }
+        checklistItemRepository.saveAll(created);
+
+        if (!created.isEmpty() || !newPins.isEmpty()) {
+            evaluateClearanceGate(jobId);
+            auditService.recordDecision(
+                    specialist,
+                    "CHECKLIST_GENERATED",
+                    "Generated " + created.size() + " checklist " + (created.size() == 1 ? "item" : "items") + " for "
+                            + job.getCode() + " from the pinned regulation catalogs.",
+                    "TRANSPORT_JOB",
+                    job.getId(),
+                    job.getCode(),
+                    null,
+                    null,
+                    null);
+        }
+
+        return checklistItemRepository.findByJobId(jobId).stream()
+                .map(ClearanceMapper::toItemResponse)
+                .toList();
+    }
+
+    /** audit_log.reason holds 500 characters. */
+    private static final int REASON_MAX = 500;
+
+    /**
+     * The gate's outstanding issues for the audit reason: whole issues while they fit in the column, then
+     * "and N more", so a long checklist never fails the gate run that records it.
+     */
+    static String issuesText(List<String> issues) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < issues.size(); i++) {
+            String next = (text.isEmpty() ? "" : "; ") + issues.get(i);
+            String more = "; and " + (issues.size() - i) + " more";
+            boolean last = i == issues.size() - 1;
+            if (text.length() + next.length() + (last ? 0 : more.length()) > REASON_MAX) {
+                return text.isEmpty() ? issues.size() + " outstanding issues" : text + more;
+            }
+            text.append(next);
+        }
+        return text.toString();
+    }
+
+    /** The destination place's country, else the country the corridor's last crossing leads into. */
+    private static Country destinationCountry(TransportRequest request) {
+        if (request.getDestinationPlace() != null
+                && request.getDestinationPlace().getCountry() != null) {
+            return request.getDestinationPlace().getCountry();
+        }
+        if (request.getCorridor() == null
+                || request.getCorridor().getCrossings().isEmpty()) {
+            return null;
+        }
+        List<CorridorCrossing> crossings = request.getCorridor().getCrossings();
+        return crossings.getLast().getBorderCrossing().getToCountry();
+    }
+
+    private static boolean isPinned(List<JobRegulationPin> pins, RegulationRole role) {
+        return pins.stream().anyMatch(p -> p.getRole() == role);
+    }
+
+    private Optional<RegulationVersion> publishedVersion(Country country) {
+        return regulationCatalogRepository
+                .findByCountryCode(country.getCode())
+                .flatMap(c -> regulationVersionRepository.findByCatalogIdAndStatus(c.getId(), CatalogStatus.PUBLISHED));
+    }
+
+    private static JobRegulationPin pin(TransportJob job, RegulationVersion version, RegulationRole role) {
+        JobRegulationPin pin = new JobRegulationPin();
+        pin.setJob(job);
+        pin.setRegulationVersion(version);
+        pin.setRole(role);
+        return pin;
+    }
+
+    private static String itemKey(UUID documentTypeId, UUID horseId, UUID crossingId) {
+        return documentTypeId + "|" + horseId + "|" + crossingId;
+    }
+
+    /** Adds the item unless the job already has one for this document, horse and crossing. */
+    private static void addItem(
+            List<ChecklistItem> created,
+            Set<String> existing,
+            TransportJob job,
+            RegulationRule rule,
+            LocalDate due,
+            Horse horse,
+            BorderCrossing crossing) {
+        DocumentType type = rule.getDocumentType();
+        String key =
+                itemKey(type.getId(), horse == null ? null : horse.getId(), crossing == null ? null : crossing.getId());
+        if (!existing.add(key)) {
+            return;
+        }
+        boolean customerProvides = type.getProvidedBy() == DocumentProvider.CUSTOMER;
+        ChecklistItem item = new ChecklistItem();
+        item.setJob(job);
+        item.setDocumentType(type);
+        item.setRegulationRule(rule);
+        item.setHorse(horse);
+        item.setBorderCrossing(crossing);
+        item.setStatus(customerProvides ? ChecklistStatus.AWAITING_UPLOAD : ChecklistStatus.NOT_ISSUED);
+        item.setHolder(customerProvides ? ChecklistHolder.CUSTOMER : ChecklistHolder.SPECIALIST);
+        item.setDueDate(due);
+        created.add(item);
+    }
+
+    /** The pinned version's lead time before the planned departure day; empty until a departure is planned. */
+    private static LocalDate dueDate(TransportJob job, RegulationVersion version) {
+        if (job.getPlannedDepartureAt() == null) {
+            return null;
+        }
+        LocalDate departure =
+                job.getPlannedDepartureAt().atZone(AppConstants.BUSINESS_ZONE).toLocalDate();
+        return departure.minusDays(version.getLeadTimeDays());
     }
 
     private record GateAssessment(

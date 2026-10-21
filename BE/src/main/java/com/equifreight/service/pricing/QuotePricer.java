@@ -13,6 +13,7 @@ import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RateCertainty;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.ServiceClass;
+import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -50,10 +51,12 @@ public final class QuotePricer {
             expand(in, rates, row, lines);
         }
         List<MissingRate> missing = RequiredRates.forRequest(in, rates);
-        for (MissingRate gap : missing) {
+        for (int i = 0; i < missing.size(); i++) {
+            MissingRate gap = missing.get(i);
             if (gap.group() != null) {
                 lines.add(new PricedLine(
                         gap.group(),
+                        "MISSING:" + (i + 1),
                         gap.description(),
                         RateBasis.PER_SHIPMENT,
                         "No rate in the catalog",
@@ -71,6 +74,18 @@ public final class QuotePricer {
         lines.sort(Comparator.comparing(PricedLine::group));
         boolean complete = missing.isEmpty() && (fit == null || fit.refusal() == null);
         return new PricedQuote(List.copyOf(lines), missing, fit, totals(in, rates, lines, complete));
+    }
+
+    /**
+     * The totals in the fixed order over lines the manager adjusted: overridden amounts in place and added lines
+     * included. Over the engine's own lines it gives exactly {@link #price}'s totals.
+     */
+    public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines) {
+        StallFit fit = fit(in, rates);
+        boolean complete = lines.stream().allMatch(l -> l.amount() != null)
+                && RequiredRates.forRequest(in, rates).isEmpty()
+                && (fit == null || fit.refusal() == null);
+        return totals(in, rates, lines, complete);
     }
 
     /** How the horses fit the priced air class; null for road, or when the class has no row in the catalog. */
@@ -125,6 +140,7 @@ public final class QuotePricer {
         BigDecimal quantity = BigDecimal.valueOf(fit.positions());
         return new PricedLine(
                 "C",
+                "STALL",
                 PricingText.fitDescription(
                         "Air stall position " + in.fromCity() + " → " + in.toCity() + ", " + classWord(in.airClass())),
                 RateBasis.PER_POSITION,
@@ -201,6 +217,7 @@ public final class QuotePricer {
         }
         return new PricedLine(
                 row.group(),
+                row.code(),
                 description(row),
                 row.basis(),
                 basis,
@@ -251,8 +268,10 @@ public final class QuotePricer {
 
     private static PricedLine line(
             RateRow row, String basis, BigDecimal quantity, UUID horseId, LineCertainty certainty) {
+        String key = row.basis() == RateBasis.PER_DAY && horseId != null ? row.code() + ":" + horseId : row.code();
         return new PricedLine(
                 row.group(),
+                key,
                 description(row),
                 row.basis(),
                 basis,
@@ -298,6 +317,7 @@ public final class QuotePricer {
                 : null;
         BigDecimal contingencyPct = rates.policies().get(RatePolicyKey.CONTINGENCY_PCT);
         BigDecimal serviceFeePct = rates.policies().get(RatePolicyKey.SERVICE_FEE_PCT);
+        BigDecimal windowPct = windowApplies(in) ? rates.policies().get(RatePolicyKey.ARRIVAL_WINDOW_PCT) : null;
 
         List<TotalRow> rows = new ArrayList<>();
         String freight = in.mode() == TransportMode.AIR ? "air" : "road";
@@ -308,6 +328,9 @@ public final class QuotePricer {
                         breakLabel(band),
                         pct(discount) + " of " + freight + " and ground lines (A, C, G)",
                         null));
+            }
+            if (windowPct != null) {
+                rows.add(new TotalRow("ARRIVAL_WINDOW", "Arrival window", windowBase(windowPct), null));
             }
             if (fuelPct != null) {
                 rows.add(new TotalRow(
@@ -326,7 +349,7 @@ public final class QuotePricer {
             if (serviceFeePct != null) {
                 rows.add(new TotalRow("SERVICE_FEE", "Service fee", pct(serviceFeePct) + " after contingency", null));
             }
-            return new PricedTotals(cents(priced), null, null, null, null, null, null, null, rows);
+            return new PricedTotals(cents(priced), null, null, null, null, null, null, null, null, rows);
         }
 
         BigDecimal subtotal = cents(priced);
@@ -337,6 +360,16 @@ public final class QuotePricer {
                     breakLabel(band),
                     pct(discount) + " of " + freight + " and ground lines (A, C, G) · " + money(breakBase),
                     volumeBreak));
+        }
+        BigDecimal arrivalWindow = null;
+        if (windowPct != null) {
+            BigDecimal groundAfterBreak = cents(breakBase.multiply(BigDecimal.ONE.subtract(discount.divide(HUNDRED))));
+            arrivalWindow = percent(groundAfterBreak, windowPct);
+            rows.add(new TotalRow(
+                    "ARRIVAL_WINDOW",
+                    "Arrival window",
+                    windowBase(windowPct) + " · " + money(groundAfterBreak),
+                    arrivalWindow));
         }
         BigDecimal fuel = null;
         if (fuelPct != null) {
@@ -357,7 +390,10 @@ public final class QuotePricer {
                     pct(insurancePct) + " of declared value · " + money(declared),
                     insurance));
         }
-        BigDecimal costBase = subtotal.subtract(volumeBreak).add(zero(fuel)).add(zero(insurance));
+        BigDecimal costBase = subtotal.subtract(volumeBreak)
+                .add(zero(arrivalWindow))
+                .add(zero(fuel))
+                .add(zero(insurance));
         BigDecimal contingency = percent(costBase, contingencyPct);
         rows.add(new TotalRow(
                 "CONTINGENCY", "Contingency", pct(contingencyPct) + " of " + money(costBase), contingency));
@@ -373,12 +409,22 @@ public final class QuotePricer {
                 subtotal,
                 subtotal,
                 volumeBreak.signum() > 0 ? volumeBreak : null,
+                arrivalWindow,
                 fuel,
                 insurance,
                 contingency,
                 serviceFee,
                 total,
                 rows);
+    }
+
+    /** The arrival-window surcharge applies to a road move with a private trailer and a window (AGENTS.md). */
+    public static boolean windowApplies(PricingInput in) {
+        return in.mode() == TransportMode.ROAD && in.trailer() == TrailerType.PRIVATE && in.arrivalWindow();
+    }
+
+    private static String windowBase(BigDecimal windowPct) {
+        return pct(windowPct) + " of ground lines (A, C, G) after the volume break";
     }
 
     private static String breakLabel(BreakRow band) {

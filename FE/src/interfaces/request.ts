@@ -1,4 +1,5 @@
 import type { HorseSex } from './horse';
+import type { QuotationIssuedRef } from './quotation';
 import type { TransportMode } from './job';
 import type { StallType } from './vehicle';
 
@@ -112,6 +113,11 @@ export interface RequestHorse {
 /** A transport request (GET /customer/requests/{id}); `leadTime` and `blockers` only for a draft. */
 export interface TransportRequest {
   id: string;
+  /** The range shown at the latest submission (US-Q-05); null for a draft or when there was none. */
+  estimateLow: number | null;
+  estimateHigh: number | null;
+  /** The latest issued quotation, on the customer's read; null until one is issued. */
+  quotation?: QuotationIssuedRef | null;
   /** Null until submitted. */
   code: string | null;
   status: RequestStatus;
@@ -161,6 +167,8 @@ export interface RequestSummary {
   horseCount: number;
   createdAt: string;
   submittedAt: string | null;
+  /** The latest issued quotation; null until one is issued. */
+  quotation: QuotationIssuedRef | null;
 }
 
 /** The body of POST and PUT /customer/requests, sent whole: a field left out is cleared. */
@@ -182,4 +190,40 @@ export interface RequestDraftInput {
   airClass: ServiceClass | null;
   insurance: InsuranceOption | null;
   vetEscort: boolean;
+}
+
+/** Where the customer's instant estimate stands (POST /customer/requests/estimate). */
+export const EstimateStatusEnum = {
+  READY: 'READY',
+  UNAVAILABLE: 'UNAVAILABLE',
+  NOT_READY: 'NOT_READY',
+  NOT_RUN: 'NOT_RUN',
+} as const;
+export type EstimateStatus = (typeof EstimateStatusEnum)[keyof typeof EstimateStatusEnum];
+
+/** One wizard choice and how it moves the range (signed deltas, an exact figure, or why not). */
+export interface OptionEffect {
+  value: string;
+  current: boolean;
+  deltaLow: number | null;
+  deltaHigh: number | null;
+  exact: number | null;
+  unavailable: string | null;
+}
+
+/** The customer's indicative range: never a quotation, never acceptable (BR-Q-10). */
+export interface Estimate {
+  status: EstimateStatus;
+  low: number | null;
+  high: number | null;
+  message: string | null;
+  assumptions: string[];
+  versionNo: number | null;
+  options: {
+    mode: OptionEffect[];
+    trailer: OptionEffect[];
+    airClass: OptionEffect[];
+    insurance: OptionEffect[];
+    arrivalWindow: OptionEffect[];
+  };
 }

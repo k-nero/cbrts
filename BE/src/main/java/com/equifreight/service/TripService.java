@@ -189,7 +189,6 @@ public class TripService {
                     .findFirst()
                     .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
         }
-        List<UUID> documentsShown = validateDocumentsShown(job, stop, request.kind(), request.documentsShown());
         TripRecord record = new TripRecord();
         record.setJob(job);
         record.setRouteStop(stop);
@@ -200,7 +199,7 @@ public class TripService {
         record.setRecordedBy(user);
         record.setChannel(channel);
         record.setText(request.text());
-        record.setDocumentsShown(documentsShown);
+        attachDocumentsShown(record, job, stop, request.kind(), request.documentsShown());
         Set<UUID> seen = new HashSet<>();
         Set<UUID> attachedFiles = new HashSet<>();
         if (request.conditions() != null)
@@ -238,9 +237,9 @@ public class TripService {
         return TripMapper.toRecordResponse(saved);
     }
 
-    private List<UUID> validateDocumentsShown(
-            TransportJob job, RouteStop stop, TripRecordKind kind, List<UUID> documentIds) {
-        if (documentIds == null || documentIds.isEmpty()) return List.of();
+    private void attachDocumentsShown(
+            TripRecord record, TransportJob job, RouteStop stop, TripRecordKind kind, List<UUID> documentIds) {
+        if (documentIds == null || documentIds.isEmpty()) return;
         boolean borderEvent = EnumSet.of(
                         TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.HELD)
                 .contains(kind);
@@ -263,8 +262,11 @@ public class TripService {
                     || item.getBorderCrossing() == null
                     || !crossingId.equals(item.getBorderCrossing().getId()))
                 throw ResourceNotFoundException.of("Border document", documentId);
+            TripRecordDocument doc = new TripRecordDocument();
+            doc.setChecklistItem(item);
+            doc.setTripRecord(record);
+            record.getDocumentsShown().add(doc);
         }
-        return List.copyOf(documentIds);
     }
 
     /**

@@ -17,6 +17,10 @@ export const queryKeys = {
     /** The list pages (useCrudResource keys them [resource, 'page', params]). */
     pages: () => ['requests', 'page'] as const,
     one: (id: string) => ['requests', id] as const,
+    /** The request's issued quotation. */
+    quotation: (id: string) => ['requests', id, 'quotation'] as const,
+    /** The instant estimate for one set of wizard values. */
+    estimate: (input: unknown) => ['requests', 'estimate', input] as const,
     /** The corridors between two places. */
     routes: (from: string, to: string) => ['routes', 'pair', from, to] as const,
     /** The corridors touching one place's city (the alternatives on a route we don't run). */
@@ -29,7 +33,11 @@ export const queryKeys = {
     queues: () => ['staff-requests', 'queue'] as const,
     queue: (page: number) => ['staff-requests', 'queue', page] as const,
     one: (id: string) => ['staff-requests', id] as const,
-    quotation: (id: string) => ['staff-requests', id, 'quotation'] as const,
+    /** Every version of the request's quotation; invalidate this after a write. */
+    quotations: (id: string) => ['staff-requests', id, 'quotation'] as const,
+    /** One version, or the latest when none is named. */
+    quotation: (id: string, version?: number) =>
+      ['staff-requests', id, 'quotation', version ?? 'latest'] as const,
   },
   rates: {
     all: () => ['rates'] as const,

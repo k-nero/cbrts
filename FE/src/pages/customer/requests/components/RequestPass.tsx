@@ -1,29 +1,10 @@
 import type { FC } from 'react';
 
-import { COAT_SWATCH, cx, DraftPass, type Tone } from '@/components/ui';
-import type { Blocker, Horse, Route } from '@/interfaces';
-import { coatOf, passRows, type WizardValues } from '@/lib/utils';
+import { HorseSwatches } from './HorseSwatches';
 
-/** The picked horses as overlapping coat swatches with the count, as on the pass. */
-export const HorseSwatches: FC<{ ids: string[]; horses: Horse[] }> = ({ ids, horses }) => (
-  <span className="flex items-center gap-2">
-    <span className="flex -space-x-1.5">
-      {ids.slice(0, 6).map((id) => {
-        const coat = coatOf(horses.find((h) => h.id === id)?.coat ?? null);
-        return (
-          <span
-            key={id}
-            aria-hidden
-            className={cx('size-4 rounded-full border-2 border-card', COAT_SWATCH[coat])}
-          />
-        );
-      })}
-    </span>
-    <span className="type-data text-ink">
-      {ids.length} {ids.length === 1 ? 'horse' : 'horses'}
-    </span>
-  </span>
-);
+import { DraftPass, type Tone } from '@/components/ui';
+import type { Blocker, Horse, Route } from '@/interfaces';
+import { passRows, type WizardValues } from '@/lib/utils';
 
 export const DRAFT_SUB =
   'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.';
@@ -36,6 +17,8 @@ type Props = {
   notRun: boolean;
   horses: Horse[];
   chip?: { tone: Tone; label: string };
+  /** The indicative range ("$31,900 – $43,300"); null or absent shows a dash. */
+  range?: string | null;
   rangeSub?: string;
   className?: string;
 };
@@ -48,6 +31,7 @@ export const RequestPass: FC<Props> = ({
   notRun,
   horses,
   chip,
+  range,
   rangeSub,
   className,
 }) => {
@@ -67,6 +51,7 @@ export const RequestPass: FC<Props> = ({
           : { label: 'Horses', value: null, step: 1 },
         ...passRows(values, live, route, notRun),
       ]}
+      range={notRun ? null : (range ?? null)}
       rangeSub={
         notRun && from && to
           ? `No range: we don't run ${from} → ${to} yet.`

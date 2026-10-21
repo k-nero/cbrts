@@ -77,6 +77,7 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.SERVICE_FEE_PCT, "Service fee"),
             Map.entry(RatePolicyKey.DEPOSIT_PCT, "Deposit"),
             Map.entry(RatePolicyKey.QUOTE_VALIDITY_DAYS, "Quote validity"),
+            Map.entry(RatePolicyKey.ESTIMATE_BAND_PCT, "Estimate band"),
             Map.entry(RatePolicyKey.FLIGHT_VET_MIN_HORSES, "The flight vet threshold"),
             Map.entry(RatePolicyKey.HIGH_VALUE_THRESHOLD, "The high value threshold"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_PCT, "Arrival window surcharge"),
@@ -332,13 +333,13 @@ public class RateCatalogService {
         RateCatalogVersion draft = requireDraft();
         values.forEach(RateCatalogService::checkPolicy);
         for (Map.Entry<RatePolicyKey, BigDecimal> entry : new TreeMap<>(values).entrySet()) {
-            RatePolicy.Key key = new RatePolicy.Key(draft.getId(), entry.getKey());
-            RatePolicy policy = policies.findById(key).orElseGet(() -> {
-                RatePolicy created = new RatePolicy();
-                created.setId(key);
-                created.setVersion(draft);
-                return created;
-            });
+            RatePolicy policy = policies.findByVersionIdAndKey(draft.getId(), entry.getKey())
+                    .orElseGet(() -> {
+                        RatePolicy created = new RatePolicy();
+                        created.setVersion(draft);
+                        created.setKey(entry.getKey());
+                        return created;
+                    });
             policy.setValue(entry.getValue());
             policies.save(policy);
         }
@@ -590,7 +591,7 @@ public class RateCatalogService {
         policies.saveAll(rows.policies().stream()
                 .map(p -> {
                     RatePolicy copy = new RatePolicy();
-                    copy.setId(new RatePolicy.Key(draft.getId(), p.getId().getKey()));
+                    copy.setKey(p.getKey());
                     copy.setVersion(draft);
                     copy.setValue(p.getValue());
                     return copy;

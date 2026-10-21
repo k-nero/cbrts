@@ -24,4 +24,6 @@ public record PricingInput(
         InsuranceOption insurance,
         boolean vetEscort,
         Integer quarantineDays,
-        List<PricingHorse> horses) {}
+        List<PricingHorse> horses,
+        /** The request asks for an arrival window (road, private trailer). */
+        boolean arrivalWindow) {}

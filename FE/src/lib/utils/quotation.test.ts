@@ -1,8 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 
+import type { QuoteLineRow, Readiness } from '@/interfaces';
+
 import {
+  changedSince,
   classOptions,
   conflictMessage,
+  depositText,
+  issueBlocker,
+  statusActions,
+  overrideDefaults,
+  validityText,
   money,
   moneyOrDash,
   quoteSummary,
@@ -198,5 +206,149 @@ describe('conflictMessage', () => {
   test('anything else is not a conflict', () => {
     expect(conflictMessage({ response: { status: 400, data: { message: 'x' } } })).toBeNull();
     expect(conflictMessage(new Error('offline'))).toBeNull();
+  });
+});
+
+// --- slice 6: issuing -------------------------------------------------------------------------------
+
+const readiness = (blockers: string[]): Readiness => ({
+  ready: blockers.length === 0,
+  pricedLines: 9,
+  lineCount: 9,
+  blockers,
+});
+
+const line = (over: Partial<QuoteLineRow> = {}): QuoteLineRow => ({
+  id: 'l1',
+  lineKey: 'GROOM',
+  description: 'Flying groom',
+  basisText: 'one per three horses · 2 ÷ 3, rounded up = 1',
+  quantity: 1,
+  unitRate: 1450,
+  amount: 1450,
+  certainty: 'FIXED',
+  estimateNote: null,
+  source: 'CATALOG',
+  catalogAmount: 1450,
+  overrideAmount: null,
+  overrideReason: null,
+  manual: false,
+  manualReason: null,
+  ...over,
+});
+
+describe('issueBlocker', () => {
+  test('nothing blocks an issued version or a ready draft', () => {
+    expect(issueBlocker(null)).toBeNull();
+    expect(issueBlocker(readiness([]))).toBeNull();
+  });
+  test('names the first blocker', () => {
+    expect(
+      issueBlocker(
+        readiness([
+          '1 rate is missing on Hanoi → Vientiane.',
+          'Rate catalog v5 has no deposit percentage.',
+        ]),
+      ),
+    ).toBe('1 rate is missing on Hanoi → Vientiane.');
+  });
+});
+
+describe('changedSince', () => {
+  const previous = { versionNo: 1, total: 9120.4, amountsByKey: { GROOM: 1450 } };
+  test('a changed amount says what it was', () => {
+    expect(changedSince(line({ amount: 1200, overrideAmount: 1200 }), previous)).toBe(
+      'was $1,450.00',
+    );
+  });
+  test("what it was reads in the quotation's currency", () => {
+    expect(changedSince(line({ amount: 1200 }), previous, 'EUR')).toBe('was €1,450.00');
+  });
+  test('a line the previous version did not have is new', () => {
+    expect(changedSince(line({ lineKey: 'MANUAL:abc' }), previous)).toBe('new');
+  });
+  test('an unchanged line, or no previous version, says nothing', () => {
+    expect(changedSince(line(), previous)).toBeNull();
+    expect(changedSince(line({ amount: 1200 }), null)).toBeNull();
+  });
+});
+
+describe('validityText', () => {
+  test('a draft counts its days from issue', () => {
+    expect(validityText(null, 7)).toEqual({ line1: 'In 7 days', line2: 'from issue' });
+  });
+  test('an issued version names its last day', () => {
+    expect(validityText('2026-10-27T16:59:59.999Z', 7)).toEqual({
+      line1: 'Until 27 Oct 2026',
+      line2: 'end of day, Vietnam time',
+    });
+  });
+  test('no validity in the catalog', () => {
+    expect(validityText(null, null)).toEqual({ line1: '—', line2: 'no validity in the catalog' });
+  });
+});
+
+describe('depositText', () => {
+  test('percentage and amount', () => {
+    expect(depositText({ pct: 30, amount: 2627.02 })).toBe('30% · $2,627.02');
+  });
+  test('a draft shows the percentage of the total to come', () => {
+    expect(depositText(null)).toBe('—');
+  });
+  test("in the quotation's currency", () => {
+    expect(depositText({ pct: 30, amount: 2627.02 }, 'EUR')).toBe('30% · €2,627.02');
+  });
+});
+
+describe('overrideDefaults', () => {
+  test('starts from the catalog amount', () => {
+    expect(overrideDefaults(line())).toEqual({ amount: '1450.00', reason: '' });
+  });
+  test('editing an override starts from it', () => {
+    expect(
+      overrideDefaults(line({ amount: 1200, overrideAmount: 1200, overrideReason: 'Own groom' })),
+    ).toEqual({ amount: '1200.00', reason: 'Own groom' });
+  });
+});
+
+describe('statusActions', () => {
+  const v = (versionNo: number, status: string) => ({
+    versionNo,
+    status: status as never,
+    issuedAt: null,
+    validUntil: null,
+    total: null,
+    supersededReason: null,
+  });
+  test('the latest issued version can be revised', () => {
+    expect(statusActions({ versionNo: 1, status: 'ISSUED', versions: [v(1, 'ISSUED')] })).toEqual({
+      latest: true,
+      draftVersionNo: null,
+      canRevise: true,
+    });
+  });
+  test('with a revision drafted, the issued version offers the draft', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'ISSUED', versions: [v(2, 'DRAFT'), v(1, 'ISSUED')] }),
+    ).toEqual({ latest: true, draftVersionNo: 2, canRevise: false });
+  });
+  test('a superseded version is not the latest', () => {
+    expect(
+      statusActions({
+        versionNo: 1,
+        status: 'SUPERSEDED',
+        versions: [v(2, 'ISSUED'), v(1, 'SUPERSEDED')],
+      }).latest,
+    ).toBe(false);
+  });
+  test('an accepted or declined quotation is not revised', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'ACCEPTED', versions: [v(1, 'ACCEPTED')] }).canRevise,
+    ).toBe(false);
+  });
+  test('an expired version can be revised', () => {
+    expect(
+      statusActions({ versionNo: 1, status: 'EXPIRED', versions: [v(1, 'EXPIRED')] }).canRevise,
+    ).toBe(true);
   });
 });

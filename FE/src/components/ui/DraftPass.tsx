@@ -4,6 +4,7 @@ import { Chip } from './Chip';
 import { Icon } from './Icon';
 import { Perforation } from './Perforation';
 import { cx, type Tone, TONE_FG } from './tone';
+import { End } from './End';
 
 export type DraftPassRow = {
   label: string;
@@ -29,25 +30,6 @@ type Props = {
   rangeSub: ReactNode;
   className?: string;
 };
-
-const End: FC<{ city: string | null; placeholder: string; align: 'start' | 'end' }> = ({
-  city,
-  placeholder,
-  align,
-}) => (
-  <span
-    className={cx('flex min-w-0 flex-col gap-0.5', align === 'end' ? 'items-end text-right' : '')}
-  >
-    {city ? (
-      <span className="type-h4 text-ink">{city}</span>
-    ) : (
-      <>
-        <span className="type-data-l text-ink-3">···</span>
-        <span className="type-body-s text-ink-3">{placeholder}</span>
-      </>
-    )}
-  </span>
-);
 
 /**
  * The request drawn as the pass it becomes once approved (DESIGN.md, Draft pass; 03-pages.js,

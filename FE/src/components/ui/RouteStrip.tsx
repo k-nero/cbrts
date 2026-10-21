@@ -2,8 +2,10 @@ import type { FC, ReactNode } from 'react';
 
 import { Icon } from './Icon';
 import { cx } from './tone';
+import { Leg } from './Leg';
+import { Marker } from './Marker';
 
-export type RouteStopState = 'done' | 'current' | 'held' | 'upcoming';
+export type RouteStopState = 'done' | 'current' | 'upcoming';
 
 export type RouteStripStop = {
   name: ReactNode;
@@ -20,27 +22,6 @@ type Props = {
   gate?: 'locked' | 'clear';
   className?: string;
 };
-
-/* A leg turns green only between confirmed checkpoints: positions come from recorded checkpoints, never a guess. */
-const Leg: FC<{ confirmed: boolean }> = ({ confirmed }) => (
-  <span aria-hidden className="flex-1 pt-[9px]">
-    <span className={cx('block h-0.5 w-full', confirmed ? 'bg-ok' : 'bg-line-strong')} />
-  </span>
-);
-
-const Marker: FC<{ state: RouteStopState }> = ({ state }) => (
-  <span className="grid size-5 place-items-center">
-    <span
-      className={cx(
-        'block rounded-full',
-        state === 'done' && 'size-3.5 bg-ok',
-        state === 'current' && 'size-5 border-2 border-info bg-info-soft',
-        state === 'held' && 'size-5 border-2 border-bad bg-bad-soft',
-        state === 'upcoming' && 'size-3.5 border-2 border-line-strong bg-canvas',
-      )}
-    />
-  </span>
-);
 
 /**
  * The schematic route (DESIGN.md, Stage Row and Route Stop): circular stops joined by 2 px legs,
@@ -73,7 +54,7 @@ export const RouteStrip: FC<Props> = ({ stops, gate, className }) => (
         <li key={i} className="contents">
           <span
             className="flex w-[132px] shrink-0 flex-col items-center gap-1.5 text-center"
-            aria-current={s.state === 'current' || s.state === 'held' ? 'step' : undefined}
+            aria-current={s.state === 'current' ? 'step' : undefined}
           >
             <Marker state={s.state} />
             <span
@@ -83,14 +64,7 @@ export const RouteStrip: FC<Props> = ({ stops, gate, className }) => (
             </span>
             <span className="type-mono-label text-ink-3">{s.kind}</span>
             <span
-              className={cx(
-                'type-caption',
-                s.state === 'held'
-                  ? 'text-bad'
-                  : s.state === 'current'
-                    ? 'text-info'
-                    : 'text-ink-3',
-              )}
+              className={cx('type-caption', s.state === 'current' ? 'text-info' : 'text-ink-3')}
             >
               {s.time}
             </span>

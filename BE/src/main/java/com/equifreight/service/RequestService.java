@@ -5,6 +5,7 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
@@ -14,6 +15,7 @@ import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
@@ -21,8 +23,11 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.estimate.EstimateMapper;
+import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.LeadTimeResponse;
+import com.equifreight.model.request.QuotationIssuedRefResponse;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestHorseInput;
 import com.equifreight.model.request.RequestMapper;
@@ -33,8 +38,11 @@ import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.pricing.EstimateResult;
+import com.equifreight.service.pricing.EstimateStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +50,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,6 +93,8 @@ public class RequestService {
     private final AuditLogRepository auditLogs;
     private final JsonMapper json;
     private final Clock clock;
+    private final RequestEstimator estimator;
+    private final QuotationRepository quotations;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -96,7 +107,9 @@ public class RequestService {
             AuditService audit,
             AuditLogRepository auditLogs,
             JsonMapper json,
-            Clock clock) {
+            Clock clock,
+            RequestEstimator estimator,
+            QuotationRepository quotations) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -108,6 +121,8 @@ public class RequestService {
         this.auditLogs = auditLogs;
         this.json = json;
         this.clock = clock;
+        this.estimator = estimator;
+        this.quotations = quotations;
     }
 
     @Transactional(readOnly = true)
@@ -121,7 +136,17 @@ public class RequestService {
             requests.countHorses(page.map(TransportRequest::getId).getContent())
                     .forEach(c -> counts.put(c.getRequestId(), c.getHorses()));
         }
-        return page.map(r -> RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)));
+        Map<UUID, Quotation> issued = new HashMap<>();
+        if (!page.isEmpty()) {
+            quotations
+                    .findByRequestIdInAndStatusNot(
+                            page.map(TransportRequest::getId).getContent(), QuotationStatus.DRAFT)
+                    .forEach(q -> issued.merge(
+                            q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
+        }
+        return page.map(r -> RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)).toBuilder()
+                .quotation(issued.containsKey(r.getId()) ? issuedRef(issued.get(r.getId())) : null)
+                .build());
     }
 
     @Transactional(readOnly = true)
@@ -129,7 +154,16 @@ public class RequestService {
         Club club = clubs.requireClub(user);
         TransportRequest request = requests.findByIdAndClubId(id, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
-        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null);
+        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null).toBuilder()
+                .quotation(quotations
+                        .findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT)
+                        .map(RequestService::issuedRef)
+                        .orElse(null))
+                .build();
+    }
+
+    private static QuotationIssuedRefResponse issuedRef(Quotation q) {
+        return new QuotationIssuedRefResponse(q.getCode(), q.getVersionNo(), q.getStatus(), q.getValidUntil());
     }
 
     @Transactional
@@ -154,6 +188,37 @@ public class RequestService {
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
         return toResponse(requests.saveAndFlush(request), resolution);
+    }
+
+    /**
+     * The customer's instant estimate (US-Q-05) for the wizard's current values. The body is checked and written
+     * onto a request that is never saved; a value the save would refuse answers why instead of a 400, so the
+     * wizard keeps working while the customer types (BR-Q-10: nothing is stored).
+     */
+    @Transactional(readOnly = true)
+    public EstimateResponse estimate(User user, RequestDraftRequest body) {
+        Club club = clubs.requireClub(user);
+        boolean noHorses = body.horses() == null || body.horses().isEmpty();
+        boolean noOrigin = body.originPlaceId() == null && clean(body.originText()) == null;
+        boolean noDestination = body.destinationPlaceId() == null && clean(body.destinationText()) == null;
+        if (noHorses || noOrigin || noDestination) {
+            return EstimateMapper.notReady(EstimateStatus.NOT_READY, "Choose the route and horses to see an estimate.");
+        }
+        Draft draft;
+        try {
+            draft = validate(club, body, Set.of());
+        } catch (BusinessException | ConflictException e) {
+            return EstimateMapper.notReady(EstimateStatus.UNAVAILABLE, e.getMessage());
+        }
+        TransportRequest request = new TransportRequest();
+        request.setClub(club);
+        request.setStatus(RequestStatus.DRAFT);
+        RouteResolution resolution = write(request, draft);
+        if (resolution.corridor() == null && resolution.modesRun().isEmpty()) {
+            return EstimateMapper.notReady(
+                    EstimateStatus.NOT_RUN, "We don't run this route yet, so there's no estimate.");
+        }
+        return EstimateMapper.toResponse(estimator.estimate(request, resolution));
     }
 
     /**
@@ -194,6 +259,11 @@ public class RequestService {
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
+        // The range shown at this submission is kept to compare the quotation against; never a quotation itself.
+        EstimateResult estimate = estimator.rangeFor(request);
+        boolean ranged = estimate.status() == EstimateStatus.READY;
+        request.setEstimateLow(ranged ? estimate.low() : null);
+        request.setEstimateHigh(ranged ? estimate.high() : null);
         Instant now = Instant.now(clock);
         if (!resubmission) {
             request.setCode(codes.next(CodePrefix.REQ, today.getYear()));

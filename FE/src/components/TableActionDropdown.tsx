@@ -6,8 +6,10 @@ import {
   PlusCircleOutlined,
   ZoomInOutlined,
 } from '@ant-design/icons';
-import { Button, ButtonProps, Dropdown, MenuProps } from 'antd';
+import { Dropdown, MenuProps } from 'antd';
 import { useShallow } from 'zustand/react/shallow';
+
+import { ActionButton } from './ActionButton';
 
 import { Permission } from '@/interfaces';
 import { hasPermission } from '@/lib';
@@ -23,14 +25,6 @@ type ActionItem = {
 type ActionType = 'view' | 'edit' | 'delete' | 'add';
 
 export type TableActionDropdownProps = Partial<Record<ActionType, ActionItem>>;
-
-const ActionButton: FC<ButtonProps> = (props) => {
-  return (
-    <Button type="link" {...props}>
-      {props?.children}
-    </Button>
-  );
-};
 
 const TableActionDropdown: FC<TableActionDropdownProps> = ({
   add: {

@@ -25,11 +25,11 @@ SWP391 project. Racing clubs request road or air transport for their horses acro
 ### Docker
 
 ```bash
-cp .env.example .env   # then set DB_PASSWORD, JWT_SECRET and S3_SECRET_KEY
+cp .env.example .env   # then set SPRING_DATASOURCE_PASSWORD, JWT_SECRET and APP_STORAGE_S3_SECRETKEY
 docker compose up -d --build
 ```
 
-This starts PostgreSQL, SeaweedFS (file storage), the API and the web app. Open `http://localhost:3000`. nginx serves the SPA and proxies `/api` and Swagger UI (`/swagger-ui.html`) to the backend. The API is also published on `http://localhost:8080`, Postgres on `localhost:5433` and the S3 endpoint on `localhost:8333`.
+This starts PostgreSQL, SeaweedFS (file storage), the API (with the `docker` profile) and the web app. Open `http://localhost:3000`. nginx serves the SPA and proxies `/api` and Swagger UI (`/swagger-ui.html`) to the backend. The API is also published on `http://localhost:8080`, Postgres on `localhost:5433` and the S3 endpoint on `localhost:8333`.
 
 The backend image runs on a JRE with two ahead-of-time steps that cut startup time:
 - **Spring AOT:** `processAot` generates the bean-definition code at build time, and the app runs with `-Dspring.aot.enabled=true`. Beans are fixed at build time, so `@Profile` and `@ConditionalOnProperty` are decided at build time, not from runtime properties.
@@ -49,13 +49,13 @@ cd BE
 
 The API listens on `http://localhost:8080`, and Swagger UI is at `/swagger-ui.html`. Flyway creates the schema.
 
-The database defaults are `postgres` / `123456` on `localhost:5432`. Override them with `DB_URL`, `DB_USERNAME` and `DB_PASSWORD`. Set `JWT_SECRET` (at least 32 bytes) anywhere but local development.
+Configuration is split by Spring profile. `application.properties` holds what every environment shares; `application-dev.properties` (the default profile) holds the values for a developer machine, and `application-docker.properties` the compose hostnames. The dev database is `postgres` / `123456` on `localhost:5432`. Override any property from the environment by its Spring relaxed name, e.g. `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_PASSWORD` or `JWT_SECRET` (at least 32 bytes, required outside dev). `./gradlew flywayInfo`, `flywayMigrate` and `flywayClean` use the same dev connection and overrides.
 
-Uploaded files go to file storage; Postgres keeps only their metadata (`files`). `STORAGE_TYPE` picks where:
-- `s3` (default): S3-compatible storage. For local development, start the compose storage service with `docker compose up -d storage` and export the same `S3_SECRET_KEY` as in `.env`; the other `S3_*` defaults match it. In production, point `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` at S3, R2 or any S3-compatible service.
-- `local`: a directory on this machine, for running without Docker: `STORAGE_TYPE=local ./gradlew bootRun`. Files go under `BE/data/files` (git-ignored), or `STORAGE_LOCAL_DIR`. Not for production. Unit tests use the same class on a temporary directory.
+Uploaded files go to file storage; Postgres keeps only their metadata (`files`). `app.storage.type` picks where:
+- `s3` (default): S3-compatible storage. For local development, start the compose storage service with `docker compose up -d storage`. The dev profile matches it except for the secret: export the one from `.env` with `set -a && . ./.env && set +a` before `./gradlew bootRun`. In production, point `APP_STORAGE_S3_ENDPOINT`, `APP_STORAGE_S3_BUCKET`, `APP_STORAGE_S3_ACCESSKEY` and `APP_STORAGE_S3_SECRETKEY` at S3, R2 or any S3-compatible service.
+- `local`: a directory on this machine, for running without Docker: `APP_STORAGE_TYPE=local ./gradlew bootRun`. Files go under `BE/data/files` (git-ignored), or `APP_STORAGE_LOCAL_DIR`. Not for production. Unit tests use the same class on a temporary directory.
 
-On first start, `DataSeeder` creates the five roles and one account per role. Each account's password is `SEED_PASSWORD`, which defaults to `changeme123!`.
+On first start, `DataSeeder` creates the five roles and one account per role. Each account's password is `app.seed.default.password` (`APP_SEED_DEFAULT_PASSWORD`), which is `changeme123!` in the dev profile and in compose.
 
 | Email | Role |
 |---|---|

@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * EQUINE_PASSPORT, EIA_TEST, IMPORT_PERMIT, … Seeded by V5.
+ * EQUINE_PASSPORT, EIA_TEST, IMPORT_PERMIT, … Seeded by DataSeeder.
  */
 @Setter
 @Getter

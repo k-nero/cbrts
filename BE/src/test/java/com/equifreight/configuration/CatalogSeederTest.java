@@ -62,7 +62,7 @@ class CatalogSeederTest {
             Country c = new Country();
             c.setCode(code);
             c.setName(name);
-            when(countries.getReferenceById(code)).thenReturn(c);
+            when(countries.findByCode(code)).thenReturn(Optional.of(c));
         });
         lan = new User();
         when(users.getByEmail("lan.nguyen@equifreight.vn")).thenReturn(lan);
@@ -96,9 +96,8 @@ class CatalogSeederTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(hcmBkk.getCrossings().stream()
-                        .sorted(Comparator.comparingInt(cc -> cc.getId().getSeq()))
-                        .map(cc -> cc.getId().getSeq() + " "
-                                + cc.getBorderCrossing().getName()))
+                        .sorted(Comparator.comparingInt(cc -> cc.getSeq()))
+                        .map(cc -> cc.getSeq() + " " + cc.getBorderCrossing().getName()))
                 .containsExactly("1 Mộc Bài – Bavet", "2 Poipet – Aranyaprathet");
         assertThat(hcmBkk.getDistanceKm()).isEqualTo(960);
 

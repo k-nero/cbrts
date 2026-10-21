@@ -1,15 +1,14 @@
 import { type FC, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Skeleton } from 'antd';
-import type { AxiosError } from 'axios';
 
 import { FactGrid } from '../components/FactGrid';
 import HorseHeader from '../components/HorseHeader';
-import { DocumentsComeLater } from '../components/SidePanels';
+import { DocumentsComeLater } from '../components/DocumentsComeLater';
 
 import ArchiveHorseModal from './ArchiveHorseModal';
+import { HorseLoadState } from './HorseLoadState';
 
-import { Button, Callout, Chip, Panel } from '@/components/ui';
+import { Button, Chip, Panel } from '@/components/ui';
 import { useHorse } from '@/hooks/horse';
 import type { Horse, StallType } from '@/interfaces';
 import {
@@ -36,48 +35,6 @@ const ageLine = (horse: Horse, today: string): string => {
   const years = ageYears(horse.dateOfBirth, today);
   if (years === null || !horse.dateOfBirth) return '—';
   return `${years} ${years === 1 ? 'year' : 'years'} · born ${horse.dateOfBirth.slice(0, 4)}`;
-};
-
-/** A missing horse, or another club's (the API answers 404 for both). */
-export const HorseNotFound: FC = () => {
-  const router = useCustomRouter();
-  return (
-    <div className="flex flex-col items-start gap-3 pt-[46px]">
-      <h1 className="type-display-m m-0 text-ink">We couldn’t find this horse</h1>
-      <p className="type-body-m m-0 text-ink-2">
-        It may have been removed, or it belongs to another club.
-      </p>
-      <Button onClick={() => router.push(router.paths.get('my-horses'))}>Back to My horses</Button>
-    </div>
-  );
-};
-
-/** Loading, not found or failed: what a horse page shows until its horse arrives. */
-export const HorseLoadState: FC<{ query: ReturnType<typeof useHorse> }> = ({ query }) => {
-  if (query.isPending) {
-    return (
-      <div className="flex flex-col gap-6 pt-[46px]" aria-busy>
-        <Skeleton.Node active className="!h-[132px] !w-full" />
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </div>
-    );
-  }
-  if ((query.error as AxiosError | null)?.response?.status === 404) return <HorseNotFound />;
-  return (
-    <div className="pt-[46px]">
-      <Callout
-        tone="bad"
-        title="This horse didn't load"
-        action={
-          <Button size="sm" onClick={() => query.refetch()}>
-            Try again
-          </Button>
-        }
-      >
-        Nothing has changed. Check your connection and try again.
-      </Callout>
-    </div>
-  );
 };
 
 /** The horse profile (spec §6). */

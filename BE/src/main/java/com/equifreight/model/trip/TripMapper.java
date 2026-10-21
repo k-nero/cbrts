@@ -108,7 +108,11 @@ public final class TripMapper {
                 record.getConditionLogs().stream()
                         .map(TripMapper::toConditionResponse)
                         .toList(),
-                record.getDocumentsShown() == null ? List.of() : List.copyOf(record.getDocumentsShown()));
+                record.getDocumentsShown() == null
+                        ? List.of()
+                        : record.getDocumentsShown().stream()
+                                .map(d -> d.getChecklistItem().getId())
+                                .toList());
     }
 
     public static TripConditionResponse toConditionResponse(ConditionLog log) {

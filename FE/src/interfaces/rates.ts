@@ -34,6 +34,7 @@ export const RatePolicyKeyEnum = {
   ARRIVAL_WINDOW_MIN_HOURS: 'ARRIVAL_WINDOW_MIN_HOURS',
   LATE_PENALTY_PCT_PER_HOUR: 'LATE_PENALTY_PCT_PER_HOUR',
   LATE_PENALTY_CAP_PCT: 'LATE_PENALTY_CAP_PCT',
+  ESTIMATE_BAND_PCT: 'ESTIMATE_BAND_PCT',
 } as const;
 export type RatePolicyKey = (typeof RatePolicyKeyEnum)[keyof typeof RatePolicyKeyEnum];
 

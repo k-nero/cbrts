@@ -7,11 +7,12 @@ import { ClearanceGate, StageMark } from '@/components/ui';
 import { useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
-import { CoordinatorTripView } from '@/pages/trip/CoordinatorTripView';
+import { TripTab } from './TripTab';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
+import { Placeholder } from './Placeholder';
 
 /** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
@@ -49,17 +50,9 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       key: 'trip',
       label: 'Trip',
       owner: 'Escort (driver / groom)',
-      render: (job) => <CoordinatorTripView jobCode={job.code} />,
+      render: (job) => <TripTab jobCode={job.code} />,
     },
   ];
-
-/** A tab whose content isn't built on this page yet. */
-const Placeholder = ({ title, children }: { title: string; children: ReactNode }) => (
-  <div className="rounded-lg border border-line bg-card p-8 text-center">
-    <h4 className="type-h4 text-ink">{title}</h4>
-    <p className="type-body-s mt-1 text-ink-3">{children}</p>
-  </div>
-);
 
 const STAGE_MAP: Record<
   string,

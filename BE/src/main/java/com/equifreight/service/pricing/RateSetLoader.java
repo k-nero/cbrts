@@ -50,7 +50,7 @@ public class RateSetLoader {
                 classes.findByVersionId(id),
                 lines.findByVersionId(id),
                 breaks.findByVersionId(id),
-                policies.findByIdVersionId(id),
+                policies.findByVersionId(id),
                 feeBands.findByVersionIdOrderByKindAscMinDaysAsc(id));
     }
 }

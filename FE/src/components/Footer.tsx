@@ -2,21 +2,15 @@ import { FC } from 'react';
 import { Flex } from 'antd';
 
 import Brand from './Brand';
+import { DemoNote } from './DemoNote';
+import { Link } from './Link';
 
 import { COLOR_BORDER, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY } from '@/constant/color';
 
 /** Placeholder until the operations desk has a real number (DESIGN.md, Footer). */
 const OPS_PHONE = '+84 28 0000 0000';
+
 const OPS_EMAIL = 'ops@equifreight.vn';
-const AS_OF = '26 Sep 2026';
-
-const Link: FC<{ children: string }> = ({ children }) => (
-  <span className="cursor-default text-[13px] text-ink-2">{children}</span>
-);
-
-const DemoNote: FC = () => (
-  <span className="font-mono text-[12px] text-ink-3">Prototype · demo data as of {AS_OF}</span>
-);
 
 // AntD styles every <a> in the link colour (gold); inline tokens keep the footer free of gold.
 

@@ -2,44 +2,32 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.CrewRole;
 import jakarta.persistence.*;
-import java.io.Serializable;
-import java.util.UUID;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Grooms = ⌈horses ÷ 3⌉ is checked by the application.
+ * One person on a job's crew. Grooms = ⌈horses ÷ 3⌉ is checked by the application.
  */
 @Setter
 @Getter
 @Entity
-@Table(name = "crew_assignments")
-public class CrewAssignment {
+@Table(
+        name = "crew_assignments",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "crew_assignments_job_id_user_id_key",
+                        columnNames = {"job_id", "user_id"}))
+public class CrewAssignment extends BaseEntity {
 
-    @EmbeddedId
-    private Key id = new Key();
-
-    @MapsId("jobId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id")
+    @JoinColumn(name = "job_id", nullable = false)
     private TransportJob job;
 
-    @MapsId("userId")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CrewRole crewRole;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    @Embeddable
-    public static class Key implements Serializable {
-        private UUID jobId;
-        private UUID userId;
-    }
 }

@@ -373,7 +373,8 @@ class RouteServiceTest {
         c.setDistanceKm(500);
         for (int i = 0; i < crossings.length; i++) {
             CorridorCrossing cc = new CorridorCrossing();
-            cc.setId(new CorridorCrossing.Key(c.getId(), (short) (i + 1)));
+            cc.setCorridor(c);
+            cc.setSeq((short) (i + 1));
             cc.setCorridor(c);
             cc.setBorderCrossing(crossings[i]);
             c.getCrossings().add(cc);

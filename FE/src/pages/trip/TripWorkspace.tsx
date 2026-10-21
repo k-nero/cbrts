@@ -1,61 +1,55 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConfigProvider, Input, message, Select, Spin, Upload } from 'antd';
+import { useRef, useState } from 'react';
 import type { UploadFile } from 'antd';
+import { Input, message, Select, Spin, Upload } from 'antd';
+
+import { TripDetails } from './TripDetails';
+import { eventLabels, formatTime, sentence } from './tripFormat';
+
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import {
-  Button,
-  Callout,
-  Checkbox,
-  Chip,
-  Icon,
-  OptionCard,
-  Panel,
-  RouteStrip,
-  StageMark,
-  StatTile,
-} from '@/components/ui';
-import { useAuth, useMe } from '@/hooks/auth';
-import { themeAntd } from '@/config/themeConfig';
+import { Button, Callout, Checkbox, Chip, Panel } from '@/components/ui';
+import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
+import type { HorseCondition, TripRecordKind, TripSummary } from '@/interfaces';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
-import type {
-  HorseCondition,
-  TripRecordKind,
-  TripStatus,
-  TripSummary,
-  TripView,
-} from '@/interfaces';
-import { useThemeStore } from '@/stores/themeStore';
-import { TripRecords } from './TripRecords';
-import { EscortCab } from './EscortCab';
-import {
-  CabHeader,
-  CabRoute,
-  ConditionRows,
-  currentStopForTrip,
-  emptyObservation,
-} from './TripCabParts';
-import type { Observation } from './TripCabParts';
-import { CoordinatorTripContent } from './CoordinatorTripContent';
-import { CustomerTripContent } from './CustomerTripContent';
-import {
-  coordinatorKindsByStatus,
-  conditions,
-  datetimeLocal,
-  elapsedLabel,
-  errorMessage,
-  eventLabels,
-  escortEventsByStop,
-  formatClock,
-  formatTime,
-  lastConditionRecord,
-  lastRecord,
-  sentence,
-  stopKindLabel,
-  useNow,
-} from './trip-utils';
+
+const eventKinds = Object.values(TripRecordKindEnum);
+
+const checkpointKinds = eventKinds.filter((kind) => kind !== TripRecordKindEnum.CONDITION_CHECK);
+
+const conditions = Object.values(HorseConditionEnum);
+
+const datetimeLocal = () => {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+};
+
+const errorMessage = (error: unknown) =>
+  apiErrorMessage(error, 'The trip update could not be saved.');
+
+const statusTone = (status: string) =>
+  status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
+
+type Observation = {
+  checked: boolean;
+  condition: HorseCondition | null;
+  drinking: boolean | null;
+  eating: boolean | null;
+  note: string;
+  photos: UploadFile[];
+};
+
+const emptyObservation = (): Observation => ({
+  checked: false,
+  condition: null,
+  drinking: null,
+  eating: null,
+  note: '',
+  photos: [],
+});
+
 export function TripWorkspace({
   audience,
   title,
@@ -67,12 +61,8 @@ export function TripWorkspace({
   summary: string;
   editable?: boolean;
 }) {
-  const now = useNow();
   const { logout } = useAuth();
-  const meQuery = useMe();
   const [page, setPage] = useState(0);
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
   const [code, setCode] = useState('');
@@ -83,73 +73,17 @@ export function TripWorkspace({
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [stopId, setStopId] = useState<string>();
-  const [documentsShown, setDocumentsShown] = useState<string[]>([]);
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
-  const occurredAtEdited = useRef(false);
   const [text, setText] = useState('');
   const [receiverName, setReceiverName] = useState('');
-  const [showConditionForm, setShowConditionForm] = useState(false);
   const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
   const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
     checkpoint: null,
     condition: null,
   });
   const uploadedPhotos = useRef(new Map<string, string>());
-  const seenCustomerRecords = useRef<{ code: string; ids: Set<string> } | null>(null);
   const mutation = useTripRecord(audience === 'staff' ? 'staff' : 'escort', selectedCode);
   const [messageApi, contextHolder] = message.useMessage();
-  const setRecordTime = (value: string) => {
-    occurredAtEdited.current = true;
-    setOccurredAt(value);
-  };
-  const occurredAtForSave = () =>
-    occurredAtEdited.current ? new Date(occurredAt).toISOString() : new Date().toISOString();
-  const refreshRecordTime = () => {
-    occurredAtEdited.current = false;
-    setOccurredAt(datetimeLocal());
-  };
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (!occurredAtEdited.current) setOccurredAt(datetimeLocal());
-    }, 30_000);
-    return () => window.clearInterval(interval);
-  }, []);
-  useEffect(() => {
-    const online = () => setIsOnline(true);
-    const offline = () => setIsOnline(false);
-    window.addEventListener('online', online);
-    window.addEventListener('offline', offline);
-    return () => {
-      window.removeEventListener('online', online);
-      window.removeEventListener('offline', offline);
-    };
-  }, []);
-  useEffect(() => {
-    if (audience !== 'customer' || !trip) return;
-    const ids = new Set(trip.records.map((record) => record.id));
-    const previous = seenCustomerRecords.current;
-    if (!previous || previous.code !== selectedCode) {
-      seenCustomerRecords.current = { code: selectedCode, ids };
-      return;
-    }
-    const unseen = trip.records
-      .filter((record) => !previous.ids.has(record.id))
-      .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
-    seenCustomerRecords.current = { code: selectedCode, ids };
-    unseen.forEach((record) => {
-      if (record.kind === TripRecordKindEnum.CLEARED_BORDER) {
-        messageApi.success(
-          `Customs cleared at ${record.checkpointName ?? 'the border'} · ${formatClock(record.occurredAt)}.`,
-        );
-      }
-      const stop = trip.stops.find((item) => item.id === record.routeStopId);
-      if (record.kind === TripRecordKindEnum.ARRIVED_AT_STOP && stop?.kind === 'DELIVERY') {
-        messageApi.info(
-          `Your horses arrived at the handover point, ${stop.name} · ${formatClock(record.occurredAt)}.`,
-        );
-      }
-    });
-  }, [audience, messageApi, selectedCode, trip]);
   const updateObservation = (horseId: string, update: Partial<Observation>) => {
     setConditionByHorse((current) => ({
       ...current,
@@ -163,66 +97,19 @@ export function TripWorkspace({
     clientRefs.current.checkpoint = clientRef;
     try {
       await mutation.mutateAsync({
-        routeStopId: audience === 'staff' ? (stopId ?? null) : (selectedStop?.id ?? null),
+        routeStopId: stopId ?? null,
         kind,
-        occurredAt: occurredAtForSave(),
+        occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
-        documentsShown,
         receiverName:
           kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
-      setDocumentsShown([]);
-      refreshRecordTime();
-    } catch (error) {
-      messageApi.error(errorMessage(error));
-    }
-  };
-
-  const saveHandover = async () => {
-    if (!trip) return;
-    const name = receiverName.trim();
-    if (!name) {
-      messageApi.error('Enter the receiving person’s name before recording handover.');
-      return;
-    }
-    const clientRef = clientRefs.current.checkpoint ?? crypto.randomUUID();
-    clientRefs.current.checkpoint = clientRef;
-    try {
-      await mutation.mutateAsync({
-        routeStopId: selectedStop?.id ?? null,
-        kind: TripRecordKindEnum.HANDED_OVER,
-        occurredAt: new Date().toISOString(),
-        clientRef,
-        text: `Received by ${name}.`,
-        receiverName: name,
-      });
-      clientRefs.current.checkpoint = null;
-      messageApi.success('Handover recorded.');
       setReceiverName('');
-      refreshRecordTime();
-    } catch (error) {
-      messageApi.error(errorMessage(error));
-    }
-  };
-
-  const saveStopDeparture = async () => {
-    if (!trip || !selectedStop) return;
-    const clientRef = clientRefs.current.checkpoint ?? crypto.randomUUID();
-    clientRefs.current.checkpoint = clientRef;
-    try {
-      await mutation.mutateAsync({
-        routeStopId: selectedStop.id,
-        kind: TripRecordKindEnum.LEFT_STOP,
-        occurredAt: new Date().toISOString(),
-        clientRef,
-      });
-      clientRefs.current.checkpoint = null;
-      messageApi.success('Stop departure saved.');
-      refreshRecordTime();
+      setOccurredAt(datetimeLocal());
     } catch (error) {
       messageApi.error(errorMessage(error));
     }
@@ -235,11 +122,7 @@ export function TripWorkspace({
       return observation?.checked ? [{ horse, observation }] : [];
     });
     if (checked.length === 0) {
-      messageApi.error('Select at least one horse you actually checked before saving.');
-      return;
-    }
-    if (taskMode === 'delivery' && checked.length !== trip.horses.length) {
-      messageApi.error('Check every horse on arrival before recording the delivery condition.');
+      messageApi.error('Select each horse you actually checked before saving.');
       return;
     }
     if (checked.some(({ observation }) => observation.condition === null)) {
@@ -274,9 +157,9 @@ export function TripWorkspace({
         }),
       );
       await mutation.mutateAsync({
-        routeStopId: selectedStop?.id ?? null,
+        routeStopId: stopId ?? null,
         kind: TripRecordKindEnum.CONDITION_CHECK,
-        occurredAt: new Date().toISOString(),
+        occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
         conditions,
@@ -284,32 +167,12 @@ export function TripWorkspace({
       clientRefs.current.condition = null;
       uploadedPhotos.current.clear();
       setConditionByHorse({});
-      setShowConditionForm(false);
       messageApi.success('Horse condition log saved.');
       setText('');
-      refreshRecordTime();
+      setOccurredAt(datetimeLocal());
     } catch (error) {
       messageApi.error(errorMessage(error));
     }
-  };
-
-  const applyAllStable = () => {
-    if (!trip) return;
-    setConditionByHorse(
-      Object.fromEntries(
-        trip.horses.map((horse) => [
-          horse.id,
-          {
-            checked: true,
-            condition: HorseConditionEnum.STABLE,
-            drinking: true,
-            eating: true,
-            note: '',
-            photos: [],
-          },
-        ]),
-      ),
-    );
   };
 
   const pageChange = (nextPage: number) => {
@@ -317,163 +180,9 @@ export function TripWorkspace({
     setCode('');
     setStopId(undefined);
   };
-  useEffect(() => {
-    setStopId(undefined);
-    setReceiverName('');
-    setShowConditionForm(false);
-  }, [selectedCode]);
-  const activeStop = trip ? currentStopForTrip(trip) : undefined;
-  const selectedStop = trip
-    ? (trip.stops.find((stop) => stop.id === stopId) ?? activeStop)
-    : undefined;
-  const isAtWelfareConditionStop =
-    (selectedStop?.kind === 'WELFARE' || selectedStop?.kind === 'QUARANTINE') &&
-    (selectedStop.latestStatus === TripRecordKindEnum.ARRIVED_AT_STOP ||
-      selectedStop.latestStatus === TripRecordKindEnum.CONDITION_CHECK);
-  const baseTaskMode = !trip
-    ? 'checkpoint'
-    : trip.tripStatus === TripStatusEnum.HELD
-      ? 'held'
-      : trip.tripStatus === TripStatusEnum.ARRIVED
-        ? 'delivery'
-        : trip.tripStatus === TripStatusEnum.DELIVERED
-          ? trip.records.some((record) => record.kind === TripRecordKindEnum.HANDED_OVER)
-            ? 'complete'
-            : 'handover'
-          : isAtWelfareConditionStop
-            ? 'condition'
-            : 'checkpoint';
-  const taskMode =
-    showConditionForm &&
-    trip?.tripStatus !== TripStatusEnum.ARRIVED &&
-    trip?.tripStatus !== TripStatusEnum.DELIVERED
-      ? 'condition'
-      : baseTaskMode;
-  useEffect(() => {
-    occurredAtEdited.current = false;
-    setOccurredAt(datetimeLocal());
-    setDocumentsShown([]);
-  }, [audience, selectedCode, taskMode, selectedStop?.id]);
-  const currentLog = trip ? lastRecord(trip) : undefined;
-  const conditionLog = trip ? lastConditionRecord(trip) : undefined;
-  const activeStopIndex =
-    trip && activeStop ? trip.stops.findIndex((stop) => stop.id === activeStop.id) : -1;
-  const nextStop = trip && activeStopIndex >= 0 ? trip.stops[activeStopIndex + 1] : undefined;
-  const chosenHorseCount = trip
-    ? trip.horses.filter(
-        (horse) => conditionByHorse[horse.id]?.checked && conditionByHorse[horse.id]?.condition,
-      ).length
-    : 0;
-  const allHorsesChecked = Boolean(trip?.horses.length) && chosenHorseCount === trip?.horses.length;
-
-  useEffect(() => {
-    if (!selectedStop) return;
-    const defaultKind =
-      selectedStop.kind === 'BORDER'
-        ? TripRecordKindEnum.CLEARED_BORDER
-        : selectedStop.kind === 'DELIVERY' && trip?.tripStatus === TripStatusEnum.ARRIVED
-          ? TripRecordKindEnum.DELIVERED
-          : selectedStop.kind === 'PICKUP'
-            ? TripRecordKindEnum.DEPARTED
-            : TripRecordKindEnum.ARRIVED_AT_STOP;
-    setKind(defaultKind);
-  }, [selectedStop?.id, trip?.tripStatus]);
-
-  useEffect(() => {
-    if (audience !== 'staff' || !trip) return;
-    const allowed = coordinatorKindsByStatus[trip.tripStatus];
-    const preferred = {
-      [TripStatusEnum.NOT_STARTED]: trip.clearanceReady
-        ? TripRecordKindEnum.DEPARTED
-        : TripRecordKindEnum.LOADED,
-      [TripStatusEnum.DEPARTED]: TripRecordKindEnum.ARRIVED_AT_STOP,
-      [TripStatusEnum.HELD]: TripRecordKindEnum.LEFT_STOP,
-      [TripStatusEnum.ARRIVED]: TripRecordKindEnum.DELIVERED,
-      [TripStatusEnum.DELIVERED]: TripRecordKindEnum.HANDED_OVER,
-    }[trip.tripStatus];
-    if (!allowed.includes(kind)) setKind(preferred);
-  }, [audience, trip?.tripStatus, trip?.clearanceReady, kind]);
-
-  useEffect(() => {
-    if (audience !== 'escort') return;
-    const root = document.documentElement;
-    root.dataset.theme = 'light';
-    root.style.colorScheme = 'light';
-    return () => {
-      const mode = useThemeStore.getState().mode;
-      root.dataset.theme = mode;
-      root.style.colorScheme = mode;
-    };
-  }, [audience]);
-
-  const tripPicker =
-    summaries.length > 1 ? (
-      <label className="type-body-s flex flex-col gap-2 sm:flex-row sm:items-center">
-        <span className="sr-only">Select trip</span>
-        <Select
-          aria-label="Select trip"
-          value={selectedCode}
-          onChange={(value) => {
-            setCode(value);
-            setStopId(undefined);
-          }}
-          options={summaries.map((item) => ({
-            value: item.jobCode,
-            label: `${item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
-          }))}
-          className="min-w-72"
-        />
-      </label>
-    ) : null;
-
-  if (audience === 'escort') {
-    return (
-      <EscortCab
-        now={now}
-        trip={trip}
-        summaries={summaries}
-        meQuery={meQuery}
-        selectedCode={selectedCode}
-        setCode={setCode}
-        setStopId={setStopId}
-        logout={logout}
-        mutation={mutation}
-        isOnline={isOnline}
-        summariesQuery={summariesQuery}
-        detailQuery={detailQuery}
-        page={page}
-        pageChange={pageChange}
-        tripPicker={tripPicker}
-        activeStop={activeStop}
-        selectedStop={selectedStop}
-        nextStop={nextStop}
-        taskMode={taskMode}
-        kind={kind}
-        setKind={setKind}
-        occurredAt={occurredAt}
-        setRecordTime={setRecordTime}
-        text={text}
-        setText={setText}
-        documentsShown={documentsShown}
-        setDocumentsShown={setDocumentsShown}
-        receiverName={receiverName}
-        setReceiverName={setReceiverName}
-        showConditionForm={showConditionForm}
-        setShowConditionForm={setShowConditionForm}
-        conditionByHorse={conditionByHorse}
-        updateObservation={updateObservation}
-        applyAllStable={applyAllStable}
-        conditionLog={conditionLog}
-        chosenHorseCount={chosenHorseCount}
-        allHorsesChecked={allHorsesChecked}
-        saveCheckpoint={saveCheckpoint}
-        saveConditions={saveConditions}
-        saveHandover={saveHandover}
-        saveStopDeparture={saveStopDeparture}
-        contextHolder={contextHolder}
-      />
-    );
-  }
+  const selectedSummary: TripSummary | undefined = summaries.find(
+    (item) => item.jobCode === selectedCode,
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -482,14 +191,13 @@ export function TripWorkspace({
         title={title}
         summary={summary}
         right={
-          audience === 'staff' ? (
-            <Button variant="secondary" onClick={() => setShowUpdateForm((shown) => !shown)}>
-              {showUpdateForm ? 'Close update form' : 'Record progress'}
+          audience === 'escort' ? (
+            <Button variant="secondary" onClick={logout}>
+              Sign out
             </Button>
           ) : undefined
         }
       />
-      {tripPicker}
       {summariesQuery.isPending && (
         <div className="py-12 text-center">
           <Spin />
@@ -500,51 +208,87 @@ export function TripWorkspace({
           {apiErrorMessage(summariesQuery.error, 'Refresh the page to try again.')}
         </Callout>
       )}
-      {summariesQuery.data?.totalPages === 0 && (
+      {summariesQuery.data && summariesQuery.data.totalPages === 0 && (
         <Panel>
           <p className="type-body-s m-0 text-ink-2">No trips are available for this account yet.</p>
         </Panel>
       )}
-      {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            disabled={summariesQuery.data.first}
-            onClick={() => pageChange(page - 1)}
-          >
-            Previous trips
-          </Button>
-          <span className="type-body-s text-ink-3">
-            Page {page + 1} of {summariesQuery.data.totalPages}
-          </span>
-          <Button
-            size="sm"
-            disabled={summariesQuery.data.last}
-            onClick={() => pageChange(page + 1)}
-          >
-            Next trips
-          </Button>
-        </div>
-      )}
-      {detailQuery.isPending && (
-        <div className="py-8 text-center">
-          <Spin />
-        </div>
-      )}
-      {detailQuery.isError && (
-        <Callout tone="bad" title="This trip could not be loaded">
-          {apiErrorMessage(detailQuery.error, 'Refresh the page to try again.')}
-        </Callout>
-      )}
-      {trip && audience === 'staff' && (
+      {summaries.length > 0 && (
         <>
-          {editable && showUpdateForm && (
-            <Panel
-              title="Update progress by checkpoint"
-              extra={
-                <span className="type-caption text-ink-3">
-                  Recorded updates are visible to the customer
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Select
+              aria-label="Select trip"
+              value={selectedCode}
+              onChange={(value) => {
+                setCode(value);
+                setStopId(undefined);
+              }}
+              options={summaries.map((item) => ({
+                value: item.jobCode,
+                label: `${item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
+              }))}
+              className="min-w-72 flex-1"
+            />
+            {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={summariesQuery.data.first}
+                  onClick={() => pageChange(page - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="type-body-s text-ink-3">
+                  Page {page + 1} of {summariesQuery.data.totalPages}
                 </span>
+                <Button
+                  size="sm"
+                  disabled={summariesQuery.data.last}
+                  onClick={() => pageChange(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+          {selectedSummary && (
+            <Panel
+              title={selectedSummary.jobCode}
+              extra={
+                <Chip tone={statusTone(selectedSummary.tripStatus)}>
+                  {sentence(selectedSummary.tripStatus)}
+                </Chip>
+              }
+            >
+              <p className="type-body-s m-0 text-ink-3">
+                {selectedSummary.origin ?? 'Origin not set'} →{' '}
+                {selectedSummary.destination ?? 'Destination not set'} · Last update{' '}
+                {formatTime(selectedSummary.lastUpdate)}
+              </p>
+            </Panel>
+          )}
+          {detailQuery.isPending && (
+            <div className="py-8 text-center">
+              <Spin />
+            </div>
+          )}
+          {detailQuery.isError && (
+            <Callout tone="bad" title="This trip could not be loaded">
+              {apiErrorMessage(detailQuery.error, 'Refresh the page to try again.')}
+            </Callout>
+          )}
+          {audience === 'customer' && trip && (
+            <Callout tone="info" title="Progress follows recorded checkpoints">
+              You see the last checkpoint the escort or coordinator recorded, with its time. It
+              refreshes on its own.
+            </Callout>
+          )}
+          {editable && trip && (
+            <Panel
+              title={
+                audience === 'escort'
+                  ? 'Report checkpoint and horse condition'
+                  : 'Update progress by checkpoint'
               }
             >
               {!trip.clearanceReady && (
@@ -564,14 +308,11 @@ export function TripWorkspace({
                   />
                 </label>
                 <label className="type-body-s flex flex-col gap-2">
-                  Progress status
+                  Checkpoint status
                   <Select
                     value={kind}
                     onChange={setKind}
-                    options={(coordinatorKindsByStatus[trip.tripStatus] ?? []).map((value) => ({
-                      value,
-                      label: eventLabels[value],
-                    }))}
+                    options={checkpointKinds.map((value) => ({ value, label: eventLabels[value] }))}
                   />
                 </label>
                 <label className="type-body-s flex flex-col gap-2">
@@ -579,8 +320,8 @@ export function TripWorkspace({
                   <input
                     type="datetime-local"
                     value={occurredAt}
-                    onChange={(event) => setRecordTime(event.target.value)}
-                    className="h-10 rounded-md border border-line-strong bg-input px-2"
+                    onChange={(event) => setOccurredAt(event.target.value)}
+                    className="h-8 rounded-md border border-line-strong bg-input px-2"
                   />
                 </label>
                 <label className="type-body-s flex flex-col gap-2">
@@ -593,20 +334,106 @@ export function TripWorkspace({
                   />
                 </label>
                 {kind === TripRecordKindEnum.HANDED_OVER && (
-                  <label className="type-body-s flex flex-col gap-2 md:col-span-2">
-                    Receiving person
+                  <label className="type-body-s flex flex-col gap-2">
+                    Received by
                     <Input
                       value={receiverName}
                       onChange={(event) => setReceiverName(event.target.value)}
                       maxLength={120}
-                      placeholder="Name of the person receiving the horses"
+                      placeholder="Name of the receiving person"
                     />
                   </label>
                 )}
               </div>
-              <div className="mt-4 flex justify-end">
+              {audience === 'escort' && (
+                <div className="mt-5 divide-y divide-line">
+                  {trip.horses.map((horse) => {
+                    const observation = conditionByHorse[horse.id] ?? emptyObservation();
+                    return (
+                      <section key={horse.id} className="grid gap-3 py-4 md:grid-cols-2">
+                        <div>
+                          <strong className="type-h4">{horse.name}</strong>
+                          <p className="type-body-s m-0 text-ink-3">
+                            {horse.stall ?? 'Stall not assigned'}
+                          </p>
+                        </div>
+                        <Checkbox
+                          label="I checked this horse"
+                          checked={observation.checked}
+                          onChange={(event) =>
+                            updateObservation(horse.id, { checked: event.target.checked })
+                          }
+                        />
+                        <Select
+                          aria-label={`${horse.name} condition`}
+                          allowClear
+                          placeholder="Observed condition"
+                          value={observation.condition ?? undefined}
+                          onChange={(condition?: HorseCondition) =>
+                            updateObservation(horse.id, { condition: condition ?? null })
+                          }
+                          options={conditions.map((condition) => ({
+                            value: condition,
+                            label: sentence(condition),
+                          }))}
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          {(['drinking', 'eating'] as const).map((field) => (
+                            <label key={field} className="type-body-s flex flex-col gap-1">
+                              {field === 'drinking' ? 'Drinking' : 'Eating'}
+                              <Select
+                                allowClear
+                                placeholder="Not recorded"
+                                value={
+                                  observation[field] === null
+                                    ? undefined
+                                    : observation[field]
+                                      ? 'YES'
+                                      : 'NO'
+                                }
+                                onChange={(value?: 'YES' | 'NO') =>
+                                  updateObservation(horse.id, {
+                                    [field]: value === undefined ? null : value === 'YES',
+                                  })
+                                }
+                                options={[
+                                  { value: 'YES', label: 'Yes' },
+                                  { value: 'NO', label: 'No' },
+                                ]}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <Input
+                          value={observation.note}
+                          onChange={(event) =>
+                            updateObservation(horse.id, { note: event.target.value })
+                          }
+                          maxLength={500}
+                          placeholder="Condition note (optional)"
+                        />
+                        <Upload
+                          accept="image/jpeg,image/png,image/heic,image/heif"
+                          multiple
+                          maxCount={8}
+                          fileList={observation.photos}
+                          beforeUpload={() => false}
+                          onChange={({ fileList }) =>
+                            updateObservation(horse.id, { photos: fileList })
+                          }
+                        >
+                          <Button type="button" size="sm" leadingIcon="upload">
+                            Attach photos
+                          </Button>
+                        </Upload>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+              {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
                 <Button
-                  variant="secondary"
                   disabled={
                     mutation.isPending ||
                     ((kind === TripRecordKindEnum.DEPARTED ||
@@ -616,15 +443,26 @@ export function TripWorkspace({
                   }
                   onClick={saveCheckpoint}
                 >
-                  {mutation.isPending ? 'Saving…' : 'Record progress update'}
+                  {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
                 </Button>
+                {audience === 'escort' && (
+                  <Button
+                    variant="primary"
+                    disabled={
+                      mutation.isPending ||
+                      !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
+                    }
+                    onClick={saveConditions}
+                  >
+                    Save checked horse conditions
+                  </Button>
+                )}
               </div>
             </Panel>
           )}
-          <CoordinatorTripContent trip={trip} />
+          {trip && <TripDetails trip={trip} />}
         </>
       )}
-      {trip && audience === 'customer' && <CustomerTripContent trip={trip} />}
     </div>
   );
 }

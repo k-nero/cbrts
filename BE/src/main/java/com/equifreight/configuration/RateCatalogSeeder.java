@@ -61,6 +61,7 @@ public class RateCatalogSeeder {
             Map.entry(RatePolicyKey.FLIGHT_VET_MIN_HORSES, "8"),
             Map.entry(RatePolicyKey.HIGH_VALUE_THRESHOLD, "250000"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_PCT, "20"),
+            Map.entry(RatePolicyKey.ESTIMATE_BAND_PCT, "15"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_MIN_HOURS, "3"),
             Map.entry(RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, "10"),
             Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "30"));
@@ -137,7 +138,7 @@ public class RateCatalogSeeder {
         policies.saveAll(POLICIES.entrySet().stream()
                 .map(e -> {
                     RatePolicy p = new RatePolicy();
-                    p.setId(new RatePolicy.Key(draft.getId(), e.getKey()));
+                    p.setKey(e.getKey());
                     p.setVersion(draft);
                     p.setValue(new BigDecimal(e.getValue()));
                     return p;

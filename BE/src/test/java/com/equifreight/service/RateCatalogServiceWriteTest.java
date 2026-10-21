@@ -223,8 +223,8 @@ class RateCatalogServiceWriteTest {
         band.setMinHorses((short) 1);
         band.setDiscountPct(BigDecimal.ZERO);
         RatePolicy fuel = new RatePolicy();
-        fuel.setId(new RatePolicy.Key(v2.getId(), RatePolicyKey.FUEL_PCT));
         fuel.setVersion(v2);
+        fuel.setKey(RatePolicyKey.FUEL_PCT);
         fuel.setValue(new BigDecimal("18"));
         RateFeeBand cancel = new RateFeeBand();
         cancel.setVersion(v2);
@@ -258,7 +258,7 @@ class RateCatalogServiceWriteTest {
         assertThat(copiedBreaks.getValue()).hasSize(1);
         ArgumentCaptor<List<RatePolicy>> copiedPolicies = listCaptor();
         verify(policies).saveAll(copiedPolicies.capture());
-        assertThat(copiedPolicies.getValue().getFirst().getId().getKey()).isEqualTo(RatePolicyKey.FUEL_PCT);
+        assertThat(copiedPolicies.getValue().getFirst().getKey()).isEqualTo(RatePolicyKey.FUEL_PCT);
         assertThat(copiedPolicies.getValue().getFirst().getVersion().getVersionNo())
                 .isEqualTo(3);
         ArgumentCaptor<List<RateFeeBand>> copiedBands = listCaptor();
@@ -617,12 +617,12 @@ class RateCatalogServiceWriteTest {
     @Test
     void policiesAreUpsertedOnTheDraft() {
         RatePolicy fuel = new RatePolicy();
-        fuel.setId(new RatePolicy.Key(draft.getId(), RatePolicyKey.FUEL_PCT));
         fuel.setVersion(draft);
+        fuel.setKey(RatePolicyKey.FUEL_PCT);
         fuel.setValue(new BigDecimal("18"));
-        when(policies.findById(new RatePolicy.Key(draft.getId(), RatePolicyKey.FUEL_PCT)))
+        when(policies.findByVersionIdAndKey(draft.getId(), RatePolicyKey.FUEL_PCT))
                 .thenReturn(Optional.of(fuel));
-        when(policies.findById(new RatePolicy.Key(draft.getId(), RatePolicyKey.DEPOSIT_PCT)))
+        when(policies.findByVersionIdAndKey(draft.getId(), RatePolicyKey.DEPOSIT_PCT))
                 .thenReturn(Optional.empty());
 
         Map<RatePolicyKey, BigDecimal> values = new EnumMap<>(RatePolicyKey.class);
@@ -633,7 +633,7 @@ class RateCatalogServiceWriteTest {
         ArgumentCaptor<RatePolicy> saved = ArgumentCaptor.forClass(RatePolicy.class);
         verify(policies, org.mockito.Mockito.times(2)).save(saved.capture());
         assertThat(saved.getAllValues())
-                .extracting(p -> p.getId().getKey(), p -> p.getValue().toPlainString())
+                .extracting(p -> p.getKey(), p -> p.getValue().toPlainString())
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(RatePolicyKey.FUEL_PCT, "20"),
                         org.assertj.core.groups.Tuple.tuple(RatePolicyKey.DEPOSIT_PCT, "30"));
@@ -763,5 +763,14 @@ class RateCatalogServiceWriteTest {
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(versions);
         order.verify(versions).lockByStatus(CatalogStatus.PUBLISHED);
         order.verify(versions).findByStatus(CatalogStatus.DRAFT);
+    }
+
+    @Test
+    void theEstimateBandIsAPercentage() {
+        assertRefused(
+                () -> service.putPolicies(
+                        lan, Map.of(RatePolicyKey.ESTIMATE_BAND_PCT, new BigDecimal("101")), pnhHkg.getId()),
+                "ESTIMATE_BAND_PCT",
+                "Estimate band must be between 0 and 100%.");
     }
 }

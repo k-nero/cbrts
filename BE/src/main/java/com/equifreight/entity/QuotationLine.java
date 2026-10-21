@@ -108,6 +108,18 @@ public class QuotationLine extends BaseEntity {
     private String overrideReason;
 
     /**
+     * The line's identity across re-prices and revisions: the rate line's code, STALL, MISSING:n or MANUAL:uuid.
+     */
+    @Column(length = 80)
+    private String lineKey;
+
+    /**
+     * Why the logistics manager added the line; set only on an added line (DB check).
+     */
+    @Column(length = 300)
+    private String manualReason;
+
+    /**
      * coalesce(overrideAmount, catalogAmount): a generated column, read back after every write.
      */
     @Generated(event = {EventType.INSERT, EventType.UPDATE})

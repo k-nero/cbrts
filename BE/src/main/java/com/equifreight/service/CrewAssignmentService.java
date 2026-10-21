@@ -130,8 +130,6 @@ public class CrewAssignmentService {
             ca.setJob(job);
             ca.setUser(user);
             ca.setCrewRole(item.crewRole());
-            ca.getId().setJobId(job.getId());
-            ca.getId().setUserId(user.getId());
             assignments.add(ca);
         }
 

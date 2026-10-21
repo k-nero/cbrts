@@ -31,6 +31,9 @@ export const clearanceApi = {
   getChecklist: (jobId: string) =>
     client.get<ChecklistItem[]>(`/staff/clearance/jobs/${jobId}/checklist`),
 
+  generateChecklist: (jobId: string) =>
+    client.post<ChecklistItem[]>(`/staff/clearance/jobs/${jobId}/generate-checklist`),
+
   getClearanceStatus: (jobId: string) =>
     client.get<ClearanceStatus>(`/staff/clearance/jobs/${jobId}/status`),
 

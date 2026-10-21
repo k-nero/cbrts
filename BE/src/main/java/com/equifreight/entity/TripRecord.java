@@ -10,8 +10,6 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * The escort's log and the only source of positions. Append-only (trigger). A DEPARTED record is refused unless the
@@ -71,10 +69,9 @@ public class TripRecord extends BaseEntity {
     @Column(length = 500)
     private String text;
 
-    /** Border checklist items the escort presented with this immutable checkpoint record. */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "documents_shown", nullable = false, columnDefinition = "jsonb")
-    private List<UUID> documentsShown = new ArrayList<>();
+    /** Checklist items the escort physically presented at a border crossing with this record. */
+    @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.PERSIST)
+    private List<TripRecordDocument> documentsShown = new ArrayList<>();
 
     @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.PERSIST)
     private List<ConditionLog> conditionLogs = new ArrayList<>();

@@ -1,8 +1,14 @@
 import { type FC, useState } from 'react';
-import { Empty, Select, Spin } from 'antd';
+import { App, Empty, Select, Spin } from 'antd';
 import { Button, Callout, Chip, DocumentRow } from '@/components/ui';
-import { useClearanceJobs, useClearanceStatus, useJobChecklist } from '@/hooks/clearance';
+import {
+  useClearanceJobs,
+  useClearanceStatus,
+  useGenerateChecklist,
+  useJobChecklist,
+} from '@/hooks/clearance';
 import { type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
+import { apiErrorMessage } from '@/lib/utils';
 import ClearanceSummary from './ClearanceSummary';
 import { rowStatus } from './rowStatus';
 
@@ -23,6 +29,23 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
     isError: checklistFailed,
   } = useJobChecklist(jobId);
   const { data: status } = useClearanceStatus(jobId);
+  const generate = useGenerateChecklist();
+  const { message } = App.useApp();
+
+  // BR-F2-01: items from the pinned catalogs. A re-run only adds what is missing (a horse added later).
+  const onGenerate = async (id: string) => {
+    try {
+      const items = await generate.mutateAsync(id);
+      const added = items.length - checklist.length;
+      message.success(
+        added > 0
+          ? `${added} ${added === 1 ? 'item' : 'items'} added from the regulation catalog`
+          : 'The checklist already has every item the catalog requires',
+      );
+    } catch (error) {
+      message.error(apiErrorMessage(error, "The checklist wasn't generated. Try again."));
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,7 +96,17 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h3 className="type-h3 text-ink">Checklist</h3>
-              <span className="type-caption text-ink-3">{checklist.length} items configured</span>
+              <span className="flex items-center gap-3">
+                <span className="type-caption text-ink-3">{checklist.length} items configured</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={generate.isPending || checklistLoading}
+                  onClick={() => void onGenerate(jobId)}
+                >
+                  {checklist.length === 0 ? 'Generate checklist' : 'Add missing items'}
+                </Button>
+              </span>
             </div>
 
             {checklistLoading && (
@@ -90,7 +123,7 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
 
             {!checklistLoading && !checklistFailed && checklist.length === 0 && (
               <div className="rounded-lg border border-line bg-card p-12 text-center">
-                <Empty description="No checklist items found for this job." />
+                <Empty description="No checklist yet. Generate it from the regulation catalogs of the countries on this route." />
               </div>
             )}
 

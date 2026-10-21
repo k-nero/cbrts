@@ -94,7 +94,7 @@ class TripServiceTest {
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
 
     private static TripConditionRequest condition(Horse horse, List<UUID> photos) {
-        return new TripConditionRequest(horse.getId(), HorseCondition.SOUND, true, true, null, photos);
+        return new TripConditionRequest(horse.getId(), HorseCondition.STABLE, true, true, null, photos);
     }
 
     private static Horse horse(String name) {

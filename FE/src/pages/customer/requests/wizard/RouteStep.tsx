@@ -1,10 +1,11 @@
 import type { FC, ReactNode } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { components, type InputProps } from 'react-select';
 
-import { Group, StepRefusal } from './parts';
+import { Group } from './Group';
+import { StepRefusal } from './StepRefusal';
 
-import type { StepProps } from '.';
+import type { StepProps } from './WizardForm';
+import { CappedInput } from './CappedInput';
 
 import { useFormWrapperCtx } from '@/components/form/FormWrapper';
 import { Button, Callout, Checkbox, OptionCard, Panel, RouteStrip } from '@/components/ui';
@@ -14,6 +15,7 @@ import type { Route } from '@/interfaces';
 import {
   alsoByLine,
   formatDay,
+  optionMeta,
   type PlaceOption,
   roadRuns,
   routePlanLine,
@@ -33,7 +35,7 @@ const TIMES = Array.from({ length: 48 }, (_, i) => {
 const PENALTY =
   'The penalty is 10% of the job total for each started hour after the window closes, up to 30%, credited on the final invoice. The clock stops while a border authority holds the trailer or a vet stops it for a horse’s welfare. Your quotation states the exact terms.';
 
-type PlaceChoice = PlaceOption & { country?: string };
+export type PlaceChoice = PlaceOption & { country?: string };
 
 /** Pickup and delivery points whose name or city matches what is typed. */
 const loadPlaces = (q: string): Promise<PlaceChoice[]> =>
@@ -53,11 +55,6 @@ const typedCity = async (text: string): Promise<PlaceChoice> => ({
   city: text,
   __isNew__: true,
 });
-
-/** The search box stops at the server's 160 characters for a typed city. */
-const CappedInput = (props: InputProps<PlaceChoice, false>) => (
-  <components.Input {...props} maxLength={160} />
-);
 
 const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }): ReactNode =>
   context === 'menu' && o.country ? (
@@ -93,6 +90,7 @@ const alternativeLine = (r: Route) => {
 
 /** Step 2 (spec §5.3): from and to, the route we run (or that we don't), dates and arrival. */
 const RouteStep: FC<StepProps> = ({
+  estimate,
   saved,
   live,
   routes,
@@ -227,6 +225,7 @@ const RouteStep: FC<StepProps> = ({
                 onChange={() => set('arrivalMode', 'ANY_TIME')}
                 title="Any time on the day"
                 description="We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days."
+                meta={optionMeta(estimate?.options.arrivalWindow.find((o) => o.value === 'false'))}
               />
               <OptionCard
                 name="arrivalMode"
@@ -237,7 +236,10 @@ const RouteStep: FC<StepProps> = ({
                 onChange={() => set('arrivalMode', 'WINDOW')}
                 title="Within a window"
                 description="You choose a window of at least 3 hours. We use a private trailer so the departure is yours."
-                meta={windowRuns ? undefined : 'Road moves only'}
+                meta={optionMeta(
+                  estimate?.options.arrivalWindow.find((o) => o.value === 'true'),
+                  windowRuns ? undefined : 'Road moves only',
+                )}
               />
             </div>
             {arrivalMode === 'WINDOW' ? (

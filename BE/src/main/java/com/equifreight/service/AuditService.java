@@ -120,13 +120,21 @@ public class AuditService {
         AuditLog log = new AuditLog();
         log.setOccurredAt(Instant.now(clock));
         log.setAction(action);
-        log.setSummary(summary);
+        log.setSummary(truncate(summary, 500));
         log.setEntityType(entityType);
         log.setEntityId(entityId);
         log.setEntityCode(entityCode);
         log.setBefore(toJson(before));
         log.setAfter(toJson(after));
         return log;
+    }
+
+    /** A summary is built by the code, so an over-long one is cut rather than failing the decision it records. */
+    private static String truncate(String text, int max) {
+        if (text == null || text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, max - 3) + "...";
     }
 
     private String labelOf(User actor) {
