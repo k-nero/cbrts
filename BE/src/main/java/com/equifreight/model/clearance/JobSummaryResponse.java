@@ -9,4 +9,11 @@ import lombok.Builder;
  * Lightweight job summary for staff job selection and overview.
  */
 @Builder
-public record JobSummaryResponse(UUID id, String code, DossierStatus dossierStatus, JobStage stage, String clubName) {}
+public record JobSummaryResponse(
+        UUID id,
+        String code,
+        DossierStatus dossierStatus,
+        JobStage stage,
+        String clubName,
+        String originCity,
+        String destinationCity) {}

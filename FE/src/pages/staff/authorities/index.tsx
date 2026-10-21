@@ -36,6 +36,7 @@ import {
   useEvaluateClearanceGate,
   useCheckLateSubmissions,
 } from '@/hooks/clearance';
+import { apiErrorMessage } from '@/lib/utils';
 import type {
   JobSummary,
   AuthoritySubmission,
@@ -249,10 +250,10 @@ const AuthoritiesPage: FC = () => {
 
   const handleEvaluateGate = async () => {
     try {
-      await evaluateGateMutation.mutateAsync();
-      message.success('Clearance gate re-evaluated successfully.');
-    } catch {
-      message.error('Failed to evaluate clearance gate.');
+      await evaluateGateMutation.mutateAsync(jobId ?? undefined);
+      void message.success('Clearance gate re-evaluated successfully.');
+    } catch (err: unknown) {
+      void message.error(apiErrorMessage(err, 'Failed to evaluate clearance gate.'));
     }
   };
 
@@ -301,10 +302,16 @@ const AuthoritiesPage: FC = () => {
             onChange={(val) => setJobId(val ?? null)}
             onSearch={setJobSearch}
             loading={loadingJobs}
-            options={clearanceJobs.map((j: JobSummary) => ({
-              label: `${j.code} · ${j.clubName ? j.clubName + ' ' : ''}(${j.originCity} → ${j.destinationCity})`,
-              value: j.id,
-            }))}
+            options={clearanceJobs.map((j: JobSummary) => {
+              const route =
+                j.originCity && j.destinationCity
+                  ? `(${j.originCity} → ${j.destinationCity})`
+                  : '(Cross-border corridor)';
+              return {
+                label: `${j.code} · ${j.clubName ? j.clubName + ' ' : ''}${route}`,
+                value: j.id,
+              };
+            })}
             className="w-[380px] sm:w-[460px]"
             size="middle"
           />
@@ -312,7 +319,7 @@ const AuthoritiesPage: FC = () => {
         <div className="flex items-center gap-2 text-[13px] text-ink-2">
           <span>Crossing route:</span>
           <Tag color="cyan">
-            {selectedJob
+            {selectedJob?.originCity && selectedJob?.destinationCity
               ? `${selectedJob.originCity} → ${selectedJob.destinationCity}`
               : (clearanceStatus?.jobCode ?? 'In transit')}
           </Tag>

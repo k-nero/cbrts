@@ -16,12 +16,27 @@ public final class ClearanceMapper {
 
     /** A job on the transport specialist's picker. */
     public static JobSummaryResponse toJobSummaryResponse(TransportJob job) {
+        String origin = job.getRequest() != null && job.getRequest().getOriginPlace() != null
+                ? job.getRequest().getOriginPlace().getCity()
+                : (job.getRequest() != null && job.getRequest().getCorridor() != null
+                        ? job.getRequest().getCorridor().getOriginCity()
+                        : "Ho Chi Minh City");
+        String dest = job.getRequest() != null && job.getRequest().getDestinationPlace() != null
+                ? job.getRequest().getDestinationPlace().getCity()
+                : (job.getRequest() != null && job.getRequest().getCorridor() != null
+                        ? job.getRequest().getCorridor().getDestinationCity()
+                        : "Phnom Penh");
+        String club = job.getRequest() != null && job.getRequest().getClub() != null
+                ? job.getRequest().getClub().getName()
+                : null;
         return JobSummaryResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
                 .dossierStatus(job.getDossierStatus())
                 .stage(job.getStage())
-                .clubName(job.getRequest().getClub().getName())
+                .clubName(club)
+                .originCity(origin)
+                .destinationCity(dest)
                 .build();
     }
 

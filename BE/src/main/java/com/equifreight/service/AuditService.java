@@ -57,7 +57,7 @@ public class AuditService {
         log.setActorLabel(actor == null ? SYSTEM : labelOf(actor));
         log.setActorRole(actor == null ? SYSTEM_ROLE : roleOf(actor));
         log.setChannel(Channel.WEB);
-        log.setReason(reason);
+        log.setReason(truncate(reason, 500));
         return logs.save(log);
     }
 
@@ -89,13 +89,20 @@ public class AuditService {
         AuditLog log = new AuditLog();
         log.setOccurredAt(Instant.now(clock));
         log.setAction(action);
-        log.setSummary(summary);
+        log.setSummary(truncate(summary, 500));
         log.setEntityType(entityType);
         log.setEntityId(entityId);
         log.setEntityCode(entityCode);
         log.setBefore(toJson(before));
         log.setAfter(toJson(after));
         return log;
+    }
+
+    private static String truncate(String text, int max) {
+        if (text == null || text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, max - 3) + "...";
     }
 
     private String labelOf(User actor) {
