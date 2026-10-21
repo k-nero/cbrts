@@ -34,7 +34,10 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
 RUN PG=$(ls /usr/lib/postgresql) \
     && pg_ctlcluster "$PG" main start \
     && su postgres -c "psql -qc \"ALTER USER postgres PASSWORD 'train'\" && createdb cbrtsdb" \
-    && DB_URL=jdbc:postgresql://localhost:5432/cbrtsdb DB_USERNAME=postgres DB_PASSWORD=train \
+    && SPRING_PROFILES_ACTIVE=docker SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/cbrtsdb \
+       SPRING_DATASOURCE_USERNAME=postgres SPRING_DATASOURCE_PASSWORD=train \
+       JWT_SECRET=aot-training-run-only-not-a-real-secret-0123456789 APP_SEED_DEFAULT_PASSWORD=train \
+       APP_STORAGE_S3_ACCESSKEY=train APP_STORAGE_S3_SECRETKEY=train \
        java -Xlog:aot=error -XX:AOTCacheOutput=app.aot -Dspring.aot.enabled=true -Dspring.context.exit=onRefresh -jar app.jar \
     && pg_ctlcluster "$PG" main stop
 
@@ -46,6 +49,8 @@ WORKDIR /app
 COPY --from=train /app ./
 USER app
 EXPOSE 8080
+# The image is for compose; without this it would fall back to the dev profile (spring.profiles.default).
+ENV SPRING_PROFILES_ACTIVE=docker
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
 # On startup the JVM may log a couple of "Failed to link AdapterHandlerEntry" warnings. They're harmless: it
 # regenerates those adapters and still uses the rest of the cache. "AOT cache ... mismatch" would mean it's ignored.

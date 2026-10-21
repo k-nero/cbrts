@@ -69,11 +69,13 @@ tasks.named('test') {
 }
 
 // Local schema tasks: ./gradlew flywayInfo, flywayMigrate, and flywayClean then flywayMigrate to reset a dev database.
-// Same connection as the app (application.properties): DB_URL, DB_USERNAME and DB_PASSWORD, with the same defaults.
+// Same connection as the app's dev profile, overridden the same way: SPRING_DATASOURCE_URL, _USERNAME, _PASSWORD.
+def devProfile = new Properties()
+file('src/main/resources/application-dev.properties').withInputStream { devProfile.load(it) }
 flyway {
-    url = System.getenv('DB_URL') ?: 'jdbc:postgresql://localhost:5432/cbrtsdb'
-    user = System.getenv('DB_USERNAME') ?: 'postgres'
-    password = System.getenv('DB_PASSWORD') ?: '123456'
+    url = System.getenv('SPRING_DATASOURCE_URL') ?: devProfile['spring.datasource.url']
+    user = System.getenv('SPRING_DATASOURCE_USERNAME') ?: devProfile['spring.datasource.username']
+    password = System.getenv('SPRING_DATASOURCE_PASSWORD') ?: devProfile['spring.datasource.password']
     schemas = ['public']
     locations = ['filesystem:src/main/resources/db/migration']
     // Flyway 10+ refuses clean by default. These tasks only ever point at a developer's own database.

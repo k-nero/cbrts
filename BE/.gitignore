@@ -41,7 +41,5 @@ CLAUDE.MD
 .env
 .env.*
 !.env.example
-application-dev.properties
-src/main/resources/application-dev.properties
-### Uploaded files (STORAGE_TYPE=local) ###
+### Uploaded files (app.storage.type=local) ###
 /data/
