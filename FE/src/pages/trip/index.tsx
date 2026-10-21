@@ -169,14 +169,6 @@ function TripDetails({ trip }: { trip: TripView }) {
         ) : (
           <ol className="m-0 list-none space-y-3 p-0">
             {trip.stops.map((stop) => {
-              const stopKind =
-                stop.kind === 'BORDER'
-                  ? 'border'
-                  : stop.kind === 'WELFARE' || stop.kind === 'QUARANTINE'
-                    ? 'welfare'
-                    : stop.kind === 'DELIVERY' || stop.kind === 'AIRPORT_IN'
-                      ? 'delivery'
-                      : 'pickup';
               const detail = [
                 stop.details,
                 stop.latestNote,
@@ -192,7 +184,7 @@ function TripDetails({ trip }: { trip: TripView }) {
               return (
                 <li key={stop.id}>
                   <TimelineStop
-                    kind={stopKind}
+                    kind={stop.kind}
                     stop={`${stop.sequence}. ${stop.name}`}
                     time={
                       stop.latestOccurredAt

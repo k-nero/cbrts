@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { vehicleApi } from '@/apis/vehicle';
-import type { CreateVehicleInput, UpdateVehicleInput, VehicleBookingInput } from '@/interfaces';
+import type {
+  CreateVehicleInput,
+  UpdateVehicleInput,
+  VehicleBookingInput,
+  VehicleKind,
+} from '@/interfaces';
 
 export const useVehicles = (params?: { page?: number; size?: number; sort?: string }) => {
   return useQuery({
@@ -58,9 +63,9 @@ export const useBookVehicle = () => {
   });
 };
 
-export const useFleetCalendar = (from?: string, to?: string) => {
+export const useFleetCalendar = (from?: string, to?: string, vehicleKind?: VehicleKind) => {
   return useQuery({
-    queryKey: ['fleet-calendar', from, to],
-    queryFn: () => vehicleApi.getFleetCalendar({ from, to }),
+    queryKey: ['fleet-calendar', from, to, vehicleKind],
+    queryFn: () => vehicleApi.getFleetCalendar({ from, to, vehicleKind }),
   });
 };

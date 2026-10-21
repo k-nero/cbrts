@@ -5,6 +5,7 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CrewRole;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.CrewMemberResponse;
@@ -119,7 +120,7 @@ public class CrewAssignmentService {
                     && !crewAssignmentRepository
                             .findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt)
                             .isEmpty()) {
-                throw new com.equifreight.exception.ConflictException(
+                throw new ConflictException(
                         "CREW_OVERLAP",
                         "Crew member " + user.getFirstName() + " " + user.getLastName()
                                 + " is already assigned to another overlapping trip");
