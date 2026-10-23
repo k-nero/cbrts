@@ -86,6 +86,8 @@ const BLANK: TransportRequest = {
   leadTime: null,
   blockers: null,
   infoRequiredNote: null,
+  cancelledAt: null,
+  cancellationFeePct: null,
   revisions: [],
 };
 

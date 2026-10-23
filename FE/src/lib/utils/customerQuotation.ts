@@ -135,3 +135,58 @@ export const quotationCallout = (
       : 'It is itemised, with the deposit and cancellation terms.',
   };
 };
+
+/** "25%": a fee band's percentage, without trailing zeros. */
+const feePct = (pct: number): string => `${Number(pct.toFixed(2))}%`;
+
+/**
+ * What cancelling costs today (BR-F1-07, US-Q-08): the band the days left before departure fall in,
+ * from the quotation's pinned catalog.
+ */
+export const cancellationToday = (q: Pick<CustomerQuotation, 'cancellation'>): string => {
+  const band = q.cancellation.bands.find((b) => b.current);
+  const days = Math.max(0, q.cancellation.daysToDeparture);
+  if (!band) return 'Cancelling before approval costs the fee band for the notice you give.';
+  return `If you cancel before approval, the fee today is ${feePct(band.pct)} of the total, with ${days} ${
+    days === 1 ? 'day' : 'days'
+  } to departure.`;
+};
+
+/** The cancellation as it was recorded: "You cancelled on 26 Sep 2026. The fee is 25% of the quotation total." */
+export const cancelledText = (cancelledAt: string | null, pct: number | null): string => {
+  const on = cancelledAt
+    ? `You cancelled on ${formatDate(cancelledAt)}.`
+    : 'You cancelled this request.';
+  if (pct == null) return on;
+  return pct === 0
+    ? `${on} No fee, as no quotation was issued.`
+    : `${on} The fee is ${feePct(pct)} of the quotation total.`;
+};
+
+/** The quoted pass's chip: the version and where the club's answer stands. */
+export const quotedPassChip = (
+  q: Pick<CustomerQuotation, 'status' | 'requestStatus' | 'versionNo'>,
+): { tone: 'info' | 'ok' | 'neutral'; label: string } => {
+  if (q.requestStatus === 'CANCELLED') return { tone: 'neutral', label: 'Cancelled' };
+  if (q.status === 'ACCEPTED') return { tone: 'ok', label: `Accepted · v${q.versionNo}` };
+  if (q.status === 'DECLINED') return { tone: 'neutral', label: `Declined · v${q.versionNo}` };
+  if (q.status === 'EXPIRED') return { tone: 'neutral', label: `Expired · v${q.versionNo}` };
+  return { tone: 'info', label: `Quoted · v${q.versionNo}` };
+};
+
+/** The line under the quoted total: until when it holds, or what became of it. */
+export const quotedPassSub = (
+  q: Pick<
+    CustomerQuotation,
+    'status' | 'requestStatus' | 'validUntil' | 'acceptedAt' | 'declinedAt' | 'cancelledAt'
+  >,
+): string => {
+  const on = (iso: string | null) => (iso ? ` ${formatDate(iso)}` : '');
+  if (q.requestStatus === 'CANCELLED') return `Request cancelled${on(q.cancelledAt)}.`;
+  if (q.status === 'ACCEPTED')
+    return `Accepted${on(q.acceptedAt)}. Once the job is approved, this becomes your travel pass.`;
+  if (q.status === 'DECLINED') return `Declined${on(q.declinedAt)}.`;
+  if (q.status === 'EXPIRED')
+    return `Expired${on(q.validUntil)}. It is re-priced from the rate catalog in force now.`;
+  return `Valid until ${q.validUntil ? formatDate(q.validUntil) : '—'}. Once you accept and the job is approved, this becomes your travel pass.`;
+};
