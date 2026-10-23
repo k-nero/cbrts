@@ -11,6 +11,7 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.model.job.BiosecurityWarningResponse;
 import com.equifreight.model.job.ShareTripResponse;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
@@ -56,6 +57,9 @@ class TripSharingServiceTest {
 
     @Mock
     private AuditService audit;
+
+    @Mock
+    private BiosecurityService biosecurity;
 
     private TripSharingService service;
 
@@ -111,13 +115,21 @@ class TripSharingServiceTest {
         when(jobTrips.jobsOn(joiningTrip)).thenReturn(List.of());
         when(jobTrips.horsesOn(joiningTrip)).thenReturn(List.of(horse(joiningTrip, joining)));
         service = new TripSharingService(
-                jobs, jobTrips, loadPlans, routePlans, bookings, crew, audit, Clock.fixed(NOW, ZoneOffset.UTC));
+                jobs,
+                jobTrips,
+                loadPlans,
+                routePlans,
+                bookings,
+                crew,
+                audit,
+                biosecurity,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
     @DisplayName("A job joins another job's trip on the days both allow, and the trip reopens with its stops")
     void aJobJoinsTheTrip() {
-        ShareTripResponse result = service.share(host.getId(), joining.getId(), khoi);
+        ShareTripResponse result = service.share(host.getId(), joining.getId(), List.of(), khoi);
 
         // 041 can leave 28 Nov to 4 Dec, 042 from 30 Nov to 6 Dec.
         assertEquals(LocalDate.of(2026, 11, 30), result.departFrom());
@@ -148,7 +160,7 @@ class TripSharingServiceTest {
         when(bookings.findByTrip_Id(joiningTrip.getId())).thenReturn(List.of(booking));
         when(jobTrips.vehiclesOf(joiningTrip)).thenReturn(List.of(tv));
 
-        service.share(host.getId(), joining.getId(), khoi);
+        service.share(host.getId(), joining.getId(), List.of(), khoi);
 
         verify(bookings).deleteAll(List.of(booking));
         verify(crew).deleteByTripVehicleId(tv.getId());
@@ -160,8 +172,8 @@ class TripSharingServiceTest {
     void privateTrailersDontShare() {
         joining.getRequest().setTrailer(TrailerType.PRIVATE);
 
-        BusinessException ex =
-                assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
 
         assertThat(ex.getMessage()).contains("CBRT-2026-042").contains("private trailer");
         verify(jobTrips, never()).moveJob(any(), any(), any());
@@ -174,7 +186,7 @@ class TripSharingServiceTest {
         other.setId(UUID.randomUUID());
         joining.getRequest().setCorridor(other);
 
-        assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
         verify(jobTrips, never()).moveJob(any(), any(), any());
     }
 
@@ -183,8 +195,8 @@ class TripSharingServiceTest {
     void datesThatDontFit() {
         joining.getRequest().setDepartureDate(LocalDate.of(2026, 12, 20));
 
-        ConflictException ex =
-                assertThrows(ConflictException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        ConflictException ex = assertThrows(
+                ConflictException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
 
         assertEquals("DATES_DONT_FIT", ex.getCode());
         assertThat(ex.getMessage())
@@ -198,8 +210,8 @@ class TripSharingServiceTest {
         when(loadPlans.lackOfRoom(hostTrip, joining))
                 .thenReturn("5 horses need a stall and the trip's trailers have 4");
 
-        ConflictException ex =
-                assertThrows(ConflictException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        ConflictException ex = assertThrows(
+                ConflictException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
 
         assertEquals("NEEDS_ANOTHER_TRAILER", ex.getCode());
         assertThat(ex.getMessage()).contains("Add a trailer");
@@ -216,11 +228,32 @@ class TripSharingServiceTest {
         when(jobTrips.horsesOn(joiningTrip)).thenReturn(List.of(onJoining));
         when(jobTrips.horsesOn(hostTrip)).thenReturn(List.of(onHost));
 
-        BusinessException ex =
-                assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
 
         assertThat(ex.getMessage()).contains("Copper King").contains("CBRT-2026-041");
         verify(jobTrips, never()).moveJob(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Unaccepted biosecurity warnings stop the share before anything moves (US-F3-12)")
+    void biosecurityWarningsAreAcceptedFirst() {
+        List<BiosecurityWarningResponse> warnings = List.of(BiosecurityWarningResponse.builder()
+                .key("k1")
+                .kind("ISOLATION")
+                .message("TRP-2026-001: isolation mismatch")
+                .build());
+        when(biosecurity.forJoin(hostTrip, joining)).thenReturn(warnings);
+        doThrow(new ConflictException("BIOSECURITY_WARNINGS", "Accept them"))
+                .when(biosecurity)
+                .requireAccepted(hostTrip, warnings, List.of(), khoi);
+
+        assertThrows(ConflictException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
+        verify(jobTrips, never()).moveJob(any(), any(), any());
+
+        service.share(host.getId(), joining.getId(), List.of("k1"), khoi);
+        verify(biosecurity).requireAccepted(hostTrip, warnings, List.of("k1"), khoi);
+        verify(jobTrips).moveJob(joining, joiningTrip, hostTrip);
     }
 
     @Test
@@ -229,7 +262,7 @@ class TripSharingServiceTest {
         host.setTripStatus(TripStatus.DEPARTED);
         host.setDepartedAt(NOW);
 
-        assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), khoi));
+        assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
         verify(jobTrips, never()).moveJob(any(), any(), any());
     }
 

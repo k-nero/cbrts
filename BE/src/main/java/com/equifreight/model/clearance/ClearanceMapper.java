@@ -184,6 +184,7 @@ public final class ClearanceMapper {
                 .name(dt.getName())
                 .scope(dt.getScope())
                 .providedBy(dt.getProvidedBy())
+                .category(dt.getCategory())
                 .build();
     }
 

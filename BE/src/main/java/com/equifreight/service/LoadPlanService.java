@@ -33,6 +33,7 @@ public class LoadPlanService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final JobTripService jobTrips;
     private final RoutePlanService routePlanService;
+    private final BiosecurityService biosecurity;
     private final AuditService auditService;
 
     public LoadPlanService(
@@ -45,6 +46,7 @@ public class LoadPlanService {
             CrewAssignmentRepository crewAssignmentRepository,
             JobTripService jobTrips,
             RoutePlanService routePlanService,
+            BiosecurityService biosecurity,
             AuditService auditService) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
@@ -55,6 +57,7 @@ public class LoadPlanService {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.jobTrips = jobTrips;
         this.routePlanService = routePlanService;
+        this.biosecurity = biosecurity;
         this.auditService = auditService;
     }
 
@@ -578,6 +581,15 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse confirmLoadPlan(UUID jobId, User currentUser) {
+        return confirmLoadPlan(jobId, List.of(), currentUser);
+    }
+
+    /**
+     * As {@link #confirmLoadPlan(UUID, User)}, with the biosecurity warnings the coordinator accepted: a warning that
+     * is new or changed since it was accepted has to be accepted again before the load is confirmed (US-F3-12).
+     */
+    @Transactional
+    public TripLoadResponse confirmLoadPlan(UUID jobId, Collection<String> acceptedWarnings, User currentUser) {
         TransportJob job = job(jobId);
         Trip trip = jobTrips.tripOf(jobId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
@@ -601,6 +613,8 @@ public class LoadPlanService {
                     "Cannot confirm load plan: resolve " + state.conflicts().size() + " placement conflicts first ("
                             + state.conflicts().getFirst().description() + ")");
         }
+
+        biosecurity.requireAccepted(trip, state.warnings(), acceptedWarnings, currentUser);
 
         // Every trailer is booked for the trip's planned dates, which the confirmed route sets: from the departure
         // until the last job on it arrives.
@@ -841,6 +855,7 @@ public class LoadPlanService {
                 .vehicles(vehicles)
                 .unassignedHorses(unassigned)
                 .conflicts(allConflicts)
+                .warnings(biosecurity.forTrip(trip))
                 .build();
     }
 

@@ -146,8 +146,11 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public TripLoadResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
-        return loadPlanService.confirmLoadPlan(jobId, user);
+    public TripLoadResponse confirmLoadPlan(
+            @PathVariable UUID jobId,
+            @RequestBody(required = false) ConfirmLoadPlanRequest request,
+            @AuthenticationPrincipal User user) {
+        return loadPlanService.confirmLoadPlan(jobId, request == null ? List.of() : request.acceptedWarnings(), user);
     }
 
     /**
@@ -161,6 +164,17 @@ public class StaffJobController {
     }
 
     /**
+     * US-F3-12: Biosecurity warnings for this job's trip: if {@code withJobId} joined it, or as its trailers are
+     * loaded now. They don't block; the coordinator accepts them when sharing or confirming.
+     */
+    @GetMapping("/{jobId}/trip/warnings")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<BiosecurityWarningResponse> tripWarnings(
+            @PathVariable UUID jobId, @RequestParam(value = "withJobId", required = false) UUID withJobId) {
+        return tripSharingService.warnings(jobId, withJobId);
+    }
+
+    /**
      * US-F3-11: Shared trailer - put another job on this job's trip; reopens the trips' plans.
      */
     @PostMapping("/{jobId}/trip/jobs")
@@ -169,7 +183,7 @@ public class StaffJobController {
             @PathVariable UUID jobId,
             @Valid @RequestBody ShareTripRequest request,
             @AuthenticationPrincipal User user) {
-        return tripSharingService.share(jobId, request.jobId(), user);
+        return tripSharingService.share(jobId, request.jobId(), request.acceptedWarnings(), user);
     }
 
     /**
