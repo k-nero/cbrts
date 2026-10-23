@@ -4,8 +4,7 @@ import com.equifreight.entity.CrewAssignment;
 import com.equifreight.model.trip.TripSummaryResponse;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -24,27 +23,26 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
     void deleteByTripVehicleId(@Param("tripVehicleId") UUID tripVehicleId);
 
     /**
-     * The escort's upcoming and active trips (US-F4-01), one row per job on a trip they crew: closed jobs drop off
-     * the list. Trips are only released to the crew once signed off by the logistics manager (US-F3-08, US-F4-01).
+     * The escort's upcoming and active trips (US-F4-01), one row per job on a trip they crew, with the trip's code so
+     * the service can fold a shared trip into one row: closed jobs drop off the list. Trips are only released to the
+     * crew once signed off by the logistics manager (US-F3-08, US-F4-01).
      */
-    @Query(value = """
+    @Query("""
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
-                (select max(r.occurredAt) from TripRecord r where r.trip = t))
+                (select max(r.occurredAt) from TripRecord r where r.trip = t),
+                t.code)
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d,
                  Trip t
             where t.id in (select th.trip.id from TripHorse th where th.job = j)
               and exists (select 1 from CrewAssignment c where c.tripVehicle.trip = t and c.user.id = :userId)
               and (j.signedOffAt is not null or j.tripStatus <> com.equifreight.entity.enums.TripStatus.NOT_STARTED)
               and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
-            """, countQuery = """
-                    select count(j) from TransportJob j, Trip t
-                    where t.id in (select th.trip.id from TripHorse th where th.job = j)
-                      and exists (select 1 from CrewAssignment c where c.tripVehicle.trip = t and c.user.id = :userId)
-                      and (j.signedOffAt is not null or j.tripStatus <> com.equifreight.entity.enums.TripStatus.NOT_STARTED)
-                      and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
-                    """)
-    Page<TripSummaryResponse> findTripSummariesByUserId(@Param("userId") UUID userId, Pageable pageable);
+            """)
+    List<TripSummaryResponse> findTripRowsByUserId(@Param("userId") UUID userId, Sort sort);
+
+    /** The user's crew places on a trip: the trailers they ride. */
+    List<CrewAssignment> findByTripVehicle_Trip_IdAndUser_Id(UUID tripId, UUID userId);
 
     boolean existsByTripVehicle_Trip_IdAndUser_Id(UUID tripId, UUID userId);
 

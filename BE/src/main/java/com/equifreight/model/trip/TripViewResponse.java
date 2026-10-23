@@ -18,7 +18,10 @@ public record TripViewResponse(
         Instant arrivalWindowEnd,
         String origin,
         String destination,
+        /** The confirmed trailers; for the escort, the ones they ride. */
         String vehicleCode,
+        /** True when the trailer carries another job too; the customer is told only that, never whose. */
+        boolean shared,
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
         List<TripRecordResponse> records) {}

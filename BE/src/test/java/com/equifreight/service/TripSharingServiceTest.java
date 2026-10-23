@@ -39,6 +39,9 @@ class TripSharingServiceTest {
     private static final Instant NOW = Instant.parse("2026-11-20T03:00:00Z");
 
     @Mock
+    private TripNotices notices;
+
+    @Mock
     private TransportJobRepository jobs;
 
     @Mock
@@ -124,6 +127,7 @@ class TripSharingServiceTest {
                 crew,
                 audit,
                 biosecurity,
+                notices,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -284,6 +288,7 @@ class TripSharingServiceTest {
         verify(loadPlans).reopenTrip(hostTrip, "CBRT-2026-042 taken off the trip");
         verify(routePlans).removeJobStops(hostTrip, joining);
         assertThat(joining.getSignedOffAt()).isNull();
+        verify(notices).replanned(joining, hostTrip);
         verify(audit)
                 .recordDecision(
                         eq(khoi),

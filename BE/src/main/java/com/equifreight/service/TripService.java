@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -103,9 +104,37 @@ public class TripService {
         return new ConflictException("TRIP_STATE_CONFLICT", "%s Current trip status: %s.".formatted(reason, status));
     }
 
+    /**
+     * The escort's trips, one row per trip however many jobs it carries (US-F3-14): the crew work one trailer, not one
+     * job. An escort has a handful of trips, so they are folded and paged here rather than in the query.
+     */
     @Transactional(readOnly = true)
     public Page<TripSummaryResponse> escortTrips(User user, Pageable pageable) {
-        return crew.findTripSummariesByUserId(user.getId(), pageable);
+        Map<String, List<TripSummaryResponse>> byTrip = new LinkedHashMap<>();
+        crew.findTripRowsByUserId(user.getId(), pageable.getSort())
+                .forEach(row -> byTrip.computeIfAbsent(row.tripCode(), k -> new ArrayList<>())
+                        .add(row));
+        List<TripSummaryResponse> rows =
+                byTrip.values().stream().map(TripService::oneRow).toList();
+        int from = (int) Math.min(pageable.getOffset(), rows.size());
+        int to = Math.min(from + pageable.getPageSize(), rows.size());
+        return new PageImpl<>(rows.subList(from, to), pageable, rows.size());
+    }
+
+    /** A trip's rows as one: it opens on its first job not yet delivered, and lists every job it carries. */
+    private static TripSummaryResponse oneRow(List<TripSummaryResponse> rows) {
+        TripSummaryResponse lead = rows.stream()
+                .filter(r -> r.tripStatus() != TripStatus.DELIVERED)
+                .findFirst()
+                .orElse(rows.getFirst());
+        return new TripSummaryResponse(
+                lead.jobCode(),
+                lead.tripStatus(),
+                lead.origin(),
+                lead.destination(),
+                lead.lastUpdate(),
+                lead.tripCode(),
+                rows.stream().map(TripSummaryResponse::jobCode).sorted().toList());
     }
 
     @Transactional(readOnly = true)
@@ -124,15 +153,18 @@ public class TripService {
         TransportJob job = job(code);
         Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
-            throw ResourceNotFoundException.of("Trip", code);
-        return view(job, trip, true);
+        // The cab surface is per trailer (US-F3-14): the escort sees the horses on the trailers they ride.
+        Set<UUID> trailers = new HashSet<>();
+        crew.findByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId())
+                .forEach(c -> trailers.add(c.getTripVehicle().getId()));
+        if (trailers.isEmpty() || !released) throw ResourceNotFoundException.of("Trip", code);
+        return view(job, trip, true, trailers);
     }
 
     @Transactional(readOnly = true)
     public TripViewResponse coordinatorTrip(String code) {
         TransportJob job = job(code);
-        return view(job, jobTrips.tripOf(job.getId()), true);
+        return view(job, jobTrips.tripOf(job.getId()), true, null);
     }
 
     @Transactional(readOnly = true)
@@ -141,7 +173,7 @@ public class TripService {
         if (user.getClub() == null
                 || !job.getRequest().getClub().getId().equals(user.getClub().getId()))
             throw ResourceNotFoundException.of("Trip", code);
-        return view(job, jobTrips.tripOf(job.getId()), false);
+        return view(job, jobTrips.tripOf(job.getId()), false, null);
     }
 
     @Transactional
@@ -467,47 +499,69 @@ public class TripService {
                 after);
     }
 
-    /** The trip as {@code job}'s people see it; {@code staffView} is false for the customer, who never sees the TRP code. */
-    private TripViewResponse view(TransportJob job, Trip trip, boolean staffView) {
-        // The customer sees their own stops and horses only: on a shared trip, nothing about the other client
-        // (US-F3-11). Stops of the whole trip (borders, welfare stops) are theirs too.
-        java.util.function.Predicate<RouteStop> visible =
-                st -> staffView || st.getJob() == null || st.getJob().getId().equals(job.getId());
+    /**
+     * The trip as {@code job}'s people see it; {@code staffView} is false for the customer, who never sees the TRP
+     * code. {@code trailers} limits the horses and vehicles to the trailers an escort rides; null shows them all.
+     */
+    private TripViewResponse view(TransportJob job, Trip trip, boolean staffView, Set<UUID> trailers) {
+        // The customer sees their own horses and records only: on a shared trip, nothing about the other client
+        // (US-F3-11, US-F3-14). Stops of the whole trip (borders, welfare stops) are theirs too, and another job's
+        // pickup or delivery is "a stop on the way".
+        java.util.function.Predicate<RouteStop> own =
+                st -> st.getJob() == null || st.getJob().getId().equals(job.getId());
         Set<UUID> ownHorses = new HashSet<>();
         requestHorses
                 .findByRequest_Id(job.getRequest().getId())
                 .forEach(rh -> ownHorses.add(rh.getHorse().getId()));
-        List<TripRecord> tripRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
-                .filter(r -> r.getRouteStop() == null || visible.test(r.getRouteStop()))
+        List<TripHorse> riders = jobTrips.horsesEverOn(trip).stream()
+                .filter(th -> th.getStatus() != TripHorseStatus.MOVED)
+                .toList();
+        boolean shared =
+                riders.stream().map(th -> th.getJob().getId()).distinct().count() > 1;
+        List<TripRecord> allRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId());
+        List<TripRecord> tripRecords = allRecords.stream()
+                .filter(r -> staffView || r.getRouteStop() == null || own.test(r.getRouteStop()))
                 .toList();
         Map<UUID, TripRecord> latest = new HashMap<>();
-        tripRecords.stream()
+        allRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
                 .forEach(r -> latest.put(r.getRouteStop().getId(), r));
         List<TripStopResponse> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
-                        .filter(visible)
-                        .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
+                        .map(s -> !staffView && !own.test(s)
+                                ? TripMapper.toStopOnTheWay(s, latest.get(s.getId()))
+                                : TripMapper.toStopResponse(
+                                        s,
+                                        latest.get(s.getId()),
+                                        staffView && shared && s.getJob() != null
+                                                ? s.getJob().getCode()
+                                                : null))
                         .toList())
                 .orElse(List.of());
-        // Every confirmed trailer of the convoy, in order (US-F3-10).
+        // Every confirmed trailer of the convoy, in order (US-F3-10); the escort's own only.
         List<LoadPlan> confirmed = loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()).stream()
                 .filter(p -> p.getStatus() == LoadPlanStatus.CONFIRMED)
+                .filter(p ->
+                        trailers == null || trailers.contains(p.getTripVehicle().getId()))
                 .toList();
         Map<UUID, LoadPlanStall> stalls = new HashMap<>();
         confirmed.forEach(
                 p -> p.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s)));
-        // Staff and the crew see every horse that rode the trip; the customer their own.
-        List<Horse> horsesOnTrip = staffView
-                ? jobTrips.horsesEverOn(trip).stream()
-                        .filter(th -> th.getStatus() != TripHorseStatus.MOVED)
-                        .map(TripHorse::getHorse)
-                        .toList()
-                : List.of();
-        if (horsesOnTrip.isEmpty()) {
-            horsesOnTrip = requestHorses.findByRequest_Id(job.getRequest().getId()).stream()
-                    .map(RequestHorse::getHorse)
+        // Staff and the crew see every horse that rode the trip (the escort those on their trailers); the customer
+        // their own.
+        List<Horse> horsesOnTrip;
+        if (trailers != null) {
+            horsesOnTrip = riders.stream()
+                    .map(TripHorse::getHorse)
+                    .filter(h -> stalls.containsKey(h.getId()))
                     .toList();
+        } else {
+            horsesOnTrip = staffView ? riders.stream().map(TripHorse::getHorse).toList() : List.of();
+            if (horsesOnTrip.isEmpty()) {
+                horsesOnTrip = requestHorses.findByRequest_Id(job.getRequest().getId()).stream()
+                        .map(RequestHorse::getHorse)
+                        .toList();
+            }
         }
         List<TripHorseResponse> horses = horsesOnTrip.stream()
                 .map(h -> TripMapper.toHorseResponse(h, stalls.get(h.getId()), confirmed.size() > 1))
@@ -526,6 +580,7 @@ public class TripService {
                                 confirmed.stream()
                                         .map(p -> p.getVehicle().getCode())
                                         .toList()),
+                shared,
                 stops,
                 horses,
                 recordResponses);
