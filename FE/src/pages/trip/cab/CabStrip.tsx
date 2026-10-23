@@ -13,40 +13,65 @@ export function CabStrip({ trip, selectedStopId, onSelectStop }: Props) {
   // Determine state of each stop: 'Done' | 'Current' | 'Held' | 'Upcoming'
   const isTripHeld = trip.tripStatus === TripStatusEnum.HELD;
 
-  // Find index of the first stop without latestOccurredAt
+  // Find index of the first stop without latestOccurredAt or held stop
   const firstPendingIndex = trip.stops.findIndex((s) => !s.latestOccurredAt);
-  const currentIndex =
-    firstPendingIndex === -1 ? trip.stops.length - 1 : Math.max(0, firstPendingIndex);
+  const heldIndex = isTripHeld
+    ? trip.stops.findIndex((s) => s.latestStatus === TripRecordKindEnum.HELD)
+    : -1;
+  const activeHeldIndex =
+    heldIndex !== -1
+      ? heldIndex
+      : firstPendingIndex === -1
+        ? trip.stops.length - 1
+        : firstPendingIndex;
+
+  const currentIndex = isTripHeld
+    ? activeHeldIndex
+    : firstPendingIndex === -1
+      ? trip.stops.length - 1
+      : Math.max(0, firstPendingIndex);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
       {trip.stops.map((stop, index) => {
-        const isDone = Boolean(stop.latestOccurredAt) && index < currentIndex;
-        const isCurrent = index === currentIndex;
-        const isHeld = isCurrent && isTripHeld;
-        const state: 'Done' | 'Current' | 'Held' | 'Upcoming' = isHeld
-          ? 'Held'
-          : isDone
-            ? 'Done'
-            : isCurrent
-              ? 'Current'
-              : 'Upcoming';
+        let state: 'Done' | 'Current' | 'Held' | 'Upcoming';
+        let timeDisplay: string;
+        let subNote: string;
 
-        const isCardActive = selectedStopId ? selectedStopId === stop.id : isCurrent;
-
-        const timeDisplay = stop.latestOccurredAt
-          ? formatClock(stop.latestOccurredAt)
-          : formatClock(stop.plannedAt);
-
-        const subNote = stop.latestNote
-          ? stop.latestNote
-          : isHeld
-            ? 'Held since'
+        if (isTripHeld) {
+          if (index < activeHeldIndex) {
+            state = 'Done';
+            timeDisplay = formatClock(stop.latestOccurredAt);
+            subNote = stop.kind === 'BORDER' ? 'Cleared' : 'Departed';
+          } else if (index === activeHeldIndex) {
+            state = 'Held';
+            timeDisplay = formatClock(stop.latestOccurredAt);
+            subNote = 'Held since';
+          } else {
+            state = 'Upcoming';
+            timeDisplay = '—';
+            subNote = 'Waits on the decision';
+          }
+        } else {
+          const isDone = Boolean(stop.latestOccurredAt) && index < currentIndex;
+          const isCurrent = index === currentIndex;
+          state = isDone ? 'Done' : isCurrent ? 'Current' : 'Upcoming';
+          timeDisplay = stop.latestOccurredAt
+            ? formatClock(stop.latestOccurredAt)
+            : formatClock(stop.plannedAt);
+          subNote = stop.latestNote
+            ? stop.latestNote
             : isDone
-              ? 'Departed / Cleared'
+              ? 'Departed'
               : isCurrent
                 ? 'Arrived · recording now'
                 : 'Planned';
+        }
+
+        const isHeld = state === 'Held';
+        const isDone = state === 'Done';
+        const isCurrent = state === 'Current';
+        const isCardActive = selectedStopId ? selectedStopId === stop.id : isCurrent;
 
         const dotBg =
           state === 'Done'
