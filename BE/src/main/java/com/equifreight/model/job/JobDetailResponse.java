@@ -33,4 +33,6 @@ public record JobDetailResponse(
         List<JobHorseResponse> horses,
         TripLoadResponse loadPlan,
         RoutePlanResponse routePlan,
-        List<CrewMemberResponse> crew) {}
+        List<CrewMemberResponse> crew,
+        /** Every job on the job's trip, this one included (US-F3-11). */
+        List<TripJobResponse> tripJobs) {}

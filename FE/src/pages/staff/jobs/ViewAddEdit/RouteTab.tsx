@@ -98,10 +98,13 @@ export function RouteTab({ job }: Props) {
                 })
               : '—';
 
-            const stopName =
+            // On a shared trip each pickup and delivery names its job (US-F3-11).
+            const shared = new Set(stops.map((s) => s.jobCode).filter(Boolean)).size > 1;
+            const placeName =
               stop.kind === 'BORDER'
                 ? stop.borderCrossingName || 'Border'
                 : stop.placeName || 'Stop';
+            const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
 
             return (
               <TimelineStop

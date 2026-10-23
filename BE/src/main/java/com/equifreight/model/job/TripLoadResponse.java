@@ -20,4 +20,6 @@ public record TripLoadResponse(
         List<LoadPlanResponse> vehicles,
         List<JobHorseResponse> unassignedHorses,
         /** Every trailer's conflicts. */
-        List<LoadPlanConflictResponse> conflicts) {}
+        List<LoadPlanConflictResponse> conflicts,
+        /** Biosecurity warnings for horses of different jobs on one trailer (US-F3-12). */
+        List<BiosecurityWarningResponse> warnings) {}

@@ -195,7 +195,17 @@ class ConvoyTest {
         when(bookings.findByTrip_IdAndVehicle_Id(any(), any())).thenReturn(Optional.empty());
 
         service = new LoadPlanService(
-                loadPlans, placements, jobs, vehicles, stalls, bookings, crew, jobTrips, routePlanService, audit);
+                loadPlans,
+                placements,
+                jobs,
+                vehicles,
+                stalls,
+                bookings,
+                crew,
+                jobTrips,
+                routePlanService,
+                mock(BiosecurityService.class),
+                audit);
         crewService = new CrewAssignmentService(crew, jobs, users, jobTrips, loadPlans, placements, audit);
         jobService = new TransportJobService(
                 jobs,

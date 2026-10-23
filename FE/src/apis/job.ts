@@ -2,6 +2,7 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
+  BiosecurityWarning,
   CrewMember,
   JobDetail,
   JobListParams,
@@ -9,6 +10,8 @@ import type {
   TripLoad,
   MoveHorse,
   RoutePlan,
+  ShareTripResult,
+  TripJob,
 } from '@/interfaces';
 
 export const jobApi = {
@@ -47,8 +50,16 @@ export const jobApi = {
   autoArrange: (jobId: string) =>
     client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/auto-arrange`).then((r) => r.data),
 
-  confirmLoadPlan: (jobId: string) =>
-    client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`).then((r) => r.data),
+  confirmLoadPlan: (jobId: string, acceptedWarnings: string[] = []) =>
+    client
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`, { acceptedWarnings })
+      .then((r) => r.data),
+
+  /** Biosecurity warnings for this job's trip: if `withJobId` joined it, or as loaded now. */
+  getTripWarnings: (jobId: string, withJobId?: string) =>
+    client
+      .get<BiosecurityWarning[]>(`/staff/jobs/${jobId}/trip/warnings`, { params: { withJobId } })
+      .then((r) => r.data),
 
   getRoutePlans: (jobId: string) =>
     client.get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`).then((r) => r.data),
@@ -59,6 +70,23 @@ export const jobApi = {
         params: { changeReason },
       })
       .then((r) => r.data),
+
+  /** Approved jobs that could join this job's trip (US-F3-11). */
+  getShareCandidates: (jobId: string) =>
+    client.get<TripJob[]>(`/staff/jobs/${jobId}/trip/candidates`).then((r) => r.data),
+
+  /** Puts another job on this job's trip; the trip's plans reopen. */
+  shareTrip: (jobId: string, otherJobId: string, acceptedWarnings: string[] = []) =>
+    client
+      .post<ShareTripResult>(`/staff/jobs/${jobId}/trip/jobs`, {
+        jobId: otherJobId,
+        acceptedWarnings,
+      })
+      .then((r) => r.data),
+
+  /** Takes a job off this job's trip onto a trip of its own. */
+  takeOffTrip: (jobId: string, otherJobId: string) =>
+    client.delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`).then((r) => r.data),
 
   getCrew: (jobId: string) =>
     client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`).then((r) => r.data),

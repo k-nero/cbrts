@@ -16,7 +16,9 @@ import com.equifreight.repository.TripHorseRepository;
 import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.TripVehicleRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -96,6 +98,12 @@ public class JobTripService {
         return tripHorses.findByTrip_IdAndStatusOrderByCreatedAt(trip.getId(), TripHorseStatus.ON_TRIP);
     }
 
+    /** Every horse that rode the trip, delivered or moved ones included, in the order they joined. */
+    @Transactional(readOnly = true)
+    public List<TripHorse> horsesEverOn(Trip trip) {
+        return tripHorses.findByTrip_IdOrderByCreatedAt(trip.getId());
+    }
+
     /** The jobs with horses on the trip now. */
     @Transactional(readOnly = true)
     public List<TransportJob> jobsOn(Trip trip) {
@@ -139,6 +147,51 @@ public class JobTripService {
         });
         tripVehicle.setVehicle(vehicle);
         return tripVehicles.save(tripVehicle);
+    }
+
+    /**
+     * A new trip for {@code job} alone, on its request's corridor, with no horses yet: the job's horses move onto it
+     * with {@link #moveJob}.
+     */
+    @Transactional
+    public Trip newTripFor(TransportJob job, User createdBy, Instant at) {
+        Trip trip = new Trip();
+        trip.setCode(
+                codeService.next(CodePrefix.TRP, at.atZone(BusinessTime.ZONE).getYear()));
+        trip.setCorridor(job.getRequest().getCorridor());
+        trip.setCreatedBy(createdBy);
+        return trips.save(trip);
+    }
+
+    /**
+     * Moves the job's horses from {@code from} to {@code to} before departure (US-F3-11). Their rows on {@code from}
+     * stay as MOVED, so history shows where they were; a horse that rode {@code to} before is put back on it.
+     */
+    @Transactional
+    public List<UUID> moveJob(TransportJob job, Trip from, Trip to) {
+        List<TripHorse> moving =
+                tripHorses.findByTrip_IdAndJob_IdAndStatus(from.getId(), job.getId(), TripHorseStatus.ON_TRIP);
+        for (TripHorse onTrip : moving) {
+            onTrip.setStatus(TripHorseStatus.MOVED);
+        }
+        tripHorses.saveAllAndFlush(moving);
+        Map<UUID, TripHorse> before = new HashMap<>();
+        for (TripHorse earlier : tripHorses.findByTrip_IdOrderByCreatedAt(to.getId())) {
+            before.put(earlier.getHorse().getId(), earlier);
+        }
+        for (TripHorse moved : moving) {
+            TripHorse onTrip = before.get(moved.getHorse().getId());
+            if (onTrip == null) {
+                onTrip = new TripHorse();
+                onTrip.setTrip(to);
+                onTrip.setHorse(moved.getHorse());
+            }
+            onTrip.setJob(job);
+            onTrip.setStatus(TripHorseStatus.ON_TRIP);
+            tripHorses.save(onTrip);
+        }
+        tripHorses.flush();
+        return moving.stream().map(th -> th.getHorse().getId()).toList();
     }
 
     /**

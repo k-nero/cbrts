@@ -1,5 +1,6 @@
 package com.equifreight.entity;
 
+import com.equifreight.entity.enums.DocumentCategory;
 import com.equifreight.entity.enums.DocumentProvider;
 import com.equifreight.entity.enums.DocumentScope;
 import jakarta.persistence.*;
@@ -28,4 +29,9 @@ public class DocumentType extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private DocumentProvider providedBy;
+
+    /** HEALTH documents decide a horse's health status on a shared trip (US-F3-12). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private DocumentCategory category = DocumentCategory.TRANSPORT;
 }

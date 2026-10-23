@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), and convoys (US-F3-10, #169). The rest is in #170–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170) and biosecurity warnings (US-F3-12, #171). The rest is in #172–#175.
 
 ## Why
 
@@ -12,6 +12,7 @@ Today one approved request becomes one job, and one job has exactly one trailer:
 | --- | --- |
 | Scope | Both: **sharing** (several jobs in one trailer) and **splitting** (one job across several trailers). |
 | Who combines jobs, and when | The **fleet coordinator, after approval**, while planning. The app suggests jobs that fit. |
+| Private trailers | **Never shared.** Only jobs whose customer chose a shared trailer can be combined; a private-trailer job (and so every job with an arrival window, which needs a private trailer) always travels alone. Decided 23 Oct 2026, while building US-F3-11. |
 | Price | **Unchanged.** Space is already priced by stall width, so each customer keeps their quoted price; sharing saves the company a trailer. The locked price and horse list are untouched. |
 | Routes | **Same catalog corridor.** Different pickup or drop-off points become extra stops on one route plan. |
 | Model | A new **Trip** above jobs: one trip holds 1+ jobs and 1+ vehicles. Jobs keep their CBRT codes. |
@@ -145,7 +146,7 @@ Health status is never typed in: it's derived from what each job's clearance alr
 
 **What counts as a health document.** `document_types` gains `category` (`HEALTH`, `IDENTITY`, `PERMIT`, `TRANSPORT`), maintained in the regulation catalog like the rest of it. Checks 2 and 3 use `HEALTH` only: influenza vaccination, EIA (Coggins) test, piroplasmosis test and the export health certificate today; the equine passport is `IDENTITY`.
 
-**When it's checked.** When the coordinator adds a job (or moves a horse between trailers), and again when the trip's load plans are confirmed. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
+**When it's checked.** When the coordinator adds a job, and again when the trip's load plans are confirmed; the load plan shows the trip's current warnings after every change, so moving a horse between trailers shows what it mixes. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
 
 ## What each person sees
 

@@ -64,6 +64,21 @@ public interface TransportJobRepository
                     """)
     Page<TransportJob> findOpenDossiers(@Param("q") String q, Pageable pageable);
 
+    /**
+     * Jobs that could share a trailer on {@code corridorId} (US-F3-11): approved, not departed, not closed, and the
+     * customer chose a shared trailer. Earliest departure first.
+     */
+    @Query("""
+            select j from TransportJob j join j.request r
+            where r.corridor.id = :corridorId
+              and r.trailer = com.equifreight.entity.enums.TrailerType.SHARED
+              and j.departedAt is null
+              and j.tripStatus = com.equifreight.entity.enums.TripStatus.NOT_STARTED
+              and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
+            order by r.departureDate, j.code
+            """)
+    List<TransportJob> findShareCandidates(@Param("corridorId") UUID corridorId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from TransportJob j where j.code = :code")
     Optional<TransportJob> findByCodeForUpdate(@Param("code") String code);
