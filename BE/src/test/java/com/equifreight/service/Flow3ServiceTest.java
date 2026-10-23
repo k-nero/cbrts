@@ -230,6 +230,7 @@ class Flow3ServiceTest {
                 crewAssignmentRepository,
                 jobTrips,
                 routePlanService,
+                mock(BiosecurityService.class),
                 auditService);
         crewAssignmentService = new CrewAssignmentService(
                 crewAssignmentRepository,

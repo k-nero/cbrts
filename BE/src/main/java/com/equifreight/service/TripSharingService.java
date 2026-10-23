@@ -10,6 +10,7 @@ import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.job.BiosecurityWarningResponse;
 import com.equifreight.model.job.JobMapper;
 import com.equifreight.model.job.ShareTripResponse;
 import com.equifreight.model.job.TripJobResponse;
@@ -20,6 +21,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -46,6 +48,7 @@ public class TripSharingService {
     private final VehicleBookingRepository bookings;
     private final CrewAssignmentRepository crew;
     private final AuditService audit;
+    private final BiosecurityService biosecurity;
     private final Clock clock;
 
     public TripSharingService(
@@ -56,6 +59,7 @@ public class TripSharingService {
             VehicleBookingRepository bookings,
             CrewAssignmentRepository crew,
             AuditService audit,
+            BiosecurityService biosecurity,
             Clock clock) {
         this.jobs = jobs;
         this.jobTrips = jobTrips;
@@ -64,6 +68,7 @@ public class TripSharingService {
         this.bookings = bookings;
         this.crew = crew;
         this.audit = audit;
+        this.biosecurity = biosecurity;
         this.clock = clock;
     }
 
@@ -128,7 +133,8 @@ public class TripSharingService {
      * sign-off cleared.
      */
     @Transactional
-    public ShareTripResponse share(UUID hostJobId, UUID joiningJobId, User currentUser) {
+    public ShareTripResponse share(
+            UUID hostJobId, UUID joiningJobId, Collection<String> acceptedWarnings, User currentUser) {
         TransportJob host = job(hostJobId);
         TransportJob joining = job(joiningJobId);
         Trip trip = jobTrips.tripOf(hostJobId);
@@ -189,6 +195,9 @@ public class TripSharingService {
                             + ". Add a trailer on the Load plan tab first.");
         }
 
+        // Different health status warns but doesn't block: the coordinator accepts what it says (US-F3-12).
+        biosecurity.requireAccepted(trip, biosecurity.forJoin(trip, joining), acceptedWarnings, currentUser);
+
         List<UUID> horses = jobTrips.horsesOn(from).stream()
                 .filter(th -> th.getJob().getId().equals(joining.getId()))
                 .map(th -> th.getHorse().getId())
@@ -225,6 +234,16 @@ public class TripSharingService {
                 .departTo(days.to())
                 .jobs(now)
                 .build();
+    }
+
+    /**
+     * The biosecurity warnings for {@code jobId}'s trip (US-F3-12): if {@code withJobId} joined it, or as the trip's
+     * trailers are loaded now.
+     */
+    @Transactional(readOnly = true)
+    public List<BiosecurityWarningResponse> warnings(UUID jobId, UUID withJobId) {
+        Trip trip = jobTrips.tripOf(jobId);
+        return withJobId == null ? biosecurity.forTrip(trip) : biosecurity.forJoin(trip, job(withJobId));
     }
 
     /**

@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169) and shared trailers (US-F3-11, #170). The rest is in #171–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170) and biosecurity warnings (US-F3-12, #171). The rest is in #172–#175.
 
 ## Why
 
@@ -146,7 +146,7 @@ Health status is never typed in: it's derived from what each job's clearance alr
 
 **What counts as a health document.** `document_types` gains `category` (`HEALTH`, `IDENTITY`, `PERMIT`, `TRANSPORT`), maintained in the regulation catalog like the rest of it. Checks 2 and 3 use `HEALTH` only: influenza vaccination, EIA (Coggins) test, piroplasmosis test and the export health certificate today; the equine passport is `IDENTITY`.
 
-**When it's checked.** When the coordinator adds a job (or moves a horse between trailers), and again when the trip's load plans are confirmed. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
+**When it's checked.** When the coordinator adds a job, and again when the trip's load plans are confirmed; the load plan shows the trip's current warnings after every change, so moving a horse between trailers shows what it mixes. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
 
 ## What each person sees
 
