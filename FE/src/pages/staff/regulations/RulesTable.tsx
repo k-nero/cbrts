@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 import { Chip, Panel } from '@/components/ui';
 import { DocumentScopeEnum, type RegulationRule, RegulationRuleDiffEnum } from '@/interfaces';
 import { RULE_SHAPE_LABELS, SCOPE_OPTIONS } from './constants';
@@ -64,7 +65,7 @@ const RulesTable: FC<Props> = ({ title, rules, selectedRuleId, onEdit }) => (
                 }`}
               >
                 <td className="px-6 py-3">
-                  <div className="flex items-center gap-2">
+                  <Flex align="center" gap={8}>
                     <span className="type-label-s font-medium text-ink">
                       {rule.documentType?.name ?? 'Document'}
                     </span>
@@ -73,7 +74,7 @@ const RulesTable: FC<Props> = ({ title, rules, selectedRuleId, onEdit }) => (
                         {isNew ? 'New' : 'Changed'}
                       </Chip>
                     )}
-                  </div>
+                  </Flex>
                 </td>
                 <td className="px-4 py-3">
                   <Chip tone="neutral" dot={false} className="text-[12px]">

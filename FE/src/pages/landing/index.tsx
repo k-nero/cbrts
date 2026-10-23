@@ -1,3 +1,4 @@
+import { Col, Flex, Row } from 'antd';
 import type { FC } from 'react';
 
 import { Corridors } from './Corridors';
@@ -116,24 +117,26 @@ const LandingPage: FC = () => {
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand />
-        <nav aria-label="Account" className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" leadingIcon="info" onClick={toHowItWorks}>
-            Help
-          </Button>
-          <ThemeToggle />
-          {isAuthenticated ? (
-            <Button size="sm" trailingIcon="arrow-right" onClick={toHome}>
-              Go to my workspace
+    <Flex vertical className="min-h-screen bg-canvas">
+      <header className="h-16 shrink-0 border-b border-line px-10">
+        <Flex align="center" justify="space-between" className="h-full">
+          <Brand />
+          <Flex component="nav" aria-label="Account" align="center" gap={8}>
+            <Button size="sm" variant="ghost" leadingIcon="info" onClick={toHowItWorks}>
+              Help
             </Button>
-          ) : (
-            <Button size="sm" onClick={toSignIn}>
-              Sign in
-            </Button>
-          )}
-        </nav>
+            <ThemeToggle />
+            {isAuthenticated ? (
+              <Button size="sm" trailingIcon="arrow-right" onClick={toHome}>
+                Go to my workspace
+              </Button>
+            ) : (
+              <Button size="sm" onClick={toSignIn}>
+                Sign in
+              </Button>
+            )}
+          </Flex>
+        </Flex>
       </header>
 
       <main className="flex-1">
@@ -148,49 +151,61 @@ const LandingPage: FC = () => {
           ]}
           className="h-[720px]"
         >
-          <div className="mx-auto flex h-full max-w-[1200px] items-center">
-            <div className="flex w-[620px] flex-col gap-6">
-              <h1 className="type-display-xl m-0 text-ink">
-                Precision <em className="italic">transport</em>
-                <br />
-                for every horse
-              </h1>
-              <p className="type-body-l m-0 max-w-[560px] text-ink-2">
-                Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong.
-                Every document is checked against your travel dates, and no horse leaves until
-                clearance is complete.
-              </p>
-              <div className="flex gap-3">
-                <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
-                  Request transport
-                </Button>
-                {!isAuthenticated && <Button onClick={toSignUp}>Create a club account</Button>}
-              </div>
-            </div>
+          <div className="mx-auto h-full max-w-[1200px]">
+            <Flex align="center" className="h-full">
+              <Flex vertical gap={24} className="w-[620px]">
+                <h1 className="type-display-xl m-0 text-ink">
+                  Precision <em className="italic">transport</em>
+                  <br />
+                  for every horse
+                </h1>
+                <p className="type-body-l m-0 max-w-[560px] text-ink-2">
+                  Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong
+                  Kong. Every document is checked against your travel dates, and no horse leaves
+                  until clearance is complete.
+                </p>
+                <Flex gap={12}>
+                  <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
+                    Request transport
+                  </Button>
+                  {!isAuthenticated && <Button onClick={toSignUp}>Create a club account</Button>}
+                </Flex>
+              </Flex>
+            </Flex>
           </div>
         </PhotoPanel>
 
         <div className="mx-auto w-full max-w-[1200px] pb-24">
-          <section aria-labelledby="pass-title" className="flex items-center gap-16 pt-20">
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
-              <h2 id="pass-title" className="type-display-l m-0 text-ink">
-                Every move, on one pass
-              </h2>
-              <p className="type-body-m m-0 max-w-[520px] text-ink-2">
-                Once a request is approved, the move gets its own pass: the route, the departure,
-                your arrival window, and the date each document must carry for the crossings on your
-                route.
-              </p>
-              <ul className="m-0 flex list-none flex-col gap-2.5 p-0 pt-2">
-                {PASS_POINTS.map((point) => (
-                  <li key={point} className="type-body-m flex items-center gap-2.5 text-ink">
-                    <Icon name="check" size={16} className="shrink-0 text-ok" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <TravelPass />
+          <section aria-labelledby="pass-title" className="pt-20">
+            <Flex align="center" gap={64}>
+              <Flex vertical gap={16} className="min-w-0 flex-1">
+                <h2 id="pass-title" className="type-display-l m-0 text-ink">
+                  Every move, on one pass
+                </h2>
+                <p className="type-body-m m-0 max-w-[520px] text-ink-2">
+                  Once a request is approved, the move gets its own pass: the route, the departure,
+                  your arrival window, and the date each document must carry for the crossings on
+                  your route.
+                </p>
+                <div className="pt-2">
+                  <Flex component="ul" vertical gap={10} className="list-none">
+                    {PASS_POINTS.map((point) => (
+                      <Flex
+                        key={point}
+                        component="li"
+                        align="center"
+                        gap={10}
+                        className="type-body-m text-ink"
+                      >
+                        <Icon name="check" size={16} className="shrink-0 text-ok" />
+                        {point}
+                      </Flex>
+                    ))}
+                  </Flex>
+                </div>
+              </Flex>
+              <TravelPass />
+            </Flex>
           </section>
 
           <Section
@@ -216,10 +231,10 @@ const LandingPage: FC = () => {
                   {SERVICES.map((s) => (
                     <tr key={s.name} className="border-t border-line align-middle">
                       <td className="px-4 py-3">
-                        <span className="flex flex-col gap-1">
+                        <Flex component="span" vertical gap={4}>
                           <span className="type-h4 text-ink">{s.name}</span>
                           <span className="type-body-s text-ink-2">{s.what}</span>
-                        </span>
+                        </Flex>
                       </td>
                       <td className="type-body-s px-4 py-3 text-ink-2">{s.scope}</td>
                       <td className="type-body-s px-4 py-3 text-ink-2">{s.price}</td>
@@ -235,10 +250,10 @@ const LandingPage: FC = () => {
             title="Where we move horses"
             summary="Six countries by road, and Hong Kong by air. Every border crossing has its own document rules, and each one is checked against your travel dates."
           >
-            <div className="flex items-start gap-6">
+            <Flex align="start" gap={24}>
               <RouteMap />
               <Corridors />
-            </div>
+            </Flex>
           </Section>
 
           <Section
@@ -248,55 +263,62 @@ const LandingPage: FC = () => {
           >
             <ol className="m-0 grid list-none grid-cols-4 gap-6 p-0">
               {PHASES.map((p) => (
-                <li key={p.title} className="flex flex-col gap-3 border-t border-line pt-6">
-                  <span className="type-label-s text-ink-3">{p.stages}</span>
-                  <h3 className="type-h3 m-0 text-ink">{p.title}</h3>
-                  <p className="type-body-s m-0 text-ink-2">{p.body}</p>
-                  <p className="type-body-s m-0 text-ink-3">Owner: {p.owner}</p>
-                  <p className="type-body-s m-0 mt-auto flex gap-2 border-t border-line pt-3 text-ink-2">
-                    <Icon name="check" size={16} className="mt-0.5 shrink-0 text-ok" />
-                    {p.rule}
-                  </p>
+                <li key={p.title} className="border-t border-line pt-6">
+                  <Flex vertical gap={12} className="h-full">
+                    <span className="type-label-s text-ink-3">{p.stages}</span>
+                    <h3 className="type-h3 m-0 text-ink">{p.title}</h3>
+                    <p className="type-body-s m-0 text-ink-2">{p.body}</p>
+                    <p className="type-body-s m-0 text-ink-3">Owner: {p.owner}</p>
+                    <p className="type-body-s m-0 mt-auto border-t border-line pt-3 text-ink-2">
+                      <Flex component="span" gap={8}>
+                        <Icon name="check" size={16} className="mt-0.5 shrink-0 text-ok" />
+                        {p.rule}
+                      </Flex>
+                    </p>
+                  </Flex>
                 </li>
               ))}
             </ol>
           </Section>
 
           <Section id="features" title="Built around the paperwork and the horse">
-            <div className="grid grid-cols-3 gap-6">
+            <Row gutter={[24, 24]}>
               {FEATURES.map((f) => (
-                <article
-                  key={f.title}
-                  className="flex flex-col gap-4 rounded-lg border border-line bg-card p-7"
-                >
-                  {f.visual}
-                  <h3 className="type-h3 m-0 text-ink">{f.title}</h3>
-                  <p className="type-body-s m-0 text-ink-2">{f.body}</p>
-                </article>
+                <Col key={f.title} span={8}>
+                  <article className="h-full rounded-lg border border-line bg-card p-7">
+                    <Flex vertical gap={16}>
+                      {f.visual}
+                      <h3 className="type-h3 m-0 text-ink">{f.title}</h3>
+                      <p className="type-body-s m-0 text-ink-2">{f.body}</p>
+                    </Flex>
+                  </article>
+                </Col>
               ))}
-            </div>
+            </Row>
           </Section>
 
           <section className="pt-20">
-            <div className="flex items-center justify-between gap-12 rounded-lg border border-line bg-card px-12 py-10">
-              <div className="flex flex-col gap-2.5">
-                <h2 className="type-display-m m-0 text-ink">
-                  Send us the horses, the route and the date
-                </h2>
-                <p className="type-body-m m-0 text-ink-2">
-                  Nothing is booked until you accept the itemised quotation.
-                </p>
-              </div>
-              <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
-                Request transport
-              </Button>
+            <div className="rounded-lg border border-line bg-card px-12 py-10">
+              <Flex align="center" justify="space-between" gap={48}>
+                <Flex vertical gap={10}>
+                  <h2 className="type-display-m m-0 text-ink">
+                    Send us the horses, the route and the date
+                  </h2>
+                  <p className="type-body-m m-0 text-ink-2">
+                    Nothing is booked until you accept the itemised quotation.
+                  </p>
+                </Flex>
+                <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
+                  Request transport
+                </Button>
+              </Flex>
             </div>
           </section>
         </div>
       </main>
 
       <Footer />
-    </div>
+    </Flex>
   );
 };
 

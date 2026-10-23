@@ -5,3 +5,9 @@ export const getFileType = (name: string) => {
     ? ''
     : name.slice(lastDotIndex + 1);
 };
+
+/** "412 KB", "3.4 MB". */
+export const fileSize = (bytes: number) =>
+  bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

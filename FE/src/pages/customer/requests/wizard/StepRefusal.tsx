@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Callout } from '@/components/ui';
 
@@ -10,11 +11,13 @@ export const StepRefusal: FC<{ messages: string[]; title?: string }> = ({ messag
     <div data-refusal>
       <Callout tone="bad" title={rest.length && title ? title : first}>
         {rest.length > 0 && (
-          <ul className="m-0 flex list-disc flex-col gap-1 pl-5">
-            {(title ? messages : rest).map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
+          <div className="pl-5">
+            <Flex component="ul" vertical gap={4} className="list-disc">
+              {(title ? messages : rest).map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </Flex>
+          </div>
         )}
       </Callout>
     </div>

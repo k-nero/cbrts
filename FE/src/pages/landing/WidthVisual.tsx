@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { Visual } from './Visual';
@@ -14,21 +15,22 @@ const STALL_ROWS: [string, number, string][] = [
 export const WidthVisual: FC = () => (
   <Visual
     label="One 96 inch air stall position: three horses in Economy, two in Business, one in First"
-    className="justify-center gap-2.5"
+    justify="center"
+    gap={10}
   >
     {STALL_ROWS.map(([cls, n, caption]) => (
-      <span key={cls} className="flex items-center gap-2.5">
+      <Flex key={cls} component="span" align="center" gap={10}>
         <span className="type-body-s w-16 shrink-0 text-ink-2">{cls}</span>
-        <span className="flex h-[18px] flex-1 gap-[3px]" aria-hidden>
+        <Flex component="span" gap={3} className="h-[18px] flex-1" aria-hidden>
           {Array.from({ length: n }, (_, i) => (
             <span
               key={i}
               className={cx('flex-1 rounded-sm', i === 0 ? 'bg-stall-standard' : 'bg-stall-box')}
             />
           ))}
-        </span>
+        </Flex>
         <span className="type-caption shrink-0 text-ink-3">{caption}</span>
-      </span>
+      </Flex>
     ))}
   </Visual>
 );

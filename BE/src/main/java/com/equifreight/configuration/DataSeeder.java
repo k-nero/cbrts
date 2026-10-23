@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.exception.StorageException;
 import com.equifreight.repository.*;
 import com.equifreight.service.HorseSizing;
+import com.equifreight.service.JobTripService;
 import com.equifreight.service.storage.FileStorage;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -202,6 +203,7 @@ public class DataSeeder implements ApplicationRunner {
     private final StoredFileRepository storedFileRepository;
     private final FileStorage fileStorage;
     private final CatalogSeeder catalogSeeder;
+    private final JobTripService jobTrips;
 
     public DataSeeder(
             RoleRepository roleRepository,
@@ -242,7 +244,8 @@ public class DataSeeder implements ApplicationRunner {
             DocumentVersionRepository documentVersionRepository,
             StoredFileRepository storedFileRepository,
             FileStorage fileStorage,
-            CatalogSeeder catalogSeeder) {
+            CatalogSeeder catalogSeeder,
+            JobTripService jobTrips) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -282,6 +285,7 @@ public class DataSeeder implements ApplicationRunner {
         this.storedFileRepository = storedFileRepository;
         this.fileStorage = fileStorage;
         this.catalogSeeder = catalogSeeder;
+        this.jobTrips = jobTrips;
     }
 
     @Override
@@ -684,6 +688,9 @@ public class DataSeeder implements ApplicationRunner {
         job.setQuotation(savedQuote);
         job.setApprovedBy(yen);
         job.setApprovedAt(Instant.now());
+        // The team chosen at approval (US-F1-07): Lan owns the documents, Khôi plans the move.
+        job.setTransportSpecialist(userRepository.getByEmail("lan.nguyen@equifreight.vn"));
+        job.setCoordinator(khoi);
         job.setStage(JobStage.DOCUMENTS);
         job.setDossierStatus(DossierStatus.OPEN);
         job.setTripStatus(TripStatus.NOT_STARTED);
@@ -693,14 +700,16 @@ public class DataSeeder implements ApplicationRunner {
         job.setWindowEnd(Instant.parse("2026-10-18T14:00:00Z"));
         TransportJob savedJob = transportJobRepository.save(job);
 
-        // Vehicle TX-447
+        // Vehicle TX-447, on the job's own trip
         Vehicle tx447 = vehicleRepository.findByCode("TX-447").orElseThrow();
         List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(tx447.getId());
+        Trip trip = jobTrips.createForJob(savedJob, yen, savedJob.getApprovedAt());
+        trip.setPlannedDepartureAt(savedJob.getPlannedDepartureAt());
+        TripVehicle tripVehicle = jobTrips.useVehicle(trip, tx447);
 
         // Load plan for CBRT-2026-041 (matching Figma demo state: 3 loaded, 1 conflict, 1 to load)
         LoadPlan lp = new LoadPlan();
-        lp.setJob(savedJob);
-        lp.setVehicle(tx447);
+        lp.setTripVehicle(tripVehicle);
         lp.setStatus(LoadPlanStatus.DRAFT);
         LoadPlan savedLp = loadPlanRepository.save(lp);
 
@@ -717,7 +726,7 @@ public class DataSeeder implements ApplicationRunner {
                 borderCrossingRepository.findByName("Mộc Bài – Bavet").orElse(null);
 
         RoutePlan rp = new RoutePlan();
-        rp.setJob(savedJob);
+        rp.setTrip(trip);
         rp.setVersionNo((short) 1);
         rp.setStatus(RoutePlanStatus.CONFIRMED);
         rp.setDistanceKm(240);
@@ -728,6 +737,7 @@ public class DataSeeder implements ApplicationRunner {
 
         RouteStop s1 = createStop(
                 savedRp,
+                savedJob,
                 (short) 1,
                 RouteStopKind.PICKUP,
                 origin,
@@ -737,6 +747,7 @@ public class DataSeeder implements ApplicationRunner {
                 "Loading and condition check, logged with photos.");
         RouteStop s2 = createStop(
                 savedRp,
+                savedJob,
                 (short) 2,
                 RouteStopKind.BORDER,
                 null,
@@ -746,6 +757,7 @@ public class DataSeeder implements ApplicationRunner {
                 "Vietnam export clearance and Cambodia entry. Recorded per leg as Cleared or Held.");
         RouteStop s3 = createStop(
                 savedRp,
+                savedJob,
                 (short) 3,
                 RouteStopKind.WELFARE,
                 welfare,
@@ -755,6 +767,7 @@ public class DataSeeder implements ApplicationRunner {
                 "45-minute rest, water and hay, welfare check by the escort.");
         RouteStop s4 = createStop(
                 savedRp,
+                savedJob,
                 (short) 4,
                 RouteStopKind.DELIVERY,
                 dest,
@@ -772,9 +785,9 @@ public class DataSeeder implements ApplicationRunner {
         User hoa = userRepository.getByEmail("hoa.le@equifreight.vn");
         User tuan = userRepository.getByEmail("tuan.pham@equifreight.vn");
 
-        assignCrewMember(savedJob, minh, CrewRole.DRIVER);
-        assignCrewMember(savedJob, hoa, CrewRole.GROOM);
-        assignCrewMember(savedJob, tuan, CrewRole.GROOM);
+        assignCrewMember(tripVehicle, minh, CrewRole.DRIVER);
+        assignCrewMember(tripVehicle, hoa, CrewRole.GROOM);
+        assignCrewMember(tripVehicle, tuan, CrewRole.GROOM);
 
         log.info("Seeded canonical job CBRT-2026-041 with route and load plans");
     }
@@ -823,8 +836,10 @@ public class DataSeeder implements ApplicationRunner {
         loadPlanStallRepository.save(lps);
     }
 
+    /** A stop of the seeded job's route; its pickup and delivery name the job. */
     private RouteStop createStop(
             RoutePlan plan,
+            TransportJob job,
             short seq,
             RouteStopKind kind,
             Place place,
@@ -841,6 +856,7 @@ public class DataSeeder implements ApplicationRunner {
         s.setPlannedAt(plannedAt);
         s.setPlannedStayMin(stayMin);
         s.setDetails(details);
+        if (kind == RouteStopKind.PICKUP || kind == RouteStopKind.DELIVERY) s.setJob(job);
         return routeStopRepository.save(s);
     }
 
@@ -857,9 +873,9 @@ public class DataSeeder implements ApplicationRunner {
         routeLegRepository.save(leg);
     }
 
-    private void assignCrewMember(TransportJob job, User user, CrewRole role) {
+    private void assignCrewMember(TripVehicle tripVehicle, User user, CrewRole role) {
         CrewAssignment ca = new CrewAssignment();
-        ca.setJob(job);
+        ca.setTripVehicle(tripVehicle);
         ca.setUser(user);
         ca.setCrewRole(role);
         crewAssignmentRepository.save(ca);
@@ -1272,6 +1288,8 @@ public class DataSeeder implements ApplicationRunner {
             n1.setBody(
                     "Copper King's EI booster is scheduled for 10 Oct at the club clinic. Can we submit the updated veterinary record 7 days before departure instead of the required 14 days?");
             n1.setStatus(NoteStatus.ANSWERED);
+            n1.setAttachedFile(seedDemoPdf(
+                    "demo/ei-booster-schedule-copper-king.pdf", "EI-Booster-Schedule-CopperKing.pdf", customer));
             Note savedN1 = noteRepository.save(n1);
 
             if (lan != null) {

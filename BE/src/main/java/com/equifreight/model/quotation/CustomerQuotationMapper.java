@@ -6,6 +6,7 @@ import com.equifreight.entity.RateFeeBand;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.service.pricing.PricingText;
+import com.equifreight.service.quotation.CancellationFee;
 import com.equifreight.service.quotation.QuotationSnapshot;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -37,8 +38,13 @@ public final class CustomerQuotationMapper {
                 .code(q.getCode())
                 .versionNo(q.getVersionNo())
                 .status(q.getStatus())
+                .requestStatus(request.getStatus())
                 .issuedAt(q.getIssuedAt())
                 .validUntil(q.getValidUntil())
+                .acceptedAt(q.getAcceptedAt())
+                .declinedAt(q.getDeclinedAt())
+                .cancelledAt(request.getCancelledAt())
+                .cancellationFeePct(request.getCancellationFeePct())
                 .currency(q.getCurrency())
                 .pinnedVersionNo(q.getRateCatalogVersion().getVersionNo())
                 .request(new CustomerQuotationResponse.Request(
@@ -83,8 +89,7 @@ public final class CustomerQuotationMapper {
                                         b.getMinDays(),
                                         b.getMaxDays() == null ? null : (int) b.getMaxDays(),
                                         b.getValue(),
-                                        daysToDeparture >= b.getMinDays()
-                                                && (b.getMaxDays() == null || daysToDeparture <= b.getMaxDays())))
+                                        CancellationFee.applies(b, daysToDeparture)))
                                 .toList()))
                 .latePenalty(
                         q.getLatePenaltyPctPerHour() == null

@@ -15,6 +15,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * How a trip is loaded (US-F3-05, US-F3-10): one load plan per trailer, and every horse on the trip placed on exactly
+ * one of them before the trip's load is confirmed. A horse can move between trailers, so every change takes all the
+ * trip's plans under a row lock first.
+ */
 @Service
 @Log4j2
 public class LoadPlanService {
@@ -24,8 +29,10 @@ public class LoadPlanService {
     private final TransportJobRepository transportJobRepository;
     private final VehicleRepository vehicleRepository;
     private final VehicleStallRepository vehicleStallRepository;
-    private final HorseRepository horseRepository;
     private final VehicleBookingRepository vehicleBookingRepository;
+    private final CrewAssignmentRepository crewAssignmentRepository;
+    private final JobTripService jobTrips;
+    private final RoutePlanService routePlanService;
     private final AuditService auditService;
 
     public LoadPlanService(
@@ -34,165 +41,345 @@ public class LoadPlanService {
             TransportJobRepository transportJobRepository,
             VehicleRepository vehicleRepository,
             VehicleStallRepository vehicleStallRepository,
-            HorseRepository horseRepository,
             VehicleBookingRepository vehicleBookingRepository,
+            CrewAssignmentRepository crewAssignmentRepository,
+            JobTripService jobTrips,
+            RoutePlanService routePlanService,
             AuditService auditService) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.transportJobRepository = transportJobRepository;
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
-        this.horseRepository = horseRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
+        this.crewAssignmentRepository = crewAssignmentRepository;
+        this.jobTrips = jobTrips;
+        this.routePlanService = routePlanService;
         this.auditService = auditService;
     }
 
+    /** The trip's horses, with the mares travelling with a foal at foot. */
+    private record Cargo(List<Horse> horses, Set<UUID> maresWithFoal) {}
+
+    /** The job's trip load; empty until a vehicle is chosen. */
     @Transactional(readOnly = true)
-    public Optional<LoadPlanResponse> getActiveLoadPlan(UUID jobId) {
-        return loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId).map(this::buildResponse);
+    public Optional<TripLoadResponse> getActiveLoadPlan(UUID jobId) {
+        TransportJob job = job(jobId);
+        return jobTrips.findTripOf(jobId).flatMap(trip -> {
+            List<LoadPlan> plans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
+            return plans.isEmpty() ? Optional.empty() : Optional.of(buildResponse(trip, plans, job));
+        });
     }
 
-    @Transactional
-    public LoadPlanResponse createLoadPlan(UUID jobId, UUID vehicleId) {
-        TransportJob job = transportJobRepository
+    private TransportJob job(UUID jobId) {
+        return transportJobRepository
                 .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+    }
 
-        Vehicle vehicle;
-        if (vehicleId != null) {
-            vehicle = vehicleRepository
-                    .findById(vehicleId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
-        } else {
-            vehicle = vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
-                    .findFirst()
-                    .orElseThrow(() -> new BusinessException("No active vehicles available to create load plan"));
-        }
+    private List<LoadPlan> lockedPlans(Trip trip, UUID jobId) {
+        List<LoadPlan> plans = loadPlanRepository.findByTripIdForUpdate(trip.getId());
+        if (plans.isEmpty()) throw new ResourceNotFoundException("Load plan not found for job: " + jobId);
+        return plans;
+    }
 
+    private static Vehicle activeVehicle(Vehicle vehicle, String use) {
         if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
             throw new BusinessException("Vehicle " + vehicle.getCode() + " is currently in " + vehicle.getStatus()
-                    + " and cannot be used for load plan");
+                    + " and cannot be " + use);
         }
+        return vehicle;
+    }
 
-        Optional<LoadPlan> existingDraft = loadPlanRepository.findByJobIdAndStatus(jobId, LoadPlanStatus.DRAFT);
-        LoadPlan plan;
-        if (existingDraft.isPresent()) {
-            plan = existingDraft.get();
-            if (!plan.getVehicle().getId().equals(vehicle.getId())) {
-                loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
-                plan.setVehicle(vehicle);
-                plan = loadPlanRepository.save(plan);
+    private Vehicle vehicle(UUID vehicleId) {
+        return vehicleRepository
+                .findById(vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
+    }
+
+    /** Before departure only: after it, a trailer leaves the convoy only through an incident (US-F5-06). */
+    private static void requireNotDeparted(TransportJob job, String action) {
+        if (job.getDepartedAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED) {
+            throw new BusinessException("Cannot " + action
+                    + ": the trip has departed. A trailer leaves a moving trip only through an incident.");
+        }
+    }
+
+    /**
+     * Starts the trip's load on {@code vehicleId}, or on the first active vehicle. When the trip has a vehicle
+     * already, this changes the first trailer's vehicle instead.
+     */
+    @Transactional
+    public TripLoadResponse createLoadPlan(UUID jobId, UUID vehicleId) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        Vehicle vehicle = vehicleId != null
+                ? vehicle(vehicleId)
+                : vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
+                        .findFirst()
+                        .orElseThrow(() -> new BusinessException("No active vehicles available to create load plan"));
+        activeVehicle(vehicle, "used for load plan");
+
+        Optional<TripVehicle> first = jobTrips.vehicleOf(trip);
+        if (first.isPresent()) {
+            return changeLoadPlanVehicle(jobId, first.get().getId(), vehicle.getId());
+        }
+        LoadPlan plan = new LoadPlan();
+        plan.setTripVehicle(jobTrips.useVehicle(trip, vehicle));
+        plan.setStatus(LoadPlanStatus.DRAFT);
+        loadPlanRepository.save(plan);
+        return buildResponse(
+                trip, loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()), job);
+    }
+
+    /**
+     * Puts another vehicle under one trailer's draft plan ({@code tripVehicleId}, or the first trailer). Its
+     * placements are cleared, since the stalls differ; its crew stays.
+     */
+    @Transactional
+    public TripLoadResponse changeLoadPlanVehicle(UUID jobId, UUID tripVehicleId, UUID vehicleId) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        Vehicle vehicle = activeVehicle(vehicle(vehicleId), "used for load plan");
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
+        LoadPlan plan = tripVehicleId == null ? plans.getFirst() : planOf(plans, tripVehicleId);
+        if (!plan.getVehicle().getId().equals(vehicle.getId())) {
+            if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
+                throw new BusinessException("Cannot change the vehicle of a CONFIRMED load plan");
             }
-        } else {
-            plan = new LoadPlan();
-            plan.setJob(job);
-            plan.setVehicle(vehicle);
-            plan.setStatus(LoadPlanStatus.DRAFT);
-            plan = loadPlanRepository.save(plan);
+            if (plans.stream().anyMatch(p -> p.getVehicle().getId().equals(vehicle.getId()))) {
+                throw new BusinessException("Vehicle " + vehicle.getCode() + " is already on this trip");
+            }
+            loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
+            plan.getTripVehicle().setVehicle(vehicle);
         }
-
-        return buildResponse(plan);
+        return buildResponse(trip, plans, job);
     }
 
-    @Transactional
-    public LoadPlanResponse changeLoadPlanVehicle(UUID jobId, UUID vehicleId) {
-        return createLoadPlan(jobId, vehicleId);
+    private static LoadPlan planOf(List<LoadPlan> plans, UUID tripVehicleId) {
+        return plans.stream()
+                .filter(p -> p.getTripVehicle().getId().equals(tripVehicleId))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Trailer on this trip", tripVehicleId));
     }
 
+    /**
+     * Adds a trailer to the convoy with an empty draft plan (US-F3-10). The trip's plans reopen: the confirmed load
+     * plans go back to draft, the confirmed route is superseded by a new draft version, and the sign-off is cleared.
+     */
     @Transactional
-    public LoadPlanResponse assignStall(UUID jobId, UUID vehicleStallId, UUID horseId) {
-        LoadPlan plan = loadPlanRepository
-                .findLatestByJobIdForUpdate(jobId)
-                .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
+    public TripLoadResponse addVehicle(UUID jobId, UUID vehicleId, User currentUser) {
+        TransportJob job = job(jobId);
+        requireNotDeparted(job, "add a trailer");
+        Trip trip = jobTrips.tripOf(jobId);
+        Vehicle vehicle = activeVehicle(vehicle(vehicleId), "added to the trip");
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
 
+        LoadPlan plan = new LoadPlan();
+        plan.setTripVehicle(jobTrips.addVehicle(trip, vehicle));
+        plan.setStatus(LoadPlanStatus.DRAFT);
+        plans = new ArrayList<>(plans);
+        plans.add(loadPlanRepository.save(plan));
+
+        String reason = "Trailer " + vehicle.getCode() + " added to the convoy";
+        reopen(trip, plans, reason);
+        auditService.recordDecision(
+                currentUser,
+                "ADD_TRIP_VEHICLE",
+                reason + " of trip " + trip.getCode() + " (job " + job.getCode() + ")",
+                "TRIP",
+                trip.getId(),
+                trip.getCode(),
+                null,
+                null,
+                vehicle.getCode());
+        return buildResponse(trip, plans, job);
+    }
+
+    /**
+     * Takes a trailer out of the convoy, with its placements, crew and booking (US-F3-10). The trip keeps at least
+     * one trailer, and its plans reopen as when one is added.
+     */
+    @Transactional
+    public TripLoadResponse removeVehicle(UUID jobId, UUID tripVehicleId, User currentUser) {
+        TransportJob job = job(jobId);
+        requireNotDeparted(job, "remove a trailer");
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> plans = new ArrayList<>(lockedPlans(trip, jobId));
+        LoadPlan plan = planOf(plans, tripVehicleId);
+        if (plans.size() == 1) {
+            throw new BusinessException("A trip keeps at least one trailer; choose another vehicle instead");
+        }
+        TripVehicle tripVehicle = plan.getTripVehicle();
+        String code = tripVehicle.getVehicle().getCode();
+
+        vehicleBookingRepository
+                .findByTrip_IdAndVehicle_Id(
+                        trip.getId(), tripVehicle.getVehicle().getId())
+                .ifPresent(vehicleBookingRepository::delete);
+        loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
+        crewAssignmentRepository.deleteByTripVehicleId(tripVehicle.getId());
+        loadPlanRepository.delete(plan);
+        loadPlanRepository.flush();
+        plans.remove(plan);
+        jobTrips.removeVehicle(tripVehicle);
+
+        String reason = "Trailer " + code + " taken out of the convoy";
+        reopen(trip, plans, reason);
+        auditService.recordDecision(
+                currentUser,
+                "REMOVE_TRIP_VEHICLE",
+                reason + " of trip " + trip.getCode() + " (job " + job.getCode() + ")",
+                "TRIP",
+                trip.getId(),
+                trip.getCode(),
+                null,
+                code,
+                null);
+        return buildResponse(trip, plans, job);
+    }
+
+    /**
+     * Nothing confirmed changes silently: the load plans go back to draft, the confirmed route is superseded by a new
+     * draft version with {@code reason}, and every job on the trip needs a new sign-off.
+     */
+    private void reopen(Trip trip, List<LoadPlan> plans, String reason) {
+        for (LoadPlan plan : plans) {
+            if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
+                plan.setStatus(LoadPlanStatus.DRAFT);
+                plan.setConfirmedBy(null);
+                plan.setConfirmedAt(null);
+            }
+        }
+        routePlanService.reopen(trip, reason);
+        for (TransportJob onTrip : jobTrips.jobsOn(trip)) {
+            onTrip.setSignedOffAt(null);
+            onTrip.setSignedOffBy(null);
+        }
+    }
+
+    private static void clearSignOff(TransportJob job) {
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
+    }
+
+    private Cargo cargo(Trip trip) {
+        List<Horse> horses = new ArrayList<>();
+        Set<UUID> withFoal = new HashSet<>();
+        for (TripHorse onTrip : jobTrips.horsesOn(trip)) {
+            horses.add(onTrip.getHorse());
+            TransportRequest request = onTrip.getJob().getRequest();
+            if (request != null && request.getHorses() != null) {
+                for (RequestHorse rh : request.getHorses()) {
+                    if (rh.isWithFoal()
+                            && rh.getHorse() != null
+                            && rh.getHorse().getId().equals(onTrip.getHorse().getId())) {
+                        withFoal.add(rh.getHorse().getId());
+                    }
+                }
+            }
+        }
+        return new Cargo(horses, withFoal);
+    }
+
+    private static Horse horseOnTrip(Cargo cargo, UUID horseId) {
+        return cargo.horses().stream()
+                .filter(h -> h.getId().equals(horseId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Horse " + horseId + " is not on this trip"));
+    }
+
+    /** The trailer plan whose vehicle has {@code stall}. */
+    private static LoadPlan planWithStall(List<LoadPlan> plans, VehicleStall stall) {
+        return plans.stream()
+                .filter(p -> p.getVehicle().getId().equals(stall.getVehicle().getId()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("Stall does not belong to a vehicle on this trip"));
+    }
+
+    private static void requireDraft(LoadPlan plan) {
         if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
             throw new BusinessException("Cannot modify a CONFIRMED load plan. Create a new revision if needed.");
         }
+    }
+
+    /** Where the horse stands on the trip, on whichever trailer; empty when it is waiting to load. */
+    private Optional<LoadPlanStall> placementOf(List<LoadPlan> plans, UUID horseId) {
+        for (LoadPlan plan : plans) {
+            Optional<LoadPlanStall> found = loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horseId);
+            if (found.isPresent()) return found;
+        }
+        return Optional.empty();
+    }
+
+    @Transactional
+    public TripLoadResponse assignStall(UUID jobId, UUID vehicleStallId, UUID horseId) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
 
         VehicleStall stall = vehicleStallRepository
                 .findById(vehicleStallId)
                 .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + vehicleStallId));
+        LoadPlan plan = planWithStall(plans, stall);
+        requireDraft(plan);
 
-        if (!stall.getVehicle().getId().equals(plan.getVehicle().getId())) {
-            throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
-        }
-
-        // Validate before changing anything: the horse must travel on this job.
-        if (horseId != null) {
-            boolean horseOnJob = plan.getJob().getRequest() != null
-                    && plan.getJob().getRequest().getHorses() != null
-                    && plan.getJob().getRequest().getHorses().stream()
-                            .anyMatch(rh -> rh.getHorse().getId().equals(horseId));
-            if (!horseOnJob) {
-                throw new ResourceNotFoundException("Horse " + horseId + " is not assigned to this job");
-            }
-        }
+        // Validate before changing anything: the horse must travel on this trip.
+        Horse horse = horseId == null ? null : horseOnTrip(cargo(trip), horseId);
 
         // Free the stall (bulk delete, runs before the insert below)
         loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(plan.getId(), vehicleStallId);
 
-        // If assigning a horse, take it out of its previous stall, then place it here
-        if (horseId != null) {
-            loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horseId);
-
-            Horse horse = horseRepository
-                    .findById(horseId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Horse not found: " + horseId));
-
-            LoadPlanStall lps = new LoadPlanStall();
-            lps.setLoadPlan(plan);
-            lps.setVehicleStall(stall);
-            lps.setHorse(horse);
-            loadPlanStallRepository.save(lps);
+        // If assigning a horse, take it out of its previous stall on any trailer, then place it here
+        if (horse != null) {
+            Optional<LoadPlanStall> current = placementOf(plans, horse.getId());
+            if (current.isPresent()) {
+                requireDraft(current.get().getLoadPlan());
+                loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(
+                        current.get().getLoadPlan().getId(), horse.getId());
+            }
+            place(plan, stall, horse);
         }
 
-        // Invalidate prior sign-off when load plan changes
-        plan.getJob().setSignedOffAt(null);
-        plan.getJob().setSignedOffBy(null);
-        transportJobRepository.save(plan.getJob());
-
-        return buildResponse(plan);
+        clearSignOff(job);
+        return buildResponse(trip, plans, job);
     }
 
     /**
-     * Move, swap or unload one horse (US-F3-05, drag and drop). The request states what the
-     * coordinator's screen showed: where the horse was and who stood in the target stall. Both are
-     * checked under the plan's row lock, so when two people change the same plan at once the second
-     * change is refused with 409 instead of silently undoing the first.
+     * Move, swap or unload one horse (US-F3-05, drag and drop), on one trailer or between trailers. The request
+     * states what the coordinator's screen showed: where the horse was and who stood in the target stall. Both are
+     * checked under the plans' row locks, so when two people change the same trip at once the second change is
+     * refused with 409 instead of silently undoing the first.
      */
     @Transactional
-    public LoadPlanResponse moveHorse(UUID jobId, MoveHorseRequest request) {
-        LoadPlan plan = loadPlanRepository
-                .findLatestByJobIdForUpdate(jobId)
-                .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
+    public TripLoadResponse moveHorse(UUID jobId, MoveHorseRequest request) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
 
-        if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
-            throw new BusinessException("Cannot modify a CONFIRMED load plan. Create a new revision if needed.");
-        }
         if (request.toStallId() == null && request.expectedOccupantId() != null) {
             throw new BusinessException(
                     "A horse taken off the vehicle has no stall to swap with; leave the expected occupant empty");
         }
 
-        Horse horse = getJobHorses(plan.getJob()).stream()
-                .filter(h -> h.getId().equals(request.horseId()))
-                .findFirst()
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Horse " + request.horseId() + " is not assigned to this job"));
+        Horse horse = horseOnTrip(cargo(trip), request.horseId());
 
         VehicleStall toStall = null;
+        LoadPlan toPlan = null;
         if (request.toStallId() != null) {
             toStall = vehicleStallRepository
                     .findById(request.toStallId())
                     .orElseThrow(() -> new ResourceNotFoundException("Stall not found: " + request.toStallId()));
-            if (!toStall.getVehicle().getId().equals(plan.getVehicle().getId())) {
-                throw new BusinessException("Stall does not belong to the vehicle assigned to this load plan");
-            }
+            toPlan = planWithStall(plans, toStall);
+            requireDraft(toPlan);
         }
 
         // Precondition 1: the horse is where the coordinator saw it.
-        Optional<LoadPlanStall> current =
-                loadPlanStallRepository.findByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
+        Optional<LoadPlanStall> current = placementOf(plans, horse.getId());
+        current.ifPresent(c -> requireDraft(c.getLoadPlan()));
+        if (toPlan == null && current.isEmpty()) {
+            requireDraft(plans.getFirst());
+        }
         UUID currentStallId = current.map(a -> a.getVehicleStall().getId()).orElse(null);
         if (!Objects.equals(currentStallId, request.fromStallId())) {
             throw new ConflictException(
@@ -207,7 +394,7 @@ public class LoadPlanService {
         Horse occupant = null;
         if (toStall != null) {
             occupant = loadPlanStallRepository
-                    .findByLoadPlanIdAndVehicleStallId(plan.getId(), toStall.getId())
+                    .findByLoadPlanIdAndVehicleStallId(toPlan.getId(), toStall.getId())
                     .map(LoadPlanStall::getHorse)
                     .orElse(null);
             UUID occupantId = occupant != null ? occupant.getId() : null;
@@ -222,22 +409,25 @@ public class LoadPlanService {
 
         // Dropped where it already is: nothing to change.
         if (Objects.equals(request.toStallId(), currentStallId)) {
-            return buildResponse(plan);
+            return buildResponse(trip, plans, job);
         }
 
         // Free both positions first (bulk deletes run before the inserts below).
-        loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horse.getId());
+        if (current.isPresent()) {
+            loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(
+                    current.get().getLoadPlan().getId(), horse.getId());
+        }
         if (toStall != null) {
-            loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(plan.getId(), toStall.getId());
+            loadPlanStallRepository.deleteByLoadPlanIdAndVehicleStallId(toPlan.getId(), toStall.getId());
         }
 
         try {
             if (toStall != null) {
-                place(plan, toStall, horse);
+                place(toPlan, toStall, horse);
             }
             // A swap: the occupant takes the moved horse's old stall, or waits to load when it came from the list.
             if (occupant != null && current.isPresent()) {
-                place(plan, current.get().getVehicleStall(), occupant);
+                place(current.get().getLoadPlan(), current.get().getVehicleStall(), occupant);
             }
             loadPlanStallRepository.flush();
         } catch (DataIntegrityViolationException e) {
@@ -247,12 +437,8 @@ public class LoadPlanService {
                     "Someone else changed the load plan at the same moment; check the refreshed plan and try again.");
         }
 
-        // Invalidate prior sign-off when load plan changes
-        plan.getJob().setSignedOffAt(null);
-        plan.getJob().setSignedOffBy(null);
-        transportJobRepository.save(plan.getJob());
-
-        return buildResponse(plan);
+        clearSignOff(job);
+        return buildResponse(trip, plans, job);
     }
 
     private void place(LoadPlan plan, VehicleStall stall, Horse horse) {
@@ -263,32 +449,34 @@ public class LoadPlanService {
         loadPlanStallRepository.save(lps);
     }
 
+    /** Places every horse on the trip across all its trailers with no rule broken, replacing the placements. */
     @Transactional
-    public LoadPlanResponse autoArrange(UUID jobId) {
-        LoadPlan plan = loadPlanRepository
-                .findLatestByJobIdForUpdate(jobId)
-                .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
-
-        if (plan.getStatus() == LoadPlanStatus.CONFIRMED) {
+    public TripLoadResponse autoArrange(UUID jobId) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
+        if (plans.stream().anyMatch(p -> p.getStatus() == LoadPlanStatus.CONFIRMED)) {
             throw new BusinessException("Cannot auto-arrange a CONFIRMED load plan");
         }
 
-        List<Horse> horses = getJobHorses(plan.getJob());
-        List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(
-                plan.getVehicle().getId());
+        Cargo cargo = cargo(trip);
+        List<VehicleStall> stalls = new ArrayList<>();
+        for (LoadPlan plan : plans) {
+            stalls.addAll(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                    plan.getVehicle().getId()));
+        }
 
-        if (horses.size() > stalls.size()) {
-            throw new BusinessException(
-                    "Vehicle has only " + stalls.size() + " stalls, cannot accommodate " + horses.size() + " horses");
+        if (cargo.horses().size() > stalls.size()) {
+            throw new BusinessException("The trip's trailers have only " + stalls.size()
+                    + " stalls, cannot accommodate " + cargo.horses().size() + " horses. Add a trailer.");
         }
 
         // Smart arrangement:
         // 1. Box-needing horses (stallion or aggressive)
         // 2. Climate-needing horses (climate stall or nervous)
         // 3. Nervous horses away from ramp
-        // 4. Mares away from stallions
-        Set<VehicleStall> availableStalls = new HashSet<>(stalls);
-        Map<Horse, VehicleStall> solution = solveArrangement(horses, availableStalls, getHorsesWithFoal(plan.getJob()));
+        // 4. Mares away from stallions on the same trailer
+        Map<Horse, VehicleStall> solution = solveArrangement(cargo.horses(), stalls, cargo.maresWithFoal());
 
         if (solution == null) {
             throw new BusinessException("Could not automatically find a placement satisfying all welfare rules");
@@ -296,35 +484,35 @@ public class LoadPlanService {
 
         // Replace the current placements. A bulk delete runs before the inserts; deleteAll(entities)
         // would be flushed after them and break the unique constraints when a horse was already placed.
-        loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
+        for (LoadPlan plan : plans) {
+            loadPlanStallRepository.deleteAllForLoadPlan(plan.getId());
+        }
         for (Map.Entry<Horse, VehicleStall> entry : solution.entrySet()) {
-            LoadPlanStall lps = new LoadPlanStall();
-            lps.setLoadPlan(plan);
-            lps.setHorse(entry.getKey());
-            lps.setVehicleStall(entry.getValue());
-            loadPlanStallRepository.save(lps);
+            place(planWithStall(plans, entry.getValue()), entry.getValue(), entry.getKey());
         }
 
-        // Invalidate prior sign-off when load plan changes
-        plan.getJob().setSignedOffAt(null);
-        plan.getJob().setSignedOffBy(null);
-        transportJobRepository.save(plan.getJob());
-
-        return buildResponse(plan);
+        clearSignOff(job);
+        return buildResponse(trip, plans, job);
     }
 
+    /**
+     * Confirms the trip's load: every horse on the trip placed on one trailer, no trailer with a conflict, and every
+     * trailer booked for the trip's dates (US-F3-10).
+     */
     @Transactional
-    public LoadPlanResponse confirmLoadPlan(UUID jobId, User currentUser) {
-        LoadPlan plan = loadPlanRepository
-                .findLatestByJobIdForUpdate(jobId)
-                .orElseThrow(() -> new ResourceNotFoundException("Load plan not found for job: " + jobId));
+    public TripLoadResponse confirmLoadPlan(UUID jobId, User currentUser) {
+        TransportJob job = job(jobId);
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> plans = lockedPlans(trip, jobId);
 
-        if (plan.getVehicle().getStatus() != VehicleStatus.ACTIVE) {
-            throw new BusinessException("Vehicle " + plan.getVehicle().getCode() + " is currently in "
-                    + plan.getVehicle().getStatus() + " and cannot be confirmed for load plan");
+        for (LoadPlan plan : plans) {
+            if (plan.getVehicle().getStatus() != VehicleStatus.ACTIVE) {
+                throw new BusinessException("Vehicle " + plan.getVehicle().getCode() + " is currently in "
+                        + plan.getVehicle().getStatus() + " and cannot be confirmed for load plan");
+            }
         }
 
-        LoadPlanResponse state = buildResponse(plan);
+        TripLoadResponse state = buildResponse(trip, plans, job);
 
         if (!state.unassignedHorses().isEmpty()) {
             throw new BusinessException(
@@ -337,8 +525,7 @@ public class LoadPlanService {
                             + state.conflicts().getFirst().description() + ")");
         }
 
-        // The vehicle is booked for the trip's planned dates, which the confirmed route sets.
-        TransportJob job = plan.getJob();
+        // Every trailer is booked for the trip's planned dates, which the confirmed route sets.
         Instant startsAt = job.getPlannedDepartureAt();
         Instant endsAt = job.getPlannedArrivalAt();
         if (startsAt == null || endsAt == null) {
@@ -347,69 +534,73 @@ public class LoadPlanService {
                             + "for the planned departure and arrival");
         }
 
-        // Check overlapping bookings excluding this job
-        List<VehicleBooking> overlaps =
-                vehicleBookingRepository
-                        .findOverlappingBookings(plan.getVehicle().getId(), startsAt, endsAt, null)
-                        .stream()
-                        .filter(b -> b.getJob() == null || !b.getJob().getId().equals(job.getId()))
-                        .toList();
-        if (!overlaps.isEmpty()) {
-            throw new ConflictException(
-                    "DOUBLE_BOOKING",
-                    "Vehicle " + plan.getVehicle().getCode() + " is already booked between " + startsAt + " and "
-                            + endsAt);
+        for (LoadPlan plan : plans) {
+            book(trip, plan.getVehicle(), startsAt, endsAt);
         }
 
-        // Create or update vehicle booking
-        List<VehicleBooking> jobBookings = vehicleBookingRepository.findByJobId(job.getId());
-        VehicleBooking booking = jobBookings.isEmpty() ? new VehicleBooking() : jobBookings.getFirst();
-        booking.setVehicle(plan.getVehicle());
-        booking.setJob(job);
-        booking.setKind(com.equifreight.entity.enums.BookingKind.JOB);
-        booking.setStartsAt(startsAt);
-        booking.setEndsAt(endsAt);
-
-        try {
-            // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
-            vehicleBookingRepository.saveAndFlush(booking);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw new ConflictException(
-                    "DOUBLE_BOOKING",
-                    "Vehicle " + plan.getVehicle().getCode() + " is already booked for this interval");
+        Instant now = Instant.now();
+        for (LoadPlan plan : plans) {
+            plan.setStatus(LoadPlanStatus.CONFIRMED);
+            plan.setConfirmedBy(currentUser);
+            plan.setConfirmedAt(now);
         }
-
-        plan.setStatus(LoadPlanStatus.CONFIRMED);
-        plan.setConfirmedBy(currentUser);
-        plan.setConfirmedAt(Instant.now());
-        loadPlanRepository.save(plan);
 
         // Invalidate prior sign-off when load plan is re-confirmed
-        job.setSignedOffAt(null);
-        job.setSignedOffBy(null);
-        transportJobRepository.save(job);
+        clearSignOff(job);
 
+        String vehicles = plans.stream().map(p -> p.getVehicle().getCode()).collect(Collectors.joining(", "));
         auditService.recordDecision(
                 currentUser,
                 "CONFIRM_LOAD_PLAN",
-                "Confirmed load plan for job " + job.getCode() + " on vehicle "
-                        + plan.getVehicle().getCode(),
+                "Confirmed load plan for job " + job.getCode() + " on " + (plans.size() == 1 ? "vehicle " : "vehicles ")
+                        + vehicles,
                 "LOAD_PLAN",
-                plan.getId(),
+                plans.getFirst().getId(),
                 job.getCode(),
                 null,
                 null,
                 "CONFIRMED");
 
-        log.info("Confirmed load plan for job {}", job.getCode());
-        return buildResponse(plan);
+        log.info("Confirmed load plan for job {} on {}", job.getCode(), vehicles);
+        return buildResponse(trip, plans, job);
     }
 
+    /** Books {@code vehicle} for the trip, once; refused when another booking overlaps (BR-F3-04). */
+    private void book(Trip trip, Vehicle vehicle, Instant startsAt, Instant endsAt) {
+        boolean overlaps =
+                vehicleBookingRepository.findOverlappingBookings(vehicle.getId(), startsAt, endsAt, null).stream()
+                        .anyMatch(
+                                b -> b.getTrip() == null || !b.getTrip().getId().equals(trip.getId()));
+        if (overlaps) {
+            throw new ConflictException(
+                    "DOUBLE_BOOKING",
+                    "Vehicle " + vehicle.getCode() + " is already booked between " + startsAt + " and " + endsAt);
+        }
+        VehicleBooking booking = vehicleBookingRepository
+                .findByTrip_IdAndVehicle_Id(trip.getId(), vehicle.getId())
+                .orElseGet(VehicleBooking::new);
+        booking.setVehicle(vehicle);
+        booking.setTrip(trip);
+        booking.setKind(BookingKind.JOB);
+        booking.setStartsAt(startsAt);
+        booking.setEndsAt(endsAt);
+        try {
+            // Flushed here, so a booking that loses a race to the no-overlap constraint is caught below.
+            vehicleBookingRepository.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "DOUBLE_BOOKING", "Vehicle " + vehicle.getCode() + " is already booked for this interval");
+        }
+    }
+
+    /**
+     * The rules broken on one trailer, by every horse on it whichever job it belongs to: box, width, climate and ramp
+     * needs, a stallion beside or behind a mare, and the trailer's payload.
+     */
     public List<LoadPlanConflictResponse> evaluateConflicts(
-            LoadPlan plan, List<LoadPlanStall> assignments, List<Horse> allHorses) {
+            LoadPlan plan, Set<UUID> maresWithFoal, List<LoadPlanStall> assignments) {
         List<LoadPlanConflictResponse> conflicts = new ArrayList<>();
         Vehicle vehicle = plan.getVehicle();
-        Set<UUID> maresWithFoal = getHorsesWithFoal(plan.getJob());
 
         int totalWeight = 0;
         for (LoadPlanStall lps : assignments) {
@@ -498,56 +689,74 @@ public class LoadPlanService {
         return conflicts;
     }
 
-    private LoadPlanResponse buildResponse(LoadPlan plan) {
-        List<LoadPlanStall> assignments = loadPlanStallRepository.findByLoadPlanId(plan.getId());
-        List<Horse> allHorses = getJobHorses(plan.getJob());
-        List<VehicleStall> allStalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(
-                plan.getVehicle().getId());
+    private TripLoadResponse buildResponse(Trip trip, List<LoadPlan> plans, TransportJob job) {
+        Cargo cargo = cargo(trip);
+        Map<UUID, List<LoadPlanStall>> byPlan =
+                loadPlanStallRepository
+                        .findByLoadPlanIdIn(plans.stream().map(LoadPlan::getId).toList())
+                        .stream()
+                        .collect(Collectors.groupingBy(a -> a.getLoadPlan().getId()));
 
-        List<LoadPlanConflictResponse> conflicts = evaluateConflicts(plan, assignments, allHorses);
-        Map<UUID, String> stallIssues = new HashMap<>();
-        for (LoadPlanConflictResponse c : conflicts) {
-            if (c.stallId() != null) {
-                stallIssues.merge(c.stallId(), c.description(), (o, n) -> o + "; " + n);
+        List<LoadPlanResponse> vehicles = new ArrayList<>();
+        List<LoadPlanConflictResponse> allConflicts = new ArrayList<>();
+        Set<UUID> placed = new HashSet<>();
+        int totalWeight = 0;
+        int payload = 0;
+        for (LoadPlan plan : plans) {
+            List<LoadPlanStall> assignments = byPlan.getOrDefault(plan.getId(), List.of());
+            List<LoadPlanConflictResponse> conflicts = evaluateConflicts(plan, cargo.maresWithFoal(), assignments);
+            allConflicts.addAll(conflicts);
+            Map<UUID, String> stallIssues = new HashMap<>();
+            for (LoadPlanConflictResponse c : conflicts) {
+                if (c.stallId() != null) {
+                    stallIssues.merge(c.stallId(), c.description(), (o, n) -> o + "; " + n);
+                }
             }
+            Map<UUID, LoadPlanStall> assignmentByStallId = assignments.stream()
+                    .collect(Collectors.toMap(a -> a.getVehicleStall().getId(), a -> a));
+            List<LoadPlanStallResponse> stalls =
+                    vehicleStallRepository
+                            .findByVehicleIdOrderByPositionNo(plan.getVehicle().getId())
+                            .stream()
+                            .map(s -> {
+                                LoadPlanStall a = assignmentByStallId.get(s.getId());
+                                JobHorseResponse horse = a != null && a.getHorse() != null
+                                        ? JobMapper.toHorseResponse(a.getHorse())
+                                        : null;
+                                return JobMapper.toLoadPlanStallResponse(s, horse, stallIssues.get(s.getId()));
+                            })
+                            .toList();
+            int weight = assignments.stream()
+                    .mapToInt(a ->
+                            a.getHorse().getWeightKg() != null ? a.getHorse().getWeightKg() : 0)
+                    .sum();
+            assignments.forEach(a -> placed.add(a.getHorse().getId()));
+            totalWeight += weight;
+            payload += plan.getVehicle().getPayloadKg();
+            vehicles.add(JobMapper.toLoadPlanResponse(plan, job, weight, stalls, conflicts));
         }
 
-        Map<UUID, LoadPlanStall> assignmentByStallId = assignments.stream()
-                .collect(Collectors.toMap(a -> a.getVehicleStall().getId(), a -> a));
-
-        List<LoadPlanStallResponse> stallResponses = allStalls.stream()
-                .map(s -> {
-                    LoadPlanStall a = assignmentByStallId.get(s.getId());
-                    JobHorseResponse hResp = null;
-                    if (a != null && a.getHorse() != null) {
-                        hResp = JobMapper.toHorseResponse(a.getHorse());
-                    }
-                    return JobMapper.toLoadPlanStallResponse(s, hResp, stallIssues.get(s.getId()));
-                })
-                .toList();
-
-        Set<UUID> assignedHorseIds =
-                assignments.stream().map(a -> a.getHorse().getId()).collect(Collectors.toSet());
-
-        List<JobHorseResponse> unassigned = allHorses.stream()
-                .filter(h -> !assignedHorseIds.contains(h.getId()))
+        List<JobHorseResponse> unassigned = cargo.horses().stream()
+                .filter(h -> !placed.contains(h.getId()))
                 .map(JobMapper::toHorseResponse)
                 .toList();
-
-        int totalWeight = assignments.stream()
-                .mapToInt(a -> a.getHorse().getWeightKg() != null ? a.getHorse().getWeightKg() : 0)
-                .sum();
-
-        return JobMapper.toLoadPlanResponse(plan, totalWeight, stallResponses, unassigned, conflicts);
-    }
-
-    private List<Horse> getJobHorses(TransportJob job) {
-        if (job.getRequest() != null && job.getRequest().getHorses() != null) {
-            return job.getRequest().getHorses().stream()
-                    .map(RequestHorse::getHorse)
-                    .toList();
-        }
-        return Collections.emptyList();
+        boolean confirmed = plans.stream().allMatch(p -> p.getStatus() == LoadPlanStatus.CONFIRMED);
+        LoadPlan lastConfirmed = plans.stream()
+                .filter(p -> p.getConfirmedAt() != null)
+                .max(Comparator.comparing(LoadPlan::getConfirmedAt))
+                .orElse(null);
+        return TripLoadResponse.builder()
+                .tripCode(trip.getCode())
+                .status(confirmed ? LoadPlanStatus.CONFIRMED : LoadPlanStatus.DRAFT)
+                .confirmedByName(
+                        confirmed && lastConfirmed != null ? JobMapper.fullName(lastConfirmed.getConfirmedBy()) : null)
+                .confirmedAt(confirmed && lastConfirmed != null ? lastConfirmed.getConfirmedAt() : null)
+                .totalWeightKg(totalWeight)
+                .payloadKg(payload)
+                .vehicles(vehicles)
+                .unassignedHorses(unassigned)
+                .conflicts(allConflicts)
+                .build();
     }
 
     private boolean requiresBox(Horse horse, Set<UUID> maresWithFoal) {
@@ -575,26 +784,20 @@ public class LoadPlanService {
         return true;
     }
 
-    private Set<UUID> getHorsesWithFoal(TransportJob job) {
-        Set<UUID> mares = new HashSet<>();
-        if (job != null && job.getRequest() != null && job.getRequest().getHorses() != null) {
-            for (RequestHorse rh : job.getRequest().getHorses()) {
-                if (rh.isWithFoal() && rh.getHorse() != null) {
-                    mares.add(rh.getHorse().getId());
-                }
-            }
-        }
-        return mares;
-    }
-
     private Map<Horse, VehicleStall> solveArrangement(
-            List<Horse> horses, Set<VehicleStall> availableStalls, Set<UUID> maresWithFoal) {
+            List<Horse> horses, List<VehicleStall> stalls, Set<UUID> maresWithFoal) {
         // Backtracking solver to find a 0-conflict placement
         Map<Horse, VehicleStall> assignment = new HashMap<>();
-        if (solveRecursive(0, horses, new ArrayList<>(availableStalls), assignment, maresWithFoal)) {
+        if (solveRecursive(0, horses, stalls, assignment, maresWithFoal)) {
             return assignment;
         }
         return null;
+    }
+
+    private static boolean sameVehicle(VehicleStall a, VehicleStall b) {
+        return a.getVehicle() == null
+                || b.getVehicle() == null
+                || Objects.equals(a.getVehicle().getId(), b.getVehicle().getId());
     }
 
     private boolean solveRecursive(
@@ -620,7 +823,7 @@ public class LoadPlanService {
                 continue;
             }
 
-            // Stallion near mare check against currently placed horses:
+            // Stallion near mare check against horses already placed on the same trailer:
             boolean isStallion = (horse.getSex() == HorseSex.STALLION || horse.getSex() == HorseSex.COLT);
             boolean isMare = (horse.getSex() == HorseSex.MARE || horse.getSex() == HorseSex.FILLY);
             boolean violatesProximity = false;
@@ -628,6 +831,9 @@ public class LoadPlanService {
             for (Map.Entry<Horse, VehicleStall> entry : current.entrySet()) {
                 Horse placedHorse = entry.getKey();
                 VehicleStall placedStall = entry.getValue();
+                if (!sameVehicle(stall, placedStall)) {
+                    continue;
+                }
 
                 if (isStallion && (placedHorse.getSex() == HorseSex.MARE || placedHorse.getSex() == HorseSex.FILLY)) {
                     if (stall.getRowNo() == placedStall.getRowNo()

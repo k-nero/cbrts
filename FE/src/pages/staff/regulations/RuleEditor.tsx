@@ -18,7 +18,7 @@ type Props = {
 const RuleEditor: FC<Props> = ({ rule, editable }) => {
   if (!rule)
     return (
-      <Panel title="Edit rule" className="lg:col-span-2">
+      <Panel title="Edit rule" className="h-full">
         <p className="type-body-s m-0 text-ink-3">This version has no document rules yet.</p>
       </Panel>
     );

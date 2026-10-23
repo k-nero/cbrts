@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clearanceApi } from '@/apis/clearance';
+import { fileApi } from '@/apis/file';
 import { queryKeys } from '@/constant/query';
 import type {
   AuthorityKind,
@@ -7,12 +8,15 @@ import type {
   ClearanceStatus,
   CreateAuthoritySubmissionRequest,
   CreateQuarantinePeriodRequest,
+  DocumentCheckRequest,
+  DocumentCheckResponse,
   DocumentUploadRequest,
   DocumentVersion,
   ClearanceJobSummary,
   ReviewDocumentRequest,
   UpdateAuthoritySubmissionRequest,
 } from '@/interfaces';
+import { ValidityEnum } from '@/interfaces';
 
 /**
  * Open dossiers for the specialist's job picker, searched on the server by job code or club.
@@ -52,6 +56,65 @@ export const usePendingReviews = () => {
         return (raw as { content: DocumentVersion[] }).content;
       }
       return [];
+    },
+  });
+};
+
+/** US-F2-02: the customer's documents for one request, owed or not. */
+export const useRequestChecklist = (requestId: string) =>
+  useQuery({
+    queryKey: queryKeys.clearance.requestChecklist(requestId),
+    queryFn: async (): Promise<ChecklistItem[]> =>
+      (await clearanceApi.getCustomerRequestChecklist(requestId)).data,
+    enabled: Boolean(requestId),
+  });
+
+/** US-F2-03: every version of one of the customer's documents, newest first. */
+export const useDocumentVersions = (checklistItemId: string) =>
+  useQuery({
+    queryKey: queryKeys.clearance.versions(checklistItemId),
+    queryFn: async (): Promise<DocumentVersion[]> =>
+      (await clearanceApi.getCustomerVersions(checklistItemId)).data,
+    enabled: Boolean(checklistItemId),
+  });
+
+export type SubmitDocumentInput = DocumentCheckRequest & {
+  checklistItemId: string;
+  file: File;
+  issuer?: string;
+};
+
+/**
+ * US-F2-03: check the dates first, and only upload and attach the file when the check doesn't refuse it, so a
+ * refused certificate is never stored. Attaching runs the same check again on the server.
+ */
+export const useSubmitCustomerDocument = (requestId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      checklistItemId,
+      file,
+      issuer,
+      ...dates
+    }: SubmitDocumentInput): Promise<DocumentCheckResponse> => {
+      const check = (await clearanceApi.checkCustomerDocument(checklistItemId, dates)).data;
+      if (check.validity === ValidityEnum.RED) return check;
+      const stored = await fileApi.upload(file);
+      await clearanceApi.uploadCustomerDocumentVersion(checklistItemId, {
+        fileId: stored.id,
+        ...dates,
+        issuer: issuer || undefined,
+      });
+      return check;
+    },
+    onSuccess: (check, { checklistItemId }) => {
+      if (check.validity === ValidityEnum.RED) return;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.clearance.requestChecklist(requestId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.clearance.versions(checklistItemId),
+      });
     },
   });
 };

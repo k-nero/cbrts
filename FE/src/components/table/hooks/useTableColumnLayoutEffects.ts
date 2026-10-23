@@ -25,7 +25,10 @@ type UseApplyColumnWidthsOptions = {
  *
  * 1. A layout effect (keyed to the structural inputs) reapplies after each React render.
  * 2. A MutationObserver on the table container catches Ant-internal DOM rebuilds that do
- *    not flow through a React render of this component (e.g. pagination).
+ *    not flow through a React render of this component (e.g. pagination), and Ant
+ *    repainting a `<col>` width from the column defs after our write.
+ * 3. A ResizeObserver reapplies when the container's width changes, since the last
+ *    column's share of the slack depends on it.
  *
  * Both bail while a resize drag is in flight — the drag commit already wrote the DOM and
  * is authoritative.
@@ -83,7 +86,7 @@ export const useApplyColumnWidths = ({
     }
 
     let rafId = 0;
-    const observer = new MutationObserver(() => {
+    const reapply = () => {
       if (isResizingRef.current || rafId) {
         return;
       }
@@ -95,12 +98,34 @@ export const useApplyColumnWidths = ({
           onWidthsAppliedRef.current?.();
         }
       });
+    };
+    const observer = new MutationObserver((records) => {
+      if (records.some((r) => r.type === 'childList' || (r.target as Element).tagName === 'COL')) {
+        reapply();
+      }
     });
-    // Width writes set styles only (no childList change), so this never self-triggers.
-    observer.observe(container, { childList: true, subtree: true });
+    // Our own width writes skip unchanged values, so once applied a reapply writes nothing
+    // and this doesn't loop.
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+    // The slack the last column takes depends on the container's width, which can still be
+    // settling when the first reapply runs (and changes when the sidebar or window does).
+    let lastWidth = container.clientWidth;
+    const resizeObserver = new ResizeObserver(() => {
+      if (container.clientWidth !== lastWidth) {
+        lastWidth = container.clientWidth;
+        reapply();
+      }
+    });
+    resizeObserver.observe(container);
 
     return () => {
       observer.disconnect();
+      resizeObserver.disconnect();
       if (rafId) {
         cancelAnimationFrame(rafId);
       }

@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { useWatch } from 'react-hook-form';
+import { Flex } from 'antd';
 
 import type { HorseFormShape } from './HorseForm';
 
@@ -14,22 +15,24 @@ export const SizeLine: FC = () => {
   const { data: classes } = useSizeClasses();
   const size = sizeClassFor(heightHh, requiredStall ?? 'STANDARD', classes ?? []);
   return (
-    <div className="flex items-center gap-3 rounded-sm bg-sunken px-4 py-3">
-      {size ? (
-        <>
-          <Chip tone="neutral">
-            Size {size.code} · {size.widthIn} in
-          </Chip>
-          <span className="type-body-s text-ink-2">
-            Worked out from {formatHeight(heightHh)}. It decides the stall width and the air
-            position.
+    <div className="rounded-sm bg-sunken px-4 py-3">
+      <Flex align="center" gap={12}>
+        {size ? (
+          <>
+            <Chip tone="neutral">
+              Size {size.code} · {size.widthIn} in
+            </Chip>
+            <span className="type-body-s text-ink-2">
+              Worked out from {formatHeight(heightHh)}. It decides the stall width and the air
+              position.
+            </span>
+          </>
+        ) : (
+          <span className="type-body-s text-ink-3">
+            Your horse&apos;s size class appears when you enter a height.
           </span>
-        </>
-      ) : (
-        <span className="type-body-s text-ink-3">
-          Your horse&apos;s size class appears when you enter a height.
-        </span>
-      )}
+        )}
+      </Flex>
     </div>
   );
 };

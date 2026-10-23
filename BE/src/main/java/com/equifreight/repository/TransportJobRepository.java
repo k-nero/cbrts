@@ -28,6 +28,24 @@ public interface TransportJobRepository
 
     Optional<TransportJob> findByRequestId(UUID requestId);
 
+    boolean existsByRequestId(UUID requestId);
+
+    /** Open jobs (not closed) per transport specialist, for the approval's team choice (US-F1-07). */
+    @Query("""
+            select j.transportSpecialist.id as userId, count(j) as jobs from TransportJob j
+            where j.closedAt is null and j.transportSpecialist.id in :ids
+            group by j.transportSpecialist.id
+            """)
+    List<UserJobCount> countOpenBySpecialist(@Param("ids") Collection<UUID> ids);
+
+    /** Open jobs (not closed) per fleet & route coordinator. */
+    @Query("""
+            select j.coordinator.id as userId, count(j) as jobs from TransportJob j
+            where j.closedAt is null and j.coordinator.id in :ids
+            group by j.coordinator.id
+            """)
+    List<UserJobCount> countOpenByCoordinator(@Param("ids") Collection<UUID> ids);
+
     List<TransportJob> findByDossierStatus(DossierStatus dossierStatus);
 
     List<TransportJob> findByStage(JobStage stage);
@@ -56,7 +74,8 @@ public interface TransportJobRepository
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
-                (select max(r.occurredAt) from TripRecord r where r.job = j))
+                (select max(r.occurredAt) from TripRecord r
+                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where rq.club.id = :clubId
             """, countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
@@ -68,7 +87,8 @@ public interface TransportJobRepository
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
-                (select max(r.occurredAt) from TripRecord r where r.job = j))
+                (select max(r.occurredAt) from TripRecord r
+                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                               com.equifreight.entity.enums.JobStage.TRIP,

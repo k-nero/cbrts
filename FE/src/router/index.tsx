@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
 
 import AuthenticateLayout from '@/components/AuthenticateLayout';
+import RouteErrorPage from '@/components/RouteErrorPage';
 import StaffMenu from '@/components/menu/StaffMenu';
 import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
 import DesignSystemPage from '@/pages/design-system';
@@ -11,11 +12,14 @@ import EditHorsePage from '@/pages/customer/horses/edit';
 import AddHorsePage from '@/pages/customer/horses/new';
 import HorseProfilePage from '@/pages/customer/horses/profile';
 import MyRequestsPage from '@/pages/customer/requests';
+import RequestDocumentPage from '@/pages/customer/requests/document';
+import RequestDocumentsPage from '@/pages/customer/requests/documents';
 import RequestQuotationPage from '@/pages/customer/requests/quotation';
 import RequestSubmittedPage from '@/pages/customer/requests/submitted';
 import RequestWizardPage from '@/pages/customer/requests/wizard';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
+import NotificationsPage from '@/pages/notifications';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
@@ -42,6 +46,8 @@ const todo = (title: string) => <PlaceholderPage title={title} />;
 
 export const router = createBrowserRouter([
   {
+    // An error outside a page's own boundary (the shell, the sidebar's counts) gets the same page.
+    errorElement: <RouteErrorPage />,
     element: (
       <RoutesGuardWrapper>
         {/* A new page opens at its top; back and forward return to where you were. */}
@@ -73,7 +79,10 @@ export const router = createBrowserRouter([
           { path: '/requests/:id/edit', element: <RequestWizardPage /> },
           { path: '/requests/:id/submitted', element: <RequestSubmittedPage /> },
           { path: '/requests/:id/quotation', element: <RequestQuotationPage /> },
+          { path: '/requests/:id/documents', element: <RequestDocumentsPage /> },
+          { path: '/requests/:id/documents/:itemId', element: <RequestDocumentPage /> },
           { path: '/tracking', element: <CustomerTripPage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
         ],
       },
       {
@@ -86,6 +95,7 @@ export const router = createBrowserRouter([
         children: [
           { path: 'jobs', element: <JobsPage /> },
           { path: 'jobs/:id', element: <JobDetailPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: <RequestsPage /> },

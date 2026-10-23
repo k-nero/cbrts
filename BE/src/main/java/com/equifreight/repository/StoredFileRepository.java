@@ -11,14 +11,15 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Files reach a job through document versions, incident photos, horse condition logs and authority filing results.
- * A file referenced from none of them is an orphan.
+ * Files reach a job through document versions, incident photos, horse condition logs and authority filing results,
+ * and a customer note through its attachment. A file referenced from none of them is an orphan.
  */
 @Repository
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
 
     /**
-     * True when the file is a document version or a filing result on a job requested by {@code clubId}.
+     * True when the file is a document version or a filing result on a job requested by {@code clubId}, or a photo
+     * of one of that job's horses in the trip log.
      */
     @Query(value = """
             select exists (
@@ -28,10 +29,11 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       join checklist_items ci on ci.id = dv.checklist_item_id
                       where dv.file_id = :fileId
                       union all
-                      select tr.job_id
+                      select th.job_id
                       from condition_log_files clf
                       join condition_logs cl on cl.id = clf.condition_log_id
                       join trip_records tr on tr.id = cl.trip_record_id
+                      join trip_horses th on th.trip_id = tr.trip_id and th.horse_id = cl.horse_id
                       where clf.file_id = :fileId
                       union all
                       select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
@@ -42,7 +44,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     boolean isOnClubJob(@Param("fileId") UUID fileId, @Param("clubId") UUID clubId);
 
     /**
-     * True when the file is attached to any job {@code userId} is crewing.
+     * True when the file is attached to any job on a trip {@code userId} is crewing.
      */
     @Query(value = """
             select exists (
@@ -57,14 +59,17 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       join incidents i on i.id = f.incident_id
                       where f.file_id = :fileId
                       union all
-                      select tr.job_id
+                      select th.job_id
                       from condition_log_files clf
                       join condition_logs cl on cl.id = clf.condition_log_id
                       join trip_records tr on tr.id = cl.trip_record_id
+                      join trip_horses th on th.trip_id = tr.trip_id and th.horse_id = cl.horse_id
                       where clf.file_id = :fileId
                       union all
                       select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
-                join crew_assignments ca on ca.job_id = j.job_id
+                join trip_horses th on th.job_id = j.job_id
+                join trip_vehicles tv on tv.trip_id = th.trip_id
+                join crew_assignments ca on ca.trip_vehicle_id = tv.id
                 where ca.user_id = :userId)
             """, nativeQuery = true)
     boolean isOnCrewJob(@Param("fileId") UUID fileId, @Param("userId") UUID userId);
@@ -77,6 +82,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                 or exists (select 1 from incident_files where file_id = :fileId)
                 or exists (select 1 from condition_log_files where file_id = :fileId)
                 or exists (select 1 from authority_submissions where result_file_id = :fileId)
+                or exists (select 1 from notes where attached_file_id = :fileId)
             """, nativeQuery = true)
     boolean isAttached(@Param("fileId") UUID fileId);
 
@@ -90,6 +96,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
               and not exists (select 1 from incident_files i where i.file_id = f.id)
               and not exists (select 1 from condition_log_files clf where clf.file_id = f.id)
               and not exists (select 1 from authority_submissions s where s.result_file_id = f.id)
+              and not exists (select 1 from notes n where n.attached_file_id = f.id)
             order by f.created_at
             limit :limit
             """, nativeQuery = true)

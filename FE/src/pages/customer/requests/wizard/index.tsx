@@ -1,4 +1,5 @@
 import { type FC } from 'react';
+import { Flex } from 'antd';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { WizardForm } from './WizardForm';
@@ -34,7 +35,7 @@ const RequestWizardPage: FC = () => {
       : firstOpenStep(saved);
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         back={{ label: 'My requests', onClick: () => router.push(router.paths.get('my-requests')) }}
         title="Request transport"
@@ -47,7 +48,7 @@ const RequestWizardPage: FC = () => {
       )}
       <Steps steps={STEP_LABELS} current={WIZARD_STEPS.indexOf(step)} />
       <WizardForm key={saved?.id ?? 'new'} saved={saved} step={step} />
-    </div>
+    </Flex>
   );
 };
 

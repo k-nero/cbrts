@@ -1,5 +1,7 @@
 package com.equifreight.model.fleet;
 
+import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.Trip;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
@@ -36,14 +38,23 @@ public final class FleetMapper {
                 .build();
     }
 
+    /** A booking; a trip's booking names the trip and its jobs, with the job's id when it carries one. */
     public static VehicleBookingResponse toBookingResponse(VehicleBooking booking) {
+        Trip trip = booking.getTrip();
+        List<TransportJob> jobs = trip != null ? trip.getJobs() : List.of();
         return VehicleBookingResponse.builder()
                 .id(booking.getId())
                 .vehicleId(booking.getVehicle().getId())
                 .vehicleCode(booking.getVehicle().getCode())
                 .vehicleKind(booking.getVehicle().getKind())
-                .jobId(booking.getJob() != null ? booking.getJob().getId() : null)
-                .jobCode(booking.getJob() != null ? booking.getJob().getCode() : null)
+                .tripCode(trip != null ? trip.getCode() : null)
+                .jobId(jobs.size() == 1 ? jobs.getFirst().getId() : null)
+                .jobCode(
+                        jobs.isEmpty()
+                                ? null
+                                : String.join(
+                                        ", ",
+                                        jobs.stream().map(TransportJob::getCode).toList()))
                 .kind(booking.getKind() != null ? booking.getKind().name() : "JOB")
                 .startsAt(booking.getStartsAt())
                 .endsAt(booking.getEndsAt())

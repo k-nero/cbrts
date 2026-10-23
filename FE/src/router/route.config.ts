@@ -104,6 +104,20 @@ export const routesConfig = [
             breadcrumb: 'Quotation',
             name: 'request-quotation',
           },
+          {
+            path: '/documents',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Documents',
+            name: 'request-documents',
+          },
+          {
+            path: '/documents/{itemId}',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Document',
+            name: 'request-document',
+          },
         ],
       },
     ],
@@ -116,6 +130,13 @@ export const routesConfig = [
     name: 'tracking',
   },
   {
+    path: '/notifications',
+    roles: ['CUSTOMER'],
+    type: 'authenticated',
+    breadcrumb: 'Notifications',
+    name: 'notifications',
+  },
+  {
     path: '/staff',
     roles: [LM, TS, FRC],
     type: 'authenticated',
@@ -123,6 +144,14 @@ export const routesConfig = [
     name: 'staff',
     children: [
       { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
+      {
+        // Every staff role has one; the bell in the top bar opens it.
+        path: '/notifications',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Notifications',
+        name: 'staff-notifications',
+      },
       {
         path: '/trips',
         roles: [FRC, LM],

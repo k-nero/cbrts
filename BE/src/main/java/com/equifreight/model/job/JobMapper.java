@@ -36,22 +36,26 @@ public final class JobMapper {
                 .clearanceReadyAt(job.getClearanceReadyAt())
                 .blockingReason(blockingReason)
                 .nextStepOwner(nextStepOwner)
+                .transportSpecialist(nameOf(job.getTransportSpecialist()))
+                .coordinator(nameOf(job.getCoordinator()))
                 .build();
     }
 
     public static JobDetailResponse toDetailResponse(
             TransportJob job,
+            String tripCode,
             String blockingReason,
             String nextStepOwner,
             String clearanceGateState,
             String clearanceGateSummary,
             List<JobHorseResponse> horses,
-            LoadPlanResponse loadPlan,
+            TripLoadResponse loadPlan,
             RoutePlanResponse routePlan,
             List<CrewMemberResponse> crew) {
         return JobDetailResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
+                .tripCode(tripCode)
                 .originCity(originCity(job))
                 .destinationCity(destinationCity(job))
                 .stage(job.getStage())
@@ -63,6 +67,8 @@ public final class JobMapper {
                 .clearanceReadyAt(job.getClearanceReadyAt())
                 .blockingReason(blockingReason)
                 .nextStepOwner(nextStepOwner)
+                .transportSpecialist(nameOf(job.getTransportSpecialist()))
+                .coordinator(nameOf(job.getCoordinator()))
                 .clearanceGateState(clearanceGateState)
                 .clearanceGateSummary(clearanceGateSummary)
                 .horses(horses)
@@ -94,6 +100,8 @@ public final class JobMapper {
                 .staffCode(u.getStaffCode())
                 .email(u.getEmail())
                 .crewRole(ca.getCrewRole())
+                .tripVehicleId(ca.getTripVehicle().getId())
+                .vehicleCode(ca.getTripVehicle().getVehicle().getCode())
                 .build();
     }
 
@@ -126,13 +134,15 @@ public final class JobMapper {
 
     public static LoadPlanResponse toLoadPlanResponse(
             LoadPlan plan,
+            TransportJob job,
             int totalWeightKg,
             List<LoadPlanStallResponse> stalls,
-            List<JobHorseResponse> unassignedHorses,
             List<LoadPlanConflictResponse> conflicts) {
         return LoadPlanResponse.builder()
                 .id(plan.getId())
-                .jobId(plan.getJob().getId())
+                .jobId(job.getId())
+                .tripVehicleId(plan.getTripVehicle().getId())
+                .seq(plan.getTripVehicle().getSeq())
                 .vehicleId(plan.getVehicle().getId())
                 .vehicleCode(plan.getVehicle().getCode())
                 .status(plan.getStatus())
@@ -141,16 +151,18 @@ public final class JobMapper {
                 .totalWeightKg(totalWeightKg)
                 .payloadKg(plan.getVehicle().getPayloadKg())
                 .stalls(stalls)
-                .unassignedHorses(unassignedHorses)
                 .conflicts(conflicts)
                 .build();
     }
 
-    /** A route plan with its stops and legs; {@code flightsByLegId} holds the flight of each air leg. */
-    public static RoutePlanResponse toRoutePlanResponse(RoutePlan plan, Map<UUID, Flight> flightsByLegId) {
+    /**
+     * A route plan of {@code jobId}'s trip with its stops and legs; {@code flightsByLegId} holds the flight of each
+     * air leg.
+     */
+    public static RoutePlanResponse toRoutePlanResponse(RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId) {
         return RoutePlanResponse.builder()
                 .id(plan.getId())
-                .jobId(plan.getJob().getId())
+                .jobId(jobId)
                 .versionNo(plan.getVersionNo())
                 .status(plan.getStatus())
                 .distanceKm(plan.getDistanceKm())
@@ -245,7 +257,11 @@ public final class JobMapper {
         return "Not set";
     }
 
-    private static String fullName(User user) {
+    public static String fullName(User user) {
         return user != null ? user.getFirstName() + " " + user.getLastName() : null;
+    }
+
+    private static String nameOf(User user) {
+        return user == null ? null : user.displayName();
     }
 }

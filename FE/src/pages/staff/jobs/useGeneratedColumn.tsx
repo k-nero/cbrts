@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TableColumnsType } from 'antd';
+import { Flex, TableColumnsType } from 'antd';
 
 import { Chip, Deadline, StageMark } from '@/components/ui';
 import type { JobSummary } from '@/interfaces';
@@ -56,14 +56,14 @@ export const useGeneratedJobColumn = () =>
         key: 'horses',
         width: 350,
         render: (_, job) => (
-          <div className="flex flex-col">
+          <Flex vertical>
             <span className="type-label-s text-ink">
               {job.horseCount} {job.horseCount === 1 ? 'horse' : 'horses'}
             </span>
             {job.horseNames?.length > 0 && (
               <span className="type-body-s text-ink-3">{job.horseNames.join(', ')}</span>
             )}
-          </div>
+          </Flex>
         ),
       },
       {
@@ -95,6 +95,27 @@ export const useGeneratedJobColumn = () =>
             <Chip tone="bad">{job.blockingReason}</Chip>
           ) : (
             <Chip tone="ok">Clear to depart</Chip>
+          ),
+      },
+      {
+        // The team chosen at approval (US-F1-07): who owns the documents, then who plans the move.
+        title: 'Team',
+        key: 'team',
+        width: 220,
+        render: (_, job) =>
+          job.transportSpecialist || job.coordinator ? (
+            <Flex component="span" vertical gap={2}>
+              <span className="type-body-s text-ink">
+                {job.transportSpecialist ?? 'No specialist'}
+                <span className="type-caption text-ink-3"> · documents</span>
+              </span>
+              <span className="type-body-s text-ink">
+                {job.coordinator ?? 'No coordinator'}
+                <span className="type-caption text-ink-3"> · planning</span>
+              </span>
+            </Flex>
+          ) : (
+            <span className="type-body-s text-ink-3">Not assigned</span>
           ),
       },
       {

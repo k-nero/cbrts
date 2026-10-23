@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import HorseForm from '../components/HorseForm';
 import HorseHeader from '../components/HorseHeader';
@@ -25,7 +25,7 @@ const EditHorsePage: FC = () => {
   if (horse.archivedAt) return <Navigate to={profile} replace />;
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <HorseHeader horse={horse} right={<span className="type-caption text-ink-3">Editing</span>} />
       <HorseForm
         key={horse.updatedAt}
@@ -40,7 +40,7 @@ const EditHorsePage: FC = () => {
         }}
         afterForm={horse.identityLocked ? <PassportPanel horse={horse} /> : undefined}
       />
-    </div>
+    </Flex>
   );
 };
 

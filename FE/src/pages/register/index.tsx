@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isAxiosError } from 'axios';
-import { Flex } from 'antd';
+import { Col, Flex, Row } from 'antd';
 
 import { FormGroup } from './FormGroup';
 import { PASSWORD_MIN, type RegisterForm, registerSchema } from './schema';
@@ -84,9 +84,11 @@ const RegisterPage = () => {
 
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand />
-        <ThemeToggle />
+      <header className="h-16 shrink-0 border-b border-line px-10">
+        <Flex align="center" justify="space-between" className="h-full">
+          <Brand />
+          <ThemeToggle />
+        </Flex>
       </header>
       <Flex style={{ flex: 1 }}>
         <Flex vertical gap={32} style={{ width: 720, padding: '96px 120px 64px 160px' }}>
@@ -123,20 +125,24 @@ const RegisterPage = () => {
                   />
                 </FormGroup>
                 <FormGroup title="You">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      name="lastName"
-                      label="Family name"
-                      component="text"
-                      componentProps={{ autoComplete: 'family-name' }}
-                    />
-                    <FormField
-                      name="firstName"
-                      label="Given name"
-                      component="text"
-                      componentProps={{ autoComplete: 'given-name' }}
-                    />
-                  </div>
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
+                      <FormField
+                        name="lastName"
+                        label="Family name"
+                        component="text"
+                        componentProps={{ autoComplete: 'family-name' }}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <FormField
+                        name="firstName"
+                        label="Given name"
+                        component="text"
+                        componentProps={{ autoComplete: 'given-name' }}
+                      />
+                    </Col>
+                  </Row>
                   <FormField
                     name="email"
                     label="Email"
@@ -173,51 +179,59 @@ const RegisterPage = () => {
                   }}
                 />
                 <SubmitButton type="primary" block label="Create account" />
-                <div className="flex items-center gap-1 border-t border-line pt-5">
-                  <span className="type-body-s text-ink-2">Already have an account?</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => router.push(router.paths.get('login'))}
-                  >
-                    Sign in
-                  </Button>
+                <div className="border-t border-line pt-5">
+                  <Flex align="center" gap={4}>
+                    <span className="type-body-s text-ink-2">Already have an account?</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => router.push(router.paths.get('login'))}
+                    >
+                      Sign in
+                    </Button>
+                  </Flex>
                 </div>
               </>
             )}
           </FormWrapper>
         </Flex>
-        <aside
+        <Flex
+          component="aside"
+          vertical
           aria-labelledby="next-title"
-          className="flex flex-1 flex-col border-l border-line bg-sunken"
+          className="flex-1 border-l border-line bg-sunken"
           style={{ padding: '96px 120px 64px 96px' }}
         >
           <h2 id="next-title" className="type-h3 m-0 pb-4 text-ink">
             What happens next
           </h2>
-          <ol className="m-0 flex max-w-[480px] list-none flex-col p-0">
+          <Flex component="ol" vertical className="m-0 max-w-[480px] list-none p-0">
             {NEXT_STEPS.map(([title, body], i) => (
-              <li key={title} className="flex gap-3.5 border-t border-line py-3.5">
-                <span
-                  aria-hidden
-                  className={[
-                    'type-caption grid size-7 shrink-0 place-items-center rounded-full border',
-                    i === 0 ? 'border-ink text-ink' : 'border-line-strong text-ink-3',
-                  ].join(' ')}
-                >
-                  {i + 1}
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="type-label-m text-ink">
-                    {title}
-                    {i === 0 && <span className="sr-only"> (this step)</span>}
-                  </span>
-                  <span className="type-body-s text-ink-2">{body}</span>
-                </span>
+              <li key={title} className="border-t border-line py-3.5">
+                <Flex gap={14}>
+                  <Flex
+                    aria-hidden
+                    align="center"
+                    justify="center"
+                    className={[
+                      'type-caption size-7 shrink-0 rounded-full border',
+                      i === 0 ? 'border-ink text-ink' : 'border-line-strong text-ink-3',
+                    ].join(' ')}
+                  >
+                    {i + 1}
+                  </Flex>
+                  <Flex component="span" vertical gap={2}>
+                    <span className="type-label-m text-ink">
+                      {title}
+                      {i === 0 && <span className="sr-only"> (this step)</span>}
+                    </span>
+                    <span className="type-body-s text-ink-2">{body}</span>
+                  </Flex>
+                </Flex>
               </li>
             ))}
-          </ol>
-        </aside>
+          </Flex>
+        </Flex>
       </Flex>
       <Footer size="compact" />
     </Flex>

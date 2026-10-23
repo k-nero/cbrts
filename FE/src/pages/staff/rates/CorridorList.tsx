@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Chip, Panel, cx } from '@/components/ui';
 import type { RateCorridor } from '@/interfaces';
@@ -28,35 +29,37 @@ export const CorridorList: FC<Props> = ({ corridors, selectedId, versionNo, onSe
       const rows = corridors.filter((c) => c.mode === group.mode);
       if (rows.length === 0) return null;
       return (
-        <div key={group.mode} className="flex flex-col border-t border-line py-2 first:border-t-0">
-          <span className="type-body-s px-6 py-1 text-ink-3">{group.label}</span>
-          {rows.map((c) => {
-            const selected = c.id === selectedId;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-current={selected || undefined}
-                onClick={() => onSelect(c.id)}
-                className={cx(
-                  'flex w-full cursor-pointer items-center gap-3 border-0 px-6 py-2 text-left',
-                  selected ? 'bg-muted' : 'bg-transparent hover:bg-muted',
-                )}
-              >
-                <span className="type-mono-label w-9 shrink-0 text-ink-3">{group.tag}</span>
-                <span className="type-data min-w-0 flex-1 truncate text-ink">
-                  {corridorShort(c.code)}
-                </span>
-                {c.missingCount > 0 ? (
-                  <Chip tone="bad">{`${c.missingCount} missing`}</Chip>
-                ) : (
-                  versionNo != null && (
-                    <span className="type-caption text-ink-3">{`v${versionNo}`}</span>
-                  )
-                )}
-              </button>
-            );
-          })}
+        <div key={group.mode} className="border-t border-line py-2 first:border-t-0">
+          <Flex vertical>
+            <span className="type-body-s px-6 py-1 text-ink-3">{group.label}</span>
+            {rows.map((c) => {
+              const selected = c.id === selectedId;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-current={selected || undefined}
+                  onClick={() => onSelect(c.id)}
+                  className={cx(
+                    'flex w-full cursor-pointer items-center gap-3 border-0 px-6 py-2 text-left',
+                    selected ? 'bg-muted' : 'bg-transparent hover:bg-muted',
+                  )}
+                >
+                  <span className="type-mono-label w-9 shrink-0 text-ink-3">{group.tag}</span>
+                  <span className="type-data min-w-0 flex-1 truncate text-ink">
+                    {corridorShort(c.code)}
+                  </span>
+                  {c.missingCount > 0 ? (
+                    <Chip tone="bad">{`${c.missingCount} missing`}</Chip>
+                  ) : (
+                    versionNo != null && (
+                      <span className="type-caption text-ink-3">{`v${versionNo}`}</span>
+                    )
+                  )}
+                </button>
+              );
+            })}
+          </Flex>
         </div>
       );
     })}

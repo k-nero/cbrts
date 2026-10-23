@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { App, Empty, Select, Spin } from 'antd';
+import { App, Empty, Flex, Select, Spin } from 'antd';
 import { Button, Callout, Chip, DocumentRow } from '@/components/ui';
 import {
   useClearanceJobs,
@@ -8,9 +8,8 @@ import {
   useJobChecklist,
 } from '@/hooks/clearance';
 import { type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
+import { apiErrorMessage, rowStatus } from '@/lib/utils';
 import ClearanceSummary from './ClearanceSummary';
-import { rowStatus } from './rowStatus';
 
 type Props = {
   jobId: string | null;
@@ -48,36 +47,38 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <Flex vertical gap={24}>
       {/* Job picker: open dossiers, searched on the server by code or club */}
-      <div className="flex items-center gap-4 rounded-lg border border-line bg-card p-4">
-        <span className="type-label-s shrink-0 text-ink-2">Job</span>
-        <Select
-          showSearch
-          placeholder="Search by job code or club"
-          value={jobId || undefined}
-          onChange={(value) => onSelectJob(value ?? null)}
-          onSearch={setJobSearch}
-          loading={jobsLoading}
-          className="w-full max-w-md"
-          filterOption={false}
-          notFoundContent={jobsLoading ? <Spin size="small" /> : 'No open dossier matches'}
-          options={[
-            ...jobs.map((job) => ({
-              value: job.id,
-              label: `${job.code}${job.clubName ? ' · ' + job.clubName : ''}`,
-            })),
-            // A job opened by link (e.g. a departed one) may not be in the open-dossier list; label it by its code.
-            ...(jobId && status && !jobs.some((job) => job.id === jobId)
-              ? [{ value: jobId, label: status.jobCode }]
-              : []),
-          ]}
-        />
-        {jobId && (
-          <Button variant="secondary" size="sm" onClick={() => onSelectJob(null)}>
-            Clear
-          </Button>
-        )}
+      <div className="rounded-lg border border-line bg-card p-4">
+        <Flex align="center" gap={16}>
+          <span className="type-label-s shrink-0 text-ink-2">Job</span>
+          <Select
+            showSearch
+            placeholder="Search by job code or club"
+            value={jobId || undefined}
+            onChange={(value) => onSelectJob(value ?? null)}
+            onSearch={setJobSearch}
+            loading={jobsLoading}
+            className="w-full max-w-md"
+            filterOption={false}
+            notFoundContent={jobsLoading ? <Spin size="small" /> : 'No open dossier matches'}
+            options={[
+              ...jobs.map((job) => ({
+                value: job.id,
+                label: `${job.code}${job.clubName ? ' · ' + job.clubName : ''}`,
+              })),
+              // A job opened by link (e.g. a departed one) may not be in the open-dossier list; label it by its code.
+              ...(jobId && status && !jobs.some((job) => job.id === jobId)
+                ? [{ value: jobId, label: status.jobCode }]
+                : []),
+            ]}
+          />
+          {jobId && (
+            <Button variant="secondary" size="sm" onClick={() => onSelectJob(null)}>
+              Clear
+            </Button>
+          )}
+        </Flex>
       </div>
 
       {!jobId && (
@@ -93,10 +94,10 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
         <>
           {status && <ClearanceSummary jobId={jobId} status={status} />}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+          <Flex vertical gap={8}>
+            <Flex align="center" justify="space-between">
               <h3 className="type-h3 text-ink">Checklist</h3>
-              <span className="flex items-center gap-3">
+              <Flex component="span" align="center" gap={12}>
                 <span className="type-caption text-ink-3">{checklist.length} items configured</span>
                 <Button
                   variant="secondary"
@@ -106,12 +107,14 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
                 >
                   {checklist.length === 0 ? 'Generate checklist' : 'Add missing items'}
                 </Button>
-              </span>
-            </div>
+              </Flex>
+            </Flex>
 
             {checklistLoading && (
-              <div className="flex justify-center p-12">
-                <Spin size="large" />
+              <div className="p-12">
+                <Flex justify="center">
+                  <Spin size="large" />
+                </Flex>
               </div>
             )}
 
@@ -137,13 +140,13 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
                       item.status === ChecklistStatusEnum.REJECTED ? 'Rejected' : undefined
                     }
                     document={
-                      <div className="flex items-center gap-2">
+                      <Flex align="center" gap={8}>
                         <span>{item.documentTypeName || item.documentTypeCode}</span>
                         {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
                         {item.horseName && (
                           <span className="font-display text-ink-3">{item.horseName}</span>
                         )}
-                      </div>
+                      </Flex>
                     }
                     rule={item.ruleDescription || 'Standard validity validation'}
                     result={
@@ -159,7 +162,7 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
                         : 'No version'
                     }
                     actions={
-                      <div className="flex items-center gap-2">
+                      <Flex align="center" gap={8}>
                         {item.currentVersion && (
                           <Button
                             variant="secondary"
@@ -172,16 +175,16 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
                         <Button variant="secondary" size="sm" onClick={() => onUpload(item)}>
                           Upload
                         </Button>
-                      </div>
+                      </Flex>
                     }
                   />
                 ))}
               </div>
             )}
-          </div>
+          </Flex>
         </>
       )}
-    </div>
+    </Flex>
   );
 };
 

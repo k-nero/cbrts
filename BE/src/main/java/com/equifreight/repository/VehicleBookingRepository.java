@@ -3,6 +3,7 @@ package com.equifreight.repository;
 import com.equifreight.entity.VehicleBooking;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +14,9 @@ import org.springframework.stereotype.Repository;
 public interface VehicleBookingRepository extends JpaRepository<VehicleBooking, UUID> {
     List<VehicleBooking> findByVehicleId(UUID vehicleId);
 
-    List<VehicleBooking> findByJobId(UUID jobId);
+    List<VehicleBooking> findByTrip_Id(UUID tripId);
+
+    Optional<VehicleBooking> findByTrip_IdAndVehicle_Id(UUID tripId, UUID vehicleId);
 
     @Query("SELECT b FROM VehicleBooking b WHERE b.vehicle.id = :vehicleId "
             + "AND (:excludeId IS NULL OR b.id <> :excludeId) "

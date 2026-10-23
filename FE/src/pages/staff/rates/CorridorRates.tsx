@@ -1,4 +1,5 @@
 import { type FC } from 'react';
+import { Col, Flex, Row } from 'antd';
 
 import { BreaksPanel } from './BreaksPanel';
 import { ClassTable } from './ClassTable';
@@ -27,19 +28,19 @@ export const CorridorRates: FC<{
   view: RateCorridorView;
   editing: Editing | null;
 }> = ({ catalog, view, editing }) => (
-  <div className="flex flex-col gap-6">
+  <Flex vertical gap={24}>
     <RateTiles catalog={catalog} view={view} />
     {view.missing.length > 0 && (
       <Callout
         tone="bad"
         title={`${corridorShort(view.corridor.code)} has ${view.missing.length} missing ${view.missing.length === 1 ? 'rate' : 'rates'}`}
       >
-        <span className="flex flex-col gap-1">
+        <Flex component="span" vertical gap={4}>
           {view.missing.map((m) => (
             <span key={m.description}>{m.why}</span>
           ))}
           <span>Quotations on this corridor can&apos;t be issued until they are filled in.</span>
-        </span>
+        </Flex>
       </Callout>
     )}
     {view.corridor.mode === 'AIR' && (
@@ -56,38 +57,42 @@ export const CorridorRates: FC<{
         }
       />
     )}
-    <div className="grid grid-cols-2 items-start gap-6">
-      <BreaksPanel
-        view={view}
-        edit={
-          editing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Edit volume breaks"
-              onClick={editing.onEditBreaks}
-            >
-              Edit
-            </Button>
-          )
-        }
-      />
-      <PolicyPanel
-        view={view}
-        edit={
-          editing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Edit percentages and policy"
-              onClick={editing.onEditPolicies}
-            >
-              Edit
-            </Button>
-          )
-        }
-      />
-    </div>
+    <Row gutter={[24, 24]} align="top">
+      <Col span={12}>
+        <BreaksPanel
+          view={view}
+          edit={
+            editing && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="Edit volume breaks"
+                onClick={editing.onEditBreaks}
+              >
+                Edit
+              </Button>
+            )
+          }
+        />
+      </Col>
+      <Col span={12}>
+        <PolicyPanel
+          view={view}
+          edit={
+            editing && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="Edit percentages and policy"
+                onClick={editing.onEditPolicies}
+              >
+                Edit
+              </Button>
+            )
+          }
+        />
+      </Col>
+    </Row>
     <LineTable
       view={view}
       actions={editing && { onEdit: editing.onEditLine, onRemove: editing.onRemoveLine }}
@@ -99,5 +104,5 @@ export const CorridorRates: FC<{
         )
       }
     />
-  </div>
+  </Flex>
 );

@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { Input } from 'antd';
+import { Col, Flex, Input, Row } from 'antd';
 import { fileApi } from '@/apis/file';
 import { Button, Callout } from '@/components/ui';
 import { useUploadDocumentVersion } from '@/hooks/clearance';
@@ -52,10 +52,10 @@ export const UploadForm: FC<{ item: ChecklistItem; jobId: string | null; onClose
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <Flex vertical gap={16}>
       {error && <Callout tone="bad" title={error} />}
 
-      <div className="flex flex-col gap-1.5">
+      <Flex vertical gap={6}>
         <label className="type-label-s text-ink">
           File (PDF, JPEG, PNG or HEIC, up to 25 MB) <span className="text-bad">*</span>
         </label>
@@ -73,51 +73,55 @@ export const UploadForm: FC<{ item: ChecklistItem; jobId: string | null; onClose
             Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
           </span>
         )}
-      </div>
+      </Flex>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label className="type-label-s text-ink">
-            Issued on <span className="text-bad">*</span>
-          </label>
-          <Input
-            type="date"
-            required
-            value={issuedOn}
-            onChange={(event) => setIssuedOn(event.target.value)}
-          />
-        </div>
+      <Row gutter={[12, 12]}>
+        <Col span={12}>
+          <Flex vertical gap={6}>
+            <label className="type-label-s text-ink">
+              Issued on <span className="text-bad">*</span>
+            </label>
+            <Input
+              type="date"
+              required
+              value={issuedOn}
+              onChange={(event) => setIssuedOn(event.target.value)}
+            />
+          </Flex>
+        </Col>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="type-label-s text-ink">
-            Valid until <span className="text-bad">*</span>
-          </label>
-          <Input
-            type="date"
-            required
-            value={validUntil}
-            onChange={(event) => setValidUntil(event.target.value)}
-          />
-        </div>
-      </div>
+        <Col span={12}>
+          <Flex vertical gap={6}>
+            <label className="type-label-s text-ink">
+              Valid until <span className="text-bad">*</span>
+            </label>
+            <Input
+              type="date"
+              required
+              value={validUntil}
+              onChange={(event) => setValidUntil(event.target.value)}
+            />
+          </Flex>
+        </Col>
+      </Row>
 
-      <div className="flex flex-col gap-1.5">
+      <Flex vertical gap={6}>
         <label className="type-label-s text-ink">Issuer (authority or laboratory)</label>
         <Input
           placeholder="e.g. DAH Vietnam, USDA APHIS"
           value={issuer}
           onChange={(event) => setIssuer(event.target.value)}
         />
-      </div>
+      </Flex>
 
-      <div className="flex justify-end gap-2">
+      <Flex justify="end" gap={8}>
         <Button variant="secondary" size="sm" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="primary" size="sm" disabled={busy} onClick={submit}>
           {busy ? 'Uploading…' : 'Upload and check'}
         </Button>
-      </div>
-    </div>
+      </Flex>
+    </Flex>
   );
 };

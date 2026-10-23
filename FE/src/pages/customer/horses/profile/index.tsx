@@ -1,5 +1,6 @@
 import { type FC, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Flex } from 'antd';
 
 import { FactGrid } from '../components/FactGrid';
 import HorseHeader from '../components/HorseHeader';
@@ -51,7 +52,7 @@ const HorseProfilePage: FC = () => {
   const temperament = temperamentChip(horse.temperament);
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <HorseHeader
         horse={horse}
         right={
@@ -70,9 +71,9 @@ const HorseProfilePage: FC = () => {
         }
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
-        <div className="flex flex-col gap-6">
+        <Flex vertical gap={24}>
           <Panel title={`What ${subject} needs to travel`}>
-            <div className="flex flex-col gap-3">
+            <Flex vertical gap={12}>
               <FactGrid
                 facts={[
                   { label: 'Stall', value: STALL[horse.requiredStall] },
@@ -89,20 +90,20 @@ const HorseProfilePage: FC = () => {
               <p className="type-body-s m-0 text-ink-3">
                 Read by the load plan and by every quotation.
               </p>
-            </div>
+            </Flex>
           </Panel>
           <DocumentsComeLater />
-        </div>
-        <div className="flex flex-col gap-6">
+        </Flex>
+        <Flex vertical gap={24}>
           <Panel title="Declared value">
-            <div className="flex flex-col gap-1.5">
+            <Flex vertical gap={6}>
               <span className="type-display-m text-ink">
                 {formatValue(horse.declaredValue, horse.valueCurrency)}
               </span>
               <span className="type-body-s text-ink-3">
                 Used for insurance on quotations: 1.5% when you insure through us.
               </span>
-            </div>
+            </Flex>
           </Panel>
           {!horse.archivedAt && (
             <div>
@@ -111,10 +112,10 @@ const HorseProfilePage: FC = () => {
               </Button>
             </div>
           )}
-        </div>
+        </Flex>
       </div>
       <ArchiveHorseModal horse={horse} open={archiving} onClose={() => setArchiving(false)} />
-    </div>
+    </Flex>
   );
 };
 

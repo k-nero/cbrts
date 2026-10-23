@@ -60,6 +60,9 @@ public final class RequestMapper {
                 .leadTime(leadTime)
                 .blockers(blockers)
                 .infoRequiredNote(r.getInfoRequiredNote())
+                .rejectReason(r.getRejectReason())
+                .cancelledAt(r.getCancelledAt())
+                .cancellationFeePct(r.getCancellationFeePct())
                 .revisions(revisions)
                 .build();
     }

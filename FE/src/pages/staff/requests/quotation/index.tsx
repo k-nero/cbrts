@@ -1,6 +1,6 @@
 import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { App, Skeleton } from 'antd';
+import { App, Flex, Skeleton } from 'antd';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import type { RunWrite } from './editorOptions';
@@ -94,12 +94,12 @@ const QuotationBuilderPage: FC = () => {
 
   if (query.isPending) {
     return (
-      <div className="flex flex-col gap-7">
+      <Flex vertical gap={28}>
         <PageHeader back={back} title="Quotation" />
         <Panel>
           <Skeleton active title={false} paragraph={{ rows: 8 }} />
         </Panel>
-      </div>
+      </Flex>
     );
   }
 
@@ -107,7 +107,7 @@ const QuotationBuilderPage: FC = () => {
   // the version in the address doesn't exist.
   if (!query.data && version) {
     return (
-      <div className="flex flex-col gap-7">
+      <Flex vertical gap={28}>
         <PageHeader back={back} title="Quotation" />
         <Callout
           tone="info"
@@ -118,26 +118,26 @@ const QuotationBuilderPage: FC = () => {
             </Button>
           }
         />
-      </div>
+      </Flex>
     );
   }
 
   if (!query.data) {
     return (
-      <div className="flex flex-col gap-7">
+      <Flex vertical gap={28}>
         <PageHeader back={back} title="Quotation" />
         {conflict && <Callout tone="bad" title={conflict} />}
         <Panel title="No quotation yet">
-          <div className="flex flex-col items-start gap-3">
+          <Flex vertical gap={12} align="start">
             <p className="type-body-m m-0 text-ink-2">
               Start the quotation to price this request from the published rate catalog.
             </p>
             <Button variant="secondary" disabled={start.isPending} onClick={() => void onStart()}>
               Start quotation
             </Button>
-          </div>
+          </Flex>
         </Panel>
-      </div>
+      </Flex>
     );
   }
 
@@ -196,26 +196,26 @@ const QuotationBuilderPage: FC = () => {
     });
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         back={back}
         title={`${q.request.fromCity} → ${q.request.toCity}`}
         summary={
-          <span className="flex flex-col gap-1">
+          <Flex component="span" vertical gap={4}>
             <span className="type-data text-ink">{q.code}</span>
             <span>{quoteSummary(q)}</span>
-          </span>
+          </Flex>
         }
         right={
-          <span className="flex items-center gap-3">
+          <Flex component="span" gap={12} align="center">
             <StageMark stage="Quotation" />
             <VersionChip status={q.status} />
             <Chip dot={false}>{`Rates v${q.pinnedVersion.versionNo} pinned`}</Chip>
-          </span>
+          </Flex>
         }
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
-        <div className="flex min-w-0 flex-col gap-6">
+        <Flex vertical gap={24} className="min-w-0">
           {conflict && (
             <Callout tone="bad" title={conflict}>
               The quotation has been reloaded to show where it stands now.
@@ -241,8 +241,8 @@ const QuotationBuilderPage: FC = () => {
           )}
           <Ledger key={`${q.versionNo}-${q.status}`} quotation={q} editable={draft} run={write} />
           <TotalsPanel quotation={q} />
-        </div>
-        <div className="flex flex-col gap-6">
+        </Flex>
+        <Flex vertical gap={24}>
           {draft ? (
             <IssuePanel
               quotation={q}
@@ -270,9 +270,9 @@ const QuotationBuilderPage: FC = () => {
               onPick={(v) => showVersion(v === q.versions[0].versionNo ? null : v)}
             />
           )}
-        </div>
+        </Flex>
       </div>
-    </div>
+    </Flex>
   );
 };
 

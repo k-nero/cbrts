@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 import { Chip, Panel } from '@/components/ui';
 import { CatalogStatusEnum, type RegulationCatalog, type RegulationVersion } from '@/interfaces';
 import { formatDay } from './constants';
@@ -19,34 +20,36 @@ const publishedLine = (version: RegulationVersion) => {
 const VersionsPanel: FC<{ catalog: RegulationCatalog }> = ({ catalog }) => {
   const versions = [...(catalog.versions ?? [])].sort((a, b) => b.versionNo - a.versionNo);
   return (
-    <Panel title={`Versions · ${catalog.name.replace(' import', '')}`}>
-      <div className="flex flex-col divide-y divide-line">
+    <Panel title={`Versions · ${catalog.name.replace(' import', '')}`} className="h-full">
+      <Flex vertical className="divide-y divide-line">
         {versions.map((version) => (
-          <div key={version.id} className="flex flex-col gap-1 py-3">
-            <div className="flex items-center gap-2">
-              <span className="type-mono font-bold text-ink">v{version.versionNo}</span>
-              {version.status === CatalogStatusEnum.DRAFT && (
-                <Chip tone="warn" dot={false}>
-                  Draft
-                </Chip>
-              )}
-              {version.id === catalog.activeVersion?.id && (
-                <Chip tone="info" dot={false}>
-                  Current
-                </Chip>
-              )}
-            </div>
-            <span className="type-body-s text-ink-3">
-              {version.status === CatalogStatusEnum.DRAFT
-                ? 'Not published yet'
-                : publishedLine(version)}
-            </span>
+          <div key={version.id} className="py-3">
+            <Flex vertical gap={4}>
+              <Flex align="center" gap={8}>
+                <span className="type-mono font-bold text-ink">v{version.versionNo}</span>
+                {version.status === CatalogStatusEnum.DRAFT && (
+                  <Chip tone="warn" dot={false}>
+                    Draft
+                  </Chip>
+                )}
+                {version.id === catalog.activeVersion?.id && (
+                  <Chip tone="info" dot={false}>
+                    Current
+                  </Chip>
+                )}
+              </Flex>
+              <span className="type-body-s text-ink-3">
+                {version.status === CatalogStatusEnum.DRAFT
+                  ? 'Not published yet'
+                  : publishedLine(version)}
+              </span>
+            </Flex>
           </div>
         ))}
         {versions.length === 0 && (
           <span className="type-body-s py-3 text-ink-3">No versions yet.</span>
         )}
-      </div>
+      </Flex>
     </Panel>
   );
 };

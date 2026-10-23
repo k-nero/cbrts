@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.configuration.BusinessTime;
@@ -15,13 +16,15 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
 import com.equifreight.service.AuditService;
 import com.equifreight.service.NotificationService;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.time.Clock;
@@ -40,25 +43,22 @@ class QuotationExpiryJobTest {
 
     QuotationRepository quotations;
     TransportRequestRepository requests;
-    UserRepository users;
     NotificationService notifications;
     AuditService audit;
     EntityManager entities;
     QuotationExpiryJob job;
     List<Quotation> issued = new ArrayList<>();
     TransportRequest request;
-    User owner;
 
     @BeforeEach
     void setUp() {
         quotations = mock(QuotationRepository.class);
         requests = mock(TransportRequestRepository.class);
-        users = mock(UserRepository.class);
         notifications = mock(NotificationService.class);
         audit = mock(AuditService.class);
         entities = mock(EntityManager.class);
         job = new QuotationExpiryJob(
-                quotations, requests, users, notifications, audit, entities, Clock.fixed(NOW, BusinessTime.ZONE));
+                quotations, requests, notifications, audit, entities, Clock.fixed(NOW, BusinessTime.ZONE));
         Club club = new Club();
         club.setId(UUID.randomUUID());
         request = new TransportRequest();
@@ -66,8 +66,6 @@ class QuotationExpiryJobTest {
         request.setCode("REQ-2026-0199");
         request.setClub(club);
         request.setStatus(RequestStatus.QUOTED);
-        owner = new User();
-        when(users.findByClubId(club.getId())).thenReturn(List.of(owner));
         when(quotations.findByStatusAndValidUntilBefore(eq(QuotationStatus.ISSUED), any()))
                 .thenAnswer(i -> issued.stream()
                         .filter(q -> q.getStatus() == QuotationStatus.ISSUED
@@ -115,15 +113,14 @@ class QuotationExpiryJobTest {
                         "{\"status\":\"QUOTED\"}",
                         "{\"status\":\"EXPIRED\"}");
         verify(notifications)
-                .sendNotification(
-                        owner,
-                        "QUOTATION_EXPIRED",
+                .notify(
+                        NotificationKind.QUOTATION_EXPIRED,
+                        Audience.club(request.getClub().getId()),
+                        Subject.quotation(q),
                         "Quotation Q-2026-0189 has expired",
-                        "Vũ Thị Yến can re-price it from the rate catalog in force now.",
-                        "TRANSPORT_REQUEST",
-                        request.getId());
+                        "Vũ Thị Yến can re-price it from the rate catalog in force now.");
         verify(notifications, never())
-                .sendNotification(any(), eq("QUOTATION_EXPIRING"), anyString(), any(), any(), any());
+                .notify(eq(NotificationKind.QUOTATION_EXPIRING), any(), any(), anyString(), any());
     }
 
     @Test
@@ -135,6 +132,18 @@ class QuotationExpiryJobTest {
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.EXPIRED);
         assertThat(request.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+        verifyNoInteractions(notifications);
+    }
+
+    @Test
+    void aCancelledRequestsQuotationIsNotReminded() {
+        request.setStatus(RequestStatus.CANCELLED);
+        Quotation q = issuedUntil(NOW.plus(Duration.ofHours(20)));
+
+        job.run();
+
+        assertThat(q.getReminderSentAt()).isNull();
+        verifyNoInteractions(notifications);
     }
 
     @Test
@@ -147,13 +156,12 @@ class QuotationExpiryJobTest {
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.ISSUED);
         assertThat(q.getReminderSentAt()).isEqualTo(NOW);
         verify(notifications)
-                .sendNotification(
-                        owner,
-                        "QUOTATION_EXPIRING",
+                .notify(
+                        NotificationKind.QUOTATION_EXPIRING,
+                        Audience.club(request.getClub().getId()),
+                        Subject.quotation(q),
                         "Quotation Q-2026-0189 v1 expires within a day",
-                        "It holds its price until 28 Oct 2026.",
-                        "TRANSPORT_REQUEST",
-                        request.getId());
+                        "It holds its price until 28 Oct 2026.");
     }
 
     @Test
@@ -163,7 +171,7 @@ class QuotationExpiryJobTest {
         job.run();
 
         assertThat(q.getReminderSentAt()).isNull();
-        verify(notifications, never()).sendNotification(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(notifications);
     }
 
     @Test
@@ -205,6 +213,6 @@ class QuotationExpiryJobTest {
         assertThat(q.getSupersededReason()).isEqualTo("Departure moved from 12 Nov to 20 Nov.");
         assertThat(request.getStatus()).isEqualTo(RequestStatus.QUOTED);
         verify(quotations, never()).save(q);
-        verify(notifications, never()).sendNotification(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(notifications);
     }
 }

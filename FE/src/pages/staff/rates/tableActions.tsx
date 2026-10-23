@@ -1,3 +1,5 @@
+import { Flex } from 'antd';
+
 import { Button } from '@/components/ui';
 import { rowActionLabels } from '@/lib/utils';
 
@@ -15,7 +17,7 @@ export const actionsColumn = <T extends object>(
           width: 150,
           align: 'right' as const,
           render: (_: unknown, row: T) => (
-            <span className="flex justify-end gap-1">
+            <Flex component="span" justify="end" gap={4}>
               <Button
                 size="sm"
                 variant="ghost"
@@ -32,7 +34,7 @@ export const actionsColumn = <T extends object>(
               >
                 Remove
               </Button>
-            </span>
+            </Flex>
           ),
         },
       ]

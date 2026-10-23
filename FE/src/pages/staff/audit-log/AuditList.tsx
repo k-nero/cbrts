@@ -1,5 +1,6 @@
 import { FC, useMemo } from 'react';
 import type { TableColumnsType } from 'antd';
+import { Flex } from 'antd';
 
 import { fromLabel, recordedLabel, roleLabel } from './format';
 
@@ -34,10 +35,10 @@ const AuditList: FC<Props> = ({ crud, selectedId, onSelect, empty }) => {
         width: 104,
         sorter: true,
         render: (v: string) => (
-          <div className="flex flex-col gap-0.5">
+          <Flex vertical gap={2}>
             <span className="type-data text-ink">{formatTime(v)}</span>
             <span className="type-caption text-ink-3">{ict(v).format('D MMM')}</span>
-          </div>
+          </Flex>
         ),
       },
       {
@@ -45,12 +46,12 @@ const AuditList: FC<Props> = ({ crud, selectedId, onSelect, empty }) => {
         key: 'actorLabel',
         width: open ? 180 : 210,
         render: (_, r) => (
-          <div className="flex flex-col gap-0.5">
+          <Flex vertical gap={2}>
             <span className={`type-label-s ${r.actorId ? 'text-ink' : 'text-ink-2'}`}>
               {r.actorLabel}
             </span>
             <span className="type-body-s text-ink-3">{roleLabel(r.actorRole)}</span>
-          </div>
+          </Flex>
         ),
       },
       {
@@ -73,10 +74,10 @@ const AuditList: FC<Props> = ({ crud, selectedId, onSelect, empty }) => {
         render: (_, r) => {
           const recorded = recordedLabel(r);
           return (
-            <div className="flex flex-col items-start gap-1">
+            <Flex vertical align="start" gap={4}>
               <Chip dot={false}>{fromLabel(r)}</Chip>
               {recorded && <span className="type-body-s text-ink-3">{recorded}</span>}
-            </div>
+            </Flex>
           );
         },
       },

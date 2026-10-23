@@ -1,4 +1,5 @@
 import { type FC, useEffect, useRef, useState } from 'react';
+import { Flex } from 'antd';
 import { type Resolver, useFormState, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { AxiosError } from 'axios';
@@ -289,12 +290,12 @@ export const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardS
   return (
     <FormWrapper methods={methods} isSubmitting={save.isPending} layout="vertical">
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
-        <div className="flex min-w-0 flex-col gap-6">
+        <Flex vertical gap={24} className="min-w-0">
           {step === 'horses' && <HorsesStep {...props} query={horsesQuery} />}
           {step === 'route' && <RouteStep {...props} />}
           {step === 'service' && <ServiceStep {...props} />}
           {step === 'review' && <ReviewStep {...props} />}
-        </div>
+        </Flex>
         <RequestPass
           className="sticky top-6"
           values={values}

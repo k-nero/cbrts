@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { DlRow } from './DlRow';
 
@@ -24,11 +25,11 @@ export const AgainstEstimate: FC<{ quotation: CustomerQuotation }> = ({ quotatio
     .map((l) => l.description);
   return (
     <Panel>
-      <div className="flex flex-col gap-3">
-        <span className="flex flex-wrap items-center justify-between gap-2">
+      <Flex vertical gap={12}>
+        <Flex component="span" wrap align="center" justify="space-between" gap={8}>
           <span className="type-h4 text-ink">Against your estimate</span>
           {verdict && <Chip tone={verdict.tone}>{verdict.label}</Chip>}
-        </span>
+        </Flex>
         {quotation.estimate ? (
           <DlRow
             label="Your estimate at submission"
@@ -57,7 +58,7 @@ export const AgainstEstimate: FC<{ quotation: CustomerQuotation }> = ({ quotatio
             .filter(Boolean)
             .join(' ')}
         </span>
-      </div>
+      </Flex>
     </Panel>
   );
 };

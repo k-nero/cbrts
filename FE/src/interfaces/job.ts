@@ -56,6 +56,9 @@ export interface CrewMember {
   staffCode?: string | null;
   email: string;
   crewRole: CrewRole;
+  /** The trailer this crew member travels with. */
+  tripVehicleId: string;
+  vehicleCode: string;
 }
 
 export interface LoadPlanConflict {
@@ -78,9 +81,13 @@ export interface LoadPlanStall {
   issue?: string | null;
 }
 
+/** One trailer's load plan on the trip. */
 export interface LoadPlan {
   id: string;
   jobId: string;
+  tripVehicleId: string;
+  /** The trailer's place in the convoy, from 1. */
+  seq: number;
   vehicleId: string;
   vehicleCode: string;
   status: 'DRAFT' | 'CONFIRMED';
@@ -89,7 +96,23 @@ export interface LoadPlan {
   totalWeightKg: number;
   payloadKg: number;
   stalls: LoadPlanStall[];
+  conflicts: LoadPlanConflict[];
+}
+
+/**
+ * How the trip is loaded (US-F3-10): one plan per trailer, and the horses on the trip not yet on any
+ * of them. CONFIRMED once every trailer's plan is.
+ */
+export interface TripLoad {
+  tripCode: string;
+  status: 'DRAFT' | 'CONFIRMED';
+  confirmedByName?: string | null;
+  confirmedAt?: string | null;
+  totalWeightKg: number;
+  payloadKg: number;
+  vehicles: LoadPlan[];
   unassignedHorses: JobHorse[];
+  /** Every trailer's conflicts. */
   conflicts: LoadPlanConflict[];
 }
 
@@ -175,11 +198,16 @@ export interface JobSummary extends BaseEntity {
   clearanceReadyAt?: string | null;
   blockingReason?: string | null;
   nextStepOwner?: string | null;
+  /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
+  transportSpecialist?: string | null;
+  coordinator?: string | null;
   clubName?: string | null;
 }
 
 export interface JobDetail extends BaseEntity {
   code: string;
+  /** The trip the job travels on (TRP-YYYY-NNN); staff only. */
+  tripCode?: string | null;
   originCity: string;
   destinationCity: string;
   stage: JobStage;
@@ -191,10 +219,13 @@ export interface JobDetail extends BaseEntity {
   clearanceReadyAt?: string | null;
   blockingReason?: string | null;
   nextStepOwner?: string | null;
+  /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
+  transportSpecialist?: string | null;
+  coordinator?: string | null;
   clearanceGateState: 'Locked' | 'Clear';
   clearanceGateSummary: string;
   horses: JobHorse[];
-  loadPlan: LoadPlan;
+  loadPlan: TripLoad | null;
   routePlan?: RoutePlan | null;
   crew: CrewMember[];
 }

@@ -27,6 +27,14 @@ public class RouteStop extends BaseEntity {
     @Column(nullable = false, length = 12)
     private RouteStopKind kind;
 
+    /**
+     * The job whose horses a PICKUP collects or a DELIVERY hands over; null for every other kind (DB check), which
+     * belongs to the whole trip.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_id")
+    private TransportJob job;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id")
     private Place place;

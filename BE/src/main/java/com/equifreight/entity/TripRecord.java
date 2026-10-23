@@ -12,8 +12,8 @@ import lombok.Setter;
 import org.hibernate.annotations.Immutable;
 
 /**
- * The escort's log and the only source of positions. Append-only (trigger). A DEPARTED record is refused unless the
- * job is CLEARANCE_READY (BR-F2-03).
+ * The trip's log, kept by its escorts, and the only source of positions. Append-only (trigger). A DEPARTED record is
+ * refused unless every job with horses on the trip is CLEARANCE_READY (BR-F2-03).
  */
 @Setter
 @Getter
@@ -23,8 +23,8 @@ import org.hibernate.annotations.Immutable;
 public class TripRecord extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id", nullable = false)
-    private TransportJob job;
+    @JoinColumn(name = "trip_id", nullable = false)
+    private Trip trip;
 
     /**
      * The checkpoint, if any.

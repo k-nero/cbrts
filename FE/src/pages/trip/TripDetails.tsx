@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
+import { Col, Flex, Row } from 'antd';
 
 import { eventLabels, formatAgainstPlan, formatClock, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
+import { Table } from '@/components/table';
 import { Button, Chip, Panel, StatTile } from '@/components/ui';
 import type { HorseCondition, TripRecordKind, TripStop, TripView } from '@/interfaces';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
@@ -10,14 +12,16 @@ import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interf
 const kindTone = (kind: TripRecordKind) =>
   kind === TripRecordKindEnum.HELD
     ? 'bad'
-    : kind === TripRecordKindEnum.CLEARED_BORDER ||
-        kind === TripRecordKindEnum.DELIVERED ||
-        kind === TripRecordKindEnum.DEPARTED
+    : kind === TripRecordKindEnum.DEPARTED || kind === TripRecordKindEnum.DELIVERED
       ? 'ok'
       : 'info';
 
 const conditionTone = (cond: HorseCondition) =>
-  cond === HorseConditionEnum.STABLE ? 'ok' : cond === HorseConditionEnum.OFF_FEED ? 'bad' : 'warn';
+  cond === HorseConditionEnum.STABLE
+    ? 'ok'
+    : cond === HorseConditionEnum.OFF_FEED
+      ? 'bad'
+      : 'warn';
 
 export function TripDetails({
   trip,
@@ -78,222 +82,254 @@ export function TripDetails({
     return 'Departure is being prepared. Tracking updates will appear as checkpoints are recorded.';
   }, [trip.tripStatus, lastRecordedStop, nextStop]);
 
+  const columns = useMemo(
+    () => [
+      {
+        title: 'Checkpoint',
+        dataIndex: 'name',
+        key: 'name',
+        render: (_: unknown, stop: TripStop) => (
+          <Flex vertical gap={2}>
+            <span className="type-label-m text-ink">{stop.name}</span>
+            <span className="type-body-s text-ink-3">
+              {stop.sequence}. {stop.kind.toLowerCase().replaceAll('_', ' ')}
+              {stop.details ? ` · ${stop.details}` : ''}
+            </span>
+          </Flex>
+        ),
+      },
+      {
+        title: 'Planned',
+        dataIndex: 'plannedAt',
+        key: 'plannedAt',
+        width: 100,
+        render: (plannedAt: string) => (
+          <span className="type-mono-data text-ink-2">{formatClock(plannedAt)}</span>
+        ),
+      },
+      {
+        title: 'Recorded',
+        key: 'recorded',
+        width: 300,
+        render: (_: unknown, stop: TripStop) => {
+          const isDone = Boolean(stop.latestOccurredAt);
+          const isNext = nextStop?.id === stop.id;
+          if (isDone) {
+            return (
+              <Flex vertical gap={2}>
+                <span className="type-mono-data font-bold text-ink">
+                  {formatClock(stop.latestOccurredAt)}
+                </span>
+                <span className="type-body-s text-ink-3">
+                  {stop.latestNote ??
+                    (stop.latestRecordedBy ? `Recorded by ${stop.latestRecordedBy}` : '')}
+                </span>
+              </Flex>
+            );
+          }
+          return (
+            <span className={`type-body-s ${isNext ? 'text-info font-medium' : 'text-ink-3'}`}>
+              {isNext ? `Expected at ${formatClock(stop.plannedAt)}` : 'Planned'}
+            </span>
+          );
+        },
+      },
+      {
+        title: 'Against plan',
+        key: 'againstPlan',
+        width: 120,
+        align: 'right' as const,
+        render: (_: unknown, stop: TripStop) => {
+          const against = formatAgainstPlan(stop.plannedAt, stop.latestOccurredAt);
+          return <span className="type-mono-data text-ink-2">{against}</span>;
+        },
+      },
+      {
+        title: 'Status',
+        key: 'status',
+        width: 130,
+        align: 'right' as const,
+        render: (_: unknown, stop: TripStop) => {
+          const isNext = nextStop?.id === stop.id;
+          if (stop.latestStatus) {
+            return (
+              <Chip tone={kindTone(stop.latestStatus)}>
+                {eventLabels[stop.latestStatus] ?? sentence(stop.latestStatus)}
+              </Chip>
+            );
+          }
+          if (isNext) {
+            return <Chip tone="info">Next</Chip>;
+          }
+          return <Chip tone="neutral">Upcoming</Chip>;
+        },
+      },
+    ],
+    [nextStop?.id],
+  );
+
   return (
-    <div className="flex flex-col gap-6">
+    <Flex vertical gap={24}>
       {/* 4 StatTiles at top (matching Figma scrTripCoordinator) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile
-          tone={againstPlanText.startsWith('+') ? 'warn' : 'neutral'}
-          value={againstPlanText}
-          label={`Against plan at ${lastRecordedStop?.name ?? 'first stop'}`}
-        />
-        <StatTile
-          tone="neutral"
-          value={windowText}
-          label={`Arrival window · plan arrives ${formatClock(trip.plannedArrivalAt)}`}
-        />
-        <StatTile
-          tone="info"
-          value={nextStop ? formatClock(nextStop.plannedAt) : 'Complete'}
-          label={`Next checkpoint · ${nextStop?.name ?? 'Delivered'}`}
-        />
-        <StatTile
-          tone={stableHorsesCount === trip.horses.length ? 'ok' : 'warn'}
-          value={`${stableHorsesCount} of ${trip.horses.length}`}
-          label={`Horses stable at last check${
-            lastConditionRecord ? `, ${formatClock(lastConditionRecord.occurredAt)}` : ''
-          }`}
-        />
-      </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
+          <StatTile
+            tone={againstPlanText.startsWith('+') ? 'warn' : 'neutral'}
+            value={againstPlanText}
+            label={`Against plan at ${lastRecordedStop?.name ?? 'first stop'}`}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatTile
+            tone="neutral"
+            value={windowText}
+            label={`Arrival window · plan arrives ${formatClock(trip.plannedArrivalAt)}`}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatTile
+            tone="info"
+            value={nextStop ? formatClock(nextStop.plannedAt) : 'Complete'}
+            label={`Next checkpoint · ${nextStop?.name ?? 'Delivered'}`}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatTile
+            tone={stableHorsesCount === trip.horses.length ? 'ok' : 'warn'}
+            value={`${stableHorsesCount} of ${trip.horses.length}`}
+            label={`Horses stable at last check${
+              lastConditionRecord ? `, ${formatClock(lastConditionRecord.occurredAt)}` : ''
+            }`}
+          />
+        </Col>
+      </Row>
 
       {/* Full-width Checkpoints Table */}
       <Panel
         title="Checkpoints, planned against recorded"
         extra={
           <span className="type-caption text-ink-3">
-            Updated {formatClock(lastRecordedStop?.latestOccurredAt ?? new Date())}
+            Updated {formatClock(lastRecordedStop?.latestOccurredAt ?? new Date().toISOString())}
           </span>
         }
       >
         <p className="type-body-s -mt-2 mb-4 text-ink-3">
           From the route plan confirmed for this trip; recorded times come from the cab.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line text-xs font-semibold text-ink-3">
-                <th className="pb-3 pr-4">Checkpoint</th>
-                <th className="pb-3 pr-4">Planned</th>
-                <th className="pb-3 pr-4">Recorded</th>
-                <th className="pb-3 pr-4 text-right">Against plan</th>
-                <th className="pb-3 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {trip.stops.map((stop) => {
-                const isNext = nextStop?.id === stop.id;
-                const isDone = Boolean(stop.latestOccurredAt);
-                const against = formatAgainstPlan(stop.plannedAt, stop.latestOccurredAt);
-
-                let statusChip = <Chip tone="neutral">Upcoming</Chip>;
-                if (stop.latestStatus) {
-                  statusChip = (
-                    <Chip tone={kindTone(stop.latestStatus)}>
-                      {eventLabels[stop.latestStatus] ?? sentence(stop.latestStatus)}
-                    </Chip>
-                  );
-                } else if (isNext) {
-                  statusChip = <Chip tone="info">Next</Chip>;
-                }
-
-                return (
-                  <tr
-                    key={stop.id}
-                    className={`transition-colors ${
-                      isNext ? 'bg-info-soft/20 font-medium' : 'hover:bg-muted/30'
-                    }`}
-                  >
-                    <td className="py-3.5 pr-4">
-                      <div className="flex flex-col">
-                        <span className="type-label-m text-ink">{stop.name}</span>
-                        <span className="type-body-s text-ink-3">
-                          {stop.sequence}. {stop.kind.toLowerCase().replaceAll('_', ' ')}
-                          {stop.details ? ` · ${stop.details}` : ''}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 pr-4">
-                      <span className="type-mono-data text-ink-2">
-                        {formatClock(stop.plannedAt)}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 pr-4">
-                      {isDone ? (
-                        <div className="flex flex-col">
-                          <span className="type-mono-data font-bold text-ink">
-                            {formatClock(stop.latestOccurredAt)}
-                          </span>
-                          <span className="type-body-s text-ink-3">
-                            {stop.latestNote ??
-                              (stop.latestRecordedBy ? `Recorded by ${stop.latestRecordedBy}` : '')}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className={`type-body-s ${isNext ? 'text-info' : 'text-ink-3'}`}>
-                          {isNext ? `Expected at ${formatClock(stop.plannedAt)}` : 'Planned'}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 pr-4 text-right">
-                      <span className="type-mono-data text-ink-2">{against}</span>
-                    </td>
-
-                    <td className="py-3.5 text-right">{statusChip}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={trip.stops}
+          pagination={false}
+          rowClassName={(record) => (nextStop?.id === record.id ? 'bg-info-soft/20' : '')}
+        />
       </Panel>
 
       {/* Split Columns (Left & Right) */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        {/* Left Column (7 cols): Escort log + Customer sees */}
-        <div className="flex flex-col gap-6 lg:col-span-7">
-          <TripRecords trip={trip} />
+      <Row gutter={[24, 24]} align="top">
+        {/* Left Column (14 of 24 cols): Escort log + Customer sees */}
+        <Col xs={24} lg={14}>
+          <Flex vertical gap={24}>
+            <TripRecords trip={trip} />
 
-          {audience !== 'customer' && (
-            <Panel title="What the customer sees">
-              <p className="type-body-s m-0 text-ink-2">{customerSeesText}</p>
+            {audience !== 'customer' && (
+              <Panel title="What the customer sees">
+                <p className="type-body-s m-0 text-ink-2">{customerSeesText}</p>
+              </Panel>
+            )}
+          </Flex>
+        </Col>
+
+        {/* Right Column (10 of 24 cols): On board + Crew & vehicle + If trip stops */}
+        <Col xs={24} lg={10}>
+          <Flex vertical gap={24}>
+            {/* On board horses */}
+            <Panel
+              title="On board"
+              extra={
+                <span className="type-caption text-ink-3">
+                  Last check{' '}
+                  {lastConditionRecord
+                    ? formatClock(lastConditionRecord.occurredAt)
+                    : 'not logged'}
+                </span>
+              }
+            >
+              <div className="divide-y divide-line">
+                {trip.horses.map((horse) => {
+                  const latestCondition = lastConditionRecord?.conditions.find(
+                    (c) => c.horseId === horse.id,
+                  );
+                  const cond = latestCondition?.condition ?? HorseConditionEnum.STABLE;
+
+                  return (
+                    <Flex
+                      key={horse.id}
+                      align="center"
+                      justify="space-between"
+                      className="py-3"
+                    >
+                      <Flex vertical gap={2}>
+                        <span className="type-label-m text-ink">{horse.name}</span>
+                        <span className="type-body-s text-ink-3">
+                          {horse.stall ?? 'Standard stall'}
+                          {latestCondition?.note ? ` · ${latestCondition.note}` : ''}
+                        </span>
+                      </Flex>
+                      <Chip tone={conditionTone(cond)}>{sentence(cond)}</Chip>
+                    </Flex>
+                  );
+                })}
+              </div>
             </Panel>
-          )}
-        </div>
 
-        {/* Right Column (5 cols): On board + Crew & vehicle + If trip stops */}
-        <div className="flex flex-col gap-6 lg:col-span-5">
-          {/* On board horses */}
-          <Panel
-            title="On board"
-            extra={
-              <span className="type-caption text-ink-3">
-                Last check{' '}
-                {lastConditionRecord ? formatClock(lastConditionRecord.occurredAt) : 'not logged'}
-              </span>
-            }
-          >
-            <div className="divide-y divide-line">
-              {trip.horses.map((horse) => {
-                const latestCondition = lastConditionRecord?.conditions.find(
-                  (c) => c.horseId === horse.id,
-                );
-                const cond = latestCondition?.condition ?? HorseConditionEnum.STABLE;
-
-                return (
-                  <div key={horse.id} className="flex items-center justify-between py-3">
-                    <div className="flex flex-col">
-                      <span className="type-label-m text-ink">{horse.name}</span>
-                      <span className="type-body-s text-ink-3">
-                        {horse.stall ?? 'Standard stall'}
-                        {latestCondition?.note ? ` · ${latestCondition.note}` : ''}
-                      </span>
-                    </div>
-                    <Chip tone={conditionTone(cond)}>{sentence(cond)}</Chip>
+            {/* Crew and vehicle */}
+            <Panel title="Crew and vehicle">
+              <div className="divide-y divide-line">
+                <Flex align="center" justify="space-between" className="py-2.5">
+                  <span className="type-body-s text-ink-3">Vehicle</span>
+                  <span className="type-label-m text-ink">
+                    {trip.vehicleCode ?? 'Trailer TX-447'}
+                  </span>
+                </Flex>
+                <Flex align="center" justify="space-between" className="py-2.5">
+                  <span className="type-body-s text-ink-3">Driver</span>
+                  <span className="type-body-m text-ink">Minh, driver</span>
+                </Flex>
+                <Flex align="center" justify="space-between" className="py-2.5">
+                  <span className="type-body-s text-ink-3">Grooms</span>
+                  <span className="type-body-m text-ink">Lê Thị Hoa, Phạm Quốc Tuấn</span>
+                </Flex>
+                <Flex align="center" justify="space-between" className="py-2.5">
+                  <span className="type-body-s text-ink-3">Records</span>
+                  <span className="type-body-m text-ink">
+                    All sent · last{' '}
+                    {lastRecordedStop?.latestOccurredAt
+                      ? formatClock(lastRecordedStop.latestOccurredAt)
+                      : '—'}
+                  </span>
+                </Flex>
+                {audience === 'staff' && (
+                  <div className="pt-3">
+                    <Button variant="secondary" block>
+                      Call the cab
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
-          </Panel>
+                )}
+              </div>
+            </Panel>
 
-          {/* Crew and vehicle */}
-          <Panel title="Crew and vehicle">
-            <div className="divide-y divide-line">
-              <div className="flex items-center justify-between py-2.5">
-                <span className="type-body-s text-ink-3">Vehicle</span>
-                <span className="type-label-m text-ink">
-                  {trip.vehicleCode ?? 'Trailer TX-447'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2.5">
-                <span className="type-body-s text-ink-3">Driver</span>
-                <span className="type-body-m text-ink">Minh, driver</span>
-              </div>
-              <div className="flex items-center justify-between py-2.5">
-                <span className="type-body-s text-ink-3">Grooms</span>
-                <span className="type-body-m text-ink">Lê Thị Hoa, Phạm Quốc Tuấn</span>
-              </div>
-              <div className="flex items-center justify-between py-2.5">
-                <span className="type-body-s text-ink-3">Records</span>
-                <span className="type-body-m text-ink">
-                  All sent · last{' '}
-                  {lastRecordedStop?.latestOccurredAt
-                    ? formatClock(lastRecordedStop.latestOccurredAt)
-                    : '—'}
-                </span>
-              </div>
-              {audience === 'staff' && (
-                <div className="pt-3">
-                  <Button variant="secondary" block>
-                    Call the cab
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Panel>
-
-          {/* If the trip stops */}
-          <Panel title="If the trip stops">
-            <p className="type-body-s m-0 text-ink-2">
-              The escort records the stop and reason in the cab. That hold stays in the journey log
-              and customer tracking until the trip resumes. The logistics manager owns incident
-              follow-up.
-            </p>
-          </Panel>
-        </div>
-      </div>
-    </div>
+            {/* If the trip stops */}
+            <Panel title="If the trip stops">
+              <p className="type-body-s m-0 text-ink-2">
+                The escort records the stop and reason in the cab. That hold stays in the journey log
+                and customer tracking until the trip resumes. The logistics manager owns incident
+                follow-up.
+              </p>
+            </Panel>
+          </Flex>
+        </Col>
+      </Row>
+    </Flex>
   );
 }

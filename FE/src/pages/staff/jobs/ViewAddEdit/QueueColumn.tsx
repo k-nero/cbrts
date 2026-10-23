@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import { useDroppable } from '@dnd-kit/core';
 import { type ReactNode } from 'react';
 
@@ -19,7 +20,7 @@ export function QueueColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: QUEUE_DROP_ID, disabled });
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-3">
+    <Flex vertical gap={12} ref={setNodeRef}>
       <span className="type-label-s text-ink-2">To load · {count}</span>
       {unloading && (
         <div
@@ -35,6 +36,6 @@ export function QueueColumn({
         </div>
       )}
       {children}
-    </div>
+    </Flex>
   );
 }

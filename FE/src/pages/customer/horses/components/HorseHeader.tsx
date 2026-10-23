@@ -1,4 +1,5 @@
 import type { FC, ReactNode } from 'react';
+import { Flex } from 'antd';
 
 import { horseChips } from './horseCardProps';
 
@@ -40,11 +41,15 @@ const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) 
         />
       }
       summary={
-        <div className="flex flex-col gap-2">
+        <Flex vertical gap={8}>
           <span className="type-data text-ink">{formatMicrochip(horse.microchip)}</span>
           <span>{summaryLine(horse, today)}</span>
-          {chips && <span className="flex flex-wrap gap-1.5">{chips}</span>}
-        </div>
+          {chips && (
+            <Flex component="span" wrap gap={6}>
+              {chips}
+            </Flex>
+          )}
+        </Flex>
       }
       right={right}
     />

@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { useController } from 'react-hook-form';
+import { Flex } from 'antd';
 
 import type { HorseFormShape } from './HorseForm';
 
@@ -9,7 +10,7 @@ import { Checkbox } from '@/components/ui';
 export const StallTicks: FC = () => {
   const { field } = useController<HorseFormShape, 'requiredStall'>({ name: 'requiredStall' });
   return (
-    <div className="flex gap-6">
+    <Flex gap={24}>
       <Checkbox
         label="Climate-controlled stall"
         checked={field.value === 'CLIMATE'}
@@ -20,6 +21,6 @@ export const StallTicks: FC = () => {
         checked={field.value === 'BOX'}
         onChange={(e) => field.onChange(e.target.checked ? 'BOX' : 'STANDARD')}
       />
-    </div>
+    </Flex>
   );
 };

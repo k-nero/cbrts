@@ -1,6 +1,9 @@
 package com.equifreight.controller.staff;
 
 import com.equifreight.entity.User;
+import com.equifreight.model.approval.ApprovalOptionsResponse;
+import com.equifreight.model.approval.ApproveRequest;
+import com.equifreight.model.approval.RejectRequest;
 import com.equifreight.model.quotation.AirClassRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.ManualLineRequest;
@@ -12,6 +15,7 @@ import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.model.review.ReturnRequest;
 import com.equifreight.service.QuotationDraftService;
 import com.equifreight.service.QuotationIssueService;
+import com.equifreight.service.RequestApprovalService;
 import com.equifreight.service.RequestReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -44,12 +48,17 @@ public class StaffRequestController {
     private final RequestReviewService service;
     private final QuotationDraftService quotations;
     private final QuotationIssueService issues;
+    private final RequestApprovalService approvals;
 
     public StaffRequestController(
-            RequestReviewService service, QuotationDraftService quotations, QuotationIssueService issues) {
+            RequestReviewService service,
+            QuotationDraftService quotations,
+            QuotationIssueService issues,
+            RequestApprovalService approvals) {
         this.service = service;
         this.quotations = quotations;
         this.issues = issues;
+        this.approvals = approvals;
     }
 
     @Operation(summary = "The review queue: requests waiting for review, oldest first, 20 to a page")
@@ -65,6 +74,33 @@ public class StaffRequestController {
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public RequestReviewResponse view(@PathVariable UUID id) {
         return service.view(id);
+    }
+
+    @Operation(
+            summary = "Who can be put on a job at approval: active transport specialists and coordinators, fewest"
+                    + " open jobs first")
+    @GetMapping("/approval-options")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public ApprovalOptionsResponse approvalOptions() {
+        return approvals.options();
+    }
+
+    @Operation(
+            summary = "Approve an accepted request into its job (US-F1-07): creates the CBRT job with its team and"
+                    + " its document checklist")
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public RequestReviewResponse approve(
+            @PathVariable UUID id, @Valid @RequestBody ApproveRequest body, @AuthenticationPrincipal User user) {
+        return approvals.approve(user, id, body);
+    }
+
+    @Operation(summary = "Reject a request before approval, with a mandatory reason the customer reads (BR-F1-04)")
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public RequestReviewResponse reject(
+            @PathVariable UUID id, @RequestBody RejectRequest body, @AuthenticationPrincipal User user) {
+        return approvals.reject(user, id, body.reason());
     }
 
     @Operation(summary = "Return a request to the customer for missing information, with a mandatory note")

@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { Panel, Tabs } from '@/components/ui';
@@ -15,7 +16,7 @@ export const StallChoice: FC<{
   const fit = quotation.fit;
   return (
     <Panel title="Air stall">
-      <div className="flex flex-col gap-3">
+      <Flex vertical gap={12}>
         <Tabs<ServiceClass>
           label="Service class"
           items={options.map((o) => ({ key: o.value, label: o.label, disabled: o.disabled }))}
@@ -23,7 +24,7 @@ export const StallChoice: FC<{
           onChange={(key) => !pending && key !== current && onChange(key)}
         />
         {fit?.refusal ? (
-          <span className="flex flex-col gap-1">
+          <Flex component="span" vertical gap={4}>
             <span className="type-body-s text-bad">{fit.refusal}</span>
             <span className="type-body-s text-ink-2">
               {fit.achievableClasses.length
@@ -33,7 +34,7 @@ export const StallChoice: FC<{
                     .join(', ')}`
                 : 'No class in the catalog fits these horses.'}
             </span>
-          </span>
+          </Flex>
         ) : fit ? (
           <span className="type-body-s text-ink-2">
             {`${fit.widthUsedIn} in across ${fit.positions} ${fit.positions === 1 ? 'position' : 'positions'} of 96 in.`}
@@ -48,7 +49,7 @@ export const StallChoice: FC<{
             {`The customer asked for ${quotation.request.requestedClass.toLowerCase()}.`}
           </span>
         )}
-      </div>
+      </Flex>
     </Panel>
   );
 };

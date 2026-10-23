@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import { useState } from 'react';
 import { Chip, Icon, Panel } from '@/components/ui';
 import { useFleetCalendar, useVehicles } from '@/hooks/useVehicle';
@@ -42,147 +43,159 @@ export default function FleetCalendarPage() {
       : allBookings.filter((b) => b.vehicleId === selectedVehicleId);
 
   return (
-    <div className="flex flex-col gap-8 p-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="type-display-m text-ink">Fleet Calendar</h1>
-          <p className="type-body-m text-ink-2">
-            Schedule of vehicle deployments, transport jobs, and planned maintenance windows.
-          </p>
-        </div>
+    <div className="p-8">
+      <Flex vertical gap={32}>
+        {/* Header */}
+        <Flex wrap gap={16} align="center" justify="space-between">
+          <Flex vertical gap={4}>
+            <h1 className="type-display-m text-ink">Fleet Calendar</h1>
+            <p className="type-body-m text-ink-2">
+              Schedule of vehicle deployments, transport jobs, and planned maintenance windows.
+            </p>
+          </Flex>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="type-label-s text-ink-3">Type:</span>
-            <select
-              value={selectedKind}
-              onChange={(e) => setSelectedKind(e.target.value as VehicleKind | 'ALL')}
-              className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
-            >
-              <option value="ALL">All types</option>
-              {Object.values(VehicleKindEnum).map((k) => (
-                <option key={k} value={k}>
-                  {k === 'TRAILER' ? 'Trailer' : 'Rigid Truck'}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filters */}
+          <Flex wrap gap={12} align="center">
+            <Flex gap={8} align="center">
+              <span className="type-label-s text-ink-3">Type:</span>
+              <select
+                value={selectedKind}
+                onChange={(e) => setSelectedKind(e.target.value as VehicleKind | 'ALL')}
+                className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
+              >
+                <option value="ALL">All types</option>
+                {Object.values(VehicleKindEnum).map((k) => (
+                  <option key={k} value={k}>
+                    {k === 'TRAILER' ? 'Trailer' : 'Rigid Truck'}
+                  </option>
+                ))}
+              </select>
+            </Flex>
 
-          <div className="flex items-center gap-2">
-            <span className="type-label-s text-ink-3">Vehicle:</span>
-            <select
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-              className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
-            >
-              <option value="ALL">All vehicles</option>
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.code} ({v.kind.toLowerCase()})
-                </option>
-              ))}
-            </select>
-          </div>
+            <Flex gap={8} align="center">
+              <span className="type-label-s text-ink-3">Vehicle:</span>
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="focus-ring h-9 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none"
+              >
+                <option value="ALL">All vehicles</option>
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.code} ({v.kind.toLowerCase()})
+                  </option>
+                ))}
+              </select>
+            </Flex>
 
-          <div className="flex items-center gap-2">
-            <span className="type-label-s text-ink-3">From:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
-            />
-          </div>
+            <Flex gap={8} align="center">
+              <span className="type-label-s text-ink-3">From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
+              />
+            </Flex>
 
-          <div className="flex items-center gap-2">
-            <span className="type-label-s text-ink-3">To:</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
-            />
-          </div>
-        </div>
-      </div>
+            <Flex gap={8} align="center">
+              <span className="type-label-s text-ink-3">To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="focus-ring h-9 rounded-md border border-line bg-card px-2 text-sm text-ink outline-none"
+              />
+            </Flex>
+          </Flex>
+        </Flex>
 
-      {/* Bookings / Schedule Timeline */}
-      <Panel className="p-6">
-        <div className="flex flex-col gap-6">
-          <div className="flex items-center justify-between border-b border-line pb-4">
-            <h3 className="type-h3 text-ink">Scheduled Deployments</h3>
-            <span className="type-caption text-ink-3">
-              {filteredBookings.length} scheduled slots
-            </span>
-          </div>
-
-          {isLoading ? (
-            <div className="p-8 text-center text-ink-3">Loading calendar events...</div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-line p-8 text-center text-ink-3">
-              No vehicle bookings in this period.
+        {/* Bookings / Schedule Timeline */}
+        <Panel className="p-6">
+          <Flex vertical gap={24}>
+            <div className="pb-4 border-b border-line">
+              <Flex align="center" justify="space-between">
+                <h3 className="type-h3 text-ink">Scheduled Deployments</h3>
+                <span className="type-caption text-ink-3">
+                  {filteredBookings.length} scheduled slots
+                </span>
+              </Flex>
             </div>
-          ) : (
-            <div className="flex flex-col divide-y divide-line">
-              {filteredBookings.map((b) => {
-                const sDate = new Date(b.startsAt).toLocaleDateString('en-GB', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-                const eDate = new Date(b.endsAt).toLocaleDateString('en-GB', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
 
-                const kindTone =
-                  b.kind === 'JOB' ? 'ok' : b.kind === 'MAINTENANCE' ? 'warn' : 'neutral';
+            {isLoading ? (
+              <div className="p-8 text-center text-ink-3">Loading calendar events...</div>
+            ) : filteredBookings.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-line p-8 text-center text-ink-3">
+                No vehicle bookings in this period.
+              </div>
+            ) : (
+              <Flex vertical className="divide-y divide-line">
+                {filteredBookings.map((b) => {
+                  const sDate = new Date(b.startsAt).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                  const eDate = new Date(b.endsAt).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
 
-                return (
-                  <div
-                    key={b.id}
-                    className="flex flex-wrap items-center justify-between gap-4 py-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="grid size-10 place-items-center rounded-lg bg-muted text-ink">
-                        <Icon name="truck" size={20} />
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="type-h4 text-ink">{b.vehicleCode}</span>
-                          <Chip tone={kindTone}>{b.kind}</Chip>
-                        </div>
-                        {b.jobCode ? (
-                          <span className="type-body-s text-ink-2">
-                            Assigned to Job:{' '}
-                            <span className="font-mono font-medium">{b.jobCode}</span>
+                  const kindTone =
+                    b.kind === 'JOB' ? 'ok' : b.kind === 'MAINTENANCE' ? 'warn' : 'neutral';
+
+                  return (
+                    <div key={b.id} className="py-4">
+                      <Flex wrap gap={16} align="center" justify="space-between">
+                        <Flex gap={16} align="center">
+                          <Flex
+                            align="center"
+                            justify="center"
+                            className="size-10 rounded-lg bg-muted text-ink"
+                          >
+                            <Icon name="truck" size={20} />
+                          </Flex>
+                          <Flex vertical>
+                            <Flex gap={8} align="center">
+                              <span className="type-h4 text-ink">{b.vehicleCode}</span>
+                              <Chip tone={kindTone}>{b.kind}</Chip>
+                            </Flex>
+                            {b.jobCode ? (
+                              <span className="type-body-s text-ink-2">
+                                {b.tripCode && (
+                                  <>
+                                    Trip <span className="font-mono font-medium">{b.tripCode}</span>
+                                    {' · '}
+                                  </>
+                                )}
+                                Job <span className="font-mono font-medium">{b.jobCode}</span>
+                              </span>
+                            ) : (
+                              <span className="type-body-s text-ink-3">Internal fleet booking</span>
+                            )}
+                          </Flex>
+                        </Flex>
+
+                        <Flex vertical align="end">
+                          <span className="type-data text-ink">
+                            {sDate} → {eDate}
                           </span>
-                        ) : (
-                          <span className="type-body-s text-ink-3">Internal fleet booking</span>
-                        )}
-                      </div>
+                          <span className="type-caption text-ink-3">Local Indochina Time</span>
+                        </Flex>
+                      </Flex>
                     </div>
-
-                    <div className="flex flex-col items-end">
-                      <span className="type-data text-ink">
-                        {sDate} → {eDate}
-                      </span>
-                      <span className="type-caption text-ink-3">Local Indochina Time</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </Panel>
+                  );
+                })}
+              </Flex>
+            )}
+          </Flex>
+        </Panel>
+      </Flex>
     </div>
   );
 }

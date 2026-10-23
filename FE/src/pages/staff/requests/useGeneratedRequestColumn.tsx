@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Button } from '@/components/ui';
-import { TableColumnsType } from 'antd';
+import { Button, Chip } from '@/components/ui';
+import { Flex, TableColumnsType } from 'antd';
 import type { PagedResponse, QueueRow } from '@/interfaces';
 import { ageWords, departsWords, queueRoute } from '@/lib';
 import { UseQueryResult } from '@tanstack/react-query';
@@ -18,13 +18,24 @@ export const useGeneratedRequestColumn = ({ query }: Props): TableColumnsType<Qu
         title: 'Request',
         width: 150,
         render: (_, r) => (
-          <span className="flex flex-col gap-0.5">
+          <Flex component="span" vertical gap={2}>
             <span className="type-caption text-ink">{r.code}</span>
             {r.revisionNo >= 2 && (
               <span className="type-body-s text-ink-3">Version {r.revisionNo}</span>
             )}
-          </span>
+          </Flex>
         ),
+      },
+      {
+        key: 'status',
+        title: 'Waiting for',
+        width: 150,
+        render: (_, r) =>
+          r.status === 'CUSTOMER_ACCEPTED' ? (
+            <Chip tone="ok">Approval</Chip>
+          ) : (
+            <Chip tone="info">Review</Chip>
+          ),
       },
       { key: 'club', title: 'Customer', width: 200, dataIndex: 'club' },
       {
@@ -34,10 +45,10 @@ export const useGeneratedRequestColumn = ({ query }: Props): TableColumnsType<Qu
         render: (_, r) => {
           const route = queueRoute(r);
           return (
-            <span className="flex flex-col gap-0.5">
+            <Flex component="span" vertical gap={2}>
               <span className="type-body-m text-ink">{route.title}</span>
               <span className="type-body-s text-ink-3">{route.by}</span>
-            </span>
+            </Flex>
           );
         },
       },

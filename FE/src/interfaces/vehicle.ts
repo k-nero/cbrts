@@ -47,7 +47,11 @@ export interface VehicleBooking extends BaseEntity {
   vehicleId: string;
   vehicleCode: string;
   vehicleKind?: VehicleKind;
+  /** The trip's TRP code, for a JOB booking. */
+  tripCode?: string | null;
+  /** Set when the trip carries one job. */
   jobId?: string | null;
+  /** The codes of the trip's jobs, comma-separated. */
   jobCode?: string | null;
   kind: 'JOB' | 'MAINTENANCE' | 'HOLD';
   startsAt: string;

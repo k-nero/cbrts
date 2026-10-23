@@ -12,6 +12,8 @@ import lombok.Builder;
 public record JobDetailResponse(
         UUID id,
         String code,
+        /** The trip's TRP code; staff only. */
+        String tripCode,
         String originCity,
         String destinationCity,
         JobStage stage,
@@ -23,9 +25,12 @@ public record JobDetailResponse(
         Instant clearanceReadyAt,
         String blockingReason,
         String nextStepOwner,
+        /** The team assigned at approval (US-F1-07); null on jobs approved before teams were kept. */
+        String transportSpecialist,
+        String coordinator,
         String clearanceGateState, // "Locked" or "Clear"
         String clearanceGateSummary,
         List<JobHorseResponse> horses,
-        LoadPlanResponse loadPlan,
+        TripLoadResponse loadPlan,
         RoutePlanResponse routePlan,
         List<CrewMemberResponse> crew) {}

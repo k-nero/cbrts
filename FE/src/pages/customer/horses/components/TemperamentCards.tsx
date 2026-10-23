@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { useController } from 'react-hook-form';
+import { Col, Row } from 'antd';
 
 import type { HorseFormShape } from './HorseForm';
 
@@ -36,20 +37,21 @@ const TEMPERAMENT_CARDS: {
 export const TemperamentCards: FC = () => {
   const { field } = useController<HorseFormShape, 'temperament'>({ name: 'temperament' });
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <Row gutter={[12, 12]}>
       {TEMPERAMENT_CARDS.map((card) => (
-        <OptionCard
-          key={card.value}
-          type="radio"
-          name="temperament"
-          value={card.value}
-          selected={field.value === card.value}
-          onChange={(selected) => selected && field.onChange(card.value)}
-          title={card.title}
-          description={card.description}
-          meta={card.meta}
-        />
+        <Col key={card.value} span={8}>
+          <OptionCard
+            type="radio"
+            name="temperament"
+            value={card.value}
+            selected={field.value === card.value}
+            onChange={(selected) => selected && field.onChange(card.value)}
+            title={card.title}
+            description={card.description}
+            meta={card.meta}
+          />
+        </Col>
       ))}
-    </div>
+    </Row>
   );
 };

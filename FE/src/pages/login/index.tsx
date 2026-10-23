@@ -60,9 +60,11 @@ const LoginPage = () => {
 
   return (
     <Flex vertical style={{ minHeight: '100vh' }}>
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-10">
-        <Brand />
-        <ThemeToggle />
+      <header className="h-16 shrink-0 border-b border-line px-10">
+        <Flex align="center" justify="space-between" className="h-full">
+          <Brand />
+          <ThemeToggle />
+        </Flex>
       </header>
       <Flex style={{ flex: 1 }}>
         <Flex vertical gap={32} style={{ width: 720, padding: '96px 120px 64px 160px' }}>
@@ -96,7 +98,7 @@ const LoginPage = () => {
                   componentProps={{ autoComplete: 'current-password' }}
                 />
                 <SubmitButton type="primary" block label="Sign in" />
-                <div className="flex items-center gap-1">
+                <Flex align="center" gap={4}>
                   <span className="type-body-s text-ink-2">New to EquiFreight?</span>
                   <Button
                     size="sm"
@@ -106,7 +108,7 @@ const LoginPage = () => {
                   >
                     Create a club account
                   </Button>
-                </div>
+                </Flex>
                 <p className="m-0 border-t border-line pt-5 text-[13px] leading-5 text-ink-3">
                   Staff sign in here too, with the email your invite was sent to. Your role decides
                   where you land.
@@ -128,7 +130,7 @@ const LoginPage = () => {
           className="flex flex-1 flex-col justify-end"
           style={{ padding: '96px 120px 64px 96px' }}
         >
-          <aside aria-labelledby="keeps-title" className="flex max-w-[480px] flex-col">
+          <Flex component="aside" vertical aria-labelledby="keeps-title" className="max-w-[480px]">
             <h2
               id="keeps-title"
               className="m-0 pb-4 font-display text-[22px] leading-7 font-semibold text-ink"
@@ -136,12 +138,14 @@ const LoginPage = () => {
               One account for every move
             </h2>
             {ACCOUNT_KEEPS.map(([title, icon]) => (
-              <Flex key={title} gap={14} align="center" className="border-t border-line py-3.5">
-                <span className="text-[18px] text-ink-3">{icon}</span>
-                <span className="text-[14px] font-medium text-ink">{title}</span>
-              </Flex>
+              <div key={title} className="border-t border-line py-3.5">
+                <Flex gap={14} align="center">
+                  <span className="text-[18px] text-ink-3">{icon}</span>
+                  <span className="text-[14px] font-medium text-ink">{title}</span>
+                </Flex>
+              </div>
             ))}
-          </aside>
+          </Flex>
         </PhotoPanel>
       </Flex>
       <Footer size="compact" />

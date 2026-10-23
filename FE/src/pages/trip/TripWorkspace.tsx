@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { message, Select, Spin } from 'antd';
+import { Flex, message, Select, Spin } from 'antd';
 
 import { EscortCabSurface } from './cab/EscortCabSurface';
 import { CheckpointReportForm } from './CheckpointReportForm';
@@ -106,7 +106,7 @@ export function TripWorkspace({
   const selectedSummary = summaries.find((item) => item.jobCode === selectedCode);
 
   return (
-    <div className="flex flex-col gap-6">
+    <Flex vertical gap={24}>
       {contextHolder}
       <PageHeader
         title={title}
@@ -136,7 +136,7 @@ export function TripWorkspace({
       )}
       {summaries.length > 0 && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <Flex wrap align="center" justify="space-between" gap={12}>
             <Select
               aria-label="Select trip"
               value={selectedCode}
@@ -148,7 +148,7 @@ export function TripWorkspace({
               className="min-w-72 flex-1"
             />
             {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
-              <div className="flex items-center gap-2">
+              <Flex align="center" gap={8}>
                 <Button
                   size="sm"
                   disabled={summariesQuery.data.first}
@@ -166,12 +166,16 @@ export function TripWorkspace({
                 >
                   Next
                 </Button>
-              </div>
+              </Flex>
             )}
-          </div>
+          </Flex>
           {selectedSummary && (
             <Panel
-              title={selectedSummary.jobCode}
+              title={
+                trip?.tripCode
+                  ? `${selectedSummary.jobCode} · ${trip.tripCode}`
+                  : selectedSummary.jobCode
+              }
               extra={
                 <Chip tone={statusTone(selectedSummary.tripStatus)}>
                   {sentence(selectedSummary.tripStatus)}
@@ -229,6 +233,6 @@ export function TripWorkspace({
           )}
         </>
       )}
-    </div>
+    </Flex>
   );
 }

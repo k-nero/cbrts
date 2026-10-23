@@ -4,14 +4,23 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.*;
+import com.equifreight.entity.Country;
+import com.equifreight.entity.JobRegulationPin;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.RegulationRole;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.clearance.ChecklistItemResponse;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
+import com.equifreight.model.clearance.DocumentCheckRequest;
+import com.equifreight.model.clearance.DocumentCheckResponse;
 import com.equifreight.model.clearance.DocumentUploadRequest;
 import com.equifreight.model.clearance.ReviewDocumentRequest;
 import com.equifreight.repository.*;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +74,10 @@ class ClearanceServiceTest {
 
     @Mock
     private RegulationRuleRepository regulationRuleRepository;
+
+    // 23 Oct 2026, 10:00 in Ho Chi Minh City.
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-10-23T03:00:00Z"), BusinessTime.ZONE);
 
     @InjectMocks
     private ClearanceService clearanceService;
@@ -302,6 +316,50 @@ class ClearanceServiceTest {
                         isNull(),
                         eq("OPEN"),
                         eq("CLEARANCE_READY"));
+    }
+
+    @Test
+    @DisplayName("#113: a job pinned to a version with no document rules never clears, and the gate says why")
+    void anEmptyChecklistNeverClearsTheGate() {
+        RegulationVersion version = cambodiaCatalog();
+        Country cambodia = new Country();
+        cambodia.setName("Cambodia");
+        version.getCatalog().setCountry(cambodia);
+        version.setVersionNo(7);
+        JobRegulationPin pin = new JobRegulationPin();
+        pin.setRole(RegulationRole.DESTINATION);
+        pin.setRegulationVersion(version);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertFalse(resp.clearanceReady());
+        assertEquals(DossierStatus.OPEN, job.getDossierStatus());
+        assertNull(job.getClearanceReadyAt());
+        assertEquals(
+                List.of("The pinned regulation catalog, Cambodia v7, has no mandatory document rules, so the gate"
+                        + " stays closed until the job's checklist has its documents."),
+                resp.outstandingIssues());
+    }
+
+    @Test
+    @DisplayName("A job with no checklist yet says so")
+    void aJobWithNoChecklistSaysSo() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+
+        ClearanceStatusResponse resp = clearanceService.getClearanceStatus(job.getId());
+
+        assertFalse(resp.clearanceReady());
+        assertEquals(
+                List.of("The job has no document checklist yet. Generate it from the regulation catalogs."),
+                resp.outstandingIssues());
     }
 
     @Test
@@ -597,5 +655,174 @@ class ClearanceServiceTest {
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(submissions);
+    }
+
+    private static User customerOf(Club club) {
+        User customer = new User();
+        customer.setId(UUID.randomUUID());
+        customer.setClub(club);
+        return customer;
+    }
+
+    @Test
+    @DisplayName("A request with no job yet has no documents to show its club")
+    void requestChecklistIsEmptyBeforeApproval() {
+        UUID requestId = UUID.randomUUID();
+        when(transportJobRepository.findByRequestId(requestId)).thenReturn(Optional.empty());
+
+        assertTrue(clearanceService
+                .getCustomerRequestChecklist(requestId, customerOf(new Club()))
+                .isEmpty());
+    }
+
+    @Test
+    @DisplayName("A request's checklist is the job's, and another club's request is not found")
+    void requestChecklistIsTheClubsOwn() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        TransportRequest request = new TransportRequest();
+        request.setId(UUID.randomUUID());
+        request.setClub(club);
+        job.setRequest(request);
+        when(transportJobRepository.findByRequestId(request.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
+
+        assertEquals(
+                List.of(checklistItem.getId()),
+                clearanceService.getCustomerRequestChecklist(request.getId(), customerOf(club)).stream()
+                        .map(ChecklistItemResponse::id)
+                        .toList());
+
+        Club other = new Club();
+        other.setId(UUID.randomUUID());
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> clearanceService.getCustomerRequestChecklist(request.getId(), customerOf(other)));
+    }
+
+    /** The setUp item, owed by its club's customer. */
+    private User ownerOfTheItem() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        TransportRequest request = new TransportRequest();
+        request.setId(UUID.randomUUID());
+        request.setClub(club);
+        job.setRequest(request);
+        checklistItem.getDocumentType().setProvidedBy(DocumentProvider.CUSTOMER);
+        checklistItem.setStatus(ChecklistStatus.AWAITING_UPLOAD);
+        checklistItem.setHolder(ChecklistHolder.CUSTOMER);
+        when(checklistItemRepository.findById(checklistItem.getId())).thenReturn(Optional.of(checklistItem));
+        return customerOf(club);
+    }
+
+    private static DocumentCheckRequest dates(String issuedOn, String validUntil) {
+        return DocumentCheckRequest.builder()
+                .issuedOn(LocalDate.parse(issuedOn))
+                .validUntil(LocalDate.parse(validUntil))
+                .build();
+    }
+
+    @Test
+    @DisplayName("US-F2-03: the check gives the engine's answer and stores nothing")
+    void checkAnswersWithoutStoringAnything() {
+        User customer = ownerOfTheItem();
+        when(validityEngine.evaluate(eq(checklistItem), any(), eq(job)))
+                .thenReturn(new ValidityEngine.Result(
+                        Validity.RED,
+                        "Sampled 90 days before departure.",
+                        "Sampled within 60 days before departure",
+                        "Sampled 20 Jul 2026: 90 days before departure",
+                        "sampled on 19 Aug 2026 or later",
+                        null));
+
+        DocumentCheckResponse answer = clearanceService.checkCustomerDocument(
+                checklistItem.getId(), dates("2026-07-20", "2026-09-18"), customer);
+
+        // US-F2-09: the refusal names the rule, the value found and the value required
+        assertEquals(Validity.RED, answer.validity());
+        assertEquals("Sampled 90 days before departure.", answer.note());
+        assertEquals("Sampled within 60 days before departure", answer.rule());
+        assertEquals("Sampled 20 Jul 2026: 90 days before departure", answer.found());
+        assertEquals("sampled on 19 Aug 2026 or later", answer.required());
+        verifyNoInteractions(fileService, documentVersionRepository, auditService);
+        verify(checklistItemRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("US-F2-03: impossible dates are refused before the rule is looked at")
+    void checkRefusesImpossibleDates() {
+        User customer = ownerOfTheItem();
+
+        for (DocumentCheckRequest bad : List.of(
+                dates("2026-10-24", "2026-12-01"), // issued tomorrow
+                dates("2026-10-01", "2026-09-30"), // expires before it was issued
+                DocumentCheckRequest.builder()
+                        .issuedOn(LocalDate.parse("2026-10-01"))
+                        .sampledOn(LocalDate.parse("2026-10-02"))
+                        .validUntil(LocalDate.parse("2026-12-01"))
+                        .build())) {
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    () -> clearanceService.checkCustomerDocument(checklistItem.getId(), bad, customer));
+            assertEquals("DOCUMENT_DATES_INVALID", ex.getCode());
+        }
+        verifyNoInteractions(validityEngine);
+    }
+
+    @Test
+    @DisplayName("US-F2-03: a customer can't upload an authority's document, after departure, or over a cleared one")
+    void customerUploadsOnlyWhatIsStillTheirs() {
+        User customer = ownerOfTheItem();
+        DocumentUploadRequest upload = DocumentUploadRequest.builder()
+                .fileId(UUID.randomUUID())
+                .issuedOn(LocalDate.parse("2026-10-01"))
+                .validUntil(LocalDate.parse("2026-12-01"))
+                .build();
+
+        checklistItem.getDocumentType().setProvidedBy(DocumentProvider.AUTHORITY);
+        assertEquals(
+                "DOCUMENT_FROM_AUTHORITY",
+                assertThrows(
+                                ConflictException.class,
+                                () -> clearanceService.uploadCustomerDocumentVersion(
+                                        checklistItem.getId(), upload, customer))
+                        .getCode());
+        checklistItem.getDocumentType().setProvidedBy(DocumentProvider.CUSTOMER);
+
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+        assertEquals(
+                "DOCUMENT_CLEARED",
+                assertThrows(
+                                ConflictException.class,
+                                () -> clearanceService.uploadCustomerDocumentVersion(
+                                        checklistItem.getId(), upload, customer))
+                        .getCode());
+
+        job.setDepartedAt(Instant.parse("2026-10-20T01:00:00Z"));
+        assertEquals(
+                "JOB_DEPARTED",
+                assertThrows(
+                                ConflictException.class,
+                                () -> clearanceService.uploadCustomerDocumentVersion(
+                                        checklistItem.getId(), upload, customer))
+                        .getCode());
+        verifyNoInteractions(fileService);
+    }
+
+    @Test
+    @DisplayName("US-F2-03: another club's document is not found, even to check")
+    void anotherClubsDocumentIsNotFound() {
+        ownerOfTheItem();
+        Club other = new Club();
+        other.setId(UUID.randomUUID());
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> clearanceService.checkCustomerDocument(
+                        checklistItem.getId(), dates("2026-10-01", "2026-12-01"), customerOf(other)));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> clearanceService.getCustomerVersions(checklistItem.getId(), customerOf(other)));
     }
 }

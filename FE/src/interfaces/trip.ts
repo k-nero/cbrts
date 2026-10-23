@@ -104,6 +104,8 @@ export interface TripPage {
 }
 export interface TripView {
   jobCode: string;
+  /** The trip's TRP code for staff and the crew; null for the customer, who never sees it. */
+  tripCode: string | null;
   tripStatus: TripStatus;
   clearanceReady: boolean;
   plannedDepartureAt: string | null;

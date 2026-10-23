@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Empty, Spin } from 'antd';
+import { Empty, Flex, Spin } from 'antd';
 import { Button, Callout, Chip } from '@/components/ui';
 import type { DocumentVersion } from '@/interfaces';
 
@@ -13,8 +13,8 @@ type Props = {
 
 /** The "Waiting for review" tab: every uploaded version the specialist still has to check. */
 const ReviewInbox: FC<Props> = ({ reviews, loading, failed, onView, onReview }) => (
-  <div className="flex flex-col gap-4">
-    <div className="flex items-center justify-between">
+  <Flex vertical gap={16}>
+    <Flex align="center" justify="space-between">
       <div>
         <h2 className="type-h3 text-ink">Review inbox</h2>
         <p className="type-body-s text-ink-3">
@@ -25,11 +25,13 @@ const ReviewInbox: FC<Props> = ({ reviews, loading, failed, onView, onReview }) 
       <span className="type-caption text-ink-3">
         {reviews.length} {reviews.length === 1 ? 'document' : 'documents'} pending review
       </span>
-    </div>
+    </Flex>
 
     {loading && (
-      <div className="flex justify-center p-12">
-        <Spin size="large" />
+      <div className="p-12">
+        <Flex justify="center">
+          <Spin size="large" />
+        </Flex>
       </div>
     )}
 
@@ -51,33 +53,35 @@ const ReviewInbox: FC<Props> = ({ reviews, loading, failed, onView, onReview }) 
     {!loading && reviews.length > 0 && (
       <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
         {reviews.map((version) => (
-          <div key={version.id} className="flex items-center justify-between gap-4 p-4">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="type-label-m text-ink">{version.fileName}</span>
-                <Chip tone="info">v{version.versionNo}</Chip>
-                <Chip tone="warn">Waiting for review</Chip>
-              </div>
-              <div className="type-body-s flex items-center gap-3 text-ink-3">
-                {version.uploadedByName && <span>Uploaded by: {version.uploadedByName}</span>}
-                {version.validUntil && <span>Valid until: {version.validUntil}</span>}
-                {version.issuer && <span>Issuer: {version.issuer}</span>}
-              </div>
-            </div>
+          <div key={version.id} className="p-4">
+            <Flex align="center" justify="space-between" gap={16}>
+              <Flex vertical gap={4} className="min-w-0 flex-1">
+                <Flex align="center" gap={8}>
+                  <span className="type-label-m text-ink">{version.fileName}</span>
+                  <Chip tone="info">v{version.versionNo}</Chip>
+                  <Chip tone="warn">Waiting for review</Chip>
+                </Flex>
+                <Flex align="center" gap={12} className="type-body-s text-ink-3">
+                  {version.uploadedByName && <span>Uploaded by: {version.uploadedByName}</span>}
+                  {version.validUntil && <span>Valid until: {version.validUntil}</span>}
+                  {version.issuer && <span>Issuer: {version.issuer}</span>}
+                </Flex>
+              </Flex>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => onView(version.fileId)}>
-                View file
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => onReview(version)}>
-                Review
-              </Button>
-            </div>
+              <Flex align="center" gap={8} className="shrink-0">
+                <Button variant="secondary" size="sm" onClick={() => onView(version.fileId)}>
+                  View file
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => onReview(version)}>
+                  Review
+                </Button>
+              </Flex>
+            </Flex>
           </div>
         ))}
       </div>
     )}
-  </div>
+  </Flex>
 );
 
 export default ReviewInbox;

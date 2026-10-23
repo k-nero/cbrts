@@ -16,9 +16,9 @@ export interface CustomerNote {
   jobId?: string;
   jobCode?: string;
   checklistItemId?: string;
-  checklistItemName?: string;
-  checklistItemDueDate?: string;
-  checklistItemWarning?: string;
+  checklistItemName?: string | null;
+  checklistItemDueDate?: string | null;
+  checklistItemWarning?: string | null;
   topic: 'DOCUMENTS' | 'DATES_PRICE_CHANGES' | 'THE_TRIP';
   routedRole: string;
   subject: string;
@@ -26,19 +26,19 @@ export interface CustomerNote {
   createdById: string;
   createdByName: string;
   createdAt: string;
-  replyDueAt: string;
+  replyDueAt: string | null;
   status: 'OPEN' | 'RESOLVED' | 'ANSWERED';
-  dueToday?: boolean;
-  isDueToday?: boolean;
-  overdue?: boolean;
-  isOverdue?: boolean;
-  attachedFileName?: string;
-  attachedFileSize?: string;
+  dueToday: boolean;
+  overdue: boolean;
+  attachedFileId?: string | null;
+  attachedFileName?: string | null;
+  attachedFileSizeBytes?: number | null;
   replies?: NoteReply[];
 }
 
 export interface CreateNoteReplyRequest {
   body: string;
   moveDueDateTo?: string;
-  moveDueDateReason?: string;
+  /** Shown to the customer with the moved date. */
+  reasonForMove?: string;
 }

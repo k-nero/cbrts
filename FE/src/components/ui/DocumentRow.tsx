@@ -5,7 +5,11 @@ import { cx, type Tone } from './tone';
 
 export type DocumentStatus = 'cleared' | 'review' | 'amber' | 'red' | 'required';
 
-const STATUS: Record<DocumentStatus, { tone: Tone; label: string; result: string }> = {
+/** Each state's tone and word; pages that show a document's state on its own use the same pair. */
+export const DOCUMENT_STATUS: Record<
+  DocumentStatus,
+  { tone: Tone; label: string; result: string }
+> = {
   cleared: { tone: 'ok', label: 'Cleared', result: 'text-ink-2' },
   review: { tone: 'info', label: 'In review', result: 'text-ink-2' },
   amber: { tone: 'warn', label: 'Expires in transit', result: 'text-warn' },
@@ -18,14 +22,15 @@ type Props = {
   /** Overrides the status word, keeping the tone ("Rejected", "With the authority"). */
   statusLabel?: string;
   document: ReactNode;
-  /** The rule in words: "Valid through arrival + 2 days". */
-  rule: ReactNode;
+  /** The rule in words: "Valid through arrival + 2 days". Left out when no rule is pinned. */
+  rule?: ReactNode;
   /** The result of the validity check, or "Not uploaded yet." */
   result?: ReactNode;
   /** Who holds the next step ("With you", "With the customer"). */
   holder?: ReactNode;
   /** "v1 · 2 Sep 2026", or a Deadline. */
   version?: ReactNode;
+  /** Left out on a read-only row, which then gives the space to the document. */
   actions?: ReactNode;
   className?: string;
 };
@@ -45,7 +50,7 @@ export const DocumentRow: FC<Props> = ({
   actions,
   className,
 }) => {
-  const s = STATUS[status];
+  const s = DOCUMENT_STATUS[status];
   return (
     <div
       className={cx(
@@ -58,13 +63,15 @@ export const DocumentRow: FC<Props> = ({
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <span className="type-label-m text-ink">{document}</span>
-        <span className="type-body-s text-ink-3">{rule}</span>
+        {rule && <span className="type-body-s text-ink-3">{rule}</span>}
         {result && <span className={cx('type-body-s', s.result)}>{result}</span>}
       </span>
       {holder && <span className="type-label-s w-[140px] shrink-0 text-ink-2">{holder}</span>}
       {/* Always present, so the actions line up down the table. */}
       <span className="type-caption w-[150px] shrink-0 text-ink-3">{version}</span>
-      <span className="flex w-[250px] shrink-0 items-center justify-end gap-2">{actions}</span>
+      {actions !== undefined && (
+        <span className="flex w-[250px] shrink-0 items-center justify-end gap-2">{actions}</span>
+      )}
     </div>
   );
 };

@@ -8,6 +8,8 @@ import lombok.Builder;
 @Builder
 public record TripViewResponse(
         String jobCode,
+        /** The trip's TRP code for staff and the crew; null for the customer, who never sees it. */
+        String tripCode,
         TripStatus tripStatus,
         boolean clearanceReady,
         Instant plannedDepartureAt,

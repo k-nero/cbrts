@@ -1,6 +1,6 @@
 import { type FC, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { message } from 'antd';
+import { Flex, message } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
@@ -53,7 +53,7 @@ const DocumentsPage: FC = () => {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+    <Flex vertical gap={28}>
       {messageHolder}
       <PageHeader
         title="Documents"
@@ -96,7 +96,7 @@ const DocumentsPage: FC = () => {
 
       <ReviewDocumentModal version={reviewing} jobId={jobId} onClose={() => setReviewing(null)} />
       <UploadVersionModal item={uploadingTo} jobId={jobId} onClose={() => setUploadingTo(null)} />
-    </div>
+    </Flex>
   );
 };
 

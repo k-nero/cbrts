@@ -8,6 +8,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
@@ -35,6 +36,7 @@ public class ClearanceService {
     private final RegulationCatalogRepository regulationCatalogRepository;
     private final RegulationVersionRepository regulationVersionRepository;
     private final RegulationRuleRepository regulationRuleRepository;
+    private final Clock clock;
 
     public ClearanceService(
             ChecklistItemRepository checklistItemRepository,
@@ -48,7 +50,8 @@ public class ClearanceService {
             JobRegulationPinRepository jobRegulationPinRepository,
             RegulationCatalogRepository regulationCatalogRepository,
             RegulationVersionRepository regulationVersionRepository,
-            RegulationRuleRepository regulationRuleRepository) {
+            RegulationRuleRepository regulationRuleRepository,
+            Clock clock) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -61,6 +64,7 @@ public class ClearanceService {
         this.regulationCatalogRepository = regulationCatalogRepository;
         this.regulationVersionRepository = regulationVersionRepository;
         this.regulationRuleRepository = regulationRuleRepository;
+        this.clock = clock;
     }
 
     /**
@@ -105,6 +109,23 @@ public class ClearanceService {
     }
 
     /**
+     * US-F2-02: the checklist behind one of the customer's requests. Empty until the request is approved into a job
+     * and its checklist is generated.
+     */
+    @Transactional(readOnly = true)
+    public List<ChecklistItemResponse> getCustomerRequestChecklist(UUID requestId, User customer) {
+        return transportJobRepository
+                .findByRequestId(requestId)
+                .map(job -> {
+                    assertClubOwnsJob(job, customer);
+                    return checklistItemRepository.findByJobId(job.getId()).stream()
+                            .map(ClearanceMapper::toItemResponse)
+                            .toList();
+                })
+                .orElse(List.of());
+    }
+
+    /**
      * Retrieve unreviewed document versions for the specialist inbox with pagination.
      */
     @Transactional(readOnly = true)
@@ -135,14 +156,75 @@ public class ClearanceService {
     }
 
     /**
-     * Customer document upload: enforces that the checklist item belongs to the customer's club job (US-F2-03).
+     * US-F2-03: the automatic check on a document's dates, run before its file is uploaded so a refused certificate
+     * is never stored. Saves nothing; attaching the file runs the same check again.
+     */
+    @Transactional(readOnly = true)
+    public DocumentCheckResponse checkCustomerDocument(
+            UUID checklistItemId, DocumentCheckRequest dates, User customer) {
+        ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
+        assertCustomerMayUpload(item, customer);
+        assertDatesMakeSense(dates.issuedOn(), dates.sampledOn(), dates.validUntil());
+        DocumentVersion candidate = new DocumentVersion();
+        candidate.setIssuedOn(dates.issuedOn());
+        candidate.setSampledOn(dates.sampledOn());
+        candidate.setValidUntil(dates.validUntil());
+        ValidityEngine.Result result = validityEngine.evaluate(item, candidate, item.getJob());
+        return new DocumentCheckResponse(
+                result.validity(), result.note(), result.rule(), result.found(), result.required(), result.renewBy());
+    }
+
+    /** US-F2-03: every version of one of the customer's documents, newest first (BR-F2-05). */
+    @Transactional(readOnly = true)
+    public List<DocumentVersionResponse> getCustomerVersions(UUID checklistItemId, User customer) {
+        ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
+        assertClubOwnsJob(item.getJob(), customer);
+        return documentVersionRepository.findByChecklistItemIdOrderByVersionNoDesc(checklistItemId).stream()
+                .map(ClearanceMapper::toVersionResponse)
+                .toList();
+    }
+
+    /**
+     * Customer document upload (US-F2-03): the item must be one of the club's own documents that is still open.
      */
     @Transactional
     public ChecklistItemResponse uploadCustomerDocumentVersion(
             UUID checklistItemId, DocumentUploadRequest request, User customer) {
-        ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
-        assertClubOwnsJob(item.getJob(), customer);
+        assertCustomerMayUpload(findChecklistItemOrThrow(checklistItemId), customer);
         return uploadDocumentVersion(checklistItemId, request, customer);
+    }
+
+    /**
+     * A customer uploads only their own club's documents, only the ones they provide (an authority's permit is filed
+     * by staff), only before departure, and not once a document is cleared with nothing left to fix.
+     */
+    private void assertCustomerMayUpload(ChecklistItem item, User customer) {
+        assertClubOwnsJob(item.getJob(), customer);
+        if (item.getDocumentType() != null && item.getDocumentType().getProvidedBy() == DocumentProvider.AUTHORITY) {
+            throw new ConflictException(
+                    "DOCUMENT_FROM_AUTHORITY", "This document is issued by an authority; we file it for you.");
+        }
+        if (item.getJob().getDepartedAt() != null) {
+            throw new ConflictException("JOB_DEPARTED", "The horses have left, so this document can't change.");
+        }
+        if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
+            throw new ConflictException("DOCUMENT_CLEARED", "This document is cleared; nothing more is needed.");
+        }
+    }
+
+    /** Dates a certificate can't have, refused whatever the rule says (US-F2-03). */
+    private void assertDatesMakeSense(LocalDate issuedOn, LocalDate sampledOn, LocalDate validUntil) {
+        LocalDate today = LocalDate.now(clock.withZone(AppConstants.BUSINESS_ZONE));
+        if (issuedOn.isAfter(today)) {
+            throw new BusinessException("DOCUMENT_DATES_INVALID", "The issue date can't be in the future.");
+        }
+        if (sampledOn != null && sampledOn.isAfter(issuedOn)) {
+            throw new BusinessException("DOCUMENT_DATES_INVALID", "The sample date can't be after the issue date.");
+        }
+        if (validUntil.isBefore(issuedOn)) {
+            throw new BusinessException(
+                    "DOCUMENT_DATES_INVALID", "The valid-until date can't be before the issue date.");
+        }
     }
 
     /**
@@ -154,6 +236,8 @@ public class ClearanceService {
     public ChecklistItemResponse uploadDocumentVersion(
             UUID checklistItemId, DocumentUploadRequest request, User uploader) {
         ChecklistItem item = findChecklistItemOrThrow(checklistItemId);
+
+        assertDatesMakeSense(request.issuedOn(), request.sampledOn(), request.validUntil());
 
         // Require that the file exists, belongs to the caller, and is not already attached (PR #79)
         StoredFile file = fileService.requireAttachable(request.fileId(), uploader);
@@ -179,7 +263,7 @@ public class ClearanceService {
         // Evaluate validity on the unsaved version first; refuse RED with clear error before persisting.
         ValidityEngine.Result valResult = validityEngine.evaluate(item, candidate, item.getJob());
         if (valResult.validity() == Validity.RED) {
-            throw new ConflictException("DOCUMENT_VALIDITY_RED", "Document validity check failed: " + valResult.note());
+            throw new ConflictException("DOCUMENT_VALIDITY_RED", "Refused: " + valResult.note());
         }
 
         DocumentVersion savedVersion = documentVersionRepository.save(candidate);
@@ -482,6 +566,15 @@ public class ClearanceService {
             }
         }
 
+        if (totalMandatory == 0) {
+            // #113: with nothing mandatory to check, the gate would hold with nothing checked. It stays closed.
+            outstandingIssues.addFirst(destinationVersion(job.getId())
+                    .map(v -> "The pinned regulation catalog, "
+                            + v.getCatalog().getCountry().getName() + " v"
+                            + v.getVersionNo() + ", has no mandatory document rules, so the gate stays closed"
+                            + " until the job's checklist has its documents.")
+                    .orElse("The job has no document checklist yet. Generate it from the regulation catalogs."));
+        }
         boolean allQuarantinesCompleted = completedQuarantines == quarantines.size();
         boolean ready = totalMandatory > 0
                 && clearedMandatory == totalMandatory
@@ -542,6 +635,27 @@ public class ClearanceService {
      * <p>Each item is due the pinned version's lead time before the planned departure; with no departure
      * planned yet, the due date stays empty until there is one.
      */
+    /**
+     * Refuses, before anything is written, a request whose job couldn't get its checklist: its destination has no
+     * country, or that country has no published regulation catalog to pin (BR-F2-01). Approval calls it first.
+     */
+    @Transactional(readOnly = true)
+    public void requireChecklistSource(TransportRequest request) {
+        Country destination = destinationCountry(request);
+        if (destination == null) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_DESTINATION",
+                    "The request's destination has no country, so its document checklist can't be made.");
+        }
+        if (publishedVersion(destination).isEmpty()) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_CATALOG",
+                    "There is no published regulation catalog for " + destination.getName()
+                            + ", so the job's document checklist can't be made. Ask the transport specialist to"
+                            + " publish one first.");
+        }
+    }
+
     @Transactional
     public List<ChecklistItemResponse> generateChecklist(UUID jobId, User specialist) {
         TransportJob job = findJobOrThrow(jobId);

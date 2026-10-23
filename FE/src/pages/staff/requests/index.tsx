@@ -1,5 +1,5 @@
 import { type FC, useEffect, useState } from 'react';
-import { Skeleton } from 'antd';
+import { Flex, Skeleton } from 'antd';
 
 import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
@@ -29,10 +29,10 @@ const RequestsPage: FC = () => {
   }, [page, query.isSuccess, query.data]);
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         title="Requests"
-        summary="Oldest first. Requests waiting for feasibility review."
+        summary="Oldest first. Requests waiting for feasibility review, or for your approval once the customer accepts."
       />
 
       {query.isError ? (
@@ -48,12 +48,12 @@ const RequestsPage: FC = () => {
           Nothing has changed. Check your connection and try again.
         </Callout>
       ) : query.isPending ? (
-        <div className="flex flex-col gap-4" aria-busy>
+        <Flex vertical gap={16} aria-busy>
           <span className="type-label-s text-ink">Waiting</span>
           <Panel>
             <Skeleton active title={false} paragraph={{ rows: 6 }} />
           </Panel>
-        </div>
+        </Flex>
       ) : empty ? (
         <Panel title="Nothing waiting for review">
           <p className="type-body-m m-0 text-ink-2">
@@ -61,7 +61,7 @@ const RequestsPage: FC = () => {
           </p>
         </Panel>
       ) : (
-        <div className="flex flex-col gap-4">
+        <Flex vertical gap={16}>
           <span className="type-label-s text-ink">{`${total ?? 0} waiting`}</span>
           <Table<QueueRow>
             id="review-queue"
@@ -80,9 +80,9 @@ const RequestsPage: FC = () => {
             }}
             onChange={(pagination) => setPage((pagination.current ?? 1) - 1)}
           />
-        </div>
+        </Flex>
       )}
-    </div>
+    </Flex>
   );
 };
 

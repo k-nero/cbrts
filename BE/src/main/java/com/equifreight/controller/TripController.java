@@ -36,7 +36,7 @@ public class TripController {
     @PreAuthorize("hasRole('ESCORT')")
     public Page<TripSummaryResponse> escortTrips(
             @AuthenticationPrincipal User user, @PageableDefault(size = 20) Pageable pageable) {
-        return trips.escortTrips(user, sorted(pageable, Sort.by(Sort.Direction.DESC, "job.plannedDepartureAt")));
+        return trips.escortTrips(user, sorted(pageable, Sort.by(Sort.Direction.DESC, "plannedDepartureAt")));
     }
 
     @GetMapping("/api/v1/escort/trips/{jobCode}")

@@ -6,10 +6,11 @@ import { DraftPass } from '@/components/ui';
 import type { CustomerQuotation } from '@/interfaces';
 import {
   departsText,
-  formatDate,
   formatDayTime,
   formatTime,
   money,
+  quotedPassChip,
+  quotedPassSub,
   serviceParts,
 } from '@/lib/utils';
 
@@ -45,7 +46,7 @@ export const QuotedPass: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
   const r = quotation.request;
   return (
     <DraftPass
-      chip={{ tone: 'info', label: `Quoted · v${quotation.versionNo}` }}
+      chip={quotedPassChip(quotation)}
       from={r.fromCity}
       to={r.toCity}
       mode={r.mode === 'AIR' ? 'air' : 'road'}
@@ -64,11 +65,7 @@ export const QuotedPass: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
       range={
         quotation.totals.total == null ? null : money(quotation.totals.total, quotation.currency)
       }
-      rangeSub={
-        quotation.status === 'EXPIRED'
-          ? `Expired ${quotation.validUntil ? formatDate(quotation.validUntil) : ''}. It is re-priced from the rate catalog in force now.`
-          : `Valid until ${quotation.validUntil ? formatDate(quotation.validUntil) : '—'}. Once you accept and the job is approved, this becomes your travel pass.`
-      }
+      rangeSub={quotedPassSub(quotation)}
     />
   );
 };

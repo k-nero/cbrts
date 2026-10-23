@@ -86,12 +86,12 @@ export const DraftPanel: FC<Props> = ({ catalog, onDraftGone }) => {
     return (
       <Panel>
         <Flex align="center" justify="space-between" gap={16}>
-          <span className="flex flex-col gap-0.5">
+          <Flex component="span" vertical gap={2}>
             <span className="type-h4 text-ink">{`Rate catalog v${current?.versionNo ?? ''} is current`}</span>
             <span className="type-body-s text-ink-2">
               Changes are made in a draft and published as the next version.
             </span>
-          </span>
+          </Flex>
           <Button variant="secondary" disabled={create.isPending} onClick={() => void onCreate()}>
             {`Create draft v${nextNo}`}
           </Button>
@@ -104,14 +104,14 @@ export const DraftPanel: FC<Props> = ({ catalog, onDraftGone }) => {
   return (
     <Panel>
       <Flex align="center" justify="space-between" gap={16}>
-        <span className="flex flex-col gap-0.5">
+        <Flex component="span" vertical gap={2}>
           <span className="type-h4 text-ink">{`Draft v${draft.versionNo}`}</span>
           <span className="type-body-s text-ink-2">
             {draft.lastEditedBy && draft.updatedAt
               ? `Edited by ${draft.lastEditedBy}, ${formatDayTime(draft.updatedAt)}`
               : 'No changes yet'}
           </span>
-        </span>
+        </Flex>
         <Flex gap={12} align="center">
           <Button variant="ghost" onClick={onDiscard}>
             Discard draft

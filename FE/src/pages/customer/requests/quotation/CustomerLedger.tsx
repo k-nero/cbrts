@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { GroupBadge } from './GroupBadge';
 
@@ -27,12 +28,14 @@ export const CustomerLedger: FC<{ quotation: CustomerQuotation }> = ({ quotation
     </div>
     {quotation.groups.map((g) => (
       <section key={g.code} aria-label={`${g.code} ${g.name}`}>
-        <div className="flex items-center gap-3 px-5 pt-4 pb-2">
-          <GroupBadge code={g.code} />
-          <span className="type-h4 flex-1 text-ink">{g.name}</span>
-          <span className="type-data text-ink-2">
-            {moneyOrDash(g.subtotal, quotation.currency)}
-          </span>
+        <div className="px-5 pt-4 pb-2">
+          <Flex align="center" gap={12}>
+            <GroupBadge code={g.code} />
+            <span className="type-h4 flex-1 text-ink">{g.name}</span>
+            <span className="type-data text-ink-2">
+              {moneyOrDash(g.subtotal, quotation.currency)}
+            </span>
+          </Flex>
         </div>
         {g.lines.map((l, i) => (
           <QuoteLine
@@ -40,10 +43,10 @@ export const CustomerLedger: FC<{ quotation: CustomerQuotation }> = ({ quotation
             certainty={certainty(l)}
             description={
               l.manual ? (
-                <span className="flex items-center gap-2">
+                <Flex component="span" align="center" gap={8}>
                   {l.description}
                   <Chip dot={false}>Manual</Chip>
-                </span>
+                </Flex>
               ) : (
                 l.description
               )
@@ -69,9 +72,11 @@ export const CustomerLedger: FC<{ quotation: CustomerQuotation }> = ({ quotation
           />
         ))}
         {g.code === 'C' && quotation.stallNote && (
-          <div className="flex flex-col gap-1 border-b border-line bg-sunken px-5 pt-2.5 pb-3.5">
-            <span className="type-label-s text-ink-2">How the stall was sized</span>
-            <span className="type-body-s text-ink-3">{quotation.stallNote}</span>
+          <div className="border-b border-line bg-sunken px-5 pt-2.5 pb-3.5">
+            <Flex vertical gap={4}>
+              <span className="type-label-s text-ink-2">How the stall was sized</span>
+              <span className="type-body-s text-ink-3">{quotation.stallNote}</span>
+            </Flex>
           </div>
         )}
       </section>
