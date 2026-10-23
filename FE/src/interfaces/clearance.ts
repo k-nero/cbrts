@@ -160,6 +160,8 @@ export interface ClearanceStatus {
   dossierStatus: DossierStatus;
   clearanceReady: boolean;
   clearanceReadyAt?: string;
+  departedAt?: string | null;
+  isDeparted?: boolean;
   totalChecklistItems: number;
   mandatoryItems: number;
   clearedMandatoryItems: number;
@@ -171,6 +173,28 @@ export interface ClearanceStatus {
   destination?: string;
   /** That catalog's minimum pre-export quarantine, in days. */
   quarantineMinDays?: number;
+}
+
+export interface DocumentReviewDetail {
+  version: DocumentVersion;
+  item: ChecklistItem;
+  jobId?: string;
+  jobCode?: string;
+  requestCode?: string;
+  clubName?: string;
+  departureDate?: string;
+  totalChecklistItems: number;
+  mandatoryItems: number;
+  clearedMandatoryItems: number;
+  remainingMandatoryItems: number;
+  allVersions: DocumentVersion[];
+  automaticCheckText: string;
+  automaticCheckTone: 'ok' | 'info' | 'warn' | 'bad';
+  /** 1-based; 0 once this version is no longer waiting for review. */
+  queuePosition: number;
+  queueTotal: number;
+  nextVersionId?: string;
+  nextDocumentName?: string;
 }
 
 export interface ReviewDocumentRequest {

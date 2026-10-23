@@ -54,6 +54,8 @@ public final class ClearanceMapper {
                 .dossierStatus(job.getDossierStatus())
                 .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
                 .clearanceReadyAt(job.getClearanceReadyAt())
+                .departedAt(job.getDepartedAt())
+                .isDeparted(job.getDepartedAt() != null)
                 .totalChecklistItems(totalChecklistItems)
                 .mandatoryItems(mandatoryItems)
                 .clearedMandatoryItems(clearedMandatoryItems)
@@ -295,6 +297,51 @@ public final class ClearanceMapper {
                 .endsOn(q.getEndsOn())
                 .completedAt(q.getCompletedAt())
                 .isCompleted(q.getCompletedAt() != null)
+                .build();
+    }
+
+    public static DocumentReviewDetailResponse toReviewDetailResponse(
+            DocumentVersion version,
+            ChecklistItem item,
+            TransportJob job,
+            List<DocumentVersion> allVersions,
+            String autoCheckText,
+            String autoCheckTone,
+            int totalItems,
+            int clearedMandatory,
+            int mandatoryItems,
+            int queuePosition,
+            int queueTotal,
+            UUID nextVersionId,
+            String nextDocName) {
+        TransportRequest request = job != null ? job.getRequest() : null;
+        return DocumentReviewDetailResponse.builder()
+                .version(toVersionResponse(version))
+                .item(toItemResponse(item))
+                .jobId(job != null ? job.getId() : null)
+                .jobCode(job != null ? job.getCode() : null)
+                .requestCode(request != null ? request.getCode() : null)
+                .clubName(
+                        request != null && request.getClub() != null
+                                ? request.getClub().getName()
+                                : null)
+                .departureDate(request != null ? request.getDepartureDate() : null)
+                .totalChecklistItems(totalItems)
+                .clearedMandatoryItems(clearedMandatory)
+                .mandatoryItems(mandatoryItems)
+                .remainingMandatoryItems(Math.max(0, mandatoryItems - clearedMandatory))
+                .allVersions(
+                        allVersions == null
+                                ? List.of()
+                                : allVersions.stream()
+                                        .map(ClearanceMapper::toVersionResponse)
+                                        .toList())
+                .automaticCheckText(autoCheckText)
+                .automaticCheckTone(autoCheckTone)
+                .queuePosition(queuePosition)
+                .queueTotal(queueTotal)
+                .nextVersionId(nextVersionId)
+                .nextDocumentName(nextDocName)
                 .build();
     }
 

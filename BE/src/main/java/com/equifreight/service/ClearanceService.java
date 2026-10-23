@@ -299,6 +299,73 @@ public class ClearanceService {
     }
 
     /**
+     * US-F2-04 (issue #88): Details for reviewing one document version on its own screen.
+     */
+    @Transactional(readOnly = true)
+    public DocumentReviewDetailResponse getDocumentReviewDetail(UUID versionId) {
+        DocumentVersion version = documentVersionRepository
+                .findById(versionId)
+                .orElseThrow(() -> ResourceNotFoundException.of("DocumentVersion", versionId));
+
+        ChecklistItem item = version.getChecklistItem();
+        TransportJob job = item != null ? item.getJob() : null;
+
+        List<DocumentVersion> allVersions = item != null
+                ? documentVersionRepository.findByChecklistItemIdOrderByVersionNoDesc(item.getId())
+                : List.of(version);
+
+        List<DocumentVersion> queue = documentVersionRepository.findAllByReview(DocumentReview.PENDING);
+        int at = -1;
+        for (int i = 0; i < queue.size(); i++) {
+            if (queue.get(i).getId().equals(versionId)) {
+                at = i;
+                break;
+            }
+        }
+        UUID nextId = null;
+        String nextDocName = null;
+        if (at >= 0 && at < queue.size() - 1) {
+            DocumentVersion next = queue.get(at + 1);
+            nextId = next.getId();
+            ChecklistItem nextItem = next.getChecklistItem();
+            if (nextItem != null && nextItem.getDocumentType() != null) {
+                String horse = nextItem.getHorse() != null ? nextItem.getHorse().getName() + " · " : "";
+                nextDocName = horse + nextItem.getDocumentType().getName();
+            } else {
+                nextDocName = next.getFile() != null ? next.getFile().getFileName() : "Next document";
+            }
+        }
+
+        ValidityEngine.Result valResult =
+                (item != null && job != null) ? validityEngine.evaluate(item, version, job) : null;
+        String autoCheckText = valResult != null ? valResult.note() : "Document present and complete.";
+        String autoCheckTone = valResult != null
+                ? (valResult.validity() == Validity.GREEN
+                        ? "ok"
+                        : valResult.validity() == Validity.AMBER ? "warn" : "bad")
+                : "ok";
+
+        // The gate's own counts, so "the departure gate still waits for N" agrees with the gate.
+        GateAssessment gate = job != null ? assess(job) : null;
+
+        return ClearanceMapper.toReviewDetailResponse(
+                version,
+                item,
+                job,
+                allVersions,
+                autoCheckText,
+                autoCheckTone,
+                gate != null ? gate.totalItems() : 0,
+                gate != null ? gate.clearedMandatoryItems() : 0,
+                gate != null ? gate.mandatoryItems() : 0,
+                // 0 when the version has left the queue (already reviewed), so nothing claims a place in it.
+                at + 1,
+                queue.size(),
+                nextId,
+                nextDocName);
+    }
+
+    /**
      * Transport specialist review decision (BR-F2-04, BR-F2-05, BR-F2-07).
      * Enforces validate-then-write, refuses superseded versions or invalid review states,
      * and audits the decision in the same transaction.

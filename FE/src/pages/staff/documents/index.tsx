@@ -9,6 +9,7 @@ import { queryKeys } from '@/constant/query';
 import { usePendingReviews } from '@/hooks/clearance';
 import type { ChecklistItem, DocumentVersion } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
+import { useCustomRouter } from '@/router/route.hook';
 import JobChecklist from './JobChecklist';
 import ReviewDocumentModal from './ReviewDocumentModal';
 import ReviewInbox from './ReviewInbox';
@@ -19,6 +20,7 @@ import UploadVersionModal from './UploadVersionModal';
  * clearance gate. A `?jobId=` link opens straight on that job's checklist.
  */
 const DocumentsPage: FC = () => {
+  const router = useCustomRouter();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialJobId = searchParams.get('jobId');
   const [activeTab, setActiveTab] = useState<'pending' | 'checklist'>(
@@ -81,7 +83,9 @@ const DocumentsPage: FC = () => {
           loading={pending.isLoading}
           failed={pending.isError}
           onView={viewFile}
-          onReview={setReviewing}
+          onReview={(version) =>
+            router.push(router.paths.get('document-review', { pathParams: [version.id] }))
+          }
         />
       )}
 
