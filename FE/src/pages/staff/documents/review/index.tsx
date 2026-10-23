@@ -1,19 +1,18 @@
-import { useEffect, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import { useParams } from 'react-router-dom';
-import { App, Flex, Spin } from 'antd';
+import { App, Col, Flex, Row, Skeleton } from 'antd';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Chip, StageMark } from '@/components/ui';
+import { Callout, Chip, StageMark } from '@/components/ui';
 import { useDocumentReviewDetail, useReviewDocument } from '@/hooks/clearance';
-import { DocumentReviewEnum } from '@/interfaces';
+import { DocumentReviewEnum, type ReviewDocumentRequest } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 import { AutomaticCheckPanel } from './AutomaticCheckPanel';
 import { DecisionPanel } from './DecisionPanel';
 import { FileViewer } from './FileViewer';
-import type { ManualCheckItem } from './YourChecksPanel';
-import { YourChecksPanel } from './YourChecksPanel';
 import { VersionsPanel } from './VersionsPanel';
+import { type ManualCheckItem, YourChecksPanel } from './YourChecksPanel';
 
 /**
  * Transport specialist Document Review screen (US-F2-04, issue #88).
@@ -27,81 +26,77 @@ const DocumentReviewPage: FC = () => {
   const router = useCustomRouter();
   const { message } = App.useApp();
 
-  const { data: detail, isLoading, isError, refetch } = useDocumentReviewDetail(id);
+  const { data: detail } = useDocumentReviewDetail(id);
   const reviewMutation = useReviewDocument(detail?.jobId);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // The decision that last failed, so Try again sends the same one (an approve or a reject with its reason).
+  const [lastDecision, setLastDecision] = useState<ReviewDocumentRequest | null>(null);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
 
-  // Specialist manual checks state
-  const [checks, setChecks] = useState<ManualCheckItem[]>([]);
-
+  // A new version starts with no ticks; a refetch of the same version keeps them.
+  const versionId = detail?.version.id;
   useEffect(() => {
-    if (detail) {
-      const v = detail.version;
-      const microchip = detail.item.horseMicrochip;
-      setChecks([
-        {
-          id: 'sample-date',
-          label: 'The sample date on the paper matches the entered date',
-          sub: v.sampledOn
-            ? `${v.sampledOn} on certificate; matches entered date.`
-            : 'Date on certificate matches entered date.',
-          checked: false,
-        },
-        {
-          id: 'lab-approved',
-          label: 'The laboratory is on the destination country’s approved list',
-          sub: v.issuer
-            ? `${v.issuer}, accreditation verified.`
-            : 'Accredited veterinary authority.',
-          checked: false,
-        },
-        {
-          id: 'result-negative',
-          label: 'The result is negative / passed',
-          checked: false,
-        },
-        {
-          id: 'microchip-match',
-          label: 'The microchip matches the horse’s passport',
-          sub: microchip ? `…${microchip.slice(-6)} verified on both documents.` : undefined,
-          checked: false,
-        },
-        {
-          id: 'signed-stamped',
-          label: 'Signed and stamped by the veterinarian or authority',
-          checked: false,
-        },
-      ]);
-      setSubmitError(null);
-    }
-  }, [detail]);
+    setTicked(new Set());
+    setSubmitError(null);
+    setLastDecision(null);
+  }, [versionId]);
+
+  const checks = useMemo<ManualCheckItem[]>(() => {
+    if (!detail) return [];
+    const { version, item } = detail;
+    const definitions: Omit<ManualCheckItem, 'checked'>[] = [
+      {
+        id: 'sample-date',
+        label: 'The sample date on the paper matches the entered date',
+        sub: version.sampledOn ? `Entered: ${version.sampledOn}.` : undefined,
+      },
+      {
+        id: 'lab-approved',
+        label: 'The laboratory is on the destination country’s approved list',
+        sub: version.issuer ? `Entered issuer: ${version.issuer}.` : undefined,
+      },
+      { id: 'result-negative', label: 'The result is negative / passed' },
+      {
+        id: 'microchip-match',
+        label: 'The microchip matches the horse’s passport',
+        sub: item.horseMicrochip
+          ? `Microchip on file: …${item.horseMicrochip.slice(-6)}.`
+          : undefined,
+      },
+      { id: 'signed-stamped', label: 'Signed and stamped by the veterinarian or authority' },
+    ];
+    return definitions.map((check) => ({ ...check, checked: ticked.has(check.id) }));
+  }, [detail, ticked]);
 
   const handleToggleCheck = (checkId: string) => {
-    setChecks((prev) => prev.map((c) => (c.id === checkId ? { ...c, checked: !c.checked } : c)));
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(checkId)) next.add(checkId);
+      return next;
+    });
   };
 
   const allChecksTicked = checks.length > 0 && checks.every((c) => c.checked);
-  const tickedCount = checks.filter((c) => c.checked).length;
+  const tickedCount = ticked.size;
 
   const toDocumentsList = () => {
     router.push(router.paths.get('documents'));
   };
 
-  const handleApprove = async () => {
+  const decide = async (data: ReviewDocumentRequest) => {
     if (!detail) return;
     setSubmitError(null);
+    setLastDecision(data);
     try {
-      await reviewMutation.mutateAsync({
-        versionId: detail.version.id,
-        data: { review: DocumentReviewEnum.APPROVED },
-      });
+      await reviewMutation.mutateAsync({ versionId: detail.version.id, data });
       message.success(
-        `Approved ${detail.item.horseName ? detail.item.horseName + ' · ' : ''}${
-          detail.item.documentTypeName || 'document'
-        }`,
+        data.review === DocumentReviewEnum.APPROVED
+          ? `Approved ${detail.item.horseName ? `${detail.item.horseName} · ` : ''}${
+              detail.item.documentTypeName || 'document'
+            }`
+          : `Rejected with reason sent to ${detail.clubName || 'the customer'}.`,
       );
-
       if (detail.nextVersionId) {
         router.push(router.paths.get('document-review', { pathParams: [detail.nextVersionId] }));
       } else {
@@ -112,114 +107,87 @@ const DocumentReviewPage: FC = () => {
     }
   };
 
-  const handleReject = async (reason: string) => {
-    if (!detail) return;
-    setSubmitError(null);
-    try {
-      await reviewMutation.mutateAsync({
-        versionId: detail.version.id,
-        data: { review: DocumentReviewEnum.REJECTED, rejectReason: reason },
-      });
-      message.success(`Rejected with reason sent to ${detail.clubName || 'the customer'}.`);
-
-      if (detail.nextVersionId) {
-        router.push(router.paths.get('document-review', { pathParams: [detail.nextVersionId] }));
-      } else {
-        toDocumentsList();
-      }
-    } catch (err) {
-      setSubmitError(apiErrorMessage(err, 'The rejection decision could not be saved.'));
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (isError || !detail) {
-    return (
-      <Flex vertical gap={24} className="p-6">
-        <Callout tone="bad" title="Document review not found">
-          This document version may have already been reviewed or does not exist.
-        </Callout>
-        <div>
-          <Button variant="secondary" onClick={toDocumentsList}>
-            Back to Documents
-          </Button>
-        </div>
-      </Flex>
-    );
+  if (!detail) {
+    return <Skeleton active paragraph={{ rows: 12 }} />;
   }
 
   const { item, version, jobCode, requestCode, clubName, departureDate } = detail;
-  const docTitle = `${item.horseName ? item.horseName + ' · ' : ''}${
+  const docTitle = `${item.horseName ? `${item.horseName} · ` : ''}${
     item.documentTypeName || 'Document'
   }`;
-
-  const dueInfo = item.dueDate ? `Due on ${item.dueDate}` : 'Due in 1 business day';
+  const pending = version.review === DocumentReviewEnum.PENDING;
 
   return (
-    <Flex vertical gap={24} className="pb-12">
-      {/* Header matching Figma docReviewScreen */}
+    <Flex vertical gap={24}>
       <PageHeader
         back={{ label: 'Documents', onClick: toDocumentsList }}
         title={docTitle}
         summary={
-          <div className="flex flex-col gap-1">
-            <span className="type-data text-ink">{jobCode || 'JOB'}</span>
+          <Flex vertical gap={4}>
+            <span className="type-data text-ink">{jobCode}</span>
             <span className="type-body-s text-ink-3">
               {[requestCode, clubName, departureDate ? `departs ${departureDate}` : null]
                 .filter(Boolean)
                 .join(' · ')}
             </span>
-          </div>
+          </Flex>
         }
         right={
-          <div className="flex items-center gap-3">
+          <>
             <StageMark stage="Documents" />
-            <Chip tone="info">In review</Chip>
-            <div className="text-right">
-              <span className="type-label-s block text-ink">{dueInfo}</span>
-              {item.dueDate && (
-                <span className="type-caption font-mono text-ink-3">{item.dueDate}</span>
-              )}
-            </div>
-          </div>
+            {pending ? (
+              <Chip tone="info">In review</Chip>
+            ) : version.review === DocumentReviewEnum.APPROVED ? (
+              <Chip tone="ok">Approved</Chip>
+            ) : (
+              <Chip tone="bad">Rejected</Chip>
+            )}
+            {item.dueDate && <span className="type-label-s text-ink">Due {item.dueDate}</span>}
+          </>
         }
       />
 
-      {/* Main 2-column body: Document on the left, checks and decision on the right */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left column: File Viewer */}
-        <div className="lg:col-span-7 xl:col-span-8">
-          <FileViewer detail={detail} />
-        </div>
+      <Row gutter={[24, 24]}>
+        <Col xs={24} lg={14} xl={16}>
+          <FileViewer version={version} />
+        </Col>
 
-        {/* Right column: Automatic Check, Your Checks, Decision, Versions */}
-        <div className="flex flex-col gap-5 lg:col-span-5 xl:col-span-4">
-          <AutomaticCheckPanel text={detail.automaticCheckText} tone={detail.automaticCheckTone} />
-
-          <YourChecksPanel checks={checks} onToggle={handleToggleCheck} />
-
-          <DecisionPanel
-            detail={detail}
-            allChecksTicked={allChecksTicked}
-            tickedCount={tickedCount}
-            totalChecks={checks.length}
-            isSubmitting={reviewMutation.isPending}
-            submitError={submitError}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onBackToList={toDocumentsList}
-          />
-
-          <VersionsPanel currentVersionId={version.id} versions={detail.allVersions} />
-        </div>
-      </div>
+        <Col xs={24} lg={10} xl={8}>
+          <Flex vertical gap={20}>
+            <AutomaticCheckPanel
+              text={detail.automaticCheckText}
+              tone={detail.automaticCheckTone}
+            />
+            {pending ? (
+              <>
+                <YourChecksPanel checks={checks} onToggle={handleToggleCheck} />
+                <DecisionPanel
+                  detail={detail}
+                  allChecksTicked={allChecksTicked}
+                  tickedCount={tickedCount}
+                  totalChecks={checks.length}
+                  isSubmitting={reviewMutation.isPending}
+                  submitError={submitError}
+                  onApprove={() => decide({ review: DocumentReviewEnum.APPROVED })}
+                  onReject={(reason) =>
+                    decide({ review: DocumentReviewEnum.REJECTED, rejectReason: reason })
+                  }
+                  onRetry={() => (lastDecision ? decide(lastDecision) : Promise.resolve())}
+                  onBackToList={toDocumentsList}
+                />
+              </>
+            ) : (
+              <Callout tone="info" title="Already reviewed">
+                This version was{' '}
+                {version.review === DocumentReviewEnum.APPROVED ? 'approved' : 'rejected'}
+                {version.reviewedByName ? ` by ${version.reviewedByName}` : ''}. Nothing is left to
+                decide here.
+              </Callout>
+            )}
+            <VersionsPanel currentVersionId={version.id} versions={detail.allVersions} />
+          </Flex>
+        </Col>
+      </Row>
     </Flex>
   );
 };

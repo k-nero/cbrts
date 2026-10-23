@@ -184,12 +184,13 @@ export interface DocumentReviewDetail {
   clubName?: string;
   departureDate?: string;
   totalChecklistItems: number;
-  clearedChecklistItems: number;
   mandatoryItems: number;
+  clearedMandatoryItems: number;
   remainingMandatoryItems: number;
   allVersions: DocumentVersion[];
   automaticCheckText: string;
   automaticCheckTone: 'ok' | 'info' | 'warn' | 'bad';
+  /** 1-based; 0 once this version is no longer waiting for review. */
   queuePosition: number;
   queueTotal: number;
   nextVersionId?: string;

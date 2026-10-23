@@ -1,6 +1,6 @@
 import { useState, type FC } from 'react';
-import { Input } from 'antd';
-import { Button, Callout } from '@/components/ui';
+import { Divider, Flex, Input } from 'antd';
+import { Button, Callout, Panel } from '@/components/ui';
 import type { DocumentReviewDetail } from '@/interfaces';
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   submitError: string | null;
   onApprove: () => Promise<void>;
   onReject: (reason: string) => Promise<void>;
+  /** Sends the decision that failed again, unchanged. */
+  onRetry: () => Promise<void>;
   onBackToList: () => void;
 };
 
@@ -30,6 +32,7 @@ export const DecisionPanel: FC<Props> = ({
   submitError,
   onApprove,
   onReject,
+  onRetry,
   onBackToList,
 }) => {
   const [isRejectMode, setIsRejectMode] = useState(false);
@@ -39,22 +42,16 @@ export const DecisionPanel: FC<Props> = ({
   const {
     item,
     clubName,
-    clearedChecklistItems,
-    totalChecklistItems,
+    clearedMandatoryItems,
+    mandatoryItems,
     remainingMandatoryItems,
     queuePosition,
     queueTotal,
     nextDocumentName,
   } = detail;
 
-  const remainingQueue = Math.max(0, queueTotal - queuePosition);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowFormatted = tomorrow.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  // queuePosition is 0 once the version has left the queue; then every queued item is still ahead.
+  const remainingQueue = Math.max(0, queuePosition > 0 ? queueTotal - queuePosition : queueTotal);
 
   const handleRejectSubmit = async () => {
     if (!rejectReason.trim()) {
@@ -68,50 +65,44 @@ export const DecisionPanel: FC<Props> = ({
   // Frame 3: Not sent (Server or Network Error)
   if (submitError) {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5">
-        <h4 className="type-h4 text-ink">Your decision</h4>
-        <Callout tone="bad" title="Not sent">
-          Nothing was recorded and {clubName || 'the customer'} wasn't told. Your {tickedCount}{' '}
-          ticks are kept.
-        </Callout>
-        <p className="type-caption text-bad">{submitError}</p>
-
-        <Button
-          variant="primary"
-          size="md"
-          leadingIcon="check"
-          className="w-full"
-          disabled={isSubmitting}
-          onClick={onApprove}
-        >
-          {isSubmitting ? 'Sending…' : 'Try again'}
-        </Button>
-
-        <span className="type-body-s text-center text-ink-3">
-          Your queue waits here until this is sent: {remainingQueue} more after it.
-        </span>
-
-        <Button variant="ghost" size="md" className="w-full" onClick={onBackToList}>
-          Keep for later
-        </Button>
-      </div>
+      <Panel title="Your decision">
+        <Flex vertical gap={12}>
+          <Callout tone="bad" title="Not sent">
+            Nothing was recorded and {clubName || 'the customer'} wasn't told. Your {tickedCount}{' '}
+            ticks are kept.
+          </Callout>
+          <span className="type-caption text-bad">{submitError}</span>
+          <Button
+            variant="primary"
+            size="md"
+            leadingIcon="check"
+            className="w-full"
+            disabled={isSubmitting}
+            onClick={onRetry}
+          >
+            {isSubmitting ? 'Sending…' : 'Try again'}
+          </Button>
+          <span className="type-body-s text-center text-ink-3">
+            Your queue waits here until this is sent: {remainingQueue} more after it.
+          </span>
+          <Button variant="ghost" size="md" className="w-full" onClick={onBackToList}>
+            Keep for later
+          </Button>
+        </Flex>
+      </Panel>
     );
   }
 
   // Frame 2: Reject with a reason
   if (isRejectMode) {
     return (
-      <div className="flex flex-col gap-4 rounded-lg border border-line bg-card p-5">
-        <h4 className="type-h4 text-ink">Your decision</h4>
-
-        <div className="flex flex-col gap-3 rounded-lg border border-line-strong bg-card p-4 shadow-sm">
+      <Panel title="Your decision">
+        <Flex vertical gap={12}>
           <span className="type-label-m text-ink">Reject with a reason</span>
-
           {rejectValidationError && (
             <span className="type-caption text-bad">{rejectValidationError}</span>
           )}
-
-          <div className="flex flex-col gap-1.5">
+          <Flex vertical gap={6}>
             <label className="type-label-s text-ink">
               Reason, shown to {clubName || 'the club'} <span className="text-bad">*</span>
             </label>
@@ -125,16 +116,13 @@ export const DecisionPanel: FC<Props> = ({
               Required. The customer sees it exactly as written; the item returns to Required and
               this version is kept.
             </span>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-line pt-3">
-            <span className="type-body-s text-ink-2">New version due</span>
-            <div className="text-right">
-              <span className="type-label-s block text-warn">Due tomorrow</span>
-              <span className="type-caption font-mono text-ink-3">{tomorrowFormatted}</span>
-            </div>
-          </div>
-
+          </Flex>
+          {item.dueDate && (
+            <Flex justify="space-between" align="center">
+              <span className="type-body-s text-ink-2">New version due</span>
+              <span className="type-caption text-warn">{item.dueDate}</span>
+            </Flex>
+          )}
           <Button
             variant="primary"
             size="md"
@@ -145,7 +133,6 @@ export const DecisionPanel: FC<Props> = ({
           >
             {isSubmitting ? 'Saving…' : 'Reject and open next'}
           </Button>
-
           <Button
             variant="secondary"
             size="sm"
@@ -154,61 +141,54 @@ export const DecisionPanel: FC<Props> = ({
           >
             Back to approve
           </Button>
-
           <span className="type-body-s text-ink-3">
             {clubName || 'The club'} is told at once, with your reason. Then {remainingQueue} more
             in your queue.
           </span>
-        </div>
-
-        <div className="border-t border-line pt-3">
+          <Divider className="my-0" />
           <Button variant="secondary" size="md" className="w-full" disabled>
             Approve
           </Button>
-          <span className="type-caption mt-1.5 block text-center text-ink-3">
+          <span className="type-caption text-center text-ink-3">
             Approve needs every check ticked ({tickedCount} of {totalChecks} ticked).
           </span>
-        </div>
-      </div>
+        </Flex>
+      </Panel>
     );
   }
 
   // Frame 1: Standard Approve mode
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5">
-      <h4 className="type-h4 text-ink">Your decision</h4>
-
-      <p className="type-body-s text-ink-2">
-        Approving clears {item.horseName ? `${item.horseName}'s ` : ''}
-        {item.documentTypeName || 'document'}: {clearedChecklistItems} of {totalChecklistItems}{' '}
-        documents cleared. The departure gate still waits for {remainingMandatoryItems}.
-      </p>
-
-      <Button
-        variant="primary"
-        size="md"
-        leadingIcon="check"
-        className="w-full"
-        disabled={!allChecksTicked || isSubmitting}
-        onClick={onApprove}
-      >
-        {isSubmitting ? 'Approving…' : 'Approve and open next'}
-      </Button>
-
-      {!allChecksTicked && (
-        <span className="type-caption text-center text-ink-3">
-          Approve needs every check ticked ({tickedCount} of {totalChecks} ticked).
+    <Panel title="Your decision">
+      <Flex vertical gap={12}>
+        <p className="type-body-s m-0 text-ink-2">
+          Approving clears {item.horseName ? `${item.horseName}'s ` : ''}
+          {item.documentTypeName || 'document'}. So far {clearedMandatoryItems} of {mandatoryItems}{' '}
+          mandatory documents are cleared; the departure gate waits for {remainingMandatoryItems}.
+        </p>
+        <Button
+          variant="primary"
+          size="md"
+          leadingIcon="check"
+          className="w-full"
+          disabled={!allChecksTicked || isSubmitting}
+          onClick={onApprove}
+        >
+          {isSubmitting ? 'Approving…' : 'Approve and open next'}
+        </Button>
+        {!allChecksTicked && (
+          <span className="type-caption text-center text-ink-3">
+            Approve needs every check ticked ({tickedCount} of {totalChecks} ticked).
+          </span>
+        )}
+        <span className="type-body-s text-center text-ink-3">
+          Then {remainingQueue} more in your queue
+          {nextDocumentName ? `: ${nextDocumentName}` : ''}.
         </span>
-      )}
-
-      <span className="type-body-s text-center text-ink-3">
-        Then {remainingQueue} more in your queue
-        {nextDocumentName ? `: ${nextDocumentName}` : ''}.
-      </span>
-
-      <Button variant="ghost" size="md" className="w-full" onClick={() => setIsRejectMode(true)}>
-        Reject with a reason
-      </Button>
-    </div>
+        <Button variant="ghost" size="md" className="w-full" onClick={() => setIsRejectMode(true)}>
+          Reject with a reason
+        </Button>
+      </Flex>
+    </Panel>
   );
 };
