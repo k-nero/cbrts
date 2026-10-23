@@ -18,6 +18,7 @@ import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
+import { TripJobsPanel } from './TripJobsPanel';
 
 import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
@@ -94,61 +95,66 @@ export function LoadPlanTab({ job }: Props) {
     const vehicleToUse = selectedVehicleId || defaultVehicle?.id;
 
     return (
-      <div className="p-12">
-        <Flex vertical align="center" justify="center">
-          <div className="p-8 w-full max-w-md rounded-xl border border-line bg-card text-center">
-            <Flex vertical gap={20} align="center">
-              <Flex
-                align="center"
-                justify="center"
-                className="size-14 rounded-full bg-muted text-ink-2"
-              >
-                <Icon name="truck" size={26} />
-              </Flex>
-
-              <Flex vertical gap={6}>
-                <h3 className="type-h3 text-ink">No load plan created yet</h3>
-                <p className="type-body-s text-ink-3">
-                  Select an active vehicle to start load planning and stall arrangement for this
-                  job.
-                </p>
-              </Flex>
-
-              {loadingVehicles ? (
-                <Skeleton active title={false} paragraph={{ rows: 2 }} />
-              ) : (
-                <Flex vertical gap={16} className="w-full">
-                  <Flex vertical gap={6} className="text-left">
-                    <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
-                      Assigned vehicle
-                    </label>
-                    <Select
-                      id="load-plan-vehicle"
-                      className="w-full"
-                      placeholder="Choose a vehicle"
-                      value={vehicleToUse || undefined}
-                      onChange={setSelectedVehicleId}
-                      options={activeVehicles?.map((v) => ({
-                        value: v.id,
-                        label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
-                      }))}
-                    />
-                  </Flex>
-
-                  <Button
-                    variant="primary"
-                    size="md"
-                    disabled={!vehicleToUse || createLoadPlanMutation.isPending}
-                    onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
-                  >
-                    {createLoadPlanMutation.isPending ? 'Creating load plan…' : 'Create load plan'}
-                  </Button>
+      <Flex vertical gap={24}>
+        <TripJobsPanel job={job} />
+        <div className="p-12">
+          <Flex vertical align="center" justify="center">
+            <div className="p-8 w-full max-w-md rounded-xl border border-line bg-card text-center">
+              <Flex vertical gap={20} align="center">
+                <Flex
+                  align="center"
+                  justify="center"
+                  className="size-14 rounded-full bg-muted text-ink-2"
+                >
+                  <Icon name="truck" size={26} />
                 </Flex>
-              )}
-            </Flex>
-          </div>
-        </Flex>
-      </div>
+
+                <Flex vertical gap={6}>
+                  <h3 className="type-h3 text-ink">No load plan created yet</h3>
+                  <p className="type-body-s text-ink-3">
+                    Select an active vehicle to start load planning and stall arrangement for this
+                    job.
+                  </p>
+                </Flex>
+
+                {loadingVehicles ? (
+                  <Skeleton active title={false} paragraph={{ rows: 2 }} />
+                ) : (
+                  <Flex vertical gap={16} className="w-full">
+                    <Flex vertical gap={6} className="text-left">
+                      <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
+                        Assigned vehicle
+                      </label>
+                      <Select
+                        id="load-plan-vehicle"
+                        className="w-full"
+                        placeholder="Choose a vehicle"
+                        value={vehicleToUse || undefined}
+                        onChange={setSelectedVehicleId}
+                        options={activeVehicles?.map((v) => ({
+                          value: v.id,
+                          label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
+                        }))}
+                      />
+                    </Flex>
+
+                    <Button
+                      variant="primary"
+                      size="md"
+                      disabled={!vehicleToUse || createLoadPlanMutation.isPending}
+                      onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
+                    >
+                      {createLoadPlanMutation.isPending
+                        ? 'Creating load plan…'
+                        : 'Create load plan'}
+                    </Button>
+                  </Flex>
+                )}
+              </Flex>
+            </div>
+          </Flex>
+        </div>
+      </Flex>
     );
   }
 
@@ -254,6 +260,9 @@ export function LoadPlanTab({ job }: Props) {
       onDragCancel={() => setDragging(null)}
     >
       <Flex vertical gap={24}>
+        {/* The jobs sharing this trip (US-F3-11) */}
+        <TripJobsPanel job={job} />
+
         {/* Stat Tiles */}
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>

@@ -5,7 +5,9 @@ import type { Picked } from './LoadPlanTab';
 import { StallTile } from '@/components/ui';
 import type { JobHorse, LoadPlanStall } from '@/interfaces';
 
-const stallMeta = (h: JobHorse) => `${h.sex} · ${h.weightKg} kg · ${h.temperament}`;
+/** On a shared trip the tile names the job the horse travels under (US-F3-11). */
+const stallMeta = (h: JobHorse) =>
+  `${h.jobCode ? h.jobCode + ' · ' : ''}${h.sex} · ${h.weightKg} kg · ${h.temperament}`;
 
 const stallType = (s: LoadPlanStall) => s.stallType.toLowerCase() as 'standard' | 'box' | 'climate';
 
