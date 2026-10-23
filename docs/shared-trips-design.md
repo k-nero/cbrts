@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170) and biosecurity warnings (US-F3-12, #171). The rest is in #172–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171) and suggestions (US-F3-13, #172). The rest is in #173–#175.
 
 ## Why
 
@@ -86,7 +86,7 @@ Clearance (`checklist_items`, the gate), quotations, invoices, notes and the pin
 
 **Joining a trip that flies.** When the trip has an air leg, two more checks apply: the job uses the same departure and arrival airports, and the flight has enough stall positions for its horses (the airline's limit for that aircraft). Adding the job creates its flight allocation, with its own air waybill to be filled in.
 
-**Suggestions.** On a job's Load plan or Route tab, the app lists approved jobs not yet departed whose corridor and windows fit, with spare stall space after combining. Nothing combines automatically.
+**Suggestions.** On a job's Load plan or Route tab, the app lists approved jobs not yet departed that pass every check of joining (a shared trailer, the corridor, a common departure day, room on the trailers, no horse on both jobs), each with the proposed departure, the horses it adds, the stalls left after combining and its biosecurity warnings. Nothing combines automatically.
 
 **Reopening.** Adding or removing a job, or adding or removing a vehicle, sends the trip's confirmed route plan and load plans back to `DRAFT` (a new route plan version, so history stays as evidence) and clears the trip sign-off. The coordinator re-places horses and reconfirms. Nothing confirmed changes silently.
 
