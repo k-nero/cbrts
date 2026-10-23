@@ -8,9 +8,8 @@ import {
   useJobChecklist,
 } from '@/hooks/clearance';
 import { type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
+import { apiErrorMessage, rowStatus } from '@/lib/utils';
 import ClearanceSummary from './ClearanceSummary';
-import { rowStatus } from './rowStatus';
 
 type Props = {
   jobId: string | null;

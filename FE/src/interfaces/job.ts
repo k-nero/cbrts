@@ -183,6 +183,8 @@ export interface JobSummary extends BaseEntity {
 
 export interface JobDetail extends BaseEntity {
   code: string;
+  /** The trip the job travels on (TRP-YYYY-NNN); staff only. */
+  tripCode?: string | null;
   originCity: string;
   destinationCity: string;
   stage: JobStage;

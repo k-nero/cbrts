@@ -11,3 +11,4 @@ export * from './quotation';
 export * from './customerQuotation';
 export * from './rates';
 export * from './estimate';
+export * from './checklist';

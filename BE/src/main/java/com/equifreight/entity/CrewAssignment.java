@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * One person on a job's crew. Grooms = ⌈horses ÷ 3⌉ is checked by the application.
+ * One person on the crew of a vehicle on a trip. Grooms = ⌈horses ÷ 3⌉ is checked by the application.
  */
 @Setter
 @Getter
@@ -15,13 +15,13 @@ import lombok.Setter;
         name = "crew_assignments",
         uniqueConstraints =
                 @UniqueConstraint(
-                        name = "crew_assignments_job_id_user_id_key",
-                        columnNames = {"job_id", "user_id"}))
+                        name = "crew_assignments_trip_vehicle_id_user_id_key",
+                        columnNames = {"trip_vehicle_id", "user_id"}))
 public class CrewAssignment extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id", nullable = false)
-    private TransportJob job;
+    @JoinColumn(name = "trip_vehicle_id", nullable = false)
+    private TripVehicle tripVehicle;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

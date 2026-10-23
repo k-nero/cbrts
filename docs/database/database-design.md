@@ -17,7 +17,7 @@ This is the logical and physical design for PostgreSQL. It is not yet a migratio
 | Enums | Stored as `varchar(40)` with a `CHECK (col IN (...))` constraint, the same names as the Java enum. Adding an enum value needs a migration that drops and recreates the check (as in the parking project's `payments_method_check`). |
 | Money | `numeric(14,2)`. A quotation has exactly one currency (`char(3)`), so money columns under it carry no currency of their own. |
 | Time | Instants are `timestamptz`. A calendar date with no time (departure date, document issue date) is `date`. Times are shown in Indochina Time (UTC+7). |
-| Human codes | `REQ-YYYY-NNNN` (request), `Q-YYYY-NNNN` (quotation), `CBRT-YYYY-NNN` (job), `INV-YYYY-NNNN` (invoice), `EF-NNN` (staff). They are unique, never reused, and issued from `code_counters`. |
+| Human codes | `REQ-YYYY-NNNN` (request), `Q-YYYY-NNNN` (quotation), `CBRT-YYYY-NNN` (job), `TRP-YYYY-NNN` (trip, staff and crew only), `INV-YYYY-NNNN` (invoice), `EF-NNN` (staff). They are unique, never reused, and issued from `code_counters`. |
 | History | Records that are legal evidence are append-only: `document_versions`, `trip_records`, `condition_logs`, `audit_log`. A trigger refuses `UPDATE` and `DELETE` on them. |
 | Versioned catalogs | A published catalog version is immutable. A request, quotation or job pins the version it used, so a later change never alters it. |
 | Derived values | Totals, counts and validity results are computed by the application from their inputs. Where a derived value is stored for speed (quotation totals, checklist results) it is recomputed on every change of its inputs and never typed. |
@@ -35,7 +35,7 @@ This is the logical and physical design for PostgreSQL. It is not yet a migratio
 | E | Regulation catalog | `regulation_catalogs`, `regulation_versions`, `document_types`, `regulation_rules` | Regulation catalog, Clearance checklist |
 | F | Requests and quotations | `transport_requests`, `request_horses`, `request_revisions`, `quotations`, `quotation_lines` | Request wizard, Request review, Quotation builder, Quotation, Tracking |
 | G | Jobs and clearance | `transport_jobs`, `job_regulation_pins`, `checklist_items`, `document_versions`, `files`, `authorities`, `authority_submissions`, `authority_submission_items`, `quarantine_periods` | Clearance checklist, Document review, Authorities, All documents, Document upload |
-| H | Fleet and routes | `vehicles`, `vehicle_stalls`, `vehicle_bookings`, `crew_assignments`, `load_plans`, `load_plan_stalls`, `route_plans`, `route_stops`, `route_legs`, `flights` | Load plan, Route plan, Fleet calendar, Vehicles |
+| H | Fleet and routes | `trips`, `trip_vehicles`, `trip_horses`, `vehicles`, `vehicle_stalls`, `vehicle_bookings`, `crew_assignments`, `load_plans`, `load_plan_stalls`, `route_plans`, `route_stops`, `route_legs`, `flights` | Load plan, Route plan, Fleet calendar, Vehicles |
 | I | Trip and handover | `trip_records`, `condition_logs`, `handovers` | Escort cab screens, Coordinator · Trip, In transit, Delivered, Closed |
 | J | Incidents | `incidents`, `incident_options`, `incident_files` | Incident · Held, Incident · Customer report, Report a problem |
 | K | Notes and notifications | `notes`, `note_replies`, `notifications` | Ask a question, Customer notes |
@@ -467,18 +467,24 @@ The review decision is the one update allowed on this table: a trigger allows ch
 
 ## 10. Domain H: fleet and routes
 
+A **trip** is what physically moves: a route, one or more vehicles with their crews, and the horses of one or more jobs (`docs/shared-trips-design.md`). The job stays the commercial and legal unit. A job that shares nothing is a trip with one job and one vehicle, and every job is approved onto a trip of its own (US-F3-09); sharing and convoys come with US-F3-10 and US-F3-11.
+
 ```mermaid
 erDiagram
+  TRIPS ||--o{ TRIP_HORSES : carries
+  TRANSPORT_JOBS ||--o{ TRIP_HORSES : "travels as"
+  TRIPS ||--o{ TRIP_VEHICLES : uses
+  VEHICLES ||--o{ TRIP_VEHICLES : "assigned as"
   VEHICLES ||--o{ VEHICLE_STALLS : has
   VEHICLES ||--o{ VEHICLE_BOOKINGS : "booked in"
-  TRANSPORT_JOBS ||--o{ VEHICLE_BOOKINGS : uses
-  TRANSPORT_JOBS ||--o{ CREW_ASSIGNMENTS : staffs
+  TRIPS ||--o{ VEHICLE_BOOKINGS : holds
+  TRIP_VEHICLES ||--o{ CREW_ASSIGNMENTS : "crewed by"
   USERS ||--o{ CREW_ASSIGNMENTS : works
-  TRANSPORT_JOBS ||--o{ LOAD_PLANS : "loaded by"
+  TRIP_VEHICLES ||--o| LOAD_PLANS : "loaded by"
   LOAD_PLANS ||--o{ LOAD_PLAN_STALLS : assigns
   VEHICLE_STALLS ||--o{ LOAD_PLAN_STALLS : holds
   HORSES ||--o{ LOAD_PLAN_STALLS : "placed in"
-  TRANSPORT_JOBS ||--o{ ROUTE_PLANS : "routed by"
+  TRIPS ||--o{ ROUTE_PLANS : "routed by"
   ROUTE_PLANS ||--o{ ROUTE_STOPS : visits
   ROUTE_PLANS ||--o{ ROUTE_LEGS : "made of"
   ROUTE_STOPS ||--o{ ROUTE_LEGS : "from / to"
@@ -487,14 +493,17 @@ erDiagram
 
 | Table | Columns | Rules |
 |---|---|---|
+| `trips` | `code` unique (`TRP-2026-014`, from `code_counters`), `corridor_id`, `status` (`NOT_STARTED`, `DEPARTED`, `HELD`, `ARRIVED`, `DELIVERED`, the `TripStatus` type the job uses), `planned_departure_at`, `created_by` | All of a trip's jobs share its corridor (application). Customers never see the code. While a trip carries one job, its status follows that job's `trip_status`, and `planned_departure_at` is set by the confirmed route's pickup. |
+| `trip_vehicles` | `trip_id`, `vehicle_id`, `seq` | Unique `(trip_id, vehicle_id)` and `(trip_id, seq)`. A convoy is a trip with several rows. Choosing another vehicle for a draft load plan replaces `vehicle_id` in place, so the crew stays. |
+| `trip_horses` | `trip_id`, `job_id`, `horse_id`, `status` (`ON_TRIP`, `MOVED`, `DELIVERED`, `LEFT_IN_CARE`) | Unique `(trip_id, horse_id)`. A job's horse is on one trip at a time: unique `(job_id, horse_id)` where `status = 'ON_TRIP'`. It is per job, not per horse, because one horse may be on two jobs not yet delivered (an outbound move and a later return). The horse belongs to the job's request, and before departure all of a job's horses are on one trip (application). Delivered horses become `DELIVERED`. A job has no trip column: its trip is the one its horses are on. |
 | `vehicles` | `code` unique (TX-447), `kind` (`TRAILER`, `TRUCK`), `payload_kg` (3,200), `status` (`ACTIVE`, `MAINTENANCE`, `RETIRED`) | |
 | `vehicle_stalls` | `vehicle_id`, `position_no`, `stall_type` (`STANDARD`, `BOX`, `CLIMATE`), `row_no`, `side` (`LEFT`, `RIGHT`), `near_ramp` | Unique `(vehicle_id, position_no)`. |
-| `vehicle_bookings` | `vehicle_id`, `job_id null`, `kind` (`JOB`, `MAINTENANCE`, `HOLD`), `starts_at`, `ends_at` | Fleet calendar. No double booking: exclusion constraint `exclude using gist (vehicle_id with =, tstzrange(starts_at, ends_at) with &&)` (needs `btree_gist`). |
-| `crew_assignments` | `job_id`, `user_id`, `crew_role` (`DRIVER`, `GROOM`, `FLYING_GROOM`, `VET`) | Primary key `(job_id, user_id)`. Grooms = ⌈horses ÷ 3⌉ is checked by the application. |
-| `load_plans` | `job_id`, `vehicle_id`, `status` (`DRAFT`, `CONFIRMED`), `confirmed_by`, `confirmed_at` | One confirmed plan per job: partial unique index. Confirming needs every horse placed and no conflict. |
+| `vehicle_bookings` | `vehicle_id`, `trip_id null`, `kind` (`JOB`, `MAINTENANCE`, `HOLD`), `starts_at`, `ends_at` | Fleet calendar. `trip_id` is set exactly when `kind` is `JOB` (check): one booking per vehicle per trip, however many jobs it carries. No double booking: exclusion constraint `exclude using gist (vehicle_id with =, tstzrange(starts_at, ends_at) with &&)` (needs `btree_gist`). |
+| `crew_assignments` | `trip_vehicle_id`, `user_id`, `crew_role` (`DRIVER`, `GROOM`, `FLYING_GROOM`, `VET`) | Unique `(trip_vehicle_id, user_id)`: the crew travels with a vehicle, so the load plan names it first. Grooms = ⌈horses ÷ 3⌉ is checked by the application. Flight crews come with US-F3-15. |
+| `load_plans` | `trip_vehicle_id` unique, `status` (`DRAFT`, `CONFIRMED`), `confirmed_by`, `confirmed_at` | One plan per vehicle on the trip; the vehicle is the trip vehicle's. Confirming needs every horse placed and no conflict, and a confirmed plan's vehicle can't be swapped. The trip is ready for sign-off when every one of its plans is confirmed. |
 | `load_plan_stalls` | `load_plan_id`, `vehicle_stall_id`, `horse_id` | Unique `(load_plan_id, vehicle_stall_id)` and `(load_plan_id, horse_id)`. Conflicts are computed, not stored: a box need in a standard stall, a stallion beside a mare, payload over the limit. |
-| `route_plans` | `job_id`, `version_no`, `status` (`DRAFT`, `CONFIRMED`, `SUPERSEDED`), `distance_km`, `duration_min`, `confirmed_by`, `confirmed_at`, `superseded_at`, `change_reason` | Unique `(job_id, version_no)`. One confirmed plan per job (partial unique index). Re-planning (Flow 5) confirms a new version and marks the old one `SUPERSEDED` with the reason; nothing is deleted. The customer sees every version that was ever confirmed, newest first, each with its reason ("Re-routed via Poipet: Mộc Bài closed to vehicles over 10 t"). Drafts are staff-only. |
-| `route_stops` | `route_plan_id`, `seq`, `kind` (`PICKUP`, `BORDER`, `WELFARE`, `DELIVERY`, `AIRPORT_OUT`, `AIRPORT_IN`, `QUARANTINE`), `place_id null`, `border_crossing_id null`, `planned_at`, `planned_stay_min`, `details` | Primary key `(route_plan_id, seq)`. Check: a `BORDER` stop has a crossing, every other kind has a place. With an arrival window, the delivery stop's `planned_at` must be before `transport_jobs.window_end` (application rule; the page shows the spare time). |
+| `route_plans` | `trip_id`, `version_no`, `status` (`DRAFT`, `CONFIRMED`, `SUPERSEDED`), `distance_km`, `duration_min`, `confirmed_by`, `confirmed_at`, `superseded_at`, `change_reason` | Unique `(trip_id, version_no)`. One confirmed plan per trip (partial unique index). Re-planning (Flow 5) confirms a new version and marks the old one `SUPERSEDED` with the reason; nothing is deleted. The customer sees every version that was ever confirmed, newest first, each with its reason ("Re-routed via Poipet: Mộc Bài closed to vehicles over 10 t"). Drafts are staff-only. |
+| `route_stops` | `route_plan_id`, `seq`, `kind` (`PICKUP`, `BORDER`, `WELFARE`, `DELIVERY`, `AIRPORT_OUT`, `AIRPORT_IN`, `QUARANTINE`), `job_id null`, `place_id null`, `border_crossing_id null`, `planned_at`, `planned_stay_min`, `details` | Primary key `(route_plan_id, seq)`. Check: a `BORDER` stop has a crossing, every other kind has a place. Check: a `PICKUP` or `DELIVERY` stop names the job whose horses it collects or hands over, and no other kind does; border, welfare and other stops belong to the whole trip. With an arrival window, the delivery stop's `planned_at` must be before `transport_jobs.window_end` (application rule; the page shows the spare time). |
 | `route_legs` | `route_plan_id`, `seq`, `from_stop_id`, `to_stop_id`, `mode` (`ROAD`, `AIR`), `vehicle_id null`, `distance_km`, `planned_min` | The line between two stops. A road leg names the vehicle; an air leg has a `flights` row. A road-only trip is all `ROAD` legs, so today's screens need nothing new. |
 | `flights` | `route_leg_id` unique, `airline`, `flight_no`, `air_waybill`, `aircraft_type`, `stall_positions`, `service_class`, `scheduled_departure_at`, `scheduled_arrival_at`, `estimated_departure_at`, `estimated_arrival_at` | The airline owns the times, so scheduled and latest estimated times are kept apart; actual times come from trip records. An air trip screen draws the same stop list as road, with the flight leg showing flight number and times between the two airport stops. |
 
@@ -504,7 +513,7 @@ erDiagram
 
 ```mermaid
 erDiagram
-  TRANSPORT_JOBS ||--o{ TRIP_RECORDS : logs
+  TRIPS ||--o{ TRIP_RECORDS : logs
   ROUTE_STOPS ||--o{ TRIP_RECORDS : "recorded at"
   USERS ||--o{ TRIP_RECORDS : records
   TRIP_RECORDS ||--o{ CONDITION_LOGS : "checks horses"
@@ -514,11 +523,11 @@ erDiagram
   TRANSPORT_JOBS ||--o| HANDOVERS : "ends with"
 ```
 
-**`trip_records`** (append-only): the escort's log and the only source of positions
+**`trip_records`** (append-only): the trip's log, kept by its escorts, and the only source of positions. A `DEPARTED` record is refused unless every job with horses `ON_TRIP` on the trip is `CLEARANCE_READY` (trigger, BR-F2-03). A condition log names its horse, so each customer's view and photos are filtered to their own horses.
 
 | Column | Type | Rule |
 |---|---|---|
-| `job_id` | → `transport_jobs` not null | |
+| `trip_id` | → `trips` not null | |
 | `route_stop_id` | → `route_stops` | The checkpoint, if any. |
 | `kind` | varchar(20) | `LOADED`, `DEPARTED`, `ARRIVED_AT_STOP`, `CLEARED_BORDER`, `HELD`, `LEFT_STOP`, `CONDITION_CHECK`, `ACCEPTED_BY_AIRLINE`, `FLIGHT_DEPARTED`, `FLIGHT_LANDED`, `RELEASED_BY_AIRLINE`, `DELIVERED`, `HANDED_OVER`, `NOTE`. The flight kinds are recorded by the flying groom or by staff from the airline's notice. |
 | `occurred_at` | timestamptz not null | The cab's clock. |
@@ -528,7 +537,7 @@ erDiagram
 | `channel` | varchar(12) | `CAB_TABLET`, `WEB`. |
 | `text` | varchar(500) | "Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet." |
 
-Index `(job_id, occurred_at)`. A `DEPARTED` record is refused unless the job is `CLEARANCE_READY` (trigger, BR-F2-03).
+Index `(trip_id, occurred_at)`.
 
 **`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
 
@@ -591,7 +600,7 @@ erDiagram
 |---|---|---|
 | `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `attached_file_id null`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. `attached_file_id` is one optional file the customer attached (→ `files`), counted as attached so the orphan cleanup keeps it. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
 | `note_replies` | `note_id`, `author_id`, `body` | |
-| `notifications` | `user_id`, `kind`, `title`, `body`, `entity_type`, `entity_id`, `read_at`, `emailed_at` | Index `(user_id, read_at)`. Sidebar badges and the bell read from it. |
+| `notifications` | `user_id`, `kind` (`NotificationKind`), `title`, `body`, `entity_type` (`NotificationSubject`: `TRANSPORT_REQUEST`, `QUOTATION`, `TRANSPORT_JOB`, `AUTHORITY_SUBMISSION`), `entity_id`, `entity_code`, `link_path`, `dedupe_key null`, `read_at`, `emailed_at` | The bell reads from it (US-00-07); sidebar badges count their own queues, not notifications. Every row links to its record: `entity_code` is the code the row shows (`REQ-2026-0031`), `link_path` the page this recipient opens it on, resolved when the row is written. Index `(user_id, read_at)`. Partial unique index `(user_id, dedupe_key) where read_at is null and dedupe_key is not null`: a repeated notice bumps the unread row instead of stacking. A notification is a pointer, never evidence; the audit log is. |
 
 ---
 
@@ -661,7 +670,7 @@ Screens: the customer's **Tracking · Invoice** page (drawn 2 Oct 2026) under th
 
 Indexes: `(occurred_at desc)`, `(entity_code, occurred_at desc)`, `(actor_id, occurred_at desc)`, `(action)`. Only the logistics manager role is granted `SELECT`; nobody is granted `UPDATE` or `DELETE`.
 
-**`code_counters`**: `prefix` (`REQ`, `Q`, `CBRT`, `EF`, `INV`), `year smallint`, `last_value int`. Primary key `(prefix, year)`. A row lock (`select … for update`) issues the next code inside the creating transaction.
+**`code_counters`**: `prefix` (`REQ`, `Q`, `CBRT`, `EF`, `INV`, `TRP`), `year smallint`, `last_value int`. Primary key `(prefix, year)`. A row lock (`select … for update`) issues the next code inside the creating transaction.
 
 ---
 

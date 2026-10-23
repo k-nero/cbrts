@@ -5,6 +5,7 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -26,7 +27,8 @@ import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -74,7 +76,6 @@ public class RequestReviewService {
 
     private final TransportRequestRepository requests;
     private final RequestRevisionRepository revisions;
-    private final UserRepository users;
     private final AuditLogRepository auditLogs;
     private final RouteService routes;
     private final AuditService audit;
@@ -87,7 +88,6 @@ public class RequestReviewService {
     public RequestReviewService(
             TransportRequestRepository requests,
             RequestRevisionRepository revisions,
-            UserRepository users,
             AuditLogRepository auditLogs,
             RouteService routes,
             AuditService audit,
@@ -98,7 +98,6 @@ public class RequestReviewService {
             Clock clock) {
         this.requests = requests;
         this.revisions = revisions;
-        this.users = users;
         this.auditLogs = auditLogs;
         this.routes = routes;
         this.audit = audit;
@@ -300,15 +299,12 @@ public class RequestReviewService {
                 note,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"INFO_REQUIRED\"}");
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(
-                    account,
-                    RequestService.INFO_REQUIRED_ACTION,
-                    request.getCode() + " needs your answer",
-                    note,
-                    ENTITY_TYPE,
-                    request.getId());
-        }
+        notifications.notify(
+                NotificationKind.REQUEST_INFO_REQUIRED,
+                Audience.club(request.getClub().getId()),
+                Subject.request(request),
+                request.getCode() + " needs your answer",
+                note);
         return viewOf(request);
     }
 }

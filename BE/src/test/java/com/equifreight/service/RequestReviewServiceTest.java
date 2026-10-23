@@ -17,6 +17,7 @@ import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TransportMode;
@@ -31,7 +32,8 @@ import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -54,7 +56,6 @@ class RequestReviewServiceTest {
 
     TransportRequestRepository requests;
     RequestRevisionRepository revisions;
-    UserRepository users;
     AuditLogRepository auditLogs;
     RouteService routes;
     AuditService audit;
@@ -63,14 +64,12 @@ class RequestReviewServiceTest {
     TransportJobRepository jobs;
     RequestReviewService service;
     User manager;
-    User clubAccount;
     Club club;
 
     @BeforeEach
     void setUp() {
         requests = mock(TransportRequestRepository.class);
         revisions = mock(RequestRevisionRepository.class);
-        users = mock(UserRepository.class);
         auditLogs = mock(AuditLogRepository.class);
         routes = mock(RouteService.class);
         audit = mock(AuditService.class);
@@ -80,7 +79,6 @@ class RequestReviewServiceTest {
         service = new RequestReviewService(
                 requests,
                 revisions,
-                users,
                 auditLogs,
                 routes,
                 audit,
@@ -95,10 +93,6 @@ class RequestReviewServiceTest {
         club = new Club();
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
-        clubAccount = new User();
-        clubAccount.setId(UUID.randomUUID());
-        clubAccount.setClub(club);
-        when(users.findByClubId(club.getId())).thenReturn(List.of(clubAccount));
         when(routes.resolve(any(), any(), any(), any(), any())).thenReturn(RouteResolution.none());
     }
 
@@ -265,13 +259,12 @@ class RequestReviewServiceTest {
                         "{\"status\":\"SUBMITTED\"}",
                         "{\"status\":\"INFO_REQUIRED\"}");
         verify(notifications)
-                .sendNotification(
-                        clubAccount,
-                        "REQUEST_INFO_REQUIRED",
+                .notify(
+                        NotificationKind.REQUEST_INFO_REQUIRED,
+                        Audience.club(club.getId()),
+                        Subject.request(r),
                         "REQ-2026-0193 needs your answer",
-                        NOTE,
-                        "TRANSPORT_REQUEST",
-                        r.getId());
+                        NOTE);
     }
 
     @Test

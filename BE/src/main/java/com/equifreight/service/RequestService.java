@@ -15,6 +15,7 @@ import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.FeeBandKind;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
@@ -22,7 +23,6 @@ import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
-import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -45,7 +45,8 @@ import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import com.equifreight.service.pricing.EstimateResult;
 import com.equifreight.service.pricing.EstimateStatus;
 import com.equifreight.service.quotation.CancellationFee;
@@ -114,7 +115,6 @@ public class RequestService {
     private final RequestEstimator estimator;
     private final QuotationRepository quotations;
     private final RateFeeBandRepository feeBands;
-    private final UserRepository users;
     private final NotificationService notifications;
 
     public RequestService(
@@ -132,7 +132,6 @@ public class RequestService {
             RequestEstimator estimator,
             QuotationRepository quotations,
             RateFeeBandRepository feeBands,
-            UserRepository users,
             NotificationService notifications) {
         this.requests = requests;
         this.horses = horses;
@@ -148,7 +147,6 @@ public class RequestService {
         this.estimator = estimator;
         this.quotations = quotations;
         this.feeBands = feeBands;
-        this.users = users;
         this.notifications = notifications;
     }
 
@@ -421,15 +419,12 @@ public class RequestService {
                 null,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + RequestStatus.CANCELLED + "\"}");
-        for (User manager : users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE)) {
-            notifications.sendNotification(
-                    manager,
-                    "REQUEST_CANCELLED",
-                    club.getName() + " cancelled " + saved.getCode(),
-                    "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + ".",
-                    ENTITY_TYPE,
-                    saved.getId());
-        }
+        notifications.notify(
+                NotificationKind.REQUEST_CANCELLED,
+                Audience.role(RoleName.LOGISTICS_MANAGER),
+                Subject.request(saved),
+                club.getName() + " cancelled " + saved.getCode(),
+                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + ".");
         return get(user, saved.getId());
     }
 

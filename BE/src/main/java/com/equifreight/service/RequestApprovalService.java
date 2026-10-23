@@ -4,6 +4,7 @@ import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
@@ -20,6 +21,8 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserJobCount;
 import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -142,31 +145,26 @@ public class RequestApprovalService {
                 null,
                 "{\"status\":\"" + RequestStatus.CUSTOMER_ACCEPTED + "\"}",
                 "{\"status\":\"" + RequestStatus.APPROVED + "\",\"job\":\"" + job.getCode() + "\"}");
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(
-                    account,
-                    "REQUEST_APPROVED",
-                    request.getCode() + " is approved: job " + job.getCode(),
-                    "Follow the move with " + job.getCode() + ". Your document checklist is open.",
-                    ENTITY_TYPE,
-                    request.getId());
-        }
+        notifications.notify(
+                NotificationKind.REQUEST_APPROVED,
+                Audience.club(request.getClub().getId()),
+                Subject.request(request),
+                request.getCode() + " is approved: job " + job.getCode(),
+                "Follow the move with " + job.getCode() + ". Your document checklist is open.");
         String route = request.getCode() + ", " + request.getHorses().size()
                 + (request.getHorses().size() == 1 ? " horse" : " horses");
-        notifications.sendNotification(
-                specialist,
-                "JOB_ASSIGNED",
+        notifications.notify(
+                NotificationKind.JOB_ASSIGNED,
+                Audience.staff(specialist),
+                Subject.job(job),
                 "You own the documents for " + job.getCode(),
-                route + ". Its checklist is generated from the pinned regulation catalogs.",
-                "TRANSPORT_JOB",
-                job.getId());
-        notifications.sendNotification(
-                coordinator,
-                "JOB_ASSIGNED",
+                route + ". Its checklist is generated from the pinned regulation catalogs.");
+        notifications.notify(
+                NotificationKind.JOB_ASSIGNED,
+                Audience.staff(coordinator),
+                Subject.job(job),
                 "You plan " + job.getCode(),
-                route + ". It is in the planning backlog.",
-                "TRANSPORT_JOB",
-                job.getId());
+                route + ". It is in the planning backlog.");
         return review.view(request.getId());
     }
 
@@ -209,15 +207,12 @@ public class RequestApprovalService {
                 reason,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + RequestStatus.REJECTED + "\"}");
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(
-                    account,
-                    "REQUEST_REJECTED",
-                    request.getCode() + " was rejected",
-                    reason,
-                    ENTITY_TYPE,
-                    request.getId());
-        }
+        notifications.notify(
+                NotificationKind.REQUEST_REJECTED,
+                Audience.club(request.getClub().getId()),
+                Subject.request(request),
+                request.getCode() + " was rejected",
+                reason);
         return review.view(request.getId());
     }
 

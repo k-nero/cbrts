@@ -20,12 +20,14 @@ public final class TripMapper {
     /** The trip screen of a job; {@code vehicleCode} is the confirmed load plan's vehicle, or null. */
     public static TripViewResponse toViewResponse(
             TransportJob job,
+            String tripCode,
             String vehicleCode,
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records) {
         return new TripViewResponse(
                 job.getCode(),
+                tripCode,
                 job.getTripStatus(),
                 job.getDossierStatus() == DossierStatus.CLEARANCE_READY,
                 job.getPlannedDepartureAt(),

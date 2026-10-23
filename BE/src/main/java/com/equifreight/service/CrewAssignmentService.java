@@ -2,6 +2,8 @@ package com.equifreight.service;
 
 import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.Trip;
+import com.equifreight.entity.TripVehicle;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CrewRole;
 import com.equifreight.exception.BusinessException;
@@ -25,24 +27,29 @@ public class CrewAssignmentService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final TransportJobRepository transportJobRepository;
     private final UserRepository userRepository;
+    private final JobTripService jobTrips;
     private final AuditService auditService;
 
     public CrewAssignmentService(
             CrewAssignmentRepository crewAssignmentRepository,
             TransportJobRepository transportJobRepository,
             UserRepository userRepository,
+            JobTripService jobTrips,
             AuditService auditService) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
+        this.jobTrips = jobTrips;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
     public List<CrewMemberResponse> getCrew(UUID jobId) {
-        return crewAssignmentRepository.findByJobId(jobId).stream()
-                .map(JobMapper::toCrewMemberResponse)
-                .toList();
+        return jobTrips.findTripOf(jobId)
+                .map(trip -> crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()).stream()
+                        .map(JobMapper::toCrewMemberResponse)
+                        .toList())
+                .orElse(List.of());
     }
 
     @Transactional
@@ -55,6 +62,12 @@ public class CrewAssignmentService {
         if (job.getDepartedAt() != null) {
             throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }
+
+        // The crew travels with a vehicle, so the load plan names it first.
+        Trip trip = jobTrips.tripOf(jobId);
+        TripVehicle tripVehicle = jobTrips.vehicleOf(trip)
+                .orElseThrow(() -> new BusinessException(
+                        "Choose the vehicle on the Load plan tab first: the crew is assigned to a vehicle"));
 
         // Duplicate check
         Set<UUID> seenUserIds = new HashSet<>();
@@ -118,7 +131,7 @@ public class CrewAssignmentService {
             // Overlapping jobs check (US-F3-06)
             if (datesKnown
                     && !crewAssignmentRepository
-                            .findOverlappingAssignments(user.getId(), job.getId(), startsAt, endsAt)
+                            .findOverlappingAssignments(user.getId(), trip.getId(), startsAt, endsAt)
                             .isEmpty()) {
                 throw new ConflictException(
                         "CREW_OVERLAP",
@@ -127,13 +140,13 @@ public class CrewAssignmentService {
             }
 
             CrewAssignment ca = new CrewAssignment();
-            ca.setJob(job);
+            ca.setTripVehicle(tripVehicle);
             ca.setUser(user);
             ca.setCrewRole(item.crewRole());
             assignments.add(ca);
         }
 
-        crewAssignmentRepository.deleteByJobId(jobId);
+        crewAssignmentRepository.deleteByTripVehicleId(tripVehicle.getId());
         List<CrewAssignment> saved = crewAssignmentRepository.saveAll(assignments);
 
         // Invalidate prior sign-off when crew changes

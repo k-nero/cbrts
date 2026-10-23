@@ -9,6 +9,7 @@ import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.repository.*;
+import com.equifreight.service.JobTripService;
 import com.equifreight.service.storage.FileStorage;
 import java.math.BigDecimal;
 import java.util.List;
@@ -79,7 +80,8 @@ class DataSeederTest {
                 mock(DocumentVersionRepository.class),
                 mock(StoredFileRepository.class),
                 mock(FileStorage.class),
-                mock(CatalogSeeder.class));
+                mock(CatalogSeeder.class),
+                mock(JobTripService.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

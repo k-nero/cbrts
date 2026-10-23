@@ -43,6 +43,7 @@ public final class JobMapper {
 
     public static JobDetailResponse toDetailResponse(
             TransportJob job,
+            String tripCode,
             String blockingReason,
             String nextStepOwner,
             String clearanceGateState,
@@ -54,6 +55,7 @@ public final class JobMapper {
         return JobDetailResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
+                .tripCode(tripCode)
                 .originCity(originCity(job))
                 .destinationCity(destinationCity(job))
                 .stage(job.getStage())
@@ -130,13 +132,14 @@ public final class JobMapper {
 
     public static LoadPlanResponse toLoadPlanResponse(
             LoadPlan plan,
+            TransportJob job,
             int totalWeightKg,
             List<LoadPlanStallResponse> stalls,
             List<JobHorseResponse> unassignedHorses,
             List<LoadPlanConflictResponse> conflicts) {
         return LoadPlanResponse.builder()
                 .id(plan.getId())
-                .jobId(plan.getJob().getId())
+                .jobId(job.getId())
                 .vehicleId(plan.getVehicle().getId())
                 .vehicleCode(plan.getVehicle().getCode())
                 .status(plan.getStatus())
@@ -150,11 +153,14 @@ public final class JobMapper {
                 .build();
     }
 
-    /** A route plan with its stops and legs; {@code flightsByLegId} holds the flight of each air leg. */
-    public static RoutePlanResponse toRoutePlanResponse(RoutePlan plan, Map<UUID, Flight> flightsByLegId) {
+    /**
+     * A route plan of {@code jobId}'s trip with its stops and legs; {@code flightsByLegId} holds the flight of each
+     * air leg.
+     */
+    public static RoutePlanResponse toRoutePlanResponse(RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId) {
         return RoutePlanResponse.builder()
                 .id(plan.getId())
-                .jobId(plan.getJob().getId())
+                .jobId(jobId)
                 .versionNo(plan.getVersionNo())
                 .status(plan.getStatus())
                 .distanceKm(plan.getDistanceKm())

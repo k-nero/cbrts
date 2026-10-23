@@ -3,10 +3,12 @@ package com.equifreight.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -17,6 +19,8 @@ import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,13 +90,38 @@ class Flow3ServiceTest {
     @Mock
     private TransportRequestRepository transportRequestRepository;
 
+    @Mock
+    private JobTripService jobTrips;
+
+    /** The trip every job in these tests travels on alone. */
+    private final Trip trip = trip();
+
     private VehicleService vehicleService;
     private LoadPlanService loadPlanService;
     private RoutePlanService routePlanService;
     private CrewAssignmentService crewAssignmentService;
     private TransportJobService transportJobService;
 
-    private static LoadPlan loadPlan(TransportJob job) {
+    private static Trip trip() {
+        Trip trip = new Trip();
+        trip.setId(UUID.randomUUID());
+        trip.setCode("TRP-2026-001");
+        return trip;
+    }
+
+    /** Puts {@code plan} on {@code vehicle} as a vehicle of {@code trip}. */
+    private static TripVehicle onVehicle(LoadPlan plan, Trip trip, Vehicle vehicle) {
+        TripVehicle tripVehicle = new TripVehicle();
+        tripVehicle.setId(UUID.randomUUID());
+        tripVehicle.setTrip(trip);
+        tripVehicle.setVehicle(vehicle);
+        tripVehicle.setSeq((short) 1);
+        plan.setTripVehicle(tripVehicle);
+        return tripVehicle;
+    }
+
+    /** A draft plan for the trip's vehicle, TX-447, which the trip lookup returns. */
+    private LoadPlan loadPlan(TransportJob job) {
         Vehicle vehicle = new Vehicle();
         vehicle.setId(UUID.randomUUID());
         vehicle.setCode("TX-447");
@@ -100,15 +129,16 @@ class Flow3ServiceTest {
         vehicle.setPayloadKg(5504);
         LoadPlan plan = new LoadPlan();
         plan.setId(UUID.randomUUID());
-        plan.setJob(job);
-        plan.setVehicle(vehicle);
+        TripVehicle tripVehicle = onVehicle(plan, trip, vehicle);
         plan.setStatus(LoadPlanStatus.DRAFT);
+        lenient().when(jobTrips.vehicleOf(trip)).thenReturn(Optional.of(tripVehicle));
+        lenient().when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         return plan;
     }
 
-    private static CrewAssignment assignment(TransportJob job, User user, CrewRole role) {
+    private CrewAssignment assignment(User user, CrewRole role) {
         CrewAssignment ca = new CrewAssignment();
-        ca.setJob(job);
+        ca.setTripVehicle(jobTrips.vehicleOf(trip).orElse(null));
         ca.setUser(user);
         ca.setCrewRole(role);
         return ca;
@@ -142,8 +172,15 @@ class Flow3ServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(jobTrips.findTripOf(any())).thenReturn(Optional.of(trip));
+        lenient().when(jobTrips.tripOf(any())).thenReturn(trip);
+        // The vehicle the load plan chose, which the crew travels with; tests with a load plan replace it.
+        TripVehicle chosen = new TripVehicle();
+        chosen.setId(UUID.randomUUID());
+        chosen.setTrip(trip);
+        lenient().when(jobTrips.vehicleOf(trip)).thenReturn(Optional.of(chosen));
         vehicleService = new VehicleService(
-                vehicleRepository, vehicleStallRepository, vehicleBookingRepository, transportJobRepository);
+                vehicleRepository, vehicleStallRepository, vehicleBookingRepository, transportJobRepository, jobTrips);
         loadPlanService = new LoadPlanService(
                 loadPlanRepository,
                 loadPlanStallRepository,
@@ -152,6 +189,7 @@ class Flow3ServiceTest {
                 vehicleStallRepository,
                 horseRepository,
                 vehicleBookingRepository,
+                jobTrips,
                 auditService);
         routePlanService = new RoutePlanService(
                 routePlanRepository,
@@ -163,9 +201,10 @@ class Flow3ServiceTest {
                 borderCrossingRepository,
                 vehicleRepository,
                 clearanceService,
+                jobTrips,
                 auditService);
         crewAssignmentService = new CrewAssignmentService(
-                crewAssignmentRepository, transportJobRepository, userRepository, auditService);
+                crewAssignmentRepository, transportJobRepository, userRepository, jobTrips, auditService);
         transportJobService = new TransportJobService(
                 transportJobRepository,
                 loadPlanService,
@@ -177,7 +216,42 @@ class Flow3ServiceTest {
                 clearanceService,
                 auditService,
                 notificationService,
-                mock(CodeService.class));
+                mock(CodeService.class),
+                jobTrips);
+    }
+
+    @Test
+    @DisplayName("A job not planned yet has no route plan, and reading it doesn't throw")
+    void aJobWithoutARoutePlanHasNone() {
+        UUID jobId = UUID.randomUUID();
+        when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(routePlanRepository.findFirstByTrip_IdOrderByVersionNoDesc(trip.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId)).isEmpty();
+        // The endpoint still answers 404 for it.
+        assertThrows(ResourceNotFoundException.class, () -> routePlanService.getActiveRoutePlan(jobId));
+    }
+
+    @Test
+    @DisplayName("The confirmed route plan wins over a later draft")
+    void theConfirmedRoutePlanWins() {
+        UUID jobId = UUID.randomUUID();
+        RoutePlan confirmed = new RoutePlan();
+        confirmed.setId(UUID.randomUUID());
+        confirmed.setStatus(RoutePlanStatus.CONFIRMED);
+        TransportJob job = new TransportJob();
+        job.setId(jobId);
+        confirmed.setTrip(trip);
+        when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(confirmed));
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId))
+                .get()
+                .extracting(r -> r.id())
+                .isEqualTo(confirmed.getId());
+        verify(routePlanRepository, never()).findFirstByTrip_IdOrderByVersionNoDesc(trip.getId());
     }
 
     @Test
@@ -255,7 +329,7 @@ class Flow3ServiceTest {
         vehicle.setPayloadKg(3200);
 
         LoadPlan plan = new LoadPlan();
-        plan.setVehicle(vehicle);
+        onVehicle(plan, trip, vehicle);
 
         VehicleStall stall1 = new VehicleStall();
         stall1.setPositionNo((short) 1);
@@ -288,7 +362,7 @@ class Flow3ServiceTest {
         s2.setHorse(mare);
 
         List<LoadPlanConflictResponse> conflicts =
-                loadPlanService.evaluateConflicts(plan, List.of(s1, s2), List.of(stallion, mare));
+                loadPlanService.evaluateConflicts(plan, new TransportJob(), List.of(s1, s2));
 
         assertFalse(conflicts.isEmpty());
         assertTrue(conflicts.stream().anyMatch(c -> c.rule().equals("STALLION_NEAR_MARE")));
@@ -301,7 +375,7 @@ class Flow3ServiceTest {
         vehicle.setPayloadKg(3200);
 
         LoadPlan plan = new LoadPlan();
-        plan.setVehicle(vehicle);
+        onVehicle(plan, trip, vehicle);
 
         VehicleStall rampStall = new VehicleStall();
         rampStall.setPositionNo((short) 5);
@@ -320,7 +394,7 @@ class Flow3ServiceTest {
         s1.setHorse(nervousHorse);
 
         List<LoadPlanConflictResponse> conflicts =
-                loadPlanService.evaluateConflicts(plan, List.of(s1), List.of(nervousHorse));
+                loadPlanService.evaluateConflicts(plan, new TransportJob(), List.of(s1));
 
         assertFalse(conflicts.isEmpty());
         assertTrue(conflicts.stream().anyMatch(c -> c.rule().equals("NERVOUS_NEAR_RAMP")));
@@ -376,7 +450,7 @@ class Flow3ServiceTest {
         when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
         RoutePlan plan = new RoutePlan();
-        plan.setJob(job);
+        plan.setTrip(trip);
         plan.setVersionNo((short) 1);
 
         RouteStop s1 = new RouteStop();
@@ -421,14 +495,78 @@ class Flow3ServiceTest {
 
         LoadPlan plan = new LoadPlan();
         plan.setId(UUID.randomUUID());
-        plan.setJob(job);
-        plan.setVehicle(vehicle);
+        TripVehicle tripVehicle = onVehicle(plan, trip, vehicle);
         plan.setStatus(LoadPlanStatus.DRAFT);
+        when(jobTrips.vehicleOf(trip)).thenReturn(Optional.of(tripVehicle));
 
-        when(loadPlanRepository.findLatestByJobIdForUpdate(jobId)).thenReturn(Optional.of(plan));
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
         when(vehicleStallRepository.findById(stallId)).thenReturn(Optional.of(stall));
 
         assertThrows(ResourceNotFoundException.class, () -> loadPlanService.assignStall(jobId, stallId, horseId));
+    }
+
+    @Test
+    @DisplayName("A confirmed load plan's vehicle can't be swapped (US-F3-09)")
+    void loadPlan_confirmedVehicleCannotBeSwapped() {
+        TransportJob job = readyJob();
+        LoadPlan plan = loadPlan(job);
+        plan.setStatus(LoadPlanStatus.CONFIRMED);
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
+        Vehicle other = new Vehicle();
+        other.setId(UUID.randomUUID());
+        other.setStatus(VehicleStatus.ACTIVE);
+        when(vehicleRepository.findById(other.getId())).thenReturn(Optional.of(other));
+
+        assertThrows(BusinessException.class, () -> loadPlanService.createLoadPlan(job.getId(), other.getId()));
+        verify(jobTrips, never()).useVehicle(any(), any());
+    }
+
+    @Test
+    @DisplayName("Swapping a draft plan's vehicle clears its placements and keeps the trip's vehicle and crew")
+    void loadPlan_draftVehicleSwapKeepsTheTripVehicle() {
+        TransportJob job = readyJob();
+        LoadPlan plan = loadPlan(job);
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
+        Vehicle other = new Vehicle();
+        other.setId(UUID.randomUUID());
+        other.setStatus(VehicleStatus.ACTIVE);
+        other.setPayloadKg(5504);
+        when(vehicleRepository.findById(other.getId())).thenReturn(Optional.of(other));
+        when(jobTrips.useVehicle(trip, other)).thenAnswer(i -> {
+            plan.getTripVehicle().setVehicle(other);
+            return plan.getTripVehicle();
+        });
+
+        loadPlanService.createLoadPlan(job.getId(), other.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(jobTrips).useVehicle(trip, other);
+        verify(loadPlanRepository, never()).save(any());
+        assertThat(plan.getVehicle()).isSameAs(other);
+    }
+
+    @Test
+    @DisplayName("The crew is assigned to a vehicle, so the load plan names it first (US-F3-09)")
+    void crewAssignment_needsTheTripsVehicle() {
+        TransportJob job = readyJob();
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jobTrips.vehicleOf(trip)).thenReturn(Optional.empty());
+        User driver = user("minh.tran@equifreight.vn", RoleName.ESCORT);
+        User groom = user("hoa.le@equifreight.vn", RoleName.ESCORT);
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> crewAssignmentService.assignCrew(
+                        job.getId(), crew(driver, CrewRole.DRIVER, groom, CrewRole.GROOM), user("khoi.do", "x")));
+        assertThat(ex.getMessage()).contains("Load plan");
+        verify(crewAssignmentRepository, never()).saveAll(any());
     }
 
     @Test
@@ -539,11 +677,13 @@ class Flow3ServiceTest {
         when(userRepository.findById(driverId)).thenReturn(Optional.of(driverUser));
 
         CrewAssignment overlapping = new CrewAssignment();
-        TransportJob otherJob = new TransportJob();
-        otherJob.setCode("CBRT-2026-042");
-        overlapping.setJob(otherJob);
+        Trip otherTrip = trip();
+        otherTrip.setCode("TRP-2026-002");
+        TripVehicle otherVehicle = new TripVehicle();
+        otherVehicle.setTrip(otherTrip);
+        overlapping.setTripVehicle(otherVehicle);
 
-        when(crewAssignmentRepository.findOverlappingAssignments(eq(driverId), eq(jobId), any(), any()))
+        when(crewAssignmentRepository.findOverlappingAssignments(eq(driverId), eq(trip.getId()), any(), any()))
                 .thenReturn(List.of(overlapping));
 
         AssignCrewRequest.CrewItem driverItem = AssignCrewRequest.CrewItem.builder()
@@ -603,7 +743,7 @@ class Flow3ServiceTest {
         when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
         RoutePlan plan = new RoutePlan();
-        plan.setJob(job);
+        plan.setTrip(trip);
         plan.setVersionNo((short) 1);
 
         RouteStop s1 = new RouteStop();
@@ -641,14 +781,14 @@ class Flow3ServiceTest {
         assertEquals(JobStage.CLEARANCE, job.getStage());
         assertNotNull(job.getSignedOffAt());
         assertEquals(manager, job.getSignedOffBy());
-        verify(notificationService, times(2))
-                .sendNotification(
-                        any(),
-                        eq("TRIP_RELEASED"),
+        verify(notificationService)
+                .notify(
+                        eq(NotificationKind.TRIP_RELEASED),
+                        argThat(to -> to instanceof Audience.Escorts crew
+                                && crew.users().size() == 2),
+                        eq(Subject.job(job)),
                         contains("Trip plan signed off"),
-                        any(),
-                        eq("TRANSPORT_JOB"),
-                        eq(job.getId()));
+                        any());
     }
 
     @Test
@@ -656,7 +796,7 @@ class Flow3ServiceTest {
     void signOff_refusesOverlappingCrew() {
         TransportJob job = readyJob();
         CrewAssignment busy = new CrewAssignment();
-        busy.setJob(new TransportJob());
+        busy.setTripVehicle(new TripVehicle());
         stubPlansAndCrew(job, List.of(busy));
 
         ConflictException ex = assertThrows(
@@ -701,7 +841,7 @@ class Flow3ServiceTest {
                         job.getId(),
                         crew(driver, CrewRole.DRIVER, driver, CrewRole.GROOM),
                         user("khoi.do@equifreight.vn", RoleName.FLEET_COORDINATOR)));
-        verify(crewAssignmentRepository, never()).deleteByJobId(any());
+        verify(crewAssignmentRepository, never()).deleteByTripVehicleId(any());
     }
 
     @Test
@@ -712,7 +852,9 @@ class Flow3ServiceTest {
         job.setPlannedArrivalAt(null);
         job.getRequest().setHorses(List.of());
         LoadPlan plan = loadPlan(job);
-        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
 
         BusinessException ex = assertThrows(
                 BusinessException.class,
@@ -728,7 +870,9 @@ class Flow3ServiceTest {
         TransportJob job = readyJob();
         job.getRequest().setHorses(List.of());
         LoadPlan plan = loadPlan(job);
-        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
 
         loadPlanService.autoArrange(job.getId());
 
@@ -851,18 +995,20 @@ class Flow3ServiceTest {
         LoadPlan load = loadPlan(job);
         load.setStatus(LoadPlanStatus.CONFIRMED);
         lenient()
-                .when(loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId()))
-                .thenReturn(Optional.of(load));
+                .when(loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
+                .thenReturn(List.of(load));
         RoutePlan route = new RoutePlan();
-        route.setJob(job);
+        route.setTrip(trip);
         lenient()
-                .when(routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED))
+                .when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
                 .thenReturn(Optional.of(route));
-        CrewAssignment driver = assignment(job, user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
-        CrewAssignment groom = assignment(job, user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
-        lenient().when(crewAssignmentRepository.findByJobId(job.getId())).thenReturn(List.of(driver, groom));
+        CrewAssignment driver = assignment(user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
+        CrewAssignment groom = assignment(user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
         lenient()
-                .when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(job.getId()), any(), any()))
+                .when(crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()))
+                .thenReturn(List.of(driver, groom));
+        lenient()
+                .when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(trip.getId()), any(), any()))
                 .thenReturn(overlaps);
     }
 
@@ -880,7 +1026,9 @@ class Flow3ServiceTest {
 
         MoveFixture() {
             job.getRequest().setHorses(onRequest);
-            when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+            when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                            plan.getTripVehicle().getId()))
+                    .thenReturn(Optional.of(plan));
             lenient().when(vehicleStallRepository.findById(stall1.getId())).thenReturn(Optional.of(stall1));
             lenient().when(vehicleStallRepository.findById(stall2.getId())).thenReturn(Optional.of(stall2));
             lenient()
@@ -953,8 +1101,7 @@ class Flow3ServiceTest {
         assignment.setHorse(mare);
         assignment.setVehicleStall(standardStall);
 
-        List<LoadPlanConflictResponse> conflicts =
-                loadPlanService.evaluateConflicts(plan, List.of(assignment), List.of(mare));
+        List<LoadPlanConflictResponse> conflicts = loadPlanService.evaluateConflicts(plan, job, List.of(assignment));
 
         assertThat(conflicts)
                 .anyMatch(c -> "BOX_REQUIRED".equals(c.rule())
@@ -983,7 +1130,7 @@ class Flow3ServiceTest {
         assignment.setVehicleStall(standardStall);
 
         List<LoadPlanConflictResponse> conflicts =
-                loadPlanService.evaluateConflicts(plan, List.of(assignment), List.of(horse));
+                loadPlanService.evaluateConflicts(plan, new TransportJob(), List.of(assignment));
 
         assertThat(conflicts)
                 .anyMatch(c ->
@@ -1012,7 +1159,9 @@ class Flow3ServiceTest {
         boxStall.setPositionNo((short) 2);
         boxStall.setRowNo((short) 1);
 
-        when(loadPlanRepository.findLatestByJobIdForUpdate(job.getId())).thenReturn(Optional.of(plan));
+        when(loadPlanRepository.findByTripVehicleIdForUpdate(
+                        plan.getTripVehicle().getId()))
+                .thenReturn(Optional.of(plan));
         when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
                         plan.getVehicle().getId()))
                 .thenReturn(List.of(standardStall, boxStall));

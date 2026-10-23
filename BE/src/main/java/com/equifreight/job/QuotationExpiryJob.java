@@ -3,14 +3,15 @@ package com.equifreight.job;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
-import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
 import com.equifreight.service.AuditService;
 import com.equifreight.service.NotificationService;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.time.Clock;
@@ -35,7 +36,6 @@ public class QuotationExpiryJob {
 
     private final QuotationRepository quotations;
     private final TransportRequestRepository requests;
-    private final UserRepository users;
     private final NotificationService notifications;
     private final AuditService audit;
     private final EntityManager entities;
@@ -44,14 +44,12 @@ public class QuotationExpiryJob {
     public QuotationExpiryJob(
             QuotationRepository quotations,
             TransportRequestRepository requests,
-            UserRepository users,
             NotificationService notifications,
             AuditService audit,
             EntityManager entities,
             Clock clock) {
         this.quotations = quotations;
         this.requests = requests;
-        this.users = users;
         this.notifications = notifications;
         this.audit = audit;
         this.entities = entities;
@@ -118,8 +116,8 @@ public class QuotationExpiryJob {
                 ? "The logistics manager"
                 : q.getPreparedBy().displayName();
         notify(
-                request,
-                "QUOTATION_EXPIRED",
+                q,
+                NotificationKind.QUOTATION_EXPIRED,
                 "Quotation " + q.getCode() + " has expired",
                 manager + " can re-price it from the rate catalog in force now.");
     }
@@ -128,16 +126,14 @@ public class QuotationExpiryJob {
         q.setReminderSentAt(now);
         quotations.save(q);
         notify(
-                q.getRequest(),
-                "QUOTATION_EXPIRING",
+                q,
+                NotificationKind.QUOTATION_EXPIRING,
                 "Quotation " + q.getCode() + " v" + q.getVersionNo() + " expires within a day",
                 "It holds its price until " + day(q.getValidUntil()) + ".");
     }
 
-    private void notify(TransportRequest request, String kind, String title, String body) {
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(account, kind, title, body, ENTITY_TYPE, request.getId());
-        }
+    private void notify(Quotation q, NotificationKind kind, String title, String body) {
+        notifications.notify(kind, Audience.club(q.getRequest().getClub().getId()), Subject.quotation(q), title, body);
     }
 
     private static String day(Instant instant) {

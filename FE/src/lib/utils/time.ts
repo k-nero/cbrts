@@ -39,3 +39,14 @@ export const dueLeft = (due: string, now: string) => {
   if (days === 0) return 'Due today';
   return `Due in ${plural(days, 'day')}`;
 };
+
+/** When something happened, for a feed: "Just now", "12 min ago", "3 h ago", "2 days ago", then the date. */
+export const timeAgo = (iso: string, now: string) => {
+  const minutes = ict(now).diff(ict(iso), 'minute');
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  const days = daysUntil(now, iso);
+  if (days < 7) return `${plural(days, 'day')} ago`;
+  return formatDate(iso);
+};

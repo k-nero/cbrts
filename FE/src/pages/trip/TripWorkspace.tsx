@@ -253,7 +253,11 @@ export function TripWorkspace({
           </Flex>
           {selectedSummary && (
             <Panel
-              title={selectedSummary.jobCode}
+              title={
+                trip?.tripCode
+                  ? `${selectedSummary.jobCode} · ${trip.tripCode}`
+                  : selectedSummary.jobCode
+              }
               extra={
                 <Chip tone={statusTone(selectedSummary.tripStatus)}>
                   {sentence(selectedSummary.tripStatus)}

@@ -6,6 +6,7 @@ import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.*;
 import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -14,6 +15,8 @@ import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.LoadPlanRepository;
 import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
@@ -40,6 +43,7 @@ public class TransportJobService {
     private final AuditService auditService;
     private final NotificationService notificationService;
     private final CodeService codeService;
+    private final JobTripService jobTrips;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -52,7 +56,8 @@ public class TransportJobService {
             ClearanceService clearanceService,
             AuditService auditService,
             NotificationService notificationService,
-            CodeService codeService) {
+            CodeService codeService,
+            JobTripService jobTrips) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -64,6 +69,7 @@ public class TransportJobService {
         this.auditService = auditService;
         this.notificationService = notificationService;
         this.codeService = codeService;
+        this.jobTrips = jobTrips;
     }
 
     @Transactional(readOnly = true)
@@ -120,12 +126,8 @@ public class TransportJobService {
         LoadPlanResponse loadPlan =
                 loadPlanService.getActiveLoadPlan(job.getId()).orElse(null);
 
-        RoutePlanResponse routePlan = null;
-        try {
-            routePlan = routePlanService.getActiveRoutePlan(job.getId());
-        } catch (ResourceNotFoundException e) {
-            log.debug("No route plan yet for job {}", job.getCode());
-        }
+        RoutePlanResponse routePlan =
+                routePlanService.findActiveRoutePlan(job.getId()).orElse(null);
 
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
 
@@ -145,6 +147,7 @@ public class TransportJobService {
 
         return JobMapper.toDetailResponse(
                 job,
+                jobTrips.findTripOf(job.getId()).map(Trip::getCode).orElse(null),
                 getBlockingReason(job),
                 getNextStepOwner(job),
                 gateState,
@@ -158,7 +161,8 @@ public class TransportJobService {
     /**
      * The job an approved request becomes (US-F1-07, BR-F1-05): its CBRT code from the code counter, the accepted
      * quotation it is held to, the manager who approved it and the team they chose, with the request's arrival window.
-     * The caller has checked the request and the team; the dates are planned in Flow 3.
+     * It travels on a trip of its own, with all its horses (US-F3-09). The caller has checked the request and the
+     * team; the dates are planned in Flow 3.
      */
     @Transactional
     public TransportJob createApproved(
@@ -179,7 +183,9 @@ public class TransportJobService {
         job.setCoordinator(coordinator);
         job.setWindowStart(request.getWindowStart());
         job.setWindowEnd(request.getWindowEnd());
-        return transportJobRepository.saveAndFlush(job);
+        TransportJob saved = transportJobRepository.saveAndFlush(job);
+        jobTrips.createForJob(saved, manager, approvedAt);
+        return saved;
     }
 
     @Transactional
@@ -200,20 +206,22 @@ public class TransportJobService {
                     + gate.outstandingIssues().size() + " items outstanding)");
         }
 
-        // Validate load plan confirmed
-        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId);
-        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
+        // Validate the trip's load plans confirmed
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
+        if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
             throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
         }
 
         // Validate route plan confirmed
-        Optional<RoutePlan> routePlanOpt = routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
+        Optional<RoutePlan> routePlanOpt =
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
         if (routePlanOpt.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: Route plan is not confirmed yet");
         }
 
         // Validate crew assigned: driver and groom ratio
-        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByJobId(jobId);
+        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId());
         if (crewAssignments.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: No crew assigned to this job");
         }
@@ -240,7 +248,7 @@ public class TransportJobService {
                 if (!crewAssignmentRepository
                         .findOverlappingAssignments(
                                 member.getUser().getId(),
-                                job.getId(),
+                                trip.getId(),
                                 job.getPlannedDepartureAt(),
                                 job.getPlannedArrivalAt())
                         .isEmpty()) {
@@ -280,10 +288,13 @@ public class TransportJobService {
                         + " has been updated and re-signed off. Please re-check the route and stall assignments."
                 : "The trip plan for job " + job.getCode() + " has been signed off and released.";
 
-        for (CrewAssignment member : crewAssignments) {
-            notificationService.sendNotification(
-                    member.getUser(), "TRIP_RELEASED", notifTitle, notifBody, "TRANSPORT_JOB", job.getId());
-        }
+        notificationService.notify(
+                NotificationKind.TRIP_RELEASED,
+                Audience.escorts(
+                        crewAssignments.stream().map(CrewAssignment::getUser).toList()),
+                Subject.job(job),
+                notifTitle,
+                notifBody);
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);
@@ -310,16 +321,21 @@ public class TransportJobService {
         if (job.getStage() == JobStage.DOCUMENTS || job.getDossierStatus() != DossierStatus.CLEARANCE_READY) {
             return "Transport specialist";
         }
-        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId());
-        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
+        Optional<Trip> trip = jobTrips.findTripOf(job.getId());
+        if (trip.isEmpty()) {
+            return "Fleet & route coordinator";
+        }
+        UUID tripId = trip.get().getId();
+        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(tripId);
+        if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
             return "Fleet & route coordinator";
         }
         Optional<RoutePlan> routePlanOpt =
-                routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED);
+                routePlanRepository.findByTrip_IdAndStatus(tripId, RoutePlanStatus.CONFIRMED);
         if (routePlanOpt.isEmpty()) {
             return "Fleet & route coordinator";
         }
-        List<CrewAssignment> crew = crewAssignmentRepository.findByJobId(job.getId());
+        List<CrewAssignment> crew = crewAssignmentRepository.findByTripVehicle_Trip_Id(tripId);
         if (crew.isEmpty() || crew.stream().noneMatch(c -> c.getCrewRole() == CrewRole.DRIVER)) {
             return "Fleet & route coordinator";
         }

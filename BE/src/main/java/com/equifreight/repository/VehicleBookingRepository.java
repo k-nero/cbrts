@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 public interface VehicleBookingRepository extends JpaRepository<VehicleBooking, UUID> {
     List<VehicleBooking> findByVehicleId(UUID vehicleId);
 
-    List<VehicleBooking> findByJobId(UUID jobId);
+    List<VehicleBooking> findByTrip_Id(UUID tripId);
 
     @Query("SELECT b FROM VehicleBooking b WHERE b.vehicle.id = :vehicleId "
             + "AND (:excludeId IS NULL OR b.id <> :excludeId) "
