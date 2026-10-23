@@ -75,6 +75,11 @@ public class ClearanceController {
         return ResponseEntity.ok(clearanceService.uploadDocumentVersion(checklistItemId, request, user));
     }
 
+    @GetMapping("/versions/{documentVersionId}")
+    public ResponseEntity<DocumentReviewDetailResponse> getDocumentReviewDetail(@PathVariable UUID documentVersionId) {
+        return ResponseEntity.ok(clearanceService.getDocumentReviewDetail(documentVersionId));
+    }
+
     @PostMapping("/versions/{documentVersionId}/review")
     public ResponseEntity<DocumentVersionResponse> reviewDocument(
             @PathVariable UUID documentVersionId,

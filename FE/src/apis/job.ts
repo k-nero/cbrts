@@ -9,6 +9,9 @@ import type {
   TripLoad,
   MoveHorse,
   RoutePlan,
+  ShareSuggestion,
+  ShareTripResult,
+  TripJob,
 } from '@/interfaces';
 
 export const jobApi = {
@@ -47,8 +50,10 @@ export const jobApi = {
   autoArrange: (jobId: string) =>
     client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/auto-arrange`).then((r) => r.data),
 
-  confirmLoadPlan: (jobId: string) =>
-    client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`).then((r) => r.data),
+  confirmLoadPlan: (jobId: string, acceptedWarnings: string[] = []) =>
+    client
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`, { acceptedWarnings })
+      .then((r) => r.data),
 
   getRoutePlans: (jobId: string) =>
     client.get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`).then((r) => r.data),
@@ -59,6 +64,23 @@ export const jobApi = {
         params: { changeReason },
       })
       .then((r) => r.data),
+
+  /** Approved jobs that could share this job's trailer, with what combining means (US-F3-13). */
+  getShareSuggestions: (jobId: string) =>
+    client.get<ShareSuggestion[]>(`/staff/jobs/${jobId}/trip/suggestions`).then((r) => r.data),
+
+  /** Puts another job on this job's trip; the trip's plans reopen. */
+  shareTrip: (jobId: string, otherJobId: string, acceptedWarnings: string[] = []) =>
+    client
+      .post<ShareTripResult>(`/staff/jobs/${jobId}/trip/jobs`, {
+        jobId: otherJobId,
+        acceptedWarnings,
+      })
+      .then((r) => r.data),
+
+  /** Takes a job off this job's trip onto a trip of its own. */
+  takeOffTrip: (jobId: string, otherJobId: string) =>
+    client.delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`).then((r) => r.data),
 
   getCrew: (jobId: string) =>
     client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`).then((r) => r.data),

@@ -226,6 +226,15 @@ export const routesConfig = [
         type: 'authenticated',
         breadcrumb: 'Documents',
         name: 'documents',
+        children: [
+          {
+            path: '/review/{id}',
+            roles: [TS],
+            type: 'authenticated',
+            breadcrumb: 'Review',
+            name: 'document-review',
+          },
+        ],
       },
       {
         path: '/authorities',

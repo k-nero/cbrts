@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), and convoys (US-F3-10, #169). The rest is in #170–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171) and suggestions (US-F3-13, #172). The rest is in #173–#175.
 
 ## Why
 
@@ -12,6 +12,7 @@ Today one approved request becomes one job, and one job has exactly one trailer:
 | --- | --- |
 | Scope | Both: **sharing** (several jobs in one trailer) and **splitting** (one job across several trailers). |
 | Who combines jobs, and when | The **fleet coordinator, after approval**, while planning. The app suggests jobs that fit. |
+| Private trailers | **Never shared.** Only jobs whose customer chose a shared trailer can be combined; a private-trailer job (and so every job with an arrival window, which needs a private trailer) always travels alone. Decided 23 Oct 2026, while building US-F3-11. |
 | Price | **Unchanged.** Space is already priced by stall width, so each customer keeps their quoted price; sharing saves the company a trailer. The locked price and horse list are untouched. |
 | Routes | **Same catalog corridor.** Different pickup or drop-off points become extra stops on one route plan. |
 | Model | A new **Trip** above jobs: one trip holds 1+ jobs and 1+ vehicles. Jobs keep their CBRT codes. |
@@ -85,7 +86,7 @@ Clearance (`checklist_items`, the gate), quotations, invoices, notes and the pin
 
 **Joining a trip that flies.** When the trip has an air leg, two more checks apply: the job uses the same departure and arrival airports, and the flight has enough stall positions for its horses (the airline's limit for that aircraft). Adding the job creates its flight allocation, with its own air waybill to be filled in.
 
-**Suggestions.** On a job's Load plan or Route tab, the app lists approved jobs not yet departed whose corridor and windows fit, with spare stall space after combining. Nothing combines automatically.
+**Suggestions.** On a job's Load plan or Route tab, the app lists approved jobs not yet departed that pass every check of joining (a shared trailer, the corridor, a common departure day, room on the trailers, no horse on both jobs), each with the proposed departure, the horses it adds, the stalls left after combining and its biosecurity warnings. Nothing combines automatically.
 
 **Reopening.** Adding or removing a job, or adding or removing a vehicle, sends the trip's confirmed route plan and load plans back to `DRAFT` (a new route plan version, so history stays as evidence) and clears the trip sign-off. The coordinator re-places horses and reconfirms. Nothing confirmed changes silently.
 
@@ -145,7 +146,7 @@ Health status is never typed in: it's derived from what each job's clearance alr
 
 **What counts as a health document.** `document_types` gains `category` (`HEALTH`, `IDENTITY`, `PERMIT`, `TRANSPORT`), maintained in the regulation catalog like the rest of it. Checks 2 and 3 use `HEALTH` only: influenza vaccination, EIA (Coggins) test, piroplasmosis test and the export health certificate today; the equine passport is `IDENTITY`.
 
-**When it's checked.** When the coordinator adds a job (or moves a horse between trailers), and again when the trip's load plans are confirmed. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
+**When it's checked.** When the coordinator adds a job, and again when the trip's load plans are confirmed; the load plan shows the trip's current warnings after every change, so moving a horse between trailers shows what it mixes. A warning that appears only at confirmation, because a document expired or quarantine changed since, has to be accepted again before the trip is confirmed; warnings already accepted and unchanged aren't asked twice.
 
 ## What each person sees
 

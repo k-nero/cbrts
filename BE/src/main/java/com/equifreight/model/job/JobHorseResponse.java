@@ -16,4 +16,6 @@ public record JobHorseResponse(
         String sizeClassCode,
         StallType requiredStall,
         Temperament temperament,
-        String handlingNotes) {}
+        String handlingNotes,
+        /** On a shared trip's load plan, the job the horse travels under; null elsewhere. */
+        String jobCode) {}

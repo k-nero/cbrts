@@ -341,6 +341,7 @@ public class DataSeeder implements ApplicationRunner {
                 type.setName(d.name());
                 type.setScope(d.scope());
                 type.setProvidedBy(d.providedBy());
+                type.setCategory(d.category());
                 documentTypeRepository.save(type);
                 log.info("Seeded document type {}", d.code());
             }
@@ -902,6 +903,7 @@ public class DataSeeder implements ApplicationRunner {
             dt.setName("Equine piroplasmosis test result");
             dt.setScope(DocumentScope.PER_HORSE);
             dt.setProvidedBy(DocumentProvider.CUSTOMER);
+            dt.setCategory(DocumentCategory.HEALTH);
             return documentTypeRepository.save(dt);
         });
 
@@ -1350,7 +1352,18 @@ public class DataSeeder implements ApplicationRunner {
 
     private record SizeClass(String code, int widthIn, String minHeightHh) {}
 
-    private record DocType(String code, String name, DocumentScope scope, DocumentProvider providedBy) {}
+    private record DocType(String code, String name, DocumentScope scope, DocumentProvider providedBy) {
+        /** What the document is about; the health documents decide a horse's health status (US-F3-12). */
+        DocumentCategory category() {
+            return switch (code) {
+                case "INFLUENZA_VACCINATION", "EIA_TEST", "PIROPLASMOSIS_TEST", "EXPORT_HEALTH_CERT" ->
+                    DocumentCategory.HEALTH;
+                case "EQUINE_PASSPORT", "PROOF_OF_OWNERSHIP" -> DocumentCategory.IDENTITY;
+                case "IMPORT_PERMIT" -> DocumentCategory.PERMIT;
+                default -> DocumentCategory.TRANSPORT;
+            };
+        }
+    }
 
     /**
      * A one-page PDF named after the document, stored for real so the demo version opens like an upload. If the

@@ -152,7 +152,8 @@ export const useAutoArrange = (jobId: string) => {
 export const useConfirmLoadPlan = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => jobApi.confirmLoadPlan(jobId),
+    mutationFn: (acceptedWarnings: string[] = []) =>
+      jobApi.confirmLoadPlan(jobId, acceptedWarnings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
       queryClient.invalidateQueries({ queryKey: ['job', jobId, 'load-plan'] });
@@ -204,6 +205,45 @@ export const useSignOffTripPlan = (jobId: string) => {
     mutationFn: () => jobApi.signOff(jobId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Approved jobs that could share this job's trailer (US-F3-13). */
+export const useShareSuggestions = (jobId: string, enabled: boolean) => {
+  return useQuery({
+    queryKey: ['job', jobId, 'share-suggestions'],
+    queryFn: () => jobApi.getShareSuggestions(jobId),
+    enabled: Boolean(jobId) && enabled,
+  });
+};
+
+/** Puts another job on this job's trip; both jobs' plans reopen. */
+export const useShareTrip = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      otherJobId,
+      acceptedWarnings,
+    }: {
+      otherJobId: string;
+      acceptedWarnings: string[];
+    }) => jobApi.shareTrip(jobId, otherJobId, acceptedWarnings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Takes a job off this job's trip onto a trip of its own. */
+export const useTakeOffTrip = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (otherJobId: string) => jobApi.takeOffTrip(jobId, otherJobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
   });

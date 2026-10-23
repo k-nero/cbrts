@@ -9,26 +9,38 @@ const ClearanceSummary: FC<{ jobId: string; status: ClearanceStatus }> = ({ jobI
   const evaluateGate = useEvaluateClearanceGate(jobId);
   const remaining = Math.max(0, status.mandatoryItems - status.clearedMandatoryItems);
 
+  const isDeparted = Boolean(status.departedAt || status.isDeparted);
+  const gateState = isDeparted ? 'departed' : status.clearanceReady ? 'clear' : 'locked';
+  const gateTitle = isDeparted
+    ? 'Departed'
+    : status.clearanceReady
+      ? 'Clear to depart'
+      : 'Departure locked';
+
   return (
     <>
       <ClearanceGate
-        state={status.clearanceReady ? 'clear' : 'locked'}
-        title={status.clearanceReady ? 'Clear to depart' : 'Departure locked'}
+        state={gateState}
+        title={gateTitle}
         action={
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={evaluateGate.isPending}
-            // A failure shows in the mutation's state; the gate keeps its last result.
-            onClick={() => evaluateGate.mutateAsync(jobId).catch(() => undefined)}
-          >
-            {evaluateGate.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
-          </Button>
+          !isDeparted && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={evaluateGate.isPending}
+              // A failure shows in the mutation's state; the gate keeps its last result.
+              onClick={() => evaluateGate.mutateAsync(jobId).catch(() => undefined)}
+            >
+              {evaluateGate.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
+            </Button>
+          )
         }
       >
-        {status.clearanceReady
-          ? 'Every mandatory document is approved and GREEN, quarantines are complete and every permit is issued.'
-          : `${status.clearedMandatoryItems} of ${status.mandatoryItems} mandatory documents cleared · ${status.outstandingIssues.length} outstanding.`}
+        {isDeparted
+          ? 'The job has departed. The dossier is frozen.'
+          : status.clearanceReady
+            ? 'Every mandatory document is approved and GREEN, quarantines are complete and every permit is issued.'
+            : `${status.clearedMandatoryItems} of ${status.mandatoryItems} mandatory documents cleared · ${status.outstandingIssues.length} outstanding.`}
       </ClearanceGate>
 
       <Row gutter={[16, 16]}>

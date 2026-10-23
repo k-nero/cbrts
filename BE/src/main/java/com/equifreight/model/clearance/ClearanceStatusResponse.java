@@ -13,6 +13,8 @@ public record ClearanceStatusResponse(
         DossierStatus dossierStatus,
         boolean clearanceReady,
         Instant clearanceReadyAt,
+        Instant departedAt,
+        boolean isDeparted,
         int totalChecklistItems,
         int mandatoryItems,
         int clearedMandatoryItems,

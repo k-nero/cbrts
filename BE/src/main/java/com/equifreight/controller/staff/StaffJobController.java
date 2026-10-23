@@ -7,6 +7,7 @@ import com.equifreight.service.CrewAssignmentService;
 import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
 import com.equifreight.service.TransportJobService;
+import com.equifreight.service.TripSharingService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -26,16 +27,19 @@ public class StaffJobController {
     private final LoadPlanService loadPlanService;
     private final RoutePlanService routePlanService;
     private final CrewAssignmentService crewAssignmentService;
+    private final TripSharingService tripSharingService;
 
     public StaffJobController(
             TransportJobService transportJobService,
             LoadPlanService loadPlanService,
             RoutePlanService routePlanService,
-            CrewAssignmentService crewAssignmentService) {
+            CrewAssignmentService crewAssignmentService,
+            TripSharingService tripSharingService) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
         this.crewAssignmentService = crewAssignmentService;
+        this.tripSharingService = tripSharingService;
     }
 
     /**
@@ -142,8 +146,55 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public TripLoadResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
-        return loadPlanService.confirmLoadPlan(jobId, user);
+    public TripLoadResponse confirmLoadPlan(
+            @PathVariable UUID jobId,
+            @RequestBody(required = false) ConfirmLoadPlanRequest request,
+            @AuthenticationPrincipal User user) {
+        return loadPlanService.confirmLoadPlan(jobId, request == null ? List.of() : request.acceptedWarnings(), user);
+    }
+
+    /**
+     * US-F3-13: Shared trailer - approved jobs that could share this job's trailer: same corridor, shared trailer, a
+     * common departure day and room, with the proposed departure, stalls left and biosecurity warnings. Nothing
+     * combines until one is chosen.
+     */
+    @GetMapping("/{jobId}/trip/suggestions")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<ShareSuggestionResponse> shareSuggestions(@PathVariable UUID jobId) {
+        return tripSharingService.suggestions(jobId);
+    }
+
+    /**
+     * US-F3-12: Biosecurity warnings for this job's trip: if {@code withJobId} joined it, or as its trailers are
+     * loaded now. They don't block; the coordinator accepts them when sharing or confirming.
+     */
+    @GetMapping("/{jobId}/trip/warnings")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<BiosecurityWarningResponse> tripWarnings(
+            @PathVariable UUID jobId, @RequestParam(value = "withJobId", required = false) UUID withJobId) {
+        return tripSharingService.warnings(jobId, withJobId);
+    }
+
+    /**
+     * US-F3-11: Shared trailer - put another job on this job's trip; reopens the trips' plans.
+     */
+    @PostMapping("/{jobId}/trip/jobs")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public ShareTripResponse shareTrip(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody ShareTripRequest request,
+            @AuthenticationPrincipal User user) {
+        return tripSharingService.share(jobId, request.jobId(), request.acceptedWarnings(), user);
+    }
+
+    /**
+     * US-F3-11: Shared trailer - take a job off this job's trip onto a trip of its own, before departure.
+     */
+    @DeleteMapping("/{jobId}/trip/jobs/{otherJobId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public TripJobResponse takeOffTrip(
+            @PathVariable UUID jobId, @PathVariable UUID otherJobId, @AuthenticationPrincipal User user) {
+        return tripSharingService.takeOff(jobId, otherJobId, user);
     }
 
     /**

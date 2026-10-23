@@ -1,4 +1,4 @@
--- V8: Replace legacy horse condition enum with the four values from docs/requirement.txt,
+-- V9: Replace legacy horse condition enum with the four values from docs/requirement.txt,
 --     and add a trip_record_documents table for referential integrity.
 
 -- 1. Replace the HorseCondition enum with only the four requirement values.

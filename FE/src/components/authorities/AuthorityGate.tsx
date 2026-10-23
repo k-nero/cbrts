@@ -40,28 +40,36 @@ const AuthorityGate: FC<Props> = ({ jobId, jobCode, status, submissions }) => {
     }
   };
 
+  const isDeparted = Boolean(status?.departedAt || status?.isDeparted);
+  const gateState = isDeparted ? 'departed' : status?.clearanceReady ? 'clear' : 'locked';
+  const gateTitle = isDeparted
+    ? `Departed (${code})`
+    : status?.clearanceReady
+      ? `Clearance Gate OPEN (${code})`
+      : `Clearance Gate LOCKED (${code})`;
+
   return (
     <>
       <ClearanceGate
-        state={status?.clearanceReady ? 'clear' : 'locked'}
-        title={
-          status?.clearanceReady
-            ? `Clearance Gate OPEN (${code})`
-            : `Clearance Gate LOCKED (${code})`
-        }
+        state={gateState}
+        title={gateTitle}
         action={
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={evaluateGate.isPending}
-            onClick={reEvaluate}
-          >
-            <ReloadOutlined spin={evaluateGate.isPending} className="mr-1" />
-            Re-evaluate gate
-          </Button>
+          !isDeparted && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={evaluateGate.isPending}
+              onClick={reEvaluate}
+            >
+              <ReloadOutlined spin={evaluateGate.isPending} className="mr-1" />
+              Re-evaluate gate
+            </Button>
+          )
         }
       >
-        {status?.clearanceReady ? (
+        {isDeparted ? (
+          'The job has departed. The dossier is frozen.'
+        ) : status?.clearanceReady ? (
           'All required veterinary certificates, customs clearances, and quarantine periods have been completed. The convoy is cleared for departure.'
         ) : status?.outstandingIssues && status.outstandingIssues.length > 0 ? (
           <ul className="m-0 list-disc pl-4 text-[13px] text-bad">

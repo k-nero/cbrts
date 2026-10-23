@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -15,6 +16,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
+import com.equifreight.model.trip.TripViewResponse;
 import com.equifreight.repository.*;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
@@ -22,6 +24,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -454,6 +457,130 @@ class TripServiceTest {
         verify(jobTrips).markDelivered(trip, job);
     }
 
+    // ---------- a shared trailer (US-F3-11) ----------
+
+    /** Puts a second job, CBRT-2026-042, on the trip with its own delivery stop. */
+    private TransportJob sharedWith() {
+        TransportRequest request = new TransportRequest();
+        request.setId(UUID.randomUUID());
+        TransportJob other = new TransportJob();
+        other.setId(UUID.randomUUID());
+        other.setCode("CBRT-2026-042");
+        other.setRequest(request);
+        other.setStage(job.getStage());
+        other.setTripStatus(job.getTripStatus());
+        other.setDepartedAt(job.getDepartedAt());
+        other.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        other.setClearanceReadyAt(NOW.minus(Duration.ofDays(1)));
+        other.setSignedOffAt(job.getSignedOffAt());
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job, other));
+        return other;
+    }
+
+    private RouteStop deliveryOf(TransportJob owner) {
+        RouteStop stop = new RouteStop();
+        stop.setId(UUID.randomUUID());
+        stop.setKind(RouteStopKind.DELIVERY);
+        stop.setJob(owner);
+        Place place = new Place();
+        place.setName("Chao Phraya Racing Stables");
+        stop.setPlace(place);
+        RoutePlan plan = new RoutePlan();
+        plan.setStops(new ArrayList<>(List.of(stop)));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+        return stop;
+    }
+
+    @Test
+    @DisplayName("A shared trip can't depart while one of its jobs isn't cleared, and the refusal names it")
+    void aSharedTripWaitsForEveryJob() {
+        TransportJob other = sharedWith();
+        other.setDossierStatus(DossierStatus.OPEN);
+        other.setClearanceReadyAt(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> record(TripRecordKind.DEPARTED, NOW));
+
+        assertEquals("CLEARANCE_REQUIRED", ex.getCode());
+        assertTrue(ex.getMessage().contains("CBRT-2026-042"));
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Departure moves every job on a shared trip")
+    void departureMovesEveryJob() {
+        TransportJob other = sharedWith();
+
+        record(TripRecordKind.DEPARTED, NOW);
+
+        assertEquals(TripStatus.DEPARTED, job.getTripStatus());
+        assertEquals(TripStatus.DEPARTED, other.getTripStatus());
+        assertEquals(NOW, other.getDepartedAt());
+        assertEquals(TripStatus.DEPARTED, trip.getStatus());
+    }
+
+    @Test
+    @DisplayName("A delivery at one job's stop delivers that job only; the trip carries on with the other")
+    void deliveryIsPerJob() {
+        departed();
+        TransportJob other = sharedWith();
+        other.setTripStatus(TripStatus.ARRIVED);
+        RouteStop stop = deliveryOf(other);
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job, other)).thenReturn(List.of(job));
+
+        service.addCoordinatorRecord(
+                job.getCode(),
+                coordinator,
+                new TripRecordRequest(
+                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null));
+
+        assertEquals(TripStatus.DELIVERED, other.getTripStatus());
+        assertEquals(TripStatus.DEPARTED, job.getTripStatus());
+        assertEquals(TripStatus.DEPARTED, trip.getStatus());
+        verify(jobTrips).markDelivered(trip, other);
+        verify(jobTrips, never()).markDelivered(trip, job);
+    }
+
+    @Test
+    @DisplayName("The customer of a shared trip sees nothing of the other client: not its stops or its horses")
+    void theCustomerSeesOnlyTheirOwn() {
+        departed();
+        TransportJob other = sharedWith();
+        RouteStop othersStop = deliveryOf(other);
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        User customer = new User();
+        customer.setClub(club);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        RequestHorse own = new RequestHorse();
+        own.setHorse(shadowfax);
+        when(requestHorses.findByRequest_Id(job.getRequest().getId())).thenReturn(List.of(own));
+        TripRecord check = stored(TripRecordKind.CONDITION_CHECK, NOW.minusSeconds(60));
+        for (Horse horse : List.of(shadowfax, nightfall)) {
+            ConditionLog log = new ConditionLog();
+            log.setTripRecord(check);
+            log.setHorse(horse);
+            log.setCondition(HorseCondition.SOUND);
+            check.getConditionLogs().add(log);
+        }
+        TripRecord atOthersStop = stored(TripRecordKind.DELIVERED, NOW.minusSeconds(30));
+        atOthersStop.setRouteStop(othersStop);
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId())).thenReturn(List.of(check, atOthersStop));
+
+        TripViewResponse view = service.customerTrip(job.getCode(), customer);
+
+        assertTrue(view.stops().isEmpty());
+        assertEquals(1, view.records().size());
+        assertEquals(
+                List.of(shadowfax.getId()),
+                view.records().getFirst().conditions().stream()
+                        .map(c -> c.horseId())
+                        .toList());
+        assertEquals(
+                List.of("Shadowfax"), view.horses().stream().map(h -> h.name()).toList());
+    }
+
     @Test
     @DisplayName("Staff see the trip's TRP code; the customer never does")
     void onlyStaffSeeTheTripCode() {
@@ -536,12 +663,15 @@ class TripServiceTest {
     }
 
     private void stubHorses() {
+        List<TripHorse> onTrip = new ArrayList<>();
         for (Horse horse : List.of(shadowfax, nightfall)) {
-            RequestHorse rh = new RequestHorse();
-            rh.setHorse(horse);
-            when(requestHorses.findByRequest_IdAndHorse_Id(job.getRequest().getId(), horse.getId()))
-                    .thenReturn(Optional.of(rh));
+            TripHorse th = new TripHorse();
+            th.setTrip(trip);
+            th.setJob(job);
+            th.setHorse(horse);
+            onTrip.add(th);
         }
+        when(jobTrips.horsesOn(trip)).thenReturn(onTrip);
     }
 
     private TripRecord stored(TripRecordKind kind, Instant at) {

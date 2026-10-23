@@ -33,6 +33,7 @@ public class LoadPlanService {
     private final CrewAssignmentRepository crewAssignmentRepository;
     private final JobTripService jobTrips;
     private final RoutePlanService routePlanService;
+    private final BiosecurityService biosecurity;
     private final AuditService auditService;
 
     public LoadPlanService(
@@ -45,6 +46,7 @@ public class LoadPlanService {
             CrewAssignmentRepository crewAssignmentRepository,
             JobTripService jobTrips,
             RoutePlanService routePlanService,
+            BiosecurityService biosecurity,
             AuditService auditService) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
@@ -55,11 +57,21 @@ public class LoadPlanService {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.jobTrips = jobTrips;
         this.routePlanService = routePlanService;
+        this.biosecurity = biosecurity;
         this.auditService = auditService;
     }
 
-    /** The trip's horses, with the mares travelling with a foal at foot. */
-    private record Cargo(List<Horse> horses, Set<UUID> maresWithFoal) {}
+    /**
+     * The trip's horses, with the mares travelling with a foal at foot and, on a shared trip, the job code each
+     * travels under.
+     */
+    private record Cargo(List<Horse> horses, Set<UUID> maresWithFoal, Map<UUID, String> jobCodes) {
+        JobHorseResponse response(Horse h) {
+            return jobCodes.isEmpty()
+                    ? JobMapper.toHorseResponse(h)
+                    : JobMapper.toHorseResponse(h, jobCodes.get(h.getId()));
+        }
+    }
 
     /** The job's trip load; empty until a vehicle is chosen. */
     @Transactional(readOnly = true)
@@ -240,6 +252,88 @@ public class LoadPlanService {
     }
 
     /**
+     * The stalls free on the trip's trailers if {@code joining}'s horses were added (US-F3-13); null while the trip
+     * has no trailer.
+     */
+    @Transactional(readOnly = true)
+    public Integer stallsLeft(Trip trip, TransportJob joining) {
+        List<TripVehicle> trailers = jobTrips.vehiclesOf(trip);
+        if (trailers.isEmpty()) return null;
+        int stalls = 0;
+        for (TripVehicle tv : trailers) {
+            stalls += vehicleStallRepository
+                    .findByVehicleIdOrderByPositionNo(tv.getVehicle().getId())
+                    .size();
+        }
+        return stalls
+                - jobTrips.horsesOn(trip).size()
+                - joining.getRequest().getHorses().size();
+    }
+
+    /**
+     * Why the trip's trailers can't also carry {@code joining}'s horses (US-F3-11), or null when they can: enough
+     * stalls, box stalls for the horses that need a box, climate stalls for the heat-sensitive, and payload. A trip
+     * with no vehicle yet has nothing to check.
+     */
+    @Transactional(readOnly = true)
+    public String lackOfRoom(Trip trip, TransportJob joining) {
+        List<TripVehicle> trailers = jobTrips.vehiclesOf(trip);
+        if (trailers.isEmpty()) return null;
+        Cargo cargo = cargo(trip);
+        List<Horse> horses = new ArrayList<>(cargo.horses());
+        Set<UUID> withFoal = new HashSet<>(cargo.maresWithFoal());
+        for (RequestHorse rh : joining.getRequest().getHorses()) {
+            horses.add(rh.getHorse());
+            if (rh.isWithFoal()) withFoal.add(rh.getHorse().getId());
+        }
+        List<VehicleStall> stalls = new ArrayList<>();
+        int payload = 0;
+        for (TripVehicle tv : trailers) {
+            stalls.addAll(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                    tv.getVehicle().getId()));
+            payload += tv.getVehicle().getPayloadKg();
+        }
+        long boxNeeded = horses.stream().filter(h -> requiresBox(h, withFoal)).count();
+        long climateNeeded = horses.stream()
+                .filter(h -> !requiresBox(h, withFoal) && h.getRequiredStall() == StallType.CLIMATE)
+                .count();
+        long boxStalls =
+                stalls.stream().filter(st -> st.getStallType() == StallType.BOX).count();
+        long climateStalls = stalls.stream()
+                .filter(st -> st.getStallType() == StallType.CLIMATE)
+                .count();
+        int weight = horses.stream()
+                .mapToInt(h -> h.getWeightKg() != null ? h.getWeightKg() : 0)
+                .sum();
+        if (horses.size() > stalls.size())
+            return horses.size() + " horses need a stall and the trip's trailers have " + stalls.size();
+        if (boxNeeded > boxStalls) return boxNeeded + " horses need a box stall and there are " + boxStalls;
+        if (climateNeeded > climateStalls)
+            return climateNeeded + " horses need a climate stall and there are " + climateStalls;
+        if (weight > payload) return "the horses weigh " + weight + " kg and the trailers carry " + payload + " kg";
+        return null;
+    }
+
+    /**
+     * Reopens the trip after its jobs changed (US-F3-11), as when a trailer is added: the load plans back to draft,
+     * the confirmed route superseded with {@code reason}, and the sign-off cleared.
+     */
+    @Transactional
+    public void reopenTrip(Trip trip, String reason) {
+        reopen(trip, loadPlanRepository.findByTripIdForUpdate(trip.getId()), reason);
+    }
+
+    /** Takes {@code horseIds} out of every trailer of the trip; they no longer travel on it. */
+    @Transactional
+    public void unload(Trip trip, Collection<UUID> horseIds) {
+        for (LoadPlan plan : loadPlanRepository.findByTripIdForUpdate(trip.getId())) {
+            for (UUID horseId : horseIds) {
+                loadPlanStallRepository.deleteByLoadPlanIdAndHorseId(plan.getId(), horseId);
+            }
+        }
+    }
+
+    /**
      * Nothing confirmed changes silently: the load plans go back to draft, the confirmed route is superseded by a new
      * draft version with {@code reason}, and every job on the trip needs a new sign-off.
      */
@@ -266,8 +360,13 @@ public class LoadPlanService {
     private Cargo cargo(Trip trip) {
         List<Horse> horses = new ArrayList<>();
         Set<UUID> withFoal = new HashSet<>();
-        for (TripHorse onTrip : jobTrips.horsesOn(trip)) {
+        Map<UUID, String> jobCodes = new HashMap<>();
+        List<TripHorse> onThisTrip = jobTrips.horsesOn(trip);
+        boolean shared =
+                onThisTrip.stream().map(th -> th.getJob().getId()).distinct().count() > 1;
+        for (TripHorse onTrip : onThisTrip) {
             horses.add(onTrip.getHorse());
+            if (shared) jobCodes.put(onTrip.getHorse().getId(), onTrip.getJob().getCode());
             TransportRequest request = onTrip.getJob().getRequest();
             if (request != null && request.getHorses() != null) {
                 for (RequestHorse rh : request.getHorses()) {
@@ -279,7 +378,7 @@ public class LoadPlanService {
                 }
             }
         }
-        return new Cargo(horses, withFoal);
+        return new Cargo(horses, withFoal, jobCodes);
     }
 
     private static Horse horseOnTrip(Cargo cargo, UUID horseId) {
@@ -501,6 +600,15 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse confirmLoadPlan(UUID jobId, User currentUser) {
+        return confirmLoadPlan(jobId, List.of(), currentUser);
+    }
+
+    /**
+     * As {@link #confirmLoadPlan(UUID, User)}, with the biosecurity warnings the coordinator accepted: a warning that
+     * is new or changed since it was accepted has to be accepted again before the load is confirmed (US-F3-12).
+     */
+    @Transactional
+    public TripLoadResponse confirmLoadPlan(UUID jobId, Collection<String> acceptedWarnings, User currentUser) {
         TransportJob job = job(jobId);
         Trip trip = jobTrips.tripOf(jobId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
@@ -525,9 +633,20 @@ public class LoadPlanService {
                             + state.conflicts().getFirst().description() + ")");
         }
 
-        // Every trailer is booked for the trip's planned dates, which the confirmed route sets.
-        Instant startsAt = job.getPlannedDepartureAt();
-        Instant endsAt = job.getPlannedArrivalAt();
+        biosecurity.requireAccepted(trip, state.warnings(), acceptedWarnings, currentUser);
+
+        // Every trailer is booked for the trip's planned dates, which the confirmed route sets: from the departure
+        // until the last job on it arrives.
+        List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
+        if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
+        Instant startsAt =
+                trip.getPlannedDepartureAt() != null ? trip.getPlannedDepartureAt() : job.getPlannedDepartureAt();
+        Instant endsAt = jobsOnTrip.stream().anyMatch(j -> j.getPlannedArrivalAt() == null)
+                ? null
+                : jobsOnTrip.stream()
+                        .map(TransportJob::getPlannedArrivalAt)
+                        .max(Comparator.naturalOrder())
+                        .orElse(null);
         if (startsAt == null || endsAt == null) {
             throw new BusinessException(
                     "Cannot confirm load plan: confirm the route plan first, so the vehicle can be booked "
@@ -720,9 +839,8 @@ public class LoadPlanService {
                             .stream()
                             .map(s -> {
                                 LoadPlanStall a = assignmentByStallId.get(s.getId());
-                                JobHorseResponse horse = a != null && a.getHorse() != null
-                                        ? JobMapper.toHorseResponse(a.getHorse())
-                                        : null;
+                                JobHorseResponse horse =
+                                        a != null && a.getHorse() != null ? cargo.response(a.getHorse()) : null;
                                 return JobMapper.toLoadPlanStallResponse(s, horse, stallIssues.get(s.getId()));
                             })
                             .toList();
@@ -738,7 +856,7 @@ public class LoadPlanService {
 
         List<JobHorseResponse> unassigned = cargo.horses().stream()
                 .filter(h -> !placed.contains(h.getId()))
-                .map(JobMapper::toHorseResponse)
+                .map(cargo::response)
                 .toList();
         boolean confirmed = plans.stream().allMatch(p -> p.getStatus() == LoadPlanStatus.CONFIRMED);
         LoadPlan lastConfirmed = plans.stream()
@@ -756,6 +874,7 @@ public class LoadPlanService {
                 .vehicles(vehicles)
                 .unassignedHorses(unassigned)
                 .conflicts(allConflicts)
+                .warnings(biosecurity.forTrip(trip))
                 .build();
     }
 

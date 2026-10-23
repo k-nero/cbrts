@@ -10,6 +10,9 @@ public record RouteStopResponse(
         UUID id,
         short seq,
         RouteStopKind kind,
+        /** The job a PICKUP or DELIVERY stop is for; null for a stop of the whole trip. */
+        UUID jobId,
+        String jobCode,
         UUID placeId,
         String placeName,
         UUID borderCrossingId,
