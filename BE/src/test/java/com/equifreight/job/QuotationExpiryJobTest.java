@@ -135,6 +135,18 @@ class QuotationExpiryJobTest {
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.EXPIRED);
         assertThat(request.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+        verify(notifications, never()).sendNotification(any(), anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void aCancelledRequestsQuotationIsNotReminded() {
+        request.setStatus(RequestStatus.CANCELLED);
+        Quotation q = issuedUntil(NOW.plus(Duration.ofHours(20)));
+
+        job.run();
+
+        assertThat(q.getReminderSentAt()).isNull();
+        verify(notifications, never()).sendNotification(any(), anyString(), anyString(), any(), any(), any());
     }
 
     @Test

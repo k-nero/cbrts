@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,12 +25,15 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.RateCatalogVersion;
+import com.equifreight.entity.RateFeeBand;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.entity.enums.FeeBandKind;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.QuotationStatus;
@@ -51,8 +56,10 @@ import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.QuotationRepository;
+import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -92,6 +99,9 @@ class RequestServiceTest {
     AuditLogRepository auditLogs;
     RequestEstimator estimator;
     QuotationRepository quotations;
+    RateFeeBandRepository feeBands;
+    UserRepository users;
+    NotificationService notifications;
     RequestService service;
     User user;
     Club club;
@@ -115,6 +125,9 @@ class RequestServiceTest {
         auditLogs = mock(AuditLogRepository.class);
         estimator = mock(RequestEstimator.class);
         quotations = mock(QuotationRepository.class);
+        feeBands = mock(RateFeeBandRepository.class);
+        users = mock(UserRepository.class);
+        notifications = mock(NotificationService.class);
         service = new RequestService(
                 requests,
                 horses,
@@ -128,7 +141,10 @@ class RequestServiceTest {
                 JsonMapper.builder().build(),
                 Clock.fixed(NOW, BusinessTime.ZONE),
                 estimator,
-                quotations);
+                quotations,
+                feeBands,
+                users,
+                notifications);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -704,6 +720,141 @@ class RequestServiceTest {
         assertThat(service.get(user, r.getId()).revisions()).isEmpty();
     }
 
+    // --- US-F1-06, BR-F1-07: the customer cancels before approval ---------------------------------------
+
+    @Nested
+    class Cancel {
+
+        static final UUID CATALOG_V2 = UUID.fromString("01a1453c-0000-7000-8000-0000000000c2");
+
+        TransportRequest quoted;
+
+        @BeforeEach
+        void setUpQuoted() {
+            quoted = submitted();
+            quoted.setStatus(RequestStatus.QUOTED);
+            // Today is 26 Sep 2026 in Ho Chi Minh City.
+            quoted.setDepartureDate(LocalDate.of(2026, 10, 16));
+            Quotation q = issuedQuotation(quoted, 1);
+            RateCatalogVersion v2 = new RateCatalogVersion();
+            v2.setId(CATALOG_V2);
+            q.setRateCatalogVersion(v2);
+            when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(quoted.getId(), QuotationStatus.DRAFT))
+                    .thenReturn(Optional.of(q));
+            when(feeBands.findByVersionIdAndKindOrderByMinDays(CATALOG_V2, FeeBandKind.CANCELLATION))
+                    .thenReturn(
+                            List.of(band(0, 6, "100"), band(7, 13, "50"), band(14, 29, "25"), band(30, null, "10")));
+        }
+
+        RateFeeBand band(int min, Integer max, String pct) {
+            RateFeeBand b = new RateFeeBand();
+            b.setKind(FeeBandKind.CANCELLATION);
+            b.setMinDays((short) min);
+            b.setMaxDays(max == null ? null : max.shortValue());
+            b.setValue(new BigDecimal(pct));
+            return b;
+        }
+
+        @Test
+        void theFeeBandFollowsTheDaysLeftBeforeDeparture() {
+            RequestResponse r = service.cancel(user, quoted.getId());
+
+            // 20 days to departure: the 14-29 day band.
+            assertThat(quoted.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+            assertThat(quoted.getCancellationFeePct()).isEqualByComparingTo("25");
+            assertThat(quoted.getCancelledAt()).isEqualTo(NOW);
+            assertThat(r.status()).isEqualTo(RequestStatus.CANCELLED);
+            assertThat(r.cancellationFeePct()).isEqualByComparingTo("25");
+            verify(requests).findForUpdate(quoted.getId(), CLUB_ID);
+            verify(audit)
+                    .recordDecision(
+                            eq(user),
+                            eq("REQUEST_CANCELLED"),
+                            eq("Cancelled by Saigon Turf Club; fee 25% with 20 days to departure"),
+                            eq("TRANSPORT_REQUEST"),
+                            eq(quoted.getId()),
+                            eq("REQ-2026-0001"),
+                            isNull(),
+                            eq("{\"status\":\"QUOTED\"}"),
+                            eq("{\"status\":\"CANCELLED\"}"));
+        }
+
+        @Test
+        void underAWeekCostsTheWholeBand() {
+            quoted.setDepartureDate(LocalDate.of(2026, 9, 30));
+
+            service.cancel(user, quoted.getId());
+
+            assertThat(quoted.getCancellationFeePct()).isEqualByComparingTo("100");
+        }
+
+        @Test
+        void anAcceptedRequestCanStillBeCancelledBeforeApproval() {
+            quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
+
+            service.cancel(user, quoted.getId());
+
+            assertThat(quoted.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+        }
+
+        @Test
+        void withNoQuotationIssuedThereIsNoFee() {
+            TransportRequest inReview = submitted();
+            inReview.setStatus(RequestStatus.UNDER_REVIEW);
+            inReview.setDepartureDate(LocalDate.of(2026, 10, 16));
+            when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(
+                            inReview.getId(), QuotationStatus.DRAFT))
+                    .thenReturn(Optional.empty());
+
+            service.cancel(user, inReview.getId());
+
+            assertThat(inReview.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+            assertThat(inReview.getCancellationFeePct()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        void anApprovedRequestCantBeCancelled() {
+            quoted.setStatus(RequestStatus.APPROVED);
+
+            assertThatThrownBy(() -> service.cancel(user, quoted.getId()))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("is approved, so its price and horses are locked")
+                    .extracting("code")
+                    .isEqualTo("REQUEST_NOT_CANCELLABLE");
+            assertThat(quoted.getStatus()).isEqualTo(RequestStatus.APPROVED);
+            verify(requests, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void aDraftIsDiscardedNotCancelled() {
+            TransportRequest d = draft(shadowfax);
+
+            assertThatThrownBy(() -> service.cancel(user, d.getId()))
+                    .hasMessage("A draft isn't cancelled; discard it from your requests instead.");
+            assertThat(d.getStatus()).isEqualTo(RequestStatus.DRAFT);
+        }
+
+        @Test
+        void aRequestIsCancelledOnlyOnce() {
+            service.cancel(user, quoted.getId());
+            clearInvocations(requests, audit);
+
+            assertThatThrownBy(() -> service.cancel(user, quoted.getId()))
+                    .hasMessage("REQ-2026-0001 was already cancelled on 26 Sep 2026.");
+            verify(requests, never()).saveAndFlush(any());
+            verify(audit, never())
+                    .recordDecision(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void anotherClubsRequestIsNotFound() {
+            UUID id = UUID.randomUUID();
+            when(requests.findForUpdate(id, CLUB_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.cancel(user, id)).isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
     @Nested
     class Submit {
 
@@ -1051,7 +1202,10 @@ class RequestServiceTest {
                     JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-12-31T17:30:00Z"), BusinessTime.ZONE),
                     estimator,
-                    quotations);
+                    quotations,
+                    feeBands,
+                    users,
+                    notifications);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 
