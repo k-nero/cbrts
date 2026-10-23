@@ -69,6 +69,10 @@ public class TripRecord extends BaseEntity {
     @Column(length = 500)
     private String text;
 
+    /** Checklist items the escort physically presented at a border crossing with this record. */
+    @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.ALL)
+    private List<TripRecordDocument> documentsShown = new ArrayList<>();
+
     @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.PERSIST)
     private List<ConditionLog> conditionLogs = new ArrayList<>();
 }

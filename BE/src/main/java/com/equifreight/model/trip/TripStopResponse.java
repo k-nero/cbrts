@@ -2,6 +2,7 @@ package com.equifreight.model.trip;
 
 import com.equifreight.entity.enums.TripRecordKind;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
@@ -17,4 +18,5 @@ public record TripStopResponse(
         TripRecordKind latestStatus,
         Instant latestOccurredAt,
         String latestNote,
-        String latestRecordedBy) {}
+        String latestRecordedBy,
+        List<TripBorderDocumentResponse> borderDocuments) {}

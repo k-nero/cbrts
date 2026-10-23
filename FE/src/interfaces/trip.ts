@@ -18,9 +18,10 @@ export const TripRecordKindEnum = {
 export type TripRecordKind = (typeof TripRecordKindEnum)[keyof typeof TripRecordKindEnum];
 
 export const HorseConditionEnum = {
-  SOUND: 'SOUND',
-  WATCH: 'WATCH',
-  CONCERN: 'CONCERN',
+  STABLE: 'STABLE',
+  OFF_FEED: 'OFF_FEED',
+  STRESSED: 'STRESSED',
+  CLIMATE_CHANGE: 'CLIMATE_CHANGE',
 } as const;
 export type HorseCondition = (typeof HorseConditionEnum)[keyof typeof HorseConditionEnum];
 
@@ -60,6 +61,7 @@ export interface TripRecord {
   channel: 'WEB' | 'CAB_TABLET' | 'SYSTEM';
   text: string | null;
   conditions: TripCondition[];
+  documentsShown: string[];
 }
 export interface TripStop {
   id: string;
@@ -73,6 +75,13 @@ export interface TripStop {
   latestOccurredAt: string | null;
   latestNote: string | null;
   latestRecordedBy: string | null;
+  borderDocuments: Array<{
+    id: string;
+    label: string;
+    status: string;
+    validity: string | null;
+    readyToShow: boolean;
+  }>;
 }
 export interface TripHorse {
   id: string;
@@ -116,6 +125,8 @@ export interface TripRecordInput {
   occurredAt: string;
   clientRef: string;
   text?: string;
+  /** Checklist items recorded as presented at a border checkpoint. */
+  documentsShown?: string[];
   /** Who received the horses; required when kind is HANDED_OVER. */
   receiverName?: string;
   conditions?: Array<{

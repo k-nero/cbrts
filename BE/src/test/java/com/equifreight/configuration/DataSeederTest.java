@@ -81,7 +81,8 @@ class DataSeederTest {
                 mock(StoredFileRepository.class),
                 mock(FileStorage.class),
                 mock(CatalogSeeder.class),
-                mock(JobTripService.class));
+                mock(JobTripService.class),
+                mock(TripRecordRepository.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

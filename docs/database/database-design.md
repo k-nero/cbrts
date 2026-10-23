@@ -537,10 +537,11 @@ erDiagram
 | `recorded_by` | → `users` | Driver or groom. |
 | `channel` | varchar(12) | `CAB_TABLET`, `WEB`. |
 | `text` | varchar(500) | "Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet." |
+| `documents_shown` | jsonb not null default `[]` | Checklist item IDs presented at this border checkpoint; kept with the append-only event. |
 
 Index `(trip_id, occurred_at)`.
 
-**`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`.
+**`condition_logs`** (append-only): `trip_record_id`, `horse_id`, `condition` (`SOUND`, `WATCH`, `CONCERN` for existing records; new Flow 4 entries use `STABLE`, `OFF_FEED`, `STRESSED`, or `CLIMATE_CHANGE`), `drinking boolean`, `eating boolean`, `note`. Unique `(trip_record_id, horse_id)`. The new categories retain the requirement's specific welfare observations without rewriting immutable historical records.
 
 **`condition_log_files`**: `(condition_log_id, file_id)`, the photos attached to one horse's condition entry. A file can be attached once; links are append-only and follow the same ownership checks as other job files.
 

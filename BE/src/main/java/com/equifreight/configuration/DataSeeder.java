@@ -97,12 +97,12 @@ public class DataSeeder implements ApplicationRunner {
      */
     private static final String[][] USERS = {
         {"bookings@saigonturf.vn", "Saigon Turf", "Club", RoleName.CUSTOMER},
-        {"yen.vu@equifreight.vn", "Hải Yến", "Vũ", RoleName.LOGISTICS_MANAGER},
-        {"lan.nguyen@equifreight.vn", "Thị Lan", "Nguyễn", RoleName.TRANSPORT_SPECIALIST},
-        {"khoi.do@equifreight.vn", "Minh Khôi", "Đỗ", RoleName.FLEET_COORDINATOR},
-        {"minh.tran@equifreight.vn", "Văn Minh", "Trần", RoleName.ESCORT},
-        {"hoa.le@equifreight.vn", "Thị Hoa", "Lê", RoleName.ESCORT},
-        {"tuan.pham@equifreight.vn", "Quốc Tuấn", "Phạm", RoleName.ESCORT}
+        {"yen.vu@equifreight.vn", "Háº£i Yáº¿n", "VÅ©", RoleName.LOGISTICS_MANAGER},
+        {"lan.nguyen@equifreight.vn", "Thá»‹ Lan", "Nguyá»…n", RoleName.TRANSPORT_SPECIALIST},
+        {"khoi.do@equifreight.vn", "Minh KhÃ´i", "Äá»—", RoleName.FLEET_COORDINATOR},
+        {"minh.tran@equifreight.vn", "VÄƒn Minh", "Tráº§n", RoleName.ESCORT},
+        {"hoa.le@equifreight.vn", "Thá»‹ Hoa", "LÃª", RoleName.ESCORT},
+        {"tuan.pham@equifreight.vn", "Quá»‘c Tuáº¥n", "Pháº¡m", RoleName.ESCORT}
     };
 
     private static final String CLUB_NAME = "Saigon Turf Club";
@@ -204,6 +204,7 @@ public class DataSeeder implements ApplicationRunner {
     private final FileStorage fileStorage;
     private final CatalogSeeder catalogSeeder;
     private final JobTripService jobTrips;
+    private final TripRecordRepository tripRecordRepository;
 
     public DataSeeder(
             RoleRepository roleRepository,
@@ -245,7 +246,8 @@ public class DataSeeder implements ApplicationRunner {
             StoredFileRepository storedFileRepository,
             FileStorage fileStorage,
             CatalogSeeder catalogSeeder,
-            JobTripService jobTrips) {
+            JobTripService jobTrips,
+            TripRecordRepository tripRecordRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -286,6 +288,7 @@ public class DataSeeder implements ApplicationRunner {
         this.fileStorage = fileStorage;
         this.catalogSeeder = catalogSeeder;
         this.jobTrips = jobTrips;
+        this.tripRecordRepository = tripRecordRepository;
     }
 
     @Override
@@ -438,42 +441,46 @@ public class DataSeeder implements ApplicationRunner {
         if (vn == null || kh == null) return;
 
         createPlaceIfAbsent(
-                "Phú Thọ training centre", PlaceKind.TRAINING_CENTRE, "Ho Chi Minh City", vn, "2 Lê Đại Hành, Q.11");
+                "PhÃº Thá» training centre",
+                PlaceKind.TRAINING_CENTRE,
+                "Ho Chi Minh City",
+                vn,
+                "2 LÃª Äáº¡i HÃ nh, Q.11");
         createPlaceIfAbsent(
                 "Phnom Penh Equestrian Centre", PlaceKind.STABLE, "Phnom Penh", kh, "Hun Sen Blvd, Phnom Penh");
         createPlaceIfAbsent(
                 "Svay Rieng welfare stop", PlaceKind.WELFARE_STOP, "Svay Rieng", kh, "National Road 1, Svay Rieng");
 
-        if (borderCrossingRepository.findByName("Mộc Bài – Bavet").isEmpty()) {
+        if (borderCrossingRepository.findByName("Má»™c BÃ i â€“ Bavet").isEmpty()) {
             BorderCrossing bc = new BorderCrossing();
-            bc.setName("Mộc Bài – Bavet");
+            bc.setName("Má»™c BÃ i â€“ Bavet");
             bc.setFromCountry(vn);
             bc.setToCountry(kh);
             bc.setRoadOnly(true);
             borderCrossingRepository.save(bc);
         }
 
-        if (borderCrossingRepository.findByName("Poipet – Aranyaprathet").isEmpty() && th != null) {
+        if (borderCrossingRepository.findByName("Poipet â€“ Aranyaprathet").isEmpty() && th != null) {
             BorderCrossing bc = new BorderCrossing();
-            bc.setName("Poipet – Aranyaprathet");
+            bc.setName("Poipet â€“ Aranyaprathet");
             bc.setFromCountry(kh);
             bc.setToCountry(th);
             bc.setRoadOnly(true);
             borderCrossingRepository.save(bc);
         }
 
-        if (borderCrossingRepository.findByName("Cầu Treo – Nam Phao").isEmpty() && la != null) {
+        if (borderCrossingRepository.findByName("Cáº§u Treo â€“ Nam Phao").isEmpty() && la != null) {
             BorderCrossing bc = new BorderCrossing();
-            bc.setName("Cầu Treo – Nam Phao");
+            bc.setName("Cáº§u Treo â€“ Nam Phao");
             bc.setFromCountry(vn);
             bc.setToCountry(la);
             bc.setRoadOnly(true);
             borderCrossingRepository.save(bc);
         }
 
-        if (borderCrossingRepository.findByName("Sadao – Bukit Kayu Hitam").isEmpty() && th != null && my != null) {
+        if (borderCrossingRepository.findByName("Sadao â€“ Bukit Kayu Hitam").isEmpty() && th != null && my != null) {
             BorderCrossing bc = new BorderCrossing();
-            bc.setName("Sadao – Bukit Kayu Hitam");
+            bc.setName("Sadao â€“ Bukit Kayu Hitam");
             bc.setFromCountry(th);
             bc.setToCountry(my);
             bc.setRoadOnly(true);
@@ -569,7 +576,9 @@ public class DataSeeder implements ApplicationRunner {
         advanceCodeCounter(CodePrefix.Q, (short) 2026, 188);
         advanceCodeCounter(CodePrefix.CBRT, (short) 2026, 41);
 
-        if (transportJobRepository.findByCode("CBRT-2026-041").isPresent()) {
+        boolean has41 = transportJobRepository.findByCode("CBRT-2026-041").isPresent();
+        boolean has40 = transportJobRepository.findByCode("CBRT-2026-040").isPresent();
+        if (has41 && has40) {
             return;
         }
 
@@ -588,6 +597,44 @@ public class DataSeeder implements ApplicationRunner {
                 .findByCode("M")
                 .orElseGet(() -> horseSizeClassRepository.findAll().getFirst());
 
+        Vehicle tx447 = vehicleRepository.findByCode("TX-447").orElseThrow();
+        List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(tx447.getId());
+
+        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
+        User khoi = userRepository.getByEmail("khoi.do@equifreight.vn");
+        User customer = userRepository.getByEmail("bookings@saigonturf.vn");
+        User minh = userRepository.getByEmail("minh.tran@equifreight.vn");
+
+        RateCatalogVersion rateVersion = rateCatalogVersionRepository
+                .findByVersionNo(1)
+                .orElseGet(() -> {
+                    RateCatalogVersion rv = new RateCatalogVersion();
+                    rv.setVersionNo(1);
+                    rv.setStatus(CatalogStatus.PUBLISHED);
+                    rv.setPublishedAt(Instant.now());
+                    rv.setPublishedBy(yen);
+                    rv.setChangeNote("Baseline rate catalog v1");
+                    return rateCatalogVersionRepository.save(rv);
+                });
+
+        if (!has41) {
+            seedCbrt2026041(club, customer, yen, khoi, rateVersion, stalls, tx447, sizeM);
+        }
+
+        if (!has40) {
+            seedCbrt2026040(club, customer, yen, khoi, rateVersion, stalls, tx447, minh, sizeM);
+        }
+    }
+
+    private void seedCbrt2026041(
+            Club club,
+            User customer,
+            User yen,
+            User khoi,
+            RateCatalogVersion rateVersion,
+            List<VehicleStall> stalls,
+            Vehicle tx447,
+            HorseSizeClass sizeM) {
         Horse shadowfax = createHorseIfAbsent(
                 "Shadowfax",
                 club,
@@ -625,22 +672,6 @@ public class DataSeeder implements ApplicationRunner {
                 Temperament.CALM,
                 StallType.STANDARD);
 
-        User yen = userRepository.getByEmail("yen.vu@equifreight.vn");
-        User khoi = userRepository.getByEmail("khoi.do@equifreight.vn");
-        User customer = userRepository.getByEmail("bookings@saigonturf.vn");
-
-        RateCatalogVersion rateVersion = rateCatalogVersionRepository
-                .findByVersionNo(1)
-                .orElseGet(() -> {
-                    RateCatalogVersion rv = new RateCatalogVersion();
-                    rv.setVersionNo(1);
-                    rv.setStatus(CatalogStatus.PUBLISHED);
-                    rv.setPublishedAt(Instant.now());
-                    rv.setPublishedBy(yen);
-                    rv.setChangeNote("Baseline rate catalog v1");
-                    return rateCatalogVersionRepository.save(rv);
-                });
-
         // Create Request REQ-2026-0193
         TransportRequest req = new TransportRequest();
         req.setCode("REQ-2026-0193");
@@ -651,7 +682,8 @@ public class DataSeeder implements ApplicationRunner {
         req.setSubmittedAt(Instant.parse("2026-09-26T02:14:00Z"));
         req.setMode(TransportMode.ROAD);
         req.setTrailer(TrailerType.PRIVATE);
-        req.setOriginPlace(placeRepository.findByName("Phú Thọ training centre").orElse(null));
+        req.setOriginPlace(
+                placeRepository.findByName("PhÃº Thá» training centre").orElse(null));
         req.setDestinationPlace(
                 placeRepository.findByName("Phnom Penh Equestrian Centre").orElse(null));
         req.setCorridor(corridorRepository.findByCode("RD HCM -> PNH").orElse(null));
@@ -689,42 +721,45 @@ public class DataSeeder implements ApplicationRunner {
         job.setQuotation(savedQuote);
         job.setApprovedBy(yen);
         job.setApprovedAt(Instant.now());
-        // The team chosen at approval (US-F1-07): Lan owns the documents, Khôi plans the move.
+        // The team chosen at approval (US-F1-07): Lan owns the documents, KhÃ´i plans the move.
         job.setTransportSpecialist(userRepository.getByEmail("lan.nguyen@equifreight.vn"));
         job.setCoordinator(khoi);
-        job.setStage(JobStage.DOCUMENTS);
-        job.setDossierStatus(DossierStatus.OPEN);
-        job.setTripStatus(TripStatus.NOT_STARTED);
+        job.setStage(JobStage.TRIP);
+        job.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        job.setTripStatus(TripStatus.DEPARTED);
+        job.setSignedOffAt(Instant.parse("2026-10-18T05:30:00Z"));
+        job.setSignedOffBy(yen);
         job.setPlannedDepartureAt(Instant.parse("2026-10-18T06:00:00Z"));
+        job.setDepartedAt(Instant.parse("2026-10-18T06:05:00Z"));
         job.setPlannedArrivalAt(Instant.parse("2026-10-18T12:30:00Z"));
         job.setWindowStart(Instant.parse("2026-10-18T11:00:00Z"));
         job.setWindowEnd(Instant.parse("2026-10-18T14:00:00Z"));
         TransportJob savedJob = transportJobRepository.save(job);
 
         // Vehicle TX-447, on the job's own trip
-        Vehicle tx447 = vehicleRepository.findByCode("TX-447").orElseThrow();
-        List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(tx447.getId());
         Trip trip = jobTrips.createForJob(savedJob, yen, savedJob.getApprovedAt());
         trip.setPlannedDepartureAt(savedJob.getPlannedDepartureAt());
         TripVehicle tripVehicle = jobTrips.useVehicle(trip, tx447);
 
-        // Load plan for CBRT-2026-041 (matching Figma demo state: 3 loaded, 1 conflict, 1 to load)
+        // Load plan for CBRT-2026-041 (matching Figma demo state: 4 loaded in stalls 1, 2, 4, 6)
         LoadPlan lp = new LoadPlan();
         lp.setTripVehicle(tripVehicle);
-        lp.setStatus(LoadPlanStatus.DRAFT);
+        lp.setStatus(LoadPlanStatus.CONFIRMED);
+        lp.setConfirmedBy(khoi);
+        lp.setConfirmedAt(Instant.parse("2026-10-17T17:00:00Z"));
         LoadPlan savedLp = loadPlanRepository.save(lp);
 
         assignStallDirect(savedLp, stalls.get(0), shadowfax);
-        assignStallDirect(savedLp, stalls.get(2), copperKing); // Conflict: stallion beside mare, in standard stall
-        assignStallDirect(savedLp, stalls.get(3), nightfall);
-        // silverBell unassigned!
+        assignStallDirect(savedLp, stalls.get(1), copperKing); // Box stall
+        assignStallDirect(savedLp, stalls.get(3), nightfall); // Climate stall
+        assignStallDirect(savedLp, stalls.get(5), silverBell); // Standard stall
 
         // Route plan for CBRT-2026-041 (v1, CONFIRMED)
-        Place origin = placeRepository.findByName("Phú Thọ training centre").orElse(null);
+        Place origin = placeRepository.findByName("PhÃº Thá» training centre").orElse(null);
         Place dest = placeRepository.findByName("Phnom Penh Equestrian Centre").orElse(null);
         Place welfare = placeRepository.findByName("Svay Rieng welfare stop").orElse(null);
         BorderCrossing border =
-                borderCrossingRepository.findByName("Mộc Bài – Bavet").orElse(null);
+                borderCrossingRepository.findByName("Má»™c BÃ i â€“ Bavet").orElse(null);
 
         RoutePlan rp = new RoutePlan();
         rp.setTrip(trip);
@@ -781,7 +816,7 @@ public class DataSeeder implements ApplicationRunner {
         createLeg(savedRp, (short) 2, s2, s3, tx447, 50, 60);
         createLeg(savedRp, (short) 3, s3, s4, tx447, 120, 135);
 
-        // Assign crew: Driver Minh, Grooms Hoa & Tuấn
+        // Assign crew: Driver Minh, Grooms Hoa & Tuáº¥n
         User minh = userRepository.getByEmail("minh.tran@equifreight.vn");
         User hoa = userRepository.getByEmail("hoa.le@equifreight.vn");
         User tuan = userRepository.getByEmail("tuan.pham@equifreight.vn");
@@ -790,7 +825,216 @@ public class DataSeeder implements ApplicationRunner {
         assignCrewMember(tripVehicle, hoa, CrewRole.GROOM);
         assignCrewMember(tripVehicle, tuan, CrewRole.GROOM);
 
-        log.info("Seeded canonical job CBRT-2026-041 with route and load plans");
+        // Seed canonical trip records for CBRT-2026-041 (matching Figma TRIP_LOG)
+        TripRecord r1 = createTripRecord(
+                trip,
+                s1,
+                TripRecordKind.DEPARTED,
+                Instant.parse("2026-10-18T06:05:00Z"),
+                minh,
+                "Departed PhÃº Thá» training centre on schedule.");
+        addConditionLog(r1, shadowfax, HorseCondition.STABLE, true, true, "Calm during loading.");
+        addConditionLog(r1, copperKing, HorseCondition.STABLE, true, false, "Loaded into box stall.");
+        addConditionLog(r1, nightfall, HorseCondition.STABLE, true, true, "Loaded into climate stall.");
+        addConditionLog(r1, silverBell, HorseCondition.STABLE, true, true, "Settled in stall 6.");
+        tripRecordRepository.save(r1);
+
+        TripRecord r2 = createTripRecord(
+                trip,
+                s2,
+                TripRecordKind.CLEARED_BORDER,
+                Instant.parse("2026-10-18T08:34:00Z"),
+                minh,
+                "Export inspection completed at Má»™c BÃ i border. Health certificate and passport checked.");
+        tripRecordRepository.save(r2);
+
+        TripRecord r3 = createTripRecord(
+                trip,
+                s3,
+                TripRecordKind.ARRIVED_AT_STOP,
+                Instant.parse("2026-10-18T09:36:00Z"),
+                hoa,
+                "Arrived at Svay Rieng welfare stop. 45-minute rest, water and hay offered.");
+        addConditionLog(r3, shadowfax, HorseCondition.STABLE, true, true, "Settled, eating and drinking well.");
+        addConditionLog(
+                r3, copperKing, HorseCondition.STRESSED, true, false, "Restless during transport, offered extra hay.");
+        addConditionLog(r3, nightfall, HorseCondition.CLIMATE_CHANGE, true, true, "Adapting well to climate control.");
+        addConditionLog(
+                r3, silverBell, HorseCondition.OFF_FEED, false, false, "Refused water at checkpoint, monitoring.");
+        tripRecordRepository.save(r3);
+
+        log.info("Seeded canonical job CBRT-2026-041 with route and load plans and trip records");
+    }
+
+    private void seedCbrt2026040(
+            Club club,
+            User customer,
+            User yen,
+            User khoi,
+            RateCatalogVersion rateVersion,
+            List<VehicleStall> stalls,
+            Vehicle tx447,
+            User minh,
+            HorseSizeClass sizeM) {
+        if (transportJobRepository.findByCode("CBRT-2026-040").isPresent()) {
+            return;
+        }
+
+        Horse mekongStar = createHorseIfAbsent(
+                "Mekong Star",
+                club,
+                HorseCoat.BAY,
+                HorseSex.GELDING,
+                (short) 480,
+                sizeM,
+                Temperament.CALM,
+                StallType.STANDARD);
+
+        Place pnh = placeRepository.findByName("Phnom Penh Equestrian Centre").orElse(null);
+        Place pt = placeRepository.findByName("Phú Thọ training centre").orElse(null);
+        createPlaceIfMissing("Tây Ninh welfare stop", PlaceKind.WELFARE_STOP, "Tây Ninh", "VN", "QL22B, Tây Ninh");
+        Place tayNinh = placeRepository.findByName("Tây Ninh welfare stop").orElse(null);
+        BorderCrossing border =
+                borderCrossingRepository.findByName("Mộc Bài – Bavet").orElse(null);
+
+        TransportRequest req40 = new TransportRequest();
+        req40.setCode("REQ-2026-0144");
+        req40.setClub(club);
+        req40.setCreatedBy(customer);
+        req40.setStatus(RequestStatus.SUBMITTED);
+        req40.setOriginPlace(pnh);
+        req40.setDestinationPlace(pt);
+        req40.setCorridor(corridorRepository.findByCode("RD HCM -> PNH").orElse(null));
+        req40.setMode(TransportMode.ROAD);
+        req40.setTrailer(TrailerType.SHARED);
+        req40.setDepartureDate(LocalDate.of(2026, 9, 29));
+        req40.setSubmittedAt(Instant.parse("2026-09-20T08:00:00Z"));
+        req40.setHorses(new ArrayList<>());
+        TransportRequest savedReq40 = transportRequestRepository.save(req40);
+        addRequestHorse(savedReq40, mekongStar);
+        savedReq40.setStatus(RequestStatus.APPROVED);
+        transportRequestRepository.save(savedReq40);
+
+        Quotation quote40 = new Quotation();
+        quote40.setCode("Q-2026-0144");
+        quote40.setRequest(savedReq40);
+        quote40.setVersionNo((short) 1);
+        quote40.setStatus(QuotationStatus.ACCEPTED);
+        quote40.setRateCatalogVersion(rateVersion);
+        quote40.setCurrency("USD");
+        quote40.setPreparedBy(yen);
+        quote40.setIssuedAt(Instant.parse("2026-09-22T08:00:00Z"));
+        quote40.setSubtotal(new BigDecimal("3500.00"));
+        quote40.setTotal(new BigDecimal("3500.00"));
+        Quotation savedQuote40 = quotationRepository.save(quote40);
+
+        TransportJob job40 = new TransportJob();
+        job40.setCode("CBRT-2026-040");
+        job40.setRequest(savedReq40);
+        job40.setQuotation(savedQuote40);
+        job40.setApprovedBy(yen);
+        job40.setApprovedAt(Instant.parse("2026-09-25T10:00:00Z"));
+        job40.setTransportSpecialist(userRepository.getByEmail("lan.nguyen@equifreight.vn"));
+        job40.setCoordinator(khoi);
+        job40.setStage(JobStage.TRIP);
+        job40.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        job40.setTripStatus(TripStatus.HELD);
+        job40.setSignedOffAt(Instant.parse("2026-09-29T05:00:00Z"));
+        job40.setSignedOffBy(yen);
+        job40.setPlannedDepartureAt(Instant.parse("2026-09-29T05:30:00Z"));
+        job40.setDepartedAt(Instant.parse("2026-09-29T05:30:00Z"));
+        job40.setPlannedArrivalAt(Instant.parse("2026-09-29T13:30:00Z"));
+        job40.setWindowStart(Instant.parse("2026-09-29T12:00:00Z"));
+        job40.setWindowEnd(Instant.parse("2026-09-29T15:00:00Z"));
+        TransportJob savedJob40 = transportJobRepository.save(job40);
+
+        Trip trip40 = jobTrips.createForJob(savedJob40, yen, savedJob40.getApprovedAt());
+        trip40.setPlannedDepartureAt(savedJob40.getPlannedDepartureAt());
+        TripVehicle tv40 = jobTrips.useVehicle(trip40, tx447);
+
+        LoadPlan lp40 = new LoadPlan();
+        lp40.setTripVehicle(tv40);
+        lp40.setStatus(LoadPlanStatus.CONFIRMED);
+        lp40.setConfirmedBy(khoi);
+        lp40.setConfirmedAt(Instant.parse("2026-09-28T17:00:00Z"));
+        LoadPlan savedLp40 = loadPlanRepository.save(lp40);
+        assignStallDirect(savedLp40, stalls.get(0), mekongStar);
+
+        RoutePlan rp40 = new RoutePlan();
+        rp40.setTrip(trip40);
+        rp40.setVersionNo((short) 1);
+        rp40.setStatus(RoutePlanStatus.CONFIRMED);
+        rp40.setDistanceKm(240);
+        rp40.setDurationMin(390);
+        rp40.setConfirmedBy(khoi);
+        rp40.setConfirmedAt(Instant.parse("2026-09-28T17:30:00Z"));
+        RoutePlan savedRp40 = routePlanRepository.save(rp40);
+
+        RouteStop s40_1 = createStop(
+                savedRp40,
+                savedJob40,
+                (short) 1,
+                RouteStopKind.PICKUP,
+                pnh,
+                null,
+                Instant.parse("2026-09-29T05:30:00Z"),
+                (short) 30,
+                "Loading and departure.");
+
+        RouteStop s40_2 = createStop(
+                savedRp40,
+                savedJob40,
+                (short) 2,
+                RouteStopKind.BORDER,
+                null,
+                border,
+                Instant.parse("2026-09-29T08:00:00Z"),
+                (short) 60,
+                "Border crossing: Bavet – Mộc Bài.");
+
+        RouteStop s40_3 = createStop(
+                savedRp40,
+                savedJob40,
+                (short) 3,
+                RouteStopKind.WELFARE,
+                tayNinh,
+                null,
+                Instant.parse("2026-09-29T10:00:00Z"),
+                (short) 45,
+                "Welfare rest stop.");
+
+        RouteStop s40_4 = createStop(
+                savedRp40,
+                savedJob40,
+                (short) 4,
+                RouteStopKind.DELIVERY,
+                pt,
+                null,
+                Instant.parse("2026-09-29T13:30:00Z"),
+                (short) 30,
+                "Delivery and handover.");
+
+        assignCrewMember(tv40, minh, CrewRole.DRIVER);
+
+        TripRecord tr40_1 = createTripRecord(
+                trip40,
+                s40_1,
+                TripRecordKind.DEPARTED,
+                Instant.parse("2026-09-29T05:30:00Z"),
+                minh,
+                "Departed Phnom Penh on schedule.");
+        tripRecordRepository.save(tr40_1);
+
+        TripRecord tr40_2 = createTripRecord(
+                trip40,
+                s40_2,
+                TripRecordKind.HELD,
+                Instant.parse("2026-09-29T08:12:00Z"),
+                minh,
+                "Mộc Bài is closed to vehicles over 10 t until 16:00 for a bridge inspection. We are parked in the Bavet exit lane. Mekong Star is settled.");
+        tripRecordRepository.save(tr40_2);
+
+        log.info("Seeded canonical held incident job CBRT-2026-040");
     }
 
     private Horse createHorseIfAbsent(
@@ -827,6 +1071,33 @@ public class DataSeeder implements ApplicationRunner {
         rh.setSizeClassCode(horse.getSizeClass().getCode());
         rh.setRequiredStall(horse.getRequiredStall());
         req.getHorses().add(rh);
+    }
+
+    private TripRecord createTripRecord(
+            Trip trip, RouteStop stop, TripRecordKind kind, Instant occurredAt, User recordedBy, String text) {
+        TripRecord r = new TripRecord();
+        r.setTrip(trip);
+        r.setRouteStop(stop);
+        r.setKind(kind);
+        r.setOccurredAt(occurredAt);
+        r.setReceivedAt(occurredAt.plusSeconds(120));
+        r.setClientRef(java.util.UUID.randomUUID());
+        r.setRecordedBy(recordedBy);
+        r.setChannel(Channel.CAB_TABLET);
+        r.setText(text);
+        return r;
+    }
+
+    private void addConditionLog(
+            TripRecord record, Horse horse, HorseCondition condition, Boolean drinking, Boolean eating, String note) {
+        ConditionLog cl = new ConditionLog();
+        cl.setTripRecord(record);
+        cl.setHorse(horse);
+        cl.setCondition(condition);
+        cl.setDrinking(drinking);
+        cl.setEating(eating);
+        cl.setNote(note);
+        record.getConditionLogs().add(cl);
     }
 
     private void assignStallDirect(LoadPlan plan, VehicleStall stall, Horse horse) {
@@ -1054,7 +1325,7 @@ public class DataSeeder implements ApplicationRunner {
             return;
         }
         createAuthority("Regional Animal Health Office No. VI (RAHO6)", "VN", AuthorityKind.VETERINARY, (short) 5);
-        createAuthority("Mộc Bài Customs Sub-Department", "VN", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority("Má»™c BÃ i Customs Sub-Department", "VN", AuthorityKind.CUSTOMS, (short) 2);
         createAuthority(
                 "General Directorate of Animal Health and Production (GDAHP)", "KH", AuthorityKind.VETERINARY, (short)
                         4);
@@ -1062,7 +1333,7 @@ public class DataSeeder implements ApplicationRunner {
         createAuthority("Cambodia Border Animal Quarantine Station", "KH", AuthorityKind.QUARANTINE, (short) 1);
 
         createPlaceIfMissing(
-                "Phú Thọ Pre-Export Quarantine Station",
+                "PhÃº Thá» Pre-Export Quarantine Station",
                 PlaceKind.QUARANTINE,
                 "Ho Chi Minh City",
                 "VN",
@@ -1263,7 +1534,7 @@ public class DataSeeder implements ApplicationRunner {
         // Quarantine Period
         if (quarantinePeriodRepository.count() == 0) {
             Place pt = placeRepository
-                    .findByName("Phú Thọ Pre-Export Quarantine Station")
+                    .findByName("PhÃº Thá» Pre-Export Quarantine Station")
                     .orElse(null);
             if (pt != null) {
                 QuarantinePeriod qp = new QuarantinePeriod();
@@ -1310,9 +1581,9 @@ public class DataSeeder implements ApplicationRunner {
             n2.setTopic(NoteTopic.TRIP);
             n2.setRoutedRole("FLEET_ROUTE_COORDINATOR");
             n2.setCreatedBy(customer);
-            n2.setSubject("Border transit timing at Mộc Bài – Bavet");
+            n2.setSubject("Border transit timing at Má»™c BÃ i â€“ Bavet");
             n2.setBody(
-                    "Please confirm expected arrival at Mộc Bài border. The owner's escort veterinarian will meet the convoy at Bavet side for handover inspection.");
+                    "Please confirm expected arrival at Má»™c BÃ i border. The owner's escort veterinarian will meet the convoy at Bavet side for handover inspection.");
             n2.setStatus(NoteStatus.OPEN);
             noteRepository.save(n2);
             log.info("Seeded customer notes and reply for CBRT-2026-041");

@@ -1,54 +1,21 @@
 import { useRef, useState } from 'react';
-import type { UploadFile } from 'antd';
-import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
+import { Flex, message, Select, Spin } from 'antd';
 
+import { EscortCabSurface } from './cab/EscortCabSurface';
+import { CheckpointReportForm } from './CheckpointReportForm';
 import { TripDetails } from './TripDetails';
-import { eventLabels, formatTime, sentence } from './tripFormat';
+import { formatTime, sentence } from './tripFormat';
 
-import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Checkbox, Chip, Panel } from '@/components/ui';
-import { useAuth } from '@/hooks/auth';
-import { apiErrorMessage } from '@/lib/utils';
+import { Button, Callout, Chip, Panel } from '@/components/ui';
+import { useAuth, useMe } from '@/hooks/auth';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import type { HorseCondition, TripRecordKind, TripSummary } from '@/interfaces';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
-
-const eventKinds = Object.values(TripRecordKindEnum);
-
-const checkpointKinds = eventKinds.filter((kind) => kind !== TripRecordKindEnum.CONDITION_CHECK);
-
-const conditions = Object.values(HorseConditionEnum);
-
-const datetimeLocal = () => {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
-};
-
-const errorMessage = (error: unknown) =>
-  apiErrorMessage(error, 'The trip update could not be saved.');
+import type { HorseCondition, TripRecordKind } from '@/interfaces';
+import { TripStatusEnum } from '@/interfaces';
+import { apiErrorMessage } from '@/lib/utils';
 
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
-
-type Observation = {
-  checked: boolean;
-  condition: HorseCondition | null;
-  drinking: boolean | null;
-  eating: boolean | null;
-  note: string;
-  photos: UploadFile[];
-};
-
-const emptyObservation = (): Observation => ({
-  checked: false,
-  condition: null,
-  drinking: null,
-  eating: null,
-  note: '',
-  photos: [],
-});
 
 export function TripWorkspace({
   audience,
@@ -62,6 +29,7 @@ export function TripWorkspace({
   editable?: boolean;
 }) {
   const { logout } = useAuth();
+  const { data: currentUser } = useMe();
   const [page, setPage] = useState(0);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
@@ -71,118 +39,71 @@ export function TripWorkspace({
     : (summaries[0]?.jobCode ?? '');
   const detailQuery = useTrip(audience, selectedCode);
   const trip = detailQuery.data;
-  const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
-  const [stopId, setStopId] = useState<string>();
-  const [occurredAt, setOccurredAt] = useState(datetimeLocal);
-  const [text, setText] = useState('');
-  const [receiverName, setReceiverName] = useState('');
-  const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
+
   const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
     checkpoint: null,
     condition: null,
   });
-  const uploadedPhotos = useRef(new Map<string, string>());
   const mutation = useTripRecord(audience === 'staff' ? 'staff' : 'escort', selectedCode);
   const [messageApi, contextHolder] = message.useMessage();
-  const updateObservation = (horseId: string, update: Partial<Observation>) => {
-    setConditionByHorse((current) => ({
-      ...current,
-      [horseId]: { ...emptyObservation(), ...current[horseId], ...update },
-    }));
-  };
 
-  const saveCheckpoint = async () => {
+  const handleSaveCheckpoint = async (data: {
+    routeStopId: string | null;
+    kind: TripRecordKind;
+    occurredAt: string;
+    text?: string;
+    receiverName?: string;
+  }) => {
     if (!trip) return;
     const clientRef = clientRefs.current.checkpoint ?? crypto.randomUUID();
     clientRefs.current.checkpoint = clientRef;
     try {
       await mutation.mutateAsync({
-        routeStopId: stopId ?? null,
-        kind,
-        occurredAt: new Date(occurredAt).toISOString(),
+        routeStopId: data.routeStopId,
+        kind: data.kind,
+        occurredAt: data.occurredAt,
         clientRef,
-        text: text || undefined,
-        receiverName:
-          kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
+        text: data.text,
+        receiverName: data.receiverName,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
-      setText('');
-      setReceiverName('');
-      setOccurredAt(datetimeLocal());
     } catch (error) {
-      messageApi.error(errorMessage(error));
+      messageApi.error(apiErrorMessage(error, 'The trip update could not be saved.'));
+      throw error;
     }
   };
 
-  const saveConditions = async () => {
+  const handleSaveConditions = async (
+    conditions: Array<{
+      horseId: string;
+      condition: HorseCondition;
+      drinking: boolean | null;
+      eating: boolean | null;
+      note?: string;
+      photoFileIds: string[];
+    }>,
+  ) => {
     if (!trip) return;
-    const checked = trip.horses.flatMap((horse) => {
-      const observation = conditionByHorse[horse.id];
-      return observation?.checked ? [{ horse, observation }] : [];
-    });
-    if (checked.length === 0) {
-      messageApi.error('Select each horse you actually checked before saving.');
-      return;
-    }
-    if (checked.some(({ observation }) => observation.condition === null)) {
-      messageApi.error('Choose an observed condition for every selected horse.');
-      return;
-    }
     const clientRef = clientRefs.current.condition ?? crypto.randomUUID();
     clientRefs.current.condition = clientRef;
     try {
-      const conditions = await Promise.all(
-        checked.map(async ({ horse, observation }) => {
-          const photoFileIds: string[] = [];
-          for (const upload of observation.photos) {
-            if (!upload.originFileObj) continue;
-            const existingId = uploadedPhotos.current.get(upload.uid);
-            if (existingId) {
-              photoFileIds.push(existingId);
-              continue;
-            }
-            const id = (await fileApi.upload(upload.originFileObj)).id;
-            uploadedPhotos.current.set(upload.uid, id);
-            photoFileIds.push(id);
-          }
-          return {
-            horseId: horse.id,
-            condition: observation.condition!,
-            drinking: observation.drinking,
-            eating: observation.eating,
-            note: observation.note || undefined,
-            photoFileIds,
-          };
-        }),
-      );
       await mutation.mutateAsync({
-        routeStopId: stopId ?? null,
-        kind: TripRecordKindEnum.CONDITION_CHECK,
-        occurredAt: new Date(occurredAt).toISOString(),
+        routeStopId: null,
+        kind: 'CONDITION_CHECK' as TripRecordKind,
+        occurredAt: new Date().toISOString(),
         clientRef,
-        text: text || undefined,
         conditions,
       });
       clientRefs.current.condition = null;
-      uploadedPhotos.current.clear();
-      setConditionByHorse({});
-      messageApi.success('Horse condition log saved.');
-      setText('');
-      setOccurredAt(datetimeLocal());
+      messageApi.success('Horse conditions recorded.');
     } catch (error) {
-      messageApi.error(errorMessage(error));
+      messageApi.error(apiErrorMessage(error, 'The condition check could not be saved.'));
+      throw error;
     }
   };
 
-  const pageChange = (nextPage: number) => {
-    setPage(nextPage);
-    setCode('');
-    setStopId(undefined);
-  };
-  const selectedSummary: TripSummary | undefined = summaries.find(
-    (item) => item.jobCode === selectedCode,
-  );
+  const selectedSummary = summaries.find((item) => item.jobCode === selectedCode);
 
   return (
     <Flex vertical gap={24}>
@@ -219,10 +140,7 @@ export function TripWorkspace({
             <Select
               aria-label="Select trip"
               value={selectedCode}
-              onChange={(value) => {
-                setCode(value);
-                setStopId(undefined);
-              }}
+              onChange={(value) => setCode(value)}
               options={summaries.map((item) => ({
                 value: item.jobCode,
                 label: `${item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
@@ -234,7 +152,7 @@ export function TripWorkspace({
                 <Button
                   size="sm"
                   disabled={summariesQuery.data.first}
-                  onClick={() => pageChange(page - 1)}
+                  onClick={() => setPage(page - 1)}
                 >
                   Previous
                 </Button>
@@ -244,7 +162,7 @@ export function TripWorkspace({
                 <Button
                   size="sm"
                   disabled={summariesQuery.data.last}
-                  onClick={() => pageChange(page + 1)}
+                  onClick={() => setPage(page + 1)}
                 >
                   Next
                 </Button>
@@ -287,216 +205,32 @@ export function TripWorkspace({
               refreshes on its own.
             </Callout>
           )}
-          {editable && trip && (
-            <Panel
-              title={
-                audience === 'escort'
-                  ? 'Report checkpoint and horse condition'
-                  : 'Update progress by checkpoint'
+          {audience === 'escort' && trip ? (
+            <EscortCabSurface
+              trip={trip}
+              userName={
+                currentUser
+                  ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'Minh, driver'
+                  : 'Minh, driver'
               }
-            >
-              {!trip.clearanceReady && (
-                <Callout className="mb-4" tone="bad" title="Departure locked">
-                  Departure can be recorded once the transport specialist clears the dossier.
-                </Callout>
+              isPending={mutation.isPending}
+              onSaveCheckpoint={handleSaveCheckpoint}
+              onSaveConditions={handleSaveConditions}
+            />
+          ) : (
+            <>
+              {editable && trip && (
+                <Panel title="Update progress by checkpoint">
+                  <CheckpointReportForm
+                    trip={trip}
+                    isPending={mutation.isPending}
+                    onSave={handleSaveCheckpoint}
+                  />
+                </Panel>
               )}
-              <Row gutter={[12, 12]}>
-                <Col xs={24} md={12}>
-                  <Flex component="label" vertical gap={8} className="type-body-s">
-                    Checkpoint
-                    <Select
-                      value={stopId}
-                      onChange={setStopId}
-                      allowClear
-                      placeholder="Trip-wide update"
-                      options={trip.stops.map((stop) => ({ value: stop.id, label: stop.name }))}
-                    />
-                  </Flex>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Flex component="label" vertical gap={8} className="type-body-s">
-                    Checkpoint status
-                    <Select
-                      value={kind}
-                      onChange={setKind}
-                      options={checkpointKinds.map((value) => ({
-                        value,
-                        label: eventLabels[value],
-                      }))}
-                    />
-                  </Flex>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Flex component="label" vertical gap={8} className="type-body-s">
-                    Recorded time
-                    <input
-                      type="datetime-local"
-                      value={occurredAt}
-                      onChange={(event) => setOccurredAt(event.target.value)}
-                      className="h-8 rounded-md border border-line-strong bg-input px-2"
-                    />
-                  </Flex>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Flex component="label" vertical gap={8} className="type-body-s">
-                    Update note
-                    <Input
-                      value={text}
-                      onChange={(event) => setText(event.target.value)}
-                      maxLength={500}
-                      placeholder="What happened at this checkpoint?"
-                    />
-                  </Flex>
-                </Col>
-                {kind === TripRecordKindEnum.HANDED_OVER && (
-                  <Col xs={24} md={12}>
-                    <Flex component="label" vertical gap={8} className="type-body-s">
-                      Received by
-                      <Input
-                        value={receiverName}
-                        onChange={(event) => setReceiverName(event.target.value)}
-                        maxLength={120}
-                        placeholder="Name of the receiving person"
-                      />
-                    </Flex>
-                  </Col>
-                )}
-              </Row>
-              {audience === 'escort' && (
-                <div className="mt-5 divide-y divide-line">
-                  {trip.horses.map((horse) => {
-                    const observation = conditionByHorse[horse.id] ?? emptyObservation();
-                    return (
-                      <section key={horse.id} className="py-4">
-                        <Row gutter={[12, 12]}>
-                          <Col xs={24} md={12}>
-                            <div>
-                              <strong className="type-h4">{horse.name}</strong>
-                              <p className="type-body-s m-0 text-ink-3">
-                                {horse.stall ?? 'Stall not assigned'}
-                              </p>
-                            </div>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Checkbox
-                              label="I checked this horse"
-                              checked={observation.checked}
-                              onChange={(event) =>
-                                updateObservation(horse.id, { checked: event.target.checked })
-                              }
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Select
-                              aria-label={`${horse.name} condition`}
-                              className="w-full"
-                              allowClear
-                              placeholder="Observed condition"
-                              value={observation.condition ?? undefined}
-                              onChange={(condition?: HorseCondition) =>
-                                updateObservation(horse.id, { condition: condition ?? null })
-                              }
-                              options={conditions.map((condition) => ({
-                                value: condition,
-                                label: sentence(condition),
-                              }))}
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Row gutter={[12, 12]}>
-                              {(['drinking', 'eating'] as const).map((field) => (
-                                <Col key={field} span={12}>
-                                  <Flex component="label" vertical gap={4} className="type-body-s">
-                                    {field === 'drinking' ? 'Drinking' : 'Eating'}
-                                    <Select
-                                      allowClear
-                                      placeholder="Not recorded"
-                                      value={
-                                        observation[field] === null
-                                          ? undefined
-                                          : observation[field]
-                                            ? 'YES'
-                                            : 'NO'
-                                      }
-                                      onChange={(value?: 'YES' | 'NO') =>
-                                        updateObservation(horse.id, {
-                                          [field]: value === undefined ? null : value === 'YES',
-                                        })
-                                      }
-                                      options={[
-                                        { value: 'YES', label: 'Yes' },
-                                        { value: 'NO', label: 'No' },
-                                      ]}
-                                    />
-                                  </Flex>
-                                </Col>
-                              ))}
-                            </Row>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Input
-                              value={observation.note}
-                              onChange={(event) =>
-                                updateObservation(horse.id, { note: event.target.value })
-                              }
-                              maxLength={500}
-                              placeholder="Condition note (optional)"
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Upload
-                              accept="image/jpeg,image/png,image/heic,image/heif"
-                              multiple
-                              maxCount={8}
-                              fileList={observation.photos}
-                              beforeUpload={() => false}
-                              onChange={({ fileList }) =>
-                                updateObservation(horse.id, { photos: fileList })
-                              }
-                            >
-                              <Button type="button" size="sm" leadingIcon="upload">
-                                Attach photos
-                              </Button>
-                            </Upload>
-                          </Col>
-                        </Row>
-                      </section>
-                    );
-                  })}
-                </div>
-              )}
-              {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
-              <div className="mt-4">
-                <Flex wrap justify="end" gap={8}>
-                  <Button
-                    disabled={
-                      mutation.isPending ||
-                      ((kind === TripRecordKindEnum.DEPARTED ||
-                        kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                        !trip.clearanceReady) ||
-                      (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
-                    }
-                    onClick={saveCheckpoint}
-                  >
-                    {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
-                  </Button>
-                  {audience === 'escort' && (
-                    <Button
-                      variant="primary"
-                      disabled={
-                        mutation.isPending ||
-                        !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
-                      }
-                      onClick={saveConditions}
-                    >
-                      Save checked horse conditions
-                    </Button>
-                  )}
-                </Flex>
-              </div>
-            </Panel>
+              {trip && <TripDetails trip={trip} audience={audience} />}
+            </>
           )}
-          {trip && <TripDetails trip={trip} />}
         </>
       )}
     </Flex>

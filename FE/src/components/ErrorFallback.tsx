@@ -42,7 +42,8 @@ export const ErrorFallback: FC<Props> = ({ error, reset, isAuthenticated = true,
   // Clears the boundary before leaving; the router clears its own error when it navigates.
   const clearBeforeLeaving = fullPage ? () => {} : reset;
 
-  const backToWork = (
+  const isUserAuthenticated = isAuthenticated && roles.length > 0;
+  const backToWork = isUserAuthenticated ? (
     <Button
       variant="ghost"
       leadingIcon="arrow-left"
@@ -52,6 +53,16 @@ export const ErrorFallback: FC<Props> = ({ error, reset, isAuthenticated = true,
       }}
     >
       Back to your work
+    </Button>
+  ) : (
+    <Button
+      variant="ghost"
+      onClick={() => {
+        clearBeforeLeaving();
+        router.push('/signin');
+      }}
+    >
+      Sign in
     </Button>
   );
   const tryAgain = (

@@ -7,6 +7,8 @@ import { ClearanceGate, StageMark } from '@/components/ui';
 import { useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
+import { TripTab } from './TripTab';
+
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
@@ -48,11 +50,7 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       key: 'trip',
       label: 'Trip',
       owner: 'Escort (driver / groom)',
-      render: () => (
-        <Placeholder title="Trip Journey Log">
-          Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
-        </Placeholder>
-      ),
+      render: (job) => <TripTab jobCode={job.code} />,
     },
   ];
 

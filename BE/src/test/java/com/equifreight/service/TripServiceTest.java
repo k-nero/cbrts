@@ -64,6 +64,9 @@ class TripServiceTest {
     private RequestHorseRepository requestHorses;
 
     @Mock
+    private ChecklistItemRepository checklistItems;
+
+    @Mock
     private FileService files;
 
     @Mock
@@ -89,17 +92,18 @@ class TripServiceTest {
     private Horse nightfall;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null);
     }
 
     private static TripRecordRequest handover(Instant at, String receiverName) {
-        return new TripRecordRequest(null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName);
+        return new TripRecordRequest(
+                null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName, null);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
 
     private static TripConditionRequest condition(Horse horse, List<UUID> photos) {
-        return new TripConditionRequest(horse.getId(), HorseCondition.SOUND, true, true, null, photos);
+        return new TripConditionRequest(horse.getId(), HorseCondition.STABLE, true, true, null, photos);
     }
 
     private static Horse horse(String name) {
@@ -135,6 +139,7 @@ class TripServiceTest {
                 routes,
                 loads,
                 requestHorses,
+                checklistItems,
                 handovers,
                 files,
                 audit,
@@ -385,7 +390,14 @@ class TripServiceTest {
                 job.getCode(),
                 escort,
                 new TripRecordRequest(
-                        null, TripRecordKind.HELD, NOW, UUID.randomUUID(), "Vet check at the border", null, null));
+                        null,
+                        TripRecordKind.HELD,
+                        NOW,
+                        UUID.randomUUID(),
+                        "Vet check at the border",
+                        null,
+                        null,
+                        null));
 
         assertEquals(TripStatus.HELD, job.getTripStatus());
         verify(notifications)
@@ -520,7 +532,7 @@ class TripServiceTest {
                 job.getCode(),
                 coordinator,
                 new TripRecordRequest(
-                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null));
+                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null, null));
 
         assertEquals(TripStatus.DELIVERED, other.getTripStatus());
         assertEquals(TripStatus.DEPARTED, job.getTripStatus());
@@ -549,7 +561,7 @@ class TripServiceTest {
             ConditionLog log = new ConditionLog();
             log.setTripRecord(check);
             log.setHorse(horse);
-            log.setCondition(HorseCondition.SOUND);
+            log.setCondition(HorseCondition.STABLE);
             check.getConditionLogs().add(log);
         }
         TripRecord atOthersStop = stored(TripRecordKind.DELIVERED, NOW.minusSeconds(30));

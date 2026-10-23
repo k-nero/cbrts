@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -16,20 +17,14 @@ import org.springframework.stereotype.Repository;
 public interface ChecklistItemRepository
         extends JpaRepository<ChecklistItem, UUID>, JpaSpecificationExecutor<ChecklistItem> {
 
-    /**
-     * Lấy toàn bộ checklist của 1 chuyến vận chuyển.
-     */
+    /** The job's checklist, including the crossing and horse labels needed by the cab. */
+    @EntityGraph(attributePaths = {"documentType", "horse", "borderCrossing"})
     List<ChecklistItem> findByJobId(UUID jobId);
 
-    /**
-     * Lấy checklist theo trạng thái (VD: lọc items đang IN_REVIEW).
-     */
+    /** Lists checklist items with one status. */
     List<ChecklistItem> findByJobIdAndStatus(UUID jobId, ChecklistStatus status);
 
-    /**
-     * Kiểm tra tất cả các items bắt buộc của 1 job đã CLEARED chưa (để mở khóa
-     * CLEARANCE_READY).
-     */
+    /** Checks whether every mandatory checklist item is cleared. */
     @Query("""
             SELECT COUNT(ci) = 0 FROM ChecklistItem ci
             JOIN ci.regulationRule rr
@@ -39,9 +34,7 @@ public interface ChecklistItemRepository
             """)
     boolean areAllMandatoryItemsCleared(@Param("jobId") UUID jobId);
 
-    /**
-     * Lấy tất cả checklist của 1 con ngựa trong 1 job (scope PER_HORSE).
-     */
+    /** Lists the checklist items for one horse in a job. */
     List<ChecklistItem> findByJobIdAndHorseId(UUID jobId, UUID horseId);
 
     /**

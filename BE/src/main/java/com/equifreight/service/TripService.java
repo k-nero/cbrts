@@ -65,6 +65,7 @@ public class TripService {
     private final RoutePlanRepository routes;
     private final LoadPlanRepository loads;
     private final RequestHorseRepository requestHorses;
+    private final ChecklistItemRepository checklistItems;
     private final HandoverRepository handovers;
     private final FileService files;
     private final AuditService audit;
@@ -79,6 +80,7 @@ public class TripService {
             RoutePlanRepository routes,
             LoadPlanRepository loads,
             RequestHorseRepository requestHorses,
+            ChecklistItemRepository checklistItems,
             HandoverRepository handovers,
             FileService files,
             AuditService audit,
@@ -91,6 +93,7 @@ public class TripService {
         this.routes = routes;
         this.loads = loads;
         this.requestHorses = requestHorses;
+        this.checklistItems = checklistItems;
         this.handovers = handovers;
         this.files = files;
         this.audit = audit;
@@ -204,6 +207,7 @@ public class TripService {
         record.setRecordedBy(user);
         record.setChannel(channel);
         record.setText(request.text());
+        attachDocumentsShown(record, job, stop, request.kind(), request.documentsShown());
         Set<UUID> seen = new HashSet<>();
         Set<UUID> attachedFiles = new HashSet<>();
         if (request.conditions() != null)
@@ -242,6 +246,38 @@ public class TripService {
         }
         writeAudit(saved, target, user, channel, stop);
         return TripMapper.toRecordResponse(saved);
+    }
+
+    private void attachDocumentsShown(
+            TripRecord record, TransportJob job, RouteStop stop, TripRecordKind kind, List<UUID> documentIds) {
+        if (documentIds == null || documentIds.isEmpty()) return;
+        boolean borderEvent = EnumSet.of(
+                        TripRecordKind.ARRIVED_AT_STOP, TripRecordKind.CLEARED_BORDER, TripRecordKind.HELD)
+                .contains(kind);
+        if (stop == null || stop.getKind() != RouteStopKind.BORDER || !borderEvent)
+            throw new BusinessException(
+                    "BORDER_DOCUMENTS_REQUIRE_BORDER_EVENT",
+                    "Documents shown can be recorded only at a border checkpoint");
+        if (documentIds.size() != new HashSet<>(documentIds).size())
+            throw new BusinessException("DUPLICATE_BORDER_DOCUMENT", "A border document can be recorded only once");
+
+        Map<UUID, ChecklistItem> jobItems = new HashMap<>();
+        checklistItems.findByJobId(job.getId()).forEach(item -> jobItems.put(item.getId(), item));
+        UUID crossingId = stop.getBorderCrossing() == null
+                ? null
+                : stop.getBorderCrossing().getId();
+        for (UUID documentId : documentIds) {
+            ChecklistItem item = jobItems.get(documentId);
+            if (item == null
+                    || crossingId == null
+                    || item.getBorderCrossing() == null
+                    || !crossingId.equals(item.getBorderCrossing().getId()))
+                throw ResourceNotFoundException.of("Border document", documentId);
+            TripRecordDocument doc = new TripRecordDocument();
+            doc.setChecklistItem(item);
+            doc.setTripRecord(record);
+            record.getDocumentsShown().add(doc);
+        }
     }
 
     /**
@@ -480,6 +516,7 @@ public class TripService {
         List<TripRecord> tripRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
                 .filter(r -> r.getRouteStop() == null || visible.test(r.getRouteStop()))
                 .toList();
+        List<ChecklistItem> jobChecklist = checklistItems.findByJobId(job.getId());
         Map<UUID, TripRecord> latest = new HashMap<>();
         tripRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
@@ -487,7 +524,18 @@ public class TripService {
         List<TripStopResponse> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
                         .filter(visible)
-                        .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
+                        .map(s -> TripMapper.toStopResponse(
+                                s,
+                                latest.get(s.getId()),
+                                s.getBorderCrossing() == null
+                                        ? List.of()
+                                        : jobChecklist.stream()
+                                                .filter(item -> item.getBorderCrossing() != null
+                                                        && item.getBorderCrossing()
+                                                                .getId()
+                                                                .equals(s.getBorderCrossing()
+                                                                        .getId()))
+                                                .toList()))
                         .toList())
                 .orElse(List.of());
         // Every confirmed trailer of the convoy, in order (US-F3-10).
@@ -547,7 +595,8 @@ public class TripService {
                 r.text(),
                 r.conditions().stream()
                         .filter(c -> ownHorses.contains(c.horseId()))
-                        .toList());
+                        .toList(),
+                r.documentsShown());
     }
 
     private TransportJob job(String code) {
