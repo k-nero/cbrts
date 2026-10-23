@@ -33,4 +33,12 @@ public record IncidentResponse(
         String reportedByName,
         String ownerName,
         String coordinatorName,
-        List<TripPhotoResponse> photos) {}
+        List<TripPhotoResponse> photos,
+        /** The job's quotation currency: every cost on the incident is in it. */
+        String currency,
+        List<IncidentOptionResponse> options,
+        /** The option waiting for the manager's approval (US-F5-02), or null. */
+        UUID proposedOptionId,
+        String proposedByName,
+        Instant proposedAt,
+        String proposalNote) {}
