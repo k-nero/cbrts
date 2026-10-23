@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { UploadFile } from 'antd';
 import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
 
@@ -65,10 +66,13 @@ export function TripWorkspace({
   const [page, setPage] = useState(0);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
-  const [code, setCode] = useState('');
-  const selectedCode = summaries.some((item) => item.jobCode === code)
-    ? code
-    : (summaries[0]?.jobCode ?? '');
+  // A notification opens tracking on its job (/tracking?job=CBRT-…); a trip lists under any of its jobs.
+  const [searchParams] = useSearchParams();
+  const [code, setCode] = useState(searchParams.get('job') ?? '');
+  const selectedCode =
+    summaries.find((item) => item.jobCode === code || item.jobCodes.includes(code))?.jobCode ??
+    summaries[0]?.jobCode ??
+    '';
   const detailQuery = useTrip(audience, selectedCode);
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
@@ -225,7 +229,8 @@ export function TripWorkspace({
               }}
               options={summaries.map((item) => ({
                 value: item.jobCode,
-                label: `${item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
+                // The escort's row is a trip: its TRP code and every job on the trailer.
+                label: `${item.tripCode ? `${item.tripCode} · ${item.jobCodes.join(', ')}` : item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
               }))}
               className="min-w-72 flex-1"
             />
@@ -254,9 +259,11 @@ export function TripWorkspace({
           {selectedSummary && (
             <Panel
               title={
-                trip?.tripCode
-                  ? `${selectedSummary.jobCode} · ${trip.tripCode}`
-                  : selectedSummary.jobCode
+                selectedSummary.tripCode
+                  ? `${selectedSummary.tripCode} · ${selectedSummary.jobCodes.join(', ')}`
+                  : trip?.tripCode
+                    ? `${selectedSummary.jobCode} · ${trip.tripCode}`
+                    : selectedSummary.jobCode
               }
               extra={
                 <Chip tone={statusTone(selectedSummary.tripStatus)}>
@@ -309,7 +316,10 @@ export function TripWorkspace({
                       onChange={setStopId}
                       allowClear
                       placeholder="Trip-wide update"
-                      options={trip.stops.map((stop) => ({ value: stop.id, label: stop.name }))}
+                      options={trip.stops.map((stop) => ({
+                        value: stop.id,
+                        label: stop.jobCode ? `${stop.name} · ${stop.jobCode}` : stop.name,
+                      }))}
                     />
                   </Flex>
                 </Col>
@@ -496,7 +506,7 @@ export function TripWorkspace({
               </div>
             </Panel>
           )}
-          {trip && <TripDetails trip={trip} />}
+          {trip && <TripDetails trip={trip} audience={audience} />}
         </>
       )}
     </Flex>

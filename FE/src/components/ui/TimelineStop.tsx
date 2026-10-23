@@ -4,7 +4,8 @@ import type { RouteStopKind } from '@/interfaces';
 import { Icon, type IconName } from './Icon';
 import { cx } from './tone';
 
-export type StopKind = Lowercase<RouteStopKind>;
+/** on_the_way: another client's stop on a shared trailer, as the customer sees it (no place). */
+export type StopKind = Lowercase<RouteStopKind> | 'on_the_way';
 
 /* The icon names the kind; status colours stay for state, so every kind is neutral. */
 const KIND: Record<StopKind, { icon: IconName; label: string }> = {
@@ -16,12 +17,13 @@ const KIND: Record<StopKind, { icon: IconName; label: string }> = {
   quarantine: { icon: 'shield', label: 'Quarantine' },
   airport_out: { icon: 'plane', label: 'Airport departure' },
   airport_in: { icon: 'plane', label: 'Airport arrival' },
+  on_the_way: { icon: 'truck', label: 'Shared trailer' },
 };
 
 const FALLBACK: { icon: IconName; label: string } = { icon: 'check', label: 'Stop' };
 
 type Props = {
-  kind: StopKind | RouteStopKind;
+  kind: StopKind | RouteStopKind | 'ON_THE_WAY';
   /** The place, in Fraunces: "Mộc Bài – Bavet". */
   stop: ReactNode;
   time: ReactNode;
