@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), and convoys (US-F3-10, #169). The rest is in #170–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169) and shared trailers (US-F3-11, #170). The rest is in #171–#175.
 
 ## Why
 
@@ -12,6 +12,7 @@ Today one approved request becomes one job, and one job has exactly one trailer:
 | --- | --- |
 | Scope | Both: **sharing** (several jobs in one trailer) and **splitting** (one job across several trailers). |
 | Who combines jobs, and when | The **fleet coordinator, after approval**, while planning. The app suggests jobs that fit. |
+| Private trailers | **Never shared.** Only jobs whose customer chose a shared trailer can be combined; a private-trailer job (and so every job with an arrival window, which needs a private trailer) always travels alone. Decided 23 Oct 2026, while building US-F3-11. |
 | Price | **Unchanged.** Space is already priced by stall width, so each customer keeps their quoted price; sharing saves the company a trailer. The locked price and horse list are untouched. |
 | Routes | **Same catalog corridor.** Different pickup or drop-off points become extra stops on one route plan. |
 | Model | A new **Trip** above jobs: one trip holds 1+ jobs and 1+ vehicles. Jobs keep their CBRT codes. |
