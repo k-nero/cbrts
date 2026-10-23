@@ -30,8 +30,9 @@ export interface CustomerNote {
   status: 'OPEN' | 'RESOLVED' | 'ANSWERED';
   dueToday: boolean;
   overdue: boolean;
+  attachedFileId?: string | null;
   attachedFileName?: string | null;
-  attachedFileSize?: string | null;
+  attachedFileSizeBytes?: number | null;
   replies?: NoteReply[];
 }
 
