@@ -63,6 +63,7 @@ export const queryKeys = {
     all: () => ['clearance'] as const,
     jobs: (q = '') => ['clearance', 'jobs', 'list', q] as const,
     pendingReviews: () => ['clearance', 'pending-reviews'] as const,
+    reviewDetail: (versionId: string) => ['clearance', 'versions', versionId, 'review-detail'] as const,
     checklist: (jobId: string) => ['clearance', 'jobs', jobId, 'checklist'] as const,
     requestChecklist: (requestId: string) =>
       ['clearance', 'requests', requestId, 'checklist'] as const,

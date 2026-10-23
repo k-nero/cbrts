@@ -4,7 +4,7 @@ import { Icon } from './Icon';
 import { cx, TONE_FG, TONE_SURFACE } from './tone';
 
 type Props = {
-  state: 'locked' | 'clear';
+  state: 'locked' | 'clear' | 'departed';
   title?: ReactNode;
   /** What is outstanding, or that every mandatory item is cleared. */
   children?: ReactNode;
@@ -19,6 +19,10 @@ type Props = {
  */
 export const ClearanceGate: FC<Props> = ({ state, title, children, action, className }) => {
   const tone = state === 'locked' ? 'bad' : 'ok';
+  const defaultIcon = state === 'locked' ? 'lock' : state === 'departed' ? 'truck' : 'unlock';
+  const defaultTitle =
+    state === 'locked' ? 'Departure locked' : state === 'departed' ? 'Departed' : 'Clear to depart';
+
   return (
     <div
       className={cx(
@@ -33,12 +37,10 @@ export const ClearanceGate: FC<Props> = ({ state, title, children, action, class
           TONE_FG[tone],
         )}
       >
-        <Icon name={state === 'locked' ? 'lock' : 'unlock'} size={22} />
+        <Icon name={defaultIcon} size={22} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="type-h3 text-ink">
-          {title ?? (state === 'locked' ? 'Departure locked' : 'Clear to depart')}
-        </span>
+        <span className="type-h3 text-ink">{title ?? defaultTitle}</span>
         {children && <span className="type-body-s text-ink-2">{children}</span>}
       </span>
       {action}

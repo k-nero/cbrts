@@ -22,6 +22,7 @@ import NotificationsPage from '@/pages/notifications';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
+import DocumentReviewPage from '@/pages/staff/documents/review';
 import AuthoritiesPage from '@/pages/staff/authorities';
 import FleetCalendarPage from '@/pages/staff/fleet-calendar';
 import JobsPage from '@/pages/staff/jobs';
@@ -103,6 +104,7 @@ export const router = createBrowserRouter([
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: <AuditLogPage /> },
           { path: 'documents', element: <DocumentsPage /> },
+          { path: 'documents/review/:id', element: <DocumentReviewPage /> },
           { path: 'authorities', element: <AuthoritiesPage /> },
           { path: 'customer-notes', element: <CustomerNotesPage /> },
           { path: 'regulations', element: <RegulationsPage /> },

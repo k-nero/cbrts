@@ -10,6 +10,7 @@ import type {
   DocumentType,
   DocumentUploadRequest,
   DocumentVersion,
+  DocumentReviewDetail,
   ClearanceJobSummary,
   PagedResponse,
   QuarantinePeriod,
@@ -45,6 +46,9 @@ export const clearanceApi = {
 
   uploadDocumentVersion: (checklistItemId: string, data: DocumentUploadRequest) =>
     client.post<ChecklistItem>(`/staff/clearance/checklist/${checklistItemId}/versions`, data),
+
+  getDocumentReviewDetail: (documentVersionId: string) =>
+    client.get<DocumentReviewDetail>(`/staff/clearance/versions/${documentVersionId}`),
 
   reviewDocument: (documentVersionId: string, data: ReviewDocumentRequest) =>
     client.post<DocumentVersion>(`/staff/clearance/versions/${documentVersionId}/review`, data),

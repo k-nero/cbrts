@@ -9,6 +9,7 @@ import type {
   CreateQuarantinePeriodRequest,
   DocumentUploadRequest,
   DocumentVersion,
+  DocumentReviewDetail,
   ClearanceJobSummary,
   ReviewDocumentRequest,
   UpdateAuthoritySubmissionRequest,
@@ -98,6 +99,21 @@ export const useClearanceStatus = (jobId: string | null | undefined) => {
 };
 
 /**
+ * US-F2-04 (issue #88): Details for reviewing one document version on its own screen.
+ */
+export const useDocumentReviewDetail = (versionId: string | null | undefined) => {
+  return useQuery({
+    queryKey: queryKeys.clearance.reviewDetail(versionId ?? ''),
+    queryFn: async (): Promise<DocumentReviewDetail | null> => {
+      if (!versionId || !versionId.trim()) return null;
+      const res = await clearanceApi.getDocumentReviewDetail(versionId);
+      return res.data;
+    },
+    enabled: Boolean(versionId && versionId.trim()),
+  });
+};
+
+/**
  * Review document version mutation (Approve / Reject).
  * Invalidates affected queries on success.
  */
@@ -106,8 +122,11 @@ export const useReviewDocument = (jobId?: string | null) => {
   return useMutation({
     mutationFn: ({ versionId, data }: { versionId: string; data: ReviewDocumentRequest }) =>
       clearanceApi.reviewDocument(versionId, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.pendingReviews() });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.clearance.reviewDetail(variables.versionId),
+      });
       if (jobId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
