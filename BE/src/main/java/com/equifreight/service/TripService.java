@@ -169,7 +169,17 @@ public class TripService {
                         "TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
             return TripMapper.toRecordResponse(existing.get());
         }
-        boolean late = validateTransition(job, trip, request.kind(), request.occurredAt(), channel);
+        RouteStop stop = null;
+        if (request.routeStopId() != null) {
+            RoutePlan plan = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                    .orElseThrow(() -> ResourceNotFoundException.of("Confirmed route", job.getCode()));
+            stop = plan.getStops().stream()
+                    .filter(s -> s.getId().equals(request.routeStopId()))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
+        }
+        TransportJob target = target(job, trip, stop);
+        boolean late = validateTransition(target, trip, request.kind(), request.occurredAt(), channel);
         boolean hasConditions =
                 request.conditions() != null && !request.conditions().isEmpty();
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
@@ -183,16 +193,7 @@ public class TripService {
         if (request.kind() == TripRecordKind.HANDED_OVER && receiverName.isEmpty())
             throw new BusinessException("RECEIVER_REQUIRED", "Enter the name of the person who received the horses");
         if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
-            requireDepartureAllowed(job, request.occurredAt());
-        RouteStop stop = null;
-        if (request.routeStopId() != null) {
-            RoutePlan plan = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
-                    .orElseThrow(() -> ResourceNotFoundException.of("Confirmed route", job.getCode()));
-            stop = plan.getStops().stream()
-                    .filter(s -> s.getId().equals(request.routeStopId()))
-                    .findFirst()
-                    .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
-        }
+            for (TransportJob riding : riding(trip, target)) requireDepartureAllowed(riding, request.occurredAt());
         TripRecord record = new TripRecord();
         record.setTrip(trip);
         record.setRouteStop(stop);
@@ -210,12 +211,15 @@ public class TripService {
                 if (!seen.add(condition.horseId()))
                     throw new BusinessException(
                             "DUPLICATE_HORSE_CONDITION", "A horse can appear only once in a condition check");
-                RequestHorse requestHorse = requestHorses
-                        .findByRequest_IdAndHorse_Id(job.getRequest().getId(), condition.horseId())
+                // Any horse on the trip, whichever job it travels under.
+                Horse horse = jobTrips.horsesOn(trip).stream()
+                        .map(TripHorse::getHorse)
+                        .filter(h -> h.getId().equals(condition.horseId()))
+                        .findFirst()
                         .orElseThrow(() -> ResourceNotFoundException.of("Horse on trip", condition.horseId()));
                 ConditionLog log = new ConditionLog();
                 log.setTripRecord(record);
-                log.setHorse(requestHorse.getHorse());
+                log.setHorse(horse);
                 log.setCondition(condition.condition());
                 log.setDrinking(condition.drinking());
                 log.setEating(condition.eating());
@@ -232,12 +236,30 @@ public class TripService {
         TripRecord saved = records.save(record);
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) {
-            updateJobStatus(job, trip, request.kind(), request.occurredAt(), stop);
-            recordHandover(job, request.kind(), request.occurredAt(), receiverName);
-            if (request.kind() == TripRecordKind.HELD) alertHold(job, stop, request.text());
+            updateJobStatus(target, trip, request.kind(), request.occurredAt(), stop);
+            recordHandover(target, request.kind(), request.occurredAt(), receiverName);
+            if (request.kind() == TripRecordKind.HELD) alertHold(target, stop, request.text());
         }
-        writeAudit(saved, job, user, channel, stop);
+        writeAudit(saved, target, user, channel, stop);
         return TripMapper.toRecordResponse(saved);
+    }
+
+    /**
+     * The job a record is about (US-F3-11): a pickup or delivery stop's own job, else the job in the URL while its
+     * horses are still on the trip, else a job still riding. Departures, holds and checkpoints move every job on
+     * the trip together; arrivals, deliveries and handovers move only the job whose stop it is.
+     */
+    private TransportJob target(TransportJob job, Trip trip, RouteStop stop) {
+        if (stop != null && stop.getJob() != null) return stop.getJob();
+        List<TransportJob> riding = jobTrips.jobsOn(trip);
+        if (riding.isEmpty() || riding.stream().anyMatch(j -> j.getId().equals(job.getId()))) return job;
+        return riding.getFirst();
+    }
+
+    /** The jobs with horses on the trip now; the target alone when the lookup has none. */
+    private List<TransportJob> riding(Trip trip, TransportJob target) {
+        List<TransportJob> riding = jobTrips.jobsOn(trip);
+        return riding.isEmpty() ? List.of(target) : riding;
     }
 
     /**
@@ -249,7 +271,9 @@ public class TripService {
                 || job.getClearanceReadyAt() == null
                 || job.getClearanceReadyAt().isAfter(occurredAt))
             throw new BusinessException(
-                    "CLEARANCE_REQUIRED", "Departure cannot be recorded before the dossier is CLEARANCE_READY");
+                    "CLEARANCE_REQUIRED",
+                    "Departure cannot be recorded before the dossier of " + job.getCode()
+                            + " is CLEARANCE_READY. On a shared trip, take that job off the trip so the others can leave.");
         if (job.getDepartedAt() == null && job.getSignedOffAt() == null)
             throw new BusinessException(
                     "SIGN_OFF_REQUIRED",
@@ -297,7 +321,10 @@ public class TripService {
                                 .contains(kind)))
             throw transitionConflict(status, "Only handover or a note can be recorded at the handover stage.");
         if (job.getStage() == JobStage.HANDOVER
-                && records.existsByTrip_IdAndKind(trip.getId(), TripRecordKind.HANDED_OVER)
+                && handovers
+                        .findByJob_Id(job.getId())
+                        .map(h -> h.getConfirmDueAt() != null)
+                        .orElse(false)
                 && kind != TripRecordKind.NOTE)
             throw transitionConflict(status, "Only a note can be added after handover.");
 
@@ -345,40 +372,49 @@ public class TripService {
     }
 
     /**
-     * Moves the job's trip status. The trip carries this one job until shared trips (US-F3-11), so it follows the
-     * job's status, and the job's horses come off the trip once delivered.
+     * Moves the trip's jobs (US-F3-11): a departure, hold, checkpoint or landing moves every job riding the trip; an
+     * arrival at a delivery stop, a delivery or a handover moves the job whose stop it is, and its horses come off
+     * the trip once delivered. The trip's status follows the jobs still on it, and is DELIVERED when none is.
      */
-    private void updateJobStatus(TransportJob job, Trip trip, TripRecordKind kind, Instant at, RouteStop stop) {
+    private void updateJobStatus(TransportJob target, Trip trip, TripRecordKind kind, Instant at, RouteStop stop) {
+        List<TransportJob> riding = riding(trip, target);
         switch (kind) {
-            case DEPARTED, FLIGHT_DEPARTED -> {
-                job.setTripStatus(TripStatus.DEPARTED);
-                job.setStage(JobStage.TRIP);
-                if (job.getDepartedAt() == null) job.setDepartedAt(at);
-            }
-            case HELD -> {
-                job.setTripStatus(TripStatus.HELD);
-                job.setStage(JobStage.TRIP);
-            }
-            case LEFT_STOP, CLEARED_BORDER -> {
-                if (job.getTripStatus() == TripStatus.HELD) job.setTripStatus(TripStatus.DEPARTED);
-            }
-            case FLIGHT_LANDED -> job.setStage(JobStage.TRIP);
+            case DEPARTED, FLIGHT_DEPARTED ->
+                riding.forEach(job -> {
+                    job.setTripStatus(TripStatus.DEPARTED);
+                    job.setStage(JobStage.TRIP);
+                    if (job.getDepartedAt() == null) job.setDepartedAt(at);
+                });
+            case HELD ->
+                riding.forEach(job -> {
+                    job.setTripStatus(TripStatus.HELD);
+                    job.setStage(JobStage.TRIP);
+                });
+            case LEFT_STOP, CLEARED_BORDER ->
+                riding.forEach(job -> {
+                    if (job.getTripStatus() == TripStatus.HELD) job.setTripStatus(TripStatus.DEPARTED);
+                });
+            case FLIGHT_LANDED -> riding.forEach(job -> job.setStage(JobStage.TRIP));
             case ARRIVED_AT_STOP -> {
-                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY) job.setTripStatus(TripStatus.ARRIVED);
+                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY) target.setTripStatus(TripStatus.ARRIVED);
             }
             case DELIVERED -> {
-                job.setTripStatus(TripStatus.DELIVERED);
-                job.setStage(JobStage.HANDOVER);
-                if (job.getDeliveredAt() == null) job.setDeliveredAt(at);
+                target.setTripStatus(TripStatus.DELIVERED);
+                target.setStage(JobStage.HANDOVER);
+                if (target.getDeliveredAt() == null) target.setDeliveredAt(at);
             }
             case HANDED_OVER -> {
-                job.setTripStatus(TripStatus.DELIVERED);
-                job.setStage(JobStage.HANDOVER);
+                target.setTripStatus(TripStatus.DELIVERED);
+                target.setStage(JobStage.HANDOVER);
             }
             default -> {}
         }
-        trip.setStatus(job.getTripStatus());
-        if (job.getTripStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, job);
+        if (target.getTripStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, target);
+        List<TransportJob> remaining = jobTrips.jobsOn(trip);
+        trip.setStatus(
+                remaining.isEmpty()
+                        ? target.getTripStatus()
+                        : remaining.getFirst().getTripStatus());
     }
 
     /**
@@ -433,13 +469,24 @@ public class TripService {
 
     /** The trip as {@code job}'s people see it; {@code staffView} is false for the customer, who never sees the TRP code. */
     private TripViewResponse view(TransportJob job, Trip trip, boolean staffView) {
-        List<TripRecord> tripRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId());
+        // The customer sees their own stops and horses only: on a shared trip, nothing about the other client
+        // (US-F3-11). Stops of the whole trip (borders, welfare stops) are theirs too.
+        java.util.function.Predicate<RouteStop> visible =
+                st -> staffView || st.getJob() == null || st.getJob().getId().equals(job.getId());
+        Set<UUID> ownHorses = new HashSet<>();
+        requestHorses
+                .findByRequest_Id(job.getRequest().getId())
+                .forEach(rh -> ownHorses.add(rh.getHorse().getId()));
+        List<TripRecord> tripRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
+                .filter(r -> r.getRouteStop() == null || visible.test(r.getRouteStop()))
+                .toList();
         Map<UUID, TripRecord> latest = new HashMap<>();
         tripRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
                 .forEach(r -> latest.put(r.getRouteStop().getId(), r));
         List<TripStopResponse> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
+                        .filter(visible)
                         .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
                         .toList())
                 .orElse(List.of());
@@ -450,11 +497,24 @@ public class TripService {
         Map<UUID, LoadPlanStall> stalls = new HashMap<>();
         confirmed.forEach(
                 p -> p.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s)));
-        List<TripHorseResponse> horses = requestHorses
-                .findByRequest_Id(job.getRequest().getId())
-                .stream()
-                .map(rh -> TripMapper.toHorseResponse(
-                        rh.getHorse(), stalls.get(rh.getHorse().getId()), confirmed.size() > 1))
+        // Staff and the crew see every horse that rode the trip; the customer their own.
+        List<Horse> horsesOnTrip = staffView
+                ? jobTrips.horsesEverOn(trip).stream()
+                        .filter(th -> th.getStatus() != TripHorseStatus.MOVED)
+                        .map(TripHorse::getHorse)
+                        .toList()
+                : List.of();
+        if (horsesOnTrip.isEmpty()) {
+            horsesOnTrip = requestHorses.findByRequest_Id(job.getRequest().getId()).stream()
+                    .map(RequestHorse::getHorse)
+                    .toList();
+        }
+        List<TripHorseResponse> horses = horsesOnTrip.stream()
+                .map(h -> TripMapper.toHorseResponse(h, stalls.get(h.getId()), confirmed.size() > 1))
+                .toList();
+        List<TripRecordResponse> recordResponses = tripRecords.stream()
+                .map(TripMapper::toRecordResponse)
+                .map(r -> staffView ? r : ownConditions(r, ownHorses))
                 .toList();
         return TripMapper.toViewResponse(
                 job,
@@ -468,7 +528,26 @@ public class TripService {
                                         .toList()),
                 stops,
                 horses,
-                tripRecords.stream().map(TripMapper::toRecordResponse).toList());
+                recordResponses);
+    }
+
+    /** A record with only the customer's own horses' welfare entries. */
+    private static TripRecordResponse ownConditions(TripRecordResponse r, Set<UUID> ownHorses) {
+        if (r.conditions() == null || r.conditions().isEmpty()) return r;
+        return new TripRecordResponse(
+                r.id(),
+                r.routeStopId(),
+                r.checkpointName(),
+                r.kind(),
+                r.occurredAt(),
+                r.receivedAt(),
+                r.clientRef(),
+                r.recordedBy(),
+                r.channel(),
+                r.text(),
+                r.conditions().stream()
+                        .filter(c -> ownHorses.contains(c.horseId()))
+                        .toList());
     }
 
     private TransportJob job(String code) {
