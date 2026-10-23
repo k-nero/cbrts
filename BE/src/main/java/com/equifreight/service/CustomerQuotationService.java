@@ -8,10 +8,10 @@ import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.FeeBandKind;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
-import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.CustomerQuotationMapper;
@@ -20,14 +20,14 @@ import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import com.equifreight.service.quotation.QuotationSnapshot;
 import com.equifreight.service.quotation.Snapshots;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +45,6 @@ public class CustomerQuotationService {
     private final RateFeeBandRepository feeBands;
     private final ClubService clubs;
     private final Snapshots snapshots;
-    private final UserRepository users;
     private final AuditService audit;
     private final NotificationService notifications;
     private final Clock clock;
@@ -56,7 +55,6 @@ public class CustomerQuotationService {
             RateFeeBandRepository feeBands,
             ClubService clubs,
             Snapshots snapshots,
-            UserRepository users,
             AuditService audit,
             NotificationService notifications,
             Clock clock) {
@@ -65,7 +63,6 @@ public class CustomerQuotationService {
         this.feeBands = feeBands;
         this.clubs = clubs;
         this.snapshots = snapshots;
-        this.users = users;
         this.audit = audit;
         this.notifications = notifications;
         this.clock = clock;
@@ -116,7 +113,7 @@ public class CustomerQuotationService {
         tellManagers(
                 q,
                 request,
-                "QUOTATION_ACCEPTED",
+                NotificationKind.QUOTATION_ACCEPTED,
                 club.getName() + " accepted " + label,
                 request.getCode() + " is waiting for your approval. " + label + ", " + money(q.getTotal()) + ".");
         return toResponse(request, saved);
@@ -160,7 +157,7 @@ public class CustomerQuotationService {
         tellManagers(
                 q,
                 request,
-                "QUOTATION_DECLINED",
+                NotificationKind.QUOTATION_DECLINED,
                 club.getName() + " declined " + label,
                 reason == null ? request.getCode() + " is closed. No reason was given." : "\u201c" + reason + "\u201d");
         return toResponse(request, saved);
@@ -210,14 +207,11 @@ public class CustomerQuotationService {
     }
 
     /** The manager who prepared it, or every active logistics manager when nobody is named. */
-    private void tellManagers(Quotation q, TransportRequest request, String kind, String title, String body) {
-        List<User> to = q.getPreparedBy() != null
-                ? List.of(q.getPreparedBy())
-                : users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE);
-        for (User manager : to) {
-            notifications.sendNotification(
-                    manager, kind, title, body, QuotationDraftService.ENTITY_TYPE, request.getId());
-        }
+    private void tellManagers(Quotation q, TransportRequest request, NotificationKind kind, String title, String body) {
+        Audience to = q.getPreparedBy() != null
+                ? Audience.staff(q.getPreparedBy())
+                : Audience.role(RoleName.LOGISTICS_MANAGER);
+        notifications.notify(kind, to, Subject.request(request), title, body);
     }
 
     private static String label(Quotation q) {

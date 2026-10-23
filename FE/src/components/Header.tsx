@@ -4,6 +4,7 @@ import { Dropdown, Flex, Layout } from 'antd';
 import type { ItemType } from 'antd/es/menu/interface';
 
 import Brand from './Brand';
+import NotificationBell from './notification/NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import { Button, NavItem } from './ui';
 
@@ -69,6 +70,7 @@ const Header: React.FC = () => {
           >
             Request transport
           </Button>
+          <NotificationBell page="notifications" />
           <ThemeToggle />
           <Dropdown menu={{ items: userItems }} placement="bottomRight" trigger={['click']}>
             <button type="button" className={ACCOUNT_CHIP}>

@@ -7,6 +7,8 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.*;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,7 +66,6 @@ public class TripService {
     private final LoadPlanRepository loads;
     private final RequestHorseRepository requestHorses;
     private final HandoverRepository handovers;
-    private final UserRepository users;
     private final FileService files;
     private final AuditService audit;
     private final NotificationService notifications;
@@ -78,7 +79,6 @@ public class TripService {
             LoadPlanRepository loads,
             RequestHorseRepository requestHorses,
             HandoverRepository handovers,
-            UserRepository users,
             FileService files,
             AuditService audit,
             NotificationService notifications,
@@ -90,7 +90,6 @@ public class TripService {
         this.loads = loads;
         this.requestHorses = requestHorses;
         this.handovers = handovers;
-        this.users = users;
         this.files = files;
         this.audit = audit;
         this.notifications = notifications;
@@ -394,8 +393,7 @@ public class TripService {
         String title = "Trip %s held%s".formatted(job.getCode(), place);
         String body = reason == null || reason.isBlank() ? "No reason was given from the cab." : reason.strip();
         for (String role : List.of(RoleName.LOGISTICS_MANAGER, RoleName.FLEET_COORDINATOR))
-            for (User recipient : users.findByRoleAndStatus(role, UserStatus.ACTIVE))
-                notifications.sendNotification(recipient, "TRIP_HELD", title, body, "TRANSPORT_JOB", job.getId());
+            notifications.notify(NotificationKind.TRIP_HELD, Audience.role(role), Subject.job(job), title, body);
     }
 
     private void writeAudit(TripRecord record, User user, Channel channel, RouteStop stop) {

@@ -59,7 +59,6 @@ import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -100,7 +99,6 @@ class RequestServiceTest {
     RequestEstimator estimator;
     QuotationRepository quotations;
     RateFeeBandRepository feeBands;
-    UserRepository users;
     NotificationService notifications;
     RequestService service;
     User user;
@@ -126,7 +124,6 @@ class RequestServiceTest {
         estimator = mock(RequestEstimator.class);
         quotations = mock(QuotationRepository.class);
         feeBands = mock(RateFeeBandRepository.class);
-        users = mock(UserRepository.class);
         notifications = mock(NotificationService.class);
         service = new RequestService(
                 requests,
@@ -143,7 +140,6 @@ class RequestServiceTest {
                 estimator,
                 quotations,
                 feeBands,
-                users,
                 notifications);
 
         club = new Club();
@@ -1204,7 +1200,6 @@ class RequestServiceTest {
                     estimator,
                     quotations,
                     feeBands,
-                    users,
                     notifications);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");

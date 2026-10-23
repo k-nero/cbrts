@@ -4,6 +4,13 @@
  */
 export const queryKeys = {
   me: () => ['me'] as const,
+  /** Everything under it refetches when the notification stream says something changed. */
+  notifications: {
+    all: () => ['notifications'] as const,
+    unreadCount: () => ['notifications', 'unread-count'] as const,
+    /** The bell's panel: the newest few, unread only or all. */
+    preview: (unread: boolean) => ['notifications', 'preview', unread] as const,
+  },
   roles: () => ['admin', 'roles'] as const,
   customerHome: () => ['customer', 'home'] as const,
   horses: {

@@ -19,6 +19,7 @@ import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
@@ -32,6 +33,8 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserJobCount;
 import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -60,7 +63,6 @@ class RequestApprovalServiceTest {
     User lan;
     User thao;
     User khoi;
-    User owner;
     TransportRequest request;
     Quotation accepted;
     TransportJob job;
@@ -92,7 +94,6 @@ class RequestApprovalServiceTest {
         lan = user("Thị Lan", "Nguyễn");
         thao = user("Thu Thảo", "Bùi");
         khoi = user("Minh Khôi", "Đỗ");
-        owner = user("Saigon Turf", "Club");
         when(users.findByRoleAndStatus(RoleName.TRANSPORT_SPECIALIST, UserStatus.ACTIVE))
                 .thenReturn(List.of(lan, thao));
         when(users.findByRoleAndStatus(RoleName.FLEET_COORDINATOR, UserStatus.ACTIVE))
@@ -101,7 +102,6 @@ class RequestApprovalServiceTest {
         Club club = new Club();
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
-        when(users.findByClubId(club.getId())).thenReturn(List.of(owner));
         request = new TransportRequest();
         request.setId(UUID.randomUUID());
         request.setCode("REQ-2026-0194");
@@ -158,19 +158,26 @@ class RequestApprovalServiceTest {
                         eq("{\"status\":\"CUSTOMER_ACCEPTED\"}"),
                         eq("{\"status\":\"APPROVED\",\"job\":\"CBRT-2026-042\"}"));
         verify(notifications)
-                .sendNotification(
-                        eq(owner),
-                        eq("REQUEST_APPROVED"),
+                .notify(
+                        eq(NotificationKind.REQUEST_APPROVED),
+                        eq(Audience.club(request.getClub().getId())),
+                        eq(Subject.request(request)),
                         eq("REQ-2026-0194 is approved: job CBRT-2026-042"),
+                        anyString());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.JOB_ASSIGNED),
+                        eq(Audience.staff(lan)),
+                        eq(Subject.job(job)),
                         anyString(),
-                        eq("TRANSPORT_REQUEST"),
-                        eq(request.getId()));
+                        anyString());
         verify(notifications)
-                .sendNotification(
-                        eq(lan), eq("JOB_ASSIGNED"), anyString(), anyString(), eq("TRANSPORT_JOB"), eq(job.getId()));
-        verify(notifications)
-                .sendNotification(
-                        eq(khoi), eq("JOB_ASSIGNED"), anyString(), anyString(), eq("TRANSPORT_JOB"), eq(job.getId()));
+                .notify(
+                        eq(NotificationKind.JOB_ASSIGNED),
+                        eq(Audience.staff(khoi)),
+                        eq(Subject.job(job)),
+                        anyString(),
+                        anyString());
         verify(review).view(request.getId());
     }
 
@@ -254,13 +261,12 @@ class RequestApprovalServiceTest {
                         eq("{\"status\":\"UNDER_REVIEW\"}"),
                         eq("{\"status\":\"REJECTED\"}"));
         verify(notifications)
-                .sendNotification(
-                        owner,
-                        "REQUEST_REJECTED",
+                .notify(
+                        NotificationKind.REQUEST_REJECTED,
+                        Audience.club(request.getClub().getId()),
+                        Subject.request(request),
                         "REQ-2026-0194 was rejected",
-                        "No climate stall free in the window.",
-                        "TRANSPORT_REQUEST",
-                        request.getId());
+                        "No climate stall free in the window.");
     }
 
     @Test

@@ -8,12 +8,15 @@ import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -61,9 +64,6 @@ class TripServiceTest {
 
     @Mock
     private HandoverRepository handovers;
-
-    @Mock
-    private UserRepository users;
 
     @Mock
     private AuditService audit;
@@ -127,7 +127,6 @@ class TripServiceTest {
                 loads,
                 requestHorses,
                 handovers,
-                users,
                 files,
                 audit,
                 notifications,
@@ -365,12 +364,6 @@ class TripServiceTest {
     @DisplayName("A hold alerts the logistics manager and the coordinator")
     void holdAlertsTheDeciders() {
         departed();
-        User manager = new User();
-        manager.setId(UUID.randomUUID());
-        when(users.findByRoleAndStatus(RoleName.LOGISTICS_MANAGER, UserStatus.ACTIVE))
-                .thenReturn(List.of(manager));
-        when(users.findByRoleAndStatus(RoleName.FLEET_COORDINATOR, UserStatus.ACTIVE))
-                .thenReturn(List.of(coordinator));
 
         service.addEscortRecord(
                 job.getCode(),
@@ -380,14 +373,19 @@ class TripServiceTest {
 
         assertEquals(TripStatus.HELD, job.getTripStatus());
         verify(notifications)
-                .sendNotification(
-                        eq(manager),
-                        eq("TRIP_HELD"),
-                        eq("Trip CBRT-2026-041 held"),
-                        eq("Vet check at the border"),
-                        eq("TRANSPORT_JOB"),
-                        eq(job.getId()));
-        verify(notifications).sendNotification(eq(coordinator), eq("TRIP_HELD"), any(), any(), any(), any());
+                .notify(
+                        NotificationKind.TRIP_HELD,
+                        Audience.role(RoleName.LOGISTICS_MANAGER),
+                        Subject.job(job),
+                        "Trip CBRT-2026-041 held",
+                        "Vet check at the border");
+        verify(notifications)
+                .notify(
+                        NotificationKind.TRIP_HELD,
+                        Audience.role(RoleName.FLEET_COORDINATOR),
+                        Subject.job(job),
+                        "Trip CBRT-2026-041 held",
+                        "Vet check at the border");
     }
 
     // ---------- handover ----------

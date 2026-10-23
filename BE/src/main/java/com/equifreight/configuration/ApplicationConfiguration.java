@@ -1,6 +1,7 @@
 package com.equifreight.configuration;
 
 import com.equifreight.entity.enums.RoleName;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -38,7 +39,12 @@ public class ApplicationConfiguration {
                 // the frontend only attempts a token refresh on 401. A role-denied authenticated
                 // user still gets 403 from the AccessDeniedHandler (see the /error note below).
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/api/v1/auth/**")
+                .authorizeHttpRequests(auth -> auth
+                        // An async dispatch continues a request that was already authorised, such as a notification
+                        // stream (SseEmitter). The bearer token isn't re-read on it, so it would look anonymous.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC)
+                        .permitAll()
+                        .requestMatchers("/api/v1/auth/**")
                         .permitAll()
                         .requestMatchers("/api/v1/public/**")
                         .permitAll()

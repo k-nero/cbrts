@@ -10,20 +10,25 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.repository.RateFeeBandRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -57,7 +62,6 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 quotations,
                 versions,
                 pricing,
-                users,
                 notifications,
                 audit,
                 snapshots,
@@ -85,7 +89,6 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 feeBands,
                 clubs,
                 snapshots,
-                users,
                 audit,
                 notifications,
                 Clock.fixed(now, BusinessTime.ZONE));
@@ -119,13 +122,12 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                         eq("{\"status\":\"QUOTED\"}"),
                         eq("{\"status\":\"CUSTOMER_ACCEPTED\"}"));
         verify(notifications)
-                .sendNotification(
-                        eq(yen),
-                        eq("QUOTATION_ACCEPTED"),
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.staff(yen)),
+                        eq(Subject.request(request)),
                         eq("Phnom Penh Royal Turf Club accepted Quotation Q-2026-0189 v1"),
-                        anyString(),
-                        eq("TRANSPORT_REQUEST"),
-                        eq(request.getId()));
+                        anyString());
     }
 
     @Test
@@ -223,7 +225,12 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                         eq("{\"status\":\"QUOTED\"}"),
                         eq("{\"status\":\"EXPIRED\"}"));
         verify(notifications)
-                .sendNotification(eq(yen), eq("QUOTATION_DECLINED"), anyString(), anyString(), anyString(), any());
+                .notify(
+                        eq(NotificationKind.QUOTATION_DECLINED),
+                        eq(Audience.staff(yen)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        anyString());
     }
 
     @Test
@@ -245,13 +252,16 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     @Test
     void everyActiveManagerIsToldWhenNobodyPreparedIt() {
         q.setPreparedBy(null);
-        User lan = new User();
-        when(users.findByRoleAndStatus(any(), any())).thenReturn(List.of(lan));
 
         customer().accept(bookings, request.getId());
 
         verify(notifications)
-                .sendNotification(eq(lan), eq("QUOTATION_ACCEPTED"), anyString(), anyString(), anyString(), any());
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.role(RoleName.LOGISTICS_MANAGER)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        anyString());
     }
 
     void assertNothingWritten() {
@@ -259,6 +269,6 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
         verify(requests, never()).save(any());
         verify(audit, never())
                 .recordDecision(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(), any());
-        verify(notifications, never()).sendNotification(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(notifications);
     }
 }

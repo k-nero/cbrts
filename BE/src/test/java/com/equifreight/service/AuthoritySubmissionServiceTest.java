@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
@@ -16,6 +17,8 @@ import com.equifreight.model.clearance.CreateAuthoritySubmissionRequest;
 import com.equifreight.model.clearance.CreateQuarantinePeriodRequest;
 import com.equifreight.model.clearance.UpdateAuthoritySubmissionRequest;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -201,8 +204,13 @@ class AuthoritySubmissionServiceTest {
         assertEquals(1, service.alertLateSubmissions(today));
 
         verify(notificationService)
-                .sendNotification(
-                        eq(manager), eq("DOSSIER_LATE"), any(), any(), eq("AuthoritySubmission"), eq(late.getId()));
+                .notify(
+                        eq(NotificationKind.DOSSIER_LATE),
+                        eq(Audience.staff(manager)),
+                        eq(Subject.authoritySubmission(late)),
+                        any(),
+                        any(),
+                        eq("DOSSIER_LATE:" + late.getId()));
         verifyNoMoreInteractions(notificationService);
     }
 }
