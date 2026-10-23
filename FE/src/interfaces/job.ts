@@ -137,6 +137,21 @@ export interface TripLoad {
   unassignedHorses: JobHorse[];
   /** Every trailer's conflicts. */
   conflicts: LoadPlanConflict[];
+  /** Biosecurity warnings for horses of different jobs on one trailer (US-F3-12). */
+  warnings: BiosecurityWarning[];
+}
+
+/**
+ * A biosecurity warning on a shared trip (US-F3-12). It doesn't block: the coordinator accepts it
+ * when sharing or confirming; a changed warning has a new key and is asked again.
+ */
+export interface BiosecurityWarning {
+  key: string;
+  kind: 'ISOLATION' | 'HEALTH_TESTS' | 'HEALTH_DOCUMENTS';
+  jobCodes: string[];
+  horses: string[];
+  message: string;
+  accepted: boolean;
 }
 
 /**

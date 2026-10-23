@@ -16,6 +16,7 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
+import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
 import { TripJobsPanel } from './TripJobsPanel';
@@ -163,6 +164,8 @@ export function LoadPlanTab({ job }: Props) {
   const stalls = trailers.flatMap((t) => t.stalls);
   const unassigned = loadPlan.unassignedHorses ?? [];
   const conflicts = loadPlan.conflicts ?? [];
+  const warnings = loadPlan.warnings ?? [];
+  const warningsToAccept = warnings.filter((w) => !w.accepted);
   const totalStalls = stalls.length;
   const occupiedStalls = stalls.filter((s) => s.horse !== null && s.horse !== undefined).length;
   const editable = !isConfirmed && !busy;
@@ -440,6 +443,9 @@ export function LoadPlanTab({ job }: Props) {
                   </Callout>
                 )}
 
+                {/* Horses of different jobs on one trailer (US-F3-12): warned, accepted at confirmation. */}
+                <BiosecurityWarnings warnings={warnings} />
+
                 {convoy && (
                   <Flex justify="end">
                     <StallLegend />
@@ -579,14 +585,21 @@ export function LoadPlanTab({ job }: Props) {
                             size="md"
                             disabled={!canConfirm || busy || confirmMutation.isPending}
                             onClick={() =>
-                              confirmMutation.mutate(undefined, {
-                                onError: reportRefusal(
-                                  'The load plan couldn’t be confirmed. Try again.',
-                                ),
-                              })
+                              confirmMutation.mutate(
+                                warnings.map((w) => w.key),
+                                {
+                                  onError: reportRefusal(
+                                    'The load plan couldn’t be confirmed. Try again.',
+                                  ),
+                                },
+                              )
                             }
                           >
-                            {confirmMutation.isPending ? 'Confirming...' : 'Confirm load plan'}
+                            {confirmMutation.isPending
+                              ? 'Confirming...'
+                              : warningsToAccept.length > 0
+                                ? 'Accept warnings and confirm'
+                                : 'Confirm load plan'}
                           </Button>
                         </>
                       )}

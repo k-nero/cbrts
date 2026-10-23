@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { App, Flex, Select } from 'antd';
 
 import { Button, Chip, Panel } from '@/components/ui';
-import { useShareCandidates, useShareTrip, useTakeOffTrip } from '@/hooks/useJob';
+import { BiosecurityWarnings } from './BiosecurityWarnings';
+
+import { useShareCandidates, useShareTrip, useShareWarnings, useTakeOffTrip } from '@/hooks/useJob';
 import type { JobDetail, TripJob } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
 
@@ -27,6 +29,9 @@ export function TripJobsPanel({ job }: { job: JobDetail }) {
   const candidates = useShareCandidates(job.id, beforeDeparture);
   const share = useShareTrip(job.id);
   const takeOff = useTakeOffTrip(job.id);
+  // What sharing with the chosen job would mix (US-F3-12): shown before it is put on the trip.
+  const warnings = useShareWarnings(job.id, candidate);
+  const toAccept = (warnings.data ?? []).filter((w) => !w.accepted);
   const jobs = job.tripJobs ?? [];
   const shared = jobs.length > 1;
 
@@ -102,25 +107,40 @@ export function TripJobsPanel({ job }: { job: JobDetail }) {
               <Button
                 variant="secondary"
                 size="md"
-                disabled={!candidate || share.isPending}
+                disabled={!candidate || share.isPending || warnings.isPending}
                 onClick={() =>
                   candidate &&
-                  share.mutate(candidate, {
-                    onSuccess: (result) => {
-                      setCandidate(undefined);
-                      message.success(
-                        result.departFrom === result.departTo
-                          ? `Shared: the trip leaves on ${day(result.departFrom)}.`
-                          : `Shared: plan the departure between ${day(result.departFrom)} and ${day(result.departTo)}.`,
-                      );
+                  share.mutate(
+                    {
+                      otherJobId: candidate,
+                      acceptedWarnings: (warnings.data ?? []).map((w) => w.key),
                     },
-                    onError: reportRefusal('The job couldn’t be put on this trip. Try again.'),
-                  })
+                    {
+                      onSuccess: (result) => {
+                        setCandidate(undefined);
+                        message.success(
+                          result.departFrom === result.departTo
+                            ? `Shared: the trip leaves on ${day(result.departFrom)}.`
+                            : `Shared: plan the departure between ${day(result.departFrom)} and ${day(result.departTo)}.`,
+                        );
+                      },
+                      onError: (error) => {
+                        // A warning that changed meanwhile is asked again.
+                        warnings.refetch();
+                        reportRefusal('The job couldn’t be put on this trip. Try again.')(error);
+                      },
+                    },
+                  )
                 }
               >
-                {share.isPending ? 'Sharing…' : 'Put on this trip'}
+                {share.isPending
+                  ? 'Sharing…'
+                  : toAccept.length > 0
+                    ? `Accept ${toAccept.length === 1 ? 'the warning' : `${toAccept.length} warnings`} and put on this trip`
+                    : 'Put on this trip'}
               </Button>
             </Flex>
+            {candidate && <BiosecurityWarnings warnings={warnings.data ?? []} />}
           </Flex>
         )}
       </Flex>
