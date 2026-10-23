@@ -64,6 +64,7 @@ client.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    let newTokens: TokenResponse;
     try {
       refreshPromise ??= axios
         .post<TokenResponse>(
@@ -78,15 +79,19 @@ client.interceptors.response.use(
         .finally(() => {
           refreshPromise = null;
         });
-      const newTokens = await refreshPromise;
-      original._retry = true;
-      original.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
-      return await client(original);
+      newTokens = await refreshPromise;
     } catch (refreshErr) {
+      // Only a refused refresh ends the session (refresh token expired, or the account blocked).
       setSession(null);
       redirectToLogin();
       return Promise.reject(refreshErr);
     }
+
+    // The session is live: whatever the retry answers (a genuine role denial 403s again) goes
+    // back to the caller to show, and must not log the user out.
+    original._retry = true;
+    original.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
+    return client(original);
   },
 );
 
