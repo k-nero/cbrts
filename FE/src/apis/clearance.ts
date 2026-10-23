@@ -11,6 +11,8 @@ import type {
   DocumentUploadRequest,
   DocumentVersion,
   DocumentReviewDetail,
+  DocumentCheckRequest,
+  DocumentCheckResponse,
   ClearanceJobSummary,
   PagedResponse,
   QuarantinePeriod,
@@ -107,6 +109,16 @@ export const clearanceApi = {
     client.get<ChecklistItem[]>(`/customer/clearance/requests/${requestId}/checklist`),
   getCustomerChecklist: (jobId: string) =>
     client.get<ChecklistItem[]>(`/customer/clearance/jobs/${jobId}/checklist`),
+
+  /** US-F2-03: the automatic check on the dates, before the file is uploaded. Saves nothing. */
+  checkCustomerDocument: (checklistItemId: string, data: DocumentCheckRequest) =>
+    client.post<DocumentCheckResponse>(
+      `/customer/clearance/checklist/${checklistItemId}/check`,
+      data,
+    ),
+
+  getCustomerVersions: (checklistItemId: string) =>
+    client.get<DocumentVersion[]>(`/customer/clearance/checklist/${checklistItemId}/versions`),
 
   uploadCustomerDocumentVersion: (checklistItemId: string, data: DocumentUploadRequest) =>
     client.post<ChecklistItem>(`/customer/clearance/checklist/${checklistItemId}/versions`, data),

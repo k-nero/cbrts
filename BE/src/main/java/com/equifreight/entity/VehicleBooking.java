@@ -20,11 +20,11 @@ public class VehicleBooking extends BaseEntity {
     private Vehicle vehicle;
 
     /**
-     * Set exactly when kind is JOB.
+     * Set exactly when kind is JOB: one booking per vehicle per trip, however many jobs it carries.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id")
-    private TransportJob job;
+    @JoinColumn(name = "trip_id")
+    private Trip trip;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)

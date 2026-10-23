@@ -27,6 +27,7 @@ public class RoutePlanService {
     private final BorderCrossingRepository borderCrossingRepository;
     private final VehicleRepository vehicleRepository;
     private final ClearanceService clearanceService;
+    private final JobTripService jobTrips;
     private final AuditService auditService;
 
     public RoutePlanService(
@@ -39,6 +40,7 @@ public class RoutePlanService {
             BorderCrossingRepository borderCrossingRepository,
             VehicleRepository vehicleRepository,
             ClearanceService clearanceService,
+            JobTripService jobTrips,
             AuditService auditService) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
@@ -49,14 +51,17 @@ public class RoutePlanService {
         this.borderCrossingRepository = borderCrossingRepository;
         this.vehicleRepository = vehicleRepository;
         this.clearanceService = clearanceService;
+        this.jobTrips = jobTrips;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
     public List<RoutePlanResponse> getRoutePlans(UUID jobId) {
-        return routePlanRepository.findByJobIdOrderByVersionNoDesc(jobId).stream()
-                .map(this::toResponse)
-                .toList();
+        return jobTrips.findTripOf(jobId)
+                .map(trip -> routePlanRepository.findByTrip_IdOrderByVersionNoDesc(trip.getId()).stream()
+                        .map(plan -> toResponse(plan, jobId))
+                        .toList())
+                .orElse(List.of());
     }
 
     /** The job's route plan for the endpoint: 404 when the job has none yet. */
@@ -74,10 +79,11 @@ public class RoutePlanService {
      */
     @Transactional(readOnly = true)
     public Optional<RoutePlanResponse> findActiveRoutePlan(UUID jobId) {
-        return routePlanRepository
-                .findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED)
-                .or(() -> routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId))
-                .map(this::toResponse);
+        return jobTrips.findTripOf(jobId)
+                .flatMap(trip -> routePlanRepository
+                        .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                        .or(() -> routePlanRepository.findFirstByTrip_IdOrderByVersionNoDesc(trip.getId())))
+                .map(plan -> toResponse(plan, jobId));
     }
 
     @Transactional
@@ -85,9 +91,10 @@ public class RoutePlanService {
         TransportJob job = transportJobRepository
                 .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+        Trip trip = jobTrips.tripOf(jobId);
 
-        // Find existing draft or create next version
-        Optional<RoutePlan> draftOpt = routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.DRAFT);
+        // Find the trip's draft or create its next version
+        Optional<RoutePlan> draftOpt = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
         RoutePlan plan;
         if (draftOpt.isPresent()) {
             plan = draftOpt.get();
@@ -98,12 +105,12 @@ public class RoutePlanService {
             plan.getStops().clear();
         } else {
             short nextVersion = 1;
-            Optional<RoutePlan> latest = routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId);
+            Optional<RoutePlan> latest = routePlanRepository.findFirstByTrip_IdOrderByVersionNoDesc(trip.getId());
             if (latest.isPresent()) {
                 nextVersion = (short) (latest.get().getVersionNo() + 1);
             }
             plan = new RoutePlan();
-            plan.setJob(job);
+            plan.setTrip(trip);
             plan.setVersionNo(nextVersion);
             plan.setStatus(RoutePlanStatus.DRAFT);
         }
@@ -123,6 +130,10 @@ public class RoutePlanService {
             stop.setPlannedAt(item.plannedAt());
             stop.setPlannedStayMin(item.plannedStayMin());
             stop.setDetails(item.details());
+            // The trip's one job is picked up and delivered; shared trips name each job's own stops (US-F3-11).
+            if (item.kind() == RouteStopKind.PICKUP || item.kind() == RouteStopKind.DELIVERY) {
+                stop.setJob(job);
+            }
 
             if (item.kind() == RouteStopKind.BORDER) {
                 if (item.borderCrossingId() == null) {
@@ -192,7 +203,7 @@ public class RoutePlanService {
             savedPlan.getLegs().add(savedLeg);
         }
 
-        return toResponse(savedPlan);
+        return toResponse(savedPlan, jobId);
     }
 
     @Transactional
@@ -205,7 +216,8 @@ public class RoutePlanService {
                 .findById(routePlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("Route plan not found: " + routePlanId));
 
-        if (plan.getJob() == null || !jobId.equals(plan.getJob().getId())) {
+        Trip trip = jobTrips.tripOf(jobId);
+        if (!plan.getTrip().getId().equals(trip.getId())) {
             throw new BusinessException("Route plan does not belong to job " + jobId);
         }
 
@@ -237,9 +249,9 @@ public class RoutePlanService {
             }
         }
 
-        // Supersede any currently CONFIRMED route plan for this job
+        // Supersede any currently CONFIRMED route plan for this trip
         Optional<RoutePlan> currentConfirmed =
-                routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
         if (currentConfirmed.isPresent() && !currentConfirmed.get().getId().equals(plan.getId())) {
             RoutePlan oldPlan = currentConfirmed.get();
             oldPlan.setStatus(RoutePlanStatus.SUPERSEDED);
@@ -261,7 +273,10 @@ public class RoutePlanService {
         Optional<RouteStop> pickup = plan.getStops().stream()
                 .filter(s -> s.getKind() == RouteStopKind.PICKUP)
                 .findFirst();
-        pickup.ifPresent(p -> job.setPlannedDepartureAt(p.getPlannedAt()));
+        pickup.ifPresent(p -> {
+            job.setPlannedDepartureAt(p.getPlannedAt());
+            trip.setPlannedDepartureAt(p.getPlannedAt());
+        });
 
         Optional<RouteStop> delivery = plan.getStops().stream()
                 .filter(s -> s.getKind() == RouteStopKind.DELIVERY)
@@ -288,14 +303,95 @@ public class RoutePlanService {
                 "v" + saved.getVersionNo());
 
         log.info("Confirmed route plan v{} for job {}", plan.getVersionNo(), job.getCode());
-        return toResponse(saved);
+        return toResponse(saved, jobId);
     }
 
-    public RoutePlanResponse toResponse(RoutePlan plan) {
+    /**
+     * The trip changed under its confirmed route (a trailer or a job added or taken out): the confirmed version is
+     * superseded with {@code reason}, and a new draft version carries its stops and legs for the coordinator to
+     * check and confirm again. Nothing is deleted, so the history stays as evidence.
+     */
+    @Transactional
+    public void reopen(Trip trip, String reason) {
+        Optional<RoutePlan> confirmed =
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
+        if (confirmed.isEmpty()) {
+            return;
+        }
+        RoutePlan old = confirmed.get();
+        old.setStatus(RoutePlanStatus.SUPERSEDED);
+        old.setSupersededAt(Instant.now());
+        old.setChangeReason(reason);
+        routePlanRepository.saveAndFlush(old);
+        if (routePlanRepository
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .isPresent()) {
+            return;
+        }
+
+        RoutePlan draft = new RoutePlan();
+        draft.setTrip(trip);
+        draft.setVersionNo((short) (routePlanRepository
+                        .findFirstByTrip_IdOrderByVersionNoDesc(trip.getId())
+                        .map(RoutePlan::getVersionNo)
+                        .orElse((short) 0)
+                + 1));
+        draft.setStatus(RoutePlanStatus.DRAFT);
+        draft.setDistanceKm(old.getDistanceKm());
+        draft.setDurationMin(old.getDurationMin());
+        draft.setChangeReason(reason);
+        draft = routePlanRepository.save(draft);
+
+        Map<UUID, RouteStop> copies = new HashMap<>();
+        for (RouteStop stop : old.getStops()) {
+            RouteStop copy = new RouteStop();
+            copy.setRoutePlan(draft);
+            copy.setSeq(stop.getSeq());
+            copy.setKind(stop.getKind());
+            copy.setJob(stop.getJob());
+            copy.setPlace(stop.getPlace());
+            copy.setBorderCrossing(stop.getBorderCrossing());
+            copy.setPlannedAt(stop.getPlannedAt());
+            copy.setPlannedStayMin(stop.getPlannedStayMin());
+            copy.setDetails(stop.getDetails());
+            copies.put(stop.getId(), routeStopRepository.save(copy));
+            draft.getStops().add(copy);
+        }
+        for (RouteLeg leg : old.getLegs()) {
+            RouteLeg copy = new RouteLeg();
+            copy.setRoutePlan(draft);
+            copy.setSeq(leg.getSeq());
+            copy.setFromStop(copies.get(leg.getFromStop().getId()));
+            copy.setToStop(copies.get(leg.getToStop().getId()));
+            copy.setMode(leg.getMode());
+            copy.setVehicle(leg.getVehicle());
+            copy.setDistanceKm(leg.getDistanceKm());
+            copy.setPlannedMin(leg.getPlannedMin());
+            RouteLeg savedLeg = routeLegRepository.save(copy);
+            flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> {
+                Flight flight = new Flight();
+                flight.setRouteLeg(savedLeg);
+                flight.setAirline(f.getAirline());
+                flight.setFlightNo(f.getFlightNo());
+                flight.setAirWaybill(f.getAirWaybill());
+                flight.setAircraftType(f.getAircraftType());
+                flight.setStallPositions(f.getStallPositions());
+                flight.setServiceClass(f.getServiceClass());
+                flight.setScheduledDepartureAt(f.getScheduledDepartureAt());
+                flight.setScheduledArrivalAt(f.getScheduledArrivalAt());
+                flight.setEstimatedDepartureAt(f.getEstimatedDepartureAt());
+                flight.setEstimatedArrivalAt(f.getEstimatedArrivalAt());
+                flightRepository.save(flight);
+            });
+            draft.getLegs().add(savedLeg);
+        }
+    }
+
+    public RoutePlanResponse toResponse(RoutePlan plan, UUID jobId) {
         Map<UUID, Flight> flightsByLegId = new HashMap<>();
         for (RouteLeg leg : plan.getLegs()) {
             flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
         }
-        return JobMapper.toRoutePlanResponse(plan, flightsByLegId);
+        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId);
     }
 }

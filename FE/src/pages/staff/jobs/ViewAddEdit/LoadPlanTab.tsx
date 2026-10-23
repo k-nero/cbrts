@@ -16,15 +16,18 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
-import { StallSlot } from './StallSlot';
+import { StallLegend } from './StallLegend';
+import { TrailerDiagram } from './TrailerDiagram';
 
 import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
+  useAddTrailer,
   useAutoArrange,
   useConfirmLoadPlan,
   useCreateLoadPlan,
   useJobDetail,
   useMoveHorse,
+  useRemoveTrailer,
   useSignOffTripPlan,
 } from '@/hooks/useJob';
 import { useActiveVehicles } from '@/hooks/useVehicle';
@@ -60,6 +63,7 @@ export function LoadPlanTab({ job }: Props) {
   const [selected, setSelected] = useState<Picked | null>(null);
   const [dragging, setDragging] = useState<Picked | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
+  const [trailerToAdd, setTrailerToAdd] = useState<string>();
 
   const { data: activeVehicles, isLoading: loadingVehicles } = useActiveVehicles();
   const createLoadPlanMutation = useCreateLoadPlan(job.id);
@@ -67,6 +71,8 @@ export function LoadPlanTab({ job }: Props) {
   const autoArrangeMutation = useAutoArrange(job.id);
   const confirmMutation = useConfirmLoadPlan(job.id);
   const signOffMutation = useSignOffTripPlan(job.id);
+  const addTrailerMutation = useAddTrailer(job.id);
+  const removeTrailerMutation = useRemoveTrailer(job.id);
 
   const isConfirmed = loadPlan?.status === 'CONFIRMED';
   const busy = moveMutation.isPending || autoArrangeMutation.isPending;
@@ -146,12 +152,20 @@ export function LoadPlanTab({ job }: Props) {
     );
   }
 
-  const stalls = loadPlan.stalls ?? [];
+  const trailers = loadPlan.vehicles ?? [];
+  const convoy = trailers.length > 1;
+  const stalls = trailers.flatMap((t) => t.stalls);
   const unassigned = loadPlan.unassignedHorses ?? [];
   const conflicts = loadPlan.conflicts ?? [];
   const totalStalls = stalls.length;
   const occupiedStalls = stalls.filter((s) => s.horse !== null && s.horse !== undefined).length;
   const editable = !isConfirmed && !busy;
+  // Trailers are added or taken out before departure only; after it, only through an incident.
+  const canChangeTrailers = job.tripStatus === 'NOT_STARTED';
+  const onTrip = new Set(trailers.map((t) => t.vehicleId));
+  const spareVehicles = (activeVehicles ?? []).filter((v) => !onTrip.has(v.id));
+  const trailerOf = (stallId: string) =>
+    trailers.find((t) => t.stalls.some((s) => s.stallId === stallId));
 
   /**
    * Drag and click both end here. The move carries what this screen shows (where the horse is,
@@ -187,7 +201,10 @@ export function LoadPlanTab({ job }: Props) {
   const stallLabel = (id: UniqueIdentifier) => {
     if (id === QUEUE_DROP_ID) return 'the to-load list';
     const stall = stalls.find((s) => s.stallId === id);
-    return stall ? `stall ${stall.positionNo}` : 'a stall';
+    if (!stall) return 'a stall';
+    return convoy
+      ? `stall ${stall.positionNo} of ${trailerOf(stall.stallId)?.vehicleCode ?? 'the trailer'}`
+      : `stall ${stall.positionNo}`;
   };
   const pickedName = (data: unknown) => (data as Picked | undefined)?.horse.name ?? 'The horse';
 
@@ -214,15 +231,6 @@ export function LoadPlanTab({ job }: Props) {
     if (!over) return;
     moveHorse(active.data.current as Picked, over.id === QUEUE_DROP_ID ? null : String(over.id));
   };
-
-  // Group stalls into rows (row 1, row 2, etc.)
-  const rowsMap = new Map<number, LoadPlanStall[]>();
-  stalls.forEach((s) => {
-    const r = s.rowNo || 1;
-    if (!rowsMap.has(r)) rowsMap.set(r, []);
-    rowsMap.get(r)!.push(s);
-  });
-  const sortedRowKeys = Array.from(rowsMap.keys()).sort((a, b) => a - b);
 
   const payloadPct = Math.min(
     100,
@@ -342,108 +350,120 @@ export function LoadPlanTab({ job }: Props) {
           {/* Right Column: Vehicle Stalls Diagram & Summary */}
           <Col xs={24} lg={16}>
             <Flex vertical gap={24}>
-              {/* Vehicle Diagram */}
-              <div className="p-5 rounded-2xl border border-line-strong bg-sunken">
-                <Flex vertical gap={12}>
-                  {/* Cab Bar */}
-                  <div className="px-4 py-3 rounded-lg bg-muted">
-                    <Flex align="center" justify="space-between">
-                      <Flex gap={8} align="center">
-                        <Icon name="truck" size={16} className="text-ink-2" />
-                        <span className="type-chip text-ink-2">Cab · {loadPlan.vehicleCode}</span>
-                      </Flex>
-                      <Flex gap={16} align="center">
-                        <Flex gap={6} align="center">
-                          <span className="size-2.5 rounded-xs bg-stall-standard" />
-                          <span className="type-caption text-ink-3">Standard</span>
-                        </Flex>
-                        <Flex gap={6} align="center">
-                          <span className="size-2.5 rounded-xs bg-stall-box" />
-                          <span className="type-caption text-ink-3">Box</span>
-                        </Flex>
-                        <Flex gap={6} align="center">
-                          <span className="size-2.5 rounded-xs bg-stall-climate" />
-                          <span className="type-caption text-ink-3">Climate</span>
-                        </Flex>
-                      </Flex>
-                      <span className="type-chip text-ink-3">Front</span>
+              {/* Trailers: one diagram per trailer of the trip (US-F3-10) */}
+              <Flex vertical gap={12}>
+                {canChangeTrailers && (
+                  <Flex wrap gap={12} align="center" justify="space-between">
+                    <span className="type-body-s text-ink-3">
+                      {convoy
+                        ? `${trailers.length} trailers travel together on ${loadPlan.tripCode}.`
+                        : `One trailer on ${loadPlan.tripCode}.`}{' '}
+                      Adding or removing a trailer reopens the route and load plan and needs a new
+                      sign-off.
+                    </span>
+                    <Flex gap={8} align="center">
+                      <Select
+                        aria-label="Trailer to add"
+                        className="w-56"
+                        placeholder={
+                          spareVehicles.length === 0 ? 'No other active vehicle' : 'Add a trailer'
+                        }
+                        value={trailerToAdd}
+                        onChange={setTrailerToAdd}
+                        disabled={spareVehicles.length === 0}
+                        options={spareVehicles.map((v) => ({
+                          value: v.id,
+                          label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
+                        }))}
+                      />
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        disabled={!trailerToAdd || addTrailerMutation.isPending}
+                        onClick={() =>
+                          trailerToAdd &&
+                          addTrailerMutation.mutate(trailerToAdd, {
+                            onSuccess: () => setTrailerToAdd(undefined),
+                            onError: reportRefusal('The trailer couldn’t be added. Try again.'),
+                          })
+                        }
+                      >
+                        {addTrailerMutation.isPending ? 'Adding…' : 'Add trailer'}
+                      </Button>
                     </Flex>
-                  </div>
-
-                  {/* Selection bar: the click and keyboard path */}
-                  {selected && (
-                    <div className="px-3.5 py-2.5 rounded-lg border border-gold bg-gold-soft">
-                      <Flex gap={12} align="center">
-                        <span className="type-label-s flex-1 text-ink">
-                          {selected.horse.name} selected. Choose a stall.
-                        </span>
-                        {selected.fromStallId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveHorse(selected, null)}
-                          >
-                            Unload
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
-                          Cancel
-                        </Button>
-                      </Flex>
-                    </div>
-                  )}
-
-                  {/* A refused move is never silent: the server says what changed and what to do. */}
-                  {moveMutation.isError && (
-                    <Callout
-                      tone="bad"
-                      title="That move wasn’t saved"
-                      action={
-                        <Button variant="ghost" size="sm" onClick={() => moveMutation.reset()}>
-                          Dismiss
-                        </Button>
-                      }
-                    >
-                      {apiErrorMessage(
-                        moveMutation.error,
-                        'The move couldn’t be saved. Check the plan and try again.',
-                      )}
-                    </Callout>
-                  )}
-
-                  {/* Stall Rows */}
-                  <Flex vertical gap={16}>
-                    {sortedRowKeys.map((rowKey) => {
-                      const rowStalls = rowsMap.get(rowKey) ?? [];
-                      // Sort by positionNo
-                      rowStalls.sort((a, b) => a.positionNo - b.positionNo);
-
-                      return (
-                        <div key={rowKey} className="grid grid-cols-2 gap-4">
-                          {rowStalls.map((s) => (
-                            <StallSlot
-                              key={s.stallId}
-                              stall={s}
-                              selected={selected}
-                              dragging={dragging}
-                              interactive={!isConfirmed}
-                              disabled={!editable}
-                              onClick={() => handleStallClick(s)}
-                            />
-                          ))}
-                        </div>
-                      );
-                    })}
                   </Flex>
+                )}
 
-                  {/* Rear Ramp */}
-                  <div className="py-2.5 rounded-lg border border-dashed border-line-strong">
-                    <Flex align="center" justify="center">
-                      <span className="type-chip text-ink-3">Rear ramp</span>
+                {/* Selection bar: the click and keyboard path */}
+                {selected && (
+                  <div className="px-3.5 py-2.5 rounded-lg border border-gold bg-gold-soft">
+                    <Flex gap={12} align="center">
+                      <span className="type-label-s flex-1 text-ink">
+                        {selected.horse.name} selected. Choose a stall.
+                      </span>
+                      {selected.fromStallId && (
+                        <Button variant="ghost" size="sm" onClick={() => moveHorse(selected, null)}>
+                          Unload
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
+                        Cancel
+                      </Button>
                     </Flex>
                   </div>
-                </Flex>
-              </div>
+                )}
+
+                {/* A refused move is never silent: the server says what changed and what to do. */}
+                {moveMutation.isError && (
+                  <Callout
+                    tone="bad"
+                    title="That move wasn’t saved"
+                    action={
+                      <Button variant="ghost" size="sm" onClick={() => moveMutation.reset()}>
+                        Dismiss
+                      </Button>
+                    }
+                  >
+                    {apiErrorMessage(
+                      moveMutation.error,
+                      'The move couldn’t be saved. Check the plan and try again.',
+                    )}
+                  </Callout>
+                )}
+
+                {convoy && (
+                  <Flex justify="end">
+                    <StallLegend />
+                  </Flex>
+                )}
+
+                {trailers.map((trailer) => (
+                  <TrailerDiagram
+                    key={trailer.tripVehicleId}
+                    plan={trailer}
+                    convoy={convoy}
+                    selected={selected}
+                    dragging={dragging}
+                    interactive={!isConfirmed}
+                    disabled={!editable}
+                    onStallClick={handleStallClick}
+                    removing={
+                      removeTrailerMutation.isPending &&
+                      removeTrailerMutation.variables === trailer.tripVehicleId
+                    }
+                    onRemove={
+                      convoy && canChangeTrailers
+                        ? () =>
+                            removeTrailerMutation.mutate(trailer.tripVehicleId, {
+                              onError: reportRefusal(
+                                'The trailer couldn’t be taken out. Try again.',
+                              ),
+                            })
+                        : undefined
+                    }
+                  />
+                ))}
+              </Flex>
 
               {/* Summary Panel */}
               <Panel title="Summary" className="p-6">
@@ -470,13 +490,32 @@ export function LoadPlanTab({ job }: Props) {
                             ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
                             : 'Not assigned'}
                         </span>
-                        <span className="type-body-s text-ink-2 truncate">
-                          {job.crew.length > 0
-                            ? job.crew
-                                .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
-                                .join(', ')
-                            : 'Assign driver and grooms'}
-                        </span>
+                        {job.crew.length === 0 ? (
+                          <span className="type-body-s text-ink-2 truncate">
+                            {convoy
+                              ? 'Assign a driver and grooms to each trailer'
+                              : 'Assign driver and grooms'}
+                          </span>
+                        ) : (
+                          trailers.map((t) => {
+                            const onTrailer = job.crew.filter(
+                              (c) => c.tripVehicleId === t.tripVehicleId,
+                            );
+                            return (
+                              <span
+                                key={t.tripVehicleId}
+                                className="type-body-s text-ink-2 truncate"
+                              >
+                                {convoy && `${t.vehicleCode}: `}
+                                {onTrailer.length > 0
+                                  ? onTrailer
+                                      .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
+                                      .join(', ')
+                                  : 'No crew yet'}
+                              </span>
+                            );
+                          })
+                        )}
                       </Flex>
                     </Col>
 

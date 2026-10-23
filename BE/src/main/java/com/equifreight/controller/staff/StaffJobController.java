@@ -63,7 +63,7 @@ public class StaffJobController {
      * US-F3-05: Load plan - view current draft or confirmed plan (null if not yet created).
      */
     @GetMapping("/{jobId}/load-plan")
-    public LoadPlanResponse getLoadPlan(@PathVariable UUID jobId) {
+    public TripLoadResponse getLoadPlan(@PathVariable UUID jobId) {
         return loadPlanService.getActiveLoadPlan(jobId).orElse(null);
     }
 
@@ -72,7 +72,7 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse createLoadPlan(
+    public TripLoadResponse createLoadPlan(
             @PathVariable UUID jobId, @RequestParam(value = "vehicleId", required = false) UUID vehicleId) {
         return loadPlanService.createLoadPlan(jobId, vehicleId);
     }
@@ -82,8 +82,31 @@ public class StaffJobController {
      */
     @PutMapping("/{jobId}/load-plan/vehicle")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse changeVehicle(@PathVariable UUID jobId, @RequestParam("vehicleId") UUID vehicleId) {
-        return loadPlanService.changeLoadPlanVehicle(jobId, vehicleId);
+    public TripLoadResponse changeVehicle(
+            @PathVariable UUID jobId,
+            @RequestParam("vehicleId") UUID vehicleId,
+            @RequestParam(value = "tripVehicleId", required = false) UUID tripVehicleId) {
+        return loadPlanService.changeLoadPlanVehicle(jobId, tripVehicleId, vehicleId);
+    }
+
+    /**
+     * US-F3-10: Convoy - add a trailer to the trip; reopens the trip's plans and clears the sign-off.
+     */
+    @PostMapping("/{jobId}/load-plan/vehicles")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public TripLoadResponse addVehicle(
+            @PathVariable UUID jobId, @RequestParam("vehicleId") UUID vehicleId, @AuthenticationPrincipal User user) {
+        return loadPlanService.addVehicle(jobId, vehicleId, user);
+    }
+
+    /**
+     * US-F3-10: Convoy - take a trailer out of the trip, with its placements, crew and booking.
+     */
+    @DeleteMapping("/{jobId}/load-plan/vehicles/{tripVehicleId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public TripLoadResponse removeVehicle(
+            @PathVariable UUID jobId, @PathVariable UUID tripVehicleId, @AuthenticationPrincipal User user) {
+        return loadPlanService.removeVehicle(jobId, tripVehicleId, user);
     }
 
     /**
@@ -91,7 +114,7 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/assign")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse assignStall(@PathVariable UUID jobId, @Valid @RequestBody AssignStallRequest request) {
+    public TripLoadResponse assignStall(@PathVariable UUID jobId, @Valid @RequestBody AssignStallRequest request) {
         return loadPlanService.assignStall(jobId, request.vehicleStallId(), request.horseId());
     }
 
@@ -101,7 +124,7 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/move")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse moveHorse(@PathVariable UUID jobId, @Valid @RequestBody MoveHorseRequest request) {
+    public TripLoadResponse moveHorse(@PathVariable UUID jobId, @Valid @RequestBody MoveHorseRequest request) {
         return loadPlanService.moveHorse(jobId, request);
     }
 
@@ -110,7 +133,7 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/auto-arrange")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse autoArrange(@PathVariable UUID jobId) {
+    public TripLoadResponse autoArrange(@PathVariable UUID jobId) {
         return loadPlanService.autoArrange(jobId);
     }
 
@@ -119,7 +142,7 @@ public class StaffJobController {
      */
     @PostMapping("/{jobId}/load-plan/confirm")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public LoadPlanResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
+    public TripLoadResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return loadPlanService.confirmLoadPlan(jobId, user);
     }
 

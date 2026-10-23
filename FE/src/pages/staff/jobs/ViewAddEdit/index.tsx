@@ -99,7 +99,11 @@ export default function JobDetailPage() {
       })
     : 'Not scheduled';
 
-  const trailerCode = job.loadPlan?.vehicleCode ? `trailer ${job.loadPlan.vehicleCode}` : 'vehicle';
+  const trailerCodes = job.loadPlan?.vehicles.map((v) => v.vehicleCode) ?? [];
+  const trailerCode =
+    trailerCodes.length === 0
+      ? 'vehicle'
+      : `${trailerCodes.length === 1 ? 'trailer' : 'trailers'} ${trailerCodes.join(', ')}`;
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
 
   return (
@@ -112,6 +116,11 @@ export default function JobDetailPage() {
             summary={
               <Flex gap={12} align="center">
                 <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">{job.code}</p>
+                {job.tripCode && (
+                  <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">
+                    {job.tripCode}
+                  </p>
+                )}
                 <p className="type-body-m text-ink-2">{metaText}</p>
               </Flex>
             }

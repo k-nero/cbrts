@@ -167,8 +167,13 @@ export default function FleetCalendarPage() {
                             </Flex>
                             {b.jobCode ? (
                               <span className="type-body-s text-ink-2">
-                                Assigned to Job:{' '}
-                                <span className="font-mono font-medium">{b.jobCode}</span>
+                                {b.tripCode && (
+                                  <>
+                                    Trip <span className="font-mono font-medium">{b.tripCode}</span>
+                                    {' · '}
+                                  </>
+                                )}
+                                Job <span className="font-mono font-medium">{b.jobCode}</span>
                               </span>
                             ) : (
                               <span className="type-body-s text-ink-3">Internal fleet booking</span>

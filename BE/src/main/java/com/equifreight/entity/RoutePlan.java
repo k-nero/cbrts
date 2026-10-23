@@ -9,7 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * A version of a job's route: stops joined by legs. Re-planning (Flow 5) confirms a new version and marks the old
+ * A version of a trip's route: stops joined by legs. Re-planning (Flow 5) confirms a new version and marks the old
  * one SUPERSEDED with the reason; nothing is deleted. The customer sees every confirmed version; drafts are staff-only.
  */
 @Setter
@@ -19,8 +19,8 @@ import lombok.Setter;
 public class RoutePlan extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_id", nullable = false)
-    private TransportJob job;
+    @JoinColumn(name = "trip_id", nullable = false)
+    private Trip trip;
 
     @Column(nullable = false)
     private short versionNo;

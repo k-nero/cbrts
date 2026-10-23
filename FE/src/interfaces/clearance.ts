@@ -209,6 +209,27 @@ export interface DocumentUploadRequest {
   issuer?: string;
 }
 
+/** US-F2-03: the dates checked before the file is uploaded. */
+export interface DocumentCheckRequest {
+  issuedOn: string;
+  sampledOn?: string;
+  validUntil: string;
+}
+
+/**
+ * RED is refused and its file never uploaded; AMBER is kept but won't clear; GREEN goes to review. The rule, the
+ * value found and the value that passes are absent when no date rule applies (US-F2-09).
+ */
+export interface DocumentCheckResponse {
+  validity: Validity;
+  note: string;
+  rule?: string | null;
+  found?: string | null;
+  required?: string | null;
+  /** AMBER only: the date a replacement is needed by. */
+  renewBy?: string | null;
+}
+
 export interface Authority {
   id: string;
   name: string;

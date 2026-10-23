@@ -69,6 +69,7 @@ public class TripService {
     private final FileService files;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final JobTripService jobTrips;
     private final Clock clock;
 
     public TripService(
@@ -82,6 +83,7 @@ public class TripService {
             FileService files,
             AuditService audit,
             NotificationService notifications,
+            JobTripService jobTrips,
             Clock clock) {
         this.jobs = jobs;
         this.crew = crew;
@@ -93,6 +95,7 @@ public class TripService {
         this.files = files;
         this.audit = audit;
         this.notifications = notifications;
+        this.jobTrips = jobTrips;
         this.clock = clock;
     }
 
@@ -119,15 +122,17 @@ public class TripService {
     @Transactional(readOnly = true)
     public TripViewResponse escortTrip(String code, User user) {
         TransportJob job = job(code);
+        Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId()) || !released)
+        if (!crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
             throw ResourceNotFoundException.of("Trip", code);
-        return view(job);
+        return view(job, trip, true);
     }
 
     @Transactional(readOnly = true)
     public TripViewResponse coordinatorTrip(String code) {
-        return view(job(code));
+        TransportJob job = job(code);
+        return view(job, jobTrips.tripOf(job.getId()), true);
     }
 
     @Transactional(readOnly = true)
@@ -136,32 +141,35 @@ public class TripService {
         if (user.getClub() == null
                 || !job.getRequest().getClub().getId().equals(user.getClub().getId()))
             throw ResourceNotFoundException.of("Trip", code);
-        return view(job);
+        return view(job, jobTrips.tripOf(job.getId()), false);
     }
 
     @Transactional
     public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request) {
         TransportJob job = jobForUpdate(code);
+        Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!crew.existsByJob_IdAndUser_Id(job.getId(), user.getId()) || !released)
+        if (!crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
             throw ResourceNotFoundException.of("Trip", code);
-        return addRecord(job, user, request, Channel.CAB_TABLET);
+        return addRecord(job, trip, user, request, Channel.CAB_TABLET);
     }
 
     @Transactional
     public TripRecordResponse addCoordinatorRecord(String code, User user, TripRecordRequest request) {
-        return addRecord(jobForUpdate(code), user, request, Channel.WEB);
+        TransportJob job = jobForUpdate(code);
+        return addRecord(job, jobTrips.tripOf(job.getId()), user, request, Channel.WEB);
     }
 
-    private TripRecordResponse addRecord(TransportJob job, User user, TripRecordRequest request, Channel channel) {
+    private TripRecordResponse addRecord(
+            TransportJob job, Trip trip, User user, TripRecordRequest request, Channel channel) {
         var existing = records.findByClientRef(request.clientRef());
         if (existing.isPresent()) {
-            if (!existing.get().getJob().getId().equals(job.getId()))
+            if (!existing.get().getTrip().getId().equals(trip.getId()))
                 throw new ConflictException(
                         "TRIP_RECORD_REFERENCE_USED", "This client reference belongs to another trip");
             return TripMapper.toRecordResponse(existing.get());
         }
-        boolean late = validateTransition(job, request.kind(), request.occurredAt(), channel);
+        boolean late = validateTransition(job, trip, request.kind(), request.occurredAt(), channel);
         boolean hasConditions =
                 request.conditions() != null && !request.conditions().isEmpty();
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
@@ -178,7 +186,7 @@ public class TripService {
             requireDepartureAllowed(job, request.occurredAt());
         RouteStop stop = null;
         if (request.routeStopId() != null) {
-            RoutePlan plan = routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(job.getId(), RoutePlanStatus.CONFIRMED)
+            RoutePlan plan = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                     .orElseThrow(() -> ResourceNotFoundException.of("Confirmed route", job.getCode()));
             stop = plan.getStops().stream()
                     .filter(s -> s.getId().equals(request.routeStopId()))
@@ -186,7 +194,7 @@ public class TripService {
                     .orElseThrow(() -> ResourceNotFoundException.of("Route stop", request.routeStopId()));
         }
         TripRecord record = new TripRecord();
-        record.setJob(job);
+        record.setTrip(trip);
         record.setRouteStop(stop);
         record.setKind(request.kind());
         record.setOccurredAt(request.occurredAt());
@@ -224,11 +232,11 @@ public class TripService {
         TripRecord saved = records.save(record);
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) {
-            updateJobStatus(job, request.kind(), request.occurredAt(), stop);
+            updateJobStatus(job, trip, request.kind(), request.occurredAt(), stop);
             recordHandover(job, request.kind(), request.occurredAt(), receiverName);
             if (request.kind() == TripRecordKind.HELD) alertHold(job, stop, request.text());
         }
-        writeAudit(saved, user, channel, stop);
+        writeAudit(saved, job, user, channel, stop);
         return TripMapper.toRecordResponse(saved);
     }
 
@@ -254,7 +262,8 @@ public class TripService {
      * log but don't change the status; lifecycle steps (loading, departure, hold, delivery, handover) must
      * still arrive in order.
      */
-    private boolean validateTransition(TransportJob job, TripRecordKind kind, Instant occurredAt, Channel channel) {
+    private boolean validateTransition(
+            TransportJob job, Trip trip, TripRecordKind kind, Instant occurredAt, Channel channel) {
         TripStatus status = job.getTripStatus();
         if (occurredAt.isAfter(Instant.now(clock).plus(CLOCK_SKEW)))
             throw new BusinessException(
@@ -263,7 +272,7 @@ public class TripService {
         if (job.getStage() == JobStage.CLOSED)
             throw transitionConflict(status, "A closed trip cannot receive new journey events.");
 
-        Instant newestStatusEvent = records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(job.getId(), STATUS_EVENTS)
+        Instant newestStatusEvent = records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(trip.getId(), STATUS_EVENTS)
                 .map(TripRecord::getOccurredAt)
                 .orElse(null);
         if (newestStatusEvent != null && occurredAt.isBefore(newestStatusEvent)) {
@@ -288,7 +297,7 @@ public class TripService {
                                 .contains(kind)))
             throw transitionConflict(status, "Only handover or a note can be recorded at the handover stage.");
         if (job.getStage() == JobStage.HANDOVER
-                && records.existsByJob_IdAndKind(job.getId(), TripRecordKind.HANDED_OVER)
+                && records.existsByTrip_IdAndKind(trip.getId(), TripRecordKind.HANDED_OVER)
                 && kind != TripRecordKind.NOTE)
             throw transitionConflict(status, "Only a note can be added after handover.");
 
@@ -335,7 +344,11 @@ public class TripService {
         return false;
     }
 
-    private void updateJobStatus(TransportJob job, TripRecordKind kind, Instant at, RouteStop stop) {
+    /**
+     * Moves the job's trip status. The trip carries this one job until shared trips (US-F3-11), so it follows the
+     * job's status, and the job's horses come off the trip once delivered.
+     */
+    private void updateJobStatus(TransportJob job, Trip trip, TripRecordKind kind, Instant at, RouteStop stop) {
         switch (kind) {
             case DEPARTED, FLIGHT_DEPARTED -> {
                 job.setTripStatus(TripStatus.DEPARTED);
@@ -364,6 +377,8 @@ public class TripService {
             }
             default -> {}
         }
+        trip.setStatus(job.getTripStatus());
+        if (job.getTripStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, job);
     }
 
     /**
@@ -396,7 +411,7 @@ public class TripService {
             notifications.notify(NotificationKind.TRIP_HELD, Audience.role(role), Subject.job(job), title, body);
     }
 
-    private void writeAudit(TripRecord record, User user, Channel channel, RouteStop stop) {
+    private void writeAudit(TripRecord record, TransportJob job, User user, Channel channel, RouteStop stop) {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("kind", record.getKind().name());
         after.put("routeStopId", stop == null ? null : stop.getId());
@@ -408,39 +423,49 @@ public class TripService {
                 AuditText.fit("%s recorded for %s%s"
                         .formatted(
                                 TripMapper.label(record.getKind()),
-                                record.getJob().getCode(),
+                                job.getCode(),
                                 stop == null ? "" : " at " + TripMapper.stopName(stop))),
                 "TRIP_RECORD",
                 record.getId(),
-                record.getJob().getCode(),
+                job.getCode(),
                 after);
     }
 
-    private TripViewResponse view(TransportJob job) {
-        List<TripRecord> tripRecords = records.findByJob_IdOrderByOccurredAtAsc(job.getId());
+    /** The trip as {@code job}'s people see it; {@code staffView} is false for the customer, who never sees the TRP code. */
+    private TripViewResponse view(TransportJob job, Trip trip, boolean staffView) {
+        List<TripRecord> tripRecords = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId());
         Map<UUID, TripRecord> latest = new HashMap<>();
         tripRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
                 .forEach(r -> latest.put(r.getRouteStop().getId(), r));
-        List<TripStopResponse> stops = routes.findTopByJob_IdAndStatusOrderByVersionNoDesc(
-                        job.getId(), RoutePlanStatus.CONFIRMED)
+        List<TripStopResponse> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                 .map(p -> p.getStops().stream()
                         .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
                         .toList())
                 .orElse(List.of());
-        LoadPlan load = loads.findTopByJob_IdAndStatusOrderByConfirmedAtDesc(job.getId(), LoadPlanStatus.CONFIRMED)
-                .orElse(null);
+        // Every confirmed trailer of the convoy, in order (US-F3-10).
+        List<LoadPlan> confirmed = loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()).stream()
+                .filter(p -> p.getStatus() == LoadPlanStatus.CONFIRMED)
+                .toList();
         Map<UUID, LoadPlanStall> stalls = new HashMap<>();
-        if (load != null) load.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s));
+        confirmed.forEach(
+                p -> p.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s)));
         List<TripHorseResponse> horses = requestHorses
                 .findByRequest_Id(job.getRequest().getId())
                 .stream()
                 .map(rh -> TripMapper.toHorseResponse(
-                        rh.getHorse(), stalls.get(rh.getHorse().getId())))
+                        rh.getHorse(), stalls.get(rh.getHorse().getId()), confirmed.size() > 1))
                 .toList();
         return TripMapper.toViewResponse(
                 job,
-                load == null ? null : load.getVehicle().getCode(),
+                staffView ? trip.getCode() : null,
+                confirmed.isEmpty()
+                        ? null
+                        : String.join(
+                                ", ",
+                                confirmed.stream()
+                                        .map(p -> p.getVehicle().getCode())
+                                        .toList()),
                 stops,
                 horses,
                 tripRecords.stream().map(TripMapper::toRecordResponse).toList());

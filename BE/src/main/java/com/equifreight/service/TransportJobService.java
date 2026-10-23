@@ -43,6 +43,7 @@ public class TransportJobService {
     private final AuditService auditService;
     private final NotificationService notificationService;
     private final CodeService codeService;
+    private final JobTripService jobTrips;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -55,7 +56,8 @@ public class TransportJobService {
             ClearanceService clearanceService,
             AuditService auditService,
             NotificationService notificationService,
-            CodeService codeService) {
+            CodeService codeService,
+            JobTripService jobTrips) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -67,6 +69,7 @@ public class TransportJobService {
         this.auditService = auditService;
         this.notificationService = notificationService;
         this.codeService = codeService;
+        this.jobTrips = jobTrips;
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +123,7 @@ public class TransportJobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + id));
 
         List<JobHorseResponse> horses = getJobHorses(job);
-        LoadPlanResponse loadPlan =
+        TripLoadResponse loadPlan =
                 loadPlanService.getActiveLoadPlan(job.getId()).orElse(null);
 
         RoutePlanResponse routePlan =
@@ -144,6 +147,7 @@ public class TransportJobService {
 
         return JobMapper.toDetailResponse(
                 job,
+                jobTrips.findTripOf(job.getId()).map(Trip::getCode).orElse(null),
                 getBlockingReason(job),
                 getNextStepOwner(job),
                 gateState,
@@ -157,7 +161,8 @@ public class TransportJobService {
     /**
      * The job an approved request becomes (US-F1-07, BR-F1-05): its CBRT code from the code counter, the accepted
      * quotation it is held to, the manager who approved it and the team they chose, with the request's arrival window.
-     * The caller has checked the request and the team; the dates are planned in Flow 3.
+     * It travels on a trip of its own, with all its horses (US-F3-09). The caller has checked the request and the
+     * team; the dates are planned in Flow 3.
      */
     @Transactional
     public TransportJob createApproved(
@@ -178,7 +183,9 @@ public class TransportJobService {
         job.setCoordinator(coordinator);
         job.setWindowStart(request.getWindowStart());
         job.setWindowEnd(request.getWindowEnd());
-        return transportJobRepository.saveAndFlush(job);
+        TransportJob saved = transportJobRepository.saveAndFlush(job);
+        jobTrips.createForJob(saved, manager, approvedAt);
+        return saved;
     }
 
     @Transactional
@@ -199,37 +206,45 @@ public class TransportJobService {
                     + gate.outstandingIssues().size() + " items outstanding)");
         }
 
-        // Validate load plan confirmed
-        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(jobId);
-        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
+        // Validate the trip's load plans confirmed
+        Trip trip = jobTrips.tripOf(jobId);
+        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
+        if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
             throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
         }
 
         // Validate route plan confirmed
-        Optional<RoutePlan> routePlanOpt = routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
+        Optional<RoutePlan> routePlanOpt =
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
         if (routePlanOpt.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: Route plan is not confirmed yet");
         }
 
         // Validate crew assigned: driver and groom ratio
-        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByJobId(jobId);
+        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId());
         if (crewAssignments.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: No crew assigned to this job");
         }
-        boolean hasDriver = crewAssignments.stream().anyMatch(c -> c.getCrewRole() == CrewRole.DRIVER);
-        if (!hasDriver) {
-            throw new BusinessException("Cannot sign off trip plan: At least one DRIVER must be assigned");
-        }
-        int horseCount = job.getRequest() != null && job.getRequest().getHorses() != null
-                ? job.getRequest().getHorses().size()
-                : 0;
-        int reqGrooms = (int) Math.ceil(horseCount / 3.0);
-        long groomCount = crewAssignments.stream()
-                .filter(c -> c.getCrewRole() == CrewRole.GROOM || c.getCrewRole() == CrewRole.FLYING_GROOM)
-                .count();
-        if (groomCount < reqGrooms) {
-            throw new BusinessException(
-                    "Cannot sign off trip plan: Requires " + reqGrooms + " groom(s), found " + groomCount);
+        // Every trailer has a driver and a groom per three horses on it (US-F3-10).
+        for (LoadPlan plan : loadPlans) {
+            TripVehicle trailer = plan.getTripVehicle();
+            String vehicleCode = trailer.getVehicle().getCode();
+            List<CrewAssignment> onTrailer = crewAssignments.stream()
+                    .filter(c -> c.getTripVehicle().getId().equals(trailer.getId()))
+                    .toList();
+            if (onTrailer.stream().noneMatch(c -> c.getCrewRole() == CrewRole.DRIVER)) {
+                throw new BusinessException(
+                        "Cannot sign off trip plan: At least one DRIVER must be assigned to " + vehicleCode);
+            }
+            int horseCount = crewAssignmentService.horsesOn(trip, trailer, loadPlans.size());
+            int reqGrooms = (int) Math.ceil(horseCount / 3.0);
+            long groomCount = onTrailer.stream()
+                    .filter(c -> c.getCrewRole() == CrewRole.GROOM || c.getCrewRole() == CrewRole.FLYING_GROOM)
+                    .count();
+            if (groomCount < reqGrooms) {
+                throw new BusinessException("Cannot sign off trip plan: " + vehicleCode + " requires " + reqGrooms
+                        + " groom(s), found " + groomCount);
+            }
         }
 
         // The confirmed route has set the travel dates by now, so check every crew member is free for them
@@ -239,7 +254,7 @@ public class TransportJobService {
                 if (!crewAssignmentRepository
                         .findOverlappingAssignments(
                                 member.getUser().getId(),
-                                job.getId(),
+                                trip.getId(),
                                 job.getPlannedDepartureAt(),
                                 job.getPlannedArrivalAt())
                         .isEmpty()) {
@@ -312,17 +327,28 @@ public class TransportJobService {
         if (job.getStage() == JobStage.DOCUMENTS || job.getDossierStatus() != DossierStatus.CLEARANCE_READY) {
             return "Transport specialist";
         }
-        Optional<LoadPlan> loadPlanOpt = loadPlanRepository.findFirstByJobIdOrderByCreatedAtDesc(job.getId());
-        if (loadPlanOpt.isEmpty() || loadPlanOpt.get().getStatus() != LoadPlanStatus.CONFIRMED) {
+        Optional<Trip> trip = jobTrips.findTripOf(job.getId());
+        if (trip.isEmpty()) {
+            return "Fleet & route coordinator";
+        }
+        UUID tripId = trip.get().getId();
+        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(tripId);
+        if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
             return "Fleet & route coordinator";
         }
         Optional<RoutePlan> routePlanOpt =
-                routePlanRepository.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED);
+                routePlanRepository.findByTrip_IdAndStatus(tripId, RoutePlanStatus.CONFIRMED);
         if (routePlanOpt.isEmpty()) {
             return "Fleet & route coordinator";
         }
-        List<CrewAssignment> crew = crewAssignmentRepository.findByJobId(job.getId());
-        if (crew.isEmpty() || crew.stream().noneMatch(c -> c.getCrewRole() == CrewRole.DRIVER)) {
+        List<CrewAssignment> crew = crewAssignmentRepository.findByTripVehicle_Trip_Id(tripId);
+        boolean everyTrailerHasADriver = loadPlans.stream()
+                .allMatch(p -> crew.stream()
+                        .anyMatch(c -> c.getCrewRole() == CrewRole.DRIVER
+                                && c.getTripVehicle()
+                                        .getId()
+                                        .equals(p.getTripVehicle().getId())));
+        if (!everyTrailerHasADriver) {
             return "Fleet & route coordinator";
         }
         if (job.getSignedOffAt() == null) {

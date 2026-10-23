@@ -3,6 +3,7 @@ import {
   type ChecklistItem,
   ChecklistHolderEnum,
   ChecklistStatusEnum,
+  DocumentProviderEnum,
   ValidityEnum,
 } from '@/interfaces';
 
@@ -132,4 +133,30 @@ export function groupChecklist(items: ChecklistItem[]): ChecklistGroup[] {
       ? [group('shipment', 'Shipment', 'Documents for the whole job', shipment)]
       : []),
   ];
+}
+
+/**
+ * The customer can upload a version (US-F2-03): one of the documents they provide, not cleared with nothing left
+ * to fix. Matches the server's check; departure is checked there.
+ */
+export const customerMayUpload = (item: ChecklistItem) =>
+  item.providedBy === DocumentProviderEnum.CUSTOMER &&
+  !(isCleared(item) && item.validity === ValidityEnum.GREEN);
+
+/** "Upload", or "Upload a new version" once one is on file. */
+export const uploadLabel = (item: ChecklistItem) =>
+  item.currentVersion ? 'Upload a new version' : 'Upload';
+
+/** File types the server accepts, read from the file's bytes there (PDF, JPEG, PNG, HEIC). */
+export const DOCUMENT_ACCEPT =
+  '.pdf,.jpg,.jpeg,.png,.heic,application/pdf,image/jpeg,image/png,image/heic';
+export const DOCUMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Why the file can't be sent, or null. The server checks the bytes again. */
+export function documentFileProblem(file: File): string | null {
+  const name = file.name.toLowerCase();
+  if (!/\.(pdf|jpe?g|png|heic)$/.test(name)) return 'Upload a PDF, JPEG, PNG or HEIC file.';
+  if (file.size > DOCUMENT_MAX_BYTES) return 'The file is larger than 25 MB.';
+  if (file.size === 0) return 'The file is empty.';
+  return null;
 }

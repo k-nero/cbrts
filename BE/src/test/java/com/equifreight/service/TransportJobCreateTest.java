@@ -3,6 +3,7 @@ package com.equifreight.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Quotation;
@@ -26,6 +27,7 @@ class TransportJobCreateTest {
     void theJobTakesItsCodeInBusinessTimeWithTheTeamAndTheWindow() {
         TransportJobRepository jobs = mock(TransportJobRepository.class);
         CodeService codes = mock(CodeService.class);
+        JobTripService jobTrips = mock(JobTripService.class);
         when(jobs.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         // 31 Dec 2026, 17:30 UTC is 1 Jan 2027 in Ho Chi Minh City.
         when(codes.next(CodePrefix.CBRT, 2027)).thenReturn("CBRT-2027-001");
@@ -40,7 +42,8 @@ class TransportJobCreateTest {
                 mock(ClearanceService.class),
                 mock(AuditService.class),
                 mock(NotificationService.class),
-                codes);
+                codes,
+                jobTrips);
         TransportRequest request = new TransportRequest();
         request.setWindowStart(Instant.parse("2027-01-20T02:00:00Z"));
         request.setWindowEnd(Instant.parse("2027-01-20T05:00:00Z"));
@@ -64,5 +67,7 @@ class TransportJobCreateTest {
         assertThat(job.getStage()).isEqualTo(JobStage.DOCUMENTS);
         assertThat(job.getDossierStatus()).isEqualTo(DossierStatus.OPEN);
         assertThat(job.getPlannedDepartureAt()).isNull();
+        // It travels on a trip of its own (US-F3-09).
+        verify(jobTrips).createForJob(job, yen, at);
     }
 }

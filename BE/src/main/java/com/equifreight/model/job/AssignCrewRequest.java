@@ -8,7 +8,10 @@ import lombok.Builder;
 
 /** The job's whole crew; a missing list is empty. */
 @Builder
-public record AssignCrewRequest(List<CrewItem> crew) {
+/**
+ * The whole crew of one trailer on the trip. {@code tripVehicleId} may be left out while the trip has one trailer.
+ */
+public record AssignCrewRequest(UUID tripVehicleId, List<CrewItem> crew) {
 
     public AssignCrewRequest {
         crew = crew == null ? List.of() : crew;
