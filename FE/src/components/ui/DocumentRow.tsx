@@ -5,7 +5,11 @@ import { cx, type Tone } from './tone';
 
 export type DocumentStatus = 'cleared' | 'review' | 'amber' | 'red' | 'required';
 
-const STATUS: Record<DocumentStatus, { tone: Tone; label: string; result: string }> = {
+/** Each state's tone and word; pages that show a document's state on its own use the same pair. */
+export const DOCUMENT_STATUS: Record<
+  DocumentStatus,
+  { tone: Tone; label: string; result: string }
+> = {
   cleared: { tone: 'ok', label: 'Cleared', result: 'text-ink-2' },
   review: { tone: 'info', label: 'In review', result: 'text-ink-2' },
   amber: { tone: 'warn', label: 'Expires in transit', result: 'text-warn' },
@@ -46,7 +50,7 @@ export const DocumentRow: FC<Props> = ({
   actions,
   className,
 }) => {
-  const s = STATUS[status];
+  const s = DOCUMENT_STATUS[status];
   return (
     <div
       className={cx(

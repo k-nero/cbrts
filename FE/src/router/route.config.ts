@@ -111,6 +111,13 @@ export const routesConfig = [
             breadcrumb: 'Documents',
             name: 'request-documents',
           },
+          {
+            path: '/documents/{itemId}',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Document',
+            name: 'request-document',
+          },
         ],
       },
     ],

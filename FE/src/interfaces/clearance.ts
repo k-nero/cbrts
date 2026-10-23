@@ -186,6 +186,19 @@ export interface DocumentUploadRequest {
   issuer?: string;
 }
 
+/** US-F2-03: the dates checked before the file is uploaded. */
+export interface DocumentCheckRequest {
+  issuedOn: string;
+  sampledOn?: string;
+  validUntil: string;
+}
+
+/** RED is refused and its file never uploaded; AMBER is kept but won't clear; GREEN goes to review. */
+export interface DocumentCheckResponse {
+  validity: Validity;
+  note: string;
+}
+
 export interface Authority {
   id: string;
   name: string;
