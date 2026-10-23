@@ -170,7 +170,8 @@ public class ClearanceService {
         candidate.setSampledOn(dates.sampledOn());
         candidate.setValidUntil(dates.validUntil());
         ValidityEngine.Result result = validityEngine.evaluate(item, candidate, item.getJob());
-        return new DocumentCheckResponse(result.validity(), result.note());
+        return new DocumentCheckResponse(
+                result.validity(), result.note(), result.rule(), result.found(), result.required(), result.renewBy());
     }
 
     /** US-F2-03: every version of one of the customer's documents, newest first (BR-F2-05). */
@@ -262,7 +263,7 @@ public class ClearanceService {
         // Evaluate validity on the unsaved version first; refuse RED with clear error before persisting.
         ValidityEngine.Result valResult = validityEngine.evaluate(item, candidate, item.getJob());
         if (valResult.validity() == Validity.RED) {
-            throw new ConflictException("DOCUMENT_VALIDITY_RED", "Document validity check failed: " + valResult.note());
+            throw new ConflictException("DOCUMENT_VALIDITY_RED", "Refused: " + valResult.note());
         }
 
         DocumentVersion savedVersion = documentVersionRepository.save(candidate);
