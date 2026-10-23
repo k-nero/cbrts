@@ -887,7 +887,7 @@ public class DataSeeder implements ApplicationRunner {
         r.setRecordedBy(recordedBy);
         r.setChannel(Channel.CAB_TABLET);
         r.setText(text);
-        return tripRecordRepository.save(r);
+        return r;
     }
 
     private void addConditionLog(
