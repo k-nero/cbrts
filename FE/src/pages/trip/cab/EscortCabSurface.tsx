@@ -598,7 +598,25 @@ export function EscortCabSurface({
 
           {/* Right Info Column (4 cols) */}
           <div className="flex flex-col gap-4 lg:col-span-4">
-            {nextStop ? (
+            {mode === 'handover' ? (
+              <Panel title="What happens next">
+                <div className="flex flex-col gap-2">
+                  <h4 className="type-h4 m-0 text-ink">The customer confirms</h4>
+                  <p className="type-body-s m-0 text-ink-2">
+                    The receiving club confirms the handover and each horse’s condition, or reports
+                    a problem.
+                  </p>
+                  <div className="flex items-baseline justify-between border-t border-line pt-2">
+                    <span className="type-mono-data text-xl font-bold text-ink">Due in 2 days</span>
+                    <span className="type-label-m text-info">Confirmation window</span>
+                  </div>
+                  <p className="type-body-s m-0 text-ink-3">
+                    If they don’t reply within 2 days, the handover is taken as accepted on this
+                    record and logistics is told.
+                  </p>
+                </div>
+              </Panel>
+            ) : nextStop ? (
               <NextStopPanel
                 title={nextStop.name}
                 sub={`${nextStop.kind.toLowerCase().replaceAll('_', ' ')} · ${
@@ -615,6 +633,34 @@ export function EscortCabSurface({
                 due="Arrival window"
               />
             )}
+
+            {mode === 'welfare' &&
+              trip.records.find((r) => r.conditions && r.conditions.length > 0) && (
+                <Panel title="Previous log">
+                  {(() => {
+                    const prev = trip.records
+                      .filter((r) => r.conditions && r.conditions.length > 0)
+                      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+                    if (!prev) return null;
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <h4 className="type-h4 m-0 text-ink">
+                          Last check · {formatClock(prev.occurredAt)}
+                        </h4>
+                        <p className="type-body-s m-0 text-ink-2">
+                          {prev.text ||
+                            prev.conditions
+                              .map((c) => `${c.horseName}: ${c.condition.toLowerCase()}`)
+                              .join(', ')}
+                        </p>
+                        {prev.recordedBy && (
+                          <span className="type-caption text-ink-3">{prev.recordedBy}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </Panel>
+              )}
 
             <OnBoardCabPanel horses={trip.horses} />
 

@@ -30,7 +30,7 @@ export function CabDock({
 
       <div className="flex items-center gap-3">
         {secondaryText && (
-          <Button variant="secondary" onClick={onSecondary} className="h-14 px-6">
+          <Button variant="secondary" onClick={onSecondary} className="h-16 px-6">
             {secondaryText}
           </Button>
         )}
@@ -40,7 +40,7 @@ export function CabDock({
             onClick={onAction}
             disabled={isActionDisabled || isActionLoading}
             leadingIcon="check"
-            className="h-14 min-w-[280px] px-8 text-base font-bold shadow-md md:min-w-[360px]"
+            className="h-16 min-w-[280px] px-8 text-base font-bold shadow-md md:min-w-[440px]"
           >
             {isActionLoading ? 'Saving...' : actionText}
           </Button>
