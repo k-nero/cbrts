@@ -2,6 +2,7 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
+  DecideIncidentInput,
   Incident,
   IncidentOptionInput,
   IncidentSummary,
@@ -26,6 +27,14 @@ export const incidentApi = {
     client
       .post<Incident>(`/staff/incidents/${id}/proposal`, { optionId, note })
       .then((r) => r.data),
+
+  /** US-F5-03: the logistics manager approves the proposed option. */
+  decide: (id: string, input: DecideIncidentInput) =>
+    client.post<Incident>(`/staff/incidents/${id}/decision`, input).then((r) => r.data),
+
+  /** US-F5-03: the logistics manager sends the proposal back, saying why. */
+  returnProposal: (id: string, reason: string) =>
+    client.post<Incident>(`/staff/incidents/${id}/proposal/return`, { reason }).then((r) => r.data),
 
   /** US-F5-01: the escort reports an emergency on the trip the cab is open on. */
   raise: (jobCode: string, input: RaiseIncidentInput) =>

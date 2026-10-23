@@ -1,6 +1,7 @@
 import { Col, Flex, Row, Skeleton } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 
+import { IncidentDecided, IncidentDecision } from './IncidentDecision';
 import { INCIDENT_STATUS, openFor } from './incidentFormat';
 import { IncidentOptions } from './IncidentOptions';
 
@@ -8,7 +9,8 @@ import PageHeader from '@/components/PageHeader';
 import { Chip, Panel } from '@/components/ui';
 import { useIncident } from '@/hooks/incident';
 import type { Incident } from '@/interfaces';
-import { IncidentStatusEnum } from '@/interfaces';
+import { IncidentStatusEnum, RoleNameEnum } from '@/interfaces';
+import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/pages/trip/tripFormat';
 import { Photo } from '@/pages/trip/Photo';
 
@@ -36,9 +38,15 @@ export default function IncidentDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   // A failed load (404 included) goes to the error boundary; until it arrives, the page is a skeleton.
   const { data: incident } = useIncident(id);
+  // Only the logistics manager decides (US-F5-03); the coordinator sees the proposal waiting.
+  const isManager = (useAuthStore((state) => state.roles) as string[]).includes(
+    RoleNameEnum.LOGISTICS_MANAGER,
+  );
   if (!incident) return <Skeleton active paragraph={{ rows: 8 }} />;
 
   const status = INCIDENT_STATUS[incident.status];
+  const decided = incident.status !== IncidentStatusEnum.OPEN && incident.decidedOptionId !== null;
+  const proposed = incident.options.find((o) => o.id === incident.proposedOptionId);
   return (
     <Flex vertical gap={28}>
       <PageHeader
@@ -79,6 +87,11 @@ export default function IncidentDetailPage() {
                 )}
               </Flex>
             </Panel>
+            {decided ? (
+              <IncidentDecided incident={incident} />
+            ) : (
+              proposed && isManager && <IncidentDecision incident={incident} option={proposed} />
+            )}
             <IncidentOptions incident={incident} />
           </Flex>
         </Col>

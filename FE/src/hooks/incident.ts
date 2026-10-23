@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { incidentApi, incidentsListApi } from '@/apis/incident';
 import { useCrudResource } from '@/hooks/crud';
 import type {
+  DecideIncidentInput,
   Incident,
   IncidentOptionInput,
   IncidentStatus,
@@ -53,3 +54,9 @@ export const useProposeIncidentOption = (id: string) =>
   useIncidentChange(id, (v: { optionId: string; note?: string }) =>
     incidentApi.propose(id, v.optionId, v.note),
   );
+
+export const useDecideIncident = (id: string) =>
+  useIncidentChange(id, (input: DecideIncidentInput) => incidentApi.decide(id, input));
+
+export const useReturnIncidentProposal = (id: string) =>
+  useIncidentChange(id, (reason: string) => incidentApi.returnProposal(id, reason));
