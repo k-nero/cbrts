@@ -589,11 +589,12 @@ erDiagram
 | `opened_at`, `reply_due_at` | timestamptz | A customer report is answered within 2 hours. |
 | `stops_clock` | boolean | True for an authority hold or a welfare stop: the arrival-window clock and the handover deadline pause while it is open. |
 | `clock_stopped_from`, `clock_stopped_until` | timestamptz | |
+| `proposed_option_id`, `proposed_by`, `proposed_at`, `proposal_note` | | The option proposed for the manager's approval (US-F5-02), and why; cleared when the manager sends it back. |
 | `decided_option_id` | → `incident_options` | |
 | `decided_by`, `decided_at`, `decision_note` | | |
 | `resolved_at` | timestamptz | |
 
-**`incident_options`**: `incident_id`, `title`, `description`, `facts jsonb` (time, documents, the horse, cost), `position`.
+**`incident_options`**: `incident_id`, `title`, `description`, `facts jsonb` (time, documents, the horse, cost), `position`, `extra_cost numeric(14,2)` (≥ 0, in the job's quotation currency), `delay_minutes` (≥ 0, added to the arrival), `changes_route` (approving it gives the trip a new route version), `created_by`. The coordinator records them and proposes one (US-F5-02).
 
 **`incident_files`**: `(incident_id, file_id)`, the photos with a report.
 
