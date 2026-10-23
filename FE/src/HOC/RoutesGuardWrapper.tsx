@@ -8,8 +8,8 @@ import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 /**
  * Config-driven access check for the current path (router/route.config.ts): every matched route
  * must allow the session state (authenticated, unauthenticated or public) and one of the user's
- * roles. A signed-out user goes to sign-in; a signed-in user on a page they can't open goes home,
- * or to /forbidden when that is where they already are.
+ * roles. A signed-out user goes to sign-in. A signed-in user on a signed-out page (sign-in, register)
+ * goes home; one whose role can't open the page goes to /forbidden, which says so and names the page.
  */
 export const RoutesGuardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useCustomRouter();
@@ -18,31 +18,40 @@ export const RoutesGuardWrapper: React.FC<{ children: React.ReactNode }> = ({ ch
   const roles = useAuthStore((state) => state.roles);
   const authStatus = isAuthenticated ? 'authenticated' : 'unauthenticated';
 
-  const isAllowedToPass = useMemo(
+  const validAuthType = useMemo(
     () =>
-      router.configsMatchPath.every((config) => {
-        const validAuthType =
-          !config.type || config.type === 'public' || config.type === authStatus;
-        const validRole =
-          config.roles.includes('*') || config.roles.some((r) => (roles as string[]).includes(r));
-        return validAuthType && validRole;
-      }),
-    [authStatus, roles, router.configsMatchPath],
+      router.configsMatchPath.every(
+        (config) => !config.type || config.type === 'public' || config.type === authStatus,
+      ),
+    [authStatus, router.configsMatchPath],
   );
+  const validRole = useMemo(
+    () =>
+      router.configsMatchPath.every(
+        (config) =>
+          config.roles.includes('*') || config.roles.some((r) => (roles as string[]).includes(r)),
+      ),
+    [roles, router.configsMatchPath],
+  );
+  const isAllowedToPass = validAuthType && validRole;
+  // Signed in, on a page meant for the signed-in, but not for this role.
+  const roleDenied = isAuthenticated && validAuthType && !validRole;
 
   const redirectPath = useMemo(() => {
     if (!isAuthenticated) return router.paths.get('login');
+    if (roleDenied) return router.paths.get('forbidden');
     return primaryRoleHome(roles);
-  }, [isAuthenticated, roles, router.paths]);
+  }, [isAuthenticated, roleDenied, roles, router.paths]);
 
   useEffect(() => {
     if (!isAllowedToPass && location.pathname !== redirectPath) {
       router.replace(redirectPath, {
         force: true,
-        state: isAuthenticated ? undefined : { from: location },
+        // Sign-in returns to the page afterwards; /forbidden names it.
+        state: !isAuthenticated || roleDenied ? { from: location } : undefined,
       });
     }
-  }, [isAllowedToPass, isAuthenticated, location, redirectPath, router]);
+  }, [isAllowedToPass, isAuthenticated, location, redirectPath, roleDenied, router]);
 
   if (!isAllowedToPass) return <LoadingPage fullscreen />;
 

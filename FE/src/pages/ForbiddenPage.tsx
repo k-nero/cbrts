@@ -1,3 +1,5 @@
+import { type Location, useLocation } from 'react-router-dom';
+
 import { ErrorPage } from '@/components/ErrorPage';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/hooks/auth';
@@ -5,10 +7,10 @@ import { useCustomRouter } from '@/router/route.hook';
 import { primaryRole, primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
 /**
- * /forbidden. The route guard sends a signed-in user who can't open a page to their role's home, so
- * this page is reached when the account has no role the app knows (primaryRoleHome's fallback):
- * say so, and offer to sign out. Opened directly, it points a signed-out visitor to sign in and
- * anyone with a role back to their work.
+ * /forbidden. The route guard sends a signed-in user here when their role can't open a page (with
+ * the page in `state.from`), and primaryRoleHome sends an account with no role the app knows. It
+ * says which, and gives the way out: back to their work, or sign out. A signed-out visitor is
+ * pointed to sign in.
  */
 const ForbiddenPage = () => {
   const router = useCustomRouter();
@@ -16,6 +18,7 @@ const ForbiddenPage = () => {
   const roles = useAuthStore((state) => state.roles);
   const me = useAuthStore((state) => state.me);
   const signedIn = useAuthStore((state) => !!state.tokens?.accessToken);
+  const from = (useLocation().state as { from?: Location } | null)?.from?.pathname;
 
   const page = !signedIn ? (
     <ErrorPage
@@ -47,7 +50,7 @@ const ForbiddenPage = () => {
   ) : (
     <ErrorPage
       icon="lock"
-      title="This page isn’t open to you"
+      title="You don’t have permission to view this page"
       actions={
         <Button
           variant="ghost"
@@ -58,7 +61,15 @@ const ForbiddenPage = () => {
         </Button>
       }
     >
-      It belongs to another account or role.
+      {from ? (
+        <>
+          <span className="font-mono">{from}</span> is kept for another role, so it can’t be opened
+          from your account. If you were sent a link to it, ask the person who sent it what they
+          need from you.
+        </>
+      ) : (
+        'It’s kept for another role, so it can’t be opened from your account.'
+      )}
     </ErrorPage>
   );
 
