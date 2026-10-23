@@ -2,6 +2,7 @@ import { Col, Flex, Row, Skeleton } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 
 import { INCIDENT_STATUS, openFor } from './incidentFormat';
+import { IncidentOptions } from './IncidentOptions';
 
 import PageHeader from '@/components/PageHeader';
 import { Chip, Panel } from '@/components/ui';
@@ -78,6 +79,7 @@ export default function IncidentDetailPage() {
                 )}
               </Flex>
             </Panel>
+            <IncidentOptions incident={incident} />
           </Flex>
         </Col>
         <Col xs={24} lg={8}>

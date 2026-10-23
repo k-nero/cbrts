@@ -16,3 +16,14 @@ export const openFor = (since: string, now = Date.now()) => {
   if (hours >= 48) return `${Math.floor(hours / 24)} days`;
   return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
 };
+
+/** "3 h 30 min", "45 min": what an option adds to the arrival. */
+export const duration = (minutes: number) => {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+};
+
+/** "USD 1,200.00" in the job's quotation currency. */
+export const money = (currency: string, amount: number) =>
+  `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

@@ -56,6 +56,37 @@ export interface Incident {
   ownerName: string | null;
   coordinatorName: string | null;
   photos: TripPhoto[];
+  /** The job's quotation currency: every cost on the incident is in it. */
+  currency: string;
+  options: IncidentOption[];
+  /** The option waiting for the manager's approval (US-F5-02). */
+  proposedOptionId: string | null;
+  proposedByName: string | null;
+  proposedAt: string | null;
+  proposalNote: string | null;
+}
+
+/** An option considered for an incident, with its cost side by side (US-F5-02). */
+export interface IncidentOption {
+  id: string;
+  position: number;
+  title: string;
+  description: string | null;
+  extraCost: number;
+  /** Minutes it adds to the arrival. */
+  delayMinutes: number;
+  /** True when it takes the horses another way: approving it gives the trip a new route version. */
+  changesRoute: boolean;
+  createdByName: string | null;
+  createdAt: string;
+}
+
+export interface IncidentOptionInput {
+  title: string;
+  description?: string;
+  extraCost: number;
+  delayMinutes: number;
+  changesRoute: boolean;
 }
 
 /** An emergency reported from the cab (US-F5-01). */
