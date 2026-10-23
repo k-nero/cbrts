@@ -117,6 +117,8 @@ export interface DocumentVersion {
   review: DocumentReview;
   reviewedById?: string;
   reviewedByName?: string;
+  /** "Lan" in "Cleared by Lan". */
+  reviewedByCalledName?: string;
   reviewedAt?: string;
   rejectReason?: string;
 }

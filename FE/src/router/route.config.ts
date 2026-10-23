@@ -104,6 +104,13 @@ export const routesConfig = [
             breadcrumb: 'Quotation',
             name: 'request-quotation',
           },
+          {
+            path: '/documents',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Documents',
+            name: 'request-documents',
+          },
         ],
       },
     ],
