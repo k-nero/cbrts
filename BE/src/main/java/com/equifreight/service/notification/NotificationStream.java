@@ -34,7 +34,10 @@ public class NotificationStream {
     private final Map<UUID, Set<SseEmitter>> streams = new ConcurrentHashMap<>();
 
     public SseEmitter open(UUID userId) {
-        SseEmitter emitter = new SseEmitter(TIMEOUT_MS);
+        return register(userId, new SseEmitter(TIMEOUT_MS));
+    }
+
+    SseEmitter register(UUID userId, SseEmitter emitter) {
         streams.computeIfAbsent(userId, id -> ConcurrentHashMap.newKeySet()).add(emitter);
         Runnable close = () -> remove(userId, emitter);
         emitter.onCompletion(close);
@@ -91,7 +94,13 @@ public class NotificationStream {
             // The tab went away; its browser opens a new stream when it comes back.
             log.debug("Dropping a closed notification stream for user {}", userId);
             remove(userId, emitter);
-            emitter.completeWithError(e);
+            try {
+                emitter.completeWithError(e);
+            } catch (IllegalStateException alreadyFailed) {
+                // The container already ended the async request; there is nothing left to complete. Letting this
+                // escape would fail the request whose commit published the change, after it was saved.
+                log.debug("Notification stream for user {} had already ended", userId);
+            }
         }
     }
 
