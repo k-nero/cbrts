@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171) and suggestions (US-F3-13, #172). The rest is in #173–#175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171), suggestions (US-F3-13, #172) and the customer and escort views with the three customer notifications (US-F3-14, #173). The rest is in #174 and #175.
 
 ## Why
 
@@ -153,7 +153,7 @@ Health status is never typed in: it's derived from what each job's clearance alr
 - **Customer:** their own job only, under its `CBRT` code; the `TRP` code is never shown. Tracking and the trip log show their horses, their pickup and drop-off, and the shared border and welfare stops. When the trailer carries other jobs, one line says the horses travel with another client's horses, with nothing about who or which. Stops that exist only for another job are shown as "a stop on the way", without the place. A hold or incident is described in terms of their own horses.
 - **Fleet coordinator:** a trip page (or a Trip section on each job) with all jobs, vehicles, the combined route and one load plan per trailer, where horses are labelled with their job code. Combining, splitting and removing happen here.
 - **Logistics manager:** each job page keeps its price, quotation and invoices; a "Shared with 1 other job" note links to the trip.
-- **Escort:** the cab surface is per trailer: it shows that trailer's horses and the trip's stops, with each delivery stop naming the job being handed over there.
+- **Escort:** the cab surface is per trailer: it shows that trailer's horses and the trip's stops, with each delivery stop naming the job being handed over there. As built (#173), the escort's trip list has one row per trip, with its TRP code and every job it carries, and a crew member sees the horses on the trailers they are assigned to.
 
 ## Customer notifications
 
@@ -168,6 +168,7 @@ New kinds for the notification centre (docs/notification-centre.md, section 6). 
 - The first sentence of `JOB_REPLANNED` gives the job's own reason. For a cause other than its clearance (for example the coordinator rebuilding the trip), it reads "The plan for the trailer leaving on 18 Oct changed, so your horses won't travel on it."
 - After departure, a job leaving or a delay goes through an incident, whose customer message is written by the logistics manager and sent as written (see [Leaving a moving trip](#leaving-a-moving-trip)); these kinds aren't used then.
 - De-duplication follows the notification centre: `dedupe_key` per job and trip confirmation, so reconfirming the same plan doesn't post twice.
+- As built (#173): the trip's confirmation is the route confirmation, which sets every job's times. A job hears `TRIP_SHARED` when the trip's last confirmed route didn't already carry it with another job, and `TRIP_TIMES_CHANGED` when it already had times and they moved (or it arrived from another trip, after being taken off one); never both. `JOB_REPLANNED` goes only to a job that had been given times. They open the job on the customer's Trip tracking (`/tracking?job=CBRT-…`, subject `TRIP_TRACKING`). The e-mail copy waits for the notification outbox (docs/notification-centre.md, PR 3), like every other kind.
 
 ## Migrating today's data
 
