@@ -105,6 +105,23 @@ public class ClearanceService {
     }
 
     /**
+     * US-F2-02: the checklist behind one of the customer's requests. Empty until the request is approved into a job
+     * and its checklist is generated.
+     */
+    @Transactional(readOnly = true)
+    public List<ChecklistItemResponse> getCustomerRequestChecklist(UUID requestId, User customer) {
+        return transportJobRepository
+                .findByRequestId(requestId)
+                .map(job -> {
+                    assertClubOwnsJob(job, customer);
+                    return checklistItemRepository.findByJobId(job.getId()).stream()
+                            .map(ClearanceMapper::toItemResponse)
+                            .toList();
+                })
+                .orElse(List.of());
+    }
+
+    /**
      * Retrieve unreviewed document versions for the specialist inbox with pagination.
      */
     @Transactional(readOnly = true)

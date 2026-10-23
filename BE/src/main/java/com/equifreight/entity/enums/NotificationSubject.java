@@ -7,5 +7,7 @@ public enum NotificationSubject {
     TRANSPORT_REQUEST,
     QUOTATION,
     TRANSPORT_JOB,
-    AUTHORITY_SUBMISSION
+    AUTHORITY_SUBMISSION,
+    /** A job's document checklist as a whole. */
+    DOCUMENTS
 }

@@ -136,6 +136,10 @@ public class NotificationService {
             case TRANSPORT_JOB -> customer ? customerRequest : escort ? "/escort" : "/staff/jobs/" + subject.jobId();
             case AUTHORITY_SUBMISSION ->
                 customer ? customerRequest : "/staff/jobs/" + subject.jobId() + "?tab=authorities";
+            case DOCUMENTS ->
+                customer
+                        ? "/requests/" + subject.requestId() + "/documents"
+                        : "/staff/documents?jobId=" + subject.jobId();
         };
     }
 

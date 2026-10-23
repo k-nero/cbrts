@@ -18,6 +18,7 @@ public enum NotificationKind {
     DOSSIER_BLOCKED(NotificationTone.WARN),
     DOSSIER_REFUSED(NotificationTone.BAD),
     DOSSIER_LATE(NotificationTone.WARN),
+    DOCUMENTS_DUE(NotificationTone.WARN),
     TRIP_RELEASED(NotificationTone.INFO),
     TRIP_HELD(NotificationTone.BAD);
 

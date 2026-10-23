@@ -32,6 +32,11 @@ public record Subject(NotificationSubject type, UUID id, String code, UUID reque
                 NotificationSubject.TRANSPORT_JOB, job.getId(), job.getCode(), requestIdOf(job), job.getId());
     }
 
+    /** The job's document checklist: the customer's All documents page, the specialist's checklist tab. */
+    public static Subject documents(TransportJob job) {
+        return new Subject(NotificationSubject.DOCUMENTS, job.getId(), job.getCode(), requestIdOf(job), job.getId());
+    }
+
     public static Subject authoritySubmission(AuthoritySubmission submission) {
         TransportJob job = submission.getJob();
         return new Subject(

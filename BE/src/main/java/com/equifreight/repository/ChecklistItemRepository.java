@@ -2,6 +2,8 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.enums.ChecklistStatus;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +43,22 @@ public interface ChecklistItemRepository
      * Lấy tất cả checklist của 1 con ngựa trong 1 job (scope PER_HORSE).
      */
     List<ChecklistItem> findByJobIdAndHorseId(UUID jobId, UUID horseId);
+
+    /**
+     * US-F2-02: what the customer still owes on a job that hasn't left, due on one of the given days.
+     */
+    @Query("""
+            SELECT ci FROM ChecklistItem ci
+            JOIN FETCH ci.job j
+            JOIN FETCH j.request r
+            JOIN FETCH r.club
+            JOIN FETCH ci.documentType
+            LEFT JOIN FETCH ci.horse
+            WHERE ci.holder = com.equifreight.entity.enums.ChecklistHolder.CUSTOMER
+              AND ci.status <> com.equifreight.entity.enums.ChecklistStatus.CLEARED
+              AND ci.dueDate IN :days
+              AND j.departedAt IS NULL
+            ORDER BY j.code, ci.dueDate
+            """)
+    List<ChecklistItem> findOwedByCustomerDueOn(@Param("days") Collection<LocalDate> days);
 }

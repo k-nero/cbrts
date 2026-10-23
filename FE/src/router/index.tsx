@@ -12,6 +12,7 @@ import EditHorsePage from '@/pages/customer/horses/edit';
 import AddHorsePage from '@/pages/customer/horses/new';
 import HorseProfilePage from '@/pages/customer/horses/profile';
 import MyRequestsPage from '@/pages/customer/requests';
+import RequestDocumentsPage from '@/pages/customer/requests/documents';
 import RequestQuotationPage from '@/pages/customer/requests/quotation';
 import RequestSubmittedPage from '@/pages/customer/requests/submitted';
 import RequestWizardPage from '@/pages/customer/requests/wizard';
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
           { path: '/requests/:id/edit', element: <RequestWizardPage /> },
           { path: '/requests/:id/submitted', element: <RequestSubmittedPage /> },
           { path: '/requests/:id/quotation', element: <RequestQuotationPage /> },
+          { path: '/requests/:id/documents', element: <RequestDocumentsPage /> },
           { path: '/tracking', element: <CustomerTripPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
         ],

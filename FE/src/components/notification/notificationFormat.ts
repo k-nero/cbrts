@@ -26,6 +26,7 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   DOSSIER_BLOCKED: 'Dossier blocked',
   DOSSIER_REFUSED: 'Refused',
   DOSSIER_LATE: 'Authority late',
+  DOCUMENTS_DUE: 'Documents due',
   TRIP_RELEASED: 'Trip released',
   TRIP_HELD: 'Trip held',
 };
