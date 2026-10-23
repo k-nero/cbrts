@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { vehicleApi } from '@/apis/vehicle';
+import { vehicleApi, vehiclesApi } from '@/apis/vehicle';
+import { useCrudResource } from '@/hooks/crud';
 import type {
   CreateVehicleInput,
   UpdateVehicleInput,
+  Vehicle,
   VehicleBookingInput,
   VehicleKind,
 } from '@/interfaces';
@@ -14,6 +16,13 @@ export const useVehicles = (params?: { page?: number; size?: number; sort?: stri
     queryFn: () => vehicleApi.list(params),
   });
 };
+
+/**
+ * The Vehicles page: paging, sort and Add vehicle. Keyed under 'vehicles', so a booking or a status
+ * change (which invalidate ['vehicles']) refreshes it.
+ */
+export const useVehicleList = () =>
+  useCrudResource<Vehicle, CreateVehicleInput>('vehicles', vehiclesApi);
 
 export const useActiveVehicles = () => {
   return useQuery({
