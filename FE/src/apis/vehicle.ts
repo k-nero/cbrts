@@ -1,4 +1,7 @@
 import client from '@/config/axios';
+
+import { makeCrudApi } from './crudFactory';
+
 import type {
   CreateVehicleInput,
   PagedResponse,
@@ -29,3 +32,6 @@ export const vehicleApi = {
   getFleetCalendar: (params?: { from?: string; to?: string; vehicleKind?: VehicleKind }) =>
     client.get<VehicleBooking[]>('/staff/fleet-calendar', { params }).then((r) => r.data),
 };
+
+/** The Vehicles page list (paged, sorted by the server) and its Add vehicle. */
+export const vehiclesApi = makeCrudApi<Vehicle, CreateVehicleInput>('/staff/vehicles');
