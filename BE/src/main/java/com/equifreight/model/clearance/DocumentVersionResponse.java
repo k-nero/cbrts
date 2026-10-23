@@ -29,5 +29,7 @@ public record DocumentVersionResponse(
         DocumentReview review,
         UUID reviewedById,
         String reviewedByName,
+        // What the customer calls the reviewer: "Lan" in "Cleared by Lan".
+        String reviewedByCalledName,
         Instant reviewedAt,
         String rejectReason) {}

@@ -11,6 +11,8 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.entity.enums.RegulationRole;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.clearance.ChecklistItemResponse;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.clearance.DocumentUploadRequest;
 import com.equifreight.model.clearance.ReviewDocumentRequest;
@@ -644,5 +646,48 @@ class ClearanceServiceTest {
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(submissions);
+    }
+
+    private static User customerOf(Club club) {
+        User customer = new User();
+        customer.setId(UUID.randomUUID());
+        customer.setClub(club);
+        return customer;
+    }
+
+    @Test
+    @DisplayName("A request with no job yet has no documents to show its club")
+    void requestChecklistIsEmptyBeforeApproval() {
+        UUID requestId = UUID.randomUUID();
+        when(transportJobRepository.findByRequestId(requestId)).thenReturn(Optional.empty());
+
+        assertTrue(clearanceService
+                .getCustomerRequestChecklist(requestId, customerOf(new Club()))
+                .isEmpty());
+    }
+
+    @Test
+    @DisplayName("A request's checklist is the job's, and another club's request is not found")
+    void requestChecklistIsTheClubsOwn() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        TransportRequest request = new TransportRequest();
+        request.setId(UUID.randomUUID());
+        request.setClub(club);
+        job.setRequest(request);
+        when(transportJobRepository.findByRequestId(request.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
+
+        assertEquals(
+                List.of(checklistItem.getId()),
+                clearanceService.getCustomerRequestChecklist(request.getId(), customerOf(club)).stream()
+                        .map(ChecklistItemResponse::id)
+                        .toList());
+
+        Club other = new Club();
+        other.setId(UUID.randomUUID());
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> clearanceService.getCustomerRequestChecklist(request.getId(), customerOf(other)));
     }
 }

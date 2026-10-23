@@ -171,6 +171,7 @@ There's no per-job staff owner column yet, so staff audiences fan out by role.
 | `DOCUMENT_UPLOADED` | customer upload / replace | Transport specialists | no | Document review |
 | `DOCUMENT_REJECTED` | document review | Club accounts | yes | Document (reason verbatim) |
 | `DOCUMENT_VALIDITY_RED` | gate re-run turns an item RED | Club accounts; specialists | club yes | Checklist item |
+| `DOCUMENTS_DUE` *(built, US-F2-02)* | `DocumentReminderJob`, 08:00 Vietnam time, 7, 3 and 1 days before an item the club holds is due; one notice per job and due day, dedupe `DOCUMENTS_DUE:{jobId}:{dueDate}` | Club accounts | yes | All documents (`/requests/{id}/documents`) |
 | `AUTHORITY_INFO_REQUIRED` | `AuthoritySubmissionService` *(exists as `ADDITIONAL_INFO_REQUIRED`)* | Club accounts | yes | Clearance |
 | `AUTHORITY_OVERDUE` | sweep | Specialists; logistics managers | yes | Authorities tab |
 | `CLEARANCE_READY` | dossier reaches `CLEARANCE_READY` | Club accounts; fleet coordinators | club yes | Clearance |

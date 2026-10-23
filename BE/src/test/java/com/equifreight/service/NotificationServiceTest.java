@@ -158,6 +158,10 @@ class NotificationServiceTest {
                 .isEqualTo("/staff/jobs/" + job.getId() + "?tab=authorities");
         assertThat(NotificationService.linkFor(Subject.authoritySubmission(submission), club))
                 .isEqualTo("/requests/" + request.getId() + "/submitted");
+        assertThat(NotificationService.linkFor(Subject.documents(job), club))
+                .isEqualTo("/requests/" + request.getId() + "/documents");
+        assertThat(NotificationService.linkFor(Subject.documents(job), staff))
+                .isEqualTo("/staff/documents?jobId=" + job.getId());
     }
 
     @Test
