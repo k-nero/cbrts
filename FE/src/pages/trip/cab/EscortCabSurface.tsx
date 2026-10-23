@@ -1,0 +1,591 @@
+import { useMemo, useState } from 'react';
+import { DatePicker, Input, Select } from 'antd';
+import dayjs from 'dayjs';
+
+import { CabBar } from './CabBar';
+import { CabDock } from './CabDock';
+import { CabStrip } from './CabStrip';
+import { ConditionSegmented } from './ConditionSegmented';
+import { HeldBanner } from './HeldBanner';
+import { NextStopPanel } from './NextStopPanel';
+import { OnBoardCabPanel } from './OnBoardCabPanel';
+import { SignatureBox } from './SignatureBox';
+import { Toggle48 } from './Toggle48';
+import { WhatCustomerSeesPanel } from './WhatCustomerSeesPanel';
+import { formatClock } from '../tripFormat';
+
+import { Button, Chip, Panel } from '@/components/ui';
+import type { HorseCondition, TripRecordKind, TripStop, TripView } from '@/interfaces';
+import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
+
+type Props = {
+  trip: TripView;
+  userName?: string;
+  isPending?: boolean;
+  onSaveCheckpoint: (data: {
+    routeStopId: string | null;
+    kind: TripRecordKind;
+    occurredAt: string;
+    text?: string;
+    documentsShown?: string[];
+    receiverName?: string;
+  }) => Promise<void>;
+  onSaveConditions: (
+    conditions: Array<{
+      horseId: string;
+      condition: HorseCondition;
+      drinking: boolean | null;
+      eating: boolean | null;
+      note?: string;
+      photoFileIds: string[];
+    }>,
+  ) => Promise<void>;
+};
+
+type CabMode = 'checkpoint' | 'welfare' | 'handover';
+
+export function EscortCabSurface({
+  trip,
+  userName = 'Minh, driver',
+  isPending = false,
+  onSaveCheckpoint,
+  onSaveConditions,
+}: Props) {
+  // Current active stop
+  const firstPendingIndex = trip.stops.findIndex((s) => !s.latestOccurredAt);
+  const currentStop =
+    firstPendingIndex === -1
+      ? trip.stops[trip.stops.length - 1]
+      : trip.stops[Math.max(0, firstPendingIndex)];
+
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(currentStop?.id ?? null);
+  const activeStop = trip.stops.find((s) => s.id === selectedStopId) ?? currentStop;
+
+  const nextStop = useMemo(() => {
+    const idx = trip.stops.findIndex((s) => s.id === activeStop?.id);
+    return idx >= 0 && idx < trip.stops.length - 1 ? trip.stops[idx + 1] : null;
+  }, [trip.stops, activeStop]);
+
+  const [mode, setMode] = useState<CabMode>(
+    activeStop?.kind === 'DELIVERY' ? 'handover' : 'checkpoint',
+  );
+
+  // Checkpoint Form state
+  const [outcome, setOutcome] = useState<'CLEARED' | 'HELD'>('CLEARED');
+  const [checkpointTime, setCheckpointTime] = useState<dayjs.Dayjs>(dayjs());
+  const [checkpointNote, setCheckpointNote] = useState('');
+  const [docsChecked, setDocsChecked] = useState<Record<string, boolean>>({
+    permit: true,
+    health: true,
+    customs: true,
+  });
+
+  // Welfare Form state
+  const [conditions, setConditions] = useState<
+    Record<
+      string,
+      {
+        condition: HorseCondition;
+        drinking: boolean | null;
+        eating: boolean | null;
+        note: string;
+      }
+    >
+  >(() => {
+    const init: Record<
+      string,
+      {
+        condition: HorseCondition;
+        drinking: boolean | null;
+        eating: boolean | null;
+        note: string;
+      }
+    > = {};
+    for (const h of trip.horses) {
+      init[h.id] = {
+        condition: HorseConditionEnum.STABLE,
+        drinking: true,
+        eating: true,
+        note: '',
+      };
+    }
+    return init;
+  });
+
+  // Handover state
+  const [receiverName, setReceiverName] = useState('Sophea · receiving groom');
+  const [isSigned, setIsSigned] = useState(true);
+  const [handoverChecks, setHandoverChecks] = useState<Record<string, boolean>>({
+    horses: true,
+    passports: true,
+    permits: true,
+    log: true,
+  });
+
+  // Action handlers
+  const handleAllStableShortcut = () => {
+    const updated = { ...conditions };
+    for (const h of trip.horses) {
+      updated[h.id] = {
+        condition: HorseConditionEnum.STABLE,
+        drinking: true,
+        eating: true,
+        note: updated[h.id]?.note || '',
+      };
+    }
+    setConditions(updated);
+  };
+
+  const handleRecordCheckpoint = async () => {
+    const kind = outcome === 'HELD' ? TripRecordKindEnum.HELD : TripRecordKindEnum.CLEARED_BORDER;
+    const documentsShown = Object.entries(docsChecked)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    await onSaveCheckpoint({
+      routeStopId: activeStop?.id ?? null,
+      kind,
+      occurredAt: checkpointTime.toISOString(),
+      text: checkpointNote || undefined,
+      documentsShown,
+    });
+  };
+
+  const handleRecordWelfare = async () => {
+    const payload = trip.horses.map((h) => ({
+      horseId: h.id,
+      condition: conditions[h.id]?.condition ?? HorseConditionEnum.STABLE,
+      drinking: conditions[h.id]?.drinking ?? null,
+      eating: conditions[h.id]?.eating ?? null,
+      note: conditions[h.id]?.note || undefined,
+      photoFileIds: [],
+    }));
+    await onSaveConditions(payload);
+  };
+
+  const handleRecordHandover = async () => {
+    await onSaveCheckpoint({
+      routeStopId: activeStop?.id ?? null,
+      kind: TripRecordKindEnum.DELIVERED,
+      occurredAt: new Date().toISOString(),
+      text: `Handed over to ${receiverName}. All passports and documents presented.`,
+      receiverName: receiverName.split('·')[0].trim(),
+    });
+  };
+
+  // Summary labels for bottom dock
+  let dockSummary = '';
+  let dockSub = '';
+  let dockAction = '';
+  let dockOnAction: () => void = () => {};
+
+  if (mode === 'checkpoint') {
+    dockSummary = `${outcome === 'CLEARED' ? 'Cleared' : 'Held'} at ${formatClock(
+      checkpointTime.toDate(),
+    )} · ${Object.values(docsChecked).filter(Boolean).length} documents shown`;
+    dockSub =
+      'Saved on this tablet first and sent as soon as there is signal. You can amend it for 15 minutes.';
+    dockAction = `Record: ${outcome === 'CLEARED' ? 'cleared' : 'held'} at ${formatClock(
+      checkpointTime.toDate(),
+    )}`;
+    dockOnAction = handleRecordCheckpoint;
+  } else if (mode === 'welfare') {
+    const offFeedCount = Object.values(conditions).filter(
+      (c) => c.condition === HorseConditionEnum.OFF_FEED,
+    ).length;
+    const stressedCount = Object.values(conditions).filter(
+      (c) => c.condition === HorseConditionEnum.STRESSED,
+    ).length;
+    const stableCount = Object.values(conditions).filter(
+      (c) => c.condition === HorseConditionEnum.STABLE,
+    ).length;
+    dockSummary = `${stableCount} stable, ${offFeedCount} off feed, ${stressedCount} stressed`;
+    dockSub = 'Saved on this tablet first; amend within 15 minutes.';
+    dockAction = 'Save condition log';
+    dockOnAction = handleRecordWelfare;
+  } else {
+    dockSummary = `${trip.horses.length} horses sound · signed by ${
+      receiverName.split('·')[0].trim() || 'receiver'
+    }`;
+    dockSub = 'Saved on this tablet first and sent as soon as there is signal.';
+    dockAction = `Record handover at ${formatClock(new Date())}`;
+    dockOnAction = handleRecordHandover;
+  }
+
+  const isTripHeld = trip.tripStatus === TripStatusEnum.HELD;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <CabBar trip={trip} userName={userName} />
+
+      <div className="flex flex-col gap-6 px-4 md:px-8">
+        {/* Big Touch Route Strip */}
+        <CabStrip
+          trip={trip}
+          selectedStopId={activeStop?.id}
+          onSelectStop={(s) => setSelectedStopId(s.id)}
+        />
+
+        {/* Mode Switch Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+          <div className="flex gap-2">
+            <Button
+              variant={mode === 'checkpoint' ? 'primary' : 'secondary'}
+              onClick={() => setMode('checkpoint')}
+            >
+              Record Checkpoint
+            </Button>
+            <Button
+              variant={mode === 'welfare' ? 'primary' : 'secondary'}
+              onClick={() => setMode('welfare')}
+            >
+              Horse Welfare
+            </Button>
+            <Button
+              variant={mode === 'handover' ? 'primary' : 'secondary'}
+              onClick={() => setMode('handover')}
+            >
+              Handover & Acceptance
+            </Button>
+          </div>
+          {isTripHeld && <Chip tone="bad">Trip is currently held</Chip>}
+        </div>
+
+        {/* Held Banner if held */}
+        {isTripHeld && (
+          <HeldBanner
+            heldTime={formatClock(trip.plannedDepartureAt)}
+            onLogWaterOrCheck={() => setMode('welfare')}
+          />
+        )}
+
+        {/* Main Task + Side Column */}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+          {/* Main Task Surface (8 cols) */}
+          <div className="flex flex-col gap-6 lg:col-span-8">
+            {mode === 'checkpoint' && (
+              <Panel
+                title={activeStop?.name ?? 'Checkpoint'}
+                extra={
+                  <span className="type-body-s text-ink-3">
+                    Arrived {formatClock(activeStop?.plannedAt)}
+                  </span>
+                }
+              >
+                <div className="flex flex-col gap-6">
+                  {/* Outcome Options */}
+                  <div className="flex flex-col gap-2">
+                    <span className="type-label-m text-ink-2">Outcome</span>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setOutcome('CLEARED')}
+                        className={`flex flex-col gap-1 rounded-xl border p-4 text-left transition-colors cursor-pointer ${
+                          outcome === 'CLEARED'
+                            ? 'border-ok bg-ok-soft/30 ring-1 ring-ok'
+                            : 'border-line bg-card hover:bg-muted/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="type-label-m font-bold text-ink">Cleared</span>
+                          {outcome === 'CLEARED' && <Chip tone="ok">Selected</Chip>}
+                        </div>
+                        <span className="type-body-s text-ink-2">
+                          Both border posts stamped the papers and the trip goes on.
+                        </span>
+                        <span className="type-caption text-ink-3">
+                          The customer sees “Cleared {formatClock(checkpointTime.toDate())}”
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOutcome('HELD')}
+                        className={`flex flex-col gap-1 rounded-xl border p-4 text-left transition-colors cursor-pointer ${
+                          outcome === 'HELD'
+                            ? 'border-bad bg-bad-soft/30 ring-1 ring-bad'
+                            : 'border-line bg-card hover:bg-muted/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="type-label-m font-bold text-ink">Held</span>
+                          {outcome === 'HELD' && <Chip tone="bad">Selected</Chip>}
+                        </div>
+                        <span className="type-body-s text-ink-2">
+                          The load is stopped at the border and can’t go on yet.
+                        </span>
+                        <span className="type-caption text-bad">
+                          Alerts Yến, logistics manager, when you save
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Documents Shown 48px Toggles */}
+                  <div className="flex flex-col gap-2">
+                    <span className="type-label-m text-ink-2">Documents shown at the border</span>
+                    <div className="flex flex-col gap-2">
+                      <Toggle48
+                        label="Cambodia import permit"
+                        sub="KH-IP-2026-3381"
+                        checked={Boolean(docsChecked.permit)}
+                        onChange={(v) => setDocsChecked((prev) => ({ ...prev, permit: v }))}
+                      />
+                      <Toggle48
+                        label="Export health certificates · 4 horses"
+                        sub="DAH-XK-2026-0917"
+                        checked={Boolean(docsChecked.health)}
+                        onChange={(v) => setDocsChecked((prev) => ({ ...prev, health: v }))}
+                      />
+                      <Toggle48
+                        label="Customs clearance"
+                        sub="TK-2026-300915"
+                        checked={Boolean(docsChecked.customs)}
+                        onChange={(v) => setDocsChecked((prev) => ({ ...prev, customs: v }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Checkpoint Time & Note */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="cab-check-time" className="type-label-s text-ink-2">
+                        Checkpoint Time
+                      </label>
+                      <DatePicker
+                        id="cab-check-time"
+                        showTime
+                        value={checkpointTime}
+                        onChange={(val) => val && setCheckpointTime(val)}
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="cab-check-note" className="type-label-s text-ink-2">
+                        Note (optional)
+                      </label>
+                      <Input
+                        id="cab-check-note"
+                        value={checkpointNote}
+                        onChange={(e) => setCheckpointNote(e.target.value)}
+                        placeholder="Stamped at the Bavet desk; the load was not opened."
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+
+            {mode === 'welfare' && (
+              <Panel
+                title="Condition of each horse"
+                extra={
+                  <Button variant="secondary" leadingIcon="check" onClick={handleAllStableShortcut}>
+                    All stable · drinking · eating
+                  </Button>
+                }
+              >
+                <div className="flex flex-col divide-y divide-line">
+                  {trip.horses.map((horse) => {
+                    const cState = conditions[horse.id] ?? {
+                      condition: HorseConditionEnum.STABLE,
+                      drinking: true,
+                      eating: true,
+                      note: '',
+                    };
+
+                    return (
+                      <div key={horse.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="type-h4 m-0 text-ink">{horse.name}</span>
+                            <span className="type-body-s text-ink-2">
+                              {horse.stall ?? 'Standard stall'}
+                            </span>
+                          </div>
+                          <ConditionSegmented
+                            value={cState.condition}
+                            onChange={(val) =>
+                              setConditions((prev) => ({
+                                ...prev,
+                                [horse.id]: { ...cState, condition: val },
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                          <div className="sm:col-span-3">
+                            <Toggle48
+                              label="Drinking"
+                              checked={Boolean(cState.drinking)}
+                              onChange={(v) =>
+                                setConditions((prev) => ({
+                                  ...prev,
+                                  [horse.id]: { ...cState, drinking: v },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <Toggle48
+                              label="Eating"
+                              checked={Boolean(cState.eating)}
+                              onChange={(v) =>
+                                setConditions((prev) => ({
+                                  ...prev,
+                                  [horse.id]: { ...cState, eating: v },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="sm:col-span-6">
+                            <Input
+                              value={cState.note}
+                              onChange={(e) =>
+                                setConditions((prev) => ({
+                                  ...prev,
+                                  [horse.id]: { ...cState, note: e.target.value },
+                                }))
+                              }
+                              placeholder="Add a note (optional)"
+                              className="h-12"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+            )}
+
+            {mode === 'handover' && (
+              <Panel title="Hand over the horses">
+                <div className="flex flex-col gap-6">
+                  {/* Offload condition preview */}
+                  <div className="divide-y divide-line">
+                    {trip.horses.map((horse) => (
+                      <div key={horse.id} className="flex items-center justify-between py-3">
+                        <div className="flex flex-col">
+                          <span className="type-label-m font-bold text-ink">{horse.name}</span>
+                          <span className="type-body-s text-ink-3">
+                            {horse.stall ?? 'Standard stall'}
+                          </span>
+                        </div>
+                        <Chip tone="ok">Stable</Chip>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Handed over toggles */}
+                  <div className="flex flex-col gap-2 border-t border-line pt-4">
+                    <span className="type-label-m text-ink-2">Handed over</span>
+                    <Toggle48
+                      label={`${trip.horses.length} horses`}
+                      sub={trip.horses.map((h) => h.name).join(' · ')}
+                      checked={Boolean(handoverChecks.horses)}
+                      onChange={(v) => setHandoverChecks((prev) => ({ ...prev, horses: v }))}
+                    />
+                    <Toggle48
+                      label={`${trip.horses.length} equine passports`}
+                      checked={Boolean(handoverChecks.passports)}
+                      onChange={(v) => setHandoverChecks((prev) => ({ ...prev, passports: v }))}
+                    />
+                    <Toggle48
+                      label="Import permit and health certificates"
+                      sub="KH-IP-2026-3381 · DAH-XK-2026-0917"
+                      checked={Boolean(handoverChecks.permits)}
+                      onChange={(v) => setHandoverChecks((prev) => ({ ...prev, permits: v }))}
+                    />
+                    <Toggle48
+                      label="Trip journey log"
+                      sub={`${trip.records.length} records completed.`}
+                      checked={Boolean(handoverChecks.log)}
+                      onChange={(v) => setHandoverChecks((prev) => ({ ...prev, log: v }))}
+                    />
+                  </div>
+
+                  {/* Received By and Signature Box */}
+                  <div className="grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="cab-recv-by" className="type-label-s text-ink-2">
+                        Received by
+                      </label>
+                      <Select
+                        id="cab-recv-by"
+                        value={receiverName}
+                        onChange={(v) => setReceiverName(v)}
+                        options={[
+                          {
+                            value: 'Sophea · receiving groom',
+                            label: 'Sophea · receiving groom (Phnom Penh)',
+                          },
+                          {
+                            value: 'Vannak · barn manager',
+                            label: 'Vannak · barn manager (Phnom Penh)',
+                          },
+                        ]}
+                        className="h-10"
+                      />
+                      <span className="type-caption text-ink-3">
+                        Named by the centre on the delivery order.
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="type-label-s text-ink-2">Signature</span>
+                      <SignatureBox
+                        signatureName={isSigned ? receiverName.split('·')[0].trim() : ''}
+                        signedWhen="Signed on this tablet"
+                        onClear={() => setIsSigned(!isSigned)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+          </div>
+
+          {/* Right Info Column (4 cols) */}
+          <div className="flex flex-col gap-4 lg:col-span-4">
+            {nextStop ? (
+              <NextStopPanel
+                title={nextStop.name}
+                sub={`${nextStop.kind.toLowerCase().replaceAll('_', ' ')} · ${
+                  nextStop.details ?? 'Scheduled stop'
+                }`}
+                time={formatClock(nextStop.plannedAt)}
+                due="Next checkpoint"
+              />
+            ) : (
+              <NextStopPanel
+                title={trip.destination ?? 'Destination'}
+                sub="Final delivery & handover"
+                time={formatClock(trip.plannedArrivalAt)}
+                due="Arrival window"
+              />
+            )}
+
+            <OnBoardCabPanel horses={trip.horses} />
+
+            <WhatCustomerSeesPanel
+              text={`The last checkpoint you recorded (${
+                activeStop?.name ?? 'Checkpoint'
+              }), with its verified time. Between checkpoints they see that one, never an estimate.`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Docked bottom bar */}
+      <CabDock
+        summary={dockSummary}
+        sub={dockSub}
+        actionText={dockAction}
+        onAction={dockOnAction}
+        isActionLoading={isPending}
+      />
+    </div>
+  );
+}

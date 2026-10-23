@@ -1,14 +1,14 @@
 import { useRef, useState } from 'react';
 import { message, Select, Spin } from 'antd';
 
+import { EscortCabSurface } from './cab/EscortCabSurface';
 import { CheckpointReportForm } from './CheckpointReportForm';
-import { HorseConditionForm } from './HorseConditionForm';
 import { TripDetails } from './TripDetails';
 import { formatTime, sentence } from './tripFormat';
 
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, Panel } from '@/components/ui';
-import { useAuth } from '@/hooks/auth';
+import { useAuth, useMe } from '@/hooks/auth';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
 import type { HorseCondition, TripRecordKind } from '@/interfaces';
 import { TripStatusEnum } from '@/interfaces';
@@ -29,6 +29,7 @@ export function TripWorkspace({
   editable?: boolean;
 }) {
   const { logout } = useAuth();
+  const { data: currentUser } = useMe();
   const [page, setPage] = useState(0);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
@@ -200,30 +201,32 @@ export function TripWorkspace({
               refreshes on its own.
             </Callout>
           )}
-          {editable && trip && (
-            <Panel
-              title={
-                audience === 'escort'
-                  ? 'Report checkpoint and horse condition'
-                  : 'Update progress by checkpoint'
+          {audience === 'escort' && trip ? (
+            <EscortCabSurface
+              trip={trip}
+              userName={
+                currentUser
+                  ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'Minh, driver'
+                  : 'Minh, driver'
               }
-            >
-              <CheckpointReportForm
-                trip={trip}
-                isPending={mutation.isPending}
-                onSave={handleSaveCheckpoint}
-              />
-              {audience === 'escort' && (
-                <HorseConditionForm
-                  trip={trip}
-                  isPending={mutation.isPending}
-                  onSave={handleSaveConditions}
-                  onError={(msg) => messageApi.error(msg)}
-                />
+              isPending={mutation.isPending}
+              onSaveCheckpoint={handleSaveCheckpoint}
+              onSaveConditions={handleSaveConditions}
+            />
+          ) : (
+            <>
+              {editable && trip && (
+                <Panel title="Update progress by checkpoint">
+                  <CheckpointReportForm
+                    trip={trip}
+                    isPending={mutation.isPending}
+                    onSave={handleSaveCheckpoint}
+                  />
+                </Panel>
               )}
-            </Panel>
+              {trip && <TripDetails trip={trip} />}
+            </>
           )}
-          {trip && <TripDetails trip={trip} />}
         </>
       )}
     </div>
