@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { UploadFile } from 'antd';
 import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
 
+import { ReportEmergency } from './ReportEmergency';
 import { TripDetails } from './TripDetails';
 import { eventLabels, formatTime, sentence } from './tripFormat';
 
@@ -294,6 +295,7 @@ export function TripWorkspace({
               refreshes on its own.
             </Callout>
           )}
+          {audience === 'escort' && trip && <ReportEmergency trip={trip} />}
           {editable && trip && (
             <Panel
               title={

@@ -38,6 +38,8 @@ import VehiclesPage from '@/pages/staff/vehicles';
 import CustomerNotesPage from '@/pages/staff/customer-notes';
 import RegulationsPage from '@/pages/staff/regulations';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
+import IncidentsPage from '@/pages/staff/incidents';
+import IncidentDetailPage from '@/pages/staff/incidents/IncidentDetail';
 
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
@@ -102,7 +104,8 @@ export const router = createBrowserRouter([
           { path: 'requests', element: <RequestsPage /> },
           { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'requests/:id/quotation', element: <QuotationBuilderPage /> },
-          { path: 'incidents', element: todo('Incidents') },
+          { path: 'incidents', element: <IncidentsPage /> },
+          { path: 'incidents/:id', element: <IncidentDetailPage /> },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit-log', element: <AuditLogPage /> },
           { path: 'documents', element: <DocumentsPage /> },

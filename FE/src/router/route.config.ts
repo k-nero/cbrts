@@ -200,10 +200,20 @@ export const routesConfig = [
       },
       {
         path: '/incidents',
-        roles: [LM],
+        roles: [LM, FRC],
         type: 'authenticated',
         breadcrumb: 'Incidents',
         name: 'incidents',
+        children: [
+          {
+            // The coordinator opens an incident from the alert, to record the options (US-F5-02).
+            path: '/{id}',
+            roles: [LM, FRC],
+            type: 'authenticated',
+            breadcrumb: 'Incident',
+            name: 'incident-detail',
+          },
+        ],
       },
       {
         path: '/users',
