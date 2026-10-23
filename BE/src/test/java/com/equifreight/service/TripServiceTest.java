@@ -532,7 +532,7 @@ class TripServiceTest {
                 job.getCode(),
                 coordinator,
                 new TripRecordRequest(
-                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null));
+                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null, null));
 
         assertEquals(TripStatus.DELIVERED, other.getTripStatus());
         assertEquals(TripStatus.DEPARTED, job.getTripStatus());
@@ -561,7 +561,7 @@ class TripServiceTest {
             ConditionLog log = new ConditionLog();
             log.setTripRecord(check);
             log.setHorse(horse);
-            log.setCondition(HorseCondition.SOUND);
+            log.setCondition(HorseCondition.STABLE);
             check.getConditionLogs().add(log);
         }
         TripRecord atOthersStop = stored(TripRecordKind.DELIVERED, NOW.minusSeconds(30));

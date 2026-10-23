@@ -204,6 +204,7 @@ public class DataSeeder implements ApplicationRunner {
     private final FileStorage fileStorage;
     private final CatalogSeeder catalogSeeder;
     private final JobTripService jobTrips;
+    private final TripRecordRepository tripRecordRepository;
 
     public DataSeeder(
             RoleRepository roleRepository,
@@ -245,7 +246,8 @@ public class DataSeeder implements ApplicationRunner {
             StoredFileRepository storedFileRepository,
             FileStorage fileStorage,
             CatalogSeeder catalogSeeder,
-            JobTripService jobTrips) {
+            JobTripService jobTrips,
+            TripRecordRepository tripRecordRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -286,6 +288,7 @@ public class DataSeeder implements ApplicationRunner {
         this.fileStorage = fileStorage;
         this.catalogSeeder = catalogSeeder;
         this.jobTrips = jobTrips;
+        this.tripRecordRepository = tripRecordRepository;
     }
 
     @Override
@@ -692,10 +695,13 @@ public class DataSeeder implements ApplicationRunner {
         // The team chosen at approval (US-F1-07): Lan owns the documents, Khôi plans the move.
         job.setTransportSpecialist(userRepository.getByEmail("lan.nguyen@equifreight.vn"));
         job.setCoordinator(khoi);
-        job.setStage(JobStage.DOCUMENTS);
-        job.setDossierStatus(DossierStatus.OPEN);
-        job.setTripStatus(TripStatus.NOT_STARTED);
+        job.setStage(JobStage.TRIP);
+        job.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        job.setTripStatus(TripStatus.DEPARTED);
+        job.setSignedOffAt(Instant.parse("2026-10-18T05:30:00Z"));
+        job.setSignedOffBy(yen);
         job.setPlannedDepartureAt(Instant.parse("2026-10-18T06:00:00Z"));
+        job.setDepartedAt(Instant.parse("2026-10-18T06:05:00Z"));
         job.setPlannedArrivalAt(Instant.parse("2026-10-18T12:30:00Z"));
         job.setWindowStart(Instant.parse("2026-10-18T11:00:00Z"));
         job.setWindowEnd(Instant.parse("2026-10-18T14:00:00Z"));
@@ -708,16 +714,18 @@ public class DataSeeder implements ApplicationRunner {
         trip.setPlannedDepartureAt(savedJob.getPlannedDepartureAt());
         TripVehicle tripVehicle = jobTrips.useVehicle(trip, tx447);
 
-        // Load plan for CBRT-2026-041 (matching Figma demo state: 3 loaded, 1 conflict, 1 to load)
+        // Load plan for CBRT-2026-041 (matching Figma demo state: 4 loaded in stalls 1, 2, 4, 6)
         LoadPlan lp = new LoadPlan();
         lp.setTripVehicle(tripVehicle);
-        lp.setStatus(LoadPlanStatus.DRAFT);
+        lp.setStatus(LoadPlanStatus.CONFIRMED);
+        lp.setConfirmedBy(khoi);
+        lp.setConfirmedAt(Instant.parse("2026-10-17T17:00:00Z"));
         LoadPlan savedLp = loadPlanRepository.save(lp);
 
         assignStallDirect(savedLp, stalls.get(0), shadowfax);
-        assignStallDirect(savedLp, stalls.get(2), copperKing); // Conflict: stallion beside mare, in standard stall
-        assignStallDirect(savedLp, stalls.get(3), nightfall);
-        // silverBell unassigned!
+        assignStallDirect(savedLp, stalls.get(1), copperKing); // Box stall
+        assignStallDirect(savedLp, stalls.get(3), nightfall); // Climate stall
+        assignStallDirect(savedLp, stalls.get(5), silverBell); // Standard stall
 
         // Route plan for CBRT-2026-041 (v1, CONFIRMED)
         Place origin = placeRepository.findByName("Phú Thọ training centre").orElse(null);
@@ -790,7 +798,45 @@ public class DataSeeder implements ApplicationRunner {
         assignCrewMember(tripVehicle, hoa, CrewRole.GROOM);
         assignCrewMember(tripVehicle, tuan, CrewRole.GROOM);
 
-        log.info("Seeded canonical job CBRT-2026-041 with route and load plans");
+        // Seed canonical trip records for CBRT-2026-041 (matching Figma TRIP_LOG)
+        TripRecord r1 = createTripRecord(
+                trip,
+                s1,
+                TripRecordKind.DEPARTED,
+                Instant.parse("2026-10-18T06:05:00Z"),
+                minh,
+                "Departed Phú Thọ training centre on schedule.");
+        addConditionLog(r1, shadowfax, HorseCondition.STABLE, true, true, "Calm during loading.");
+        addConditionLog(r1, copperKing, HorseCondition.STABLE, true, false, "Loaded into box stall.");
+        addConditionLog(r1, nightfall, HorseCondition.STABLE, true, true, "Loaded into climate stall.");
+        addConditionLog(r1, silverBell, HorseCondition.STABLE, true, true, "Settled in stall 6.");
+        tripRecordRepository.save(r1);
+
+        TripRecord r2 = createTripRecord(
+                trip,
+                s2,
+                TripRecordKind.CLEARED_BORDER,
+                Instant.parse("2026-10-18T08:34:00Z"),
+                minh,
+                "Export inspection completed at Mộc Bài border. Health certificate and passport checked.");
+        tripRecordRepository.save(r2);
+
+        TripRecord r3 = createTripRecord(
+                trip,
+                s3,
+                TripRecordKind.ARRIVED_AT_STOP,
+                Instant.parse("2026-10-18T09:36:00Z"),
+                hoa,
+                "Arrived at Svay Rieng welfare stop. 45-minute rest, water and hay offered.");
+        addConditionLog(r3, shadowfax, HorseCondition.STABLE, true, true, "Settled, eating and drinking well.");
+        addConditionLog(
+                r3, copperKing, HorseCondition.STRESSED, true, false, "Restless during transport, offered extra hay.");
+        addConditionLog(r3, nightfall, HorseCondition.CLIMATE_CHANGE, true, true, "Adapting well to climate control.");
+        addConditionLog(
+                r3, silverBell, HorseCondition.OFF_FEED, false, false, "Refused water at checkpoint, monitoring.");
+        tripRecordRepository.save(r3);
+
+        log.info("Seeded canonical job CBRT-2026-041 with route and load plans and trip records");
     }
 
     private Horse createHorseIfAbsent(
@@ -827,6 +873,33 @@ public class DataSeeder implements ApplicationRunner {
         rh.setSizeClassCode(horse.getSizeClass().getCode());
         rh.setRequiredStall(horse.getRequiredStall());
         req.getHorses().add(rh);
+    }
+
+    private TripRecord createTripRecord(
+            Trip trip, RouteStop stop, TripRecordKind kind, Instant occurredAt, User recordedBy, String text) {
+        TripRecord r = new TripRecord();
+        r.setTrip(trip);
+        r.setRouteStop(stop);
+        r.setKind(kind);
+        r.setOccurredAt(occurredAt);
+        r.setReceivedAt(occurredAt.plusSeconds(120));
+        r.setClientRef(java.util.UUID.randomUUID());
+        r.setRecordedBy(recordedBy);
+        r.setChannel(Channel.CAB_TABLET);
+        r.setText(text);
+        return tripRecordRepository.save(r);
+    }
+
+    private void addConditionLog(
+            TripRecord record, Horse horse, HorseCondition condition, Boolean drinking, Boolean eating, String note) {
+        ConditionLog cl = new ConditionLog();
+        cl.setTripRecord(record);
+        cl.setHorse(horse);
+        cl.setCondition(condition);
+        cl.setDrinking(drinking);
+        cl.setEating(eating);
+        cl.setNote(note);
+        record.getConditionLogs().add(cl);
     }
 
     private void assignStallDirect(LoadPlan plan, VehicleStall stall, Horse horse) {
