@@ -11,7 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useState } from 'react';
-import { Select, Skeleton } from 'antd';
+import { App, Select, Skeleton } from 'antd';
 
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
@@ -70,6 +70,10 @@ export function LoadPlanTab({ job }: Props) {
 
   const isConfirmed = loadPlan?.status === 'CONFIRMED';
   const busy = moveMutation.isPending || autoArrangeMutation.isPending;
+  // A refused plan action (a role without the permission, say) is never silent.
+  const { message } = App.useApp();
+  const reportRefusal = (fallback: string) => (error: unknown) =>
+    message.error(apiErrorMessage(error, fallback));
   // Shares the page's job query; this observer only adds the poll while a draft plan is open.
   // It pauses during a drag or a pending move so the board doesn't shift under the pointer.
   useJobDetail(job.id, {
@@ -467,7 +471,13 @@ export function LoadPlanTab({ job }: Props) {
                           variant="secondary"
                           size="md"
                           disabled={busy}
-                          onClick={() => autoArrangeMutation.mutate()}
+                          onClick={() =>
+                            autoArrangeMutation.mutate(undefined, {
+                              onError: reportRefusal(
+                                'The plan couldn’t be auto-arranged. Try again.',
+                              ),
+                            })
+                          }
                         >
                           {autoArrangeMutation.isPending ? 'Arranging...' : 'Auto-arrange'}
                         </Button>
@@ -475,7 +485,13 @@ export function LoadPlanTab({ job }: Props) {
                           variant="primary"
                           size="md"
                           disabled={!canConfirm || busy || confirmMutation.isPending}
-                          onClick={() => confirmMutation.mutate()}
+                          onClick={() =>
+                            confirmMutation.mutate(undefined, {
+                              onError: reportRefusal(
+                                'The load plan couldn’t be confirmed. Try again.',
+                              ),
+                            })
+                          }
                         >
                           {confirmMutation.isPending ? 'Confirming...' : 'Confirm load plan'}
                         </Button>
@@ -486,7 +502,13 @@ export function LoadPlanTab({ job }: Props) {
                         variant="primary"
                         size="md"
                         disabled={signOffMutation.isPending}
-                        onClick={() => signOffMutation.mutate()}
+                        onClick={() =>
+                          signOffMutation.mutate(undefined, {
+                            onError: reportRefusal(
+                              'The trip plan couldn’t be signed off. Try again.',
+                            ),
+                          })
+                        }
                       >
                         {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
                       </Button>
