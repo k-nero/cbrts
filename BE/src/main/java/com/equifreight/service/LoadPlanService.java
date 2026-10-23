@@ -252,6 +252,25 @@ public class LoadPlanService {
     }
 
     /**
+     * The stalls free on the trip's trailers if {@code joining}'s horses were added (US-F3-13); null while the trip
+     * has no trailer.
+     */
+    @Transactional(readOnly = true)
+    public Integer stallsLeft(Trip trip, TransportJob joining) {
+        List<TripVehicle> trailers = jobTrips.vehiclesOf(trip);
+        if (trailers.isEmpty()) return null;
+        int stalls = 0;
+        for (TripVehicle tv : trailers) {
+            stalls += vehicleStallRepository
+                    .findByVehicleIdOrderByPositionNo(tv.getVehicle().getId())
+                    .size();
+        }
+        return stalls
+                - jobTrips.horsesOn(trip).size()
+                - joining.getRequest().getHorses().size();
+    }
+
+    /**
      * Why the trip's trailers can't also carry {@code joining}'s horses (US-F3-11), or null when they can: enough
      * stalls, box stalls for the horses that need a box, climate stalls for the heat-sensitive, and payload. A trip
      * with no vehicle yet has nothing to check.

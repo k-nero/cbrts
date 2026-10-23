@@ -154,13 +154,14 @@ public class StaffJobController {
     }
 
     /**
-     * US-F3-11: Shared trailer - approved jobs that could join this job's trip (same corridor, shared trailer, not
-     * departed). The checks run when one is added.
+     * US-F3-13: Shared trailer - approved jobs that could share this job's trailer: same corridor, shared trailer, a
+     * common departure day and room, with the proposed departure, stalls left and biosecurity warnings. Nothing
+     * combines until one is chosen.
      */
-    @GetMapping("/{jobId}/trip/candidates")
+    @GetMapping("/{jobId}/trip/suggestions")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public List<TripJobResponse> shareCandidates(@PathVariable UUID jobId) {
-        return tripSharingService.candidates(jobId);
+    public List<ShareSuggestionResponse> shareSuggestions(@PathVariable UUID jobId) {
+        return tripSharingService.suggestions(jobId);
     }
 
     /**

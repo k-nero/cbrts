@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -12,6 +13,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.BiosecurityWarningResponse;
 import com.equifreight.model.job.JobMapper;
+import com.equifreight.model.job.ShareSuggestionResponse;
 import com.equifreight.model.job.ShareTripResponse;
 import com.equifreight.model.job.TripJobResponse;
 import com.equifreight.repository.CrewAssignmentRepository;
@@ -111,39 +113,56 @@ public class TripSharingService {
     }
 
     /**
-     * Jobs that could join {@code jobId}'s trip: on its corridor, not departed, a shared trailer, not on the trip
-     * yet. The checks run when one is added.
+     * Jobs that could share {@code jobId}'s trailer (US-F3-13): approved, not departed, on its corridor with a shared
+     * trailer, and passing every check of joining it (a common departure day, room on the trailers, no horse on both
+     * jobs). Each comes with the proposed departure, the horses it adds, the stalls left and its biosecurity
+     * warnings. A trip that has departed suggests nothing.
      */
     @Transactional(readOnly = true)
-    public List<TripJobResponse> candidates(UUID jobId) {
+    public List<ShareSuggestionResponse> suggestions(UUID jobId) {
+        TransportJob host = job(jobId);
         Trip trip = jobTrips.tripOf(jobId);
-        List<UUID> onTrip =
-                jobTrips.jobsOn(trip).stream().map(TransportJob::getId).toList();
-        return jobs.findShareCandidates(trip.getCorridor().getId()).stream()
-                .filter(j -> !onTrip.contains(j.getId()))
-                .map(JobMapper::toTripJobResponse)
-                .toList();
+        List<TransportJob> onTrip = jobsOn(trip, host);
+        if (onTrip.stream().anyMatch(TripSharingService::departed)) return List.of();
+        List<UUID> onTripIds = onTrip.stream().map(TransportJob::getId).toList();
+        LocalDate planned = trip.getPlannedDepartureAt() == null
+                ? null
+                : trip.getPlannedDepartureAt().atZone(BusinessTime.ZONE).toLocalDate();
+        List<ShareSuggestionResponse> suggestions = new ArrayList<>();
+        for (TransportJob candidate :
+                jobs.findShareCandidates(trip.getCorridor().getId())) {
+            if (onTripIds.contains(candidate.getId())) continue;
+            Days days;
+            try {
+                days = fit(trip, onTrip, candidate, jobTrips.tripOf(candidate.getId()));
+            } catch (BusinessException | ConflictException doesNotFit) {
+                continue;
+            }
+            boolean plannedFits = planned != null && !planned.isBefore(days.from()) && !planned.isAfter(days.to());
+            suggestions.add(ShareSuggestionResponse.builder()
+                    .job(JobMapper.toTripJobResponse(candidate))
+                    .proposedDeparture(plannedFits ? planned : days.from())
+                    .departFrom(days.from())
+                    .departTo(days.to())
+                    .horsesAdded(candidate.getRequest().getHorses().size())
+                    .stallsLeft(loadPlans.stallsLeft(trip, candidate))
+                    .warnings(biosecurity.forJoin(trip, candidate))
+                    .build());
+        }
+        return suggestions;
+    }
+
+    private List<TransportJob> jobsOn(Trip trip, TransportJob host) {
+        List<TransportJob> onTrip = jobTrips.jobsOn(trip);
+        return onTrip.isEmpty() ? List.of(host) : onTrip;
     }
 
     /**
-     * Puts {@code joiningJobId} on {@code hostJobId}'s trip, with all its horses. Refused when a customer booked a
-     * private trailer, on another corridor, when no departure day suits every job (naming whose dates rule it out),
-     * or when the trailers lack room (add a trailer first, US-F3-10). The trip it leaves and the trip it joins
-     * reopen: load plans back to draft, the route superseded by a draft with the job's pickup and delivery, and the
-     * sign-off cleared.
+     * Whether {@code joining}, now on {@code from}, can join {@code trip} (US-F3-11): the days every job on it could
+     * leave, or a refusal that says why (a departed trip, a private trailer, another corridor, no common day, a horse
+     * on both jobs, no room).
      */
-    @Transactional
-    public ShareTripResponse share(
-            UUID hostJobId, UUID joiningJobId, Collection<String> acceptedWarnings, User currentUser) {
-        TransportJob host = job(hostJobId);
-        TransportJob joining = job(joiningJobId);
-        Trip trip = jobTrips.tripOf(hostJobId);
-        Trip from = jobTrips.tripOf(joiningJobId);
-        if (from.getId().equals(trip.getId())) {
-            throw new BusinessException(joining.getCode() + " is already on trip " + trip.getCode());
-        }
-        List<TransportJob> onTrip = jobTrips.jobsOn(trip);
-        if (onTrip.isEmpty()) onTrip = List.of(host);
+    private Days fit(Trip trip, List<TransportJob> onTrip, TransportJob joining, Trip from) {
         for (TransportJob j : onTrip) {
             if (departed(j)) throw new BusinessException("Trip " + trip.getCode() + " has departed");
         }
@@ -194,6 +213,28 @@ public class TripSharingService {
                     "Not enough room on trip " + trip.getCode() + " for " + joining.getCode() + ": " + noRoom
                             + ". Add a trailer on the Load plan tab first.");
         }
+        return days;
+    }
+
+    /**
+     * Puts {@code joiningJobId} on {@code hostJobId}'s trip, with all its horses. Refused when a customer booked a
+     * private trailer, on another corridor, when no departure day suits every job (naming whose dates rule it out),
+     * or when the trailers lack room (add a trailer first, US-F3-10). The trip it leaves and the trip it joins
+     * reopen: load plans back to draft, the route superseded by a draft with the job's pickup and delivery, and the
+     * sign-off cleared.
+     */
+    @Transactional
+    public ShareTripResponse share(
+            UUID hostJobId, UUID joiningJobId, Collection<String> acceptedWarnings, User currentUser) {
+        TransportJob host = job(hostJobId);
+        TransportJob joining = job(joiningJobId);
+        Trip trip = jobTrips.tripOf(hostJobId);
+        Trip from = jobTrips.tripOf(joiningJobId);
+        if (from.getId().equals(trip.getId())) {
+            throw new BusinessException(joining.getCode() + " is already on trip " + trip.getCode());
+        }
+        List<TransportJob> onTrip = jobsOn(trip, host);
+        Days days = fit(trip, onTrip, joining, from);
 
         // Different health status warns but doesn't block: the coordinator accepts what it says (US-F3-12).
         biosecurity.requireAccepted(trip, biosecurity.forJoin(trip, joining), acceptedWarnings, currentUser);
