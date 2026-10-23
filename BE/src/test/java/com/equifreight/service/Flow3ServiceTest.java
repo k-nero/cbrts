@@ -3,10 +3,12 @@ package com.equifreight.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -17,6 +19,8 @@ import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -674,14 +678,14 @@ class Flow3ServiceTest {
         assertEquals(JobStage.CLEARANCE, job.getStage());
         assertNotNull(job.getSignedOffAt());
         assertEquals(manager, job.getSignedOffBy());
-        verify(notificationService, times(2))
-                .sendNotification(
-                        any(),
-                        eq("TRIP_RELEASED"),
+        verify(notificationService)
+                .notify(
+                        eq(NotificationKind.TRIP_RELEASED),
+                        argThat(to -> to instanceof Audience.Escorts crew
+                                && crew.users().size() == 2),
+                        eq(Subject.job(job)),
                         contains("Trip plan signed off"),
-                        any(),
-                        eq("TRANSPORT_JOB"),
-                        eq(job.getId()));
+                        any());
     }
 
     @Test

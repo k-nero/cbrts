@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -18,10 +17,10 @@ import static org.mockito.Mockito.when;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RatePolicy;
-import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.HorseSex;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RateCertainty;
 import com.equifreight.entity.enums.RatePolicyKey;
@@ -37,6 +36,8 @@ import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationVersionResponse;
 import com.equifreight.model.quotation.QuoteTotalRowResponse;
 import com.equifreight.model.quotation.StartResult;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import com.equifreight.service.pricing.CatalogRows;
 import com.equifreight.service.pricing.PricingHorse;
 import com.equifreight.service.quotation.QuotationSnapshot;
@@ -56,19 +57,12 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
 
     NotificationService notifications;
     QuotationIssueService issue;
-    User owner;
-    User trainer;
 
     @BeforeEach
     void setUpIssue() {
         notifications = mock(NotificationService.class);
         issue = issueAt(ISSUE_NOW);
         request.getClub().setId(UUID.randomUUID());
-        owner = new User();
-        owner.setId(UUID.randomUUID());
-        trainer = new User();
-        trainer.setId(UUID.randomUUID());
-        when(users.findByClubId(request.getClub().getId())).thenReturn(List.of(owner, trainer));
     }
 
     QuotationIssueService issueAt(Instant now) {
@@ -77,7 +71,6 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                 quotations,
                 versions,
                 pricing,
-                users,
                 notifications,
                 audit,
                 snapshots,
@@ -222,16 +215,13 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                         isNull(),
                         eq("{\"status\":\"UNDER_REVIEW\"}"),
                         eq("{\"status\":\"QUOTED\"}"));
-        for (User account : List.of(owner, trainer)) {
-            verify(notifications)
-                    .sendNotification(
-                            account,
-                            "QUOTATION_ISSUED",
-                            "Your quotation for REQ-2026-0199 is ready",
-                            "Quotation Q-2026-0189 v1, " + money(total) + ". It holds its price until 27 Oct 2026.",
-                            "TRANSPORT_REQUEST",
-                            request.getId());
-        }
+        verify(notifications)
+                .notify(
+                        NotificationKind.QUOTATION_ISSUED,
+                        Audience.club(request.getClub().getId()),
+                        Subject.quotation(q),
+                        "Your quotation for REQ-2026-0199 is ready",
+                        "Quotation Q-2026-0189 v1, " + money(total) + ". It holds its price until 27 Oct 2026.");
     }
 
     @Test
@@ -323,8 +313,7 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                 .isInstanceOf(ConflictException.class)
                 .extracting("code")
                 .isEqualTo("QUOTATION_NOT_DRAFT");
-        verify(notifications, times(2))
-                .sendNotification(any(), eq("QUOTATION_ISSUED"), anyString(), any(), any(), any());
+        verify(notifications).notify(eq(NotificationKind.QUOTATION_ISSUED), any(), any(), anyString(), any());
     }
 
     // --- revising and discarding (US-Q-07) ---------------------------------------------------------------

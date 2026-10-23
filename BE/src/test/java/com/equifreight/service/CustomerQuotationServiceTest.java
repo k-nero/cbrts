@@ -49,9 +49,9 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
         clubs = mock(ClubService.class);
         Clock clock = Clock.fixed(ISSUED_AT, BusinessTime.ZONE);
         issue = new QuotationIssueService(
-                requests, quotations, versions, pricing, users, notifications, audit, snapshots, clock);
+                requests, quotations, versions, pricing, notifications, audit, snapshots, clock);
         customer = new CustomerQuotationService(
-                requests, quotations, feeBands, clubs, snapshots, users, audit, notifications, clock);
+                requests, quotations, feeBands, clubs, snapshots, audit, notifications, clock);
         Club club = request.getClub();
         club.setId(UUID.randomUUID());
         bookings = new User();
@@ -225,7 +225,6 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 feeBands,
                 clubs,
                 snapshots,
-                users,
                 audit,
                 notifications,
                 Clock.fixed(Instant.parse("2026-10-22T04:00:00Z"), BusinessTime.ZONE));

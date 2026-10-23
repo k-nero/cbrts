@@ -591,7 +591,7 @@ erDiagram
 |---|---|---|
 | `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `attached_file_id null`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. `attached_file_id` is one optional file the customer attached (→ `files`), counted as attached so the orphan cleanup keeps it. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
 | `note_replies` | `note_id`, `author_id`, `body` | |
-| `notifications` | `user_id`, `kind`, `title`, `body`, `entity_type`, `entity_id`, `read_at`, `emailed_at` | Index `(user_id, read_at)`. Sidebar badges and the bell read from it. |
+| `notifications` | `user_id`, `kind` (`NotificationKind`), `title`, `body`, `entity_type` (`NotificationSubject`: `TRANSPORT_REQUEST`, `QUOTATION`, `TRANSPORT_JOB`, `AUTHORITY_SUBMISSION`), `entity_id`, `entity_code`, `link_path`, `dedupe_key null`, `read_at`, `emailed_at` | The bell reads from it (US-00-07); sidebar badges count their own queues, not notifications. Every row links to its record: `entity_code` is the code the row shows (`REQ-2026-0031`), `link_path` the page this recipient opens it on, resolved when the row is written. Index `(user_id, read_at)`. Partial unique index `(user_id, dedupe_key) where read_at is null and dedupe_key is not null`: a repeated notice bumps the unread row instead of stacking. A notification is a pointer, never evidence; the audit log is. |
 
 ---
 

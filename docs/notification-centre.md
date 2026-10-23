@@ -8,7 +8,28 @@ Draft for [US-00-07] (k-nero/cbrts#9), 20 Oct 2026. Open questions settled the s
 > - The same events are also sent by e-mail
 > - Each notification links to the record it is about
 
-## 1. Where we are
+## 0. What shipped in PR 1 (23 Oct 2026)
+
+PR 1 (backend core) follows §3 and §5, adjusted to the conventions that changed after this draft (the V1 squash, native enums, static mappers):
+
+- **Migration `V4__notification_centre.sql`**, not V19. `kind` and `entity_type` are native enum types (`NotificationKind`, `NotificationSubject`), as AGENTS.md now requires for every Java enum, so a new kind needs `alter type NotificationKind add value`. Legacy rows are typed and backfilled (`entity_code`, `link_path`); rows whose kind or record can't be resolved are dropped.
+- **No `tone` column.** The tone comes from the kind (`NotificationKind.tone()`), using the design system's tones (`OK`, `WARN`, `BAD`, `INFO`, `NEUTRAL`).
+- **No e-mail columns yet.** `email_state` and `email_attempts` arrive with the outbox in PR 3, so PR 1 doesn't leave rows `PENDING` with nothing to send them.
+- **Audiences:** `ClubAccounts` (skips `DISABLED`), `RoleHolders` (active holders), `StaffMembers` and `Escorts` (named people, such as a job's specialist or crew). Since US-F1-07 jobs have a named specialist and coordinator, so approval notifies them directly rather than by role.
+- **Every existing caller moved to `notify(...)`**: 11 call sites, not 2. The authority's request for more information is `AUTHORITY_INFO_REQUIRED` and goes to the club's accounts. `DOSSIER_LATE` uses the dedupe key `DOSSIER_LATE:{submissionId}`, so the daily repeat stays one unread row.
+- **API:** `GET /api/v1/me/notifications?unread=true|false`, `GET /unread-count`, `POST /{id}/read` (404 for anyone else's id), `POST /read-all`. The mapper is a static `NotificationMapper`, as AGENTS.md asks, not MapStruct.
+- **§7 note:** AGENTS.md now forbids a native `<button>` in a page; the bell belongs in `components/ui` (where a native button is allowed) or uses the `ui` Button.
+- **Customer links** open `/requests/{id}/submitted` (or `/quotation`): the portal has no `/requests/{id}` route.
+
+### Live updates and the frontend (23 Oct 2026)
+
+E-mail (PR 3) is on hold; the centre is in-app only for now.
+
+- **Live count over server-sent events, not polling or WebSockets.** `GET /api/v1/me/notifications/stream` (`text/event-stream`) holds one `SseEmitter` per tab in `NotificationStream`. After the transaction that wrote or read a notification commits, it sends a bare `changed` event to that person's tabs (a rollback sends nothing); the tab refetches what it shows. A 25 s comment heartbeat (`NotificationStreamHeartbeatJob`) keeps proxies from closing idle streams, and `X-Accel-Buffering: no` stops nginx buffering. The stream is one-way and reuses the JWT filter, so it needs no STOMP broker. Async dispatches are permitted in security (`DispatcherType.ASYNC`), since the request was authorised when the stream opened.
+- **One instance only.** The emitters live in that JVM's memory. A second backend instance would need Postgres `LISTEN/NOTIFY` (or a broker) to fan `changed` out to the instance holding the tab.
+- **Frontend.** `EventSource` can't send the bearer header, so `useNotificationStream` reads the stream with `@microsoft/fetch-event-source`. On 401 it lets the axios refresh renew the token and reopens; on a drop it retries after 10 s. The bell (`NotificationBell`, built on `ui/IconButton`) sits in the owner header and the staff top bar, opens `NotificationPanel` (Unread / All, 8 newest) and links to the page at `/notifications` and `/staff/notifications`. DESIGN.md's "Notification centre" entry is the visual reference until a Figma frame is drawn.
+
+## 1. Where we are (20 Oct 2026, before PR 1)
 
 | Piece | State |
 |---|---|

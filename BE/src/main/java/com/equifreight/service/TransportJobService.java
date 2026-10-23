@@ -6,6 +6,7 @@ import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.*;
 import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -14,6 +15,8 @@ import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.LoadPlanRepository;
 import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
@@ -276,10 +279,13 @@ public class TransportJobService {
                         + " has been updated and re-signed off. Please re-check the route and stall assignments."
                 : "The trip plan for job " + job.getCode() + " has been signed off and released.";
 
-        for (CrewAssignment member : crewAssignments) {
-            notificationService.sendNotification(
-                    member.getUser(), "TRIP_RELEASED", notifTitle, notifBody, "TRANSPORT_JOB", job.getId());
-        }
+        notificationService.notify(
+                NotificationKind.TRIP_RELEASED,
+                Audience.escorts(
+                        crewAssignments.stream().map(CrewAssignment::getUser).toList()),
+                Subject.job(job),
+                notifTitle,
+                notifBody);
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
         return getJobDetail(jobId);

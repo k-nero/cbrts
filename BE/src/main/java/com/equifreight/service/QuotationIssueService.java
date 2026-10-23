@@ -9,6 +9,7 @@ import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RequestStatus;
@@ -22,7 +23,8 @@ import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import com.equifreight.service.pricing.QuotePricer;
 import com.equifreight.service.quotation.Snapshots;
 import java.math.BigDecimal;
@@ -55,7 +57,6 @@ public class QuotationIssueService {
     private final QuotationRepository quotations;
     private final RateCatalogVersionRepository versions;
     private final QuotationPricing pricing;
-    private final UserRepository users;
     private final NotificationService notifications;
     private final AuditService audit;
     private final Snapshots snapshots;
@@ -66,7 +67,6 @@ public class QuotationIssueService {
             QuotationRepository quotations,
             RateCatalogVersionRepository versions,
             QuotationPricing pricing,
-            UserRepository users,
             NotificationService notifications,
             AuditService audit,
             Snapshots snapshots,
@@ -75,7 +75,6 @@ public class QuotationIssueService {
         this.quotations = quotations;
         this.versions = versions;
         this.pricing = pricing;
-        this.users = users;
         this.notifications = notifications;
         this.audit = audit;
         this.snapshots = snapshots;
@@ -158,15 +157,12 @@ public class QuotationIssueService {
                 note,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + RequestStatus.QUOTED + "\"}");
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(
-                    account,
-                    "QUOTATION_ISSUED",
-                    "Your quotation for " + request.getCode() + " is ready",
-                    label + ", " + money(q.getTotal()) + ". It holds its price until " + until + ".",
-                    QuotationDraftService.ENTITY_TYPE,
-                    request.getId());
-        }
+        notifications.notify(
+                NotificationKind.QUOTATION_ISSUED,
+                Audience.club(request.getClub().getId()),
+                Subject.quotation(q),
+                "Your quotation for " + request.getCode() + " is ready",
+                label + ", " + money(q.getTotal()) + ". It holds its price until " + until + ".");
         return pricing.toResponse(saved, request, List.of());
     }
 
