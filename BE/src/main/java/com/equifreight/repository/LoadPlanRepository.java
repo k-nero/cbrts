@@ -1,7 +1,6 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.LoadPlan;
-import com.equifreight.entity.enums.LoadPlanStatus;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -14,20 +13,17 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LoadPlanRepository extends JpaRepository<LoadPlan, UUID> {
-    List<LoadPlan> findByJobId(UUID jobId);
+    Optional<LoadPlan> findByTripVehicle_Id(UUID tripVehicleId);
 
-    Optional<LoadPlan> findByJobIdAndStatus(UUID jobId, LoadPlanStatus status);
-
-    Optional<LoadPlan> findFirstByJobIdOrderByCreatedAtDesc(UUID jobId);
-
-    Optional<LoadPlan> findTopByJob_IdAndStatusOrderByConfirmedAtDesc(UUID jobId, LoadPlanStatus status);
+    /** The trip's load plans, one per vehicle, in convoy order. */
+    List<LoadPlan> findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(UUID tripId);
 
     /**
-     * The job's current plan, row-locked until the transaction ends. Every change to the placements
+     * The vehicle's plan, row-locked until the transaction ends. Every change to the placements
      * takes this lock first, so two coordinators editing the same plan are applied one after the
      * other and the second one's preconditions are checked against the first one's result.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select p from LoadPlan p where p.job.id = :jobId order by p.createdAt desc limit 1")
-    Optional<LoadPlan> findLatestByJobIdForUpdate(@Param("jobId") UUID jobId);
+    @Query("select p from LoadPlan p where p.tripVehicle.id = :tripVehicleId")
+    Optional<LoadPlan> findByTripVehicleIdForUpdate(@Param("tripVehicleId") UUID tripVehicleId);
 }

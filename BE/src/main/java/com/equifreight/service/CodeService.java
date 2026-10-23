@@ -20,7 +20,7 @@ public class CodeService {
     public String next(CodePrefix prefix, int year) {
         int digits = switch (prefix) {
             case REQ, Q, INV -> 4;
-            case CBRT -> 3;
+            case CBRT, TRP -> 3;
             case EF -> throw new IllegalArgumentException("EF codes have no year");
         };
         int value = counters.nextValue(prefix.name(), (short) year);

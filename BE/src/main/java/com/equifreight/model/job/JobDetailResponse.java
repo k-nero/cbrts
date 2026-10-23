@@ -12,6 +12,8 @@ import lombok.Builder;
 public record JobDetailResponse(
         UUID id,
         String code,
+        /** The trip's TRP code; staff only. */
+        String tripCode,
         String originCity,
         String destinationCity,
         JobStage stage,

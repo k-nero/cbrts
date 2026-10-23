@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -71,7 +72,12 @@ class TripServiceTest {
     @Mock
     private NotificationService notifications;
 
+    @Mock
+    private JobTripService jobTrips;
+
     private TripService service;
+
+    private Trip trip;
 
     private User coordinator;
     private User escort;
@@ -130,6 +136,7 @@ class TripServiceTest {
                 files,
                 audit,
                 notifications,
+                jobTrips,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         TransportRequest request = new TransportRequest();
@@ -144,15 +151,21 @@ class TripServiceTest {
         job.setClearanceReadyAt(NOW.minus(Duration.ofDays(1)));
         job.setSignedOffAt(NOW.minus(Duration.ofHours(12)));
 
+        trip = new Trip();
+        trip.setId(UUID.randomUUID());
+        trip.setCode("TRP-2026-001");
+        lenient().when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+
         shadowfax = horse("Shadowfax");
         nightfall = horse("Nightfall");
 
         when(jobs.findByCodeForUpdate(job.getCode())).thenReturn(Optional.of(job));
         when(records.findByClientRef(any())).thenReturn(Optional.empty());
         when(records.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection()))
+        when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(trip.getId()), anyCollection()))
                 .thenReturn(Optional.empty());
-        when(crew.existsByJob_IdAndUser_Id(job.getId(), escort.getId())).thenReturn(true);
+        when(crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId()))
+                .thenReturn(true);
         when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.empty());
         when(handovers.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -219,7 +232,7 @@ class TripServiceTest {
         departed();
         job.setTripStatus(TripStatus.DELIVERED);
         job.setStage(JobStage.HANDOVER);
-        when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection()))
+        when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(trip.getId()), anyCollection()))
                 .thenReturn(Optional.of(stored(TripRecordKind.DELIVERED, NOW.minusSeconds(600))));
 
         record(TripRecordKind.ARRIVED_AT_STOP, NOW.minusSeconds(3_000));
@@ -235,7 +248,7 @@ class TripServiceTest {
     @DisplayName("A lifecycle step older than the latest status update is refused")
     void lateLifecycleStepIsRefused() {
         departed();
-        when(records.findTopByJob_IdAndKindInOrderByOccurredAtDesc(eq(job.getId()), anyCollection()))
+        when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(trip.getId()), anyCollection()))
                 .thenReturn(Optional.of(stored(TripRecordKind.CLEARED_BORDER, NOW.minusSeconds(600))));
 
         assertThrows(ConflictException.class, () -> record(TripRecordKind.HELD, NOW.minusSeconds(1_200)));
@@ -404,6 +417,45 @@ class TripServiceTest {
         assertEquals(NOW, saved.getValue().getDeliveredAt());
     }
 
+    // ---------- the trip the job travels on (US-F3-09) ----------
+
+    @Test
+    @DisplayName("The log is the trip's, and departure puts the trip in transit with its job")
+    void departureMovesTheTrip() {
+        record(TripRecordKind.DEPARTED, NOW);
+
+        ArgumentCaptor<TripRecord> saved = ArgumentCaptor.forClass(TripRecord.class);
+        verify(records).save(saved.capture());
+        assertEquals(trip, saved.getValue().getTrip());
+        assertEquals(TripStatus.DEPARTED, trip.getStatus());
+    }
+
+    @Test
+    @DisplayName("Delivery takes the job's horses off the trip")
+    void deliveryTakesTheHorsesOffTheTrip() {
+        departed();
+        job.setTripStatus(TripStatus.ARRIVED);
+
+        record(TripRecordKind.DELIVERED, NOW);
+
+        assertEquals(TripStatus.DELIVERED, trip.getStatus());
+        verify(jobTrips).markDelivered(trip, job);
+    }
+
+    @Test
+    @DisplayName("Staff see the trip's TRP code; the customer never does")
+    void onlyStaffSeeTheTripCode() {
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        User customer = new User();
+        customer.setClub(club);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+
+        assertEquals("TRP-2026-001", service.coordinatorTrip(job.getCode()).tripCode());
+        assertNull(service.customerTrip(job.getCode(), customer).tripCode());
+    }
+
     @Test
     @DisplayName("Handover needs the receiver's name")
     void handoverNeedsTheReceiver() {
@@ -457,7 +509,7 @@ class TripServiceTest {
         job.setTripStatus(TripStatus.DELIVERED);
         job.setStage(JobStage.HANDOVER);
         job.setDeliveredAt(NOW.minus(Duration.ofMinutes(30)));
-        when(records.existsByJob_IdAndKind(job.getId(), TripRecordKind.HANDED_OVER))
+        when(records.existsByTrip_IdAndKind(trip.getId(), TripRecordKind.HANDED_OVER))
                 .thenReturn(false);
     }
 
@@ -482,7 +534,7 @@ class TripServiceTest {
 
     private TripRecord stored(TripRecordKind kind, Instant at) {
         TripRecord record = new TripRecord();
-        record.setJob(job);
+        record.setTrip(trip);
         record.setKind(kind);
         record.setOccurredAt(at);
         return record;
@@ -509,10 +561,11 @@ class TripServiceTest {
         job.setSignedOffAt(NOW.minus(Duration.ofHours(1)));
         job.setTripStatus(TripStatus.NOT_STARTED);
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
-        when(routes.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED))
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
-        when(loads.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.empty());
-        when(crew.findByJobId(job.getId())).thenReturn(List.of());
+        when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
+                .thenReturn(List.of());
+        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
         assertDoesNotThrow(
@@ -525,10 +578,11 @@ class TripServiceTest {
         job.setSignedOffAt(null);
         departed();
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
-        when(routes.findByJobIdAndStatus(job.getId(), RoutePlanStatus.CONFIRMED))
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
-        when(loads.findFirstByJobIdOrderByCreatedAtDesc(job.getId())).thenReturn(Optional.empty());
-        when(crew.findByJobId(job.getId())).thenReturn(List.of());
+        when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
+                .thenReturn(List.of());
+        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
         assertDoesNotThrow(

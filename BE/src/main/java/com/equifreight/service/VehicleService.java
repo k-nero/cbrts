@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.Trip;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
@@ -42,16 +43,19 @@ public class VehicleService {
     private final VehicleStallRepository vehicleStallRepository;
     private final VehicleBookingRepository vehicleBookingRepository;
     private final TransportJobRepository transportJobRepository;
+    private final JobTripService jobTrips;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
             VehicleStallRepository vehicleStallRepository,
             VehicleBookingRepository vehicleBookingRepository,
-            TransportJobRepository transportJobRepository) {
+            TransportJobRepository transportJobRepository,
+            JobTripService jobTrips) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
         this.transportJobRepository = transportJobRepository;
+        this.jobTrips = jobTrips;
     }
 
     @Transactional(readOnly = true)
@@ -154,16 +158,18 @@ public class VehicleService {
                             + request.endsAt());
         }
 
-        TransportJob job = null;
+        // A job's booking is its trip's: the vehicle is booked once for the trip, whichever jobs it carries.
+        Trip trip = null;
         if (request.jobId() != null) {
-            job = transportJobRepository
+            TransportJob job = transportJobRepository
                     .findById(request.jobId())
                     .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.jobId()));
+            trip = jobTrips.tripOf(job.getId());
         }
 
         VehicleBooking booking = new VehicleBooking();
         booking.setVehicle(vehicle);
-        booking.setJob(job);
+        booking.setTrip(trip);
         booking.setKind(request.kind());
         booking.setStartsAt(request.startsAt());
         booking.setEndsAt(request.endsAt());
