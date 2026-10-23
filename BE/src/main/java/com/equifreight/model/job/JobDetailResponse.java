@@ -23,6 +23,9 @@ public record JobDetailResponse(
         Instant clearanceReadyAt,
         String blockingReason,
         String nextStepOwner,
+        /** The team assigned at approval (US-F1-07); null on jobs approved before teams were kept. */
+        String transportSpecialist,
+        String coordinator,
         String clearanceGateState, // "Locked" or "Clear"
         String clearanceGateSummary,
         List<JobHorseResponse> horses,

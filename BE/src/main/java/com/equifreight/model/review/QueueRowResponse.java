@@ -1,5 +1,6 @@
 package com.equifreight.model.review;
 
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TransportMode;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,6 +19,9 @@ public class QueueRowResponse {
 
     private UUID id;
     private String code;
+    /** In review, or accepted by the customer and waiting for approval (US-F1-07). */
+    private RequestStatus status;
+
     private String club;
     private String fromCity;
     private String toCity;

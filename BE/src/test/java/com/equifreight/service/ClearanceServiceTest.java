@@ -5,7 +5,10 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
+import com.equifreight.entity.Country;
+import com.equifreight.entity.JobRegulationPin;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.RegulationRole;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
@@ -302,6 +305,50 @@ class ClearanceServiceTest {
                         isNull(),
                         eq("OPEN"),
                         eq("CLEARANCE_READY"));
+    }
+
+    @Test
+    @DisplayName("#113: a job pinned to a version with no document rules never clears, and the gate says why")
+    void anEmptyChecklistNeverClearsTheGate() {
+        RegulationVersion version = cambodiaCatalog();
+        Country cambodia = new Country();
+        cambodia.setName("Cambodia");
+        version.getCatalog().setCountry(cambodia);
+        version.setVersionNo(7);
+        JobRegulationPin pin = new JobRegulationPin();
+        pin.setRole(RegulationRole.DESTINATION);
+        pin.setRegulationVersion(version);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertFalse(resp.clearanceReady());
+        assertEquals(DossierStatus.OPEN, job.getDossierStatus());
+        assertNull(job.getClearanceReadyAt());
+        assertEquals(
+                List.of("The pinned regulation catalog, Cambodia v7, has no mandatory document rules, so the gate"
+                        + " stays closed until the job's checklist has its documents."),
+                resp.outstandingIssues());
+    }
+
+    @Test
+    @DisplayName("A job with no checklist yet says so")
+    void aJobWithNoChecklistSaysSo() {
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+
+        ClearanceStatusResponse resp = clearanceService.getClearanceStatus(job.getId());
+
+        assertFalse(resp.clearanceReady());
+        assertEquals(
+                List.of("The job has no document checklist yet. Generate it from the regulation catalogs."),
+                resp.outstandingIssues());
     }
 
     @Test

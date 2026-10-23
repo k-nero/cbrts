@@ -3,14 +3,17 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import {
   addLine,
+  approveRequest,
   changeQuotationClass,
   discardRevision,
   editLine,
+  getApprovalOptions,
   getQueue,
   getQuotation,
   getReview,
   issueQuotation,
   overrideLine,
+  rejectRequest,
   removeLine,
   removeOverride,
   repriceQuotation,
@@ -60,6 +63,36 @@ export const useReturnRequest = () => {
     },
   });
 };
+
+/** Who can be put on the job at approval; read only while a request waits for approval. */
+export const useApprovalOptions = (enabled: boolean) =>
+  useQuery({
+    queryKey: [...queryKeys.staffRequests.all(), 'approval-options'],
+    queryFn: getApprovalOptions,
+    enabled,
+  });
+
+/** A decision that ends the review (approve, reject): the answer is the review, and every list reloads. */
+const useDecision = <V>(write: (id: string, value: V) => Promise<RequestReview>) => {
+  const qc = useQueryClient();
+  return useMutation<RequestReview, unknown, { id: string; value: V }>({
+    mutationFn: ({ id, value }) => write(id, value),
+    onSuccess: (review, { id }) => {
+      qc.setQueryData(queryKeys.staffRequests.one(id), review);
+      void qc.invalidateQueries({
+        queryKey: queryKeys.staffRequests.all(),
+        predicate: (q) => q.queryKey[1] !== id,
+      });
+      // The jobs list (useCrudResource keys it under 'jobs') gains the new job.
+      void qc.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+export const useApproveRequest = () =>
+  useDecision<{ transportSpecialistId: string; coordinatorId: string }>(approveRequest);
+
+export const useRejectRequest = () => useDecision<string>(rejectRequest);
 
 /**
  * The request's quotation, the latest or one version. A 404 means none has been started: the builder offers

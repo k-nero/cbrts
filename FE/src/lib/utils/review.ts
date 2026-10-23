@@ -86,6 +86,7 @@ const BLANK: TransportRequest = {
   leadTime: null,
   blockers: null,
   infoRequiredNote: null,
+  rejectReason: null,
   cancelledAt: null,
   cancellationFeePct: null,
   revisions: [],
@@ -136,3 +137,9 @@ export const quotationAction = (
   if (quotation) return 'open';
   return status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'start' : null;
 };
+
+/** A team member as a select option: "Nguyễn Thị Lan · 2 open jobs". */
+export const teamOption = (m: { id: string; name: string; openJobs: number }) => ({
+  value: m.id,
+  label: `${m.name} · ${m.openJobs} open ${m.openJobs === 1 ? 'job' : 'jobs'}`,
+});

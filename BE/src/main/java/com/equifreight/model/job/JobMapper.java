@@ -36,6 +36,8 @@ public final class JobMapper {
                 .clearanceReadyAt(job.getClearanceReadyAt())
                 .blockingReason(blockingReason)
                 .nextStepOwner(nextStepOwner)
+                .transportSpecialist(nameOf(job.getTransportSpecialist()))
+                .coordinator(nameOf(job.getCoordinator()))
                 .build();
     }
 
@@ -63,6 +65,8 @@ public final class JobMapper {
                 .clearanceReadyAt(job.getClearanceReadyAt())
                 .blockingReason(blockingReason)
                 .nextStepOwner(nextStepOwner)
+                .transportSpecialist(nameOf(job.getTransportSpecialist()))
+                .coordinator(nameOf(job.getCoordinator()))
                 .clearanceGateState(clearanceGateState)
                 .clearanceGateSummary(clearanceGateSummary)
                 .horses(horses)
@@ -247,5 +251,9 @@ public final class JobMapper {
 
     private static String fullName(User user) {
         return user != null ? user.getFirstName() + " " + user.getLastName() : null;
+    }
+
+    private static String nameOf(User user) {
+        return user == null ? null : user.displayName();
     }
 }

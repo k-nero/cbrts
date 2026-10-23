@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Button } from '@/components/ui';
+import { Button, Chip } from '@/components/ui';
 import { Flex, TableColumnsType } from 'antd';
 import type { PagedResponse, QueueRow } from '@/interfaces';
 import { ageWords, departsWords, queueRoute } from '@/lib';
@@ -25,6 +25,17 @@ export const useGeneratedRequestColumn = ({ query }: Props): TableColumnsType<Qu
             )}
           </Flex>
         ),
+      },
+      {
+        key: 'status',
+        title: 'Waiting for',
+        width: 150,
+        render: (_, r) =>
+          r.status === 'CUSTOMER_ACCEPTED' ? (
+            <Chip tone="ok">Approval</Chip>
+          ) : (
+            <Chip tone="info">Review</Chip>
+          ),
       },
       { key: 'club', title: 'Customer', width: 200, dataIndex: 'club' },
       {

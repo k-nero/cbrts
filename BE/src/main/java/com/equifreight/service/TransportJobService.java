@@ -1,7 +1,11 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.*;
+import com.equifreight.entity.Quotation;
+import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -10,6 +14,7 @@ import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.LoadPlanRepository;
 import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TransportJobRepository;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
 import java.util.*;
@@ -34,6 +39,7 @@ public class TransportJobService {
     private final ClearanceService clearanceService;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final CodeService codeService;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -45,7 +51,8 @@ public class TransportJobService {
             CrewAssignmentRepository crewAssignmentRepository,
             ClearanceService clearanceService,
             AuditService auditService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            CodeService codeService) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -56,12 +63,19 @@ public class TransportJobService {
         this.clearanceService = clearanceService;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.codeService = codeService;
     }
 
     @Transactional(readOnly = true)
     public Page<JobSummaryResponse> search(String q, JobStage stage, String filter, Pageable pageable) {
         Specification<TransportJob> spec = (root, cq, cb) -> {
             var predicates = new ArrayList<Predicate>();
+            // The team's names are on every row; fetched with the page, not one lookup per row. The count
+            // query has no fetches.
+            if (cq != null && cq.getResultType() != Long.class && cq.getResultType() != long.class) {
+                root.fetch("transportSpecialist", JoinType.LEFT);
+                root.fetch("coordinator", JoinType.LEFT);
+            }
 
             if (stage != null) {
                 predicates.add(cb.equal(root.get("stage"), stage));
@@ -139,6 +153,33 @@ public class TransportJobService {
                 loadPlan,
                 routePlan,
                 crew);
+    }
+
+    /**
+     * The job an approved request becomes (US-F1-07, BR-F1-05): its CBRT code from the code counter, the accepted
+     * quotation it is held to, the manager who approved it and the team they chose, with the request's arrival window.
+     * The caller has checked the request and the team; the dates are planned in Flow 3.
+     */
+    @Transactional
+    public TransportJob createApproved(
+            TransportRequest request,
+            Quotation accepted,
+            User manager,
+            User specialist,
+            User coordinator,
+            Instant approvedAt) {
+        TransportJob job = new TransportJob();
+        job.setCode(codeService.next(
+                CodePrefix.CBRT, approvedAt.atZone(BusinessTime.ZONE).getYear()));
+        job.setRequest(request);
+        job.setQuotation(accepted);
+        job.setApprovedBy(manager);
+        job.setApprovedAt(approvedAt);
+        job.setTransportSpecialist(specialist);
+        job.setCoordinator(coordinator);
+        job.setWindowStart(request.getWindowStart());
+        job.setWindowEnd(request.getWindowEnd());
+        return transportJobRepository.saveAndFlush(job);
     }
 
     @Transactional

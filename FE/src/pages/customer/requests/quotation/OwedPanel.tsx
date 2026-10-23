@@ -63,9 +63,11 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
         }
       >
         <p className="type-body-m m-0 text-ink-2">
-          {accepted
-            ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}. Next, ${manager} approves the job, which locks the price and the horse list.`
-            : `You declined version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}, so ${quotation.request.code} is closed.`}
+          {accepted && quotation.requestStatus === 'APPROVED'
+            ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''} and ${manager} approved the job. The price and the horse list are locked; your document checklist is open.`
+            : accepted
+              ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}. Next, ${manager} approves the job, which locks the price and the horse list.`
+              : `You declined version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}, so ${quotation.request.code} is closed.`}
         </p>
       </Panel>
     );
