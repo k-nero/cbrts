@@ -12,6 +12,7 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.job.BiosecurityWarningResponse;
+import com.equifreight.model.job.ShareSuggestionResponse;
 import com.equifreight.model.job.ShareTripResponse;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
@@ -303,11 +304,70 @@ class TripSharingServiceTest {
         verify(jobTrips, never()).newTripFor(any(), any(), any());
     }
 
-    @Test
-    @DisplayName("The jobs that could join leave out the ones already on the trip")
-    void candidatesLeaveOutTheTripsJobs() {
-        when(jobs.findShareCandidates(corridor.getId())).thenReturn(List.of(host, joining));
+    // ---------- suggestions (US-F3-13) ----------
 
-        assertThat(service.candidates(host.getId())).extracting(j -> j.code()).containsExactly("CBRT-2026-042");
+    private TransportJob candidate(String code, LocalDate departure) {
+        Trip own = trip("TRP-2026-0" + code.substring(code.length() - 2));
+        own.setCorridor(corridor);
+        TransportJob job = job(code, departure, 3, own);
+        RequestHorse rh = new RequestHorse();
+        rh.setHorse(horse(own, job).getHorse());
+        job.getRequest().getHorses().add(rh);
+        when(jobTrips.jobsOn(own)).thenReturn(List.of(job));
+        return job;
+    }
+
+    @Test
+    @DisplayName("Suggestions are the jobs that pass every check, with departure, horses, stalls left and warnings")
+    void suggestionsPassEveryCheck() {
+        TransportJob fits = candidate("CBRT-2026-043", LocalDate.of(2026, 12, 3));
+        TransportJob tooLate = candidate("CBRT-2026-044", LocalDate.of(2026, 12, 20));
+        TransportJob privateTrailer = candidate("CBRT-2026-045", LocalDate.of(2026, 12, 1));
+        privateTrailer.getRequest().setTrailer(TrailerType.PRIVATE);
+        TransportJob noRoom = candidate("CBRT-2026-046", LocalDate.of(2026, 12, 1));
+        when(loadPlans.lackOfRoom(hostTrip, noRoom)).thenReturn("no stall left");
+        when(jobs.findShareCandidates(corridor.getId()))
+                .thenReturn(List.of(host, fits, tooLate, privateTrailer, noRoom));
+        when(loadPlans.stallsLeft(hostTrip, fits)).thenReturn(1);
+        List<BiosecurityWarningResponse> warnings = List.of(BiosecurityWarningResponse.builder()
+                .key("k")
+                .kind("ISOLATION")
+                .message("mixes isolation groups")
+                .build());
+        when(biosecurity.forJoin(hostTrip, fits)).thenReturn(warnings);
+
+        List<ShareSuggestionResponse> suggestions = service.suggestions(host.getId());
+
+        assertThat(suggestions).singleElement().satisfies(s -> {
+            assertEquals("CBRT-2026-043", s.job().code());
+            // 041 can leave 28 Nov to 4 Dec, 043 from 30 Nov to 6 Dec; the trip has no planned day yet.
+            assertEquals(LocalDate.of(2026, 11, 30), s.proposedDeparture());
+            assertEquals(LocalDate.of(2026, 12, 4), s.departTo());
+            assertEquals(1, s.horsesAdded());
+            assertEquals(1, s.stallsLeft());
+            assertEquals(warnings, s.warnings());
+        });
+        verify(jobTrips, never()).moveJob(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("The proposed departure keeps the trip's planned day when the joining job allows it")
+    void proposedDepartureKeepsThePlannedDay() {
+        TransportJob fits = candidate("CBRT-2026-043", LocalDate.of(2026, 12, 3));
+        when(jobs.findShareCandidates(corridor.getId())).thenReturn(List.of(fits));
+        hostTrip.setPlannedDepartureAt(Instant.parse("2026-12-02T01:00:00Z"));
+
+        assertEquals(
+                LocalDate.of(2026, 12, 2),
+                service.suggestions(host.getId()).getFirst().proposedDeparture());
+    }
+
+    @Test
+    @DisplayName("A trip that has departed suggests nothing")
+    void aDepartedTripSuggestsNothing() {
+        host.setTripStatus(TripStatus.DEPARTED);
+        when(jobs.findShareCandidates(corridor.getId())).thenReturn(List.of(joining));
+
+        assertThat(service.suggestions(host.getId())).isEmpty();
     }
 }

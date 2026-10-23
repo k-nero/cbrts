@@ -65,6 +65,21 @@ export interface TripJob {
   departed: boolean;
 }
 
+/**
+ * An approved job that could share this job's trailer (US-F3-13): it passes every check of joining,
+ * with the proposed departure, the horses it adds, the stalls left and what sharing would mix.
+ */
+export interface ShareSuggestion {
+  job: TripJob;
+  proposedDeparture: string;
+  departFrom: string;
+  departTo: string;
+  horsesAdded: number;
+  /** Null while the trip has no trailer. */
+  stallsLeft?: number | null;
+  warnings: BiosecurityWarning[];
+}
+
 /** The trip after a job joined it: the days every job on it can leave. */
 export interface ShareTripResult {
   tripCode: string;
