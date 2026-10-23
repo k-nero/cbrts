@@ -86,13 +86,14 @@ public class AuditService {
         return logs.save(log);
     }
 
-    /** A check or change the system made on its own ("Lead time checked: …"). */
+    /** Whether an action has already been recorded for this entity. */
     @Transactional(readOnly = true)
     public boolean hasAction(String entityType, UUID entityId, String action) {
         return !logs.findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(entityType, entityId, action)
                 .isEmpty();
     }
 
+    /** A check or change the system made on its own ("Lead time checked: …"). */
     @Transactional
     public AuditLog recordSystem(
             String action,
