@@ -18,6 +18,8 @@ const KIND: Record<StopKind, { icon: IconName; label: string }> = {
   airport_in: { icon: 'plane', label: 'Airport arrival' },
 };
 
+const FALLBACK: { icon: IconName; label: string } = { icon: 'check', label: 'Stop' };
+
 type Props = {
   kind: StopKind | RouteStopKind;
   /** The place, in Fraunces: "Mộc Bài – Bavet". */
@@ -32,7 +34,7 @@ type Props = {
 /** A route plan or journey log entry (DESIGN.md, Timeline stop). */
 export const TimelineStop: FC<Props> = ({ kind, stop, time, details, status, className }) => {
   const normalizedKind = kind.toLowerCase() as StopKind;
-  const config = KIND[normalizedKind] ?? KIND.pickup;
+  const config = KIND[normalizedKind] ?? FALLBACK;
 
   return (
     <div className={cx('flex gap-4', className)}>
