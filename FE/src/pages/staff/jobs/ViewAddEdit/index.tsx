@@ -99,7 +99,11 @@ export default function JobDetailPage() {
       })
     : 'Not scheduled';
 
-  const trailerCode = job.loadPlan?.vehicleCode ? `trailer ${job.loadPlan.vehicleCode}` : 'vehicle';
+  const trailerCodes = job.loadPlan?.vehicles.map((v) => v.vehicleCode) ?? [];
+  const trailerCode =
+    trailerCodes.length === 0
+      ? 'vehicle'
+      : `${trailerCodes.length === 1 ? 'trailer' : 'trailers'} ${trailerCodes.join(', ')}`;
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
 
   return (
