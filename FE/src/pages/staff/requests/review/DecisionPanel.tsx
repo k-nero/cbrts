@@ -6,8 +6,11 @@ import { Flex, message } from 'antd';
 import type { AxiosError } from 'axios';
 
 import { afterReturn } from './afterReturn';
+import { ApprovePanel } from './ApprovePanel';
+import { JobPanel } from './JobPanel';
 import { NoteField } from './NoteField';
 import { QuotationAction } from './QuotationAction';
+import { RejectBox } from './RejectBox';
 import { type NoteForm, noteSchema } from './schema';
 
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -26,8 +29,9 @@ import {
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
- * The decision (spec §5.2): Ask for information is the one decision this slice has. After sending, the
- * page opens the next request the queue held before the return, or goes back to Requests.
+ * The decision (spec §5.2): in review, ask for information, start the quotation or reject; once the
+ * customer accepts, approve into a job or reject (US-F1-07); once approved, the job and its team. After a
+ * return, the page opens the next request the queue held before it, or goes back to Requests.
  */
 export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const router = useCustomRouter();
@@ -59,6 +63,9 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
     </Callout>
   );
 
+  if (request.status === 'CUSTOMER_ACCEPTED') return <ApprovePanel review={review} />;
+  if (request.status === 'APPROVED' && review.job) return <JobPanel job={review.job} />;
+
   if (!inReview(request.status)) {
     const chip = requestStatusChip(request.status);
     const returned = review.revisions[review.revisions.length - 1];
@@ -77,6 +84,11 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               <p className="type-body-s m-0 whitespace-pre-line text-ink">
                 {request.infoRequiredNote}
               </p>
+            </Flex>
+          ) : request.rejectReason ? (
+            <Flex vertical gap={4}>
+              <p className="type-label-s m-0 text-ink-2">Rejected with:</p>
+              <p className="type-body-s m-0 whitespace-pre-line text-ink">{request.rejectReason}</p>
             </Flex>
           ) : (
             <p className="type-body-s m-0 text-ink-2">
@@ -158,7 +170,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
           <Flex vertical gap={8}>
             <span className="type-label-s text-ink-2">Other outcomes</span>
             <QuotationAction review={review} />
-            <p className="type-body-s m-0 text-ink-3">Reject comes with the approval step.</p>
+            <RejectBox review={review} />
           </Flex>
         </div>
       </Flex>

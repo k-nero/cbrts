@@ -220,6 +220,9 @@ describe('quotedPassChip', () => {
     expect(
       quotedPassChip({ status: 'ACCEPTED', requestStatus: 'CUSTOMER_ACCEPTED', versionNo: 2 }),
     ).toEqual({ tone: 'ok', label: 'Accepted · v2' });
+    expect(quotedPassChip({ status: 'ACCEPTED', requestStatus: 'APPROVED', versionNo: 2 })).toEqual(
+      { tone: 'ok', label: 'Approved · v2' },
+    );
     expect(quotedPassChip({ status: 'ISSUED', requestStatus: 'CANCELLED', versionNo: 2 })).toEqual({
       tone: 'neutral',
       label: 'Cancelled',

@@ -168,6 +168,7 @@ export const quotedPassChip = (
   q: Pick<CustomerQuotation, 'status' | 'requestStatus' | 'versionNo'>,
 ): { tone: 'info' | 'ok' | 'neutral'; label: string } => {
   if (q.requestStatus === 'CANCELLED') return { tone: 'neutral', label: 'Cancelled' };
+  if (q.requestStatus === 'APPROVED') return { tone: 'ok', label: `Approved · v${q.versionNo}` };
   if (q.status === 'ACCEPTED') return { tone: 'ok', label: `Accepted · v${q.versionNo}` };
   if (q.status === 'DECLINED') return { tone: 'neutral', label: `Declined · v${q.versionNo}` };
   if (q.status === 'EXPIRED') return { tone: 'neutral', label: `Expired · v${q.versionNo}` };
@@ -183,6 +184,8 @@ export const quotedPassSub = (
 ): string => {
   const on = (iso: string | null) => (iso ? ` ${formatDate(iso)}` : '');
   if (q.requestStatus === 'CANCELLED') return `Request cancelled${on(q.cancelledAt)}.`;
+  if (q.requestStatus === 'APPROVED')
+    return 'Approved. The price and the horse list are locked; your document checklist is open.';
   if (q.status === 'ACCEPTED')
     return `Accepted${on(q.acceptedAt)}. Once the job is approved, this becomes your travel pass.`;
   if (q.status === 'DECLINED') return `Declined${on(q.declinedAt)}.`;

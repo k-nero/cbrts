@@ -175,6 +175,9 @@ export interface JobSummary extends BaseEntity {
   clearanceReadyAt?: string | null;
   blockingReason?: string | null;
   nextStepOwner?: string | null;
+  /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
+  transportSpecialist?: string | null;
+  coordinator?: string | null;
   clubName?: string | null;
 }
 
@@ -191,6 +194,9 @@ export interface JobDetail extends BaseEntity {
   clearanceReadyAt?: string | null;
   blockingReason?: string | null;
   nextStepOwner?: string | null;
+  /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
+  transportSpecialist?: string | null;
+  coordinator?: string | null;
   clearanceGateState: 'Locked' | 'Clear';
   clearanceGateSummary: string;
   horses: JobHorse[];

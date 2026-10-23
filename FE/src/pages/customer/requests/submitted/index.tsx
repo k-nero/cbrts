@@ -140,7 +140,13 @@ const RequestSubmittedPage: FC = () => {
     <Flex vertical gap={28}>
       <PageHeader
         back={back}
-        title={request.status === 'CANCELLED' ? 'Request cancelled' : 'Request submitted'}
+        title={
+          request.status === 'CANCELLED'
+            ? 'Request cancelled'
+            : request.status === 'REJECTED'
+              ? 'Request rejected'
+              : 'Request submitted'
+        }
         summary={
           <Flex component="span" vertical gap={4}>
             <span className="type-data-l text-ink">{request.code}</span>
@@ -156,7 +162,18 @@ const RequestSubmittedPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <Flex vertical gap={24}>
-          {request.status === 'CANCELLED' ? (
+          {request.status === 'REJECTED' ? (
+            <Panel title="Nothing needed from you" extra={<Chip tone="bad">Rejected</Chip>}>
+              <Flex vertical gap={8}>
+                <p className="type-body-m m-0 text-ink-2">
+                  The logistics manager can’t take this move. Their reason:
+                </p>
+                <p className="type-body-m m-0 whitespace-pre-line text-ink">
+                  {request.rejectReason}
+                </p>
+              </Flex>
+            </Panel>
+          ) : request.status === 'CANCELLED' ? (
             <Panel title="Nothing needed from you" extra={<Chip dot={false}>Cancelled</Chip>}>
               <p className="type-body-m m-0 text-ink-2">
                 {cancelledText(request.cancelledAt, request.cancellationFeePct)}

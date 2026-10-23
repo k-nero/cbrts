@@ -1,6 +1,7 @@
 import client from '@/config/axios';
 
 import type {
+  ApprovalOptions,
   ManualLineInput,
   OverrideInput,
   PagedResponse,
@@ -23,6 +24,21 @@ export const getReview = (id: string): Promise<RequestReview> =>
 /** Return a request for missing information (US-F1-04): 400 NOTE_REQUIRED / NOTE_TOO_LONG, 409 REQUEST_NOT_IN_REVIEW. */
 export const returnForInformation = (id: string, note: string): Promise<RequestReview> =>
   client.post<RequestReview>(`${BASE}/${id}/return`, { note }).then((r) => r.data);
+
+/** Who can be put on a job at approval (US-F1-07). */
+export const getApprovalOptions = (): Promise<ApprovalOptions> =>
+  client.get<ApprovalOptions>(`${BASE}/approval-options`).then((r) => r.data);
+
+/** Approve an accepted request into its job, with its team (US-F1-07). */
+export const approveRequest = (
+  id: string,
+  team: { transportSpecialistId: string; coordinatorId: string },
+): Promise<RequestReview> =>
+  client.post<RequestReview>(`${BASE}/${id}/approve`, team).then((r) => r.data);
+
+/** Reject a request before approval, with the reason the customer reads (BR-F1-04). */
+export const rejectRequest = (id: string, reason: string): Promise<RequestReview> =>
+  client.post<RequestReview>(`${BASE}/${id}/reject`, { reason }).then((r) => r.data);
 
 /** The request's quotation (US-Q-01): the latest version, or one version; 404 until it is started. */
 export const getQuotation = (id: string, version?: number): Promise<QuotationDraft> =>

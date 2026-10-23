@@ -32,7 +32,7 @@ const RequestsPage: FC = () => {
     <Flex vertical gap={28}>
       <PageHeader
         title="Requests"
-        summary="Oldest first. Requests waiting for feasibility review."
+        summary="Oldest first. Requests waiting for feasibility review, or for your approval once the customer accepts."
       />
 
       {query.isError ? (

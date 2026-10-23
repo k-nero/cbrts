@@ -626,4 +626,6 @@ export const passChip = (status: RequestStatus): { tone: Tone; label: string } =
       ? { tone: 'neutral', label: 'Draft' }
       : status === 'CANCELLED'
         ? { tone: 'neutral', label: 'Cancelled' }
-        : { tone: 'neutral', label: 'Submitted' };
+        : status === 'REJECTED'
+          ? { tone: 'bad', label: 'Rejected' }
+          : { tone: 'neutral', label: 'Submitted' };
