@@ -105,7 +105,18 @@ const RequestDocumentsPage: FC = () => {
             ) : (
               <div className="overflow-hidden rounded-lg border border-line bg-card">
                 {groups.map((group) => (
-                  <ChecklistGroupTable key={group.key} group={group} now={now} />
+                  <ChecklistGroupTable
+                    key={group.key}
+                    group={group}
+                    now={now}
+                    onOpen={(itemId) =>
+                      router.push(
+                        router.paths.get('request-document', {
+                          pathParams: [request.data!.id, itemId],
+                        }),
+                      )
+                    }
+                  />
                 ))}
               </div>
             )}

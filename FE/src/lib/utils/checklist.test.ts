@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   customerHolder,
+  customerMayUpload,
+  documentFileProblem,
   groupChecklist,
   isOverdue,
   isWithAuthority,
@@ -101,5 +103,30 @@ describe('groupChecklist', () => {
       'EIA (Coggins) test',
       'Equine passport',
     ]);
+  });
+});
+
+describe('customerMayUpload', () => {
+  test('their own document, until it is cleared with nothing to fix', () => {
+    expect(customerMayUpload(item({}))).toBe(true);
+    expect(customerMayUpload(item({ status: 'REJECTED' }))).toBe(true);
+    expect(customerMayUpload(item({ status: 'CLEARED', validity: 'AMBER' }))).toBe(true);
+    expect(customerMayUpload(item({ status: 'CLEARED', validity: 'GREEN' }))).toBe(false);
+    expect(customerMayUpload(item({ providedBy: 'AUTHORITY' }))).toBe(false);
+  });
+});
+
+describe('documentFileProblem', () => {
+  const file = (name: string, size: number) => new File([new Uint8Array(size)], name);
+
+  test('PDF and photos up to 25 MB pass; other types and bigger files are named', () => {
+    expect(documentFileProblem(file('EIA_Nightfall.PDF', 1000))).toBeNull();
+    expect(documentFileProblem(file('scan.heic', 1000))).toBeNull();
+    expect(documentFileProblem(file('notes.docx', 1000))).toBe(
+      'Upload a PDF, JPEG, PNG or HEIC file.',
+    );
+    expect(documentFileProblem(file('big.pdf', 25 * 1024 * 1024 + 1))).toBe(
+      'The file is larger than 25 MB.',
+    );
   });
 });

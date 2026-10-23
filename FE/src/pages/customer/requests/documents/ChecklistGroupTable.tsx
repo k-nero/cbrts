@@ -1,22 +1,24 @@
 import type { FC } from 'react';
 
-import { cx, Deadline, DocumentRow } from '@/components/ui';
+import { Button, cx, Deadline, DocumentRow } from '@/components/ui';
 import { ChecklistStatusEnum } from '@/interfaces';
 import {
   type ChecklistGroup,
   customerHolder,
+  customerMayUpload,
   formatDate,
   isOverdue,
   isOwedByCustomer,
   itemDeadline,
   rowStatus,
   rowStatusLabel,
+  uploadLabel,
 } from '@/lib/utils';
 
-type Props = { group: ChecklistGroup; now: string };
+type Props = { group: ChecklistGroup; now: string; onOpen: (itemId: string) => void };
 
-/** One horse's documents, or the shipment's, under a head counting "n of m cleared". */
-const ChecklistGroupTable: FC<Props> = ({ group, now }) => (
+/** One horse's documents, or the shipment's, under a head counting "n of m cleared". A row opens its document. */
+const ChecklistGroupTable: FC<Props> = ({ group, now, onOpen }) => (
   <section aria-label={group.title} className="border-t border-line first:border-t-0">
     {/* A plain div: AntD's Flex resets padding over Tailwind's. */}
     <div className="flex items-center justify-between border-b border-line bg-sunken px-5 py-3">
@@ -54,6 +56,23 @@ const ChecklistGroupTable: FC<Props> = ({ group, now }) => (
             </span>
           }
           version={<Deadline left={deadline.left} date={deadline.date} tone={deadline.tone} />}
+          actions={
+            customerMayUpload(item) ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                leadingIcon="upload"
+                aria-label={`${uploadLabel(item)}: ${item.documentTypeName}${item.horseName ? `, ${item.horseName}` : ''}`}
+                onClick={() => onOpen(item.id)}
+              >
+                {uploadLabel(item)}
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => onOpen(item.id)}>
+                Open
+              </Button>
+            )
+          }
         />
       );
     })}
