@@ -112,6 +112,18 @@ public class Incident extends BaseEntity {
     @Column(length = 1000)
     private String decisionNote;
 
+    /** What the customer was told about the decision, sent as written (US-F5-03). */
+    @Column(length = 1000)
+    private String customerMessage;
+
+    /** Whether the customer pays the decided option's extra cost (a job charge for the final invoice). */
+    private Boolean chargeCustomer;
+
+    /** The route version the decision gave the trip, if it changed the route or the times. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "route_plan_id")
+    private RoutePlan routePlan;
+
     private Instant resolvedAt;
 
     @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, orphanRemoval = true)

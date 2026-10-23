@@ -8,6 +8,7 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import lombok.extern.log4j.Log4j2;
@@ -352,23 +353,93 @@ public class RoutePlanService {
             return;
         }
 
-        RoutePlan draft = new RoutePlan();
-        draft.setTrip(trip);
-        draft.setVersionNo((short) (routePlanRepository
+        copyOf(old, RoutePlanStatus.DRAFT, reason);
+    }
+
+    /**
+     * An approved incident option moves the trip's times (US-F5-03): the confirmed route is superseded by a new
+     * confirmed version with the same stops and legs, in which every stop the trip hasn't reached yet is
+     * {@code delayMinutes} later, and each job's planned arrival (and, before departure, departure) follows it.
+     * Returns the new version, or empty when the trip has no confirmed route.
+     */
+    @Transactional
+    public Optional<RoutePlan> reviseForIncident(
+            Trip trip, int delayMinutes, Set<UUID> reachedStopIds, String reason, User user) {
+        Optional<RoutePlan> confirmed =
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
+        if (confirmed.isEmpty()) return Optional.empty();
+        RoutePlan old = confirmed.get();
+        old.setStatus(RoutePlanStatus.SUPERSEDED);
+        old.setSupersededAt(Instant.now());
+        old.setChangeReason(reason);
+        routePlanRepository.saveAndFlush(old);
+
+        RoutePlan revised = copyOf(old, RoutePlanStatus.CONFIRMED, reason);
+        revised.setConfirmedBy(user);
+        revised.setConfirmedAt(Instant.now());
+        Duration delay = Duration.ofMinutes(delayMinutes);
+        for (int i = 0; i < old.getStops().size(); i++) {
+            RouteStop was = old.getStops().get(i);
+            RouteStop now = revised.getStops().get(i);
+            if (was.getPlannedAt() != null && !reachedStopIds.contains(was.getId())) {
+                now.setPlannedAt(was.getPlannedAt().plus(delay));
+                routeStopRepository.save(now);
+            }
+        }
+        RoutePlan saved = routePlanRepository.save(revised);
+
+        for (TransportJob onTrip : jobTrips.jobsOn(trip)) {
+            saved.getStops().stream()
+                    .filter(st -> st.getKind() == RouteStopKind.DELIVERY
+                            && st.getJob() != null
+                            && st.getJob().getId().equals(onTrip.getId()))
+                    .findFirst()
+                    .ifPresent(d -> onTrip.setPlannedArrivalAt(d.getPlannedAt()));
+            if (onTrip.getDepartedAt() == null) {
+                saved.getStops().stream()
+                        .filter(st -> st.getKind() == RouteStopKind.PICKUP)
+                        .findFirst()
+                        .map(RouteStop::getPlannedAt)
+                        .ifPresent(onTrip::setPlannedDepartureAt);
+            }
+            transportJobRepository.save(onTrip);
+        }
+        auditService.recordDecision(
+                user,
+                "REVISE_ROUTE_PLAN",
+                AuditText.fit("Route plan v" + saved.getVersionNo() + " for trip " + trip.getCode() + ": " + reason),
+                "ROUTE_PLAN",
+                saved.getId(),
+                trip.getCode(),
+                reason,
+                "v" + old.getVersionNo(),
+                "v" + saved.getVersionNo());
+        return Optional.of(saved);
+    }
+
+    /**
+     * A new version of the trip's route carrying {@code old}'s stops, legs and flights, in {@code status}. Nothing is
+     * deleted, so the history stays as evidence.
+     */
+    private RoutePlan copyOf(RoutePlan old, RoutePlanStatus status, String reason) {
+        Trip trip = old.getTrip();
+        RoutePlan plan = new RoutePlan();
+        plan.setTrip(trip);
+        plan.setVersionNo((short) (routePlanRepository
                         .findFirstByTrip_IdOrderByVersionNoDesc(trip.getId())
                         .map(RoutePlan::getVersionNo)
                         .orElse((short) 0)
                 + 1));
-        draft.setStatus(RoutePlanStatus.DRAFT);
-        draft.setDistanceKm(old.getDistanceKm());
-        draft.setDurationMin(old.getDurationMin());
-        draft.setChangeReason(reason);
-        draft = routePlanRepository.save(draft);
+        plan.setStatus(status);
+        plan.setDistanceKm(old.getDistanceKm());
+        plan.setDurationMin(old.getDurationMin());
+        plan.setChangeReason(reason);
+        plan = routePlanRepository.save(plan);
 
         Map<UUID, RouteStop> copies = new HashMap<>();
         for (RouteStop stop : old.getStops()) {
             RouteStop copy = new RouteStop();
-            copy.setRoutePlan(draft);
+            copy.setRoutePlan(plan);
             copy.setSeq(stop.getSeq());
             copy.setKind(stop.getKind());
             copy.setJob(stop.getJob());
@@ -378,11 +449,11 @@ public class RoutePlanService {
             copy.setPlannedStayMin(stop.getPlannedStayMin());
             copy.setDetails(stop.getDetails());
             copies.put(stop.getId(), routeStopRepository.save(copy));
-            draft.getStops().add(copy);
+            plan.getStops().add(copy);
         }
         for (RouteLeg leg : old.getLegs()) {
             RouteLeg copy = new RouteLeg();
-            copy.setRoutePlan(draft);
+            copy.setRoutePlan(plan);
             copy.setSeq(leg.getSeq());
             copy.setFromStop(copies.get(leg.getFromStop().getId()));
             copy.setToStop(copies.get(leg.getToStop().getId()));
@@ -406,8 +477,9 @@ public class RoutePlanService {
                 flight.setEstimatedArrivalAt(f.getEstimatedArrivalAt());
                 flightRepository.save(flight);
             });
-            draft.getLegs().add(savedLeg);
+            plan.getLegs().add(savedLeg);
         }
+        return plan;
     }
 
     /** The job a stop is for; a stop that names none is the confirming job's. */

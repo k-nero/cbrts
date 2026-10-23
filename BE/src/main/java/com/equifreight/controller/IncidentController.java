@@ -3,10 +3,12 @@ package com.equifreight.controller;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
+import com.equifreight.model.incident.DecideIncidentRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
+import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.service.IncidentService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -77,6 +79,26 @@ public class IncidentController {
             @Valid @RequestBody ProposeOptionRequest request,
             @AuthenticationPrincipal User user) {
         return incidents.propose(id, request, user);
+    }
+
+    /** US-F5-03: the logistics manager approves the proposed option. */
+    @PostMapping("/api/v1/staff/incidents/{id}/decision")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public IncidentResponse decide(
+            @PathVariable UUID id,
+            @Valid @RequestBody DecideIncidentRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.decide(id, request, user);
+    }
+
+    /** US-F5-03: the logistics manager sends the proposal back, saying why. */
+    @PostMapping("/api/v1/staff/incidents/{id}/proposal/return")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public IncidentResponse returnProposal(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReturnProposalRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.returnProposal(id, request, user);
     }
 
     @GetMapping("/api/v1/staff/incidents/{id}")

@@ -3,15 +3,20 @@ package com.equifreight.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Incident;
+import com.equifreight.entity.IncidentOption;
+import com.equifreight.entity.JobCharge;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -27,12 +32,16 @@ import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
+import com.equifreight.model.incident.DecideIncidentRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
+import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
+import com.equifreight.repository.JobChargeRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.TripRecordRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
@@ -85,6 +94,18 @@ class IncidentServiceTest {
     @Mock
     private NotificationService notifications;
 
+    @Mock
+    private RoutePlanService routePlans;
+
+    @Mock
+    private ClearanceService clearance;
+
+    @Mock
+    private JobChargeRepository charges;
+
+    @Mock
+    private TripRecordRepository records;
+
     private IncidentService service;
     private User minh;
     private User yen;
@@ -127,7 +148,19 @@ class IncidentServiceTest {
     @BeforeEach
     void setUp() {
         service = new IncidentService(
-                incidents, jobs, crew, users, jobTrips, files, audit, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+                incidents,
+                jobs,
+                crew,
+                users,
+                jobTrips,
+                files,
+                audit,
+                notifications,
+                routePlans,
+                clearance,
+                charges,
+                records,
+                Clock.fixed(NOW, ZoneOffset.UTC));
         minh = user("Minh", "Trần");
         yen = user("Hải Yến", "Vũ");
         khoi = user("Khôi", "Đỗ Minh");
@@ -391,5 +424,152 @@ class IncidentServiceTest {
         i.setStatus(IncidentStatus.DECIDED);
 
         assertThrows(BusinessException.class, () -> service.addOption(i.getId(), option("Wait", "0", 60, false), khoi));
+    }
+
+    // ---------- the decision (US-F5-03) ----------
+
+    /** An open incident with "Second trailer" proposed by Khôi: + USD 1,200, + 90 min, a new route. */
+    private Incident proposed() {
+        Incident i = opened();
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        job.setPlannedArrivalAt(NOW.plusSeconds(6 * 3600));
+        IncidentOption option = new IncidentOption();
+        option.setId(UUID.randomUUID());
+        option.setIncident(i);
+        option.setPosition((short) 1);
+        option.setTitle("Second trailer from Tây Ninh");
+        option.setExtraCost(new BigDecimal("1200"));
+        option.setDelayMinutes(90);
+        option.setChangesRoute(true);
+        i.getOptions().add(option);
+        i.setProposedOption(option);
+        i.setProposedBy(khoi);
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job));
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId())).thenReturn(List.of());
+        when(charges.findByIncident_Id(any())).thenReturn(Optional.empty());
+        RoutePlan v3 = new RoutePlan();
+        v3.setVersionNo((short) 3);
+        when(routePlans.reviseForIncident(eq(trip), eq(90), any(), anyString(), eq(yen)))
+                .thenAnswer(inv -> {
+                    job.setPlannedArrivalAt(job.getPlannedArrivalAt().plusSeconds(90 * 60));
+                    return Optional.of(v3);
+                });
+        when(clearance.recheckAfterReplan(job.getId())).thenReturn(List.of("Shadowfax · Health certificate"));
+        return i;
+    }
+
+    private static DecideIncidentRequest approve(Incident i, boolean charge) {
+        return new DecideIncidentRequest(
+                i.getProposedOption().getId(),
+                "Cheapest safe option.",
+                "Your horses will reach Phnom Penh about 90 minutes later than planned, on a second trailer.",
+                charge);
+    }
+
+    @Test
+    @DisplayName("Approving gives the trip a new route version, re-checks the documents and charges the job")
+    void approvalRevisesTheRouteAndChargesTheJob() {
+        Incident i = proposed();
+        job.setTransportSpecialist(user("Lan", "Nguyễn Thị"));
+
+        IncidentResponse r = service.decide(i.getId(), approve(i, true), yen);
+
+        assertEquals(IncidentStatus.DECIDED, r.status());
+        assertEquals(i.getProposedOption().getId(), r.decidedOptionId());
+        assertEquals((short) 3, r.routePlanVersion());
+        verify(clearance).recheckAfterReplan(job.getId());
+        ArgumentCaptor<JobCharge> charge = ArgumentCaptor.forClass(JobCharge.class);
+        verify(charges).save(charge.capture());
+        assertEquals(new BigDecimal("1200"), charge.getValue().getAmount());
+        assertEquals(job, charge.getValue().getJob());
+        assertEquals(
+                "Vehicle breakdown: Second trailer from Tây Ninh",
+                charge.getValue().getDescription());
+        // The customer gets the manager's message as written; the specialist hears which documents to check.
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_UPDATE),
+                        eq(Audience.club(job.getRequest().getClub().getId())),
+                        any(),
+                        eq("Update on CBRT-2026-041"),
+                        eq("Your horses will reach Phnom Penh about 90 minutes later than planned, on a second"
+                                + " trailer."),
+                        eq("INCIDENT_UPDATE:" + i.getId()));
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_DECIDED),
+                        eq(Audience.staff(khoi)),
+                        any(),
+                        eq("Approved: Second trailer from Tây Ninh"),
+                        eq("Vũ Hải Yến approved \"Second trailer from Tây Ninh\": + USD 1,200.00, + 1 h 30 min, new"
+                                + " route. Route version 3 is confirmed."));
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_DECIDED),
+                        any(Audience.StaffMembers.class),
+                        any(),
+                        eq("Documents to check for CBRT-2026-041"),
+                        anyString());
+    }
+
+    @Test
+    @DisplayName("An option the customer doesn't pay for attaches no charge")
+    void approvalWithoutCharge() {
+        Incident i = proposed();
+
+        service.decide(i.getId(), approve(i, false), yen);
+
+        verify(charges, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Only the proposed option can be approved, and only once")
+    void onlyTheProposalIsApproved() {
+        Incident i = proposed();
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.decide(
+                        i.getId(), new DecideIncidentRequest(UUID.randomUUID(), null, "Message", true), yen));
+        assertEquals(
+                "Approve the proposed option, \"Second trailer from Tây Ninh\", or send it back so another can be"
+                        + " proposed",
+                ex.getMessage());
+
+        service.decide(i.getId(), approve(i, true), yen);
+        assertThrows(BusinessException.class, () -> service.decide(i.getId(), approve(i, true), yen));
+    }
+
+    @Test
+    @DisplayName("An option without a delay or a new route leaves the route and the documents alone")
+    void aCostOnlyOptionKeepsTheRoute() {
+        Incident i = proposed();
+        i.getProposedOption().setDelayMinutes(0);
+        i.getProposedOption().setChangesRoute(false);
+
+        IncidentResponse r = service.decide(i.getId(), approve(i, true), yen);
+
+        assertEquals(null, r.routePlanVersion());
+        verify(routePlans, never()).reviseForIncident(any(), anyInt(), any(), any(), any());
+        verify(clearance, never()).recheckAfterReplan(any());
+    }
+
+    @Test
+    @DisplayName("Sending a proposal back tells whoever proposed it why, and unlocks the options")
+    void aProposalCanBeSentBack() {
+        Incident i = proposed();
+
+        IncidentResponse r = service.returnProposal(i.getId(), new ReturnProposalRequest("Ask Tây Ninh first."), yen);
+
+        assertEquals(null, r.proposedOptionId());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_RETURNED),
+                        eq(Audience.staff(khoi)),
+                        any(),
+                        eq("Sent back: Second trailer from Tây Ninh"),
+                        eq("Vũ Hải Yến: Ask Tây Ninh first."));
+        service.addOption(i.getId(), option("Wait for the mechanic", "0", 180, false), khoi);
     }
 }
