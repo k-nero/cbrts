@@ -17,6 +17,7 @@ import RequestSubmittedPage from '@/pages/customer/requests/submitted';
 import RequestWizardPage from '@/pages/customer/requests/wizard';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
+import NotificationsPage from '@/pages/notifications';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import RegisterPage from '@/pages/register';
 import DocumentsPage from '@/pages/staff/documents';
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
           { path: '/requests/:id/submitted', element: <RequestSubmittedPage /> },
           { path: '/requests/:id/quotation', element: <RequestQuotationPage /> },
           { path: '/tracking', element: <CustomerTripPage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
         ],
       },
       {
@@ -89,6 +91,7 @@ export const router = createBrowserRouter([
         children: [
           { path: 'jobs', element: <JobsPage /> },
           { path: 'jobs/:id', element: <JobDetailPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'trips', element: <StaffTripPage /> },
           { path: 'overview', element: todo('Overview') },
           { path: 'requests', element: <RequestsPage /> },
