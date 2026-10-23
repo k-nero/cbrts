@@ -182,6 +182,9 @@ There's no per-job staff owner column yet, so staff audiences fan out by role.
 | `TRIP_TIMES_CHANGED` *(built, US-F3-14)* | the same confirmation, when the job already had times and they moved, or it came from another trip; dedupe `TRIP_TIMES_CHANGED:{jobId}:{routePlanId}` | Club accounts | yes | Tracking |
 | `INCIDENT_RAISED` *(built, US-F5-01)* | `IncidentService.raiseFromCab` | The incident's owner and the job's coordinator (every coordinator when the job has none) | yes (an escalation) | Incident (`/staff/incidents/{id}`) |
 | `INCIDENT_PROPOSAL` *(built, US-F5-02)* | `IncidentService.propose` | The incident's owner | yes (an escalation) | Incident |
+| `INCIDENT_DECIDED` *(built, US-F5-03)* | `IncidentService.decide` | Whoever proposed it and the coordinator; the trip's crew; the job's specialist when documents turned red | no | Incident / cab / checklist |
+| `INCIDENT_RETURNED` *(built, US-F5-03)* | `IncidentService.returnProposal` | Whoever proposed it | no | Incident |
+| `INCIDENT_UPDATE` *(built, US-F5-03)* | `IncidentService.decide`; the manager's message as written; dedupe `INCIDENT_UPDATE:{incidentId}` | Club accounts | yes | Tracking |
 | `JOB_REPLANNED` *(built, US-F3-14)* | `TripSharingService.takeOff`, before departure, when the job had been given times; dedupe `JOB_REPLANNED:{jobId}:{tripId}` | Club accounts | yes | Tracking |
 | `INVOICE_ISSUED` / `INVOICE_OVERDUE` | invoicing; sweep | Club accounts | yes | Invoice |
 | `NOTE_ROUTED` / `NOTE_ANSWERED` | customer notes | Routed role / club accounts | answered yes | Note |

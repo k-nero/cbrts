@@ -591,12 +591,17 @@ erDiagram
 | `clock_stopped_from`, `clock_stopped_until` | timestamptz | |
 | `proposed_option_id`, `proposed_by`, `proposed_at`, `proposal_note` | | The option proposed for the manager's approval (US-F5-02), and why; cleared when the manager sends it back. |
 | `decided_option_id` | → `incident_options` | |
-| `decided_by`, `decided_at`, `decision_note` | | |
+| `decided_by`, `decided_at`, `decision_note` | | The logistics manager's approval of the proposed option (US-F5-03). |
+| `customer_message` | varchar(1000) | What the customer was told, sent as written. |
+| `charge_customer` | boolean | Whether the customer pays the decided option's extra cost. |
+| `route_plan_id` | → `route_plans` | The confirmed route version the decision gave the trip, if it changed the route or the times. |
 | `resolved_at` | timestamptz | |
 
 **`incident_options`**: `incident_id`, `title`, `description`, `facts jsonb` (time, documents, the horse, cost), `position`, `extra_cost numeric(14,2)` (≥ 0, in the job's quotation currency), `delay_minutes` (≥ 0, added to the arrival), `changes_route` (approving it gives the trip a new route version), `created_by`. The coordinator records them and proposes one (US-F5-02).
 
 **`incident_files`**: `(incident_id, file_id)`, the photos with a report.
+
+**`job_charges`**: `job_id`, `incident_id null` (unique when set), `description`, `amount numeric(14,2) > 0` in the job's quotation currency, `created_by`. A cost the final invoice adds beyond the quotation, such as an approved incident option the customer pays (US-F5-03); the final invoice turns each into an `ADJUSTMENT` line.
 
 ---
 
