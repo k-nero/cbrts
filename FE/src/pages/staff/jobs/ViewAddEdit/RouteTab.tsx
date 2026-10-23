@@ -1,5 +1,7 @@
 import { Flex } from 'antd';
-import { Button, Callout, Chip, TimelineStop } from '@/components/ui';
+import { ShareSuggestions } from './ShareSuggestions';
+
+import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
 import { useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
@@ -11,11 +13,22 @@ export function RouteTab({ job }: Props) {
   const routePlan = job.routePlan;
   const { data: allVersions } = useRoutePlans(job.id);
 
+  // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13).
+  const sharePanel =
+    job.tripStatus === 'NOT_STARTED' ? (
+      <Panel title="Could share this trailer" className="p-4">
+        <ShareSuggestions job={job} />
+      </Panel>
+    ) : null;
+
   if (!routePlan) {
     return (
-      <div className="p-8 text-center">
-        <p className="type-body-s text-ink-3">No route plan has been created for this job yet.</p>
-      </div>
+      <Flex vertical gap={24}>
+        <div className="p-8 text-center">
+          <p className="type-body-s text-ink-3">No route plan has been created for this job yet.</p>
+        </div>
+        {sharePanel}
+      </Flex>
     );
   }
 
@@ -46,6 +59,8 @@ export function RouteTab({ job }: Props) {
 
   return (
     <Flex vertical gap={32}>
+      {sharePanel}
+
       {/* Summary Strip (matching Figma scrRoute) */}
       <div className="p-6 rounded-xl border border-line bg-card shadow-xs">
         <Flex wrap gap={32} align="center" justify="space-between">

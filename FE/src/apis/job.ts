@@ -2,7 +2,6 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
-  BiosecurityWarning,
   CrewMember,
   JobDetail,
   JobListParams,
@@ -10,6 +9,7 @@ import type {
   TripLoad,
   MoveHorse,
   RoutePlan,
+  ShareSuggestion,
   ShareTripResult,
   TripJob,
 } from '@/interfaces';
@@ -55,12 +55,6 @@ export const jobApi = {
       .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`, { acceptedWarnings })
       .then((r) => r.data),
 
-  /** Biosecurity warnings for this job's trip: if `withJobId` joined it, or as loaded now. */
-  getTripWarnings: (jobId: string, withJobId?: string) =>
-    client
-      .get<BiosecurityWarning[]>(`/staff/jobs/${jobId}/trip/warnings`, { params: { withJobId } })
-      .then((r) => r.data),
-
   getRoutePlans: (jobId: string) =>
     client.get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`).then((r) => r.data),
 
@@ -71,9 +65,9 @@ export const jobApi = {
       })
       .then((r) => r.data),
 
-  /** Approved jobs that could join this job's trip (US-F3-11). */
-  getShareCandidates: (jobId: string) =>
-    client.get<TripJob[]>(`/staff/jobs/${jobId}/trip/candidates`).then((r) => r.data),
+  /** Approved jobs that could share this job's trailer, with what combining means (US-F3-13). */
+  getShareSuggestions: (jobId: string) =>
+    client.get<ShareSuggestion[]>(`/staff/jobs/${jobId}/trip/suggestions`).then((r) => r.data),
 
   /** Puts another job on this job's trip; the trip's plans reopen. */
   shareTrip: (jobId: string, otherJobId: string, acceptedWarnings: string[] = []) =>

@@ -210,11 +210,11 @@ export const useSignOffTripPlan = (jobId: string) => {
   });
 };
 
-/** Approved jobs that could join this job's trip (US-F3-11). */
-export const useShareCandidates = (jobId: string, enabled: boolean) => {
+/** Approved jobs that could share this job's trailer (US-F3-13). */
+export const useShareSuggestions = (jobId: string, enabled: boolean) => {
   return useQuery({
-    queryKey: ['job', jobId, 'share-candidates'],
-    queryFn: () => jobApi.getShareCandidates(jobId),
+    queryKey: ['job', jobId, 'share-suggestions'],
+    queryFn: () => jobApi.getShareSuggestions(jobId),
     enabled: Boolean(jobId) && enabled,
   });
 };
@@ -246,14 +246,5 @@ export const useTakeOffTrip = (jobId: string) => {
       queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
-  });
-};
-
-/** The biosecurity warnings if `withJobId` joined this job's trip (US-F3-12). */
-export const useShareWarnings = (jobId: string, withJobId?: string) => {
-  return useQuery({
-    queryKey: ['job', jobId, 'trip-warnings', withJobId],
-    queryFn: () => jobApi.getTripWarnings(jobId, withJobId),
-    enabled: Boolean(jobId && withJobId),
   });
 };
