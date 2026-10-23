@@ -4,6 +4,7 @@ import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Note;
 import com.equifreight.entity.NoteReply;
 import com.equifreight.entity.Role;
+import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.NoteStatus;
 import com.equifreight.entity.enums.RoleName;
@@ -138,6 +139,7 @@ public class NoteService {
                                 .build())
                         .toList();
 
+        StoredFile attached = n.getAttachedFile();
         return NoteResponse.builder()
                 .id(n.getId())
                 .clubId(n.getClub() != null ? n.getClub().getId() : null)
@@ -166,8 +168,9 @@ public class NoteService {
                 .status(n.getStatus())
                 .isDueToday(isDueToday)
                 .isOverdue(isOverdue)
-                .attachedFileName(n.getSubject().contains("insurance") ? "PVI_extension_email.pdf" : null)
-                .attachedFileSize(n.getSubject().contains("insurance") ? "PDF · 84 KB" : null)
+                .attachedFileId(attached != null ? attached.getId() : null)
+                .attachedFileName(attached != null ? attached.getFileName() : null)
+                .attachedFileSizeBytes(attached != null ? attached.getSizeBytes() : null)
                 .replies(replyResponses)
                 .build();
     }

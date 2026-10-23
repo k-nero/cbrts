@@ -588,7 +588,7 @@ erDiagram
 
 | Table | Columns | Rules |
 |---|---|---|
-| `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
+| `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `attached_file_id null`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. `attached_file_id` is one optional file the customer attached (→ `files`), counted as attached so the orphan cleanup keeps it. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
 | `note_replies` | `note_id`, `author_id`, `body` | |
 | `notifications` | `user_id`, `kind`, `title`, `body`, `entity_type`, `entity_id`, `read_at`, `emailed_at` | Index `(user_id, read_at)`. Sidebar badges and the bell read from it. |
 

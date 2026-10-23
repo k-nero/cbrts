@@ -1272,6 +1272,8 @@ public class DataSeeder implements ApplicationRunner {
             n1.setBody(
                     "Copper King's EI booster is scheduled for 10 Oct at the club clinic. Can we submit the updated veterinary record 7 days before departure instead of the required 14 days?");
             n1.setStatus(NoteStatus.ANSWERED);
+            n1.setAttachedFile(seedDemoPdf(
+                    "demo/ei-booster-schedule-copper-king.pdf", "EI-Booster-Schedule-CopperKing.pdf", customer));
             Note savedN1 = noteRepository.save(n1);
 
             if (lan != null) {

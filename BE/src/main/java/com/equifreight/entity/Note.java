@@ -63,6 +63,13 @@ public class Note extends BaseEntity {
 
     private Instant replyDueAt;
 
+    /**
+     * A file the customer attached to the question, such as an insurer's email. Optional.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "attached_file_id")
+    private StoredFile attachedFile;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private NoteStatus status = NoteStatus.OPEN;

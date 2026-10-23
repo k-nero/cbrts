@@ -1,12 +1,14 @@
 import type { FC } from 'react';
-import { Divider, Flex } from 'antd';
+import { Divider, Flex, message } from 'antd';
 import dayjs from 'dayjs';
 
 import { noteTime, TOPIC_LABEL } from './format';
 import { ReplyComposer } from './ReplyComposer';
 
-import { Callout, Chip, Icon, Panel } from '@/components/ui';
+import { fileApi } from '@/apis/file';
+import { Button, Callout, Chip, Icon, Panel } from '@/components/ui';
 import { type CustomerNote, ROLE_LABEL, type RoleName } from '@/interfaces';
+import { apiErrorMessage } from '@/lib/utils';
 
 /**
  * The selected note (DESIGN.md, Notes on a request): the note quoted as written, its attachment,
@@ -17,6 +19,14 @@ const NoteDetail: FC<{ note: CustomerNote }> = ({ note }) => {
     ? ` · due ${dayjs(note.checklistItemDueDate).format('D MMM YYYY')}`
     : '';
   const replies = note.replies ?? [];
+  const attachedFileId = note.attachedFileId;
+
+  const [messageApi, messageHolder] = message.useMessage();
+  const openAttachment = (fileId: string) => {
+    fileApi.viewFile(fileId).catch((err: unknown) => {
+      void messageApi.error(apiErrorMessage(err, 'The file could not be opened.'));
+    });
+  };
 
   return (
     <Panel
@@ -32,22 +42,27 @@ const NoteDetail: FC<{ note: CustomerNote }> = ({ note }) => {
       }
       extra={<Chip tone="info">{TOPIC_LABEL[note.topic]}</Chip>}
     >
+      {messageHolder}
       <Flex vertical gap={20}>
         <blockquote className="m-0 rounded-lg border border-line bg-sunken p-4">
           <p className="type-body-m m-0 font-serif italic text-ink">{`“${note.body}”`}</p>
         </blockquote>
 
-        {/* The note DTO has no file id yet, so the attachment is named but can't be opened here. */}
-        {note.attachedFileName && (
+        {attachedFileId && (
           <div className="rounded-lg border border-line bg-card px-4 py-3.5">
             <Flex align="center" gap={12}>
               <Icon name="file" size={18} className="text-ink-2" />
-              <Flex vertical>
+              <Flex vertical flex={1}>
                 <span className="type-label-s text-ink">{note.attachedFileName}</span>
-                {note.attachedFileSize && (
-                  <span className="type-caption text-ink-3">{note.attachedFileSize}</span>
+                {note.attachedFileSizeBytes != null && (
+                  <span className="type-caption text-ink-3">
+                    {`${(note.attachedFileSizeBytes / 1024).toFixed(1)} KB`}
+                  </span>
                 )}
               </Flex>
+              <Button variant="ghost" size="sm" onClick={() => openAttachment(attachedFileId)}>
+                Open
+              </Button>
             </Flex>
           </div>
         )}

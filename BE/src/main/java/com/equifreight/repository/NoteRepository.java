@@ -20,6 +20,7 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
             LEFT JOIN FETCH n.job
             LEFT JOIN FETCH n.checklistItem
             LEFT JOIN FETCH n.createdBy
+            LEFT JOIN FETCH n.attachedFile
             LEFT JOIN FETCH n.replies r
             LEFT JOIN FETCH r.author
             WHERE n.routedRole = :routedRole
@@ -34,6 +35,7 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
             LEFT JOIN FETCH n.job
             LEFT JOIN FETCH n.checklistItem
             LEFT JOIN FETCH n.createdBy
+            LEFT JOIN FETCH n.attachedFile
             LEFT JOIN FETCH n.replies r
             LEFT JOIN FETCH r.author
             WHERE n.id = :id
