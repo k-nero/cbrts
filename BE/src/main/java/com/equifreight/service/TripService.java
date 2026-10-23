@@ -443,22 +443,29 @@ public class TripService {
                         .map(s -> TripMapper.toStopResponse(s, latest.get(s.getId())))
                         .toList())
                 .orElse(List.of());
-        LoadPlan load = loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()).stream()
+        // Every confirmed trailer of the convoy, in order (US-F3-10).
+        List<LoadPlan> confirmed = loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()).stream()
                 .filter(p -> p.getStatus() == LoadPlanStatus.CONFIRMED)
-                .findFirst()
-                .orElse(null);
+                .toList();
         Map<UUID, LoadPlanStall> stalls = new HashMap<>();
-        if (load != null) load.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s));
+        confirmed.forEach(
+                p -> p.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s)));
         List<TripHorseResponse> horses = requestHorses
                 .findByRequest_Id(job.getRequest().getId())
                 .stream()
                 .map(rh -> TripMapper.toHorseResponse(
-                        rh.getHorse(), stalls.get(rh.getHorse().getId())))
+                        rh.getHorse(), stalls.get(rh.getHorse().getId()), confirmed.size() > 1))
                 .toList();
         return TripMapper.toViewResponse(
                 job,
                 staffView ? trip.getCode() : null,
-                load == null ? null : load.getVehicle().getCode(),
+                confirmed.isEmpty()
+                        ? null
+                        : String.join(
+                                ", ",
+                                confirmed.stream()
+                                        .map(p -> p.getVehicle().getCode())
+                                        .toList()),
                 stops,
                 horses,
                 tripRecords.stream().map(TripMapper::toRecordResponse).toList());

@@ -31,6 +31,6 @@ public record JobDetailResponse(
         String clearanceGateState, // "Locked" or "Clear"
         String clearanceGateSummary,
         List<JobHorseResponse> horses,
-        LoadPlanResponse loadPlan,
+        TripLoadResponse loadPlan,
         RoutePlanResponse routePlan,
         List<CrewMemberResponse> crew) {}

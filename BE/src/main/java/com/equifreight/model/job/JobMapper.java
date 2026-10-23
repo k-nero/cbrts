@@ -49,7 +49,7 @@ public final class JobMapper {
             String clearanceGateState,
             String clearanceGateSummary,
             List<JobHorseResponse> horses,
-            LoadPlanResponse loadPlan,
+            TripLoadResponse loadPlan,
             RoutePlanResponse routePlan,
             List<CrewMemberResponse> crew) {
         return JobDetailResponse.builder()
@@ -100,6 +100,8 @@ public final class JobMapper {
                 .staffCode(u.getStaffCode())
                 .email(u.getEmail())
                 .crewRole(ca.getCrewRole())
+                .tripVehicleId(ca.getTripVehicle().getId())
+                .vehicleCode(ca.getTripVehicle().getVehicle().getCode())
                 .build();
     }
 
@@ -135,11 +137,12 @@ public final class JobMapper {
             TransportJob job,
             int totalWeightKg,
             List<LoadPlanStallResponse> stalls,
-            List<JobHorseResponse> unassignedHorses,
             List<LoadPlanConflictResponse> conflicts) {
         return LoadPlanResponse.builder()
                 .id(plan.getId())
                 .jobId(job.getId())
+                .tripVehicleId(plan.getTripVehicle().getId())
+                .seq(plan.getTripVehicle().getSeq())
                 .vehicleId(plan.getVehicle().getId())
                 .vehicleCode(plan.getVehicle().getCode())
                 .status(plan.getStatus())
@@ -148,7 +151,6 @@ public final class JobMapper {
                 .totalWeightKg(totalWeightKg)
                 .payloadKg(plan.getVehicle().getPayloadKg())
                 .stalls(stalls)
-                .unassignedHorses(unassignedHorses)
                 .conflicts(conflicts)
                 .build();
     }
@@ -255,7 +257,7 @@ public final class JobMapper {
         return "Not set";
     }
 
-    private static String fullName(User user) {
+    public static String fullName(User user) {
         return user != null ? user.getFirstName() + " " + user.getLastName() : null;
     }
 

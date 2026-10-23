@@ -6,10 +6,14 @@ import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
+/** One trailer's load plan on the trip; the horses still to place are the trip's ({@link TripLoadResponse}). */
 @Builder
 public record LoadPlanResponse(
         UUID id,
         UUID jobId,
+        UUID tripVehicleId,
+        /** The trailer's place in the convoy, from 1. */
+        int seq,
         UUID vehicleId,
         String vehicleCode,
         LoadPlanStatus status,
@@ -18,5 +22,4 @@ public record LoadPlanResponse(
         int totalWeightKg,
         int payloadKg,
         List<LoadPlanStallResponse> stalls,
-        List<JobHorseResponse> unassignedHorses,
         List<LoadPlanConflictResponse> conflicts) {}

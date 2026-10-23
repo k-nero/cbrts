@@ -8,7 +8,7 @@ import {
   type JobFilter,
   JobFilterEnum,
   type JobSummary,
-  type LoadPlan,
+  type TripLoad,
   type MoveHorse,
 } from '@/interfaces';
 
@@ -49,36 +49,65 @@ export const useCreateLoadPlan = (jobId: string) => {
 export const useChangeLoadPlanVehicle = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vehicleId: string) => jobApi.changeLoadPlanVehicle(jobId, vehicleId),
+    mutationFn: ({ vehicleId, tripVehicleId }: { vehicleId: string; tripVehicleId?: string }) =>
+      jobApi.changeLoadPlanVehicle(jobId, vehicleId, tripVehicleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job', jobId, 'load-plan'] });
+    },
+  });
+};
+
+/** Adds a trailer to the convoy (US-F3-10). The route, load plans and sign-off reopen. */
+export const useAddTrailer = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vehicleId: string) => jobApi.addTrailer(jobId, vehicleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Takes a trailer out of the convoy. The route, load plans and sign-off reopen. */
+export const useRemoveTrailer = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tripVehicleId: string) => jobApi.removeTrailer(jobId, tripVehicleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
   });
 };
 
 /**
- * Applies a move to the cached plan so the tile settles before the server answers. Rule issues
- * on the touched stalls are dropped until the server's answer recomputes them.
+ * Applies a move to the cached trip load so the tile settles before the server answers. The
+ * stalls can be on any trailer. Rule issues on the touched stalls are dropped until the server's
+ * answer recomputes them.
  */
-const applyMove = (plan: LoadPlan, move: MoveHorse): LoadPlan => {
+const applyMove = (load: TripLoad, move: MoveHorse): TripLoad => {
+  const allStalls = load.vehicles.flatMap((v) => v.stalls);
   const horse =
-    plan.unassignedHorses.find((h) => h.id === move.horseId) ??
-    plan.stalls.find((s) => s.horse?.id === move.horseId)?.horse;
-  if (!horse) return plan;
-  const occupant = plan.stalls.find((s) => s.stallId === move.toStallId)?.horse ?? null;
+    load.unassignedHorses.find((h) => h.id === move.horseId) ??
+    allStalls.find((s) => s.horse?.id === move.horseId)?.horse;
+  if (!horse) return load;
+  const occupant = allStalls.find((s) => s.stallId === move.toStallId)?.horse ?? null;
   // A horse dropped from the list sends the occupant back to the list; from a stall, they swap.
   const occupantGoesTo = occupant && move.fromStallId ? move.fromStallId : null;
-  const stalls = plan.stalls.map((s) => {
-    if (s.stallId === move.toStallId) return { ...s, horse, issue: null };
-    if (s.stallId === move.fromStallId)
-      return { ...s, horse: occupantGoesTo ? occupant : null, issue: null };
-    return s;
-  });
-  const unassignedHorses = plan.unassignedHorses.filter((h) => h.id !== move.horseId);
+  const vehicles = load.vehicles.map((v) => ({
+    ...v,
+    stalls: v.stalls.map((s) => {
+      if (s.stallId === move.toStallId) return { ...s, horse, issue: null };
+      if (s.stallId === move.fromStallId)
+        return { ...s, horse: occupantGoesTo ? occupant : null, issue: null };
+      return s;
+    }),
+  }));
+  const unassignedHorses = load.unassignedHorses.filter((h) => h.id !== move.horseId);
   if (!move.toStallId) unassignedHorses.push(horse);
   if (occupant && !occupantGoesTo) unassignedHorses.push(occupant);
-  return { ...plan, stalls, unassignedHorses };
+  return { ...load, vehicles, unassignedHorses };
 };
 
 export const useMoveHorse = (jobId: string) => {
@@ -156,7 +185,13 @@ export const useConfirmRoutePlan = (jobId: string) => {
 export const useAssignCrew = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (crew: { userId: string; crewRole: string }[]) => jobApi.assignCrew(jobId, crew),
+    mutationFn: ({
+      crew,
+      tripVehicleId,
+    }: {
+      crew: { userId: string; crewRole: string }[];
+      tripVehicleId?: string;
+    }) => jobApi.assignCrew(jobId, crew, tripVehicleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },

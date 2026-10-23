@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided, ready to split into tickets (23 Oct 2026). Nothing here is built yet.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), and convoys (US-F3-10, #169). The rest is in #170–#175.
 
 ## Why
 
@@ -53,10 +53,10 @@ erDiagram
 
 | Table | Columns | Rules |
 | --- | --- | --- |
-| `trips` | `code` (`TRP-YYYY-NNN`, from `code_counters`), `corridor_id`, `status` (`PLANNING`, `READY`, `IN_TRANSIT`, `HELD`, `DELIVERED`, `CANCELLED`), `planned_departure_at`, `created_by` | Unique `code`. All of a trip's jobs share its corridor (checked by the application on every add). |
+| `trips` | `code` (`TRP-YYYY-NNN`, from `code_counters`), `corridor_id`, `status` (the job's `TripStatus`: `NOT_STARTED`, `DEPARTED`, `HELD`, `ARRIVED`, `DELIVERED`), `planned_departure_at`, `created_by` | Unique `code`. All of a trip's jobs share its corridor (checked by the application on every add). |
 | `trip_vehicles` | `trip_id`, `vehicle_id`, `seq` | Unique `(trip_id, vehicle_id)`. A convoy is a trip with several rows. |
 | `flight_allocations` | `flight_id`, `job_id`, `air_waybill`, `stall_positions`, `service_class` | One per job on a flight: unique `(flight_id, job_id)` and unique `air_waybill`. The job's own consignment: its waybill, the stall positions its horses use, and its service class. Airport customs and documents stay per job. |
-| `trip_horses` | `trip_id`, `job_id`, `horse_id`, `status` (`ON_TRIP`, `MOVED`, `DELIVERED`, `LEFT_IN_CARE`) | Which horse rides which trip. A horse is on one trip at a time: unique `horse_id` where `status = 'ON_TRIP'`. The horse must belong to the job. Before departure, all of a job's horses are on the same trip (checked by the application). A horse moved by an incident keeps its old row as `MOVED`, so history shows where it was. |
+| `trip_horses` | `trip_id`, `job_id`, `horse_id`, `status` (`ON_TRIP`, `MOVED`, `DELIVERED`, `LEFT_IN_CARE`) | Which horse rides which trip. A job's horse is on one trip at a time: unique `(job_id, horse_id)` where `status = 'ON_TRIP'`. Per job, not per horse, because one horse may be on two jobs not yet delivered (an outbound move and a later return). The horse must belong to the job. Before departure, all of a job's horses are on the same trip (checked by the application). A horse moved by an incident keeps its old row as `MOVED`, so history shows where it was. |
 
 ### Changes to existing tables
 
