@@ -112,6 +112,11 @@ export default function JobDetailPage() {
             summary={
               <Flex gap={12} align="center">
                 <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">{job.code}</p>
+                {job.tripCode && (
+                  <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">
+                    {job.tripCode}
+                  </p>
+                )}
                 <p className="type-body-m text-ink-2">{metaText}</p>
               </Flex>
             }
