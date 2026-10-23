@@ -19,7 +19,13 @@ const kindTone = (kind: TripRecordKind) =>
 const conditionTone = (cond: HorseCondition) =>
   cond === HorseConditionEnum.STABLE ? 'ok' : cond === HorseConditionEnum.OFF_FEED ? 'bad' : 'warn';
 
-export function TripDetails({ trip }: { trip: TripView }) {
+export function TripDetails({
+  trip,
+  audience = 'staff',
+}: {
+  trip: TripView;
+  audience?: 'staff' | 'customer' | 'escort';
+}) {
   // Determine last recorded stop and next stop
   const recordedStops = useMemo(
     () => trip.stops.filter((s) => Boolean(s.latestOccurredAt)),
@@ -200,9 +206,11 @@ export function TripDetails({ trip }: { trip: TripView }) {
         <div className="flex flex-col gap-6 lg:col-span-7">
           <TripRecords trip={trip} />
 
-          <Panel title="What the customer sees">
-            <p className="type-body-s m-0 text-ink-2">{customerSeesText}</p>
-          </Panel>
+          {audience !== 'customer' && (
+            <Panel title="What the customer sees">
+              <p className="type-body-s m-0 text-ink-2">{customerSeesText}</p>
+            </Panel>
+          )}
         </div>
 
         {/* Right Column (5 cols): On board + Crew & vehicle + If trip stops */}
@@ -266,11 +274,13 @@ export function TripDetails({ trip }: { trip: TripView }) {
                     : '—'}
                 </span>
               </div>
-              <div className="pt-3">
-                <Button variant="secondary" block>
-                  Call the cab
-                </Button>
-              </div>
+              {audience === 'staff' && (
+                <div className="pt-3">
+                  <Button variant="secondary" block>
+                    Call the cab
+                  </Button>
+                </div>
+              )}
             </div>
           </Panel>
 

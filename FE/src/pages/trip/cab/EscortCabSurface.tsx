@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { DatePicker, Input, Select } from 'antd';
+import { useMemo, useRef, useState } from 'react';
+import type { UploadFile } from 'antd';
+import { DatePicker, Input, Select, Upload } from 'antd';
 import dayjs from 'dayjs';
 
 import { CabBar } from './CabBar';
@@ -14,6 +15,7 @@ import { Toggle48 } from './Toggle48';
 import { WhatCustomerSeesPanel } from './WhatCustomerSeesPanel';
 import { formatClock } from '../tripFormat';
 
+import { fileApi } from '@/apis/file';
 import { Button, Chip, Panel } from '@/components/ui';
 import type { HorseCondition, TripRecordKind, TripStop, TripView } from '@/interfaces';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
@@ -81,6 +83,7 @@ export function EscortCabSurface({
   });
 
   // Welfare Form state
+  const uploadedPhotos = useRef(new Map<string, string>());
   const [conditions, setConditions] = useState<
     Record<
       string,
@@ -89,6 +92,7 @@ export function EscortCabSurface({
         drinking: boolean | null;
         eating: boolean | null;
         note: string;
+        photos: UploadFile[];
       }
     >
   >(() => {
@@ -99,6 +103,7 @@ export function EscortCabSurface({
         drinking: boolean | null;
         eating: boolean | null;
         note: string;
+        photos: UploadFile[];
       }
     > = {};
     for (const h of trip.horses) {
@@ -107,6 +112,7 @@ export function EscortCabSurface({
         drinking: true,
         eating: true,
         note: '',
+        photos: [],
       };
     }
     return init;
@@ -131,6 +137,7 @@ export function EscortCabSurface({
         drinking: true,
         eating: true,
         note: updated[h.id]?.note || '',
+        photos: updated[h.id]?.photos || [],
       };
     }
     setConditions(updated);
@@ -151,14 +158,33 @@ export function EscortCabSurface({
   };
 
   const handleRecordWelfare = async () => {
-    const payload = trip.horses.map((h) => ({
-      horseId: h.id,
-      condition: conditions[h.id]?.condition ?? HorseConditionEnum.STABLE,
-      drinking: conditions[h.id]?.drinking ?? null,
-      eating: conditions[h.id]?.eating ?? null,
-      note: conditions[h.id]?.note || undefined,
-      photoFileIds: [],
-    }));
+    const payload = await Promise.all(
+      trip.horses.map(async (h) => {
+        const cState = conditions[h.id];
+        const photoFileIds: string[] = [];
+        if (cState?.photos) {
+          for (const upload of cState.photos) {
+            if (!upload.originFileObj) continue;
+            const existingId = uploadedPhotos.current.get(upload.uid);
+            if (existingId) {
+              photoFileIds.push(existingId);
+              continue;
+            }
+            const id = (await fileApi.upload(upload.originFileObj)).id;
+            uploadedPhotos.current.set(upload.uid, id);
+            photoFileIds.push(id);
+          }
+        }
+        return {
+          horseId: h.id,
+          condition: cState?.condition ?? HorseConditionEnum.STABLE,
+          drinking: cState?.drinking ?? null,
+          eating: cState?.eating ?? null,
+          note: cState?.note || undefined,
+          photoFileIds,
+        };
+      }),
+    );
     await onSaveConditions(payload);
   };
 
@@ -439,7 +465,7 @@ export function EscortCabSurface({
                               }
                             />
                           </div>
-                          <div className="sm:col-span-6">
+                          <div className="flex flex-wrap items-center gap-2 sm:col-span-6">
                             <Input
                               value={cState.note}
                               onChange={(e) =>
@@ -449,8 +475,31 @@ export function EscortCabSurface({
                                 }))
                               }
                               placeholder="Add a note (optional)"
-                              className="h-12"
+                              className="h-12 flex-1"
                             />
+                            <Upload
+                              multiple
+                              showUploadList={false}
+                              beforeUpload={() => false}
+                              onChange={({ fileList }) =>
+                                setConditions((prev) => ({
+                                  ...prev,
+                                  [horse.id]: { ...cState, photos: fileList },
+                                }))
+                              }
+                            >
+                              <Button
+                                variant="secondary"
+                                leadingIcon="upload"
+                                className="h-12 whitespace-nowrap"
+                              >
+                                {cState.photos.length > 0
+                                  ? `${cState.photos.length} photo${
+                                      cState.photos.length > 1 ? 's' : ''
+                                    }`
+                                  : 'Photos'}
+                              </Button>
+                            </Upload>
                           </div>
                         </div>
                       </div>

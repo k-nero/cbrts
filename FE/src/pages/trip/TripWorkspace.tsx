@@ -224,7 +224,7 @@ export function TripWorkspace({
                   />
                 </Panel>
               )}
-              {trip && <TripDetails trip={trip} />}
+              {trip && <TripDetails trip={trip} audience={audience} />}
             </>
           )}
         </>
