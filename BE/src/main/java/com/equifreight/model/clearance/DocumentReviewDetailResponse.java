@@ -8,7 +8,8 @@ import lombok.Builder;
 /**
  * Details for the Transport Specialist's Document Review page (US-F2-04, issue #88).
  * Contains the document version to review, its checklist item details, job context,
- * automatic check results, version history, and queue navigation.
+ * automatic check results, version history, and queue navigation. {@code queuePosition} is 1-based, and 0 when the
+ * version is no longer waiting for review.
  */
 @Builder
 public record DocumentReviewDetailResponse(
@@ -20,8 +21,8 @@ public record DocumentReviewDetailResponse(
         String clubName,
         LocalDate departureDate,
         int totalChecklistItems,
-        int clearedChecklistItems,
         int mandatoryItems,
+        int clearedMandatoryItems,
         int remainingMandatoryItems,
         List<DocumentVersionResponse> allVersions,
         String automaticCheckText,

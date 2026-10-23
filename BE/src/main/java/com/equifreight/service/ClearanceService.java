@@ -345,23 +345,8 @@ public class ClearanceService {
                         : valResult.validity() == Validity.AMBER ? "warn" : "bad")
                 : "ok";
 
-        int totalItems = 0;
-        int clearedMandatory = 0;
-        int mandatoryItems = 0;
-        if (job != null) {
-            List<ChecklistItem> items = checklistItemRepository.findByJobId(job.getId());
-            totalItems = items.size();
-            for (ChecklistItem ci : items) {
-                boolean mand =
-                        ci.getRegulationRule() != null && ci.getRegulationRule().isMandatory();
-                if (mand) {
-                    mandatoryItems++;
-                    if (ci.getStatus() == ChecklistStatus.CLEARED) {
-                        clearedMandatory++;
-                    }
-                }
-            }
-        }
+        // The gate's own counts, so "the departure gate still waits for N" agrees with the gate.
+        GateAssessment gate = job != null ? assess(job) : null;
 
         return ClearanceMapper.toReviewDetailResponse(
                 version,
@@ -370,10 +355,11 @@ public class ClearanceService {
                 allVersions,
                 autoCheckText,
                 autoCheckTone,
-                totalItems,
-                clearedMandatory,
-                mandatoryItems,
-                at >= 0 ? at + 1 : 1,
+                gate != null ? gate.totalItems() : 0,
+                gate != null ? gate.clearedMandatoryItems() : 0,
+                gate != null ? gate.mandatoryItems() : 0,
+                // 0 when the version has left the queue (already reviewed), so nothing claims a place in it.
+                at + 1,
                 queue.size(),
                 nextId,
                 nextDocName);

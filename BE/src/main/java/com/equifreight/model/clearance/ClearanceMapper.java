@@ -327,7 +327,7 @@ public final class ClearanceMapper {
                                 : null)
                 .departureDate(request != null ? request.getDepartureDate() : null)
                 .totalChecklistItems(totalItems)
-                .clearedChecklistItems(clearedMandatory)
+                .clearedMandatoryItems(clearedMandatory)
                 .mandatoryItems(mandatoryItems)
                 .remainingMandatoryItems(Math.max(0, mandatoryItems - clearedMandatory))
                 .allVersions(
