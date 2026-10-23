@@ -120,12 +120,8 @@ public class TransportJobService {
         LoadPlanResponse loadPlan =
                 loadPlanService.getActiveLoadPlan(job.getId()).orElse(null);
 
-        RoutePlanResponse routePlan = null;
-        try {
-            routePlan = routePlanService.getActiveRoutePlan(job.getId());
-        } catch (ResourceNotFoundException e) {
-            log.debug("No route plan yet for job {}", job.getCode());
-        }
+        RoutePlanResponse routePlan =
+                routePlanService.findActiveRoutePlan(job.getId()).orElse(null);
 
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
 

@@ -181,6 +181,39 @@ class Flow3ServiceTest {
     }
 
     @Test
+    @DisplayName("A job not planned yet has no route plan, and reading it doesn't throw")
+    void aJobWithoutARoutePlanHasNone() {
+        UUID jobId = UUID.randomUUID();
+        when(routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId)).thenReturn(Optional.empty());
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId)).isEmpty();
+        // The endpoint still answers 404 for it.
+        assertThrows(ResourceNotFoundException.class, () -> routePlanService.getActiveRoutePlan(jobId));
+    }
+
+    @Test
+    @DisplayName("The confirmed route plan wins over a later draft")
+    void theConfirmedRoutePlanWins() {
+        UUID jobId = UUID.randomUUID();
+        RoutePlan confirmed = new RoutePlan();
+        confirmed.setId(UUID.randomUUID());
+        confirmed.setStatus(RoutePlanStatus.CONFIRMED);
+        TransportJob job = new TransportJob();
+        job.setId(jobId);
+        confirmed.setJob(job);
+        when(routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(confirmed));
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId))
+                .get()
+                .extracting(r -> r.id())
+                .isEqualTo(confirmed.getId());
+        verify(routePlanRepository, never()).findFirstByJobIdOrderByVersionNoDesc(jobId);
+    }
+
+    @Test
     @DisplayName("Vehicle booking refuses double booking when time ranges overlap")
     void vehicleBooking_refusesOverlappingBooking() {
         UUID vehicleId = UUID.randomUUID();

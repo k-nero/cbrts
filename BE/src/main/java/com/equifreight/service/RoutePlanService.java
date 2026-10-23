@@ -59,18 +59,25 @@ public class RoutePlanService {
                 .toList();
     }
 
+    /** The job's route plan for the endpoint: 404 when the job has none yet. */
     @Transactional(readOnly = true)
     public RoutePlanResponse getActiveRoutePlan(UUID jobId) {
-        // Return CONFIRMED if present, otherwise latest DRAFT
-        Optional<RoutePlan> confirmed = routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED);
-        if (confirmed.isPresent()) {
-            return toResponse(confirmed.get());
-        }
-
-        RoutePlan latest = routePlanRepository
-                .findFirstByJobIdOrderByVersionNoDesc(jobId)
+        return findActiveRoutePlan(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("No route plan found for job: " + jobId));
-        return toResponse(latest);
+    }
+
+    /**
+     * The confirmed route plan, else the latest draft; empty for a job not planned yet, such as one just approved.
+     * Callers inside their own transaction use this rather than catching {@link #getActiveRoutePlan}'s 404: an
+     * exception leaving a {@code @Transactional} method marks the shared transaction rollback-only, and the caller's
+     * commit then fails with a 500.
+     */
+    @Transactional(readOnly = true)
+    public Optional<RoutePlanResponse> findActiveRoutePlan(UUID jobId) {
+        return routePlanRepository
+                .findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED)
+                .or(() -> routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId))
+                .map(this::toResponse);
     }
 
     @Transactional
