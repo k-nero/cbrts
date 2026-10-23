@@ -1,4 +1,4 @@
--- V2: Replace legacy horse condition enum with the four values from docs/requirement.txt,
+-- V8: Replace legacy horse condition enum with the four values from docs/requirement.txt,
 --     and add a trip_record_documents table for referential integrity.
 
 -- 1. Replace the HorseCondition enum with only the four requirement values.
@@ -30,6 +30,8 @@ alter type HorseCondition_new rename to HorseCondition;
 create table public.trip_record_documents
 (
     id                  uuid primary key,
+    created_at          timestamp with time zone not null default now(),
+    updated_at          timestamp with time zone not null default now(),
     trip_record_id      uuid not null
         constraint trip_record_documents_trip_record_id_fkey
             references public.trip_records (id),
