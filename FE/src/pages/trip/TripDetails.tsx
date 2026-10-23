@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
 import { Col, Flex, Row } from 'antd';
 
-import { eventLabels, formatAgainstPlan, formatClock, sentence } from './tripFormat';
+import {
+  eventLabels,
+  formatAgainstPlan,
+  formatClock,
+  formatCountdown,
+  sentence,
+} from './tripFormat';
 import { TripRecords } from './TripRecords';
 
 import Table from '@/components/table';
@@ -125,7 +131,11 @@ export function TripDetails({
           }
           return (
             <span className={`type-body-s ${isNext ? 'text-info font-medium' : 'text-ink-3'}`}>
-              {isNext ? `Expected at ${formatClock(stop.plannedAt)}` : 'Planned'}
+              {isNext
+                ? stop.plannedAt && formatCountdown(stop.plannedAt)
+                  ? `Expected ${formatCountdown(stop.plannedAt)}`
+                  : `Expected at ${formatClock(stop.plannedAt)}`
+                : 'Planned'}
             </span>
           );
         },

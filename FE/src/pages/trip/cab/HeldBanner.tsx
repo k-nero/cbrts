@@ -1,8 +1,11 @@
+import { formatTrailerDuration, formatUnloadBy } from '../tripFormat';
+
 import { Button, Callout } from '@/components/ui';
 
 type Props = {
   heldTime?: string;
   loadedTime?: string;
+  departedAt?: string | null;
   onLogWaterOrCheck?: () => void;
   onCallManager?: () => void;
 };
@@ -10,9 +13,13 @@ type Props = {
 export function HeldBanner({
   heldTime = '08:12',
   loadedTime = '05:30',
+  departedAt,
   onLogWaterOrCheck,
   onCallManager,
 }: Props) {
+  const durationText = departedAt ? formatTrailerDuration(departedAt) : '3 h 25 min';
+  const unloadByText = departedAt ? formatUnloadBy(departedAt) : '11:30';
+
   return (
     <div className="flex flex-col gap-4">
       <Callout
@@ -24,11 +31,11 @@ export function HeldBanner({
       </Callout>
 
       <div className="flex items-center gap-6 rounded-xl border border-warn bg-warn-soft/30 p-5">
-        <span className="type-mono-data text-3xl font-bold text-warn">3 h 25 min</span>
+        <span className="type-mono-data text-3xl font-bold text-warn">{durationText}</span>
         <div className="flex flex-col gap-1">
           <span className="type-label-m text-ink">On the trailer since {loadedTime}</span>
           <span className="type-body-s text-ink-2">
-            Unload to rest mandatory at least every 6 hours.
+            Unload to rest mandatory by {unloadByText}: at least every 6 hours.
           </span>
         </div>
       </div>

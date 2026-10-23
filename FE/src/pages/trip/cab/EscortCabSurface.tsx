@@ -13,7 +13,7 @@ import { OnBoardCabPanel } from './OnBoardCabPanel';
 import { SignatureBox } from './SignatureBox';
 import { Toggle48 } from './Toggle48';
 import { WhatCustomerSeesPanel } from './WhatCustomerSeesPanel';
-import { formatClock } from '../tripFormat';
+import { formatClock, formatCountdown } from '../tripFormat';
 
 import { fileApi } from '@/apis/file';
 import { Button, Chip, Panel } from '@/components/ui';
@@ -279,7 +279,19 @@ export function EscortCabSurface({
         {/* Held Banner if held */}
         {isTripHeld && (
           <HeldBanner
-            heldTime={formatClock(trip.plannedDepartureAt)}
+            heldTime={formatClock(
+              trip.records.find((r) => r.kind === TripRecordKindEnum.HELD)?.occurredAt ??
+                trip.records[trip.records.length - 1]?.occurredAt ??
+                trip.plannedDepartureAt,
+            )}
+            loadedTime={formatClock(
+              trip.records.find((r) => r.kind === TripRecordKindEnum.DEPARTED)?.occurredAt ??
+                trip.plannedDepartureAt,
+            )}
+            departedAt={
+              trip.records.find((r) => r.kind === TripRecordKindEnum.DEPARTED)?.occurredAt ??
+              trip.plannedDepartureAt
+            }
             onLogWaterOrCheck={() => setMode('welfare')}
           />
         )}
@@ -623,14 +635,22 @@ export function EscortCabSurface({
                   nextStop.details ?? 'Scheduled stop'
                 }`}
                 time={formatClock(nextStop.plannedAt)}
-                due="Next checkpoint"
+                due={
+                  nextStop.plannedAt
+                    ? (formatCountdown(nextStop.plannedAt) ?? 'Next checkpoint')
+                    : 'Next checkpoint'
+                }
               />
             ) : (
               <NextStopPanel
                 title={trip.destination ?? 'Destination'}
                 sub="Final delivery & handover"
                 time={formatClock(trip.plannedArrivalAt)}
-                due="Arrival window"
+                due={
+                  trip.plannedArrivalAt
+                    ? (formatCountdown(trip.plannedArrivalAt) ?? 'Arrival window')
+                    : 'Arrival window'
+                }
               />
             )}
 

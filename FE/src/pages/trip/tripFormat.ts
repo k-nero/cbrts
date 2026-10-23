@@ -40,6 +40,36 @@ export const formatDuration = (minutes: number) => {
   return `${m} min`;
 };
 
+export const formatCountdown = (target: string | null | Date, now: Date = new Date()) => {
+  if (!target) return undefined;
+  const d = typeof target === 'string' ? new Date(target) : target;
+  if (Number.isNaN(d.getTime())) return undefined;
+  const diffMinutes = Math.round((d.getTime() - now.getTime()) / 60000);
+  if (diffMinutes > 0) {
+    return `in ${formatDuration(diffMinutes)}`;
+  }
+  if (diffMinutes === 0) {
+    return 'now';
+  }
+  return `${formatDuration(Math.abs(diffMinutes))} late`;
+};
+
+export const formatTrailerDuration = (departedAt: string | null | Date, now: Date = new Date()) => {
+  if (!departedAt) return '3 h 25 min';
+  const d = typeof departedAt === 'string' ? new Date(departedAt) : departedAt;
+  if (Number.isNaN(d.getTime())) return '3 h 25 min';
+  const diffMin = Math.max(0, Math.round((now.getTime() - d.getTime()) / 60000));
+  return formatDuration(diffMin);
+};
+
+export const formatUnloadBy = (departedAt: string | null | Date, restEveryHours = 6) => {
+  if (!departedAt) return '11:30';
+  const d = typeof departedAt === 'string' ? new Date(departedAt) : new Date(departedAt.getTime());
+  if (Number.isNaN(d.getTime())) return '11:30';
+  d.setHours(d.getHours() + restEveryHours);
+  return formatClock(d);
+};
+
 export const formatAgainstPlan = (plannedAt: string | null, recordedAt: string | null) => {
   if (!plannedAt || !recordedAt) return '—';
   const p = new Date(plannedAt).getTime();

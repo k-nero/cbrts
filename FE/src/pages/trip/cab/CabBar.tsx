@@ -24,7 +24,7 @@ export function CabBar({
   useEffect(() => {
     const timer = setInterval(() => {
       setClock(formatClock(new Date()));
-    }, 10000);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
