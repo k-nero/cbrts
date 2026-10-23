@@ -20,7 +20,7 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, UUID> {
                 "conditionLogs",
                 "conditionLogs.horse"
             })
-    List<TripRecord> findByJob_IdOrderByOccurredAtAsc(UUID jobId);
+    List<TripRecord> findByTrip_IdOrderByOccurredAtAsc(UUID tripId);
 
     @EntityGraph(
             attributePaths = {
@@ -35,7 +35,7 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, UUID> {
     /**
      * The newest record of one of {@code kinds}: the events that move the trip status.
      */
-    Optional<TripRecord> findTopByJob_IdAndKindInOrderByOccurredAtDesc(UUID jobId, Collection<TripRecordKind> kinds);
+    Optional<TripRecord> findTopByTrip_IdAndKindInOrderByOccurredAtDesc(UUID tripId, Collection<TripRecordKind> kinds);
 
-    boolean existsByJob_IdAndKind(UUID jobId, TripRecordKind kind);
+    boolean existsByTrip_IdAndKind(UUID tripId, TripRecordKind kind);
 }

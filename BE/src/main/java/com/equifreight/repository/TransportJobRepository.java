@@ -74,7 +74,8 @@ public interface TransportJobRepository
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
-                (select max(r.occurredAt) from TripRecord r where r.job = j))
+                (select max(r.occurredAt) from TripRecord r
+                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where rq.club.id = :clubId
             """, countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
@@ -86,7 +87,8 @@ public interface TransportJobRepository
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
-                (select max(r.occurredAt) from TripRecord r where r.job = j))
+                (select max(r.occurredAt) from TripRecord r
+                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                               com.equifreight.entity.enums.JobStage.TRIP,
