@@ -144,6 +144,9 @@ export interface TransportRequest {
   blockers: Blocker[] | null;
   /** The logistics manager's note while the request is INFO_REQUIRED (US-F1-04). */
   infoRequiredNote: string | null;
+  /** When the club cancelled the request, and the fee band applied then (BR-F1-07). */
+  cancelledAt: string | null;
+  cancellationFeePct: number | null;
   /** Every submitted version, oldest first; empty for a draft. */
   revisions: RevisionSummary[];
 }

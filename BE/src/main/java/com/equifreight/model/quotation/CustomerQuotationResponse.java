@@ -4,6 +4,7 @@ import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
@@ -23,14 +24,24 @@ import lombok.Builder;
  * @param estimate the range kept at submission against this total; null when none was kept
  * @param latePenalty the late-arrival terms when the move has an arrival window; null otherwise
  * @param versions every version that was issued, newest first
+ * @param requestStatus where the request stands; a cancelled request can't be answered whatever this version's status
+ * @param acceptedAt when the customer accepted this version (US-F1-06); null until then
+ * @param declinedAt when the customer declined this version; null unless declined
+ * @param cancelledAt when the customer cancelled the request; null unless cancelled
+ * @param cancellationFeePct the fee band applied at cancelling (BR-F1-07); null unless cancelled
  */
 @Builder
 public record CustomerQuotationResponse(
         String code,
         short versionNo,
         QuotationStatus status,
+        RequestStatus requestStatus,
         Instant issuedAt,
         Instant validUntil,
+        Instant acceptedAt,
+        Instant declinedAt,
+        Instant cancelledAt,
+        BigDecimal cancellationFeePct,
         String currency,
         int pinnedVersionNo,
         Request request,

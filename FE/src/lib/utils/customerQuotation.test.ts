@@ -3,6 +3,9 @@ import { describe, expect, test } from 'bun:test';
 import type { CustomerQuoteGroup } from '@/interfaces';
 
 import {
+  quotedPassChip,
+  cancellationToday,
+  cancelledText,
   noticeBandLabel,
   deadlineText,
   estimateVerdict,
@@ -168,5 +171,58 @@ describe('quotationCallout', () => {
     expect(quotationCallout({ ...ref, status: 'DECLINED' }).title).toBe(
       'You declined quotation Q-2026-0189 v2.',
     );
+  });
+});
+
+describe('cancellationToday', () => {
+  const bands = [
+    { minDays: 0, maxDays: 6, pct: 100, current: false },
+    { minDays: 14, maxDays: 29, pct: 25, current: true },
+  ];
+
+  test('names the current band and the days left', () => {
+    expect(cancellationToday({ cancellation: { daysToDeparture: 20, bands } })).toBe(
+      'If you cancel before approval, the fee today is 25% of the total, with 20 days to departure.',
+    );
+  });
+
+  test('a departure already past counts as no notice', () => {
+    expect(
+      cancellationToday({
+        cancellation: { daysToDeparture: -2, bands: [{ ...bands[0], current: true }] },
+      }),
+    ).toBe(
+      'If you cancel before approval, the fee today is 100% of the total, with 0 days to departure.',
+    );
+  });
+});
+
+describe('cancelledText', () => {
+  test('a fee taken from the quotation', () => {
+    expect(cancelledText('2026-09-26T02:14:00Z', 25)).toBe(
+      'You cancelled on 26 Sep 2026. The fee is 25% of the quotation total.',
+    );
+  });
+
+  test('no quotation, no fee', () => {
+    expect(cancelledText('2026-09-26T02:14:00Z', 0)).toBe(
+      'You cancelled on 26 Sep 2026. No fee, as no quotation was issued.',
+    );
+  });
+});
+
+describe('quotedPassChip', () => {
+  test('follows the answer, and a cancelled request wins over the version', () => {
+    expect(quotedPassChip({ status: 'ISSUED', requestStatus: 'QUOTED', versionNo: 2 })).toEqual({
+      tone: 'info',
+      label: 'Quoted · v2',
+    });
+    expect(
+      quotedPassChip({ status: 'ACCEPTED', requestStatus: 'CUSTOMER_ACCEPTED', versionNo: 2 }),
+    ).toEqual({ tone: 'ok', label: 'Accepted · v2' });
+    expect(quotedPassChip({ status: 'ISSUED', requestStatus: 'CANCELLED', versionNo: 2 })).toEqual({
+      tone: 'neutral',
+      label: 'Cancelled',
+    });
   });
 });

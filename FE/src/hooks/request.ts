@@ -3,6 +3,9 @@ import { isEqual } from 'lodash-es';
 
 import { horsesApi } from '@/apis/horse';
 import {
+  acceptQuotation,
+  cancelRequest,
+  declineQuotation,
   getCustomerQuotation,
   getEstimate,
   getRoutes,
@@ -11,7 +14,12 @@ import {
   submitRequest,
 } from '@/apis/request';
 import { queryKeys } from '@/constant/query';
-import type { RequestDraftInput, RequestSummary, TransportRequest } from '@/interfaces';
+import type {
+  CustomerQuotation,
+  RequestDraftInput,
+  RequestSummary,
+  TransportRequest,
+} from '@/interfaces';
 
 import { useCrudResource } from './crud';
 import { useDebouncedValue } from './useDebouncedValue';
@@ -138,3 +146,51 @@ export const useCustomerQuotation = (id: string | undefined) =>
     enabled: Boolean(id),
     retry: false,
   });
+
+/** Every read of one request: its page, its quotation and the list rows that show its status. */
+const useRefreshRequest = () => {
+  const qc = useQueryClient();
+  return (id: string) => {
+    void qc.invalidateQueries({ queryKey: queryKeys.requests.one(id) });
+    void qc.invalidateQueries({ queryKey: queryKeys.requests.pages() });
+  };
+};
+
+/** Accept the issued quotation (US-F1-06). */
+export const useAcceptQuotation = (id: string) => {
+  const qc = useQueryClient();
+  const refresh = useRefreshRequest();
+  return useMutation<CustomerQuotation, Error, void>({
+    mutationFn: () => acceptQuotation(id),
+    onSuccess: (q) => {
+      qc.setQueryData(queryKeys.requests.quotation(id), q);
+      refresh(id);
+    },
+  });
+};
+
+/** Decline the issued quotation, with an optional reason. */
+export const useDeclineQuotation = (id: string) => {
+  const qc = useQueryClient();
+  const refresh = useRefreshRequest();
+  return useMutation<CustomerQuotation, Error, string | null>({
+    mutationFn: (reason) => declineQuotation(id, reason),
+    onSuccess: (q) => {
+      qc.setQueryData(queryKeys.requests.quotation(id), q);
+      refresh(id);
+    },
+  });
+};
+
+/** Cancel the request before approval (BR-F1-07). */
+export const useCancelRequest = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation<TransportRequest, Error, void>({
+    mutationFn: () => cancelRequest(id),
+    onSuccess: (request) => {
+      qc.setQueryData(queryKeys.requests.one(id), request);
+      void qc.invalidateQueries({ queryKey: queryKeys.requests.quotation(id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.requests.pages() });
+    },
+  });
+};

@@ -72,7 +72,9 @@ public class QuotationExpiryJob {
         Instant soon = now.plus(Duration.ofHours(24));
         for (Quotation q :
                 quotations.findByStatusAndReminderSentAtIsNullAndValidUntilBefore(QuotationStatus.ISSUED, soon)) {
-            if (stillIssuedBefore(q, soon) && q.getReminderSentAt() == null) {
+            if (stillIssuedBefore(q, soon)
+                    && q.getReminderSentAt() == null
+                    && q.getRequest().getStatus() == RequestStatus.QUOTED) {
                 remind(q, now);
             }
         }
@@ -108,6 +110,10 @@ public class QuotationExpiryJob {
                 request.getCode(),
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + request.getStatus() + "\"}");
+        if (before != RequestStatus.QUOTED) {
+            // A cancelled request has no quotation left to re-price; the club isn't told it expired.
+            return;
+        }
         String manager = q.getPreparedBy() == null
                 ? "The logistics manager"
                 : q.getPreparedBy().displayName();

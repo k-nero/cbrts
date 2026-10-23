@@ -4,6 +4,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
+import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
@@ -94,5 +95,32 @@ public class RequestController {
     @GetMapping("/requests/{id}/quotation")
     public CustomerQuotationResponse quotation(@AuthenticationPrincipal User user, @PathVariable UUID id) {
         return quotations.get(user, id);
+    }
+
+    @Operation(
+            summary = "Accept the latest issued quotation (US-F1-06): only before it expires; the request becomes"
+                    + " CUSTOMER_ACCEPTED and that version is bound")
+    @PostMapping("/requests/{id}/quotation/accept")
+    public CustomerQuotationResponse accept(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        return quotations.accept(user, id);
+    }
+
+    @Operation(
+            summary = "Decline the latest issued quotation (US-F1-06), with an optional reason; the request ends"
+                    + " EXPIRED")
+    @PostMapping("/requests/{id}/quotation/decline")
+    public CustomerQuotationResponse decline(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) DeclineRequest body) {
+        return quotations.decline(user, id, body);
+    }
+
+    @Operation(
+            summary = "Cancel a submitted request in any state before APPROVED (BR-F1-07); the fee band follows the"
+                    + " days left before departure")
+    @PostMapping("/requests/{id}/cancel")
+    public RequestResponse cancel(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        return requestService.cancel(user, id);
     }
 }

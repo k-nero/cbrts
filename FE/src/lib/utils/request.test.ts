@@ -717,6 +717,7 @@ describe("the pass's chip", () => {
   test('a returned request needs an answer; a draft and a submitted one say so', () => {
     expect(passChip('INFO_REQUIRED')).toEqual({ tone: 'warn', label: 'Needs your answer' });
     expect(passChip('DRAFT')).toEqual({ tone: 'neutral', label: 'Draft' });
+    expect(passChip('CANCELLED')).toEqual({ tone: 'neutral', label: 'Cancelled' });
     expect(passChip('SUBMITTED')).toEqual({ tone: 'neutral', label: 'Submitted' });
   });
 });
