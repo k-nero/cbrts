@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { Input } from 'antd';
+import { Flex, Input } from 'antd';
 import { Button, Callout, Radio } from '@/components/ui';
 import { useReviewDocument } from '@/hooks/clearance';
 import { type DocumentReview, DocumentReviewEnum, type DocumentVersion } from '@/interfaces';
@@ -34,7 +34,7 @@ export const ReviewForm: FC<{
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <Flex vertical gap={16}>
       {error && <Callout tone="bad" title={error} />}
 
       <div className="type-body-s text-ink-2">
@@ -42,7 +42,7 @@ export const ReviewForm: FC<{
         with your reason.
       </div>
 
-      <div className="flex gap-4">
+      <Flex gap={16}>
         <Radio
           name="decision"
           label="Approve"
@@ -55,10 +55,10 @@ export const ReviewForm: FC<{
           checked={rejecting}
           onChange={() => setDecision(DocumentReviewEnum.REJECTED)}
         />
-      </div>
+      </Flex>
 
       {rejecting && (
-        <div className="flex flex-col gap-1.5">
+        <Flex vertical gap={6}>
           <label className="type-label-s text-ink">
             Reason the customer will read <span className="text-bad">*</span>
           </label>
@@ -68,17 +68,17 @@ export const ReviewForm: FC<{
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
           />
-        </div>
+        </Flex>
       )}
 
-      <div className="flex justify-end gap-2">
+      <Flex justify="end" gap={8}>
         <Button variant="secondary" size="sm" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="primary" size="sm" disabled={review.isPending} onClick={submit}>
           {review.isPending ? 'Saving…' : rejecting ? 'Reject document' : 'Approve document'}
         </Button>
-      </div>
-    </div>
+      </Flex>
+    </Flex>
   );
 };

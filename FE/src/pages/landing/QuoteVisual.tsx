@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { Visual } from './Visual';
@@ -12,15 +13,15 @@ const QUOTE_ROWS: [string, Tone, string, string][] = [
 
 /** Quote lines say which can move on the final invoice. */
 export const QuoteVisual: FC = () => (
-  <Visual label="Three quotation lines: two fixed, one estimated" className="gap-2.5">
+  <Visual label="Three quotation lines: two fixed, one estimated" gap={10}>
     {QUOTE_ROWS.map(([line, tone, tag, amount]) => (
-      <span key={line} className="flex items-center gap-2.5">
+      <Flex key={line} component="span" align="center" gap={10}>
         <span className="type-body-s flex-1 text-ink">{line}</span>
         <Chip tone={tone} dot={false}>
           {tag}
         </Chip>
         <span className="type-caption w-[60px] shrink-0 text-right text-ink">{amount}</span>
-      </span>
+      </Flex>
     ))}
   </Visual>
 );

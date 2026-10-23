@@ -2,7 +2,7 @@ import { type FC, useRef, useState } from 'react';
 import { useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { message } from 'antd';
+import { Flex, message } from 'antd';
 import type { AxiosError } from 'axios';
 
 import { afterReturn } from './afterReturn';
@@ -51,10 +51,10 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const conflictCallout = conflict && (
     <Callout tone="bad" title={conflict.sentence}>
       {conflict.unsent && (
-        <span className="flex flex-col gap-1">
+        <Flex component="span" vertical gap={4}>
           <span>Your note wasn&apos;t sent:</span>
           <span className="whitespace-pre-line text-ink">{conflict.unsent}</span>
-        </span>
+        </Flex>
       )}
     </Callout>
   );
@@ -67,24 +67,24 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
         title={request.status === 'INFO_REQUIRED' ? 'Waiting for the customer' : 'Not in review'}
         extra={<Chip tone={chip.tone}>{chip.label}</Chip>}
       >
-        <div className="flex flex-col gap-4">
+        <Flex vertical gap={16}>
           {conflictCallout}
           {request.infoRequiredNote ? (
-            <div className="flex flex-col gap-1">
+            <Flex vertical gap={4}>
               <p className="type-label-s m-0 text-ink-2">
                 Returned{returned?.returnedAt ? ` ${formatDate(returned.returnedAt)}` : ''} with:
               </p>
               <p className="type-body-s m-0 whitespace-pre-line text-ink">
                 {request.infoRequiredNote}
               </p>
-            </div>
+            </Flex>
           ) : (
             <p className="type-body-s m-0 text-ink-2">
               This request isn&apos;t waiting for review.
             </p>
           )}
           <QuotationAction review={review} />
-        </div>
+        </Flex>
       </Panel>
     );
   }
@@ -127,37 +127,41 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
 
   return (
     <Panel title="Your decision">
-      <div className="flex flex-col gap-4">
+      <Flex vertical gap={16}>
         <p className="type-body-s m-0 text-ink-2">
           Ask the customer before quoting, or start the quotation.
         </p>
         {conflictCallout}
         {failure && <Callout tone="bad" title={failure} />}
-        <div className="flex flex-col gap-3 rounded-md border border-line-strong bg-raised p-4">
-          <span className="type-label-m text-ink">Ask for information</span>
-          <FormWrapper methods={methods} isSubmitting={send.isPending} layout="vertical">
-            <NoteField club={request.club} />
-          </FormWrapper>
-          <span
-            className={`type-caption self-end ${state.length > NOTE_MAX ? 'text-bad' : 'text-ink-3'}`}
-          >
-            {state.count}
-          </span>
-          <Button
-            variant="primary"
-            trailingIcon="arrow-right"
-            disabled={!state.ok || send.isPending}
-            onClick={() => void methods.handleSubmit(onSend)()}
-          >
-            Send to customer
-          </Button>
+        <div className="p-4 rounded-md border border-line-strong bg-raised">
+          <Flex vertical gap={12}>
+            <span className="type-label-m text-ink">Ask for information</span>
+            <FormWrapper methods={methods} isSubmitting={send.isPending} layout="vertical">
+              <NoteField club={request.club} />
+            </FormWrapper>
+            <span
+              className={`type-caption self-end ${state.length > NOTE_MAX ? 'text-bad' : 'text-ink-3'}`}
+            >
+              {state.count}
+            </span>
+            <Button
+              variant="primary"
+              trailingIcon="arrow-right"
+              disabled={!state.ok || send.isPending}
+              onClick={() => void methods.handleSubmit(onSend)()}
+            >
+              Send to customer
+            </Button>
+          </Flex>
         </div>
-        <div className="flex flex-col gap-2 border-t border-line pt-4">
-          <span className="type-label-s text-ink-2">Other outcomes</span>
-          <QuotationAction review={review} />
-          <p className="type-body-s m-0 text-ink-3">Reject comes with the approval step.</p>
+        <div className="pt-4 border-t border-line">
+          <Flex vertical gap={8}>
+            <span className="type-label-s text-ink-2">Other outcomes</span>
+            <QuotationAction review={review} />
+            <p className="type-body-s m-0 text-ink-3">Reject comes with the approval step.</p>
+          </Flex>
         </div>
-      </div>
+      </Flex>
     </Panel>
   );
 };

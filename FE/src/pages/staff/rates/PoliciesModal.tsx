@@ -1,6 +1,6 @@
 import { type FC, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { App, Flex } from 'antd';
+import { App, Col, Flex, Row } from 'antd';
 
 import { type OnDraftGone, refuse } from './editorOptions';
 import { POLICY_FIELDS, type PolicyForm, policySchema } from './schema';
@@ -58,17 +58,18 @@ export const PoliciesModal: FC<{
       >
         {({ FormField }) => (
           <>
-            <div className="grid grid-cols-2 gap-x-4">
+            <Row gutter={[16, 0]}>
               {POLICY_FIELDS.map((f) => (
-                <FormField
-                  key={f.key}
-                  name={f.key}
-                  label={f.label}
-                  component="number"
-                  componentProps={{ isRequired: true, min: 0, max: f.max, step: f.step }}
-                />
+                <Col key={f.key} span={12}>
+                  <FormField
+                    name={f.key}
+                    label={f.label}
+                    component="number"
+                    componentProps={{ isRequired: true, min: 0, max: f.max, step: f.step }}
+                  />
+                </Col>
               ))}
-            </div>
+            </Row>
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />
               <SubmitButton type="primary" label="Save to draft" />

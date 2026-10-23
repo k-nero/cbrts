@@ -1,5 +1,5 @@
 import { type ChangeEvent, type FC, useState } from 'react';
-import { Alert, Input, message, Modal } from 'antd';
+import { Alert, Col, Flex, Input, message, Modal, Row } from 'antd';
 import { fileApi } from '@/apis/file';
 import { apiErrorMessage } from '@/lib/utils';
 
@@ -94,17 +94,19 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
       aria-labelledby="owed-title"
       className="overflow-hidden rounded-lg border border-line bg-card"
     >
-      <header className="flex items-center justify-between gap-6 px-5 pt-5 pb-4">
-        <div className="flex flex-col gap-1">
-          <h2 id="owed-title" className="type-h3 m-0 text-ink">
-            You owe {plural(home.owed.length - Object.keys(submittedIds).length, 'item')}
-          </h2>
-          <p className="type-body-s m-0 max-w-[620px] text-ink-2">
-            Across {plural(home.owedRequestCount, 'request')}, soonest first. Each upload is checked
-            against your travel dates the moment you send it.
-          </p>
-        </div>
-        {overdue > 0 && <Chip tone="bad">{overdue} overdue</Chip>}
+      <header className="px-5 pt-5 pb-4">
+        <Flex align="center" justify="space-between" gap={24}>
+          <Flex vertical gap={4}>
+            <h2 id="owed-title" className="type-h3 m-0 text-ink">
+              You owe {plural(home.owed.length - Object.keys(submittedIds).length, 'item')}
+            </h2>
+            <p className="type-body-s m-0 max-w-[620px] text-ink-2">
+              Across {plural(home.owedRequestCount, 'request')}, soonest first. Each upload is
+              checked against your travel dates the moment you send it.
+            </p>
+          </Flex>
+          {overdue > 0 && <Chip tone="bad">{overdue} overdue</Chip>}
+        </Flex>
       </header>
       {home.owed.map((o, i) => {
         const submitted = submittedIds[o.id];
@@ -132,7 +134,7 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
             }}
             action={
               submitted ? (
-                <div className="flex items-center gap-2">
+                <Flex align="center" gap={8}>
                   <Chip tone="ok">Submitted ✓</Chip>
                   <Button
                     size="sm"
@@ -141,7 +143,7 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
                   >
                     View File
                   </Button>
-                </div>
+                </Flex>
               ) : (
                 <Button
                   size="sm"
@@ -189,66 +191,72 @@ export const OwedPanel: FC<OwedProps> = ({ home, onOpen, onAllRequests }) => {
           </Button>,
         ]}
       >
-        <div className="flex flex-col gap-4 py-3">
-          {uploadError && <Alert type="error" message={uploadError} showIcon />}
+        <div className="py-3">
+          <Flex vertical gap={16}>
+            {uploadError && <Alert type="error" message={uploadError} showIcon />}
 
-          {selectedItem && (
-            <div className="rounded-md border border-line bg-sunken p-3 text-sm">
-              <div className="type-label-s text-ink font-semibold">{selectedItem.subject}</div>
-              <div className="type-body-s text-ink-2 mt-1">{selectedItem.reason}</div>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <label className="type-label-s text-ink">
-              Choose PDF / Document File <span className="text-bad">*</span>
-            </label>
-            <input
-              type="file"
-              accept=".pdf,image/png,image/jpeg"
-              onChange={handleFileChange}
-              className="border border-line rounded p-2 text-sm bg-card text-ink"
-            />
-            {uploadFile && (
-              <span className="type-caption text-ink-3">
-                Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-              </span>
+            {selectedItem && (
+              <div className="rounded-md border border-line bg-sunken p-3 text-sm">
+                <div className="type-label-s text-ink font-semibold">{selectedItem.subject}</div>
+                <div className="type-body-s text-ink-2 mt-1">{selectedItem.reason}</div>
+              </div>
             )}
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+            <Flex vertical gap={6}>
               <label className="type-label-s text-ink">
-                Issued Date <span className="text-bad">*</span>
+                Choose PDF / Document File <span className="text-bad">*</span>
               </label>
-              <Input
-                type="date"
-                required
-                value={issuedOn}
-                onChange={(e) => setIssuedOn(e.target.value)}
+              <input
+                type="file"
+                accept=".pdf,image/png,image/jpeg"
+                onChange={handleFileChange}
+                className="border border-line rounded p-2 text-sm bg-card text-ink"
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="type-label-s text-ink">
-                Valid Until (Expiry) <span className="text-bad">*</span>
-              </label>
-              <Input
-                type="date"
-                required
-                value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
-              />
-            </div>
-          </div>
+              {uploadFile && (
+                <span className="type-caption text-ink-3">
+                  Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                </span>
+              )}
+            </Flex>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="type-label-s text-ink">Issuing Authority / Clinic</label>
-            <Input
-              placeholder="e.g. Regional Animal Health Office, PVI Insurance"
-              value={issuer}
-              onChange={(e) => setIssuer(e.target.value)}
-            />
-          </div>
+            <Row gutter={[12, 12]}>
+              <Col span={12}>
+                <Flex vertical gap={6}>
+                  <label className="type-label-s text-ink">
+                    Issued Date <span className="text-bad">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    required
+                    value={issuedOn}
+                    onChange={(e) => setIssuedOn(e.target.value)}
+                  />
+                </Flex>
+              </Col>
+              <Col span={12}>
+                <Flex vertical gap={6}>
+                  <label className="type-label-s text-ink">
+                    Valid Until (Expiry) <span className="text-bad">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    required
+                    value={validUntil}
+                    onChange={(e) => setValidUntil(e.target.value)}
+                  />
+                </Flex>
+              </Col>
+            </Row>
+
+            <Flex vertical gap={6}>
+              <label className="type-label-s text-ink">Issuing Authority / Clinic</label>
+              <Input
+                placeholder="e.g. Regional Animal Health Office, PVI Insurance"
+                value={issuer}
+                onChange={(e) => setIssuer(e.target.value)}
+              />
+            </Flex>
+          </Flex>
         </div>
       </Modal>
     </section>

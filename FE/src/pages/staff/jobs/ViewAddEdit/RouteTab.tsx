@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import { Button, Callout, Chip, TimelineStop } from '@/components/ui';
 import { useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
@@ -44,49 +45,51 @@ export function RouteTab({ job }: Props) {
   const borderCrossing = stops.find((s) => s.kind === 'BORDER')?.borderCrossingName || 'None';
 
   return (
-    <div className="flex flex-col gap-8">
+    <Flex vertical gap={32}>
       {/* Summary Strip (matching Figma scrRoute) */}
-      <div className="flex flex-wrap items-center justify-between gap-8 rounded-xl border border-line bg-card p-6 shadow-xs">
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Origin</span>
-          <span className="type-label-m text-ink">{job.originCity}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Destination</span>
-          <span className="type-label-m text-ink">{job.destinationCity}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Distance</span>
-          <span className="type-label-m text-ink">{routePlan.distanceKm || 0} km</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Duration</span>
-          <span className="type-label-m text-ink">
-            {routePlan.durationMin ? `${(routePlan.durationMin / 60).toFixed(1)} h` : '—'}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Border crossing</span>
-          <span className="type-label-m text-ink">{borderCrossing}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Welfare stops</span>
-          <span className="type-label-m text-ink">{welfareCount}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="type-body-s text-ink-3">Arrival window</span>
-          <span className="type-label-m text-ink">{formatWindow()}</span>
-        </div>
+      <div className="p-6 rounded-xl border border-line bg-card shadow-xs">
+        <Flex wrap gap={32} align="center" justify="space-between">
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Origin</span>
+            <span className="type-label-m text-ink">{job.originCity}</span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Destination</span>
+            <span className="type-label-m text-ink">{job.destinationCity}</span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Distance</span>
+            <span className="type-label-m text-ink">{routePlan.distanceKm || 0} km</span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Duration</span>
+            <span className="type-label-m text-ink">
+              {routePlan.durationMin ? `${(routePlan.durationMin / 60).toFixed(1)} h` : '—'}
+            </span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Border crossing</span>
+            <span className="type-label-m text-ink">{borderCrossing}</span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Welfare stops</span>
+            <span className="type-label-m text-ink">{welfareCount}</span>
+          </Flex>
+          <Flex vertical gap={4}>
+            <span className="type-body-s text-ink-3">Arrival window</span>
+            <span className="type-label-m text-ink">{formatWindow()}</span>
+          </Flex>
+        </Flex>
       </div>
 
       {/* Timeline of Stops */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+      <Flex vertical gap={16}>
+        <Flex align="center" justify="space-between">
           <h3 className="type-h3 text-ink">Timeline</h3>
           <Chip tone="neutral">Version {routePlan.versionNo}</Chip>
-        </div>
+        </Flex>
 
-        <div className="flex flex-col gap-4">
+        <Flex vertical gap={16}>
           {stops.map((stop) => {
             const timeStr = stop.plannedAt
               ? new Date(stop.plannedAt).toLocaleTimeString('en-GB', {
@@ -110,61 +113,65 @@ export function RouteTab({ job }: Props) {
               />
             );
           })}
-        </div>
-      </div>
+        </Flex>
+      </Flex>
 
       {/* Departure Gate / Action */}
-      <div className="flex flex-col gap-4 rounded-xl border border-line bg-card p-6">
-        {!isGateClear ? (
-          <>
-            <Callout tone="bad" title="Departure can’t be recorded yet">
-              {job.clearanceGateSummary ||
-                'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
-            </Callout>
-            <div>
-              <Button variant="primary" size="md" disabled leadingIcon="lock">
-                Record departure
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <Callout tone="ok" title="Clear to depart">
-              Dossier status is CLEARANCE_READY. The driver may record departure.
-            </Callout>
-            <div>
-              <Button variant="primary" size="md" leadingIcon="arrow-right">
-                Record departure
-              </Button>
-            </div>
-          </>
-        )}
+      <div className="p-6 rounded-xl border border-line bg-card">
+        <Flex vertical gap={16}>
+          {!isGateClear ? (
+            <>
+              <Callout tone="bad" title="Departure can’t be recorded yet">
+                {job.clearanceGateSummary ||
+                  'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
+              </Callout>
+              <div>
+                <Button variant="primary" size="md" disabled leadingIcon="lock">
+                  Record departure
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Callout tone="ok" title="Clear to depart">
+                Dossier status is CLEARANCE_READY. The driver may record departure.
+              </Callout>
+              <div>
+                <Button variant="primary" size="md" leadingIcon="arrow-right">
+                  Record departure
+                </Button>
+              </div>
+            </>
+          )}
+        </Flex>
       </div>
 
       {/* Version History */}
       {allVersions && allVersions.length > 1 && (
-        <div className="flex flex-col gap-3">
+        <Flex vertical gap={12}>
           <h4 className="type-h4 text-ink">Version history</h4>
-          <div className="flex flex-col divide-y divide-line rounded-lg border border-line bg-card">
+          <Flex vertical className="divide-y divide-line rounded-lg border border-line bg-card">
             {allVersions.map((v) => (
-              <div key={v.id} className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <span className="type-data text-ink">v{v.versionNo}</span>
-                  <Chip tone={v.status === 'CONFIRMED' ? 'ok' : 'neutral'}>{v.status}</Chip>
-                  {v.changeReason && (
-                    <span className="type-body-s text-ink-2 truncate max-w-md">
-                      {v.changeReason}
-                    </span>
-                  )}
-                </div>
-                <span className="type-caption text-ink-3">
-                  {v.confirmedAt ? new Date(v.confirmedAt).toLocaleDateString('en-GB') : 'Draft'}
-                </span>
+              <div key={v.id} className="p-4">
+                <Flex align="center" justify="space-between">
+                  <Flex gap={12} align="center">
+                    <span className="type-data text-ink">v{v.versionNo}</span>
+                    <Chip tone={v.status === 'CONFIRMED' ? 'ok' : 'neutral'}>{v.status}</Chip>
+                    {v.changeReason && (
+                      <span className="type-body-s text-ink-2 truncate max-w-md">
+                        {v.changeReason}
+                      </span>
+                    )}
+                  </Flex>
+                  <span className="type-caption text-ink-3">
+                    {v.confirmedAt ? new Date(v.confirmedAt).toLocaleDateString('en-GB') : 'Draft'}
+                  </span>
+                </Flex>
               </div>
             ))}
-          </div>
-        </div>
+          </Flex>
+        </Flex>
       )}
-    </div>
+    </Flex>
   );
 }

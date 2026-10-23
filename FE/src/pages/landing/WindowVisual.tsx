@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { Visual } from './Visual';
@@ -13,11 +14,11 @@ export const WindowVisual: FC = () => (
       <span className="absolute top-2 left-[30%] size-3 rounded-full bg-warn" />
       <span className="absolute top-0 right-0 h-7 w-0.5 bg-ink" />
     </div>
-    <span className="flex flex-wrap gap-x-2 gap-y-1">
+    <Flex component="span" wrap style={{ columnGap: 8, rowGap: 4 }}>
       <span className="type-caption text-warn">Test 2 Aug</span>
       <span className="type-caption text-ok">60-day window</span>
       <span className="type-caption text-ink">Departs 18 Oct</span>
-    </span>
+    </Flex>
     <Chip tone="warn">Expires in transit</Chip>
   </Visual>
 );

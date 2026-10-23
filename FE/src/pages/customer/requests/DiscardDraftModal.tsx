@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import BaseModal from '@/components/modal/BaseModal';
 import { Button, Callout } from '@/components/ui';
@@ -28,7 +28,7 @@ const DiscardDraftModal: FC<{ id: string | null; onClose: () => void }> = ({ id,
 
   return (
     <BaseModal open={id !== null} onCancel={close} title="Discard this draft?">
-      <div className="flex flex-col gap-4">
+      <Flex vertical gap={16}>
         <p className="type-body-m m-0 text-ink-2">
           It’s deleted. Nothing was submitted, so nothing else changes.
         </p>
@@ -37,15 +37,15 @@ const DiscardDraftModal: FC<{ id: string | null; onClose: () => void }> = ({ id,
             {apiErrorMessage(discard.error, 'Something went wrong. Try again.')}
           </Callout>
         )}
-        <div className="flex justify-end gap-2">
+        <Flex justify="end" gap={8}>
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
           <Button variant="primary" onClick={confirm} disabled={discard.isPending}>
             Discard
           </Button>
-        </div>
-      </div>
+        </Flex>
+      </Flex>
     </BaseModal>
   );
 };

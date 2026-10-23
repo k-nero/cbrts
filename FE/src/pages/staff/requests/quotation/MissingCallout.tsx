@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { Callout } from '@/components/ui';
@@ -12,14 +13,14 @@ export const MissingCallout: FC<{ quotation: QuotationDraft }> = ({ quotation })
       tone="bad"
       title={`${n} ${n === 1 ? 'rate is' : 'rates are'} missing on ${quotation.request.fromCity} → ${quotation.request.toCity}`}
     >
-      <span className="flex flex-col gap-1">
+      <Flex component="span" vertical gap={4}>
         {quotation.missing.map((m) => (
           <span key={m.description}>{m.why}</span>
         ))}
         {quotation.catalogOwner && (
           <span>{`${quotation.catalogOwner}, transport specialist, keeps the rate catalog.`}</span>
         )}
-      </span>
+      </Flex>
     </Callout>
   );
 };

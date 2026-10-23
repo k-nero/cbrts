@@ -11,7 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useState } from 'react';
-import { App, Select, Skeleton } from 'antd';
+import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
@@ -88,51 +88,60 @@ export function LoadPlanTab({ job }: Props) {
     const vehicleToUse = selectedVehicleId || defaultVehicle?.id;
 
     return (
-      <div className="flex flex-col items-center justify-center p-12">
-        <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-xl border border-line bg-card p-8 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-muted text-ink-2">
-            <Icon name="truck" size={26} />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <h3 className="type-h3 text-ink">No load plan created yet</h3>
-            <p className="type-body-s text-ink-3">
-              Select an active vehicle to start load planning and stall arrangement for this job.
-            </p>
-          </div>
-
-          {loadingVehicles ? (
-            <Skeleton active title={false} paragraph={{ rows: 2 }} />
-          ) : (
-            <div className="flex w-full flex-col gap-4">
-              <div className="flex flex-col gap-1.5 text-left">
-                <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
-                  Assigned vehicle
-                </label>
-                <Select
-                  id="load-plan-vehicle"
-                  className="w-full"
-                  placeholder="Choose a vehicle"
-                  value={vehicleToUse || undefined}
-                  onChange={setSelectedVehicleId}
-                  options={activeVehicles?.map((v) => ({
-                    value: v.id,
-                    label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
-                  }))}
-                />
-              </div>
-
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!vehicleToUse || createLoadPlanMutation.isPending}
-                onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
+      <div className="p-12">
+        <Flex vertical align="center" justify="center">
+          <div className="p-8 w-full max-w-md rounded-xl border border-line bg-card text-center">
+            <Flex vertical gap={20} align="center">
+              <Flex
+                align="center"
+                justify="center"
+                className="size-14 rounded-full bg-muted text-ink-2"
               >
-                {createLoadPlanMutation.isPending ? 'Creating load plan…' : 'Create load plan'}
-              </Button>
-            </div>
-          )}
-        </div>
+                <Icon name="truck" size={26} />
+              </Flex>
+
+              <Flex vertical gap={6}>
+                <h3 className="type-h3 text-ink">No load plan created yet</h3>
+                <p className="type-body-s text-ink-3">
+                  Select an active vehicle to start load planning and stall arrangement for this
+                  job.
+                </p>
+              </Flex>
+
+              {loadingVehicles ? (
+                <Skeleton active title={false} paragraph={{ rows: 2 }} />
+              ) : (
+                <Flex vertical gap={16} className="w-full">
+                  <Flex vertical gap={6} className="text-left">
+                    <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
+                      Assigned vehicle
+                    </label>
+                    <Select
+                      id="load-plan-vehicle"
+                      className="w-full"
+                      placeholder="Choose a vehicle"
+                      value={vehicleToUse || undefined}
+                      onChange={setSelectedVehicleId}
+                      options={activeVehicles?.map((v) => ({
+                        value: v.id,
+                        label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
+                      }))}
+                    />
+                  </Flex>
+
+                  <Button
+                    variant="primary"
+                    size="md"
+                    disabled={!vehicleToUse || createLoadPlanMutation.isPending}
+                    onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
+                  >
+                    {createLoadPlanMutation.isPending ? 'Creating load plan…' : 'Create load plan'}
+                  </Button>
+                </Flex>
+              )}
+            </Flex>
+          </div>
+        </Flex>
       </div>
     );
   }
@@ -236,290 +245,327 @@ export function LoadPlanTab({ job }: Props) {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setDragging(null)}
     >
-      <div className="flex flex-col gap-6">
+      <Flex vertical gap={24}>
         {/* Stat Tiles */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatTile
-            tone="neutral"
-            value={`${occupiedStalls}/${totalStalls}`}
-            label="Positions filled"
-          />
-          <StatTile
-            tone={conflicts.length > 0 ? 'bad' : 'ok'}
-            value={String(conflicts.length)}
-            label={conflicts.length === 1 ? 'Conflict' : 'Conflicts'}
-          />
-          <StatTile
-            tone={unassigned.length > 0 ? 'warn' : 'neutral'}
-            value={String(unassigned.length)}
-            label={unassigned.length === 1 ? 'Horse to place' : 'Horses to place'}
-          />
-        </div>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone="neutral"
+              value={`${occupiedStalls}/${totalStalls}`}
+              label="Positions filled"
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone={conflicts.length > 0 ? 'bad' : 'ok'}
+              value={String(conflicts.length)}
+              label={conflicts.length === 1 ? 'Conflict' : 'Conflicts'}
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone={unassigned.length > 0 ? 'warn' : 'neutral'}
+              value={String(unassigned.length)}
+              label={unassigned.length === 1 ? 'Horse to place' : 'Horses to place'}
+            />
+          </Col>
+        </Row>
 
         {/* Main Content: Left Queue + Right Plan */}
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <Row gutter={[24, 24]} align="top">
           {/* Left Column: Queue & Placement Rules */}
-          <div className="flex flex-col gap-4 lg:col-span-4">
-            <QueueColumn
-              count={unassigned.length}
-              unloading={dragging?.fromStallId ? dragging.horse : null}
-              disabled={isConfirmed}
-            >
-              {unassigned.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-line p-4 text-center">
-                  <span className="type-body-s text-ink-3">All horses placed on vehicle</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {unassigned.map((h) => (
-                    <QueueHorse
-                      key={h.id}
-                      horse={h}
-                      selected={selected?.horse.id === h.id}
-                      disabled={!editable}
-                      onSelect={() => handleSelectHorse({ horse: h, fromStallId: null })}
-                    />
-                  ))}
-                </div>
-              )}
-            </QueueColumn>
+          <Col xs={24} lg={8}>
+            <Flex vertical gap={16}>
+              <QueueColumn
+                count={unassigned.length}
+                unloading={dragging?.fromStallId ? dragging.horse : null}
+                disabled={isConfirmed}
+              >
+                {unassigned.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-line p-4 text-center">
+                    <span className="type-body-s text-ink-3">All horses placed on vehicle</span>
+                  </div>
+                ) : (
+                  <Flex vertical gap={8}>
+                    {unassigned.map((h) => (
+                      <QueueHorse
+                        key={h.id}
+                        horse={h}
+                        selected={selected?.horse.id === h.id}
+                        disabled={!editable}
+                        onSelect={() => handleSelectHorse({ horse: h, fromStallId: null })}
+                      />
+                    ))}
+                  </Flex>
+                )}
+              </QueueColumn>
 
-            {/* Placement rules card */}
-            <Panel title="Placement rules" className="p-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start gap-2.5">
-                  <Icon name="box" size={16} className="text-stall-box shrink-0 mt-0.5" />
-                  <span className="type-body-s text-ink-2">
-                    Stallions and aggressive horses need a box stall.
-                  </span>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <Icon name="snowflake" size={16} className="text-stall-climate shrink-0 mt-0.5" />
-                  <span className="type-body-s text-ink-2">
-                    Heat-sensitive horses need the climate stall.
-                  </span>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <Icon name="alert" size={16} className="text-bad shrink-0 mt-0.5" />
-                  <span className="type-body-s text-ink-2">
-                    No stallion beside or behind a mare.
-                  </span>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <Icon name="info" size={16} className="text-info shrink-0 mt-0.5" />
-                  <span className="type-body-s text-ink-2">
-                    Keep nervous horses away from the ramp.
-                  </span>
-                </div>
-              </div>
-            </Panel>
-          </div>
+              {/* Placement rules card */}
+              <Panel title="Placement rules" className="p-4">
+                <Flex vertical gap={12}>
+                  <Flex gap={10} align="start">
+                    <Icon name="box" size={16} className="text-stall-box shrink-0 mt-0.5" />
+                    <span className="type-body-s text-ink-2">
+                      Stallions and aggressive horses need a box stall.
+                    </span>
+                  </Flex>
+                  <Flex gap={10} align="start">
+                    <Icon
+                      name="snowflake"
+                      size={16}
+                      className="text-stall-climate shrink-0 mt-0.5"
+                    />
+                    <span className="type-body-s text-ink-2">
+                      Heat-sensitive horses need the climate stall.
+                    </span>
+                  </Flex>
+                  <Flex gap={10} align="start">
+                    <Icon name="alert" size={16} className="text-bad shrink-0 mt-0.5" />
+                    <span className="type-body-s text-ink-2">
+                      No stallion beside or behind a mare.
+                    </span>
+                  </Flex>
+                  <Flex gap={10} align="start">
+                    <Icon name="info" size={16} className="text-info shrink-0 mt-0.5" />
+                    <span className="type-body-s text-ink-2">
+                      Keep nervous horses away from the ramp.
+                    </span>
+                  </Flex>
+                </Flex>
+              </Panel>
+            </Flex>
+          </Col>
 
           {/* Right Column: Vehicle Stalls Diagram & Summary */}
-          <div className="flex flex-col gap-6 lg:col-span-8">
-            {/* Vehicle Diagram */}
-            <div className="flex flex-col gap-3 rounded-2xl border border-line-strong bg-sunken p-5">
-              {/* Cab Bar */}
-              <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Icon name="truck" size={16} className="text-ink-2" />
-                  <span className="type-chip text-ink-2">Cab · {loadPlan.vehicleCode}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-xs bg-stall-standard" />
-                    <span className="type-caption text-ink-3">Standard</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-xs bg-stall-box" />
-                    <span className="type-caption text-ink-3">Box</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-xs bg-stall-climate" />
-                    <span className="type-caption text-ink-3">Climate</span>
-                  </div>
-                </div>
-                <span className="type-chip text-ink-3">Front</span>
-              </div>
-
-              {/* Selection bar: the click and keyboard path */}
-              {selected && (
-                <div className="flex items-center gap-3 rounded-lg border border-gold bg-gold-soft px-3.5 py-2.5">
-                  <span className="type-label-s flex-1 text-ink">
-                    {selected.horse.name} selected. Choose a stall.
-                  </span>
-                  {selected.fromStallId && (
-                    <Button variant="ghost" size="sm" onClick={() => moveHorse(selected, null)}>
-                      Unload
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
-
-              {/* A refused move is never silent: the server says what changed and what to do. */}
-              {moveMutation.isError && (
-                <Callout
-                  tone="bad"
-                  title="That move wasn’t saved"
-                  action={
-                    <Button variant="ghost" size="sm" onClick={() => moveMutation.reset()}>
-                      Dismiss
-                    </Button>
-                  }
-                >
-                  {apiErrorMessage(
-                    moveMutation.error,
-                    'The move couldn’t be saved. Check the plan and try again.',
-                  )}
-                </Callout>
-              )}
-
-              {/* Stall Rows */}
-              <div className="flex flex-col gap-4">
-                {sortedRowKeys.map((rowKey) => {
-                  const rowStalls = rowsMap.get(rowKey) ?? [];
-                  // Sort by positionNo
-                  rowStalls.sort((a, b) => a.positionNo - b.positionNo);
-
-                  return (
-                    <div key={rowKey} className="grid grid-cols-2 gap-4">
-                      {rowStalls.map((s) => (
-                        <StallSlot
-                          key={s.stallId}
-                          stall={s}
-                          selected={selected}
-                          dragging={dragging}
-                          interactive={!isConfirmed}
-                          disabled={!editable}
-                          onClick={() => handleStallClick(s)}
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Rear Ramp */}
-              <div className="flex items-center justify-center rounded-lg border border-dashed border-line-strong py-2.5">
-                <span className="type-chip text-ink-3">Rear ramp</span>
-              </div>
-            </div>
-
-            {/* Summary Panel */}
-            <Panel title="Summary" className="p-6">
-              <div className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  {/* Payload */}
-                  <div className="flex flex-col gap-2">
-                    <span className="type-body-s text-ink-3">Payload</span>
-                    <span className="type-data text-ink">
-                      {loadPlan.totalWeightKg.toLocaleString()} kg of{' '}
-                      {loadPlan.payloadKg.toLocaleString()} kg
-                    </span>
-                    <Progress tone="neutral" value={payloadPct} label="Payload percentage" />
+          <Col xs={24} lg={16}>
+            <Flex vertical gap={24}>
+              {/* Vehicle Diagram */}
+              <div className="p-5 rounded-2xl border border-line-strong bg-sunken">
+                <Flex vertical gap={12}>
+                  {/* Cab Bar */}
+                  <div className="px-4 py-3 rounded-lg bg-muted">
+                    <Flex align="center" justify="space-between">
+                      <Flex gap={8} align="center">
+                        <Icon name="truck" size={16} className="text-ink-2" />
+                        <span className="type-chip text-ink-2">Cab · {loadPlan.vehicleCode}</span>
+                      </Flex>
+                      <Flex gap={16} align="center">
+                        <Flex gap={6} align="center">
+                          <span className="size-2.5 rounded-xs bg-stall-standard" />
+                          <span className="type-caption text-ink-3">Standard</span>
+                        </Flex>
+                        <Flex gap={6} align="center">
+                          <span className="size-2.5 rounded-xs bg-stall-box" />
+                          <span className="type-caption text-ink-3">Box</span>
+                        </Flex>
+                        <Flex gap={6} align="center">
+                          <span className="size-2.5 rounded-xs bg-stall-climate" />
+                          <span className="type-caption text-ink-3">Climate</span>
+                        </Flex>
+                      </Flex>
+                      <span className="type-chip text-ink-3">Front</span>
+                    </Flex>
                   </div>
 
-                  {/* Crew */}
-                  <div className="flex flex-col gap-1.5">
-                    <span className="type-body-s text-ink-3">Crew</span>
-                    <span className="type-data text-ink">
-                      {job.crew.length > 0
-                        ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
-                        : 'Not assigned'}
-                    </span>
-                    <span className="type-body-s text-ink-2 truncate">
-                      {job.crew.length > 0
-                        ? job.crew.map((c) => `${c.name} (${c.crewRole.toLowerCase()})`).join(', ')
-                        : 'Assign driver and grooms'}
-                    </span>
-                  </div>
-
-                  {/* Clearance */}
-                  <div className="flex flex-col gap-2">
-                    <span className="type-body-s text-ink-3">Clearance</span>
-                    <Chip tone={job.clearanceGateState === 'Clear' ? 'ok' : 'bad'}>
-                      {job.clearanceGateState === 'Clear' ? 'Clear to depart' : 'Locked'}
-                    </Chip>
-                    <span className="type-body-s text-ink-3">
-                      {job.clearanceGateState === 'Clear'
-                        ? 'Dossier complete.'
-                        : 'Departure stays locked until clearance is ready.'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="h-px w-full bg-line" />
-
-                {/* Footer Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <span className="type-body-s text-ink-3">
-                    {isConfirmed
-                      ? `Confirmed by ${loadPlan.confirmedByName || 'Coordinator'}`
-                      : unassigned.length > 0 || conflicts.length > 0
-                        ? `Place every horse and resolve ${conflicts.length} conflict(s) to confirm.`
-                        : 'All horses placed with zero conflicts. Ready to confirm.'}
-                  </span>
-
-                  <div className="flex items-center gap-3">
-                    {!isConfirmed && (
-                      <>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          disabled={busy}
-                          onClick={() =>
-                            autoArrangeMutation.mutate(undefined, {
-                              onError: reportRefusal(
-                                'The plan couldn’t be auto-arranged. Try again.',
-                              ),
-                            })
-                          }
-                        >
-                          {autoArrangeMutation.isPending ? 'Arranging...' : 'Auto-arrange'}
+                  {/* Selection bar: the click and keyboard path */}
+                  {selected && (
+                    <div className="px-3.5 py-2.5 rounded-lg border border-gold bg-gold-soft">
+                      <Flex gap={12} align="center">
+                        <span className="type-label-s flex-1 text-ink">
+                          {selected.horse.name} selected. Choose a stall.
+                        </span>
+                        {selected.fromStallId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => moveHorse(selected, null)}
+                          >
+                            Unload
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
+                          Cancel
                         </Button>
+                      </Flex>
+                    </div>
+                  )}
+
+                  {/* A refused move is never silent: the server says what changed and what to do. */}
+                  {moveMutation.isError && (
+                    <Callout
+                      tone="bad"
+                      title="That move wasn’t saved"
+                      action={
+                        <Button variant="ghost" size="sm" onClick={() => moveMutation.reset()}>
+                          Dismiss
+                        </Button>
+                      }
+                    >
+                      {apiErrorMessage(
+                        moveMutation.error,
+                        'The move couldn’t be saved. Check the plan and try again.',
+                      )}
+                    </Callout>
+                  )}
+
+                  {/* Stall Rows */}
+                  <Flex vertical gap={16}>
+                    {sortedRowKeys.map((rowKey) => {
+                      const rowStalls = rowsMap.get(rowKey) ?? [];
+                      // Sort by positionNo
+                      rowStalls.sort((a, b) => a.positionNo - b.positionNo);
+
+                      return (
+                        <div key={rowKey} className="grid grid-cols-2 gap-4">
+                          {rowStalls.map((s) => (
+                            <StallSlot
+                              key={s.stallId}
+                              stall={s}
+                              selected={selected}
+                              dragging={dragging}
+                              interactive={!isConfirmed}
+                              disabled={!editable}
+                              onClick={() => handleStallClick(s)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </Flex>
+
+                  {/* Rear Ramp */}
+                  <div className="py-2.5 rounded-lg border border-dashed border-line-strong">
+                    <Flex align="center" justify="center">
+                      <span className="type-chip text-ink-3">Rear ramp</span>
+                    </Flex>
+                  </div>
+                </Flex>
+              </div>
+
+              {/* Summary Panel */}
+              <Panel title="Summary" className="p-6">
+                <Flex vertical gap={24}>
+                  <Row gutter={[24, 24]}>
+                    {/* Payload */}
+                    <Col xs={24} md={8}>
+                      <Flex vertical gap={8}>
+                        <span className="type-body-s text-ink-3">Payload</span>
+                        <span className="type-data text-ink">
+                          {loadPlan.totalWeightKg.toLocaleString()} kg of{' '}
+                          {loadPlan.payloadKg.toLocaleString()} kg
+                        </span>
+                        <Progress tone="neutral" value={payloadPct} label="Payload percentage" />
+                      </Flex>
+                    </Col>
+
+                    {/* Crew */}
+                    <Col xs={24} md={8}>
+                      <Flex vertical gap={6}>
+                        <span className="type-body-s text-ink-3">Crew</span>
+                        <span className="type-data text-ink">
+                          {job.crew.length > 0
+                            ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
+                            : 'Not assigned'}
+                        </span>
+                        <span className="type-body-s text-ink-2 truncate">
+                          {job.crew.length > 0
+                            ? job.crew
+                                .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
+                                .join(', ')
+                            : 'Assign driver and grooms'}
+                        </span>
+                      </Flex>
+                    </Col>
+
+                    {/* Clearance */}
+                    <Col xs={24} md={8}>
+                      <Flex vertical gap={8}>
+                        <span className="type-body-s text-ink-3">Clearance</span>
+                        <Chip tone={job.clearanceGateState === 'Clear' ? 'ok' : 'bad'}>
+                          {job.clearanceGateState === 'Clear' ? 'Clear to depart' : 'Locked'}
+                        </Chip>
+                        <span className="type-body-s text-ink-3">
+                          {job.clearanceGateState === 'Clear'
+                            ? 'Dossier complete.'
+                            : 'Departure stays locked until clearance is ready.'}
+                        </span>
+                      </Flex>
+                    </Col>
+                  </Row>
+
+                  {/* Divider */}
+                  <Divider className="m-0!" />
+
+                  {/* Footer Actions */}
+                  <Flex wrap gap={16} align="center" justify="space-between">
+                    <span className="type-body-s text-ink-3">
+                      {isConfirmed
+                        ? `Confirmed by ${loadPlan.confirmedByName || 'Coordinator'}`
+                        : unassigned.length > 0 || conflicts.length > 0
+                          ? `Place every horse and resolve ${conflicts.length} conflict(s) to confirm.`
+                          : 'All horses placed with zero conflicts. Ready to confirm.'}
+                    </span>
+
+                    <Flex gap={12} align="center">
+                      {!isConfirmed && (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="md"
+                            disabled={busy}
+                            onClick={() =>
+                              autoArrangeMutation.mutate(undefined, {
+                                onError: reportRefusal(
+                                  'The plan couldn’t be auto-arranged. Try again.',
+                                ),
+                              })
+                            }
+                          >
+                            {autoArrangeMutation.isPending ? 'Arranging...' : 'Auto-arrange'}
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="md"
+                            disabled={!canConfirm || busy || confirmMutation.isPending}
+                            onClick={() =>
+                              confirmMutation.mutate(undefined, {
+                                onError: reportRefusal(
+                                  'The load plan couldn’t be confirmed. Try again.',
+                                ),
+                              })
+                            }
+                          >
+                            {confirmMutation.isPending ? 'Confirming...' : 'Confirm load plan'}
+                          </Button>
+                        </>
+                      )}
+                      {isConfirmed && (
                         <Button
                           variant="primary"
                           size="md"
-                          disabled={!canConfirm || busy || confirmMutation.isPending}
+                          disabled={signOffMutation.isPending}
                           onClick={() =>
-                            confirmMutation.mutate(undefined, {
+                            signOffMutation.mutate(undefined, {
                               onError: reportRefusal(
-                                'The load plan couldn’t be confirmed. Try again.',
+                                'The trip plan couldn’t be signed off. Try again.',
                               ),
                             })
                           }
                         >
-                          {confirmMutation.isPending ? 'Confirming...' : 'Confirm load plan'}
+                          {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
                         </Button>
-                      </>
-                    )}
-                    {isConfirmed && (
-                      <Button
-                        variant="primary"
-                        size="md"
-                        disabled={signOffMutation.isPending}
-                        onClick={() =>
-                          signOffMutation.mutate(undefined, {
-                            onError: reportRefusal(
-                              'The trip plan couldn’t be signed off. Try again.',
-                            ),
-                          })
-                        }
-                      >
-                        {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </Panel>
-          </div>
-        </div>
-      </div>
+                      )}
+                    </Flex>
+                  </Flex>
+                </Flex>
+              </Panel>
+            </Flex>
+          </Col>
+        </Row>
+      </Flex>
 
       {/* What follows the pointer: a compact card beside the cursor, so the stall under it
           keeps showing its drop hint. */}

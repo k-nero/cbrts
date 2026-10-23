@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Panel } from '@/components/ui';
 
@@ -14,16 +15,15 @@ const WHY: [string, string][] = [
 /** "Why we ask" (frame: First run · Add a horse). */
 export const WhyWeAsk: FC = () => (
   <Panel title="Why we ask">
-    <div className="flex flex-col">
+    <Flex vertical>
       {WHY.map(([title, line]) => (
-        <div
-          key={title}
-          className="flex flex-col gap-0.5 border-t border-line py-2.5 first:border-t-0"
-        >
-          <span className="type-label-s text-ink">{title}</span>
-          <span className="type-body-s text-ink-2">{line}</span>
+        <div key={title} className="border-t border-line py-2.5 first:border-t-0">
+          <Flex vertical gap={2}>
+            <span className="type-label-s text-ink">{title}</span>
+            <span className="type-body-s text-ink-2">{line}</span>
+          </Flex>
         </div>
       ))}
-    </div>
+    </Flex>
   </Panel>
 );

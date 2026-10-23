@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { changeRows, fromLabel, recordedLabel, roleLabel, stampLabel } from './format';
 import { Row } from './Row';
@@ -36,39 +37,41 @@ const AuditEntryPanel: FC<Props> = ({ entry, onClose }) => {
         </button>
       }
     >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1.5">
+      <Flex vertical gap={20}>
+        <Flex vertical gap={6}>
           <h3 className="type-h4 m-0 text-ink">{entry.summary}</h3>
           <span className="type-caption text-ink-3">{stampLabel(entry.occurredAt)}</span>
           <span className="type-body-s text-ink-2">{who}</span>
-        </div>
+        </Flex>
 
         {changes.length > 0 && (
-          <div className="flex flex-col">
+          <Flex vertical>
             <span className="type-label-m pb-1.5 text-ink">What changed</span>
             {changes.map((c) => (
-              <div key={c.label} className="flex flex-col gap-1 border-t border-line py-2.5">
-                <span className="type-body-s text-ink-2">{c.label}</span>
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="type-body-s text-ink-3 line-through">{c.before}</span>
-                  <Icon name="arrow-right" size={14} className="text-ink-3" />
-                  <span className="type-label-s text-ink">{c.after}</span>
-                </span>
+              <div key={c.label} className="border-t border-line py-2.5">
+                <Flex vertical gap={4}>
+                  <span className="type-body-s text-ink-2">{c.label}</span>
+                  <Flex component="span" wrap align="center" gap={8}>
+                    <span className="type-body-s text-ink-3 line-through">{c.before}</span>
+                    <Icon name="arrow-right" size={14} className="text-ink-3" />
+                    <span className="type-label-s text-ink">{c.after}</span>
+                  </Flex>
+                </Flex>
               </div>
             ))}
-          </div>
+          </Flex>
         )}
 
         {entry.reason && (
-          <div className="flex flex-col gap-2">
+          <Flex vertical gap={8}>
             <span className="type-label-m text-ink">Reason, as written</span>
             <blockquote className="type-body-s m-0 rounded-md bg-sunken px-3.5 py-3 text-ink">
               “{entry.reason}”
             </blockquote>
-          </div>
+          </Flex>
         )}
 
-        <div className="flex flex-col gap-2">
+        <Flex vertical gap={8}>
           {entry.entityCode && (
             <Row label="On">
               <span className="type-data text-ink">{entry.entityCode}</span>
@@ -86,7 +89,7 @@ const AuditEntryPanel: FC<Props> = ({ entry, onClose }) => {
           <Row label="Entry">
             <span className="type-caption text-ink-2">{entry.id}</span>
           </Row>
-        </div>
+        </Flex>
 
         {entry.jobId && (
           <div>
@@ -106,7 +109,7 @@ const AuditEntryPanel: FC<Props> = ({ entry, onClose }) => {
         <p className="type-body-s m-0 text-ink-3">
           This entry can’t be edited or deleted. A correction is a new entry that points back to it.
         </p>
-      </div>
+      </Flex>
     </Panel>
   );
 };

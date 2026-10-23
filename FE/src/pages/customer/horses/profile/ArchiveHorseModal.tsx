@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import BaseModal from '@/components/modal/BaseModal';
 import { Button, Callout } from '@/components/ui';
@@ -42,7 +42,7 @@ const ArchiveHorseModal: FC<{ horse: Horse; open: boolean; onClose: () => void }
 
   return (
     <BaseModal open={open} onCancel={close} title={`Archive ${horse.name}?`}>
-      <div className="flex flex-col gap-4">
+      <Flex vertical gap={16}>
         <p className="type-body-m m-0 text-ink-2">
           {horse.name} leaves My horses and can’t be put on new requests. {capitalise(possessive)}{' '}
           past requests keep {object}.
@@ -52,15 +52,15 @@ const ArchiveHorseModal: FC<{ horse: Horse; open: boolean; onClose: () => void }
             {refusal}
           </Callout>
         )}
-        <div className="flex justify-end gap-2">
+        <Flex justify="end" gap={8}>
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
           <Button variant="primary" onClick={confirm} disabled={archive.isPending}>
             Archive
           </Button>
-        </div>
-      </div>
+        </Flex>
+      </Flex>
     </BaseModal>
   );
 };

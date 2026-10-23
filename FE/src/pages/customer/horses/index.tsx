@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pagination, Skeleton } from 'antd';
+import { Col, Flex, Pagination, Row, Skeleton } from 'antd';
 
 import { archivedChip, horseCardProps } from './components/horseCardProps';
 import FirstRun from './FirstRun';
@@ -51,11 +51,13 @@ const MyHorsesPage: FC = () => {
   const body = () => {
     if (listQuery.isPending || activeCount.isPending) {
       return (
-        <div className="grid grid-cols-3 gap-6" aria-busy>
+        <Row gutter={[24, 24]} aria-busy>
           {[0, 1, 2].map((i) => (
-            <Skeleton.Node key={i} active className="!h-[420px] !w-full" />
+            <Col key={i} span={8}>
+              <Skeleton.Node active className="!h-[420px] !w-full" />
+            </Col>
           ))}
-        </div>
+        </Row>
       );
     }
     if (listQuery.isError || !page) {
@@ -80,38 +82,45 @@ const MyHorsesPage: FC = () => {
           No archived horses. Archiving keeps a horse’s history but takes it off new requests.
         </p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <Flex vertical gap={16}>
           <p className="type-body-m m-0 text-ink-2">
             No active horses. Add one, or see the Archived tab.
           </p>
-          <div className="grid grid-cols-3 gap-6">
-            <AddHorseCard onClick={toAdd} />
-          </div>
-        </div>
+          <Row gutter={[24, 24]}>
+            <Col span={8}>
+              <AddHorseCard onClick={toAdd} />
+            </Col>
+          </Row>
+        </Flex>
       );
     }
     return (
-      <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-3 items-start gap-6">
+      <Flex vertical gap={24}>
+        <Row gutter={[24, 24]} align="top">
           {page.content.map((horse) => (
-            <HorseCard
-              key={horse.id}
-              {...horseCardProps(horse, today)}
-              status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
-              actions={
-                <>
-                  <Button onClick={() => toProfile(horse.id)}>Open profile</Button>
-                  {!horse.archivedAt && (
-                    <Button variant="ghost" leadingIcon="pencil" onClick={() => toEdit(horse.id)}>
-                      Edit
-                    </Button>
-                  )}
-                </>
-              }
-            />
+            <Col key={horse.id} span={8}>
+              <HorseCard
+                {...horseCardProps(horse, today)}
+                status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
+                actions={
+                  <>
+                    <Button onClick={() => toProfile(horse.id)}>Open profile</Button>
+                    {!horse.archivedAt && (
+                      <Button variant="ghost" leadingIcon="pencil" onClick={() => toEdit(horse.id)}>
+                        Edit
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            </Col>
           ))}
-          {!archived && page.last && <AddHorseCard onClick={toAdd} />}
-        </div>
+          {!archived && page.last && (
+            <Col span={8}>
+              <AddHorseCard onClick={toAdd} />
+            </Col>
+          )}
+        </Row>
         {page.totalPages > 1 && (
           <Pagination
             align="center"
@@ -122,12 +131,12 @@ const MyHorsesPage: FC = () => {
             onChange={(p) => setPageState((prev) => ({ ...prev, number: p - 1 }))}
           />
         )}
-      </div>
+      </Flex>
     );
   };
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         reserveBack
         title="My horses"
@@ -152,7 +161,7 @@ const MyHorsesPage: FC = () => {
         />
       )}
       {body()}
-    </div>
+    </Flex>
   );
 };
 

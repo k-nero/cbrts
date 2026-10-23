@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Skeleton } from 'antd';
+import { Flex, Skeleton } from 'antd';
 
 import { NothingOwed } from './NothingOwed';
 import { OnTheRoad } from './OnTheRoad';
@@ -48,9 +48,11 @@ const CustomerHomePage: FC = () => {
 
   if (isPending) {
     return (
-      <div className="flex flex-col gap-7 pt-[46px]" aria-busy>
-        <Skeleton active title={{ width: 360 }} paragraph={{ rows: 1, width: 640 }} />
-        <Skeleton active paragraph={{ rows: 6 }} />
+      <div className="pt-[46px]" aria-busy>
+        <Flex vertical gap={28}>
+          <Skeleton active title={{ width: 360 }} paragraph={{ rows: 1, width: 640 }} />
+          <Skeleton active paragraph={{ rows: 6 }} />
+        </Flex>
       </div>
     );
   }
@@ -74,7 +76,7 @@ const CustomerHomePage: FC = () => {
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader reserveBack title={home.clubName} summary={summaryOf(home)} />
       {home.owed.length > 0 ? (
         <OwedPanel home={home} onOpen={toRequests} onAllRequests={toRequests} />
@@ -86,7 +88,7 @@ const CustomerHomePage: FC = () => {
         <YourMoves home={home} onOpen={handleOpenMove} onAll={toRequests} />
         <YourHorses home={home} onAll={toHorses} />
       </div>
-    </div>
+    </Flex>
   );
 };
 

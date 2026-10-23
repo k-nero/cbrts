@@ -1,3 +1,4 @@
+import { Col, Flex, Row } from 'antd';
 import type { FC } from 'react';
 
 import { PassEnd } from './PassEnd';
@@ -40,66 +41,82 @@ const CODE_BARS = [2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 2];
  * or club.
  */
 export const TravelPass: FC = () => (
-  <aside
+  <Flex
+    component="aside"
     aria-label="Example travel pass: Ho Chi Minh City to Phnom Penh"
-    className="flex w-[520px] shrink-0 overflow-hidden rounded-xl bg-card shadow-overlay"
+    className="w-[520px] shrink-0 overflow-hidden rounded-xl bg-card shadow-overlay"
   >
-    <div className="flex min-w-0 flex-1 flex-col gap-[18px] py-6 pr-6 pl-7">
-      <div className="flex items-center justify-between">
-        <span className="type-label-s text-ink-3">Travel pass</span>
-        <Chip dot={false}>Example</Chip>
-      </div>
-      <div className="flex items-center gap-3.5">
-        <PassEnd code="HCM" city="Ho Chi Minh City" />
-        <span className="flex flex-1 items-center gap-2 pb-[18px]" aria-hidden>
-          <span className="h-px flex-1 bg-line-strong" />
-          <Icon name="truck" size={18} className="text-ink-2" />
-          <span className="h-px flex-1 bg-line-strong" />
-        </span>
-        <PassEnd code="PNH" city="Phnom Penh" end />
-      </div>
-      <dl className="m-0 flex flex-col gap-3">
-        {PASS_FACTS.map((row) => (
-          <div key={row[0][0]} className="grid grid-cols-2 gap-4">
-            {row.map(([label, value, mono]) => (
-              <div key={label} className="flex flex-col gap-0.5">
-                <dt className="type-body-s text-ink-3">{label}</dt>
-                <dd className={cx('m-0 text-ink', mono ? 'type-data' : 'type-label-m')}>{value}</dd>
-              </div>
-            ))}
-          </div>
-        ))}
-      </dl>
-      <hr className="m-0 border-0 border-t border-line" />
-      <div className="flex flex-col gap-2">
-        <span className="type-body-s text-ink-3">Each document must carry</span>
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {PASS_DOCUMENTS.map(([doc, date]) => (
-            <li key={doc} className="flex items-center gap-3">
-              <span className="type-label-s flex-1 text-ink">{doc}</span>
-              <span className="type-caption text-right text-ink-2">{date}</span>
-            </li>
+    <div className="min-w-0 flex-1 py-6 pr-6 pl-7">
+      <Flex vertical gap={18}>
+        <Flex align="center" justify="space-between">
+          <span className="type-label-s text-ink-3">Travel pass</span>
+          <Chip dot={false}>Example</Chip>
+        </Flex>
+        <Flex align="center" gap={14}>
+          <PassEnd code="HCM" city="Ho Chi Minh City" />
+          <span className="flex-1 pb-[18px]" aria-hidden>
+            <Flex component="span" align="center" gap={8}>
+              <span className="h-px flex-1 bg-line-strong" />
+              <Icon name="truck" size={18} className="text-ink-2" />
+              <span className="h-px flex-1 bg-line-strong" />
+            </Flex>
+          </span>
+          <PassEnd code="PNH" city="Phnom Penh" end />
+        </Flex>
+        <Flex component="dl" vertical gap={12}>
+          {PASS_FACTS.map((row) => (
+            <Row key={row[0][0]} gutter={[16, 16]}>
+              {row.map(([label, value, mono]) => (
+                <Col key={label} span={12}>
+                  <Flex vertical gap={2}>
+                    <dt className="type-body-s text-ink-3">{label}</dt>
+                    <dd className={cx('m-0 text-ink', mono ? 'type-data' : 'type-label-m')}>
+                      {value}
+                    </dd>
+                  </Flex>
+                </Col>
+              ))}
+            </Row>
           ))}
-        </ul>
-      </div>
+        </Flex>
+        <hr className="m-0 border-0 border-t border-line" />
+        <Flex vertical gap={8}>
+          <span className="type-body-s text-ink-3">Each document must carry</span>
+          <Flex component="ul" vertical gap={8} className="list-none">
+            {PASS_DOCUMENTS.map(([doc, date]) => (
+              <Flex key={doc} component="li" align="center" gap={12}>
+                <span className="type-label-s flex-1 text-ink">{doc}</span>
+                <span className="type-caption text-right text-ink-2">{date}</span>
+              </Flex>
+            ))}
+          </Flex>
+        </Flex>
+      </Flex>
     </div>
     <Perforation />
-    <div className="flex w-[140px] shrink-0 flex-col justify-between gap-3 bg-sunken px-[18px] py-6">
-      <div className="flex flex-col gap-2">
-        <span className="grid size-8 place-items-center rounded-full bg-ok-soft text-ok">
-          <Icon name="unlock" size={16} />
-        </span>
-        <span className="type-label-m text-ink">Clear to depart</span>
-        <span className="type-body-s text-ink-2">23 of 23 documents cleared</span>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="flex h-9 gap-0.5" aria-hidden>
-          {CODE_BARS.map((w, i) => (
-            <span key={i} className="h-full bg-ink" style={{ width: w }} />
-          ))}
-        </span>
-        <span className="type-caption text-ink-3">Example only</span>
-      </div>
+    <div className="w-[140px] shrink-0 bg-sunken px-[18px] py-6">
+      <Flex vertical justify="space-between" gap={12} className="h-full">
+        <Flex vertical gap={8}>
+          <Flex
+            component="span"
+            align="center"
+            justify="center"
+            className="size-8 rounded-full bg-ok-soft text-ok"
+          >
+            <Icon name="unlock" size={16} />
+          </Flex>
+          <span className="type-label-m text-ink">Clear to depart</span>
+          <span className="type-body-s text-ink-2">23 of 23 documents cleared</span>
+        </Flex>
+        <Flex vertical gap={6}>
+          <Flex component="span" gap={2} className="h-9" aria-hidden>
+            {CODE_BARS.map((w, i) => (
+              <span key={i} className="h-full bg-ink" style={{ width: w }} />
+            ))}
+          </Flex>
+          <span className="type-caption text-ink-3">Example only</span>
+        </Flex>
+      </Flex>
     </div>
-  </aside>
+  </Flex>
 );

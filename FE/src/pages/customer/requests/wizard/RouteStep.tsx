@@ -1,4 +1,5 @@
 import type { FC, ReactNode } from 'react';
+import { Col, Flex, Row } from 'antd';
 import { useFormContext, useWatch } from 'react-hook-form';
 
 import { Group } from './Group';
@@ -58,10 +59,10 @@ const typedCity = async (text: string): Promise<PlaceChoice> => ({
 
 const placeLabel = (o: PlaceChoice, { context }: { context: 'menu' | 'value' }): ReactNode =>
   context === 'menu' && o.country ? (
-    <span className="flex flex-col">
+    <Flex component="span" vertical>
       <span>{o.label}</span>
       <span className="type-body-s text-ink-3">{o.country}</span>
-    </span>
+    </Flex>
   ) : (
     o.label
   );
@@ -127,31 +128,35 @@ const RouteStep: FC<StepProps> = ({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      <Flex vertical gap={8}>
         <h2 className="type-h3 m-0 text-ink">Route and dates</h2>
         <p className="type-body-m m-0 text-ink-2">
           We work out the border crossings from the route. Cross-border moves need time for
           documents to clear.
         </p>
-      </div>
+      </Flex>
 
-      <div className="grid grid-cols-2 gap-4">
-        <FormField
-          name="origin"
-          label="From"
-          component="async-creatable-select"
-          componentProps={PLACE_PROPS}
-        />
-        <FormField
-          name="destination"
-          label="To"
-          component="async-creatable-select"
-          componentProps={{
-            ...PLACE_PROPS,
-            instruction: notRun ? 'Outside the region we run.' : undefined,
-          }}
-        />
-      </div>
+      <Row gutter={[16, 16]}>
+        <Col span={12}>
+          <FormField
+            name="origin"
+            label="From"
+            component="async-creatable-select"
+            componentProps={PLACE_PROPS}
+          />
+        </Col>
+        <Col span={12}>
+          <FormField
+            name="destination"
+            label="To"
+            component="async-creatable-select"
+            componentProps={{
+              ...PLACE_PROPS,
+              instruction: notRun ? 'Outside the region we run.' : undefined,
+            }}
+          />
+        </Col>
+      </Row>
 
       {notRun ? (
         <>
@@ -164,23 +169,29 @@ const RouteStep: FC<StepProps> = ({
           </Callout>
           {originId && (alternatives.data?.length ?? 0) > 0 && (
             <Panel title={`Routes we run from ${fromCity}`}>
-              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              <Flex component="ul" vertical gap={12} className="list-none">
                 {alternatives.data?.map((r) => (
-                  <li key={r.corridorId} className="flex items-center justify-between gap-4">
+                  <Flex
+                    component="li"
+                    align="center"
+                    justify="space-between"
+                    gap={16}
+                    key={r.corridorId}
+                  >
                     <span className="type-body-s text-ink-2">{alternativeLine(r)}</span>
                     <Button size="sm" trailingIcon="arrow-right" onClick={() => void takeRoute(r)}>
                       Use this route
                     </Button>
-                  </li>
+                  </Flex>
                 ))}
-              </ul>
+              </Flex>
             </Panel>
           )}
         </>
       ) : (
         <>
           {route && (
-            <div className="flex flex-col gap-2.5">
+            <Flex vertical gap={10}>
               <div className="overflow-x-auto rounded-lg border border-line bg-card p-5">
                 <RouteStrip stops={routeStops(route)} />
               </div>
@@ -188,90 +199,108 @@ const RouteStep: FC<StepProps> = ({
                 {routeSentence(route)} {routePlanLine(route)}
                 {alsoByLine(routes, route)}
               </p>
-            </div>
+            </Flex>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              name="departureDate"
-              label="Departure date"
-              component="datepicker"
-              componentProps={{
-                format: 'D MMM YYYY',
-                instruction:
-                  route?.earliestDeparture && route.leadTimeDays !== null
-                    ? `Earliest departure ${formatDay(route.earliestDeparture)} · ${route.leadTimeDays} days’ notice`
-                    : undefined,
-              }}
-            />
-            <FormField
-              name="specialInstructions"
-              label="Special instructions"
-              component="textarea"
-              componentProps={{ maxLength: 500, autoSize: { minRows: 1, maxRows: 4 } }}
-            />
-          </div>
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <FormField
+                name="departureDate"
+                label="Departure date"
+                component="datepicker"
+                componentProps={{
+                  format: 'D MMM YYYY',
+                  instruction:
+                    route?.earliestDeparture && route.leadTimeDays !== null
+                      ? `Earliest departure ${formatDay(route.earliestDeparture)} · ${route.leadTimeDays} days’ notice`
+                      : undefined,
+                }}
+              />
+            </Col>
+            <Col span={12}>
+              <FormField
+                name="specialInstructions"
+                label="Special instructions"
+                component="textarea"
+                componentProps={{ maxLength: 500, autoSize: { minRows: 1, maxRows: 4 } }}
+              />
+            </Col>
+          </Row>
 
           <Group
             title="Arrival"
             sub="Road moves only. By air, the airline’s schedule sets the arrival time."
           >
-            <div className="grid grid-cols-2 gap-4">
-              <OptionCard
-                name="arrivalMode"
-                value="ANY_TIME"
-                icon="clock"
-                selected={arrivalMode === 'ANY_TIME'}
-                onChange={() => set('arrivalMode', 'ANY_TIME')}
-                title="Any time on the day"
-                description="We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days."
-                meta={optionMeta(estimate?.options.arrivalWindow.find((o) => o.value === 'false'))}
-              />
-              <OptionCard
-                name="arrivalMode"
-                value="WINDOW"
-                icon="calendar"
-                selected={arrivalMode === 'WINDOW'}
-                disabled={!windowRuns}
-                onChange={() => set('arrivalMode', 'WINDOW')}
-                title="Within a window"
-                description="You choose a window of at least 3 hours. We use a private trailer so the departure is yours."
-                meta={optionMeta(
-                  estimate?.options.arrivalWindow.find((o) => o.value === 'true'),
-                  windowRuns ? undefined : 'Road moves only',
-                )}
-              />
-            </div>
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <OptionCard
+                  className="h-full"
+                  name="arrivalMode"
+                  value="ANY_TIME"
+                  icon="clock"
+                  selected={arrivalMode === 'ANY_TIME'}
+                  onChange={() => set('arrivalMode', 'ANY_TIME')}
+                  title="Any time on the day"
+                  description="We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days."
+                  meta={optionMeta(
+                    estimate?.options.arrivalWindow.find((o) => o.value === 'false'),
+                  )}
+                />
+              </Col>
+              <Col span={12}>
+                <OptionCard
+                  className="h-full"
+                  name="arrivalMode"
+                  value="WINDOW"
+                  icon="calendar"
+                  selected={arrivalMode === 'WINDOW'}
+                  disabled={!windowRuns}
+                  onChange={() => set('arrivalMode', 'WINDOW')}
+                  title="Within a window"
+                  description="You choose a window of at least 3 hours. We use a private trailer so the departure is yours."
+                  meta={optionMeta(
+                    estimate?.options.arrivalWindow.find((o) => o.value === 'true'),
+                    windowRuns ? undefined : 'Road moves only',
+                  )}
+                />
+              </Col>
+            </Row>
             {arrivalMode === 'WINDOW' ? (
               <>
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    name="arriveOn"
-                    label="Arrive on"
-                    component="datepicker"
-                    componentProps={{ format: 'D MMM YYYY' }}
-                  />
-                  <FormField
-                    name="windowFrom"
-                    label="From"
-                    component="select"
-                    componentProps={{ options: TIMES }}
-                  />
-                  <FormField
-                    name="windowUntil"
-                    label="Until"
-                    component="select"
-                    componentProps={{
-                      options: TIMES,
-                      instruction:
-                        windowFrom &&
-                        windowUntil &&
-                        windowMinutes(windowFrom.value, windowUntil.value) > 0
-                          ? windowLength(windowFrom.value, windowUntil.value)
-                          : undefined,
-                    }}
-                  />
-                </div>
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <FormField
+                      name="arriveOn"
+                      label="Arrive on"
+                      component="datepicker"
+                      componentProps={{ format: 'D MMM YYYY' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <FormField
+                      name="windowFrom"
+                      label="From"
+                      component="select"
+                      componentProps={{ options: TIMES }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <FormField
+                      name="windowUntil"
+                      label="Until"
+                      component="select"
+                      componentProps={{
+                        options: TIMES,
+                        instruction:
+                          windowFrom &&
+                          windowUntil &&
+                          windowMinutes(windowFrom.value, windowUntil.value) > 0
+                            ? windowLength(windowFrom.value, windowUntil.value)
+                            : undefined,
+                      }}
+                    />
+                  </Col>
+                </Row>
                 <Callout
                   tone="info"
                   title={`If we arrive after ${windowUntil?.value ?? 'the window closes'}, we pay`}
@@ -292,28 +321,30 @@ const RouteStep: FC<StepProps> = ({
 
       <StepRefusal messages={refusal ? [refusal] : []} />
 
-      <div className="flex items-center justify-between border-t border-line pt-5">
-        <Button leadingIcon="arrow-left" disabled={saving} onClick={onBack}>
-          Back
-        </Button>
-        <div className="flex items-center gap-4">
-          {notRun && (
-            <span className="type-body-s text-ink-3">Choose a route we run to continue</span>
-          )}
-          {tooSoon && earliest && (
-            <Button leadingIcon="calendar" onClick={() => set('departureDate', earliest)}>
-              Use {formatDay(earliest)}
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            trailingIcon="arrow-right"
-            disabled={saving || held || notRun}
-            onClick={onContinue}
-          >
-            Continue
+      <div className="border-t border-line pt-5">
+        <Flex align="center" justify="space-between">
+          <Button leadingIcon="arrow-left" disabled={saving} onClick={onBack}>
+            Back
           </Button>
-        </div>
+          <Flex align="center" gap={16}>
+            {notRun && (
+              <span className="type-body-s text-ink-3">Choose a route we run to continue</span>
+            )}
+            {tooSoon && earliest && (
+              <Button leadingIcon="calendar" onClick={() => set('departureDate', earliest)}>
+                Use {formatDay(earliest)}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              trailingIcon="arrow-right"
+              disabled={saving || held || notRun}
+              onClick={onContinue}
+            >
+              Continue
+            </Button>
+          </Flex>
+        </Flex>
       </div>
     </>
   );

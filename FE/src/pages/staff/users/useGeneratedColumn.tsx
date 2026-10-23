@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { App, TableColumnsType } from 'antd';
+import { App, Flex, TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 
 import { UserInput } from '@/apis/user.ts';
@@ -50,16 +50,21 @@ export const useGeneratedUserColumn = ({ crud, onEdit }: UseGeneratedUserColumnP
         width: 300,
         sorter: true,
         render: (_, r) => (
-          <div className="flex items-center gap-2.5">
-            <span className="type-chip grid size-8 shrink-0 place-items-center rounded-full bg-muted text-ink-2">
+          <Flex gap={10} align="center">
+            <Flex
+              component="span"
+              align="center"
+              justify="center"
+              className="type-chip size-8 shrink-0 rounded-full bg-muted text-ink-2"
+            >
               {initials(r)}
-            </span>
-            <div className="flex min-w-0 flex-col">
+            </Flex>
+            <Flex vertical className="min-w-0">
               <span className="font-medium text-ink">{`${r.lastName} ${r.firstName}`}</span>
               {/* Staff go by their code (EF-001); a customer has none, so their email stands in. */}
               <span className="type-caption text-ink-3">{r.staffCode ?? r.email}</span>
-            </div>
-          </div>
+            </Flex>
+          </Flex>
         ),
       },
       {

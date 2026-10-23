@@ -1,6 +1,6 @@
 import { type FC, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { App, Skeleton } from 'antd';
+import { App, Flex, Skeleton } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 
 import { CorridorList } from './CorridorList';
@@ -134,7 +134,7 @@ const RatesPage: FC = () => {
   );
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         title="Rate catalog"
         summary="Rates for each corridor and service class. A quotation pins the version it was built from, so later changes never alter an issued quote."
@@ -150,7 +150,7 @@ const RatesPage: FC = () => {
         </Panel>
       ) : (
         <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-6">
-          <div className="flex flex-col gap-6">
+          <Flex vertical gap={24}>
             <CorridorList
               corridors={catalog.corridors}
               selectedId={corridorId}
@@ -158,8 +158,8 @@ const RatesPage: FC = () => {
               onSelect={select}
             />
             <VersionsPanel versions={catalog.versions} />
-          </div>
-          <div className="flex min-w-0 flex-col gap-6">
+          </Flex>
+          <Flex vertical gap={24} className="min-w-0">
             {picked.unknown && (
               <Callout
                 tone="warn"
@@ -195,7 +195,7 @@ const RatesPage: FC = () => {
             ) : (
               loading
             )}
-          </div>
+          </Flex>
         </div>
       )}
       {view && modalOpen?.kind === 'line' && (
@@ -222,7 +222,7 @@ const RatesPage: FC = () => {
       {view && modalOpen?.kind === 'policies' && (
         <PoliciesModal open view={view} onClose={close} onDraftGone={onDraftGone} />
       )}
-    </div>
+    </Flex>
   );
 };
 

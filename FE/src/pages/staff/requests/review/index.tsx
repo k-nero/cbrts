@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -47,19 +48,19 @@ const RequestReviewPage: FC = () => {
   const to = subject.route?.toCity ?? subject.destination?.city ?? '—';
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         back={{ label: 'Requests', onClick: toList }}
         title={`${from} → ${to}`}
         summary={
-          <span className="flex flex-col gap-1">
+          <Flex component="span" vertical gap={4}>
             <span className="type-data text-ink">{request.code}</span>
             <span>{reviewSummary(subject)}</span>
-          </span>
+          </Flex>
         }
         right={
           queue && (
-            <span className="flex items-center gap-2">
+            <Flex component="span" gap={8} align="center">
               <span className="type-body-s text-ink-3">Review queue</span>
               <Button
                 size="sm"
@@ -80,19 +81,19 @@ const RequestReviewPage: FC = () => {
               >
                 Next
               </Button>
-            </span>
+            </Flex>
           )
         }
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
-        <div className="flex min-w-0 flex-col gap-6">
+        <Flex vertical gap={24} className="min-w-0">
           <ChecksPanel checks={review.checks} inReview={inReview(request.status)} />
           <SentPanel key={request.id} revisions={review.revisions} />
           <HistoryPanel history={review.history} />
-        </div>
+        </Flex>
         <DecisionPanel key={request.id} review={review} />
       </div>
-    </div>
+    </Flex>
   );
 };
 

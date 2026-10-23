@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { type HorseFormShape } from '../components/HorseForm';
 import { horseCardProps } from '../components/horseCardProps';
@@ -37,14 +38,14 @@ export const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
     today(),
   );
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
+    <Flex component="section" vertical gap={12}>
+      <Flex vertical gap={2}>
         <h4 className="type-h4 m-0 text-ink">{heading}</h4>
         <p className="type-body-s m-0 text-ink-3">
           On My horses and in every request. It updates as you type.
         </p>
-      </div>
+      </Flex>
       <HorseCard {...card} />
-    </section>
+    </Flex>
   );
 };

@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Panel } from '@/components/ui';
 import type { CustomerQuotation } from '@/interfaces';
@@ -20,19 +21,24 @@ export const AfterYouAccept: FC<{ quotation: CustomerQuotation }> = ({ quotation
   ];
   return (
     <Panel title="After you accept">
-      <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+      <Flex component="ol" vertical gap={14} className="list-none">
         {steps.map(([title, sub], i) => (
-          <li key={title} className="flex items-start gap-3.5">
-            <span className="type-mono-caption flex size-6.5 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink-3">
+          <Flex component="li" align="start" gap={14} key={title}>
+            <Flex
+              component="span"
+              align="center"
+              justify="center"
+              className="type-mono-caption size-6.5 shrink-0 rounded-full border border-line-strong text-ink-3"
+            >
               {i + 1}
-            </span>
-            <span className="flex flex-col gap-0.5">
+            </Flex>
+            <Flex component="span" vertical gap={2}>
               <span className="type-label-s text-ink">{title}</span>
               <span className="type-body-s text-ink-3">{sub}</span>
-            </span>
-          </li>
+            </Flex>
+          </Flex>
         ))}
-      </ol>
+      </Flex>
     </Panel>
   );
 };

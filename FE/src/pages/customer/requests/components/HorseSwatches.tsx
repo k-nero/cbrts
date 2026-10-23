@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { COAT_SWATCH, cx } from '@/components/ui';
 import type { Horse } from '@/interfaces';
@@ -6,7 +7,7 @@ import { coatOf } from '@/lib/utils';
 
 /** The picked horses as overlapping coat swatches with the count, as on the pass. */
 export const HorseSwatches: FC<{ ids: string[]; horses: Horse[] }> = ({ ids, horses }) => (
-  <span className="flex items-center gap-2">
+  <Flex component="span" align="center" gap={8}>
     <span className="flex -space-x-1.5">
       {ids.slice(0, 6).map((id) => {
         const coat = coatOf(horses.find((h) => h.id === id)?.coat ?? null);
@@ -22,5 +23,5 @@ export const HorseSwatches: FC<{ ids: string[]; horses: Horse[] }> = ({ ids, hor
     <span className="type-data text-ink">
       {ids.length} {ids.length === 1 ? 'horse' : 'horses'}
     </span>
-  </span>
+  </Flex>
 );

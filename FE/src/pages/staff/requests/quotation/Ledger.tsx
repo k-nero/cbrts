@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import type { RunWrite } from './editorOptions';
 import { ManualLineEditor } from './ManualLineEditor';
@@ -68,51 +68,53 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
         )}
         {changed && <span className="type-mono-caption text-ink-3">{changed}</span>}
         {actions && (l.manual || l.amount != null) && (
-          <span className="flex flex-wrap gap-2 pt-1">
-            {l.manual ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Edit ${l.description}`}
-                  onClick={() => setOpen({ kind: 'edit', lineId: l.id })}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Remove ${l.description}`}
-                  disabled={pending}
-                  onClick={() => onRemoveLine(l)}
-                >
-                  Remove
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Override ${l.description}`}
-                  onClick={() => setOpen({ kind: 'override', lineId: l.id })}
-                >
-                  {l.overrideAmount != null ? 'Change override' : 'Override'}
-                </Button>
-                {l.overrideAmount != null && (
+          <div className="pt-1">
+            <Flex component="span" wrap gap={8}>
+              {l.manual ? (
+                <>
                   <Button
                     size="sm"
                     variant="ghost"
-                    aria-label={`Remove the override on ${l.description}`}
-                    disabled={pending}
-                    onClick={() => onRemoveOverride(l)}
+                    aria-label={`Edit ${l.description}`}
+                    onClick={() => setOpen({ kind: 'edit', lineId: l.id })}
                   >
-                    Remove override
+                    Edit
                   </Button>
-                )}
-              </>
-            )}
-          </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Remove ${l.description}`}
+                    disabled={pending}
+                    onClick={() => onRemoveLine(l)}
+                  >
+                    Remove
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Override ${l.description}`}
+                    onClick={() => setOpen({ kind: 'override', lineId: l.id })}
+                  >
+                    {l.overrideAmount != null ? 'Change override' : 'Override'}
+                  </Button>
+                  {l.overrideAmount != null && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Remove the override on ${l.description}`}
+                      disabled={pending}
+                      onClick={() => onRemoveOverride(l)}
+                    >
+                      Remove override
+                    </Button>
+                  )}
+                </>
+              )}
+            </Flex>
+          </div>
         )}
       </>
     );
@@ -134,22 +136,29 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
       </div>
       {quotation.groups.map((g) => (
         <section key={g.code} aria-label={`${g.code} ${g.name}`}>
-          <div className="flex items-center gap-3 px-5 pt-4 pb-2">
-            <span className="type-mono-chip flex size-6 items-center justify-center rounded-sm bg-muted text-ink-2">
-              {g.code}
-            </span>
-            <span className="type-h4 flex-1 text-ink">{g.name}</span>
-            {editable && open === null && (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Add a line to ${g.name}`}
-                onClick={() => setOpen({ kind: 'add', group: g.code })}
+          <div className="px-5 pt-4 pb-2">
+            <Flex gap={12} align="center">
+              <Flex
+                component="span"
+                align="center"
+                justify="center"
+                className="type-mono-chip size-6 rounded-sm bg-muted text-ink-2"
               >
-                Add line
-              </Button>
-            )}
-            <span className="type-data text-ink-2">{moneyOrDash(g.subtotal, currency)}</span>
+                {g.code}
+              </Flex>
+              <span className="type-h4 flex-1 text-ink">{g.name}</span>
+              {editable && open === null && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Add a line to ${g.name}`}
+                  onClick={() => setOpen({ kind: 'add', group: g.code })}
+                >
+                  Add line
+                </Button>
+              )}
+              <span className="type-data text-ink-2">{moneyOrDash(g.subtotal, currency)}</span>
+            </Flex>
           </div>
           {g.lines.map((l) => (
             <div key={l.id}>
@@ -157,10 +166,10 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
                 certainty={certainty(l)}
                 description={
                   l.manual ? (
-                    <span className="flex items-center gap-2">
+                    <Flex component="span" gap={8} align="center">
                       {l.description}
                       <Chip dot={false}>Manual</Chip>
-                    </span>
+                    </Flex>
                   ) : (
                     l.description
                   )

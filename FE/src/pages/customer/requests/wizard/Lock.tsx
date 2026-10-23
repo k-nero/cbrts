@@ -1,7 +1,13 @@
 import { Icon } from '@/components/ui';
+import { Flex } from 'antd';
 
 export const Lock = () => (
-  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-ink-2">
+  <Flex
+    component="span"
+    align="center"
+    justify="center"
+    className="size-7 shrink-0 rounded-full bg-muted text-ink-2"
+  >
     <Icon name="lock" size={14} />
-  </span>
+  </Flex>
 );

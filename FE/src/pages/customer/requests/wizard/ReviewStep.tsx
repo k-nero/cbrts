@@ -1,4 +1,5 @@
 import { type FC, useRef, useState } from 'react';
+import { Flex } from 'antd';
 import type { AxiosError } from 'axios';
 
 import type { StepProps } from './WizardForm';
@@ -68,11 +69,13 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
       {refusal && (
         <Callout tone="bad" title={refusal.title}>
           {refusal.details.length > 0 && (
-            <ul className="m-0 flex list-disc flex-col gap-1 pl-5">
-              {refusal.details.map((d) => (
-                <li key={d}>{d}</li>
-              ))}
-            </ul>
+            <div className="pl-5">
+              <Flex component="ul" vertical gap={4} className="list-disc">
+                {refusal.details.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </Flex>
+            </div>
           )}
         </Callout>
       )}
@@ -90,51 +93,61 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
 
       {blockers.length > 0 && (
         <Callout tone="bad" title="Before you can submit">
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          <Flex component="ul" vertical gap={8} className="list-none">
             {blockers.map((b) => {
               const step = stepOfBlocker(b);
               return (
-                <li
+                <Flex
+                  component="li"
+                  align="center"
+                  justify="space-between"
+                  gap={16}
                   key={`${b.code}:${b.message}`}
-                  className="flex items-center justify-between gap-4"
                 >
                   <span>{b.message}</span>
                   <Button size="sm" variant="ghost" onClick={() => goTo(step)}>
                     Go to step {WIZARD_STEPS.indexOf(step) + 1}
                   </Button>
-                </li>
+                </Flex>
               );
             })}
-          </ul>
+          </Flex>
         </Callout>
       )}
 
       <Panel title="What happens next">
-        <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+        <Flex component="ol" vertical gap={14} className="list-none">
           {NEXT.map(([what, when], i) => (
-            <li key={what} className="flex items-center gap-3.5">
-              <span className="type-caption grid size-6.5 shrink-0 place-items-center rounded-full border border-line-strong text-ink-3">
+            <Flex component="li" align="center" gap={14} key={what}>
+              <Flex
+                component="span"
+                align="center"
+                justify="center"
+                className="type-caption size-6.5 shrink-0 rounded-full border border-line-strong text-ink-3"
+              >
                 {i + 1}
-              </span>
+              </Flex>
               <span className="type-label-m flex-1 text-ink">{what}</span>
               <span className="type-caption text-ink-3">{when}</span>
-            </li>
+            </Flex>
           ))}
-        </ol>
+        </Flex>
       </Panel>
 
-      <div className="flex items-center justify-between border-t border-line pt-5">
-        <Button leadingIcon="arrow-left" disabled={saving || submit.isPending} onClick={onBack}>
-          Back
-        </Button>
-        <Button
-          variant="primary"
-          trailingIcon="arrow-right"
-          disabled={blockers.length > 0 || submit.isPending}
-          onClick={() => void onSubmit()}
-        >
-          {submitLabel(saved)}
-        </Button>
+      <div className="border-t border-line pt-5">
+        <Flex align="center" justify="space-between">
+          <Button leadingIcon="arrow-left" disabled={saving || submit.isPending} onClick={onBack}>
+            Back
+          </Button>
+          <Button
+            variant="primary"
+            trailingIcon="arrow-right"
+            disabled={blockers.length > 0 || submit.isPending}
+            onClick={() => void onSubmit()}
+          >
+            {submitLabel(saved)}
+          </Button>
+        </Flex>
       </div>
     </>
   );
