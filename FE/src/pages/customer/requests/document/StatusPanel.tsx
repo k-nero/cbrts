@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 
 import { Chip, Deadline, DOCUMENT_STATUS, Panel } from '@/components/ui';
-import { type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
+import { type ChecklistItem, ChecklistStatusEnum, ValidityEnum } from '@/interfaces';
 import {
   customerHolder,
   formatDate,
@@ -17,6 +17,9 @@ function statusLine(item: ChecklistItem): string {
     return `${version.reviewedByCalledName ?? 'Your transport specialist'} rejected v${version.versionNo}: ${version.rejectReason}`;
   if (item.status === ChecklistStatusEnum.CLEARED)
     return 'Cleared. Nothing more is needed from you.';
+  // Kept but too old for the trip: the specialist can't clear it, so a replacement is what's needed (US-F2-09).
+  if (item.validity === ValidityEnum.AMBER && version)
+    return `v${version.versionNo} is kept, but it won't clear. ${item.validityNote ?? ''}`.trim();
   if (item.status === ChecklistStatusEnum.IN_REVIEW)
     return `Nothing more is needed from you for now. Your transport specialist reviews v${version?.versionNo ?? 1}; only a document they approve counts toward clearance.`;
   return item.validityNote || 'Not uploaded yet. Upload it with the dates printed on it.';
