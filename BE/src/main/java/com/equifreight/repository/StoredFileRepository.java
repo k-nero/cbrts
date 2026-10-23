@@ -11,8 +11,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Files reach a job through document versions, incident photos, horse condition logs and authority filing results.
- * A file referenced from none of them is an orphan.
+ * Files reach a job through document versions, incident photos, horse condition logs and authority filing results,
+ * and a customer note through its attachment. A file referenced from none of them is an orphan.
  */
 @Repository
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
@@ -77,6 +77,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                 or exists (select 1 from incident_files where file_id = :fileId)
                 or exists (select 1 from condition_log_files where file_id = :fileId)
                 or exists (select 1 from authority_submissions where result_file_id = :fileId)
+                or exists (select 1 from notes where attached_file_id = :fileId)
             """, nativeQuery = true)
     boolean isAttached(@Param("fileId") UUID fileId);
 
@@ -90,6 +91,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
               and not exists (select 1 from incident_files i where i.file_id = f.id)
               and not exists (select 1 from condition_log_files clf where clf.file_id = f.id)
               and not exists (select 1 from authority_submissions s where s.result_file_id = f.id)
+              and not exists (select 1 from notes n where n.attached_file_id = f.id)
             order by f.created_at
             limit :limit
             """, nativeQuery = true)

@@ -34,7 +34,8 @@ public class NoteResponse {
     private NoteStatus status;
     private boolean isDueToday;
     private boolean isOverdue;
+    private UUID attachedFileId;
     private String attachedFileName;
-    private String attachedFileSize;
+    private Long attachedFileSizeBytes;
     private List<NoteReplyResponse> replies;
 }
