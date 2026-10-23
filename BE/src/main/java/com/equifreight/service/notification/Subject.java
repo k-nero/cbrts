@@ -1,6 +1,7 @@
 package com.equifreight.service.notification;
 
 import com.equifreight.entity.AuthoritySubmission;
+import com.equifreight.entity.Incident;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -41,6 +42,13 @@ public record Subject(NotificationSubject type, UUID id, String code, UUID reque
     public static Subject tracking(TransportJob job) {
         return new Subject(
                 NotificationSubject.TRIP_TRACKING, job.getId(), job.getCode(), requestIdOf(job), job.getId());
+    }
+
+    /** An incident on a job: staff open the incident page. */
+    public static Subject incident(Incident incident) {
+        TransportJob job = incident.getJob();
+        return new Subject(
+                NotificationSubject.INCIDENT, incident.getId(), job.getCode(), requestIdOf(job), job.getId());
     }
 
     public static Subject authoritySubmission(AuthoritySubmission submission) {

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -48,8 +49,26 @@ public class Incident extends BaseEntity {
     @Column(nullable = false, length = 12)
     private IncidentStatus status = IncidentStatus.OPEN;
 
+    /** What happened, as the reporter wrote it. */
     @Column(nullable = false, length = 500)
     private String summary;
+
+    /** Where it happened, as the reporter wrote it ("QL22 km 41, before Gò Dầu"). */
+    @Column(length = 200)
+    private String location;
+
+    /** The horse it concerns; a horse medical incident names one. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "horse_id")
+    private Horse horse;
+
+    /** Who reported it: the escort on the cab, or staff. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reported_by")
+    private User reportedBy;
+
+    /** The tablet's reference for the report, so a resend returns the incident already opened. */
+    private UUID clientRef;
 
     @Column(nullable = false)
     private Instant openedAt = Instant.now();
