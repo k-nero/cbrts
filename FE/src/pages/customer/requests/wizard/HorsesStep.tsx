@@ -1,6 +1,6 @@
 import type { FC, MouseEvent } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { Skeleton } from 'antd';
+import { Col, Flex, Row, Skeleton } from 'antd';
 
 import { horseChips } from '../../horses/components/horseCardProps';
 
@@ -66,53 +66,55 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
     const sex = horse?.sex ?? draft?.sex;
     const foal = picked.find((h) => h.horseId === id)?.withFoal ?? false;
     return (
-      <div key={id} className="flex flex-col gap-2.5">
-        <OptionCard
-          type="checkbox"
-          selected={selected}
-          onChange={() => toggle(id)}
-          className="h-full"
-          media={
-            <span
-              aria-hidden
-              className={cx(
-                'size-12 rounded-full border border-line-strong',
-                COAT_SWATCH[coatOf(horse?.coat ?? null)],
+      <Col span={12} key={id}>
+        <Flex vertical gap={10} className="h-full">
+          <OptionCard
+            type="checkbox"
+            selected={selected}
+            onChange={() => toggle(id)}
+            className="h-full"
+            media={
+              <span
+                aria-hidden
+                className={cx(
+                  'size-12 rounded-full border border-line-strong',
+                  COAT_SWATCH[coatOf(horse?.coat ?? null)],
+                )}
+              />
+            }
+            title={horse?.name ?? draft?.name}
+            description={horse ? subtitle(horse, today) : sexLabel(sex)}
+            meta={
+              horse ? (
+                <span className="type-caption">
+                  {formatSize(horse.sizeClass)} in · {formatWeight(horse.weightKg)}
+                </span>
+              ) : undefined
+            }
+          >
+            <Flex component="span" wrap align="center" gap={8}>
+              {draft?.archived && <Chip tone="neutral">Archived</Chip>}
+              {horse && horseChips(horse)}
+              {draft && draft.missing.length > 0 && (
+                <>
+                  <Chip tone="bad">Profile incomplete</Chip>
+                  <Button size="sm" variant="ghost" onClick={(e) => openProfile(e, id)}>
+                    Open profile
+                  </Button>
+                </>
               )}
+            </Flex>
+          </OptionCard>
+          {selected && sex === 'MARE' && (
+            <Checkbox
+              label="Mare with foal at foot"
+              checked={foal}
+              onChange={(e) => setFoal(id, e.target.checked)}
+              className="pl-1"
             />
-          }
-          title={horse?.name ?? draft?.name}
-          description={horse ? subtitle(horse, today) : sexLabel(sex)}
-          meta={
-            horse ? (
-              <span className="type-caption">
-                {formatSize(horse.sizeClass)} in · {formatWeight(horse.weightKg)}
-              </span>
-            ) : undefined
-          }
-        >
-          <span className="flex flex-wrap items-center gap-2">
-            {draft?.archived && <Chip tone="neutral">Archived</Chip>}
-            {horse && horseChips(horse)}
-            {draft && draft.missing.length > 0 && (
-              <>
-                <Chip tone="bad">Profile incomplete</Chip>
-                <Button size="sm" variant="ghost" onClick={(e) => openProfile(e, id)}>
-                  Open profile
-                </Button>
-              </>
-            )}
-          </span>
-        </OptionCard>
-        {selected && sex === 'MARE' && (
-          <Checkbox
-            label="Mare with foal at foot"
-            checked={foal}
-            onChange={(e) => setFoal(id, e.target.checked)}
-            className="pl-1"
-          />
-        )}
-      </div>
+          )}
+        </Flex>
+      </Col>
     );
   };
 
@@ -121,19 +123,23 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      <Flex vertical gap={8}>
         <h2 className="type-h3 m-0 text-ink">Which horses are travelling?</h2>
         <p className="type-body-m m-0 text-ink-2">
           All horses in one request share the same route and dates. Size class and temperament
           decide stall allocation.
         </p>
-      </div>
+      </Flex>
 
       {query.isPending ? (
-        <div className="grid grid-cols-2 gap-4" aria-busy>
-          <Skeleton.Node active className="!h-[168px] !w-full" />
-          <Skeleton.Node active className="!h-[168px] !w-full" />
-        </div>
+        <Row gutter={[16, 16]} aria-busy>
+          <Col span={12}>
+            <Skeleton.Node active className="!h-[168px] !w-full" />
+          </Col>
+          <Col span={12}>
+            <Skeleton.Node active className="!h-[168px] !w-full" />
+          </Col>
+        </Row>
       ) : query.isError ? (
         <Callout
           tone="bad"
@@ -157,23 +163,25 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
           }
         />
       ) : (
-        <div className="grid grid-cols-2 gap-4">{rows.map(card)}</div>
+        <Row gutter={[16, 16]}>{rows.map(card)}</Row>
       )}
 
       <StepRefusal messages={messages} title="These horses can't travel yet" />
 
-      <div className="flex items-center justify-between border-t border-line pt-5">
-        <span className="type-label-m text-ink-2">
-          {picked.length} {picked.length === 1 ? 'horse' : 'horses'} selected
-        </span>
-        <Button
-          variant="primary"
-          trailingIcon="arrow-right"
-          disabled={saving || held}
-          onClick={onContinue}
-        >
-          Continue
-        </Button>
+      <div className="border-t border-line pt-5">
+        <Flex align="center" justify="space-between">
+          <span className="type-label-m text-ink-2">
+            {picked.length} {picked.length === 1 ? 'horse' : 'horses'} selected
+          </span>
+          <Button
+            variant="primary"
+            trailingIcon="arrow-right"
+            disabled={saving || held}
+            onClick={onContinue}
+          >
+            Continue
+          </Button>
+        </Flex>
       </div>
     </>
   );

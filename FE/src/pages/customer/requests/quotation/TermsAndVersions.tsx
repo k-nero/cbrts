@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Chip, cx, Panel } from '@/components/ui';
 import type { CustomerQuotation } from '@/interfaces';
@@ -7,7 +8,7 @@ import { formatDate, noticeBandLabel } from '@/lib/utils';
 /** The cancellation fee by notice period (today's band marked), the late-arrival terms, the versions. */
 export const TermsAndVersions: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => (
   <Panel title="Terms and versions">
-    <div className="flex flex-col gap-2">
+    <Flex vertical gap={8}>
       <span className="type-label-s text-ink-2">Cancellation fee by notice period</span>
       {quotation.cancellation.bands.length === 0 && (
         <span className="type-body-s text-ink-3">The rate catalog has no cancellation bands.</span>
@@ -39,7 +40,7 @@ export const TermsAndVersions: FC<{ quotation: CustomerQuotation }> = ({ quotati
       {quotation.versions.map((v) => {
         const current = v.versionNo === quotation.versionNo;
         return (
-          <div key={v.versionNo} className="flex items-start gap-2.5">
+          <Flex align="start" gap={10} key={v.versionNo}>
             <span
               className={cx('type-data', current ? 'text-ink' : 'text-ink-3')}
             >{`v${v.versionNo}`}</span>
@@ -55,9 +56,9 @@ export const TermsAndVersions: FC<{ quotation: CustomerQuotation }> = ({ quotati
                 Current
               </Chip>
             )}
-          </div>
+          </Flex>
         );
       })}
-    </div>
+    </Flex>
   </Panel>
 );

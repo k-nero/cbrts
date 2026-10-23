@@ -1,4 +1,5 @@
 import { type FC } from 'react';
+import { Flex } from 'antd';
 import { Chip } from '@/components/ui';
 import type { DestinationItem } from './constants';
 
@@ -15,16 +16,21 @@ export const DestinationButton: FC<{
       selected ? 'border border-line bg-sunken' : 'border border-transparent hover:bg-sunken/50'
     }`}
   >
-    <div className="flex min-w-0 items-center gap-2.5">
-      <span className="grid h-[22px] w-[30px] shrink-0 place-items-center rounded border border-line-strong font-mono text-[11px] font-medium text-ink-2">
+    <Flex align="center" gap={10} className="min-w-0">
+      <Flex
+        component="span"
+        align="center"
+        justify="center"
+        className="h-[22px] w-[30px] shrink-0 rounded border border-line-strong font-mono text-[11px] font-medium text-ink-2"
+      >
         {item.code}
-      </span>
+      </Flex>
       <span
         className={`type-label-s truncate ${selected ? 'font-semibold text-ink' : 'text-ink-2'}`}
       >
         {item.label}
       </span>
-    </div>
+    </Flex>
     {item.hasDraft ? (
       <Chip tone="warn" dot={false} className="px-1.5 py-0.5 text-[11px]">
         Draft

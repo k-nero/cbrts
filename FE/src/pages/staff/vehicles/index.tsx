@@ -1,3 +1,4 @@
+import { Col, Flex, Row } from 'antd';
 import { useState } from 'react';
 import { Button, Chip, Icon, Panel, StatTile } from '@/components/ui';
 import {
@@ -108,267 +109,312 @@ export default function VehiclesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="type-display-m text-ink">Vehicles & Fleet</h1>
-          <p className="type-body-m text-ink-2">
-            Specialised horse trailers, rigid trucks and stall configurations.
-          </p>
-        </div>
+    <div className="p-8">
+      <Flex vertical gap={32}>
+        {/* Header */}
+        <Flex wrap gap={16} align="center" justify="space-between">
+          <Flex vertical gap={4}>
+            <h1 className="type-display-m text-ink">Vehicles & Fleet</h1>
+            <p className="type-body-m text-ink-2">
+              Specialised horse trailers, rigid trucks and stall configurations.
+            </p>
+          </Flex>
 
-        <Button
-          variant="primary"
-          size="md"
-          leadingIcon="plus"
-          onClick={() => setAddModalOpen(true)}
-        >
-          Add vehicle
-        </Button>
-      </div>
+          <Button
+            variant="primary"
+            size="md"
+            leadingIcon="plus"
+            onClick={() => setAddModalOpen(true)}
+          >
+            Add vehicle
+          </Button>
+        </Flex>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile tone="neutral" value={String(vehicles.length)} label="Total fleet" />
-        <StatTile tone="ok" value={String(activeCount)} label="Active in service" />
-        <StatTile
-          tone={maintenanceCount > 0 ? 'warn' : 'neutral'}
-          value={String(maintenanceCount)}
-          label="In maintenance"
-        />
-      </div>
+        {/* Stats */}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone="neutral"
+              value={String(vehicles.length)}
+              label="Total fleet"
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone="ok"
+              value={String(activeCount)}
+              label="Active in service"
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatTile
+              className="h-full"
+              tone={maintenanceCount > 0 ? 'warn' : 'neutral'}
+              value={String(maintenanceCount)}
+              label="In maintenance"
+            />
+          </Col>
+        </Row>
 
-      {/* Vehicle Grid */}
-      {isLoading ? (
-        <div className="p-12 text-center text-ink-3">Loading fleet...</div>
-      ) : vehicles.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-line p-12 text-center text-ink-3">
-          No vehicles registered.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {vehicles.map((v) => {
-            const standardCount = v.stalls?.filter((s) => s.stallType === 'STANDARD').length || 0;
-            const boxCount = v.stalls?.filter((s) => s.stallType === 'BOX').length || 0;
-            const climateCount = v.stalls?.filter((s) => s.stallType === 'CLIMATE').length || 0;
-
-            return (
-              <Panel key={v.id} className="p-6 flex flex-col justify-between gap-6 shadow-xs">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon name="truck" size={18} className="text-ink-2" />
-                      <span className="type-h3 text-ink font-semibold">{v.code}</span>
-                    </div>
-                    <Chip tone={v.status === 'ACTIVE' ? 'ok' : 'warn'}>{v.status}</Chip>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 border-t border-line pt-3">
-                    <div className="flex justify-between type-body-s">
-                      <span className="text-ink-3">Type</span>
-                      <span className="text-ink font-medium capitalize">
-                        {v.kind.toLowerCase()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between type-body-s">
-                      <span className="text-ink-3">Payload limit</span>
-                      <span className="text-ink font-mono">{v.payloadKg?.toLocaleString()} kg</span>
-                    </div>
-                    <div className="flex justify-between type-body-s">
-                      <span className="text-ink-3">Total stalls</span>
-                      <span className="text-ink font-medium">{v.stalls?.length || 0}</span>
-                    </div>
-                  </div>
-
-                  {/* Stall breakdown */}
-                  <div className="flex items-center gap-3 pt-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-xs bg-stall-standard" />
-                      <span className="type-caption text-ink-3">{standardCount} Std (32″)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-xs bg-stall-box" />
-                      <span className="type-caption text-ink-3">{boxCount} Box (96″)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-xs bg-stall-climate" />
-                      <span className="type-caption text-ink-3">{climateCount} Climate (48″)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 border-t border-line pt-4">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleOpenBooking(v)}
-                  >
-                    Book slot
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(v)}>
-                    {v.status === 'ACTIVE' ? 'Set maintenance' : 'Set active'}
-                  </Button>
-                </div>
-              </Panel>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Add Vehicle Modal */}
-      {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-line bg-card p-6 shadow-xl flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <h3 className="type-h3 text-ink">Add new vehicle</h3>
-              <button
-                type="button"
-                onClick={() => setAddModalOpen(false)}
-                className="text-ink-3 hover:text-ink cursor-pointer"
-              >
-                <Icon name="x" size={18} />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Vehicle code</label>
-                <input
-                  type="text"
-                  placeholder="e.g. TX-550"
-                  value={newCode}
-                  onChange={(e) => setNewCode(e.target.value)}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Vehicle kind</label>
-                <select
-                  value={newKind}
-                  onChange={(e) => setNewKind(e.target.value as VehicleKind)}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                >
-                  <option value="TRAILER">Trailer</option>
-                  <option value="TRUCK">Truck</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Payload capacity (kg)</label>
-                <input
-                  type="number"
-                  value={newPayload}
-                  onChange={(e) => setNewPayload(Number(e.target.value))}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Number of stalls</label>
-                <input
-                  type="number"
-                  min={2}
-                  max={8}
-                  step={2}
-                  value={newStallCount}
-                  onChange={(e) => setNewStallCount(Number(e.target.value))}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <Button variant="ghost" size="md" onClick={() => setAddModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!newCode.trim() || createVehicleMutation.isPending}
-                onClick={handleCreateVehicle}
-              >
-                {createVehicleMutation.isPending ? 'Creating...' : 'Create vehicle'}
-              </Button>
-            </div>
+        {/* Vehicle Grid */}
+        {isLoading ? (
+          <div className="p-12 text-center text-ink-3">Loading fleet...</div>
+        ) : vehicles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-line p-12 text-center text-ink-3">
+            No vehicles registered.
           </div>
-        </div>
-      )}
+        ) : (
+          <Row gutter={[24, 24]}>
+            {vehicles.map((v) => {
+              const standardCount = v.stalls?.filter((s) => s.stallType === 'STANDARD').length || 0;
+              const boxCount = v.stalls?.filter((s) => s.stallType === 'BOX').length || 0;
+              const climateCount = v.stalls?.filter((s) => s.stallType === 'CLIMATE').length || 0;
 
-      {/* Book Vehicle Modal */}
-      {bookingModalOpen && selectedVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-line bg-card p-6 shadow-xl flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <h3 className="type-h3 text-ink">Book slot for {selectedVehicle.code}</h3>
-              <button
-                type="button"
-                onClick={() => setBookingModalOpen(false)}
-                className="text-ink-3 hover:text-ink cursor-pointer"
-              >
-                <Icon name="x" size={18} />
-              </button>
-            </div>
+              return (
+                <Col key={v.id} xs={24} md={12} lg={8}>
+                  <Panel className="h-full p-6 flex flex-col justify-between gap-6 shadow-xs">
+                    <Flex vertical gap={16}>
+                      <Flex align="center" justify="space-between">
+                        <Flex gap={8} align="center">
+                          <Icon name="truck" size={18} className="text-ink-2" />
+                          <span className="type-h3 text-ink font-semibold">{v.code}</span>
+                        </Flex>
+                        <Chip tone={v.status === 'ACTIVE' ? 'ok' : 'warn'}>{v.status}</Chip>
+                      </Flex>
 
-            {bookingError && (
-              <div className="rounded-lg border border-bad/30 bg-bad-soft p-3">
-                <span className="type-body-s text-bad">{bookingError}</span>
+                      <div className="pt-3 border-t border-line">
+                        <Flex vertical gap={6}>
+                          <Flex justify="space-between" className="type-body-s">
+                            <span className="text-ink-3">Type</span>
+                            <span className="text-ink font-medium capitalize">
+                              {v.kind.toLowerCase()}
+                            </span>
+                          </Flex>
+                          <Flex justify="space-between" className="type-body-s">
+                            <span className="text-ink-3">Payload limit</span>
+                            <span className="text-ink font-mono">
+                              {v.payloadKg?.toLocaleString()} kg
+                            </span>
+                          </Flex>
+                          <Flex justify="space-between" className="type-body-s">
+                            <span className="text-ink-3">Total stalls</span>
+                            <span className="text-ink font-medium">{v.stalls?.length || 0}</span>
+                          </Flex>
+                        </Flex>
+                      </div>
+
+                      {/* Stall breakdown */}
+                      <div className="pt-2">
+                        <Flex gap={12} align="center">
+                          <Flex gap={6} align="center">
+                            <span className="size-2 rounded-xs bg-stall-standard" />
+                            <span className="type-caption text-ink-3">
+                              {standardCount} Std (32″)
+                            </span>
+                          </Flex>
+                          <Flex gap={6} align="center">
+                            <span className="size-2 rounded-xs bg-stall-box" />
+                            <span className="type-caption text-ink-3">{boxCount} Box (96″)</span>
+                          </Flex>
+                          <Flex gap={6} align="center">
+                            <span className="size-2 rounded-xs bg-stall-climate" />
+                            <span className="type-caption text-ink-3">
+                              {climateCount} Climate (48″)
+                            </span>
+                          </Flex>
+                        </Flex>
+                      </div>
+                    </Flex>
+
+                    <div className="pt-4 border-t border-line">
+                      <Flex gap={12} align="center">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleOpenBooking(v)}
+                        >
+                          Book slot
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(v)}>
+                          {v.status === 'ACTIVE' ? 'Set maintenance' : 'Set active'}
+                        </Button>
+                      </Flex>
+                    </div>
+                  </Panel>
+                </Col>
+              );
+            })}
+          </Row>
+        )}
+
+        {/* Add Vehicle Modal */}
+        {addModalOpen && (
+          <div className="p-4 fixed inset-0 z-50 bg-ink/40">
+            <Flex align="center" justify="center" className="h-full">
+              <div className="p-6 w-full max-w-md rounded-xl border border-line bg-card shadow-xl">
+                <Flex vertical gap={20}>
+                  <Flex align="center" justify="space-between">
+                    <h3 className="type-h3 text-ink">Add new vehicle</h3>
+                    <button
+                      type="button"
+                      onClick={() => setAddModalOpen(false)}
+                      className="text-ink-3 hover:text-ink cursor-pointer"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </Flex>
+
+                  <Flex vertical gap={16}>
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Vehicle code</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TX-550"
+                        value={newCode}
+                        onChange={(e) => setNewCode(e.target.value)}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      />
+                    </Flex>
+
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Vehicle kind</label>
+                      <select
+                        value={newKind}
+                        onChange={(e) => setNewKind(e.target.value as VehicleKind)}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      >
+                        <option value="TRAILER">Trailer</option>
+                        <option value="TRUCK">Truck</option>
+                      </select>
+                    </Flex>
+
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Payload capacity (kg)</label>
+                      <input
+                        type="number"
+                        value={newPayload}
+                        onChange={(e) => setNewPayload(Number(e.target.value))}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      />
+                    </Flex>
+
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Number of stalls</label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={8}
+                        step={2}
+                        value={newStallCount}
+                        onChange={(e) => setNewStallCount(Number(e.target.value))}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      />
+                    </Flex>
+                  </Flex>
+
+                  <div className="pt-2">
+                    <Flex gap={12} align="center" justify="end">
+                      <Button variant="ghost" size="md" onClick={() => setAddModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="md"
+                        disabled={!newCode.trim() || createVehicleMutation.isPending}
+                        onClick={handleCreateVehicle}
+                      >
+                        {createVehicleMutation.isPending ? 'Creating...' : 'Create vehicle'}
+                      </Button>
+                    </Flex>
+                  </div>
+                </Flex>
               </div>
-            )}
-
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Booking kind</label>
-                <select
-                  value={bookingKind}
-                  onChange={(e) => setBookingKind(e.target.value as any)}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                >
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="HOLD">Hold (Sanitisation / Inspection)</option>
-                  <option value="JOB">Job transport</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">Start time</label>
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="type-label-s text-ink">End time</label>
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <Button variant="ghost" size="md" onClick={() => setBookingModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!startsAt || !endsAt || bookVehicleMutation.isPending}
-                onClick={handleBookVehicle}
-              >
-                {bookVehicleMutation.isPending ? 'Booking...' : 'Confirm booking'}
-              </Button>
-            </div>
+            </Flex>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Book Vehicle Modal */}
+        {bookingModalOpen && selectedVehicle && (
+          <div className="p-4 fixed inset-0 z-50 bg-ink/40">
+            <Flex align="center" justify="center" className="h-full">
+              <div className="p-6 w-full max-w-md rounded-xl border border-line bg-card shadow-xl">
+                <Flex vertical gap={20}>
+                  <Flex align="center" justify="space-between">
+                    <h3 className="type-h3 text-ink">Book slot for {selectedVehicle.code}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setBookingModalOpen(false)}
+                      className="text-ink-3 hover:text-ink cursor-pointer"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </Flex>
+
+                  {bookingError && (
+                    <div className="rounded-lg border border-bad/30 bg-bad-soft p-3">
+                      <span className="type-body-s text-bad">{bookingError}</span>
+                    </div>
+                  )}
+
+                  <Flex vertical gap={16}>
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Booking kind</label>
+                      <select
+                        value={bookingKind}
+                        onChange={(e) => setBookingKind(e.target.value as any)}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      >
+                        <option value="MAINTENANCE">Maintenance</option>
+                        <option value="HOLD">Hold (Sanitisation / Inspection)</option>
+                        <option value="JOB">Job transport</option>
+                      </select>
+                    </Flex>
+
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">Start time</label>
+                      <input
+                        type="datetime-local"
+                        value={startsAt}
+                        onChange={(e) => setStartsAt(e.target.value)}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      />
+                    </Flex>
+
+                    <Flex vertical gap={6}>
+                      <label className="type-label-s text-ink">End time</label>
+                      <input
+                        type="datetime-local"
+                        value={endsAt}
+                        onChange={(e) => setEndsAt(e.target.value)}
+                        className="focus-ring h-9 rounded-md border border-line bg-canvas px-3 text-sm text-ink outline-none"
+                      />
+                    </Flex>
+                  </Flex>
+
+                  <div className="pt-2">
+                    <Flex gap={12} align="center" justify="end">
+                      <Button variant="ghost" size="md" onClick={() => setBookingModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="md"
+                        disabled={!startsAt || !endsAt || bookVehicleMutation.isPending}
+                        onClick={handleBookVehicle}
+                      >
+                        {bookVehicleMutation.isPending ? 'Booking...' : 'Confirm booking'}
+                      </Button>
+                    </Flex>
+                  </div>
+                </Flex>
+              </div>
+            </Flex>
+          </div>
+        )}
+      </Flex>
     </div>
   );
 }

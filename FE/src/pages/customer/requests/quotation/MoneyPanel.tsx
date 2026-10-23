@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { GroupBadge } from './GroupBadge';
 
@@ -17,10 +18,10 @@ export const MoneyPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
   if (rows.length === 0) return null;
   return (
     <Panel title="Where the money goes">
-      <div className="flex flex-col gap-3">
+      <Flex vertical gap={12}>
         <p className="type-body-m m-0 text-ink-2">{moneyHead(rows)}</p>
         {rows.map((r) => (
-          <div key={r.name} className="flex items-center gap-3">
+          <Flex align="center" gap={12} key={r.name}>
             <GroupBadge code={r.code} />
             <span className="type-label-s min-w-[96px] flex-1 truncate text-ink" title={r.name}>
               {r.name}
@@ -40,9 +41,9 @@ export const MoneyPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) 
             <span className="type-mono-caption w-10 shrink-0 text-right text-ink-3">
               {shareText(r.share)}
             </span>
-          </div>
+          </Flex>
         ))}
-      </div>
+      </Flex>
     </Panel>
   );
 };

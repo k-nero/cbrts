@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Select } from 'antd';
+import { Flex, Select } from 'antd';
 import { Chip } from '@/components/ui';
 import type { ClearanceJobSummary } from '@/interfaces';
 
@@ -20,7 +20,7 @@ const JobBar: FC<Props> = ({ jobs, loading, jobId, onSelect, onSearch }) => {
   const route = routeOf(jobs.find((job) => job.id === jobId));
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
+      <Flex gap={12} align="center">
         <span className="type-label-s text-ink-2">Transport job:</span>
         <Select
           showSearch
@@ -37,13 +37,13 @@ const JobBar: FC<Props> = ({ jobs, loading, jobId, onSelect, onSearch }) => {
           className="w-[380px] sm:w-[460px]"
           size="middle"
         />
-      </div>
-      <div className="type-body-s flex items-center gap-2 text-ink-2">
+      </Flex>
+      <Flex gap={8} align="center" className="type-body-s text-ink-2">
         <span>Route:</span>
         <Chip tone="neutral" dot={false}>
           {route ?? 'Not set on the request'}
         </Chip>
-      </div>
+      </Flex>
     </div>
   );
 };

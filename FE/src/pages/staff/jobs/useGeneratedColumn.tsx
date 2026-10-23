@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TableColumnsType } from 'antd';
+import { Flex, TableColumnsType } from 'antd';
 
 import { Chip, Deadline, StageMark } from '@/components/ui';
 import type { JobSummary } from '@/interfaces';
@@ -56,14 +56,14 @@ export const useGeneratedJobColumn = () =>
         key: 'horses',
         width: 350,
         render: (_, job) => (
-          <div className="flex flex-col">
+          <Flex vertical>
             <span className="type-label-s text-ink">
               {job.horseCount} {job.horseCount === 1 ? 'horse' : 'horses'}
             </span>
             {job.horseNames?.length > 0 && (
               <span className="type-body-s text-ink-3">{job.horseNames.join(', ')}</span>
             )}
-          </div>
+          </Flex>
         ),
       },
       {

@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import HorseForm from '../components/HorseForm';
 import { DocumentsComeLater } from '../components/DocumentsComeLater';
@@ -20,7 +20,7 @@ const AddHorsePage: FC = () => {
   const firstRun = active.data === 0 && archived.data === 0;
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         back={{ label: 'My horses', onClick: () => router.push(router.paths.get('my-horses')) }}
         title="Add a horse"
@@ -50,7 +50,7 @@ const AddHorsePage: FC = () => {
           </>
         )}
       />
-    </div>
+    </Flex>
   );
 };
 

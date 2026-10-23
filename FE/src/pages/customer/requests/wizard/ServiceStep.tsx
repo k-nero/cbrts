@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Col, Flex, Row } from 'antd';
 import { useFormContext, useFormState, useWatch } from 'react-hook-form';
 
 import { Group } from './Group';
@@ -114,38 +115,44 @@ const ServiceStep: FC<StepProps> = ({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      <Flex vertical gap={8}>
         <h2 className="type-h3 m-0 text-ink">How should they travel?</h2>
         <p className="type-body-m m-0 text-ink-2">
           Each choice is priced line by line on the quotation after review.
         </p>
-      </div>
+      </Flex>
 
       <Group title="Mode" error={modeError}>
-        <div className="grid grid-cols-2 gap-4">
-          <OptionCard
-            name="mode"
-            value="ROAD"
-            icon="truck"
-            selected={mode === 'ROAD'}
-            disabled={Boolean(roadReason)}
-            onChange={() => chooseMode('ROAD')}
-            title="Road"
-            description={roadLine(road)}
-            meta={optionMeta(fx('mode', 'ROAD'), roadReason)}
-          />
-          <OptionCard
-            name="mode"
-            value="AIR"
-            icon="plane"
-            selected={mode === 'AIR'}
-            disabled={Boolean(airReason)}
-            onChange={() => chooseMode('AIR')}
-            title="Air"
-            description={airLine(air)}
-            meta={optionMeta(fx('mode', 'AIR'), airReason)}
-          />
-        </div>
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <OptionCard
+              className="h-full"
+              name="mode"
+              value="ROAD"
+              icon="truck"
+              selected={mode === 'ROAD'}
+              disabled={Boolean(roadReason)}
+              onChange={() => chooseMode('ROAD')}
+              title="Road"
+              description={roadLine(road)}
+              meta={optionMeta(fx('mode', 'ROAD'), roadReason)}
+            />
+          </Col>
+          <Col span={12}>
+            <OptionCard
+              className="h-full"
+              name="mode"
+              value="AIR"
+              icon="plane"
+              selected={mode === 'AIR'}
+              disabled={Boolean(airReason)}
+              onChange={() => chooseMode('AIR')}
+              title="Air"
+              description={airLine(air)}
+              meta={optionMeta(fx('mode', 'AIR'), airReason)}
+            />
+          </Col>
+        </Row>
       </Group>
 
       {mode === 'ROAD' && (
@@ -154,48 +161,56 @@ const ServiceStep: FC<StepProps> = ({
           sub="An arrival window on step 2 books a private trailer."
           error={errorOf('trailer')}
         >
-          <div className="grid grid-cols-2 gap-4">
-            <OptionCard
-              name="trailer"
-              value="SHARED"
-              selected={!window && values.trailer === 'SHARED'}
-              disabled={window}
-              onChange={() => set('trailer', 'SHARED')}
-              title="Shared load"
-              description="Shares a trailer with other consignments on set departures."
-              meta={optionMeta(
-                fx('trailer', 'SHARED'),
-                window ? 'Your arrival window needs a private trailer.' : undefined,
-              )}
-            />
-            <OptionCard
-              name="trailer"
-              value="PRIVATE"
-              selected={window || values.trailer === 'PRIVATE'}
-              onChange={() => set('trailer', 'PRIVATE')}
-              title="Private trailer"
-              description="Your own trailer and your own departure time."
-              meta={optionMeta(fx('trailer', 'PRIVATE'))}
-            />
-          </div>
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <OptionCard
+                className="h-full"
+                name="trailer"
+                value="SHARED"
+                selected={!window && values.trailer === 'SHARED'}
+                disabled={window}
+                onChange={() => set('trailer', 'SHARED')}
+                title="Shared load"
+                description="Shares a trailer with other consignments on set departures."
+                meta={optionMeta(
+                  fx('trailer', 'SHARED'),
+                  window ? 'Your arrival window needs a private trailer.' : undefined,
+                )}
+              />
+            </Col>
+            <Col span={12}>
+              <OptionCard
+                className="h-full"
+                name="trailer"
+                value="PRIVATE"
+                selected={window || values.trailer === 'PRIVATE'}
+                onChange={() => set('trailer', 'PRIVATE')}
+                title="Private trailer"
+                description="Your own trailer and your own departure time."
+                meta={optionMeta(fx('trailer', 'PRIVATE'))}
+              />
+            </Col>
+          </Row>
         </Group>
       )}
 
       {mode === 'AIR' && (
         <Group title="Air class" error={errorOf('airClass')}>
-          <div className="grid grid-cols-3 gap-4">
+          <Row gutter={[16, 16]}>
             {CLASSES.map((c) => (
-              <OptionCard
-                key={c.value}
-                name="airClass"
-                value={c.value}
-                selected={values.airClass === c.value}
-                onChange={() => set('airClass', c.value)}
-                title={c.title}
-                meta={optionMeta(fx('airClass', c.value))}
-              />
+              <Col span={8} key={c.value}>
+                <OptionCard
+                  className="h-full"
+                  name="airClass"
+                  value={c.value}
+                  selected={values.airClass === c.value}
+                  onChange={() => set('airClass', c.value)}
+                  title={c.title}
+                  meta={optionMeta(fx('airClass', c.value))}
+                />
+              </Col>
             ))}
-          </div>
+          </Row>
           <p className="type-body-s m-0 rounded-md bg-sunken px-4 py-3 text-ink-2">
             Whether each horse fits the class is checked when the move is priced.
           </p>
@@ -216,17 +231,19 @@ const ServiceStep: FC<StepProps> = ({
             title={`Grooms · ${groomsFor(Math.max(horses.length, 1))}`}
             sub="One groom per three horses, rounded up. Always included."
           />
-          <div className="flex items-center gap-3.5 border-t border-line px-4.5 py-3.5">
-            <Checkbox
-              label={
-                <span className="flex flex-col gap-0.5">
-                  <span className="type-label-m text-ink">Veterinary escort</span>
-                  <span className="type-body-s text-ink-3">A vet travels with the horses.</span>
-                </span>
-              }
-              checked={values.vetEscort}
-              onChange={(e) => set('vetEscort', e.target.checked)}
-            />
+          <div className="border-t border-line px-4.5 py-3.5">
+            <Flex align="center" gap={14}>
+              <Checkbox
+                label={
+                  <Flex component="span" vertical gap={2}>
+                    <span className="type-label-m text-ink">Veterinary escort</span>
+                    <span className="type-body-s text-ink-3">A vet travels with the horses.</span>
+                  </Flex>
+                }
+                checked={values.vetEscort}
+                onChange={(e) => set('vetEscort', e.target.checked)}
+              />
+            </Flex>
           </div>
         </Panel>
       </Group>
@@ -236,45 +253,53 @@ const ServiceStep: FC<StepProps> = ({
         sub="The horses must be insured for the journey plus 2 days."
         error={errorOf('insurance')}
       >
-        <div className="grid grid-cols-2 gap-4">
-          <OptionCard
-            name="insurance"
-            value="EQUIFREIGHT"
-            icon="shield"
-            selected={values.insurance === 'EQUIFREIGHT'}
-            onChange={() => set('insurance', 'EQUIFREIGHT')}
-            title="Through EquiFreight"
-            meta={optionMeta(fx('insurance', 'EQUIFREIGHT'))}
-            description={`Insured for the declared value (${formatValue(declared)}), on the quotation as its own line.`}
-          />
-          <OptionCard
-            name="insurance"
-            value="OWN_POLICY"
-            icon="file"
-            selected={values.insurance === 'OWN_POLICY'}
-            onChange={() => set('insurance', 'OWN_POLICY')}
-            title="Your own policy"
-            meta={optionMeta(fx('insurance', 'OWN_POLICY'))}
-            description="You upload it with your documents; it’s checked against your travel dates plus 2 days. No charge from us."
-          />
-        </div>
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <OptionCard
+              className="h-full"
+              name="insurance"
+              value="EQUIFREIGHT"
+              icon="shield"
+              selected={values.insurance === 'EQUIFREIGHT'}
+              onChange={() => set('insurance', 'EQUIFREIGHT')}
+              title="Through EquiFreight"
+              meta={optionMeta(fx('insurance', 'EQUIFREIGHT'))}
+              description={`Insured for the declared value (${formatValue(declared)}), on the quotation as its own line.`}
+            />
+          </Col>
+          <Col span={12}>
+            <OptionCard
+              className="h-full"
+              name="insurance"
+              value="OWN_POLICY"
+              icon="file"
+              selected={values.insurance === 'OWN_POLICY'}
+              onChange={() => set('insurance', 'OWN_POLICY')}
+              title="Your own policy"
+              meta={optionMeta(fx('insurance', 'OWN_POLICY'))}
+              description="You upload it with your documents; it’s checked against your travel dates plus 2 days. No charge from us."
+            />
+          </Col>
+        </Row>
       </Group>
 
       <StepRefusal messages={refusal ? [refusal] : []} />
 
-      <div className="flex items-center justify-between gap-6 border-t border-line pt-5">
-        <Button leadingIcon="arrow-left" disabled={saving} onClick={onBack}>
-          Back
-        </Button>
-        <span className="type-label-s text-center text-ink-2">{serviceLine(values, horses)}</span>
-        <Button
-          variant="primary"
-          trailingIcon="arrow-right"
-          disabled={saving || held}
-          onClick={onContinue}
-        >
-          Continue
-        </Button>
+      <div className="border-t border-line pt-5">
+        <Flex align="center" justify="space-between" gap={24}>
+          <Button leadingIcon="arrow-left" disabled={saving} onClick={onBack}>
+            Back
+          </Button>
+          <span className="type-label-s text-center text-ink-2">{serviceLine(values, horses)}</span>
+          <Button
+            variant="primary"
+            trailingIcon="arrow-right"
+            disabled={saving || held}
+            onClick={onContinue}
+          >
+            Continue
+          </Button>
+        </Flex>
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 import { type FC } from 'react';
+import { Flex } from 'antd';
 
 import type { Endpoint, RequestSummary } from '@/interfaces';
 
@@ -11,11 +12,11 @@ export const RouteCell: FC<{ row: RequestSummary }> = ({ row }) => {
   if (!from && !to) return <span className="type-body-s text-ink-3">Route not set</span>;
   const places = [row.origin?.name, row.destination?.name].filter(Boolean).join(' → ');
   return (
-    <span className="flex flex-col gap-0.5">
+    <Flex component="span" vertical gap={2}>
       <span className="type-label-s text-ink">
         {from ?? '—'} → {to ?? '—'}
       </span>
       {places && <span className="type-body-s text-ink-3">{places}</span>}
-    </span>
+    </Flex>
   );
 };

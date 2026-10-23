@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { UploadFile } from 'antd';
-import { Input, message, Select, Spin, Upload } from 'antd';
+import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
 
 import { TripDetails } from './TripDetails';
 import { eventLabels, formatTime, sentence } from './tripFormat';
@@ -185,7 +185,7 @@ export function TripWorkspace({
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <Flex vertical gap={24}>
       {contextHolder}
       <PageHeader
         title={title}
@@ -215,7 +215,7 @@ export function TripWorkspace({
       )}
       {summaries.length > 0 && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <Flex wrap align="center" justify="space-between" gap={12}>
             <Select
               aria-label="Select trip"
               value={selectedCode}
@@ -230,7 +230,7 @@ export function TripWorkspace({
               className="min-w-72 flex-1"
             />
             {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
-              <div className="flex items-center gap-2">
+              <Flex align="center" gap={8}>
                 <Button
                   size="sm"
                   disabled={summariesQuery.data.first}
@@ -248,9 +248,9 @@ export function TripWorkspace({
                 >
                   Next
                 </Button>
-              </div>
+              </Flex>
             )}
-          </div>
+          </Flex>
           {selectedSummary && (
             <Panel
               title={selectedSummary.jobCode}
@@ -296,173 +296,205 @@ export function TripWorkspace({
                   Departure can be recorded once the transport specialist clears the dossier.
                 </Callout>
               )}
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="type-body-s flex flex-col gap-2">
-                  Checkpoint
-                  <Select
-                    value={stopId}
-                    onChange={setStopId}
-                    allowClear
-                    placeholder="Trip-wide update"
-                    options={trip.stops.map((stop) => ({ value: stop.id, label: stop.name }))}
-                  />
-                </label>
-                <label className="type-body-s flex flex-col gap-2">
-                  Checkpoint status
-                  <Select
-                    value={kind}
-                    onChange={setKind}
-                    options={checkpointKinds.map((value) => ({ value, label: eventLabels[value] }))}
-                  />
-                </label>
-                <label className="type-body-s flex flex-col gap-2">
-                  Recorded time
-                  <input
-                    type="datetime-local"
-                    value={occurredAt}
-                    onChange={(event) => setOccurredAt(event.target.value)}
-                    className="h-8 rounded-md border border-line-strong bg-input px-2"
-                  />
-                </label>
-                <label className="type-body-s flex flex-col gap-2">
-                  Update note
-                  <Input
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
-                    maxLength={500}
-                    placeholder="What happened at this checkpoint?"
-                  />
-                </label>
-                {kind === TripRecordKindEnum.HANDED_OVER && (
-                  <label className="type-body-s flex flex-col gap-2">
-                    Received by
-                    <Input
-                      value={receiverName}
-                      onChange={(event) => setReceiverName(event.target.value)}
-                      maxLength={120}
-                      placeholder="Name of the receiving person"
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={12}>
+                  <Flex component="label" vertical gap={8} className="type-body-s">
+                    Checkpoint
+                    <Select
+                      value={stopId}
+                      onChange={setStopId}
+                      allowClear
+                      placeholder="Trip-wide update"
+                      options={trip.stops.map((stop) => ({ value: stop.id, label: stop.name }))}
                     />
-                  </label>
+                  </Flex>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Flex component="label" vertical gap={8} className="type-body-s">
+                    Checkpoint status
+                    <Select
+                      value={kind}
+                      onChange={setKind}
+                      options={checkpointKinds.map((value) => ({
+                        value,
+                        label: eventLabels[value],
+                      }))}
+                    />
+                  </Flex>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Flex component="label" vertical gap={8} className="type-body-s">
+                    Recorded time
+                    <input
+                      type="datetime-local"
+                      value={occurredAt}
+                      onChange={(event) => setOccurredAt(event.target.value)}
+                      className="h-8 rounded-md border border-line-strong bg-input px-2"
+                    />
+                  </Flex>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Flex component="label" vertical gap={8} className="type-body-s">
+                    Update note
+                    <Input
+                      value={text}
+                      onChange={(event) => setText(event.target.value)}
+                      maxLength={500}
+                      placeholder="What happened at this checkpoint?"
+                    />
+                  </Flex>
+                </Col>
+                {kind === TripRecordKindEnum.HANDED_OVER && (
+                  <Col xs={24} md={12}>
+                    <Flex component="label" vertical gap={8} className="type-body-s">
+                      Received by
+                      <Input
+                        value={receiverName}
+                        onChange={(event) => setReceiverName(event.target.value)}
+                        maxLength={120}
+                        placeholder="Name of the receiving person"
+                      />
+                    </Flex>
+                  </Col>
                 )}
-              </div>
+              </Row>
               {audience === 'escort' && (
                 <div className="mt-5 divide-y divide-line">
                   {trip.horses.map((horse) => {
                     const observation = conditionByHorse[horse.id] ?? emptyObservation();
                     return (
-                      <section key={horse.id} className="grid gap-3 py-4 md:grid-cols-2">
-                        <div>
-                          <strong className="type-h4">{horse.name}</strong>
-                          <p className="type-body-s m-0 text-ink-3">
-                            {horse.stall ?? 'Stall not assigned'}
-                          </p>
-                        </div>
-                        <Checkbox
-                          label="I checked this horse"
-                          checked={observation.checked}
-                          onChange={(event) =>
-                            updateObservation(horse.id, { checked: event.target.checked })
-                          }
-                        />
-                        <Select
-                          aria-label={`${horse.name} condition`}
-                          allowClear
-                          placeholder="Observed condition"
-                          value={observation.condition ?? undefined}
-                          onChange={(condition?: HorseCondition) =>
-                            updateObservation(horse.id, { condition: condition ?? null })
-                          }
-                          options={conditions.map((condition) => ({
-                            value: condition,
-                            label: sentence(condition),
-                          }))}
-                        />
-                        <div className="grid grid-cols-2 gap-3">
-                          {(['drinking', 'eating'] as const).map((field) => (
-                            <label key={field} className="type-body-s flex flex-col gap-1">
-                              {field === 'drinking' ? 'Drinking' : 'Eating'}
-                              <Select
-                                allowClear
-                                placeholder="Not recorded"
-                                value={
-                                  observation[field] === null
-                                    ? undefined
-                                    : observation[field]
-                                      ? 'YES'
-                                      : 'NO'
-                                }
-                                onChange={(value?: 'YES' | 'NO') =>
-                                  updateObservation(horse.id, {
-                                    [field]: value === undefined ? null : value === 'YES',
-                                  })
-                                }
-                                options={[
-                                  { value: 'YES', label: 'Yes' },
-                                  { value: 'NO', label: 'No' },
-                                ]}
-                              />
-                            </label>
-                          ))}
-                        </div>
-                        <Input
-                          value={observation.note}
-                          onChange={(event) =>
-                            updateObservation(horse.id, { note: event.target.value })
-                          }
-                          maxLength={500}
-                          placeholder="Condition note (optional)"
-                        />
-                        <Upload
-                          accept="image/jpeg,image/png,image/heic,image/heif"
-                          multiple
-                          maxCount={8}
-                          fileList={observation.photos}
-                          beforeUpload={() => false}
-                          onChange={({ fileList }) =>
-                            updateObservation(horse.id, { photos: fileList })
-                          }
-                        >
-                          <Button type="button" size="sm" leadingIcon="upload">
-                            Attach photos
-                          </Button>
-                        </Upload>
+                      <section key={horse.id} className="py-4">
+                        <Row gutter={[12, 12]}>
+                          <Col xs={24} md={12}>
+                            <div>
+                              <strong className="type-h4">{horse.name}</strong>
+                              <p className="type-body-s m-0 text-ink-3">
+                                {horse.stall ?? 'Stall not assigned'}
+                              </p>
+                            </div>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Checkbox
+                              label="I checked this horse"
+                              checked={observation.checked}
+                              onChange={(event) =>
+                                updateObservation(horse.id, { checked: event.target.checked })
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Select
+                              aria-label={`${horse.name} condition`}
+                              className="w-full"
+                              allowClear
+                              placeholder="Observed condition"
+                              value={observation.condition ?? undefined}
+                              onChange={(condition?: HorseCondition) =>
+                                updateObservation(horse.id, { condition: condition ?? null })
+                              }
+                              options={conditions.map((condition) => ({
+                                value: condition,
+                                label: sentence(condition),
+                              }))}
+                            />
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Row gutter={[12, 12]}>
+                              {(['drinking', 'eating'] as const).map((field) => (
+                                <Col key={field} span={12}>
+                                  <Flex component="label" vertical gap={4} className="type-body-s">
+                                    {field === 'drinking' ? 'Drinking' : 'Eating'}
+                                    <Select
+                                      allowClear
+                                      placeholder="Not recorded"
+                                      value={
+                                        observation[field] === null
+                                          ? undefined
+                                          : observation[field]
+                                            ? 'YES'
+                                            : 'NO'
+                                      }
+                                      onChange={(value?: 'YES' | 'NO') =>
+                                        updateObservation(horse.id, {
+                                          [field]: value === undefined ? null : value === 'YES',
+                                        })
+                                      }
+                                      options={[
+                                        { value: 'YES', label: 'Yes' },
+                                        { value: 'NO', label: 'No' },
+                                      ]}
+                                    />
+                                  </Flex>
+                                </Col>
+                              ))}
+                            </Row>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Input
+                              value={observation.note}
+                              onChange={(event) =>
+                                updateObservation(horse.id, { note: event.target.value })
+                              }
+                              maxLength={500}
+                              placeholder="Condition note (optional)"
+                            />
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Upload
+                              accept="image/jpeg,image/png,image/heic,image/heif"
+                              multiple
+                              maxCount={8}
+                              fileList={observation.photos}
+                              beforeUpload={() => false}
+                              onChange={({ fileList }) =>
+                                updateObservation(horse.id, { photos: fileList })
+                              }
+                            >
+                              <Button type="button" size="sm" leadingIcon="upload">
+                                Attach photos
+                              </Button>
+                            </Upload>
+                          </Col>
+                        </Row>
                       </section>
                     );
                   })}
                 </div>
               )}
               {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <Button
-                  disabled={
-                    mutation.isPending ||
-                    ((kind === TripRecordKindEnum.DEPARTED ||
-                      kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                      !trip.clearanceReady) ||
-                    (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
-                  }
-                  onClick={saveCheckpoint}
-                >
-                  {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
-                </Button>
-                {audience === 'escort' && (
+              <div className="mt-4">
+                <Flex wrap justify="end" gap={8}>
                   <Button
-                    variant="primary"
                     disabled={
                       mutation.isPending ||
-                      !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
+                      ((kind === TripRecordKindEnum.DEPARTED ||
+                        kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
+                        !trip.clearanceReady) ||
+                      (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
                     }
-                    onClick={saveConditions}
+                    onClick={saveCheckpoint}
                   >
-                    Save checked horse conditions
+                    {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
                   </Button>
-                )}
+                  {audience === 'escort' && (
+                    <Button
+                      variant="primary"
+                      disabled={
+                        mutation.isPending ||
+                        !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
+                      }
+                      onClick={saveConditions}
+                    >
+                      Save checked horse conditions
+                    </Button>
+                  )}
+                </Flex>
               </div>
             </Panel>
           )}
           {trip && <TripDetails trip={trip} />}
         </>
       )}
-    </div>
+    </Flex>
   );
 }

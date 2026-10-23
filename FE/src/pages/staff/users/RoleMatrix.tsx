@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 import type { TableColumnsType } from 'antd';
 
@@ -73,11 +74,13 @@ const MATRIX_COLUMNS: TableColumnsType<Capability> = [
 /** The read-only role matrix beside the staff list. */
 const RoleMatrix: FC<{ className?: string }> = ({ className }) => (
   <Panel className={className}>
-    <div className="flex flex-col gap-0.5 pb-3">
-      <h4 className="type-h4 m-0 text-ink">What each role can do</h4>
-      <p className="type-body-s m-0 text-ink-3">
-        Read-only. Roles follow the spec; change them in the spec first.
-      </p>
+    <div className="pb-3">
+      <Flex vertical gap={2}>
+        <h4 className="type-h4 m-0 text-ink">What each role can do</h4>
+        <p className="type-body-s m-0 text-ink-3">
+          Read-only. Roles follow the spec; change them in the spec first.
+        </p>
+      </Flex>
     </div>
 
     <Table<Capability>

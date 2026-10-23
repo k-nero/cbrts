@@ -1,4 +1,5 @@
 import { type FC, useMemo, useState } from 'react';
+import { Flex } from 'antd';
 import type { TableColumnsType } from 'antd';
 
 import DiscardDraftModal from './DiscardDraftModal';
@@ -35,12 +36,12 @@ const MyRequestsPage: FC = () => {
           r.code ? (
             <span className="type-caption text-ink">{r.code}</span>
           ) : (
-            <span className="flex flex-col items-start gap-1">
+            <Flex component="span" vertical align="start" gap={4}>
               <Chip>Draft</Chip>
               <span className="type-caption text-ink-3">
                 Started {ict(r.createdAt).format('D MMM')}
               </span>
-            </span>
+            </Flex>
           ),
       },
       { title: 'Route', key: 'route', width: 340, render: (_, r) => <RouteCell row={r} /> },
@@ -71,7 +72,7 @@ const MyRequestsPage: FC = () => {
         width: 230,
         render: (_, r) =>
           r.status === 'DRAFT' ? (
-            <span className="flex justify-end gap-2">
+            <Flex component="span" justify="end" gap={8}>
               <Button
                 size="sm"
                 onClick={() =>
@@ -83,9 +84,9 @@ const MyRequestsPage: FC = () => {
               <Button size="sm" variant="ghost" onClick={() => setDiscarding(r.id)}>
                 Discard
               </Button>
-            </span>
+            </Flex>
           ) : r.status === 'INFO_REQUIRED' ? (
-            <span className="flex justify-end">
+            <Flex component="span" justify="end">
               <Button
                 size="sm"
                 onClick={() =>
@@ -94,9 +95,9 @@ const MyRequestsPage: FC = () => {
               >
                 Answer
               </Button>
-            </span>
+            </Flex>
           ) : r.quotation ? (
-            <span className="flex justify-end">
+            <Flex component="span" justify="end">
               <Button
                 size="sm"
                 variant={r.status === 'QUOTED' ? 'primary' : 'secondary'}
@@ -106,7 +107,7 @@ const MyRequestsPage: FC = () => {
               >
                 {r.status === 'QUOTED' ? 'Review quotation' : 'Open quotation'}
               </Button>
-            </span>
+            </Flex>
           ) : null,
       },
     ],
@@ -117,7 +118,7 @@ const MyRequestsPage: FC = () => {
     total === undefined ? 'Requests' : `${total} ${total === 1 ? 'request' : 'requests'}`;
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         reserveBack
         title="My requests"
@@ -147,18 +148,18 @@ const MyRequestsPage: FC = () => {
         </Callout>
       ) : empty ? (
         <Panel title="No requests yet">
-          <div className="flex flex-col items-start gap-4">
+          <Flex vertical align="start" gap={16}>
             <p className="type-body-m m-0 text-ink-2">
               Your drafts and submitted requests appear here.
             </p>
             <Button variant="primary" onClick={toNew}>
               Request transport
             </Button>
-          </div>
+          </Flex>
         </Panel>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex min-h-8 items-center gap-2">
+        <Flex vertical gap={16}>
+          <Flex align="center" gap={8} className="min-h-8">
             <span className="type-label-s text-ink">{count}</span>
             <span className="type-body-s text-ink-3">
               {byDeparture
@@ -180,7 +181,7 @@ const MyRequestsPage: FC = () => {
                 Reset order
               </Button>
             )}
-          </div>
+          </Flex>
           <Table<RequestSummary>
             id="my-requests"
             rowKey="id"
@@ -207,11 +208,11 @@ const MyRequestsPage: FC = () => {
               });
             }}
           />
-        </div>
+        </Flex>
       )}
 
       <DiscardDraftModal id={discarding} onClose={() => setDiscarding(null)} />
-    </div>
+    </Flex>
   );
 };
 

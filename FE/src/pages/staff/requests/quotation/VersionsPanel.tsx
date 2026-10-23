@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { VersionChip } from './VersionChip';
@@ -12,7 +13,7 @@ export const VersionsPanel: FC<{
   onPick: (versionNo: number) => void;
 }> = ({ quotation, onPick }) => (
   <Panel title="Versions">
-    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+    <Flex component="ul" vertical gap={8} className="list-none">
       {quotation.versions.map((v) => {
         const shown = v.versionNo === quotation.versionNo;
         return (
@@ -20,40 +21,42 @@ export const VersionsPanel: FC<{
             key={v.versionNo}
             aria-current={shown ? 'true' : undefined}
             className={cx(
-              'flex flex-col gap-1 rounded-md border px-3 py-2',
+              'rounded-md border px-3 py-2',
               shown ? 'border-line-strong bg-sunken' : 'border-line',
             )}
           >
-            <span className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-3">
-                <span className="type-data text-ink">{`v${v.versionNo}`}</span>
-                <VersionChip status={v.status} />
+            <Flex vertical gap={4}>
+              <Flex component="span" gap={12} align="center" justify="space-between">
+                <Flex component="span" gap={12} align="center">
+                  <span className="type-data text-ink">{`v${v.versionNo}`}</span>
+                  <VersionChip status={v.status} />
+                </Flex>
+                {!shown && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Open version ${v.versionNo}`}
+                    onClick={() => onPick(v.versionNo)}
+                  >
+                    Open
+                  </Button>
+                )}
+              </Flex>
+              <span className="type-body-s text-ink-2">
+                {[
+                  v.total == null ? null : money(v.total, quotation.currency),
+                  v.issuedAt ? `issued ${formatDate(v.issuedAt)}` : 'draft',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
-              {!shown && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Open version ${v.versionNo}`}
-                  onClick={() => onPick(v.versionNo)}
-                >
-                  Open
-                </Button>
+              {v.supersededReason && (
+                <span className="type-body-s text-ink-3">{`Superseded. ${v.supersededReason}`}</span>
               )}
-            </span>
-            <span className="type-body-s text-ink-2">
-              {[
-                v.total == null ? null : money(v.total, quotation.currency),
-                v.issuedAt ? `issued ${formatDate(v.issuedAt)}` : 'draft',
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-            {v.supersededReason && (
-              <span className="type-body-s text-ink-3">{`Superseded. ${v.supersededReason}`}</span>
-            )}
+            </Flex>
           </li>
         );
       })}
-    </ul>
+    </Flex>
   </Panel>
 );

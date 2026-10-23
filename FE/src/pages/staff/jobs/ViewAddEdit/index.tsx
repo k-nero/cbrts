@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Skeleton, Tabs, type TabsProps } from 'antd';
+import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
 import { ClearanceGate, StageMark } from '@/components/ui';
@@ -103,39 +103,43 @@ export default function JobDetailPage() {
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
 
   return (
-    <div className="flex flex-col gap-6 p-4">
-      {/* Header section (Figma jobHead) */}
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          title={`${job.originCity} → ${job.destinationCity}`}
-          summary={
-            <div className="flex items-center gap-3">
-              <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">{job.code}</p>
-              <p className="type-body-m text-ink-2">{metaText}</p>
-            </div>
+    <div className="p-4">
+      <Flex vertical gap={24}>
+        {/* Header section (Figma jobHead) */}
+        <Flex vertical gap={16}>
+          <PageHeader
+            title={`${job.originCity} → ${job.destinationCity}`}
+            summary={
+              <Flex gap={12} align="center">
+                <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">{job.code}</p>
+                <p className="type-body-m text-ink-2">{metaText}</p>
+              </Flex>
+            }
+            right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
+          />
+
+          {/* Clearance gate component */}
+          <ClearanceGate
+            state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
+          ></ClearanceGate>
+        </Flex>
+
+        <Tabs
+          activeKey={activeTab.key}
+          onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
+          items={items}
+          // Unmount a tab when it's left, as before, so its forms start fresh on return.
+          destroyOnHidden
+          tabBarExtraContent={
+            <span className="hidden sm:block">
+              <Flex component="span" gap={8} align="center">
+                <span className="type-body-s text-ink-3">Owner:</span>
+                <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
+              </Flex>
+            </span>
           }
-          right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
         />
-
-        {/* Clearance gate component */}
-        <ClearanceGate
-          state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
-        ></ClearanceGate>
-      </div>
-
-      <Tabs
-        activeKey={activeTab.key}
-        onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
-        items={items}
-        // Unmount a tab when it's left, as before, so its forms start fresh on return.
-        destroyOnHidden
-        tabBarExtraContent={
-          <span className="hidden items-center gap-2 sm:flex">
-            <span className="type-body-s text-ink-3">Owner:</span>
-            <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
-          </span>
-        }
-      />
+      </Flex>
     </div>
   );
 }

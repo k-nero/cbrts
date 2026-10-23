@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 
 import { PanelRow } from './PanelRow';
@@ -25,11 +26,11 @@ export const StatusPanel: FC<{
   const expired = quotation.status === 'EXPIRED';
   return (
     <Panel>
-      <div className="flex flex-col gap-3">
-        <span className="flex items-center justify-between gap-3">
+      <Flex vertical gap={12}>
+        <Flex component="span" gap={12} align="center" justify="space-between">
           <span className="type-h4 text-ink">{`Version ${quotation.versionNo}`}</span>
           <VersionChip status={quotation.status} />
-        </span>
+        </Flex>
         <PanelRow label="Total">
           <span className="type-data text-ink">
             {moneyOrDash(quotation.totals.total, quotation.currency)}
@@ -52,26 +53,28 @@ export const StatusPanel: FC<{
           <span className="type-label-s text-ink">{quotation.currency}</span>
         </PanelRow>
         {latest && (
-          <div className="flex flex-col gap-2 border-t border-line pt-3">
-            {draftVersionNo != null ? (
-              <Button variant="secondary" block onClick={onOpenDraft}>
-                {`Open draft v${draftVersionNo}`}
-              </Button>
-            ) : canRevise ? (
-              <>
-                <span className="type-body-s text-ink-2">
-                  {expired
-                    ? 'Revise it to price it again from the rate catalog in force now.'
-                    : 'An issued quotation is never edited. A change makes the next version; this one holds until that is issued.'}
-                </span>
-                <Button variant="secondary" block disabled={revising} onClick={onRevise}>
-                  Revise quotation
+          <div className="pt-3 border-t border-line">
+            <Flex vertical gap={8}>
+              {draftVersionNo != null ? (
+                <Button variant="secondary" block onClick={onOpenDraft}>
+                  {`Open draft v${draftVersionNo}`}
                 </Button>
-              </>
-            ) : null}
+              ) : canRevise ? (
+                <>
+                  <span className="type-body-s text-ink-2">
+                    {expired
+                      ? 'Revise it to price it again from the rate catalog in force now.'
+                      : 'An issued quotation is never edited. A change makes the next version; this one holds until that is issued.'}
+                  </span>
+                  <Button variant="secondary" block disabled={revising} onClick={onRevise}>
+                    Revise quotation
+                  </Button>
+                </>
+              ) : null}
+            </Flex>
           </div>
         )}
-      </div>
+      </Flex>
     </Panel>
   );
 };

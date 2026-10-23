@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DatePicker, Input, Select } from 'antd';
+import { DatePicker, Flex, Input, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import AuditEntryPanel from './AuditEntryPanel';
@@ -66,31 +66,35 @@ export const AuditLedger = () => {
         : `${total} ${total === 1 ? 'entry' : 'entries'}`;
 
   const noResults = filtered ? (
-    <div className="flex flex-col items-center gap-2 px-6 pt-12 pb-13">
-      <h3 className="type-h4 m-0 text-center text-ink">No entries match these filters</h3>
-      <p className="type-body-s m-0 max-w-140 text-center text-ink-2">
-        {`Nothing was recorded${search ? ` for ${search}` : ''}${actorName ? ` by ${actorName}` : ''}${
-          filters.action ? ` as ${actionLabel(filters.action).toLowerCase()}` : ''
-        } ${rangeLabel(filters.from, filters.to)}`.trim()}
-        . A code or name may be mistyped, or the dates may be too narrow.
-      </p>
-      <div className="pt-2">
-        <Button variant="secondary" onClick={clearFilters}>
-          Clear filters
-        </Button>
-      </div>
+    <div className="px-6 pt-12 pb-13">
+      <Flex vertical align="center" gap={8}>
+        <h3 className="type-h4 m-0 text-center text-ink">No entries match these filters</h3>
+        <p className="type-body-s m-0 max-w-140 text-center text-ink-2">
+          {`Nothing was recorded${search ? ` for ${search}` : ''}${actorName ? ` by ${actorName}` : ''}${
+            filters.action ? ` as ${actionLabel(filters.action).toLowerCase()}` : ''
+          } ${rangeLabel(filters.from, filters.to)}`.trim()}
+          . A code or name may be mistyped, or the dates may be too narrow.
+        </p>
+        <div className="pt-2">
+          <Button variant="secondary" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        </div>
+      </Flex>
     </div>
   ) : (
-    <div className="flex flex-col items-center gap-2 px-6 py-12">
-      <h3 className="type-h4 m-0 text-ink">Nothing has been recorded yet</h3>
-      <p className="type-body-s m-0 text-ink-2">
-        Each decision and change appears here as it happens.
-      </p>
+    <div className="px-6 py-12">
+      <Flex vertical align="center" gap={8}>
+        <h3 className="type-h4 m-0 text-ink">Nothing has been recorded yet</h3>
+        <p className="type-body-s m-0 text-ink-2">
+          Each decision and change appears here as it happens.
+        </p>
+      </Flex>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-7">
+    <Flex vertical gap={28}>
       <PageHeader
         title="Audit log"
         summary={SUMMARY}
@@ -112,9 +116,9 @@ export const AuditLedger = () => {
         </Callout>
       )}
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-2">
+      <Flex vertical gap={16}>
+        <Flex wrap align="end" gap={16}>
+          <Flex component="label" vertical gap={8}>
             <span className="type-body-s text-ink-2">Search</span>
             <Input.Search
               allowClear
@@ -130,8 +134,8 @@ export const AuditLedger = () => {
                 setSelected(null);
               }}
             />
-          </label>
-          <label className="flex flex-col gap-2">
+          </Flex>
+          <Flex component="label" vertical gap={8}>
             <span className="type-body-s text-ink-2">Person</span>
             <Select
               allowClear
@@ -146,8 +150,8 @@ export const AuditLedger = () => {
               ]}
               onChange={(actor?: string) => setFilter({ actor })}
             />
-          </label>
-          <label className="flex flex-col gap-2">
+          </Flex>
+          <Flex component="label" vertical gap={8}>
             <span className="type-body-s text-ink-2">Action</span>
             <Select
               allowClear
@@ -159,8 +163,8 @@ export const AuditLedger = () => {
               options={(actions.data ?? []).map((a) => ({ label: actionLabel(a), value: a }))}
               onChange={(action?: string) => setFilter({ action })}
             />
-          </label>
-          <label className="flex flex-col gap-2">
+          </Flex>
+          <Flex component="label" vertical gap={8}>
             <span className="type-body-s text-ink-2">When</span>
             <DatePicker.RangePicker
               allowEmpty={[true, true]}
@@ -177,10 +181,10 @@ export const AuditLedger = () => {
                 })
               }
             />
-          </label>
-        </div>
+          </Flex>
+        </Flex>
 
-        <div className="flex min-h-8 items-center gap-3">
+        <Flex align="center" gap={12} className="min-h-8">
           <span className="type-label-s text-ink">{countLabel}</span>
           {filtered && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -188,10 +192,10 @@ export const AuditLedger = () => {
             </Button>
           )}
           <span className="type-body-s ml-auto text-ink-3">{TIME_ZONE_NOTE}</span>
-        </div>
+        </Flex>
 
         {/* Loading is the table's own spinner; a failed load goes to the error boundary. */}
-        <div className="flex items-start gap-6">
+        <Flex align="start" gap={24}>
           <div className="min-w-0 flex-1">
             <AuditList
               crud={crud}
@@ -201,8 +205,8 @@ export const AuditLedger = () => {
             />
           </div>
           {selected && <AuditEntryPanel entry={selected} onClose={() => setSelected(null)} />}
-        </div>
-      </div>
-    </div>
+        </Flex>
+      </Flex>
+    </Flex>
   );
 };

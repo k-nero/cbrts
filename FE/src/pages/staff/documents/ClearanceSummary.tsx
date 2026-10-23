@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Col, Flex, Row } from 'antd';
 import { Button, Callout, ClearanceGate, StatTile } from '@/components/ui';
 import { useEvaluateClearanceGate } from '@/hooks/clearance';
 import type { ClearanceStatus } from '@/interfaces';
@@ -30,24 +31,34 @@ const ClearanceSummary: FC<{ jobId: string; status: ClearanceStatus }> = ({ jobI
           : `${status.clearedMandatoryItems} of ${status.mandatoryItems} mandatory documents cleared · ${status.outstandingIssues.length} outstanding.`}
       </ClearanceGate>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatTile tone="neutral" label="Checklist items" value={status.totalChecklistItems} />
-        <StatTile tone="ok" label="Mandatory cleared" value={status.clearedMandatoryItems} />
-        <StatTile tone="warn" label="Mandatory remaining" value={remaining} />
-        <StatTile
-          tone={status.outstandingIssues.length > 0 ? 'bad' : 'ok'}
-          label="Outstanding"
-          value={status.outstandingIssues.length}
-        />
-      </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={12} md={6}>
+          <StatTile tone="neutral" label="Checklist items" value={status.totalChecklistItems} />
+        </Col>
+        <Col xs={12} md={6}>
+          <StatTile tone="ok" label="Mandatory cleared" value={status.clearedMandatoryItems} />
+        </Col>
+        <Col xs={12} md={6}>
+          <StatTile tone="warn" label="Mandatory remaining" value={remaining} />
+        </Col>
+        <Col xs={12} md={6}>
+          <StatTile
+            tone={status.outstandingIssues.length > 0 ? 'bad' : 'ok'}
+            label="Outstanding"
+            value={status.outstandingIssues.length}
+          />
+        </Col>
+      </Row>
 
       {status.outstandingIssues.length > 0 && (
         <Callout tone="bad" title="What holds departure">
-          <ul className="mt-1 list-inside list-disc space-y-1 text-ink-2">
-            {status.outstandingIssues.map((issue, index) => (
-              <li key={index}>{issue}</li>
-            ))}
-          </ul>
+          <div className="mt-1">
+            <Flex component="ul" vertical gap={4} className="list-inside list-disc text-ink-2">
+              {status.outstandingIssues.map((issue, index) => (
+                <li key={index}>{issue}</li>
+              ))}
+            </Flex>
+          </div>
         </Callout>
       )}
     </>

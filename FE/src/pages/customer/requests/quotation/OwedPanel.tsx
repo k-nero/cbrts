@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Flex } from 'antd';
 
 import { Button, Chip, OwedItem, Panel } from '@/components/ui';
 import type { CustomerQuotation } from '@/interfaces';
@@ -56,14 +57,16 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
         }
         deadline={{ left: deadline.line1, date: deadline.line2 }}
       />
-      <div className="flex items-center gap-3 border-t border-line px-5 py-4">
-        <Button variant="secondary" disabled>
-          Accept quotation
-        </Button>
-        <Button variant="secondary" disabled>
-          Decline
-        </Button>
-        <span className="type-body-s text-ink-3">Accepting comes with the next release.</span>
+      <div className="border-t border-line px-5 py-4">
+        <Flex align="center" gap={12}>
+          <Button variant="secondary" disabled>
+            Accept quotation
+          </Button>
+          <Button variant="secondary" disabled>
+            Decline
+          </Button>
+          <span className="type-body-s text-ink-3">Accepting comes with the next release.</span>
+        </Flex>
       </div>
     </Panel>
   );

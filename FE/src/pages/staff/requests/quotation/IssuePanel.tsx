@@ -1,3 +1,4 @@
+import { Flex } from 'antd';
 import type { FC } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -35,7 +36,7 @@ export const IssuePanel: FC<{
   const onSubmit = methods.handleSubmit((v) => onIssue(v.changeNote.trim() || null));
   return (
     <Panel>
-      <div className="flex flex-col gap-3">
+      <Flex vertical gap={12}>
         <span className="type-h4 text-ink">{`Issue version ${quotation.versionNo}`}</span>
         <PanelRow label="Total">
           <span className="type-data text-ink">
@@ -53,13 +54,15 @@ export const IssuePanel: FC<{
         <PanelRow label="Currency">
           <span className="type-label-s text-ink">{`${quotation.currency} · FX pinned at issue`}</span>
         </PanelRow>
-        <div className="flex items-center gap-3 border-t border-line pt-3">
-          {readiness.tone === 'ok' ? (
-            <Chip tone="ok">{readiness.chip}</Chip>
-          ) : (
-            <Chip dot={false}>{readiness.chip}</Chip>
-          )}
-          <span className="type-body-s text-ink-2">{readiness.text}</span>
+        <div className="pt-3 border-t border-line">
+          <Flex gap={12} align="center">
+            {readiness.tone === 'ok' ? (
+              <Chip tone="ok">{readiness.chip}</Chip>
+            ) : (
+              <Chip dot={false}>{readiness.chip}</Chip>
+            )}
+            <span className="type-body-s text-ink-2">{readiness.text}</span>
+          </Flex>
         </div>
         <FormWrapper
           methods={methods}
@@ -80,12 +83,12 @@ export const IssuePanel: FC<{
                 />
               )}
               {blocker ? (
-                <span className="flex flex-col gap-2">
+                <Flex component="span" vertical gap={8}>
                   <Button variant="secondary" block disabled>
                     Issue quotation
                   </Button>
                   <span className="type-body-s text-ink-2">{blocker}</span>
-                </span>
+                </Flex>
               ) : (
                 <Button variant="primary" block type="submit" disabled={issuing}>
                   Issue quotation
@@ -100,18 +103,20 @@ export const IssuePanel: FC<{
           </Button>
         )}
         {(offer || quotation.repriceNeeded) && (
-          <div className="flex flex-col gap-2 border-t border-line pt-3">
-            <span className="type-body-s text-ink-2">
-              {offer
-                ? `Rate catalog v${quotation.latestPublishedVersionNo} is published.`
-                : 'Re-price to work it out again from the request as it is now.'}
-            </span>
-            <Button variant="secondary" block disabled={repricing} onClick={onReprice}>
-              {offer ?? 'Re-price'}
-            </Button>
+          <div className="pt-3 border-t border-line">
+            <Flex vertical gap={8}>
+              <span className="type-body-s text-ink-2">
+                {offer
+                  ? `Rate catalog v${quotation.latestPublishedVersionNo} is published.`
+                  : 'Re-price to work it out again from the request as it is now.'}
+              </span>
+              <Button variant="secondary" block disabled={repricing} onClick={onReprice}>
+                {offer ?? 'Re-price'}
+              </Button>
+            </Flex>
           </div>
         )}
-      </div>
+      </Flex>
     </Panel>
   );
 };

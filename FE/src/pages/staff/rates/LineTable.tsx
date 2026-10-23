@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import type { TableColumnsType } from 'antd';
+import { Flex, type TableColumnsType } from 'antd';
 
 import { actionsColumn, type RowActions } from './tableActions';
 
@@ -23,7 +23,7 @@ export const LineTable: FC<{
       title: 'Line',
       width: 300,
       render: (_, l) => (
-        <span className="flex flex-wrap items-center gap-2">
+        <Flex component="span" wrap align="center" gap={8}>
           <span className="type-mono-label text-ink-3">{l.group}</span>
           <span className={cx('type-body-m', replaced(l) ? 'text-ink-3 line-through' : 'text-ink')}>
             {l.description}
@@ -39,7 +39,7 @@ export const LineTable: FC<{
               </Chip>
             )
           )}
-        </span>
+        </Flex>
       ),
     },
     {

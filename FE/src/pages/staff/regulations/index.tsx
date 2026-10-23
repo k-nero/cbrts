@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { App, Empty, Spin } from 'antd';
+import { App, Col, Empty, Flex, Row, Spin } from 'antd';
 import PageHeader from '@/components/PageHeader';
 import { Button, Chip, StatTile } from '@/components/ui';
 import {
@@ -59,7 +59,7 @@ export const RegulationsPage: FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <Flex vertical gap={24}>
       <PageHeader
         title="Regulation catalog"
         summary="Validity rules for each destination country. Publishing creates a new version; approved jobs keep the version they were pinned to."
@@ -88,10 +88,12 @@ export const RegulationsPage: FC = () => {
           onSelect={setDestinationId}
         />
 
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-6">
+        <Flex vertical gap={24} className="w-full min-w-0 flex-1">
           {loadingCatalogs || loadingVersion ? (
-            <div className="flex items-center justify-center py-24">
-              <Spin size="large" />
+            <div className="py-24">
+              <Flex align="center" justify="center">
+                <Spin size="large" />
+              </Flex>
             </div>
           ) : !catalog || !version ? (
             <div className="rounded-lg border border-line bg-card p-12 text-center">
@@ -108,24 +110,32 @@ export const RegulationsPage: FC = () => {
             <>
               {isDraft && <DraftBanner catalog={catalog} draft={version} />}
 
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <StatTile tone="neutral" value={days(version.leadTimeDays)} label="Lead time" />
-                <StatTile
-                  tone="neutral"
-                  value={days(version.quarantineMinDays)}
-                  label="Quarantine minimum"
-                />
-                <StatTile
-                  tone="neutral"
-                  value={days(version.arrivalBufferDays)}
-                  label="Arrival buffer"
-                />
-                <StatTile
-                  tone="info"
-                  value={String(active?.pinnedJobsCount ?? 0)}
-                  label={active ? `Jobs pinned to v${active.versionNo}` : 'Jobs pinned'}
-                />
-              </div>
+              <Row gutter={[16, 16]}>
+                <Col xs={12} md={6}>
+                  <StatTile tone="neutral" value={days(version.leadTimeDays)} label="Lead time" />
+                </Col>
+                <Col xs={12} md={6}>
+                  <StatTile
+                    tone="neutral"
+                    value={days(version.quarantineMinDays)}
+                    label="Quarantine minimum"
+                  />
+                </Col>
+                <Col xs={12} md={6}>
+                  <StatTile
+                    tone="neutral"
+                    value={days(version.arrivalBufferDays)}
+                    label="Arrival buffer"
+                  />
+                </Col>
+                <Col xs={12} md={6}>
+                  <StatTile
+                    tone="info"
+                    value={String(active?.pinnedJobsCount ?? 0)}
+                    label={active ? `Jobs pinned to v${active.versionNo}` : 'Jobs pinned'}
+                  />
+                </Col>
+              </Row>
 
               <RulesTable
                 title={`Document rules · ${catalog.name}`}
@@ -134,15 +144,19 @@ export const RegulationsPage: FC = () => {
                 onEdit={(r: RegulationRule) => setPickedRuleId(r.id)}
               />
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <RuleEditor key={rule?.id ?? 'none'} rule={rule} editable={isDraft} />
-                <VersionsPanel catalog={catalog} />
-              </div>
+              <Row gutter={[24, 24]}>
+                <Col xs={24} lg={16}>
+                  <RuleEditor key={rule?.id ?? 'none'} rule={rule} editable={isDraft} />
+                </Col>
+                <Col xs={24} lg={8}>
+                  <VersionsPanel catalog={catalog} />
+                </Col>
+              </Row>
             </>
           )}
-        </div>
+        </Flex>
       </div>
-    </div>
+    </Flex>
   );
 };
 

@@ -1,5 +1,5 @@
 import { type FC } from 'react';
-import { Skeleton } from 'antd';
+import { Flex, Skeleton } from 'antd';
 import type { AxiosError } from 'axios';
 
 import { HorseNotFound } from './HorseNotFound';
@@ -11,9 +11,11 @@ import { useHorse } from '@/hooks/horse';
 export const HorseLoadState: FC<{ query: ReturnType<typeof useHorse> }> = ({ query }) => {
   if (query.isPending) {
     return (
-      <div className="flex flex-col gap-6 pt-[46px]" aria-busy>
-        <Skeleton.Node active className="!h-[132px] !w-full" />
-        <Skeleton active paragraph={{ rows: 6 }} />
+      <div className="pt-[46px]" aria-busy>
+        <Flex vertical gap={24}>
+          <Skeleton.Node active className="!h-[132px] !w-full" />
+          <Skeleton active paragraph={{ rows: 6 }} />
+        </Flex>
       </div>
     );
   }
