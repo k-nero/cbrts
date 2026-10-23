@@ -19,7 +19,7 @@ const AuthoritiesPage: FC = () => {
   const selectedJob = jobs.find((job) => job.id === jobId);
 
   return (
-    <Flex vertical gap={28} className="max-w-[1240px] pb-16">
+    <Flex vertical gap={28} className="pb-16">
       <PageHeader
         title="Authorities & Submissions"
         summary="Transport Specialist: File dossiers with veterinary and border customs authorities, track approvals against committed SLAs, and record quarantine inspections."
