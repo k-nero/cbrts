@@ -10,11 +10,13 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.TripHorseStatus;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.repository.TripHorseRepository;
 import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.TripVehicleRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -75,11 +77,53 @@ public class JobTripService {
     }
 
     /**
-     * The trip's vehicle. A trip has one until convoys (US-F3-10); empty until the load plan names it.
+     * The trip's first vehicle; empty until the load plan names it.
      */
     @Transactional(readOnly = true)
     public Optional<TripVehicle> vehicleOf(Trip trip) {
-        return tripVehicles.findByTrip_IdOrderBySeq(trip.getId()).stream().findFirst();
+        return vehiclesOf(trip).stream().findFirst();
+    }
+
+    /** The trip's vehicles in convoy order (US-F3-10). */
+    @Transactional(readOnly = true)
+    public List<TripVehicle> vehiclesOf(Trip trip) {
+        return tripVehicles.findByTrip_IdOrderBySeq(trip.getId());
+    }
+
+    /** The horses on the trip now, of every job on it, in the order they joined. */
+    @Transactional(readOnly = true)
+    public List<TripHorse> horsesOn(Trip trip) {
+        return tripHorses.findByTrip_IdAndStatusOrderByCreatedAt(trip.getId(), TripHorseStatus.ON_TRIP);
+    }
+
+    /** The jobs with horses on the trip now. */
+    @Transactional(readOnly = true)
+    public List<TransportJob> jobsOn(Trip trip) {
+        return horsesOn(trip).stream().map(TripHorse::getJob).distinct().toList();
+    }
+
+    /**
+     * Adds {@code vehicle} to the trip's convoy, after its last vehicle.
+     */
+    @Transactional
+    public TripVehicle addVehicle(Trip trip, Vehicle vehicle) {
+        List<TripVehicle> current = vehiclesOf(trip);
+        if (current.stream().anyMatch(tv -> tv.getVehicle().getId().equals(vehicle.getId())))
+            throw new BusinessException("Vehicle " + vehicle.getCode() + " is already on trip " + trip.getCode());
+        TripVehicle added = new TripVehicle();
+        added.setTrip(trip);
+        added.setVehicle(vehicle);
+        added.setSeq(
+                (short) (current.stream().mapToInt(TripVehicle::getSeq).max().orElse(0) + 1));
+        return tripVehicles.save(added);
+    }
+
+    /** Takes a vehicle off the trip. The caller has removed its load plan and crew first. */
+    @Transactional
+    public void removeVehicle(TripVehicle tripVehicle) {
+        tripVehicle.getTrip().getVehicles().remove(tripVehicle);
+        tripVehicles.delete(tripVehicle);
+        tripVehicles.flush();
     }
 
     /**

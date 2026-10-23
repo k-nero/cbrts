@@ -306,6 +306,87 @@ public class RoutePlanService {
         return toResponse(saved, jobId);
     }
 
+    /**
+     * The trip changed under its confirmed route (a trailer or a job added or taken out): the confirmed version is
+     * superseded with {@code reason}, and a new draft version carries its stops and legs for the coordinator to
+     * check and confirm again. Nothing is deleted, so the history stays as evidence.
+     */
+    @Transactional
+    public void reopen(Trip trip, String reason) {
+        Optional<RoutePlan> confirmed =
+                routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
+        if (confirmed.isEmpty()) {
+            return;
+        }
+        RoutePlan old = confirmed.get();
+        old.setStatus(RoutePlanStatus.SUPERSEDED);
+        old.setSupersededAt(Instant.now());
+        old.setChangeReason(reason);
+        routePlanRepository.saveAndFlush(old);
+        if (routePlanRepository
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .isPresent()) {
+            return;
+        }
+
+        RoutePlan draft = new RoutePlan();
+        draft.setTrip(trip);
+        draft.setVersionNo((short) (routePlanRepository
+                        .findFirstByTrip_IdOrderByVersionNoDesc(trip.getId())
+                        .map(RoutePlan::getVersionNo)
+                        .orElse((short) 0)
+                + 1));
+        draft.setStatus(RoutePlanStatus.DRAFT);
+        draft.setDistanceKm(old.getDistanceKm());
+        draft.setDurationMin(old.getDurationMin());
+        draft.setChangeReason(reason);
+        draft = routePlanRepository.save(draft);
+
+        Map<UUID, RouteStop> copies = new HashMap<>();
+        for (RouteStop stop : old.getStops()) {
+            RouteStop copy = new RouteStop();
+            copy.setRoutePlan(draft);
+            copy.setSeq(stop.getSeq());
+            copy.setKind(stop.getKind());
+            copy.setJob(stop.getJob());
+            copy.setPlace(stop.getPlace());
+            copy.setBorderCrossing(stop.getBorderCrossing());
+            copy.setPlannedAt(stop.getPlannedAt());
+            copy.setPlannedStayMin(stop.getPlannedStayMin());
+            copy.setDetails(stop.getDetails());
+            copies.put(stop.getId(), routeStopRepository.save(copy));
+            draft.getStops().add(copy);
+        }
+        for (RouteLeg leg : old.getLegs()) {
+            RouteLeg copy = new RouteLeg();
+            copy.setRoutePlan(draft);
+            copy.setSeq(leg.getSeq());
+            copy.setFromStop(copies.get(leg.getFromStop().getId()));
+            copy.setToStop(copies.get(leg.getToStop().getId()));
+            copy.setMode(leg.getMode());
+            copy.setVehicle(leg.getVehicle());
+            copy.setDistanceKm(leg.getDistanceKm());
+            copy.setPlannedMin(leg.getPlannedMin());
+            RouteLeg savedLeg = routeLegRepository.save(copy);
+            flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> {
+                Flight flight = new Flight();
+                flight.setRouteLeg(savedLeg);
+                flight.setAirline(f.getAirline());
+                flight.setFlightNo(f.getFlightNo());
+                flight.setAirWaybill(f.getAirWaybill());
+                flight.setAircraftType(f.getAircraftType());
+                flight.setStallPositions(f.getStallPositions());
+                flight.setServiceClass(f.getServiceClass());
+                flight.setScheduledDepartureAt(f.getScheduledDepartureAt());
+                flight.setScheduledArrivalAt(f.getScheduledArrivalAt());
+                flight.setEstimatedDepartureAt(f.getEstimatedDepartureAt());
+                flight.setEstimatedArrivalAt(f.getEstimatedArrivalAt());
+                flightRepository.save(flight);
+            });
+            draft.getLegs().add(savedLeg);
+        }
+    }
+
     public RoutePlanResponse toResponse(RoutePlan plan, UUID jobId) {
         Map<UUID, Flight> flightsByLegId = new HashMap<>();
         for (RouteLeg leg : plan.getLegs()) {

@@ -63,14 +63,20 @@ public final class TripMapper {
     }
 
     /** A horse on the trip; {@code stall} is its place on the confirmed load plan, or null. */
-    public static TripHorseResponse toHorseResponse(Horse horse, LoadPlanStall stall) {
+    /** A horse on the trip and where it stands; in a convoy the place names the trailer. */
+    public static TripHorseResponse toHorseResponse(Horse horse, LoadPlanStall stall, boolean convoy) {
         return new TripHorseResponse(
                 horse.getId(),
                 horse.getName(),
                 stall == null
                         ? null
-                        : "Stall %d · %s"
+                        : "%sStall %d · %s"
                                 .formatted(
+                                        convoy
+                                                ? stall.getLoadPlan()
+                                                                .getVehicle()
+                                                                .getCode() + " · "
+                                                : "",
                                         stall.getVehicleStall().getPositionNo(),
                                         stall.getVehicleStall()
                                                 .getStallType()

@@ -26,4 +26,12 @@ public interface LoadPlanRepository extends JpaRepository<LoadPlan, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from LoadPlan p where p.tripVehicle.id = :tripVehicleId")
     Optional<LoadPlan> findByTripVehicleIdForUpdate(@Param("tripVehicleId") UUID tripVehicleId);
+
+    /**
+     * Every plan of the trip, row-locked until the transaction ends. A horse can move between trailers, so every
+     * change to the trip's placements takes all of them, in convoy order so two writers lock in the same order.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from LoadPlan p where p.tripVehicle.trip.id = :tripId order by p.tripVehicle.seq")
+    List<LoadPlan> findByTripIdForUpdate(@Param("tripId") UUID tripId);
 }

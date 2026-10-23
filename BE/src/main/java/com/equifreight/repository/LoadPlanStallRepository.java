@@ -1,6 +1,7 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.LoadPlanStall;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface LoadPlanStallRepository extends JpaRepository<LoadPlanStall, UUID> {
     List<LoadPlanStall> findByLoadPlanId(UUID loadPlanId);
+
+    List<LoadPlanStall> findByLoadPlanIdIn(Collection<UUID> loadPlanIds);
 
     Optional<LoadPlanStall> findByLoadPlanIdAndVehicleStallId(UUID loadPlanId, UUID vehicleStallId);
 

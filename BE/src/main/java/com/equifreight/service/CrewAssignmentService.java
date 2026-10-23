@@ -13,6 +13,8 @@ import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.CrewMemberResponse;
 import com.equifreight.model.job.JobMapper;
 import com.equifreight.repository.CrewAssignmentRepository;
+import com.equifreight.repository.LoadPlanRepository;
+import com.equifreight.repository.LoadPlanStallRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.UserRepository;
 import java.util.*;
@@ -28,6 +30,8 @@ public class CrewAssignmentService {
     private final TransportJobRepository transportJobRepository;
     private final UserRepository userRepository;
     private final JobTripService jobTrips;
+    private final LoadPlanRepository loadPlanRepository;
+    private final LoadPlanStallRepository loadPlanStallRepository;
     private final AuditService auditService;
 
     public CrewAssignmentService(
@@ -35,11 +39,15 @@ public class CrewAssignmentService {
             TransportJobRepository transportJobRepository,
             UserRepository userRepository,
             JobTripService jobTrips,
+            LoadPlanRepository loadPlanRepository,
+            LoadPlanStallRepository loadPlanStallRepository,
             AuditService auditService) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
         this.jobTrips = jobTrips;
+        this.loadPlanRepository = loadPlanRepository;
+        this.loadPlanStallRepository = loadPlanStallRepository;
         this.auditService = auditService;
     }
 
@@ -50,6 +58,22 @@ public class CrewAssignmentService {
                         .map(JobMapper::toCrewMemberResponse)
                         .toList())
                 .orElse(List.of());
+    }
+
+    /**
+     * The horses a trailer's grooms look after: every horse on the trip while it has one trailer, else the horses
+     * placed on that trailer's load plan.
+     */
+    @Transactional(readOnly = true)
+    public int horsesOn(Trip trip, TripVehicle tripVehicle, int trailers) {
+        if (trailers <= 1) {
+            return jobTrips.horsesOn(trip).size();
+        }
+        return loadPlanRepository
+                .findByTripVehicle_Id(tripVehicle.getId())
+                .map(plan ->
+                        loadPlanStallRepository.findByLoadPlanId(plan.getId()).size())
+                .orElse(0);
     }
 
     @Transactional
@@ -63,11 +87,30 @@ public class CrewAssignmentService {
             throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }
 
-        // The crew travels with a vehicle, so the load plan names it first.
+        // The crew travels with a trailer, so the load plan names it first; in a convoy, say which (US-F3-10).
         Trip trip = jobTrips.tripOf(jobId);
-        TripVehicle tripVehicle = jobTrips.vehicleOf(trip)
-                .orElseThrow(() -> new BusinessException(
-                        "Choose the vehicle on the Load plan tab first: the crew is assigned to a vehicle"));
+        List<TripVehicle> trailers = jobTrips.vehiclesOf(trip);
+        if (trailers.isEmpty()) {
+            throw new BusinessException(
+                    "Choose the vehicle on the Load plan tab first: the crew is assigned to a vehicle");
+        }
+        TripVehicle tripVehicle;
+        if (request.tripVehicleId() != null) {
+            tripVehicle = trailers.stream()
+                    .filter(tv -> tv.getId().equals(request.tripVehicleId()))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Trailer on this trip", request.tripVehicleId()));
+        } else if (trailers.size() == 1) {
+            tripVehicle = trailers.getFirst();
+        } else {
+            throw new BusinessException(
+                    "The trip has " + trailers.size() + " trailers: say which one this crew is for");
+        }
+        // One person rides one trailer of the convoy.
+        Set<UUID> onOtherTrailers = crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()).stream()
+                .filter(c -> !c.getTripVehicle().getId().equals(tripVehicle.getId()))
+                .map(c -> c.getUser().getId())
+                .collect(java.util.stream.Collectors.toSet());
 
         // Duplicate check
         Set<UUID> seenUserIds = new HashSet<>();
@@ -77,12 +120,9 @@ public class CrewAssignmentService {
             }
         }
 
-        int horseCount = 0;
-        if (job.getRequest() != null && job.getRequest().getHorses() != null) {
-            horseCount = job.getRequest().getHorses().size();
-        }
+        int horseCount = horsesOn(trip, tripVehicle, trailers.size());
 
-        // BR: Grooms = ⌈horses ÷ 3⌉
+        // BR: Grooms = ⌈horses on the trailer ÷ 3⌉
         int requiredGrooms = (int) Math.ceil(horseCount / 3.0);
         long groomCount = request.crew().stream()
                 .filter(c -> c.crewRole() == CrewRole.GROOM || c.crewRole() == CrewRole.FLYING_GROOM)
@@ -137,6 +177,11 @@ public class CrewAssignmentService {
                         "CREW_OVERLAP",
                         "Crew member " + user.getFirstName() + " " + user.getLastName()
                                 + " is already assigned to another overlapping trip");
+            }
+
+            if (onOtherTrailers.contains(user.getId())) {
+                throw new BusinessException(
+                        user.getFirstName() + " " + user.getLastName() + " is already on another trailer of this trip");
             }
 
             CrewAssignment ca = new CrewAssignment();
