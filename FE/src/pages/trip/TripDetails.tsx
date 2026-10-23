@@ -4,7 +4,7 @@ import { Col, Flex, Row } from 'antd';
 import { eventLabels, formatAgainstPlan, formatClock, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
-import { Table } from '@/components/table';
+import Table from '@/components/table';
 import { Button, Chip, Panel, StatTile } from '@/components/ui';
 import type { HorseCondition, TripRecordKind, TripStop, TripView } from '@/interfaces';
 import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
@@ -17,11 +17,7 @@ const kindTone = (kind: TripRecordKind) =>
       : 'info';
 
 const conditionTone = (cond: HorseCondition) =>
-  cond === HorseConditionEnum.STABLE
-    ? 'ok'
-    : cond === HorseConditionEnum.OFF_FEED
-      ? 'bad'
-      : 'warn';
+  cond === HorseConditionEnum.STABLE ? 'ok' : cond === HorseConditionEnum.OFF_FEED ? 'bad' : 'warn';
 
 export function TripDetails({
   trip,
@@ -217,11 +213,12 @@ export function TripDetails({
           From the route plan confirmed for this trip; recorded times come from the cab.
         </p>
         <Table
+          id="trip-checkpoints"
           rowKey="id"
           columns={columns}
           dataSource={trip.stops}
           pagination={false}
-          rowClassName={(record) => (nextStop?.id === record.id ? 'bg-info-soft/20' : '')}
+          rowClassName={(record: TripStop) => (nextStop?.id === record.id ? 'bg-info-soft/20' : '')}
         />
       </Panel>
 
@@ -249,9 +246,7 @@ export function TripDetails({
               extra={
                 <span className="type-caption text-ink-3">
                   Last check{' '}
-                  {lastConditionRecord
-                    ? formatClock(lastConditionRecord.occurredAt)
-                    : 'not logged'}
+                  {lastConditionRecord ? formatClock(lastConditionRecord.occurredAt) : 'not logged'}
                 </span>
               }
             >
@@ -263,12 +258,7 @@ export function TripDetails({
                   const cond = latestCondition?.condition ?? HorseConditionEnum.STABLE;
 
                   return (
-                    <Flex
-                      key={horse.id}
-                      align="center"
-                      justify="space-between"
-                      className="py-3"
-                    >
+                    <Flex key={horse.id} align="center" justify="space-between" className="py-3">
                       <Flex vertical gap={2}>
                         <span className="type-label-m text-ink">{horse.name}</span>
                         <span className="type-body-s text-ink-3">
@@ -322,9 +312,9 @@ export function TripDetails({
             {/* If the trip stops */}
             <Panel title="If the trip stops">
               <p className="type-body-s m-0 text-ink-2">
-                The escort records the stop and reason in the cab. That hold stays in the journey log
-                and customer tracking until the trip resumes. The logistics manager owns incident
-                follow-up.
+                The escort records the stop and reason in the cab. That hold stays in the journey
+                log and customer tracking until the trip resumes. The logistics manager owns
+                incident follow-up.
               </p>
             </Panel>
           </Flex>
