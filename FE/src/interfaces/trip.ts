@@ -18,9 +18,6 @@ export const TripRecordKindEnum = {
 export type TripRecordKind = (typeof TripRecordKindEnum)[keyof typeof TripRecordKindEnum];
 
 export const HorseConditionEnum = {
-  SOUND: 'SOUND',
-  WATCH: 'WATCH',
-  CONCERN: 'CONCERN',
   STABLE: 'STABLE',
   OFF_FEED: 'OFF_FEED',
   STRESSED: 'STRESSED',

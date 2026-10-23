@@ -33,11 +33,11 @@ export function TripRecords({ trip }: { trip: TripView }) {
                     <strong className="type-h4">{condition.horseName}</strong>
                     <Chip
                       tone={
-                        condition.condition === HorseConditionEnum.CONCERN
+                        condition.condition === HorseConditionEnum.OFF_FEED
                           ? 'bad'
-                          : condition.condition === HorseConditionEnum.WATCH
-                            ? 'warn'
-                            : 'ok'
+                          : condition.condition === HorseConditionEnum.STABLE
+                            ? 'ok'
+                            : 'warn'
                       }
                     >
                       {sentence(condition.condition)}
