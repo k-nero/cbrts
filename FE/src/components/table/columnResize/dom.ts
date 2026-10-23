@@ -114,8 +114,9 @@ export const applyColumnWidthsToDom = (
         return;
       }
       const width = `${appliedWidth[key]}px`;
-      col.style.width = width;
-      col.style.minWidth = width;
+      // Write only on change: the observer that re-asserts these widths watches <col> styles.
+      if (col.style.width !== width) col.style.width = width;
+      if (col.style.minWidth !== width) col.style.minWidth = width;
     });
   });
 
@@ -123,8 +124,8 @@ export const applyColumnWidthsToDom = (
   // `min-width: 100%` stays as a safety net (matches rc-table) in case the viewport
   // measurement is a pixel off; the flex column above already makes total ≈ viewport.
   container.querySelectorAll<HTMLElement>('table').forEach((table) => {
-    table.style.width = totalPx;
-    table.style.minWidth = '100%';
+    if (table.style.width !== totalPx) table.style.width = totalPx;
+    if (table.style.minWidth !== '100%') table.style.minWidth = '100%';
   });
 };
 
