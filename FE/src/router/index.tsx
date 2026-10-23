@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
 
 import AuthenticateLayout from '@/components/AuthenticateLayout';
+import RouteErrorPage from '@/components/RouteErrorPage';
 import StaffMenu from '@/components/menu/StaffMenu';
 import { RoutesGuardWrapper } from '@/HOC/RoutesGuardWrapper';
 import DesignSystemPage from '@/pages/design-system';
@@ -42,6 +43,8 @@ const todo = (title: string) => <PlaceholderPage title={title} />;
 
 export const router = createBrowserRouter([
   {
+    // An error outside a page's own boundary (the shell, the sidebar's counts) gets the same page.
+    errorElement: <RouteErrorPage />,
     element: (
       <RoutesGuardWrapper>
         {/* A new page opens at its top; back and forward return to where you were. */}
