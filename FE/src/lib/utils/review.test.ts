@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   ageWords,
+  teamOption,
   changedRows,
   checkTally,
   checkTone,
@@ -197,5 +198,17 @@ describe('quotationAction', () => {
 
   test('a request out of review with no quotation has no quotation action', () => {
     expect(quotationAction('INFO_REQUIRED', null)).toBeNull();
+  });
+});
+
+describe('teamOption', () => {
+  test('names the person and their open jobs, singular for one', () => {
+    expect(teamOption({ id: 'a', name: 'Nguyễn Thị Lan', openJobs: 1 })).toEqual({
+      value: 'a',
+      label: 'Nguyễn Thị Lan · 1 open job',
+    });
+    expect(teamOption({ id: 'b', name: 'Đỗ Minh Khôi', openJobs: 0 }).label).toBe(
+      'Đỗ Minh Khôi · 0 open jobs',
+    );
   });
 });

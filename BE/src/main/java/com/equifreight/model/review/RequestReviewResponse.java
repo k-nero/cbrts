@@ -1,5 +1,6 @@
 package com.equifreight.model.review;
 
+import com.equifreight.model.approval.JobRefResponse;
 import com.equifreight.model.quotation.QuotationRefResponse;
 import com.equifreight.model.request.RequestResponse;
 import java.util.List;
@@ -23,4 +24,6 @@ public class RequestReviewResponse {
     private QueuePositionResponse queue;
     /** The request's quotation once started (Start quotation or Open quotation); null before. */
     private QuotationRefResponse quotation;
+    /** The job the request became, with its team, once it is APPROVED (US-F1-07); null before. */
+    private JobRefResponse job;
 }

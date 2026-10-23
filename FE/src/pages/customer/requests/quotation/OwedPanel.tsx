@@ -1,28 +1,73 @@
-import type { FC } from 'react';
+import { type FC, useState } from 'react';
 import { Flex } from 'antd';
+
+import CancelRequestModal from '../CancelRequestModal';
+import { AcceptQuotationModal } from './AcceptQuotationModal';
+import { DeclineQuotationModal } from './DeclineQuotationModal';
 
 import { Button, Chip, OwedItem, Panel } from '@/components/ui';
 import type { CustomerQuotation } from '@/interfaces';
-import { daysUntil, deadlineText, formatDate, money, owedKind } from '@/lib/utils';
+import {
+  cancellationToday,
+  cancelledText,
+  daysUntil,
+  deadlineText,
+  formatDate,
+  money,
+  owedKind,
+} from '@/lib/utils';
 
-/** The one owed item: accept or decline before the quotation expires. Accepting comes next release. */
+/**
+ * The one owed item (DESIGN.md, Quotation page): accept or decline before the quotation expires,
+ * with the request's cancellation beneath it until the job is approved (BR-F1-07).
+ */
 export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => {
+  const [open, setOpen] = useState<'accept' | 'decline' | 'cancel' | null>(null);
   const manager = quotation.preparedBy?.name ?? 'The logistics manager';
   const kind = owedKind(quotation.status);
+  const close = () => setOpen(null);
+
+  const cancelFooter = (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setOpen('cancel')}>
+        Cancel this request
+      </Button>
+      <CancelRequestModal
+        requestId={quotation.request.id}
+        code={quotation.request.code}
+        fee={cancellationToday(quotation)}
+        open={open === 'cancel'}
+        onClose={close}
+      />
+    </>
+  );
+
+  if (quotation.requestStatus === 'CANCELLED') {
+    return (
+      <Panel title="Nothing to answer" extra={<Chip dot={false}>Cancelled</Chip>}>
+        <p className="type-body-m m-0 text-ink-2">
+          {cancelledText(quotation.cancelledAt, quotation.cancellationFeePct)}
+        </p>
+      </Panel>
+    );
+  }
   if (kind === 'accepted' || kind === 'declined') {
+    const accepted = kind === 'accepted';
+    const on = accepted ? quotation.acceptedAt : quotation.declinedAt;
     return (
       <Panel
         title="Nothing to answer"
-        extra={
-          <Chip tone={kind === 'accepted' ? 'ok' : 'neutral'}>
-            {kind === 'accepted' ? 'Accepted' : 'Declined'}
-          </Chip>
+        extra={<Chip tone={accepted ? 'ok' : 'neutral'}>{accepted ? 'Accepted' : 'Declined'}</Chip>}
+        footer={
+          accepted && quotation.requestStatus === 'CUSTOMER_ACCEPTED' ? cancelFooter : undefined
         }
       >
         <p className="type-body-m m-0 text-ink-2">
-          {kind === 'accepted'
-            ? `You accepted version ${quotation.versionNo}. Its price and horse list hold for this move.`
-            : `You declined version ${quotation.versionNo}.`}
+          {accepted && quotation.requestStatus === 'APPROVED'
+            ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''} and ${manager} approved the job. The price and the horse list are locked; your document checklist is open.`
+            : accepted
+              ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}. Next, ${manager} approves the job, which locks the price and the horse list.`
+              : `You declined version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}, so ${quotation.request.code} is closed.`}
         </p>
       </Panel>
     );
@@ -43,7 +88,19 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
     ? deadlineText(until, new Date().toISOString())
     : { line1: '—', line2: '' };
   return (
-    <Panel title="1 item" extra={<Chip tone="warn">Waiting for you</Chip>} flush>
+    <Panel
+      title={
+        <Flex vertical gap={4}>
+          <h2 className="type-h3 m-0 text-ink">You owe 1 item</h2>
+          <span className="type-body-s text-ink-2">
+            {`${manager}, logistics manager, issued version ${quotation.versionNo}${issued ? ` on ${formatDate(issued)}` : ''}. Accepting locks the price and the horse list; declining closes the request.`}
+          </span>
+        </Flex>
+      }
+      extra={<Chip tone="warn">Waiting for you</Chip>}
+      footer={cancelFooter}
+      flush
+    >
       <OwedItem
         urgency="soon"
         title="Accept or decline this quotation"
@@ -56,18 +113,19 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
             : undefined
         }
         deadline={{ left: deadline.line1, date: deadline.line2 }}
+        action={
+          <>
+            <Button variant="primary" leadingIcon="check" onClick={() => setOpen('accept')}>
+              Accept quotation
+            </Button>
+            <Button variant="secondary" onClick={() => setOpen('decline')}>
+              Decline
+            </Button>
+          </>
+        }
       />
-      <div className="border-t border-line px-5 py-4">
-        <Flex align="center" gap={12}>
-          <Button variant="secondary" disabled>
-            Accept quotation
-          </Button>
-          <Button variant="secondary" disabled>
-            Decline
-          </Button>
-          <span className="type-body-s text-ink-3">Accepting comes with the next release.</span>
-        </Flex>
-      </div>
+      <AcceptQuotationModal quotation={quotation} open={open === 'accept'} onClose={close} />
+      <DeclineQuotationModal quotation={quotation} open={open === 'decline'} onClose={close} />
     </Panel>
   );
 };

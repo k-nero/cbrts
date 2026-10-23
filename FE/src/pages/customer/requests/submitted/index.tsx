@@ -1,15 +1,18 @@
-import type { FC } from 'react';
+import { type FC, useState } from 'react';
 import { Flex } from 'antd';
 import { Navigate, useParams } from 'react-router-dom';
 
+import CancelRequestModal from '../CancelRequestModal';
+import DocumentsCallout from './DocumentsCallout';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
 
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, OwedItem, Panel } from '@/components/ui';
+import { Button, Callout, Chip, OwedItem, Panel } from '@/components/ui';
 import { useRequest, useWizardHorses } from '@/hooks/request';
 import {
+  cancelledText,
   estimateStub,
   formatDate,
   fromRequest,
@@ -29,12 +32,31 @@ const RequestSubmittedPage: FC = () => {
   const query = useRequest(id);
   const horses = useWizardHorses();
   const request = query.data;
+  const [cancelling, setCancelling] = useState(false);
 
   if (!request) return <RequestLoadState query={query} />;
   if (request.status === 'DRAFT')
     return <Navigate to={router.paths.get('request-edit', { pathParams: [request.id] })} replace />;
 
   const latest = latestRevision(request);
+  // Before a quotation is issued there is no price to take a fee from; once one is, the quotation page
+  // cancels with its fee band (BR-F1-07).
+  const cancellable =
+    !request.quotation && ['SUBMITTED', 'UNDER_REVIEW', 'INFO_REQUIRED'].includes(request.status);
+  const cancelAction = cancellable && (
+    <>
+      <Button variant="ghost" onClick={() => setCancelling(true)}>
+        Cancel this request
+      </Button>
+      <CancelRequestModal
+        requestId={request.id}
+        code={request.code ?? ''}
+        fee="No fee: no quotation has been issued yet."
+        open={cancelling}
+        onClose={() => setCancelling(false)}
+      />
+    </>
+  );
   const callout = request.quotation ? quotationCallout(request.quotation) : null;
   const toList = () => router.push(router.paths.get('my-requests'));
   const back = { label: 'My requests', onClick: toList };
@@ -100,6 +122,7 @@ const RequestSubmittedPage: FC = () => {
                     Your request number stays the same; your changes go back as version {latest + 1}
                     .
                   </span>
+                  {cancelAction}
                 </Flex>
               </div>
             </Panel>
@@ -118,7 +141,13 @@ const RequestSubmittedPage: FC = () => {
     <Flex vertical gap={28}>
       <PageHeader
         back={back}
-        title="Request submitted"
+        title={
+          request.status === 'CANCELLED'
+            ? 'Request cancelled'
+            : request.status === 'REJECTED'
+              ? 'Request rejected'
+              : 'Request submitted'
+        }
         summary={
           <Flex component="span" vertical gap={4}>
             <span className="type-data-l text-ink">{request.code}</span>
@@ -134,7 +163,24 @@ const RequestSubmittedPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <Flex vertical gap={24}>
-          {callout ? (
+          {request.status === 'REJECTED' ? (
+            <Panel title="Nothing needed from you" extra={<Chip tone="bad">Rejected</Chip>}>
+              <Flex vertical gap={8}>
+                <p className="type-body-m m-0 text-ink-2">
+                  The logistics manager can’t take this move. Their reason:
+                </p>
+                <p className="type-body-m m-0 whitespace-pre-line text-ink">
+                  {request.rejectReason}
+                </p>
+              </Flex>
+            </Panel>
+          ) : request.status === 'CANCELLED' ? (
+            <Panel title="Nothing needed from you" extra={<Chip dot={false}>Cancelled</Chip>}>
+              <p className="type-body-m m-0 text-ink-2">
+                {cancelledText(request.cancelledAt, request.cancellationFeePct)}
+              </p>
+            </Panel>
+          ) : callout ? (
             <Callout
               tone={callout.tone}
               title={callout.title}
@@ -159,6 +205,7 @@ const RequestSubmittedPage: FC = () => {
               </p>
             </Panel>
           )}
+          {request.status === 'APPROVED' && <DocumentsCallout requestId={request.id} />}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.
           </p>
@@ -169,6 +216,7 @@ const RequestSubmittedPage: FC = () => {
             <Button variant="ghost" onClick={() => router.push(router.paths.get('request-new'))}>
               Request another move
             </Button>
+            {cancelAction}
           </Flex>
         </Flex>
         <Flex vertical gap={24}>

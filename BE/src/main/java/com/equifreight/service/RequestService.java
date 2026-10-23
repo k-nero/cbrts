@@ -12,11 +12,14 @@ import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CodePrefix;
+import com.equifreight.entity.enums.FeeBandKind;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InsuranceOption;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
@@ -39,16 +42,22 @@ import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.QuotationRepository;
+import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import com.equifreight.service.pricing.EstimateResult;
 import com.equifreight.service.pricing.EstimateStatus;
+import com.equifreight.service.quotation.CancellationFee;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,6 +65,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -82,6 +92,15 @@ public class RequestService {
     /** The audit action of a return for information (US-F1-04); RequestReviewService writes it. */
     static final String INFO_REQUIRED_ACTION = "REQUEST_INFO_REQUIRED";
 
+    /** Every state after submission and before APPROVED (BR-F1-07). */
+    private static final Set<RequestStatus> CANCELLABLE = Set.of(
+            RequestStatus.SUBMITTED,
+            RequestStatus.UNDER_REVIEW,
+            RequestStatus.INFO_REQUIRED,
+            RequestStatus.QUOTED,
+            RequestStatus.CUSTOMER_ACCEPTED,
+            RequestStatus.EXPIRED);
+
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
     private final PlaceRepository places;
@@ -95,6 +114,8 @@ public class RequestService {
     private final Clock clock;
     private final RequestEstimator estimator;
     private final QuotationRepository quotations;
+    private final RateFeeBandRepository feeBands;
+    private final NotificationService notifications;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -109,7 +130,9 @@ public class RequestService {
             JsonMapper json,
             Clock clock,
             RequestEstimator estimator,
-            QuotationRepository quotations) {
+            QuotationRepository quotations,
+            RateFeeBandRepository feeBands,
+            NotificationService notifications) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -123,6 +146,8 @@ public class RequestService {
         this.clock = clock;
         this.estimator = estimator;
         this.quotations = quotations;
+        this.feeBands = feeBands;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true)
@@ -349,6 +374,82 @@ public class RequestService {
             throw notEditable(request);
         }
         requests.delete(request);
+    }
+
+    /**
+     * The customer cancels a submitted request (BR-F1-07, spec §2.4 A5): allowed in every state before APPROVED. The
+     * fee band follows the days left before departure, from the cancellation bands of the catalog the latest issued
+     * quotation is pinned to; with no quotation issued there is no price to take a fee from, so it is 0%. A draft is
+     * discarded instead, and an approved request changes through a change request.
+     */
+    @Transactional
+    public RequestResponse cancel(User user, UUID id) {
+        Club club = clubs.requireClub(user);
+        TransportRequest request = findForUpdate(club, id);
+        RequestStatus before = request.getStatus();
+        if (!CANCELLABLE.contains(before)) {
+            throw notCancellable(request);
+        }
+        Optional<Quotation> issued =
+                quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT);
+        LocalDate today = LocalDate.now(clock.withZone(BusinessTime.ZONE));
+        long days = ChronoUnit.DAYS.between(today, request.getDepartureDate());
+        BigDecimal feePct = issued.map(q -> CancellationFee.pctFor(
+                        feeBands.findByVersionIdAndKindOrderByMinDays(
+                                q.getRateCatalogVersion().getId(), FeeBandKind.CANCELLATION),
+                        days))
+                .orElse(BigDecimal.ZERO);
+
+        request.setStatus(RequestStatus.CANCELLED);
+        request.setCancelledAt(clock.instant());
+        request.setCancellationFeePct(feePct);
+        TransportRequest saved = requests.saveAndFlush(request);
+
+        String fee = issued.isEmpty()
+                ? "no fee, as no quotation was issued"
+                : "fee " + feePct.stripTrailingZeros().toPlainString() + "% with " + Math.max(0, days)
+                        + " days to departure";
+        audit.recordDecision(
+                user,
+                "REQUEST_CANCELLED",
+                AuditText.fit("Cancelled by " + club.getName() + "; " + fee),
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getCode(),
+                null,
+                "{\"status\":\"" + before + "\"}",
+                "{\"status\":\"" + RequestStatus.CANCELLED + "\"}");
+        notifications.notify(
+                NotificationKind.REQUEST_CANCELLED,
+                Audience.role(RoleName.LOGISTICS_MANAGER),
+                Subject.request(saved),
+                club.getName() + " cancelled " + saved.getCode(),
+                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + ".");
+        return get(user, saved.getId());
+    }
+
+    private static ConflictException notCancellable(TransportRequest request) {
+        return switch (request.getStatus()) {
+            case DRAFT ->
+                new ConflictException(
+                        "REQUEST_NOT_CANCELLABLE", "A draft isn't cancelled; discard it from your requests instead.");
+            case APPROVED ->
+                new ConflictException(
+                        "REQUEST_NOT_CANCELLABLE",
+                        request.getCode() + " is approved, so its price and horses are locked. Ask the logistics"
+                                + " manager for a change request.");
+            case CANCELLED ->
+                new ConflictException(
+                        "REQUEST_NOT_CANCELLABLE",
+                        request.getCode() + " was already cancelled on "
+                                + BusinessTime.DAY.format(
+                                        request.getCancelledAt().atZone(BusinessTime.ZONE)) + ".");
+            default ->
+                new ConflictException(
+                        "REQUEST_NOT_CANCELLABLE",
+                        request.getCode() + " is " + request.getStatus().name().toLowerCase()
+                                + " and has nothing left to cancel.");
+        };
     }
 
     // --- loading ------------------------------------------------------------------------------------------

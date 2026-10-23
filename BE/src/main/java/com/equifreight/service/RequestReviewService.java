@@ -5,10 +5,12 @@ import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.RequestRevision;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.approval.ApprovalMapper;
 import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.model.request.RequestMapper;
 import com.equifreight.model.request.RequestResponse;
@@ -23,8 +25,10 @@ import com.equifreight.model.route.RouteResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
+import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
-import com.equifreight.repository.UserRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -56,6 +60,10 @@ public class RequestReviewService {
     private static final Pattern EDGE_SPACE = Pattern.compile("^[\\s\\p{Z}\\x{FEFF}]+|[\\s\\p{Z}\\x{FEFF}]+$");
 
     private static final List<RequestStatus> IN_REVIEW = List.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW);
+    /** The queue: in review, or accepted and waiting for the manager's approval (US-F1-07). */
+    private static final List<RequestStatus> QUEUE =
+            List.of(RequestStatus.SUBMITTED, RequestStatus.UNDER_REVIEW, RequestStatus.CUSTOMER_ACCEPTED);
+
     private static final Map<RequestStatus, String> STATUS_WORDS = Map.of(
             RequestStatus.DRAFT, "a draft",
             RequestStatus.INFO_REQUIRED, "waiting for the customer's answer",
@@ -68,45 +76,51 @@ public class RequestReviewService {
 
     private final TransportRequestRepository requests;
     private final RequestRevisionRepository revisions;
-    private final UserRepository users;
     private final AuditLogRepository auditLogs;
     private final RouteService routes;
     private final AuditService audit;
     private final NotificationService notifications;
     private final QuotationRepository quotations;
+    private final TransportJobRepository jobs;
     private final JsonMapper json;
     private final Clock clock;
 
     public RequestReviewService(
             TransportRequestRepository requests,
             RequestRevisionRepository revisions,
-            UserRepository users,
             AuditLogRepository auditLogs,
             RouteService routes,
             AuditService audit,
             NotificationService notifications,
             QuotationRepository quotations,
+            TransportJobRepository jobs,
             JsonMapper json,
             Clock clock) {
         this.requests = requests;
         this.revisions = revisions;
-        this.users = users;
         this.auditLogs = auditLogs;
         this.routes = routes;
         this.audit = audit;
         this.notifications = notifications;
         this.quotations = quotations;
+        this.jobs = jobs;
         this.json = json;
         this.clock = clock;
+    }
+
+    /** "accepted by the customer": a status in words, for refusals. */
+    static String statusWords(RequestStatus status) {
+        return STATUS_WORDS.getOrDefault(status, status.name().toLowerCase().replace('_', ' '));
     }
 
     /** US-F1-03: the requests waiting for review, oldest first, 20 to a page. */
     @Transactional(readOnly = true)
     public Page<QueueRowResponse> queue(Pageable pageable) {
-        return requests.findQueue(IN_REVIEW, pageable)
+        return requests.findQueue(QUEUE, pageable)
                 .map(row -> QueueRowResponse.builder()
                         .id(row.getId())
                         .code(row.getCode())
+                        .status(row.getStatus())
                         .club(row.getClub())
                         .fromCity(row.getFromCity())
                         .toCity(row.getToCity())
@@ -189,6 +203,12 @@ public class RequestReviewService {
                         .findFirstByRequestIdOrderByVersionNoDesc(request.getId())
                         .map(QuotationMapper::toRef)
                         .orElse(null))
+                .job(
+                        request.getStatus() == RequestStatus.APPROVED
+                                ? jobs.findByRequestId(request.getId())
+                                        .map(ApprovalMapper::toJobRef)
+                                        .orElse(null)
+                                : null)
                 .build();
     }
 
@@ -212,10 +232,10 @@ public class RequestReviewService {
     }
 
     private QueuePositionResponse position(TransportRequest request) {
-        if (!IN_REVIEW.contains(request.getStatus())) {
+        if (!QUEUE.contains(request.getStatus())) {
             return null;
         }
-        List<UUID> ids = requests.findQueueIds(IN_REVIEW);
+        List<UUID> ids = requests.findQueueIds(QUEUE);
         int at = ids.indexOf(request.getId());
         if (at < 0) {
             return null;
@@ -279,15 +299,12 @@ public class RequestReviewService {
                 note,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"INFO_REQUIRED\"}");
-        for (User account : users.findByClubId(request.getClub().getId())) {
-            notifications.sendNotification(
-                    account,
-                    RequestService.INFO_REQUIRED_ACTION,
-                    request.getCode() + " needs your answer",
-                    note,
-                    ENTITY_TYPE,
-                    request.getId());
-        }
+        notifications.notify(
+                NotificationKind.REQUEST_INFO_REQUIRED,
+                Audience.club(request.getClub().getId()),
+                Subject.request(request),
+                request.getCode() + " needs your answer",
+                note);
         return viewOf(request);
     }
 }

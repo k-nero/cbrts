@@ -2,12 +2,15 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.AppConstants;
 import com.equifreight.entity.*;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.clearance.*;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -205,7 +208,7 @@ public class AuthoritySubmissionService {
         } else if (request.status() == SubmissionStatus.REFUSED) {
             alertManager(
                     submission,
-                    "DOSSIER_REFUSED",
+                    NotificationKind.DOSSIER_REFUSED,
                     submission.getAuthority().getName() + " refused " + submission.getKind() + " for "
                             + submission.getJob().getCode(),
                     "Reschedule or re-file before the departure slot is lost.");
@@ -213,19 +216,18 @@ public class AuthoritySubmissionService {
             // ADDITIONAL_INFO_REQUIRED is set by the gate run below.
             TransportJob job = submission.getJob();
 
-            if (job.getRequest() != null && job.getRequest().getCreatedBy() != null) {
-                notificationService.sendNotification(
-                        job.getRequest().getCreatedBy(),
-                        "ADDITIONAL_INFO_REQUIRED",
+            if (job.getRequest() != null) {
+                notificationService.notify(
+                        NotificationKind.AUTHORITY_INFO_REQUIRED,
+                        Audience.club(job.getRequest().getClub().getId()),
+                        Subject.authoritySubmission(submission),
                         "Additional information requested by "
                                 + submission.getAuthority().getName(),
-                        "Authority requested additional documentation for submission " + submission.getKind(),
-                        "AuthoritySubmission",
-                        submission.getId());
+                        "Authority requested additional documentation for submission " + submission.getKind());
             }
             alertManager(
                     submission,
-                    "DOSSIER_BLOCKED",
+                    NotificationKind.DOSSIER_BLOCKED,
                     submission.getAuthority().getName() + " asked for more information on " + submission.getKind()
                             + " for " + job.getCode(),
                     "The dossier is blocked until the customer sends it.");
@@ -362,23 +364,31 @@ public class AuthoritySubmissionService {
         for (AuthoritySubmission s : late) {
             if (alertManager(
                     s,
-                    "DOSSIER_LATE",
+                    NotificationKind.DOSSIER_LATE,
                     s.getKind() + " for " + s.getJob().getCode() + " is late",
                     s.getAuthority().getName() + " was expected to answer by " + s.getExpectedBy()
-                            + " and the submission is still " + s.getStatus() + ".")) {
+                            + " and the submission is still " + s.getStatus() + ".",
+                    // Repeated daily until the authority answers: one unread row, bumped to the top.
+                    "DOSSIER_LATE:" + s.getId())) {
                 alerted++;
             }
         }
         return alerted;
     }
 
+    private void alertManager(AuthoritySubmission submission, NotificationKind kind, String title, String body) {
+        alertManager(submission, kind, title, body, null);
+    }
+
     /** Notifies the logistics manager who approved the submission's job; false when no one approved it. */
-    private boolean alertManager(AuthoritySubmission submission, String type, String title, String body) {
+    private boolean alertManager(
+            AuthoritySubmission submission, NotificationKind kind, String title, String body, String dedupeKey) {
         User manager = submission.getJob().getApprovedBy();
         if (manager == null) {
             return false;
         }
-        notificationService.sendNotification(manager, type, title, body, "AuthoritySubmission", submission.getId());
+        notificationService.notify(
+                kind, Audience.staff(manager), Subject.authoritySubmission(submission), title, body, dedupeKey);
         return true;
     }
 

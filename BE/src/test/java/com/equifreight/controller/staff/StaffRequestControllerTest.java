@@ -22,6 +22,7 @@ import com.equifreight.model.quotation.StartResult;
 import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.service.QuotationDraftService;
 import com.equifreight.service.QuotationIssueService;
+import com.equifreight.service.RequestApprovalService;
 import com.equifreight.service.RequestReviewService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -57,7 +58,8 @@ class StaffRequestControllerTest {
         service = mock(RequestReviewService.class);
         quotations = mock(QuotationDraftService.class);
         issues = mock(QuotationIssueService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new StaffRequestController(service, quotations, issues))
+        mvc = MockMvcBuilders.standaloneSetup(
+                        new StaffRequestController(service, quotations, issues, mock(RequestApprovalService.class)))
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver(), new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
@@ -73,7 +75,7 @@ class StaffRequestControllerTest {
                         || m.isAnnotationPresent(DeleteMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(15);
+        assertThat(handlers).hasSize(18);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));

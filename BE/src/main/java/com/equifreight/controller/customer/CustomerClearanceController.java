@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Customer clearance dossier endpoints (US-F2-03).
+ * Customer clearance dossier endpoints (US-F2-02, US-F2-03).
  * Enables racing clubs and horse owners to view checklist items and upload documents for their own club's jobs.
  */
 @RestController
@@ -31,6 +31,13 @@ public class CustomerClearanceController {
     public ResponseEntity<List<ChecklistItemResponse>> getCustomerChecklist(
             @PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(clearanceService.getCustomerChecklist(jobId, user));
+    }
+
+    /** US-F2-02: the documents behind a request, for the customer's All documents page. */
+    @GetMapping("/requests/{requestId}/checklist")
+    public ResponseEntity<List<ChecklistItemResponse>> getRequestChecklist(
+            @PathVariable UUID requestId, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(clearanceService.getCustomerRequestChecklist(requestId, user));
     }
 
     @PostMapping("/checklist/{checklistItemId}/versions")

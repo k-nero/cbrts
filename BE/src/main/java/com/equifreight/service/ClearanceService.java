@@ -105,6 +105,23 @@ public class ClearanceService {
     }
 
     /**
+     * US-F2-02: the checklist behind one of the customer's requests. Empty until the request is approved into a job
+     * and its checklist is generated.
+     */
+    @Transactional(readOnly = true)
+    public List<ChecklistItemResponse> getCustomerRequestChecklist(UUID requestId, User customer) {
+        return transportJobRepository
+                .findByRequestId(requestId)
+                .map(job -> {
+                    assertClubOwnsJob(job, customer);
+                    return checklistItemRepository.findByJobId(job.getId()).stream()
+                            .map(ClearanceMapper::toItemResponse)
+                            .toList();
+                })
+                .orElse(List.of());
+    }
+
+    /**
      * Retrieve unreviewed document versions for the specialist inbox with pagination.
      */
     @Transactional(readOnly = true)
@@ -482,6 +499,15 @@ public class ClearanceService {
             }
         }
 
+        if (totalMandatory == 0) {
+            // #113: with nothing mandatory to check, the gate would hold with nothing checked. It stays closed.
+            outstandingIssues.addFirst(destinationVersion(job.getId())
+                    .map(v -> "The pinned regulation catalog, "
+                            + v.getCatalog().getCountry().getName() + " v"
+                            + v.getVersionNo() + ", has no mandatory document rules, so the gate stays closed"
+                            + " until the job's checklist has its documents.")
+                    .orElse("The job has no document checklist yet. Generate it from the regulation catalogs."));
+        }
         boolean allQuarantinesCompleted = completedQuarantines == quarantines.size();
         boolean ready = totalMandatory > 0
                 && clearedMandatory == totalMandatory
@@ -542,6 +568,27 @@ public class ClearanceService {
      * <p>Each item is due the pinned version's lead time before the planned departure; with no departure
      * planned yet, the due date stays empty until there is one.
      */
+    /**
+     * Refuses, before anything is written, a request whose job couldn't get its checklist: its destination has no
+     * country, or that country has no published regulation catalog to pin (BR-F2-01). Approval calls it first.
+     */
+    @Transactional(readOnly = true)
+    public void requireChecklistSource(TransportRequest request) {
+        Country destination = destinationCountry(request);
+        if (destination == null) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_DESTINATION",
+                    "The request's destination has no country, so its document checklist can't be made.");
+        }
+        if (publishedVersion(destination).isEmpty()) {
+            throw new BusinessException(
+                    "CHECKLIST_NO_CATALOG",
+                    "There is no published regulation catalog for " + destination.getName()
+                            + ", so the job's document checklist can't be made. Ask the transport specialist to"
+                            + " publish one first.");
+        }
+    }
+
     @Transactional
     public List<ChecklistItemResponse> generateChecklist(UUID jobId, User specialist) {
         TransportJob job = findJobOrThrow(jobId);

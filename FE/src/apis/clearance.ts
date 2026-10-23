@@ -98,6 +98,9 @@ export const clearanceApi = {
     client.post<RegulationVersion>(`/staff/regulations/catalogs/${catalogId}/draft`),
 
   // Customer Clearance Endpoints (US-F2-03)
+  /** US-F2-02: the documents behind a request; empty until it is approved into a job. */
+  getCustomerRequestChecklist: (requestId: string) =>
+    client.get<ChecklistItem[]>(`/customer/clearance/requests/${requestId}/checklist`),
   getCustomerChecklist: (jobId: string) =>
     client.get<ChecklistItem[]>(`/customer/clearance/jobs/${jobId}/checklist`),
 

@@ -1,6 +1,6 @@
 import type { TransportMode } from './job';
 import type { MissingRate } from './rates';
-import type { InsuranceOption, ServiceClass, TrailerType } from './request';
+import type { InsuranceOption, RequestStatus, ServiceClass, TrailerType } from './request';
 
 export const QuotationStatusEnum = {
   DRAFT: 'DRAFT',
@@ -223,8 +223,16 @@ export interface CustomerQuotation {
   code: string;
   versionNo: number;
   status: QuotationStatus;
+  /** Where the request stands; a cancelled request can't be answered whatever this version's status. */
+  requestStatus: RequestStatus;
   issuedAt: string | null;
   validUntil: string | null;
+  /** When the club accepted this version (US-F1-06). */
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  /** When the club cancelled the request, and the fee band applied then (BR-F1-07). */
+  cancelledAt: string | null;
+  cancellationFeePct: number | null;
   currency: string;
   pinnedVersionNo: number;
   request: {

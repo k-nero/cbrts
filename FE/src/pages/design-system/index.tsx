@@ -25,9 +25,11 @@ import {
   FactCell,
   HorseCard,
   Icon,
+  IconButton,
   ICON_NAMES,
   LoadItem,
   Nameplate,
+  NotificationItem,
   OptionCard,
   OwedItem,
   Panel,
@@ -241,6 +243,42 @@ const DesignSystemPage: FC = () => {
               extra="Owner Lan, transport specialist"
             />
             <Steps steps={['Horses', 'Service', 'Route & dates', 'Review']} current={2} />
+          </Section>
+
+          <Section
+            title="Shell tools and notifications"
+            description="The 36 px tools in the shell's corner: the theme toggle and the bell. The bell's count is a strong neutral pill, hidden at 0 and 99+ above 99, and its accessible name says what it counts. A notification links to its record: unread on the raised surface with a dot, its kind as a chip so the state is said in words."
+          >
+            <Row label="Bell: none, 3 and 120 unread">
+              <IconButton icon="bell" label="Notifications" />
+              <IconButton icon="bell" label="Notifications, 3 unread" count={3} />
+              <IconButton icon="bell" label="Notifications, 120 unread" count={120} />
+              <IconButton icon="moon" label="Switch to dark theme" />
+            </Row>
+            <div className="w-100 divide-y divide-line rounded-lg border border-line bg-card">
+              <NotificationItem
+                title="REQ-2026-0031 needs your answer"
+                body="Shadowfax and Nightfall will be in Phnom Penh from 18 Oct. Should we collect them there?"
+                kindLabel="Answer needed"
+                tone="warn"
+                code="REQ-2026-0031"
+                when="12 min ago"
+                whenExact="23 Oct, 14:02"
+                unread
+                to="/design-system"
+              />
+              <NotificationItem
+                title="Trip CBRT-2026-041 held at Mộc Bài – Bavet"
+                body="Vet check at the border."
+                kindLabel="Trip held"
+                tone="bad"
+                code="CBRT-2026-041"
+                when="2 days ago"
+                whenExact="21 Oct, 09:40"
+                unread={false}
+                to="/design-system"
+              />
+            </div>
           </Section>
 
           <Section

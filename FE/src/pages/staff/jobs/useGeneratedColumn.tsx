@@ -98,6 +98,27 @@ export const useGeneratedJobColumn = () =>
           ),
       },
       {
+        // The team chosen at approval (US-F1-07): who owns the documents, then who plans the move.
+        title: 'Team',
+        key: 'team',
+        width: 220,
+        render: (_, job) =>
+          job.transportSpecialist || job.coordinator ? (
+            <Flex component="span" vertical gap={2}>
+              <span className="type-body-s text-ink">
+                {job.transportSpecialist ?? 'No specialist'}
+                <span className="type-caption text-ink-3"> · documents</span>
+              </span>
+              <span className="type-body-s text-ink">
+                {job.coordinator ?? 'No coordinator'}
+                <span className="type-caption text-ink-3"> · planning</span>
+              </span>
+            </Flex>
+          ) : (
+            <span className="type-body-s text-ink-3">Not assigned</span>
+          ),
+      },
+      {
         title: 'Next step owner',
         key: 'nextStepOwner',
         width: 200,

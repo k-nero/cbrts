@@ -8,6 +8,7 @@ import Breadcrumb from './Breadcrumb';
 import ErrorBoundaryHandling from './ErrorBoundaryHandling';
 import Footer from './Footer';
 import Header from './Header';
+import NotificationBell from './notification/NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import { SideUser } from './SideUser';
 
@@ -46,7 +47,7 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
     );
   }
 
-  // Staff shell: a top bar with the breadcrumb and today's date, then content at 40 px gutters.
+  // Staff shell: a top bar with the breadcrumb, today's date and the bell, then content at 40 px gutters.
   const body = (
     <Layout style={{ background: COLOR_BG_CANVAS }}>
       <Flex
@@ -59,6 +60,7 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
           <span className="font-mono text-[12px] text-ink-3">
             {dayjs().format('ddd D MMM YYYY')}
           </span>
+          <NotificationBell page="staff-notifications" />
           <ThemeToggle />
         </Flex>
       </Flex>

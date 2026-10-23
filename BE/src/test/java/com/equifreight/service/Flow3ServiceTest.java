@@ -3,10 +3,12 @@ package com.equifreight.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -17,6 +19,8 @@ import com.equifreight.model.job.AssignCrewRequest;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,7 +180,41 @@ class Flow3ServiceTest {
                 crewAssignmentRepository,
                 clearanceService,
                 auditService,
-                notificationService);
+                notificationService,
+                mock(CodeService.class));
+    }
+
+    @Test
+    @DisplayName("A job not planned yet has no route plan, and reading it doesn't throw")
+    void aJobWithoutARoutePlanHasNone() {
+        UUID jobId = UUID.randomUUID();
+        when(routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(routePlanRepository.findFirstByJobIdOrderByVersionNoDesc(jobId)).thenReturn(Optional.empty());
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId)).isEmpty();
+        // The endpoint still answers 404 for it.
+        assertThrows(ResourceNotFoundException.class, () -> routePlanService.getActiveRoutePlan(jobId));
+    }
+
+    @Test
+    @DisplayName("The confirmed route plan wins over a later draft")
+    void theConfirmedRoutePlanWins() {
+        UUID jobId = UUID.randomUUID();
+        RoutePlan confirmed = new RoutePlan();
+        confirmed.setId(UUID.randomUUID());
+        confirmed.setStatus(RoutePlanStatus.CONFIRMED);
+        TransportJob job = new TransportJob();
+        job.setId(jobId);
+        confirmed.setJob(job);
+        when(routePlanRepository.findByJobIdAndStatus(jobId, RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(confirmed));
+
+        assertThat(routePlanService.findActiveRoutePlan(jobId))
+                .get()
+                .extracting(r -> r.id())
+                .isEqualTo(confirmed.getId());
+        verify(routePlanRepository, never()).findFirstByJobIdOrderByVersionNoDesc(jobId);
     }
 
     @Test
@@ -640,14 +678,14 @@ class Flow3ServiceTest {
         assertEquals(JobStage.CLEARANCE, job.getStage());
         assertNotNull(job.getSignedOffAt());
         assertEquals(manager, job.getSignedOffBy());
-        verify(notificationService, times(2))
-                .sendNotification(
-                        any(),
-                        eq("TRIP_RELEASED"),
+        verify(notificationService)
+                .notify(
+                        eq(NotificationKind.TRIP_RELEASED),
+                        argThat(to -> to instanceof Audience.Escorts crew
+                                && crew.users().size() == 2),
+                        eq(Subject.job(job)),
                         contains("Trip plan signed off"),
-                        any(),
-                        eq("TRANSPORT_JOB"),
-                        eq(job.getId()));
+                        any());
     }
 
     @Test

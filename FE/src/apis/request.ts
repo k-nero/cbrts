@@ -43,3 +43,15 @@ export const getEstimate = (input: RequestDraftInput): Promise<Estimate> =>
 /** The request's latest issued quotation (spec §6.1); 404 until one is issued. */
 export const getCustomerQuotation = (id: string): Promise<CustomerQuotation> =>
   client.get<CustomerQuotation>(`${BASE}/${id}/quotation`).then((r) => r.data);
+
+/** Accept the latest issued quotation before it expires (US-F1-06); the request becomes CUSTOMER_ACCEPTED. */
+export const acceptQuotation = (id: string): Promise<CustomerQuotation> =>
+  client.post<CustomerQuotation>(`${BASE}/${id}/quotation/accept`).then((r) => r.data);
+
+/** Decline the latest issued quotation, with an optional reason; the request ends EXPIRED. */
+export const declineQuotation = (id: string, reason: string | null): Promise<CustomerQuotation> =>
+  client.post<CustomerQuotation>(`${BASE}/${id}/quotation/decline`, { reason }).then((r) => r.data);
+
+/** Cancel a submitted request before approval; the fee band follows the days left (BR-F1-07). */
+export const cancelRequest = (id: string): Promise<TransportRequest> =>
+  client.post<TransportRequest>(`${BASE}/${id}/cancel`).then((r) => r.data);

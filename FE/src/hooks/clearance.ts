@@ -56,6 +56,15 @@ export const usePendingReviews = () => {
   });
 };
 
+/** US-F2-02: the customer's documents for one request, owed or not. */
+export const useRequestChecklist = (requestId: string) =>
+  useQuery({
+    queryKey: queryKeys.clearance.requestChecklist(requestId),
+    queryFn: async (): Promise<ChecklistItem[]> =>
+      (await clearanceApi.getCustomerRequestChecklist(requestId)).data,
+    enabled: Boolean(requestId),
+  });
+
 /**
  * Job document checklist query.
  * Only enabled when a valid jobId is provided.

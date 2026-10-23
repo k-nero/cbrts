@@ -92,9 +92,11 @@ public final class ClearanceMapper {
 
         UUID reviewedById = null;
         String reviewedByName = null;
+        String reviewedByCalledName = null;
         if (version.getReviewedBy() != null) {
             reviewedById = version.getReviewedBy().getId();
             reviewedByName = formatUserName(version.getReviewedBy());
+            reviewedByCalledName = calledName(version.getReviewedBy());
         }
 
         return DocumentVersionResponse.builder()
@@ -118,6 +120,7 @@ public final class ClearanceMapper {
                 .review(version.getReview())
                 .reviewedById(reviewedById)
                 .reviewedByName(reviewedByName)
+                .reviewedByCalledName(reviewedByCalledName)
                 .reviewedAt(version.getReviewedAt())
                 .rejectReason(version.getRejectReason())
                 .build();
@@ -292,6 +295,12 @@ public final class ClearanceMapper {
                 .completedAt(q.getCompletedAt())
                 .isCompleted(q.getCompletedAt() != null)
                 .build();
+    }
+
+    /** The last word of the given name, which is what a Vietnamese name is called by: "Thị Lan" → "Lan". */
+    static String calledName(User user) {
+        String first = user.getFirstName() == null ? "" : user.getFirstName().strip();
+        return first.isEmpty() ? null : first.substring(first.lastIndexOf(' ') + 1);
     }
 
     private static String formatUserName(User user) {

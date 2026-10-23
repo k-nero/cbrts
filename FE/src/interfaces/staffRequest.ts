@@ -1,11 +1,13 @@
 import type { TransportMode } from './job';
 import type { QuotationRef } from './quotation';
-import type { TransportRequest } from './request';
+import type { RequestStatus, TransportRequest } from './request';
 
 /** One row of the logistics manager's review queue (US-F1-03, GET /staff/requests). */
 export interface QueueRow {
   id: string;
   code: string;
+  /** In review, or accepted by the customer and waiting for approval (US-F1-07). */
+  status: RequestStatus;
   club: string;
   fromCity: string | null;
   toCity: string | null;
@@ -61,4 +63,29 @@ export interface RequestReview {
   queue: QueuePosition | null;
   /** The request's quotation once started; null before. */
   quotation: QuotationRef | null;
+  /** The job the request became, with its team, once approved (US-F1-07). */
+  job: JobRef | null;
+}
+
+/** The job an approved request became; the names are null on jobs approved before teams were kept. */
+export interface JobRef {
+  id: string;
+  code: string;
+  transportSpecialist: string | null;
+  coordinator: string | null;
+}
+
+/** Someone who can be put on a job at approval, with the open jobs they already have in that role. */
+export interface TeamMember {
+  id: string;
+  name: string;
+  openJobs: number;
+}
+
+/** GET /staff/requests/approval-options: fewest open jobs first; the suggestion is the first of each. */
+export interface ApprovalOptions {
+  specialists: TeamMember[];
+  coordinators: TeamMember[];
+  suggestedSpecialistId: string | null;
+  suggestedCoordinatorId: string | null;
 }

@@ -42,6 +42,16 @@ public class TransportJob extends BaseEntity {
     @Column(nullable = false)
     private Instant approvedAt;
 
+    /** The transport specialist who owns the job's documents and clearance; assigned at approval (US-F1-07). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transport_specialist_id")
+    private User transportSpecialist;
+
+    /** The fleet & route coordinator who plans the job; assigned at approval. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coordinator_id")
+    private User coordinator;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private JobStage stage = JobStage.DOCUMENTS;
