@@ -29,6 +29,7 @@ import com.equifreight.model.review.RequestReviewResponse;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RequestRevisionRepository;
+import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.repository.UserRepository;
 import java.time.Clock;
@@ -59,6 +60,7 @@ class RequestReviewServiceTest {
     AuditService audit;
     NotificationService notifications;
     QuotationRepository quotations;
+    TransportJobRepository jobs;
     RequestReviewService service;
     User manager;
     User clubAccount;
@@ -74,6 +76,7 @@ class RequestReviewServiceTest {
         audit = mock(AuditService.class);
         notifications = mock(NotificationService.class);
         quotations = mock(QuotationRepository.class);
+        jobs = mock(TransportJobRepository.class);
         service = new RequestReviewService(
                 requests,
                 revisions,
@@ -83,6 +86,7 @@ class RequestReviewServiceTest {
                 audit,
                 notifications,
                 quotations,
+                jobs,
                 JsonMapper.builder().build(),
                 Clock.fixed(NOW, BusinessTime.ZONE));
 
@@ -430,6 +434,10 @@ class RequestReviewServiceTest {
 
             public String getCode() {
                 return code;
+            }
+
+            public RequestStatus getStatus() {
+                return RequestStatus.SUBMITTED;
             }
 
             public String getClub() {

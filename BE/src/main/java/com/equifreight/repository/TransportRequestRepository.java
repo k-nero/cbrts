@@ -44,20 +44,22 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
     Page<TransportRequest> findByClubIdAndStatus(UUID clubId, RequestStatus status, Pageable pageable);
 
     /**
-     * The review queue (US-F1-03): requests waiting for review, oldest first by when they entered the queue,
+     * The review queue (US-F1-03, US-F1-07): requests waiting for review or approval, oldest first by when they entered the queue,
      * which is their latest version's submission. The order is fixed, so the derived columns are never sorted
      * by the client.
      */
     @Query(
-            value = "select r.id as id, r.code as code, c.name as club, o.city as fromCity, d.city as toCity,"
-                    + " r.mode as mode, (select count(rh) from RequestHorse rh where rh.request = r) as horseCount,"
-                    + " r.departureDate as departureDate, r.dateFlexDays as dateFlexDays,"
-                    + " max(v.submittedAt) as waitingSince, max(v.revisionNo) as revisionNo"
-                    + " from RequestRevision v join v.request r join r.club c"
-                    + " left join r.originPlace o left join r.destinationPlace d"
-                    + " where r.status in :statuses"
-                    + " group by r.id, r.code, c.name, o.city, d.city, r.mode, r.departureDate, r.dateFlexDays"
-                    + " order by max(v.submittedAt) asc, r.code asc",
+            value =
+                    "select r.id as id, r.code as code, r.status as status, c.name as club, o.city as fromCity, d.city as toCity,"
+                            + " r.mode as mode, (select count(rh) from RequestHorse rh where rh.request = r) as horseCount,"
+                            + " r.departureDate as departureDate, r.dateFlexDays as dateFlexDays,"
+                            + " max(v.submittedAt) as waitingSince, max(v.revisionNo) as revisionNo"
+                            + " from RequestRevision v join v.request r join r.club c"
+                            + " left join r.originPlace o left join r.destinationPlace d"
+                            + " where r.status in :statuses"
+                            + " group by r.id, r.code, r.status, c.name, o.city, d.city, r.mode, r.departureDate,"
+                            + " r.dateFlexDays"
+                            + " order by max(v.submittedAt) asc, r.code asc",
             countQuery = "select count(distinct r) from RequestRevision v join v.request r where r.status in :statuses")
     Page<QueueRow> findQueue(@Param("statuses") Collection<RequestStatus> statuses, Pageable pageable);
 
@@ -70,6 +72,8 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
         UUID getId();
 
         String getCode();
+
+        RequestStatus getStatus();
 
         String getClub();
 

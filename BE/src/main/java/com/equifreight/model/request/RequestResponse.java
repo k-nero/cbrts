@@ -49,6 +49,8 @@ public record RequestResponse(
         List<Blocker> blockers,
         /** The logistics manager's note while the request is INFO_REQUIRED (US-F1-04). */
         String infoRequiredNote,
+        /** Why the logistics manager rejected the request; null unless REJECTED (BR-F1-04). */
+        String rejectReason,
         /** When the customer cancelled the request; null unless CANCELLED (BR-F1-07). */
         Instant cancelledAt,
         /** The cancellation fee band applied when it was cancelled, as a %; null unless CANCELLED. */

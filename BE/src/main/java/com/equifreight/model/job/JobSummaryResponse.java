@@ -24,4 +24,7 @@ public record JobSummaryResponse(
         Instant windowEnd,
         Instant clearanceReadyAt,
         String blockingReason,
-        String nextStepOwner) {}
+        String nextStepOwner,
+        /** The team assigned at approval (US-F1-07); null on jobs approved before teams were kept. */
+        String transportSpecialist,
+        String coordinator) {}

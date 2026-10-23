@@ -684,6 +684,9 @@ public class DataSeeder implements ApplicationRunner {
         job.setQuotation(savedQuote);
         job.setApprovedBy(yen);
         job.setApprovedAt(Instant.now());
+        // The team chosen at approval (US-F1-07): Lan owns the documents, Khôi plans the move.
+        job.setTransportSpecialist(userRepository.getByEmail("lan.nguyen@equifreight.vn"));
+        job.setCoordinator(khoi);
         job.setStage(JobStage.DOCUMENTS);
         job.setDossierStatus(DossierStatus.OPEN);
         job.setTripStatus(TripStatus.NOT_STARTED);

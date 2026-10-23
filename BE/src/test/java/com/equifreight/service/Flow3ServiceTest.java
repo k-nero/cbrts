@@ -176,7 +176,8 @@ class Flow3ServiceTest {
                 crewAssignmentRepository,
                 clearanceService,
                 auditService,
-                notificationService);
+                notificationService,
+                mock(CodeService.class));
     }
 
     @Test

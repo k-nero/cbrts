@@ -390,6 +390,7 @@ erDiagram
 | `request_id` | → `transport_requests` unique | Exactly one job per approved request. |
 | `quotation_id` | → `quotations` not null | The accepted version. |
 | `approved_by`, `approved_at` | | Logistics manager only (BR-F1-04). |
+| `transport_specialist_id`, `coordinator_id` | → `users` | The team the logistics manager assigns at approval (US-F1-07): the transport specialist who owns the documents and clearance, and the fleet & route coordinator who plans the job. Role-checked by trigger; null only on jobs approved before V3. |
 | `stage` | varchar(12) | `DOCUMENTS`, `CLEARANCE`, `TRIP`, `HANDOVER`, `CLOSED`: stages 4–7 of the seven. |
 | `dossier_status` | varchar(30) | `OPEN`, `SUBMITTED_TO_AUTHORITY`, `ADDITIONAL_INFO_REQUIRED`, `CLEARANCE_READY` (Flow 2). |
 | `clearance_ready_at` | timestamptz | When the gate opened ("Cleared 17 Oct, 16:20 by Lan"). |
