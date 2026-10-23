@@ -144,8 +144,12 @@ export const UploadPanel: FC<Props> = ({ item, requestId, deadline }) => {
                 </Button>
               ) : (
                 <Button
-                  // Gold only while the customer owes it (DESIGN.md: a passing file has no gold).
-                  variant={isOwedByCustomer(item) ? 'primary' : 'secondary'}
+                  // Gold only while the customer owes it or a replacement (DESIGN.md: a passing file has no gold).
+                  variant={
+                    isOwedByCustomer(item) || item.validity === ValidityEnum.AMBER
+                      ? 'primary'
+                      : 'secondary'
+                  }
                   type="submit"
                   leadingIcon="upload"
                   disabled={submit.isPending}

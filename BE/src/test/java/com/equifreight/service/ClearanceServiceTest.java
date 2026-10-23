@@ -727,13 +727,23 @@ class ClearanceServiceTest {
     void checkAnswersWithoutStoringAnything() {
         User customer = ownerOfTheItem();
         when(validityEngine.evaluate(eq(checklistItem), any(), eq(job)))
-                .thenReturn(new ValidityEngine.Result(Validity.RED, "Sampled 90 days before departure."));
+                .thenReturn(new ValidityEngine.Result(
+                        Validity.RED,
+                        "Sampled 90 days before departure.",
+                        "Sampled within 60 days before departure",
+                        "Sampled 20 Jul 2026: 90 days before departure",
+                        "sampled on 19 Aug 2026 or later",
+                        null));
 
         DocumentCheckResponse answer = clearanceService.checkCustomerDocument(
                 checklistItem.getId(), dates("2026-07-20", "2026-09-18"), customer);
 
+        // US-F2-09: the refusal names the rule, the value found and the value required
         assertEquals(Validity.RED, answer.validity());
         assertEquals("Sampled 90 days before departure.", answer.note());
+        assertEquals("Sampled within 60 days before departure", answer.rule());
+        assertEquals("Sampled 20 Jul 2026: 90 days before departure", answer.found());
+        assertEquals("sampled on 19 Aug 2026 or later", answer.required());
         verifyNoInteractions(fileService, documentVersionRepository, auditService);
         verify(checklistItemRepository, never()).save(any());
     }
