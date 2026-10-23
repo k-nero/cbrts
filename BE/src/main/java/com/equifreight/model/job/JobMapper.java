@@ -8,8 +8,10 @@ import com.equifreight.entity.RouteLeg;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.VehicleStall;
+import com.equifreight.entity.enums.DossierStatus;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,7 +53,8 @@ public final class JobMapper {
             List<JobHorseResponse> horses,
             TripLoadResponse loadPlan,
             RoutePlanResponse routePlan,
-            List<CrewMemberResponse> crew) {
+            List<CrewMemberResponse> crew,
+            List<TripJobResponse> tripJobs) {
         return JobDetailResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
@@ -75,6 +78,26 @@ public final class JobMapper {
                 .loadPlan(loadPlan)
                 .routePlan(routePlan)
                 .crew(crew)
+                .tripJobs(tripJobs)
+                .build();
+    }
+
+    /** A job on a shared trip, or one that could join it (US-F3-11). */
+    public static TripJobResponse toTripJobResponse(TransportJob job) {
+        TransportRequest request = job.getRequest();
+        return TripJobResponse.builder()
+                .jobId(job.getId())
+                .code(job.getCode())
+                .origin(originCity(job))
+                .destination(destinationCity(job))
+                .horses(
+                        request != null && request.getHorses() != null
+                                ? request.getHorses().size()
+                                : 0)
+                .departureDate(request != null ? request.getDepartureDate() : null)
+                .dateFlexDays(request != null ? request.getDateFlexDays() : 0)
+                .clearanceReady(job.getDossierStatus() == DossierStatus.CLEARANCE_READY)
+                .departed(job.getDepartedAt() != null)
                 .build();
     }
 
@@ -90,6 +113,22 @@ public final class JobMapper {
                 .temperament(h.getTemperament())
                 .handlingNotes(h.getHandlingNotes())
                 .build();
+    }
+
+    /** A horse on a shared trip's load plan, with the job it travels under. */
+    public static JobHorseResponse toHorseResponse(Horse h, String jobCode) {
+        JobHorseResponse r = toHorseResponse(h);
+        return new JobHorseResponse(
+                r.id(),
+                r.name(),
+                r.sex(),
+                r.breed(),
+                r.weightKg(),
+                r.sizeClassCode(),
+                r.requiredStall(),
+                r.temperament(),
+                r.handlingNotes(),
+                jobCode);
     }
 
     public static CrewMemberResponse toCrewMemberResponse(CrewAssignment ca) {
@@ -183,6 +222,8 @@ public final class JobMapper {
                 .id(s.getId())
                 .seq(s.getSeq())
                 .kind(s.getKind())
+                .jobId(s.getJob() != null ? s.getJob().getId() : null)
+                .jobCode(s.getJob() != null ? s.getJob().getCode() : null)
                 .placeId(s.getPlace() != null ? s.getPlace().getId() : null)
                 .placeName(s.getPlace() != null ? s.getPlace().getName() : null)
                 .borderCrossingId(

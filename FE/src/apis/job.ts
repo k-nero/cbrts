@@ -9,6 +9,8 @@ import type {
   TripLoad,
   MoveHorse,
   RoutePlan,
+  ShareTripResult,
+  TripJob,
 } from '@/interfaces';
 
 export const jobApi = {
@@ -59,6 +61,20 @@ export const jobApi = {
         params: { changeReason },
       })
       .then((r) => r.data),
+
+  /** Approved jobs that could join this job's trip (US-F3-11). */
+  getShareCandidates: (jobId: string) =>
+    client.get<TripJob[]>(`/staff/jobs/${jobId}/trip/candidates`).then((r) => r.data),
+
+  /** Puts another job on this job's trip; the trip's plans reopen. */
+  shareTrip: (jobId: string, otherJobId: string) =>
+    client
+      .post<ShareTripResult>(`/staff/jobs/${jobId}/trip/jobs`, { jobId: otherJobId })
+      .then((r) => r.data),
+
+  /** Takes a job off this job's trip onto a trip of its own. */
+  takeOffTrip: (jobId: string, otherJobId: string) =>
+    client.delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`).then((r) => r.data),
 
   getCrew: (jobId: string) =>
     client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`).then((r) => r.data),

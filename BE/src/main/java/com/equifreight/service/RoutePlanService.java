@@ -130,9 +130,9 @@ public class RoutePlanService {
             stop.setPlannedAt(item.plannedAt());
             stop.setPlannedStayMin(item.plannedStayMin());
             stop.setDetails(item.details());
-            // The trip's one job is picked up and delivered; shared trips name each job's own stops (US-F3-11).
+            // A pickup or delivery names its job: the one in the request, else the job in the URL (US-F3-11).
             if (item.kind() == RouteStopKind.PICKUP || item.kind() == RouteStopKind.DELIVERY) {
-                stop.setJob(job);
+                stop.setJob(item.jobId() == null ? job : jobOnTrip(trip, item.jobId()));
             }
 
             if (item.kind() == RouteStopKind.BORDER) {
@@ -234,18 +234,30 @@ public class RoutePlanService {
             throw new BusinessException("A route plan must start with the pickup and end with the delivery stop");
         }
 
-        // Arrival window check: if the job has an arrival window, delivery stop plannedAt must be before windowEnd
-        if (job.getWindowEnd() != null) {
-            Optional<RouteStop> deliveryStop = plan.getStops().stream()
-                    .filter(s -> s.getKind() == RouteStopKind.DELIVERY)
-                    .findFirst();
-
-            if (deliveryStop.isPresent() && deliveryStop.get().getPlannedAt() != null) {
-                Instant deliveryTime = deliveryStop.get().getPlannedAt();
-                if (deliveryTime.isAfter(job.getWindowEnd())) {
-                    throw new BusinessException("Delivery stop planned time " + deliveryTime
-                            + " is after the arrival window close " + job.getWindowEnd());
-                }
+        // Every job on the trip is picked up and delivered on this route (US-F3-11), and with an arrival window its
+        // delivery stop is planned before the window closes.
+        List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
+        if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
+        for (TransportJob onTrip : jobsOnTrip) {
+            List<RouteStop> own = plan.getStops().stream()
+                    .filter(st -> ownerOf(st, job).getId().equals(onTrip.getId()))
+                    .toList();
+            if (own.stream().noneMatch(st -> st.getKind() == RouteStopKind.PICKUP)
+                    || own.stream().noneMatch(st -> st.getKind() == RouteStopKind.DELIVERY)) {
+                throw new BusinessException("The route must pick up and deliver every job on the trip; "
+                        + onTrip.getCode() + " has no "
+                        + (own.stream().noneMatch(st -> st.getKind() == RouteStopKind.PICKUP) ? "pickup" : "delivery")
+                        + " stop");
+            }
+            if (onTrip.getWindowEnd() != null) {
+                own.stream()
+                        .filter(st -> st.getKind() == RouteStopKind.DELIVERY && st.getPlannedAt() != null)
+                        .filter(st -> st.getPlannedAt().isAfter(onTrip.getWindowEnd()))
+                        .findFirst()
+                        .ifPresent(st -> {
+                            throw new BusinessException("Delivery stop planned time " + st.getPlannedAt()
+                                    + " is after the arrival window close " + onTrip.getWindowEnd());
+                        });
             }
         }
 
@@ -269,27 +281,27 @@ public class RoutePlanService {
         }
         RoutePlan saved = routePlanRepository.save(plan);
 
-        // Update planned departure and arrival on job
-        Optional<RouteStop> pickup = plan.getStops().stream()
-                .filter(s -> s.getKind() == RouteStopKind.PICKUP)
-                .findFirst();
-        pickup.ifPresent(p -> {
-            job.setPlannedDepartureAt(p.getPlannedAt());
-            trip.setPlannedDepartureAt(p.getPlannedAt());
-        });
-
-        Optional<RouteStop> delivery = plan.getStops().stream()
-                .filter(s -> s.getKind() == RouteStopKind.DELIVERY)
-                .findFirst();
-        delivery.ifPresent(d -> job.setPlannedArrivalAt(d.getPlannedAt()));
-
-        // Invalidate prior sign-off when route plan changes
-        job.setSignedOffAt(null);
-        job.setSignedOffBy(null);
-        transportJobRepository.save(job);
-
-        // Re-evaluate document validity and clearance gate
-        clearanceService.recheckJobDocuments(job.getId());
+        // The trip leaves together from its first pickup; each job arrives at its own delivery stop.
+        Instant departure = plan.getStops().stream()
+                .filter(st -> st.getKind() == RouteStopKind.PICKUP)
+                .findFirst()
+                .map(RouteStop::getPlannedAt)
+                .orElse(null);
+        trip.setPlannedDepartureAt(departure);
+        for (TransportJob onTrip : jobsOnTrip) {
+            onTrip.setPlannedDepartureAt(departure);
+            plan.getStops().stream()
+                    .filter(st -> st.getKind() == RouteStopKind.DELIVERY
+                            && ownerOf(st, job).getId().equals(onTrip.getId()))
+                    .findFirst()
+                    .ifPresent(d -> onTrip.setPlannedArrivalAt(d.getPlannedAt()));
+            // Invalidate prior sign-off when route plan changes
+            onTrip.setSignedOffAt(null);
+            onTrip.setSignedOffBy(null);
+            transportJobRepository.save(onTrip);
+            // Re-evaluate document validity and clearance gate
+            clearanceService.recheckJobDocuments(onTrip.getId());
+        }
 
         auditService.recordDecision(
                 currentUser,
@@ -384,6 +396,154 @@ public class RoutePlanService {
                 flightRepository.save(flight);
             });
             draft.getLegs().add(savedLeg);
+        }
+    }
+
+    /** The job a stop is for; a stop that names none is the confirming job's. */
+    private static TransportJob ownerOf(RouteStop stop, TransportJob job) {
+        return stop.getJob() != null ? stop.getJob() : job;
+    }
+
+    private TransportJob jobOnTrip(Trip trip, UUID jobId) {
+        return jobTrips.jobsOn(trip).stream()
+                .filter(j -> j.getId().equals(jobId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("Job " + jobId + " is not on trip " + trip.getCode()));
+    }
+
+    /** A stop as it is copied into a rebuilt draft. */
+    private record StopCopy(RouteStop from, TransportJob job, RouteStopKind kind, Place place, Instant plannedAt) {}
+
+    /**
+     * Puts {@code job}'s pickup and delivery on the trip's draft route (US-F3-11): the pickup after the last pickup,
+     * the delivery after the last delivery, both without a time until the coordinator plans them. The caller has
+     * reopened the route, so a route the trip has is now a draft.
+     */
+    @Transactional
+    public void addJobStops(Trip trip, TransportJob job) {
+        Optional<RoutePlan> draft = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
+        if (draft.isEmpty()) return;
+        List<StopCopy> stops = new ArrayList<>();
+        for (RouteStop st : draft.get().getStops()) {
+            stops.add(new StopCopy(st, st.getJob(), st.getKind(), st.getPlace(), st.getPlannedAt()));
+        }
+        TransportRequest request = job.getRequest();
+        int lastPickup = -1;
+        for (int i = 0; i < stops.size(); i++) if (stops.get(i).kind() == RouteStopKind.PICKUP) lastPickup = i;
+        stops.add(lastPickup + 1, new StopCopy(null, job, RouteStopKind.PICKUP, request.getOriginPlace(), null));
+        int lastDelivery = stops.size() - 1;
+        for (int i = 0; i < stops.size(); i++) if (stops.get(i).kind() == RouteStopKind.DELIVERY) lastDelivery = i;
+        stops.add(
+                lastDelivery + 1, new StopCopy(null, job, RouteStopKind.DELIVERY, request.getDestinationPlace(), null));
+        rebuild(draft.get(), stops);
+    }
+
+    /** Takes {@code job}'s pickup and delivery off the trip's draft route, joining its neighbours. */
+    @Transactional
+    public void removeJobStops(Trip trip, TransportJob job) {
+        Optional<RoutePlan> draft = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
+        if (draft.isEmpty()) return;
+        List<StopCopy> stops = draft.get().getStops().stream()
+                .filter(st -> st.getJob() == null || !st.getJob().getId().equals(job.getId()))
+                .map(st -> new StopCopy(st, st.getJob(), st.getKind(), st.getPlace(), st.getPlannedAt()))
+                .toList();
+        rebuild(draft.get(), stops);
+    }
+
+    /**
+     * Replaces the draft's stops with {@code stops}, in order. A leg between two stops that were already consecutive
+     * keeps its mode, vehicle, distance, time and flight; a new pair gets a road leg for the coordinator to plan.
+     */
+    private void rebuild(RoutePlan draft, List<StopCopy> stops) {
+        Map<String, RouteLeg> oldLegs = new HashMap<>();
+        for (RouteLeg leg : draft.getLegs()) {
+            oldLegs.put(leg.getFromStop().getId() + ">" + leg.getToStop().getId(), leg);
+        }
+        Map<UUID, Flight> oldFlights = new HashMap<>();
+        for (RouteLeg leg : draft.getLegs()) {
+            flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> oldFlights.put(leg.getId(), f));
+        }
+        List<RouteLeg> legsToCopy = new ArrayList<>();
+        for (int i = 0; i + 1 < stops.size(); i++) {
+            RouteStop from = stops.get(i).from();
+            RouteStop to = stops.get(i + 1).from();
+            legsToCopy.add(from == null || to == null ? null : oldLegs.get(from.getId() + ">" + to.getId()));
+        }
+        // Detached copies of what stays, before the old rows go.
+        List<RouteStop> newStops = new ArrayList<>();
+        short seq = 1;
+        for (StopCopy c : stops) {
+            RouteStop st = new RouteStop();
+            st.setRoutePlan(draft);
+            st.setSeq(seq++);
+            st.setKind(c.kind());
+            st.setJob(c.job());
+            st.setPlace(c.from() != null ? c.from().getPlace() : c.place());
+            st.setBorderCrossing(c.from() != null ? c.from().getBorderCrossing() : null);
+            st.setPlannedAt(c.plannedAt());
+            st.setPlannedStayMin(c.from() != null ? c.from().getPlannedStayMin() : null);
+            st.setDetails(c.from() != null ? c.from().getDetails() : null);
+            newStops.add(st);
+        }
+        record LegCopy(TransportMode mode, Vehicle vehicle, Integer distanceKm, Integer plannedMin, Flight flight) {}
+        List<LegCopy> legCopies = new ArrayList<>();
+        for (RouteLeg old : legsToCopy) {
+            legCopies.add(
+                    old == null
+                            ? new LegCopy(TransportMode.ROAD, null, null, null, null)
+                            : new LegCopy(
+                                    old.getMode(),
+                                    old.getVehicle(),
+                                    old.getDistanceKm(),
+                                    old.getPlannedMin(),
+                                    oldFlights.get(old.getId())));
+        }
+        Map<UUID, Flight> keptFlights = new HashMap<>();
+        for (LegCopy lc : legCopies) {
+            if (lc.flight() != null) {
+                Flight copy = new Flight();
+                Flight f = lc.flight();
+                copy.setAirline(f.getAirline());
+                copy.setFlightNo(f.getFlightNo());
+                copy.setAirWaybill(f.getAirWaybill());
+                copy.setAircraftType(f.getAircraftType());
+                copy.setStallPositions(f.getStallPositions());
+                copy.setServiceClass(f.getServiceClass());
+                copy.setScheduledDepartureAt(f.getScheduledDepartureAt());
+                copy.setScheduledArrivalAt(f.getScheduledArrivalAt());
+                copy.setEstimatedDepartureAt(f.getEstimatedDepartureAt());
+                copy.setEstimatedArrivalAt(f.getEstimatedArrivalAt());
+                keptFlights.put(f.getId(), copy);
+            }
+        }
+
+        routeLegRepository.deleteAll(draft.getLegs());
+        draft.getLegs().clear();
+        routeStopRepository.deleteAll(draft.getStops());
+        draft.getStops().clear();
+        routeStopRepository.flush();
+
+        for (RouteStop st : newStops) {
+            draft.getStops().add(routeStopRepository.save(st));
+        }
+        for (int i = 0; i < legCopies.size(); i++) {
+            LegCopy lc = legCopies.get(i);
+            RouteLeg leg = new RouteLeg();
+            leg.setRoutePlan(draft);
+            leg.setSeq((short) (i + 1));
+            leg.setFromStop(draft.getStops().get(i));
+            leg.setToStop(draft.getStops().get(i + 1));
+            leg.setMode(lc.mode());
+            leg.setVehicle(lc.mode() == TransportMode.ROAD ? lc.vehicle() : null);
+            leg.setDistanceKm(lc.distanceKm());
+            leg.setPlannedMin(lc.plannedMin());
+            RouteLeg saved = routeLegRepository.save(leg);
+            if (lc.flight() != null) {
+                Flight flight = keptFlights.get(lc.flight().getId());
+                flight.setRouteLeg(saved);
+                flightRepository.save(flight);
+            }
+            draft.getLegs().add(saved);
         }
     }
 

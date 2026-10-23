@@ -7,6 +7,7 @@ import com.equifreight.service.CrewAssignmentService;
 import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
 import com.equifreight.service.TransportJobService;
+import com.equifreight.service.TripSharingService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -26,16 +27,19 @@ public class StaffJobController {
     private final LoadPlanService loadPlanService;
     private final RoutePlanService routePlanService;
     private final CrewAssignmentService crewAssignmentService;
+    private final TripSharingService tripSharingService;
 
     public StaffJobController(
             TransportJobService transportJobService,
             LoadPlanService loadPlanService,
             RoutePlanService routePlanService,
-            CrewAssignmentService crewAssignmentService) {
+            CrewAssignmentService crewAssignmentService,
+            TripSharingService tripSharingService) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
         this.crewAssignmentService = crewAssignmentService;
+        this.tripSharingService = tripSharingService;
     }
 
     /**
@@ -144,6 +148,38 @@ public class StaffJobController {
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public TripLoadResponse confirmLoadPlan(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return loadPlanService.confirmLoadPlan(jobId, user);
+    }
+
+    /**
+     * US-F3-11: Shared trailer - approved jobs that could join this job's trip (same corridor, shared trailer, not
+     * departed). The checks run when one is added.
+     */
+    @GetMapping("/{jobId}/trip/candidates")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripJobResponse> shareCandidates(@PathVariable UUID jobId) {
+        return tripSharingService.candidates(jobId);
+    }
+
+    /**
+     * US-F3-11: Shared trailer - put another job on this job's trip; reopens the trips' plans.
+     */
+    @PostMapping("/{jobId}/trip/jobs")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public ShareTripResponse shareTrip(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody ShareTripRequest request,
+            @AuthenticationPrincipal User user) {
+        return tripSharingService.share(jobId, request.jobId(), user);
+    }
+
+    /**
+     * US-F3-11: Shared trailer - take a job off this job's trip onto a trip of its own, before departure.
+     */
+    @DeleteMapping("/{jobId}/trip/jobs/{otherJobId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public TripJobResponse takeOffTrip(
+            @PathVariable UUID jobId, @PathVariable UUID otherJobId, @AuthenticationPrincipal User user) {
+        return tripSharingService.takeOff(jobId, otherJobId, user);
     }
 
     /**

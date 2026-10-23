@@ -145,6 +145,11 @@ public class TransportJobService {
                     gate.outstandingIssues().size());
         }
 
+        List<TripJobResponse> tripJobs = jobTrips.findTripOf(job.getId())
+                .map(trip -> jobTrips.jobsOn(trip).stream()
+                        .map(JobMapper::toTripJobResponse)
+                        .toList())
+                .orElse(List.of());
         return JobMapper.toDetailResponse(
                 job,
                 jobTrips.findTripOf(job.getId()).map(Trip::getCode).orElse(null),
@@ -155,7 +160,8 @@ public class TransportJobService {
                 horses,
                 loadPlan,
                 routePlan,
-                crew);
+                crew,
+                tripJobs);
     }
 
     /**
@@ -199,15 +205,22 @@ public class TransportJobService {
             throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
         }
 
-        // Clearance gate check: departure gate must be CLEAR (US-F3-08)
-        com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(jobId);
-        if (!gate.clearanceReady()) {
-            throw new BusinessException("Cannot sign off trip plan: clearance gate is locked ("
-                    + gate.outstandingIssues().size() + " items outstanding)");
+        // Clearance gate check: every job on the trip must be CLEAR (US-F3-08, US-F3-11)
+        Trip trip = jobTrips.tripOf(jobId);
+        List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
+        if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
+        for (TransportJob onTrip : jobsOnTrip) {
+            com.equifreight.model.clearance.ClearanceStatusResponse gate =
+                    clearanceService.getClearanceStatus(onTrip.getId());
+            if (!gate.clearanceReady()) {
+                throw new BusinessException("Cannot sign off trip plan: clearance gate is locked"
+                        + (onTrip.getId().equals(jobId) ? "" : " for " + onTrip.getCode())
+                        + " (" + gate.outstandingIssues().size() + " items outstanding)"
+                        + (onTrip.getId().equals(jobId) ? "" : ". Take it off the trip so the others can leave."));
+            }
         }
 
         // Validate the trip's load plans confirmed
-        Trip trip = jobTrips.tripOf(jobId);
         List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
         if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
             throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
@@ -272,9 +285,13 @@ public class TransportJobService {
                 || auditService.hasAction("TRANSPORT_JOB", job.getId(), "SIGN_OFF_TRIP_PLAN");
 
         // The stage stays where it is: recording the departure moves the job to TRIP (TripService).
-        job.setSignedOffAt(Instant.now());
-        job.setSignedOffBy(currentUser);
-        transportJobRepository.save(job);
+        // The plan is the trip's, so the sign-off covers every job on it.
+        Instant signedOffAt = Instant.now();
+        for (TransportJob onTrip : jobsOnTrip) {
+            onTrip.setSignedOffAt(signedOffAt);
+            onTrip.setSignedOffBy(currentUser);
+            transportJobRepository.save(onTrip);
+        }
 
         auditService.recordDecision(
                 currentUser,

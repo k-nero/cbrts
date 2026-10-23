@@ -48,6 +48,29 @@ export interface JobHorse {
   requiredStall?: StallType | null;
   temperament?: string | null;
   handlingNotes?: string | null;
+  /** On a shared trip's load plan, the job the horse travels under. */
+  jobCode?: string | null;
+}
+
+/** A job on a shared trip, or one that could join it (US-F3-11). */
+export interface TripJob {
+  jobId: string;
+  code: string;
+  origin?: string | null;
+  destination?: string | null;
+  horses: number;
+  departureDate?: string | null;
+  dateFlexDays: number;
+  clearanceReady: boolean;
+  departed: boolean;
+}
+
+/** The trip after a job joined it: the days every job on it can leave. */
+export interface ShareTripResult {
+  tripCode: string;
+  departFrom: string;
+  departTo: string;
+  jobs: TripJob[];
 }
 
 export interface CrewMember {
@@ -146,6 +169,9 @@ export interface RouteStop {
   id: string;
   seq: number;
   kind: RouteStopKind;
+  /** The job a PICKUP or DELIVERY stop is for; null for a stop of the whole trip. */
+  jobId?: string | null;
+  jobCode?: string | null;
   placeId?: string | null;
   placeName?: string | null;
   borderCrossingId?: string | null;
@@ -228,6 +254,8 @@ export interface JobDetail extends BaseEntity {
   loadPlan: TripLoad | null;
   routePlan?: RoutePlan | null;
   crew: CrewMember[];
+  /** Every job on the job's trip, this one included (US-F3-11). */
+  tripJobs: TripJob[];
 }
 
 /** The Jobs list tabs (TransportJobService.search's filter). */

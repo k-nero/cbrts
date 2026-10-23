@@ -28,6 +28,8 @@ public record CreateRoutePlanRequest(
     public record StopItem(
             Short seq,
             @NotNull RouteStopKind kind,
+            /** The job a PICKUP or DELIVERY stop is for; the job in the URL when left out. */
+            UUID jobId,
             UUID placeId,
             UUID borderCrossingId,
             Instant plannedAt,

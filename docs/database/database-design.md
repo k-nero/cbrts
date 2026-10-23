@@ -467,7 +467,7 @@ The review decision is the one update allowed on this table: a trigger allows ch
 
 ## 10. Domain H: fleet and routes
 
-A **trip** is what physically moves: a route, one or more vehicles with their crews, and the horses of one or more jobs (`docs/shared-trips-design.md`). The job stays the commercial and legal unit. A job that shares nothing is a trip with one job and one vehicle, and every job is approved onto a trip of its own (US-F3-09). A convoy is a trip with several vehicles (US-F3-10); sharing comes with US-F3-11.
+A **trip** is what physically moves: a route, one or more vehicles with their crews, and the horses of one or more jobs (`docs/shared-trips-design.md`). The job stays the commercial and legal unit. A job that shares nothing is a trip with one job and one vehicle, and every job is approved onto a trip of its own (US-F3-09). A convoy is a trip with several vehicles (US-F3-10). Several jobs can share a trip (US-F3-11): only jobs whose customer chose a shared trailer, on the trip's corridor, with one departure day every job allows (its date ± its flex days) and room on the trailers; a horse can't ride a trip twice. The coordinator puts a job on another job's trip or takes it off onto a trip of its own, before departure only. Either reopens every trip it touches, and a trip nobody rides any more releases its bookings and crew. Prices don't change. Departure needs every job on the trip cleared; departures, holds and checkpoints move every job on it, while arrival, delivery and handover move the job whose stop it is, and the trip is `DELIVERED` when no job is left on it. The customer's trip page shows only their own stops and horses.
 
 ```mermaid
 erDiagram
