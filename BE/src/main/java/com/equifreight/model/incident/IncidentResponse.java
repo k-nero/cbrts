@@ -4,6 +4,7 @@ import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.TripStatus;
+import com.equifreight.model.review.HistoryEntryResponse;
 import com.equifreight.model.trip.TripPhotoResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -58,7 +59,16 @@ public record IncidentResponse(
         /** The trip the leaving horses moved to (US-F5-06), staff only. */
         String newTripCode,
         /** The job's horses on its moving trip, which an option can take off it (US-F5-06). */
-        List<RidingHorse> riding) {
+        List<RidingHorse> riding,
+        /** The arrival the latest delay alert announced (US-F5-04), or null. */
+        Instant etaAt,
+        /** How it ended and the closing note, once the logistics manager closed it (US-F5-05). */
+        String resolution,
+        String closingNote,
+        Instant resolvedAt,
+        String resolvedByName,
+        /** What happened to the incident, from the audit trail, oldest first. */
+        List<HistoryEntryResponse> timeline) {
 
     public record RidingHorse(UUID id, String name) {}
 }

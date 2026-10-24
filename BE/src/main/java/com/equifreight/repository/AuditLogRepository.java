@@ -2,6 +2,7 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.AuditLog;
 import com.equifreight.model.audit.AuditActorOption;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,9 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
 
     /** One entity's history, newest first (the Request review page). */
     List<AuditLog> findByEntityTypeAndEntityIdOrderByOccurredAtDesc(String entityType, UUID entityId);
+
+    /** Several entities' histories, oldest first (an incident's timeline; a job's incidents). */
+    List<AuditLog> findByEntityTypeAndEntityIdInOrderByOccurredAtAsc(String entityType, Collection<UUID> entityIds);
 
     /** One entity's rows of one action, oldest first (when each return for information happened). */
     List<AuditLog> findByEntityTypeAndEntityIdAndActionOrderByOccurredAtAsc(

@@ -10,7 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
+import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Incident;
 import com.equifreight.entity.IncidentOption;
@@ -35,10 +37,14 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
 import com.equifreight.model.incident.DecideIncidentRequest;
+import com.equifreight.model.incident.DelayAlertRequest;
 import com.equifreight.model.incident.IncidentResponse;
+import com.equifreight.model.incident.JobIncidentResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
+import com.equifreight.model.incident.ResolveIncidentRequest;
 import com.equifreight.model.incident.ReturnProposalRequest;
+import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
 import com.equifreight.repository.JobChargeRepository;
@@ -118,6 +124,9 @@ class IncidentServiceTest {
     @Mock
     private TripNotices notices;
 
+    @Mock
+    private AuditLogRepository auditLogs;
+
     private IncidentService service;
     private User minh;
     private User yen;
@@ -175,6 +184,7 @@ class IncidentServiceTest {
                 leaving,
                 flights,
                 notices,
+                auditLogs,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         minh = user("Minh", "Trần");
         yen = user("Hải Yến", "Vũ");
@@ -665,5 +675,259 @@ class IncidentServiceTest {
 
         verify(leaving, never()).leave(any(), any(), any(), any(), any());
         verify(routePlans).reviseForIncident(eq(trip), eq(90), any(), anyString(), eq(yen), eq(Set.of()));
+    }
+
+    // ---------- delay alerts (US-F5-04) ----------
+
+    /** The job on the road, arriving at 20:05, with Minh on the cab; the alert pushes the stops ahead by its delay. */
+    private void onTheRoad() {
+        Quotation quotation = new Quotation();
+        quotation.setCurrency("USD");
+        job.setQuotation(quotation);
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        job.setPlannedArrivalAt(NOW.plusSeconds(6 * 3600));
+        TripJob part = new TripJob();
+        part.setTrip(trip);
+        part.setJob(job);
+        part.setStatus(TripStatus.DEPARTED);
+        when(jobTrips.activePartsOf(job)).thenReturn(List.of(part));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job));
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId())).thenReturn(List.of());
+        when(charges.findByIncident_Id(any())).thenReturn(Optional.empty());
+        CrewAssignment driver = new CrewAssignment();
+        driver.setUser(minh);
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of(driver));
+        RoutePlan v4 = new RoutePlan();
+        v4.setVersionNo((short) 4);
+        when(routePlans.reviseForIncident(eq(trip), anyInt(), any(), anyString(), any(), any()))
+                .thenAnswer(inv -> {
+                    long minutes = inv.<Integer>getArgument(1);
+                    for (TransportJob j : jobTrips.jobsOn(trip)) {
+                        j.setPlannedArrivalAt(j.getPlannedArrivalAt().plusSeconds(minutes * 60));
+                    }
+                    return Optional.of(v4);
+                });
+    }
+
+    private static DelayAlertRequest delay(IncidentKind reason, Instant eta, String note) {
+        return new DelayAlertRequest(reason, eta.atOffset(ZoneOffset.ofHours(7)), note);
+    }
+
+    @Test
+    @DisplayName("A delay alert moves the stops ahead, and the crew and the customer hear the reason and new arrival")
+    void aDelayAlertReachesTheCrewAndTheCustomer() {
+        onTheRoad();
+        Instant eta = NOW.plusSeconds(8 * 3600);
+
+        IncidentResponse r =
+                service.sendDelayAlert(job.getId(), delay(IncidentKind.WEATHER, eta, "Heavy rain at Mộc Bài"), khoi);
+
+        assertEquals(IncidentKind.WEATHER, r.kind());
+        assertEquals("Bad weather", r.kindLabel());
+        assertEquals(IncidentStatus.OPEN, r.status());
+        assertEquals(IncidentSource.STAFF, r.source());
+        assertEquals(eta, r.etaAt());
+        assertEquals((short) 4, r.routePlanVersion());
+        verify(routePlans).reviseForIncident(eq(trip), eq(120), any(), anyString(), eq(khoi), eq(Set.of()));
+        verify(notices).delayAlert(job, IncidentKind.WEATHER, "Heavy rain at Mộc Bài", 120, r.id());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.DELAY_ALERT),
+                        eq(Audience.escorts(List.of(minh))),
+                        any(),
+                        eq("Delay: Bad weather"),
+                        eq("Heavy rain at Mộc Bài. The stops ahead on trip TRP-2026-001 move by 2 h; CBRT-2026-041 now"
+                                + " arrives 18 Oct 22:05."));
+        // The owner hears it from Khôi; Khôi sent it, so isn't told.
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.DELAY_ALERT),
+                        eq(Audience.staff(List.of(yen))),
+                        any(),
+                        eq("Bad weather: CBRT-2026-041"),
+                        anyString());
+        verify(audit)
+                .recordDecision(
+                        eq(khoi),
+                        eq("DELAY_ALERT"),
+                        eq("Bad weather delay alert on CBRT-2026-041: arrival now 18 Oct 22:05, 2 h later"),
+                        eq("INCIDENT"),
+                        eq(r.id()),
+                        eq("CBRT-2026-041"),
+                        eq("Heavy rain at Mộc Bài"),
+                        any(),
+                        eq("OPEN"));
+    }
+
+    @Test
+    @DisplayName("Another customer on the trip hears the reason and its own time without the note, and a missed"
+            + " window opens an incident for it")
+    void aDelayAlertOnASharedTrailer() {
+        onTheRoad();
+        TransportJob other = job("CBRT-2026-042");
+        other.setApprovedBy(yen);
+        other.setPlannedArrivalAt(NOW.plusSeconds(5 * 3600));
+        other.setWindowEnd(NOW.plusSeconds(6 * 3600));
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job, other));
+
+        IncidentResponse r = service.sendDelayAlert(
+                job.getId(), delay(IncidentKind.BORDER_CONGESTION, NOW.plusSeconds(8 * 3600), "Queue at Bavet"), khoi);
+
+        verify(notices).delayAlert(other, IncidentKind.BORDER_CONGESTION, null, 120, r.id());
+        ArgumentCaptor<Incident> saved = ArgumentCaptor.forClass(Incident.class);
+        verify(incidents, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        Incident late = saved.getAllValues().stream()
+                .filter(i -> i.getKind() == IncidentKind.LATE_ARRIVAL)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(other, late.getJob());
+        assertEquals(
+                "The delay alert on CBRT-2026-041 moves CBRT-2026-042's arrival to 18 Oct 21:05, after its window"
+                        + " closes at 18 Oct 20:05",
+                late.getSummary());
+    }
+
+    @Test
+    @DisplayName("A delay alert is about traffic, weather or a border, on a job on the road, with a later arrival")
+    void whatADelayAlertNeeds() {
+        onTheRoad();
+        Instant later = NOW.plusSeconds(8 * 3600);
+        assertThrows(
+                BusinessException.class,
+                () -> service.sendDelayAlert(job.getId(), delay(IncidentKind.VEHICLE, later, null), khoi));
+        BusinessException earlier = assertThrows(
+                BusinessException.class,
+                () -> service.sendDelayAlert(
+                        job.getId(), delay(IncidentKind.TRAFFIC, NOW.plusSeconds(3600), null), khoi));
+        assertEquals(
+                "The new arrival must be after the planned one, 18 Oct 20:05. It was 18 Oct 15:05.",
+                earlier.getMessage());
+        assertThrows(
+                BusinessException.class,
+                () -> service.sendDelayAlert(
+                        job.getId(), delay(IncidentKind.TRAFFIC, NOW.plusSeconds(9 * 24 * 3600), null), khoi));
+
+        TripJob waiting = new TripJob();
+        waiting.setTrip(trip);
+        waiting.setJob(job);
+        waiting.setStatus(TripStatus.NOT_STARTED);
+        when(jobTrips.activePartsOf(job)).thenReturn(List.of(waiting));
+        BusinessException notMoving = assertThrows(
+                BusinessException.class,
+                () -> service.sendDelayAlert(job.getId(), delay(IncidentKind.TRAFFIC, later, null), khoi));
+        assertEquals(
+                "CBRT-2026-041 isn't on the road: before departure, its times move on the Route tab",
+                notMoving.getMessage());
+        verify(routePlans, never()).reviseForIncident(any(), anyInt(), any(), anyString(), any(), any());
+    }
+
+    // ---------- closing (US-F5-05) ----------
+
+    private static ResolveIncidentRequest closing() {
+        return new ResolveIncidentRequest(
+                "Second trailer delivered both horses at 17:40", "Tyre supplier on QL22 to be reviewed.");
+    }
+
+    @Test
+    @DisplayName("Closing records the resolution and the note, and tells whoever worked on it, the cab included")
+    void closingAnIncident() {
+        Incident i = proposed();
+        service.decide(i.getId(), approve(i, false), yen);
+        i.setReportedBy(minh);
+
+        IncidentResponse r = service.resolve(i.getId(), closing(), yen);
+
+        assertEquals(IncidentStatus.RESOLVED, r.status());
+        assertEquals("Second trailer delivered both horses at 17:40", r.resolution());
+        assertEquals("Tyre supplier on QL22 to be reviewed.", r.closingNote());
+        assertEquals(NOW, r.resolvedAt());
+        assertEquals("Vũ Hải Yến", r.resolvedByName());
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("RESOLVE_INCIDENT"),
+                        eq("Closed the incident on CBRT-2026-041: Second trailer delivered both horses at 17:40"),
+                        eq("INCIDENT"),
+                        eq(i.getId()),
+                        eq("CBRT-2026-041"),
+                        eq("Tyre supplier on QL22 to be reviewed."),
+                        eq("DECIDED"),
+                        eq("RESOLVED"));
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_RESOLVED),
+                        eq(Audience.staff(List.of(khoi))),
+                        any(),
+                        eq("Closed: Vehicle breakdown on CBRT-2026-041"),
+                        anyString());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_RESOLVED),
+                        eq(Audience.escorts(List.of(minh))),
+                        any(),
+                        anyString(),
+                        anyString());
+    }
+
+    @Test
+    @DisplayName("An incident isn't closed while a proposal waits, nor closed twice")
+    void closingRefusals() {
+        Incident i = proposed();
+        assertThrows(BusinessException.class, () -> service.resolve(i.getId(), closing(), yen));
+
+        service.decide(i.getId(), approve(i, false), yen);
+        service.resolve(i.getId(), closing(), yen);
+        BusinessException twice =
+                assertThrows(BusinessException.class, () -> service.resolve(i.getId(), closing(), yen));
+        assertEquals("The incident was already closed on 18 Oct 14:05", twice.getMessage());
+    }
+
+    @Test
+    @DisplayName("The resolution and the closing note are both required")
+    void resolutionAndNoteAreRequired() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            assertEquals(
+                    1,
+                    validator.validate(new ResolveIncidentRequest(" ", "Note")).size());
+            assertEquals(
+                    1,
+                    validator
+                            .validate(new ResolveIncidentRequest("Resolved", null))
+                            .size());
+            assertEquals(0, validator.validate(closing()).size());
+        }
+    }
+
+    @Test
+    @DisplayName("The job keeps each incident with its timeline, oldest first")
+    void theJobKeepsTheTimeline() {
+        Incident i = opened();
+        i.setOpenedAt(NOW);
+        when(jobs.existsById(job.getId())).thenReturn(true);
+        when(incidents.findByJob_IdOrderByOpenedAtAsc(job.getId())).thenReturn(List.of(i));
+        AuditLog raised = new AuditLog();
+        raised.setEntityId(i.getId());
+        raised.setOccurredAt(NOW);
+        raised.setSummary("Vehicle breakdown reported on CBRT-2026-041 at QL22 km 41");
+        raised.setActorLabel("Trần Minh");
+        AuditLog closed = new AuditLog();
+        closed.setEntityId(i.getId());
+        closed.setOccurredAt(NOW.plusSeconds(3600));
+        closed.setSummary("Closed the incident on CBRT-2026-041: Tyre changed");
+        closed.setActorLabel("Vũ Hải Yến");
+        when(auditLogs.findByEntityTypeAndEntityIdInOrderByOccurredAtAsc("INCIDENT", List.of(i.getId())))
+                .thenReturn(List.of(raised, closed));
+
+        List<JobIncidentResponse> list = service.ofJob(job.getId());
+
+        assertEquals(1, list.size());
+        assertEquals(
+                List.of(raised.getSummary(), closed.getSummary()),
+                list.getFirst().timeline().stream().map(h -> h.getSummary()).toList());
+        assertThrows(ResourceNotFoundException.class, () -> service.ofJob(UUID.randomUUID()));
     }
 }

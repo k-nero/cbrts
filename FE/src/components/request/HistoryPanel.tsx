@@ -7,10 +7,13 @@ import { formatDayTime } from '@/lib/utils';
 
 /**
  * A request's history from the audit trail, newest first (BR-F1-08): every decision on the staff
- * review, every status change on the customer's request (US-F1-08).
+ * review, every status change on the customer's request (US-F1-08); an incident's timeline oldest first.
  */
-export const HistoryPanel: FC<{ history: HistoryEntry[] }> = ({ history }) => (
-  <Panel title="History" flush>
+export const HistoryPanel: FC<{ history: HistoryEntry[]; title?: string }> = ({
+  history,
+  title = 'History',
+}) => (
+  <Panel title={title} flush>
     <ol className="m-0 list-none p-0">
       {history.map((h, i) => (
         <li

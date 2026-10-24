@@ -5,11 +5,13 @@ import { incidentApi, incidentsListApi } from '@/apis/incident';
 import { useCrudResource } from '@/hooks/crud';
 import type {
   DecideIncidentInput,
+  DelayAlertInput,
   Incident,
   IncidentOptionInput,
   IncidentStatus,
   IncidentSummary,
   RaiseIncidentInput,
+  ResolveIncidentInput,
 } from '@/interfaces';
 
 export const useIncidentList = (status?: IncidentStatus) => {
@@ -60,3 +62,29 @@ export const useDecideIncident = (id: string) =>
 
 export const useReturnIncidentProposal = (id: string) =>
   useIncidentChange(id, (reason: string) => incidentApi.returnProposal(id, reason));
+
+export const useResolveIncident = (id: string) =>
+  useIncidentChange(id, (input: ResolveIncidentInput) => incidentApi.resolve(id, input));
+
+/** A job's incidents with their timelines, on its Trip tab (US-F5-05). */
+export const useJobIncidents = (jobId: string) =>
+  useQuery({
+    // Under 'incidents', so every incident change refreshes the job's record too.
+    queryKey: ['incidents', 'job', jobId],
+    queryFn: () => incidentApi.ofJob(jobId),
+    enabled: Boolean(jobId),
+  });
+
+/** A delay alert moves the job's times, so the job and its incidents load again (US-F5-04). */
+export const useSendDelayAlert = (jobId: string) => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DelayAlertInput) => incidentApi.sendDelayAlert(jobId, input),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['incidents'] }),
+        client.invalidateQueries({ queryKey: ['job', jobId] }),
+      ]);
+    },
+  });
+};

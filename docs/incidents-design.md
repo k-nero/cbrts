@@ -1,6 +1,6 @@
 # Incidents (Flow 5)
 
-Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60), recording the options (US-F5-02, #61), the manager's decision (US-F5-03, #62) and leaving a moving trip (US-F5-06, #174). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
+Status: built. Reporting an emergency from the cab (US-F5-01, #60), recording the options (US-F5-02, #61), the manager's decision (US-F5-03, #62), delay alerts (US-F5-04, #63), closing an incident (US-F5-05, #64) and leaving a moving trip (US-F5-06, #174). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
 
 ## Reporting an emergency (US-F5-01)
 
@@ -28,7 +28,24 @@ Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60),
 - **Documents:** when a job's planned arrival moved, the document check runs again for the new dates (US-F2-10), also after departure (`ClearanceService.recheckAfterReplan`). A moving job's clearance gate isn't re-locked; a cleared item that no longer holds goes back to review, and the job's transport specialist is told which ones.
 - **Cost:** when the customer pays, the option's extra cost becomes a `job_charges` row on the job (one per incident), which the final invoice turns into an `ADJUSTMENT` line. When EquiFreight pays, nothing is attached and the audit row says "not charged".
 - **Who is told:** the job's club gets `INCIDENT_UPDATE` with the manager's message as written, opening the job's tracking. Whoever proposed it and the coordinator get `INCIDENT_DECIDED`, and so does the trip's crew, on the cab.
-- **Open:** on a shared trailer the delay moves every job on the trip, but only the incident's customer gets the manager's message, since it may name their horse. Telling the other clients about their new times after departure is still to decide (docs/shared-trips-design.md keeps that for incidents). Resolving an incident (`RESOLVED`) isn't built.
+- **Open:** on a shared trailer the delay moves every job on the trip, but only the incident's customer gets the manager's message, since it may name their horse. The other clients hear their new time (`TRIP_TIMES_CHANGED`), as for leaving a moving trip below.
+
+## Delay alerts (US-F5-04)
+
+- **Who:** the coordinator, or the logistics manager, from the job's Trip tab ("Send a delay alert"), while the job is on the road: its part on a trip has departed and isn't delivered. Before departure, times move on the Route tab instead.
+- **What it holds:** the reason, as option cards (traffic `TRAFFIC`, bad weather `WEATHER`, border congestion `BORDER_CONGESTION`), the job's new arrival in Indochina Time (after the planned one, at most 7 days later), and an optional note of up to 500 characters.
+- **It opens an incident** of that kind (`source` `STAFF`), owned like any other, so the logistics manager can still weigh options and closes it. `incidents.eta_at` keeps the arrival it announced; the audit row (`DELAY_ALERT`) keeps the reason, the new arrival and the delay.
+- **The schedule moves:** the delay is the new arrival less the planned one. As for a decision, the trip gets a new confirmed route version with every stop not yet reached that much later, each job's planned arrival follows its delivery stop, and the documents are checked again for the new dates.
+- **Who is told** (`DELAY_ALERT`): the trip's crew on the cab (the reason, the note, how far the stops ahead move and the job's new arrival); the job's club (the note, the new arrival, how much later, and whether it is still inside the window); every other customer on the trip (the reason and their own new time, never the note, which may name a horse); the owner and the coordinator, unless they sent it. Another job pushed past its window gets a `LATE_ARRIVAL` incident of its own.
+- **Not built:** sending a second alert on the same incident (each alert opens its own), and an alert from the incident page of a cab report.
+
+## Closing an incident (US-F5-05)
+
+- **Who:** a logistics manager, from the incident page ("Close the incident").
+- **What it needs:** how it ended (`incidents.resolution`, up to 300 characters) and a closing note for the record (`closing_note`, up to 1000), both required; the database refuses a `RESOLVED` incident without them (`incidents_resolution_check`). `resolved_at` and `resolved_by` keep when and who.
+- **When:** once decided, closing is the page's one gold action. An open incident can be closed without a decision (the jam cleared), as a Secondary, but not while a proposal waits: approve it or send it back first. A closed incident takes no more options and can't be closed again. Closing ends a stopped clock (`clock_stopped_until`).
+- **Who is told** (`INCIDENT_RESOLVED`): the coordinator, whoever proposed and the owner, unless they closed it; an escort who reported it, on the cab. The customer isn't told; what they hear came with the decision or the alert.
+- **The timeline stays on the job.** Every step of an incident writes an audit row on it (`RAISE_INCIDENT`, the options, the proposal, a return, `DECIDE_INCIDENT`, `DELAY_ALERT`, `RESOLVE_INCIDENT`; a `LATE_ARRIVAL` incident opened by a decision or an alert now writes one too). The incident page shows them oldest first as its Timeline, and the job's Trip tab lists every incident on the job with its status, resolution and timeline (`GET /staff/jobs/{id}/incidents`).
 
 ## Leaving a moving trip (US-F5-06)
 

@@ -37,6 +37,8 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   INCIDENT_DECIDED: 'Decided',
   INCIDENT_RETURNED: 'Sent back',
   INCIDENT_UPDATE: 'Update',
+  DELAY_ALERT: 'Delay',
+  INCIDENT_RESOLVED: 'Closed',
 };
 
 /** "Notifications, 3 unread": the bell says what its count counts. */

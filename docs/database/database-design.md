@@ -578,7 +578,7 @@ erDiagram
 | Column | Type | Rule |
 |---|---|---|
 | `job_id` | → `transport_jobs` not null | |
-| `kind` | `IncidentKind` | `HELD`, `CUSTOMER_REPORT`, `WELFARE` (a horse medical incident), `VEHICLE` (a breakdown), `TRAFFIC` (a prolonged jam), `OTHER`. The cab reports the last four (US-F5-01). |
+| `kind` | `IncidentKind` | `HELD`, `CUSTOMER_REPORT`, `WELFARE` (a horse medical incident), `VEHICLE` (a breakdown), `TRAFFIC` (a prolonged jam), `OTHER`, `LATE_ARRIVAL`, `WEATHER`, `BORDER_CONGESTION`. The cab reports `WELFARE`, `VEHICLE`, `TRAFFIC` and `OTHER` (US-F5-01); a coordinator's delay alert is `TRAFFIC`, `WEATHER` or `BORDER_CONGESTION` (US-F5-04). |
 | `source` | varchar(12) | `CAB`, `CUSTOMER`, `STAFF`. |
 | `trip_record_id` | → `trip_records` | The escort's record, quoted verbatim. |
 | `owner_id` | → `users` not null | The logistics manager. Every incident has one owner. |
@@ -597,7 +597,9 @@ erDiagram
 | `customer_message` | varchar(1000) | What the customer was told, sent as written. |
 | `charge_customer` | boolean | Whether the customer pays the decided option's extra cost. |
 | `route_plan_id` | → `route_plans` | The confirmed route version the decision gave the trip, if it changed the route or the times. |
-| `resolved_at` | timestamptz | |
+| `eta_at` | timestamptz | The arrival the latest delay alert announced (US-F5-04). |
+| `resolution`, `closing_note` | varchar(300), varchar(1000) | How it ended and the closing note; both required when `RESOLVED` (`incidents_resolution_check`, US-F5-05). |
+| `resolved_at`, `resolved_by` | timestamptz, → `users` | When and which logistics manager closed it; required when `RESOLVED`. |
 
 **`incident_options`**: `incident_id`, `title`, `description`, `facts jsonb` (time, documents, the horse, cost), `position`, `extra_cost numeric(14,2)` (≥ 0, in the job's quotation currency), `delay_minutes` (≥ 0, added to the arrival), `changes_route` (approving it gives the trip a new route version), `created_by`. The coordinator records them and proposes one (US-F5-02).
 

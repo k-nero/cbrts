@@ -4,10 +4,13 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
 import com.equifreight.model.incident.DecideIncidentRequest;
+import com.equifreight.model.incident.DelayAlertRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
+import com.equifreight.model.incident.JobIncidentResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
+import com.equifreight.model.incident.ResolveIncidentRequest;
 import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.service.IncidentService;
 import jakarta.validation.Valid;
@@ -99,6 +102,32 @@ public class IncidentController {
             @Valid @RequestBody ReturnProposalRequest request,
             @AuthenticationPrincipal User user) {
         return incidents.returnProposal(id, request, user);
+    }
+
+    /** US-F5-04: a delay alert on a job on the road, with its new arrival, for the crew and the customers. */
+    @PostMapping("/api/v1/staff/jobs/{jobId}/delay-alerts")
+    @PreAuthorize("hasAnyRole('LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    public IncidentResponse sendDelayAlert(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody DelayAlertRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.sendDelayAlert(jobId, request, user);
+    }
+
+    /** US-F5-05: the logistics manager closes the incident with its resolution and a closing note. */
+    @PostMapping("/api/v1/staff/incidents/{id}/resolution")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public IncidentResponse resolve(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResolveIncidentRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.resolve(id, request, user);
+    }
+
+    /** US-F5-05: the job's incidents with their timelines, on its Trip tab. */
+    @GetMapping("/api/v1/staff/jobs/{jobId}/incidents")
+    public List<JobIncidentResponse> ofJob(@PathVariable UUID jobId) {
+        return incidents.ofJob(jobId);
     }
 
     @GetMapping("/api/v1/staff/incidents/{id}")
