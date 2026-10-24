@@ -94,7 +94,8 @@ class RouteJobStopsTest {
                 mock(VehicleRepository.class),
                 mock(ClearanceService.class),
                 mock(JobTripService.class),
-                mock(AuditService.class));
+                mock(AuditService.class),
+                mock(TripNotices.class));
     }
 
     @Test

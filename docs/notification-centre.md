@@ -178,6 +178,9 @@ There's no per-job staff owner column yet, so staff audiences fan out by role.
 | `CREW_ASSIGNED` | `CrewAssignmentService.assignCrew` | The assigned escort | yes (no header on the cab surface) | Cab trip |
 | `TRIP_DEPARTED` / `TRIP_DELIVERED` | trip records | Club accounts | yes | Tracking |
 | `TRIP_HELD` | trip record "Held" | Logistics managers; club accounts | yes | Trip / incident |
+| `TRIP_SHARED` *(built, US-F3-14)* | `RoutePlanService.confirmRoutePlan`, when the confirmed trip carries the job and another job and the trip's last confirmed route didn't share it; dedupe `TRIP_SHARED:{jobId}:{routePlanId}` | Club accounts | yes | Tracking (`/tracking?job={code}`) |
+| `TRIP_TIMES_CHANGED` *(built, US-F3-14)* | the same confirmation, when the job already had times and they moved, or it came from another trip; dedupe `TRIP_TIMES_CHANGED:{jobId}:{routePlanId}` | Club accounts | yes | Tracking |
+| `JOB_REPLANNED` *(built, US-F3-14)* | `TripSharingService.takeOff`, before departure, when the job had been given times; dedupe `JOB_REPLANNED:{jobId}:{tripId}` | Club accounts | yes | Tracking |
 | `INVOICE_ISSUED` / `INVOICE_OVERDUE` | invoicing; sweep | Club accounts | yes | Invoice |
 | `NOTE_ROUTED` / `NOTE_ANSWERED` | customer notes | Routed role / club accounts | answered yes | Note |
 

@@ -3,9 +3,9 @@ import { Col, Flex, Row } from 'antd';
 import { eventLabels, formatTime, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
-import { Chip, Panel, TimelineStop } from '@/components/ui';
-import type { TripRecordKind, TripView } from '@/interfaces';
-import { TripRecordKindEnum } from '@/interfaces';
+import { Callout, Chip, Panel, TimelineStop } from '@/components/ui';
+import type { TripRecordKind, TripStop, TripView } from '@/interfaces';
+import { ON_THE_WAY, RouteStopKindEnum, TripRecordKindEnum } from '@/interfaces';
 
 const kindTone = (kind: TripRecordKind) =>
   kind === TripRecordKindEnum.HELD
@@ -14,10 +14,33 @@ const kindTone = (kind: TripRecordKind) =>
       ? 'ok'
       : 'info';
 
-export function TripDetails({ trip }: { trip: TripView }) {
+/** On a shared trip, whose horses are picked up or handed over at a stop (staff and the crew only). */
+const handover = (stop: TripStop) =>
+  !stop.jobCode
+    ? null
+    : stop.kind === RouteStopKindEnum.PICKUP
+      ? `Pick up ${stop.jobCode}`
+      : stop.kind === RouteStopKindEnum.DELIVERY
+        ? `Hand over ${stop.jobCode}`
+        : null;
+
+export function TripDetails({
+  trip,
+  audience,
+}: {
+  trip: TripView;
+  audience: 'escort' | 'staff' | 'customer';
+}) {
   const lastRecord = [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
   return (
     <Flex vertical gap={16}>
+      {/* The customer is told the trailer is shared, never with whom (US-F3-14). */}
+      {trip.shared && audience === 'customer' && (
+        <Callout tone="info" title="Your horses share this trailer">
+          They travel with another client's horses. Each horse keeps its own stall, and the escort
+          cares for every horse on board. Stops for the other client show as a stop on the way.
+        </Callout>
+      )}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
           <Panel title="Trip status">
@@ -57,6 +80,7 @@ export function TripDetails({ trip }: { trip: TripView }) {
           <Flex component="ol" vertical gap={12} className="m-0 list-none p-0">
             {trip.stops.map((stop) => {
               const detail = [
+                handover(stop),
                 stop.details,
                 stop.latestNote,
                 stop.latestRecordedBy ? `Recorded by ${stop.latestRecordedBy}` : null,
@@ -78,7 +102,12 @@ export function TripDetails({ trip }: { trip: TripView }) {
                         ? formatTime(stop.latestOccurredAt)
                         : `Planned ${formatTime(stop.plannedAt)}`
                     }
-                    details={detail || stop.kind.replaceAll('_', ' ')}
+                    details={
+                      detail ||
+                      (stop.kind === ON_THE_WAY
+                        ? 'The trailer stops here on its way.'
+                        : stop.kind.replaceAll('_', ' '))
+                    }
                     status={status}
                   />
                 </li>
@@ -87,7 +116,7 @@ export function TripDetails({ trip }: { trip: TripView }) {
           </Flex>
         )}
       </Panel>
-      <Panel title="Horses on this trip">
+      <Panel title={audience === 'escort' ? 'Horses on your trailer' : 'Horses on this trip'}>
         <div className="divide-y divide-line">
           {trip.horses.map((horse) => (
             <div key={horse.id} className="py-3">

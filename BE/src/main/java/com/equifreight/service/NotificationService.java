@@ -140,6 +140,10 @@ public class NotificationService {
                 customer
                         ? "/requests/" + subject.requestId() + "/documents"
                         : "/staff/documents?jobId=" + subject.jobId();
+            case TRIP_TRACKING ->
+                customer
+                        ? "/tracking?job=" + subject.code()
+                        : escort ? "/escort" : "/staff/jobs/" + subject.jobId() + "?tab=trip";
         };
     }
 

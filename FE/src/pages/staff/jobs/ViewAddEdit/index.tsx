@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
@@ -105,6 +105,8 @@ export default function JobDetailPage() {
       ? 'vehicle'
       : `${trailerCodes.length === 1 ? 'trailer' : 'trailers'} ${trailerCodes.join(', ')}`;
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
+  // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
+  const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
 
   return (
     <div className="p-4">
@@ -114,7 +116,7 @@ export default function JobDetailPage() {
           <PageHeader
             title={`${job.originCity} → ${job.destinationCity}`}
             summary={
-              <Flex gap={12} align="center">
+              <Flex wrap gap={12} align="center">
                 <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">{job.code}</p>
                 {job.tripCode && (
                   <p className="type-chip text-ink-3 bg-muted px-2 py-0.5 rounded-sm">
@@ -122,6 +124,15 @@ export default function JobDetailPage() {
                   </p>
                 )}
                 <p className="type-body-m text-ink-2">{metaText}</p>
+                {othersOnTrip > 0 && (
+                  <Link
+                    to="?tab=load-plan"
+                    replace
+                    className="type-body-m whitespace-nowrap text-ink! underline underline-offset-2"
+                  >
+                    Shared with {othersOnTrip} other {othersOnTrip === 1 ? 'job' : 'jobs'}
+                  </Link>
+                )}
               </Flex>
             }
             right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}

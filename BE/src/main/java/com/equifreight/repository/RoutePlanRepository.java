@@ -15,4 +15,8 @@ public interface RoutePlanRepository extends JpaRepository<RoutePlan, UUID> {
     Optional<RoutePlan> findByTrip_IdAndStatus(UUID tripId, RoutePlanStatus status);
 
     Optional<RoutePlan> findFirstByTrip_IdOrderByVersionNoDesc(UUID tripId);
+
+    /** The trip's last route confirmed before {@code planId}, whether still confirmed or superseded since. */
+    Optional<RoutePlan> findFirstByTrip_IdAndConfirmedAtIsNotNullAndIdNotOrderByConfirmedAtDesc(
+            UUID tripId, UUID planId);
 }

@@ -51,6 +51,7 @@ public class TripSharingService {
     private final CrewAssignmentRepository crew;
     private final AuditService audit;
     private final BiosecurityService biosecurity;
+    private final TripNotices notices;
     private final Clock clock;
 
     public TripSharingService(
@@ -62,6 +63,7 @@ public class TripSharingService {
             CrewAssignmentRepository crew,
             AuditService audit,
             BiosecurityService biosecurity,
+            TripNotices notices,
             Clock clock) {
         this.jobs = jobs;
         this.jobTrips = jobTrips;
@@ -71,6 +73,7 @@ public class TripSharingService {
         this.crew = crew;
         this.audit = audit;
         this.biosecurity = biosecurity;
+        this.notices = notices;
         this.clock = clock;
     }
 
@@ -320,6 +323,7 @@ public class TripSharingService {
         leaveBehind(trip, leaving, leaving.getCode() + " taken off the trip");
         leaving.setSignedOffAt(null);
         leaving.setSignedOffBy(null);
+        notices.replanned(leaving, trip);
 
         audit.recordDecision(
                 currentUser,

@@ -20,7 +20,10 @@ public enum NotificationKind {
     DOSSIER_LATE(NotificationTone.WARN),
     DOCUMENTS_DUE(NotificationTone.WARN),
     TRIP_RELEASED(NotificationTone.INFO),
-    TRIP_HELD(NotificationTone.BAD);
+    TRIP_HELD(NotificationTone.BAD),
+    TRIP_SHARED(NotificationTone.INFO),
+    TRIP_TIMES_CHANGED(NotificationTone.WARN),
+    JOB_REPLANNED(NotificationTone.WARN);
 
     private final NotificationTone tone;
 

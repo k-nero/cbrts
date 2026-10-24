@@ -9,5 +9,7 @@ public enum NotificationSubject {
     TRANSPORT_JOB,
     AUTHORITY_SUBMISSION,
     /** A job's document checklist as a whole. */
-    DOCUMENTS
+    DOCUMENTS,
+    /** A job's trip as it is followed: the customer's tracking, the staff Trip tab, the escort's cab. */
+    TRIP_TRACKING
 }

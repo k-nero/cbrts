@@ -29,6 +29,7 @@ public class RoutePlanService {
     private final ClearanceService clearanceService;
     private final JobTripService jobTrips;
     private final AuditService auditService;
+    private final TripNotices notices;
 
     public RoutePlanService(
             RoutePlanRepository routePlanRepository,
@@ -41,7 +42,8 @@ public class RoutePlanService {
             VehicleRepository vehicleRepository,
             ClearanceService clearanceService,
             JobTripService jobTrips,
-            AuditService auditService) {
+            AuditService auditService,
+            TripNotices notices) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
@@ -53,6 +55,7 @@ public class RoutePlanService {
         this.clearanceService = clearanceService;
         this.jobTrips = jobTrips;
         this.auditService = auditService;
+        this.notices = notices;
     }
 
     @Transactional(readOnly = true)
@@ -261,6 +264,10 @@ public class RoutePlanService {
             }
         }
 
+        // Reconfirming the plan already confirmed changes nothing the customer was told.
+        boolean reconfirm = plan.getStatus() == RoutePlanStatus.CONFIRMED;
+        Map<UUID, TripNotices.Times> before = TripNotices.timesOf(jobsOnTrip);
+
         // Supersede any currently CONFIRMED route plan for this trip
         Optional<RoutePlan> currentConfirmed =
                 routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
@@ -301,6 +308,10 @@ public class RoutePlanService {
             transportJobRepository.save(onTrip);
             // Re-evaluate document validity and clearance gate
             clearanceService.recheckJobDocuments(onTrip.getId());
+        }
+
+        if (!reconfirm) {
+            notices.confirmed(trip, saved, jobsOnTrip, before);
         }
 
         auditService.recordDecision(

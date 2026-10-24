@@ -16,6 +16,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.trip.TripConditionRequest;
 import com.equifreight.model.trip.TripRecordRequest;
+import com.equifreight.model.trip.TripSummaryResponse;
 import com.equifreight.model.trip.TripViewResponse;
 import com.equifreight.repository.*;
 import com.equifreight.service.notification.Audience;
@@ -38,6 +39,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -87,6 +90,7 @@ class TripServiceTest {
     private TransportJob job;
     private Horse shadowfax;
     private Horse nightfall;
+    private TripVehicle trailer;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
         return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
@@ -169,6 +173,10 @@ class TripServiceTest {
                 .thenReturn(Optional.empty());
         when(crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId()))
                 .thenReturn(true);
+        trailer = trailer(1, "TX-447");
+        lenient()
+                .when(crew.findByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId()))
+                .thenReturn(List.of(seat(trailer)));
         when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.empty());
         when(handovers.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -462,6 +470,7 @@ class TripServiceTest {
         other.setClearanceReadyAt(NOW.minus(Duration.ofDays(1)));
         other.setSignedOffAt(job.getSignedOffAt());
         when(jobTrips.jobsOn(trip)).thenReturn(List.of(job, other));
+        when(jobTrips.horsesEverOn(trip)).thenReturn(List.of(rider(job, shadowfax), rider(other, nightfall)));
         return other;
     }
 
@@ -478,6 +487,54 @@ class TripServiceTest {
         when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
                 .thenReturn(Optional.of(plan));
         return stop;
+    }
+
+    private TripHorse rider(TransportJob owner, Horse horse) {
+        TripHorse th = new TripHorse();
+        th.setTrip(trip);
+        th.setJob(owner);
+        th.setHorse(horse);
+        th.setStatus(TripHorseStatus.ON_TRIP);
+        return th;
+    }
+
+    private TripVehicle trailer(int seq, String code) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(UUID.randomUUID());
+        vehicle.setCode(code);
+        TripVehicle tv = new TripVehicle();
+        tv.setId(UUID.randomUUID());
+        tv.setTrip(trip);
+        tv.setVehicle(vehicle);
+        tv.setSeq((short) seq);
+        return tv;
+    }
+
+    private CrewAssignment seat(TripVehicle tv) {
+        CrewAssignment c = new CrewAssignment();
+        c.setTripVehicle(tv);
+        c.setUser(escort);
+        c.setCrewRole(CrewRole.GROOM);
+        return c;
+    }
+
+    /** A confirmed load plan for {@code tv} with {@code horses} in stalls 1, 2, … */
+    private LoadPlan loaded(TripVehicle tv, Horse... horses) {
+        LoadPlan plan = new LoadPlan();
+        plan.setId(UUID.randomUUID());
+        plan.setTripVehicle(tv);
+        plan.setStatus(LoadPlanStatus.CONFIRMED);
+        for (int i = 0; i < horses.length; i++) {
+            VehicleStall vs = new VehicleStall();
+            vs.setPositionNo((short) (i + 1));
+            vs.setStallType(StallType.STANDARD);
+            LoadPlanStall stall = new LoadPlanStall();
+            stall.setLoadPlan(plan);
+            stall.setVehicleStall(vs);
+            stall.setHorse(horses[i]);
+            plan.getStalls().add(stall);
+        }
+        return plan;
     }
 
     @Test
@@ -558,7 +615,14 @@ class TripServiceTest {
 
         TripViewResponse view = service.customerTrip(job.getCode(), customer);
 
-        assertTrue(view.stops().isEmpty());
+        // The other job's delivery is a stop on the way: its time and that the trailer got there, not the place.
+        assertEquals(1, view.stops().size());
+        assertEquals("ON_THE_WAY", view.stops().getFirst().kind());
+        assertEquals("A stop on the way", view.stops().getFirst().name());
+        assertEquals(TripRecordKind.ARRIVED_AT_STOP, view.stops().getFirst().latestStatus());
+        assertNull(view.stops().getFirst().jobCode());
+        assertNull(view.stops().getFirst().details());
+        assertTrue(view.shared());
         assertEquals(1, view.records().size());
         assertEquals(
                 List.of(shadowfax.getId()),
@@ -567,6 +631,50 @@ class TripServiceTest {
                         .toList());
         assertEquals(
                 List.of("Shadowfax"), view.horses().stream().map(h -> h.name()).toList());
+    }
+
+    @Test
+    @DisplayName("The escort's cab is per trailer: their trailer's horses, every stop, and whose delivery each is")
+    void theEscortSeesTheirTrailer() {
+        departed();
+        TransportJob other = sharedWith();
+        deliveryOf(other);
+        TripVehicle second = trailer(2, "TX-512");
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
+                .thenReturn(List.of(loaded(trailer, shadowfax), loaded(second, nightfall)));
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId())).thenReturn(List.of());
+
+        TripViewResponse view = service.escortTrip(job.getCode(), escort);
+
+        assertEquals(
+                List.of("Shadowfax"), view.horses().stream().map(h -> h.name()).toList());
+        assertEquals("TX-447", view.vehicleCode());
+        assertEquals("CBRT-2026-042", view.stops().getFirst().jobCode());
+        assertEquals("Chao Phraya Racing Stables", view.stops().getFirst().name());
+        assertTrue(view.shared());
+    }
+
+    @Test
+    @DisplayName("The escort's list has one row per trip, naming every job it carries")
+    void theEscortListsTrips() {
+        when(crew.findTripRowsByUserId(eq(escort.getId()), any()))
+                .thenReturn(List.of(
+                        new TripSummaryResponse(
+                                "CBRT-2026-041", TripStatus.DEPARTED, "HCM", "BKK", NOW, "TRP-2026-001"),
+                        new TripSummaryResponse(
+                                "CBRT-2026-042", TripStatus.DEPARTED, "HCM", "BKK", NOW, "TRP-2026-001"),
+                        new TripSummaryResponse(
+                                "CBRT-2026-050", TripStatus.NOT_STARTED, "HCM", "PNH", null, "TRP-2026-007")));
+
+        Page<TripSummaryResponse> page = service.escortTrips(escort, PageRequest.of(0, 20));
+
+        assertEquals(2, page.getTotalElements());
+        TripSummaryResponse shared = page.getContent().getFirst();
+        assertEquals("TRP-2026-001", shared.tripCode());
+        assertEquals("CBRT-2026-041", shared.jobCode());
+        assertEquals(List.of("CBRT-2026-041", "CBRT-2026-042"), shared.jobCodes());
+        assertEquals(List.of("CBRT-2026-050"), page.getContent().get(1).jobCodes());
     }
 
     @Test

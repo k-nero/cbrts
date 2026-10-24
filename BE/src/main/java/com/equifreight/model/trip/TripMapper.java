@@ -15,13 +15,17 @@ import java.util.Locale;
 
 public final class TripMapper {
 
+    /** The kind of a stop only another job on the trip needs, as the customer sees it. */
+    public static final String ON_THE_WAY = "ON_THE_WAY";
+
     private TripMapper() {}
 
-    /** The trip screen of a job; {@code vehicleCode} is the confirmed load plan's vehicle, or null. */
+    /** The trip screen of a job; {@code vehicleCode} is the confirmed load plans' vehicles, or null. */
     public static TripViewResponse toViewResponse(
             TransportJob job,
             String tripCode,
             String vehicleCode,
+            boolean shared,
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records) {
@@ -41,17 +45,22 @@ public final class TripMapper {
                         ? null
                         : job.getRequest().getDestinationPlace().getName(),
                 vehicleCode,
+                shared,
                 stops,
                 horses,
                 records);
     }
 
-    /** A stop of the confirmed route plan with the latest record made there, or null. */
-    public static TripStopResponse toStopResponse(RouteStop s, TripRecord latest) {
+    /**
+     * A stop of the confirmed route plan with the latest record made there, or null; {@code jobCode} names whose
+     * pickup or delivery it is on a shared trip.
+     */
+    public static TripStopResponse toStopResponse(RouteStop s, TripRecord latest, String jobCode) {
         return new TripStopResponse(
                 s.getId(),
                 s.getSeq(),
                 s.getKind().name(),
+                jobCode,
                 stopName(s),
                 s.getPlannedAt(),
                 s.getPlannedStayMin(),
@@ -62,7 +71,34 @@ public final class TripMapper {
                 latest == null ? null : fullName(latest.getRecordedBy()));
     }
 
-    /** A horse on the trip; {@code stall} is its place on the confirmed load plan, or null. */
+    /**
+     * Another job's pickup or delivery as that job's customer sees it (US-F3-14): "A stop on the way", with its time
+     * and whether the trailer has reached or left it, but not the place, the notes or who handed over what there.
+     */
+    public static TripStopResponse toStopOnTheWay(RouteStop s, TripRecord latest) {
+        TripRecordKind status = latest == null
+                ? null
+                : switch (latest.getKind()) {
+                    case DELIVERED -> TripRecordKind.ARRIVED_AT_STOP;
+                    case HANDED_OVER, LOADED -> TripRecordKind.LEFT_STOP;
+                    case ARRIVED_AT_STOP, LEFT_STOP, HELD, DEPARTED -> latest.getKind();
+                    default -> null;
+                };
+        return new TripStopResponse(
+                s.getId(),
+                s.getSeq(),
+                ON_THE_WAY,
+                null,
+                "A stop on the way",
+                s.getPlannedAt(),
+                s.getPlannedStayMin(),
+                null,
+                status,
+                status == null ? null : latest.getOccurredAt(),
+                null,
+                null);
+    }
+
     /** A horse on the trip and where it stands; in a convoy the place names the trailer. */
     public static TripHorseResponse toHorseResponse(Horse horse, LoadPlanStall stall, boolean convoy) {
         return new TripHorseResponse(

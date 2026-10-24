@@ -34,6 +34,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class Flow3ServiceTest {
 
     @Mock
+    private TripNotices tripNotices;
+
+    @Mock
     private VehicleRepository vehicleRepository;
 
     @Mock
@@ -219,7 +222,8 @@ class Flow3ServiceTest {
                 vehicleRepository,
                 clearanceService,
                 jobTrips,
-                auditService);
+                auditService,
+                tripNotices);
         loadPlanService = new LoadPlanService(
                 loadPlanRepository,
                 loadPlanStallRepository,
@@ -792,6 +796,8 @@ class Flow3ServiceTest {
 
         assertNull(job.getSignedOffAt());
         verify(clearanceService).recheckJobDocuments(jobId);
+        // The customer hears about sharing or new times from the confirmation (US-F3-14).
+        verify(tripNotices).confirmed(any(), eq(plan), any(), any());
     }
 
     @Test

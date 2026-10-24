@@ -37,6 +37,12 @@ public record Subject(NotificationSubject type, UUID id, String code, UUID reque
         return new Subject(NotificationSubject.DOCUMENTS, job.getId(), job.getCode(), requestIdOf(job), job.getId());
     }
 
+    /** The job's trip as it is followed: the customer's Trip tracking, the staff Trip tab, the escort's cab. */
+    public static Subject tracking(TransportJob job) {
+        return new Subject(
+                NotificationSubject.TRIP_TRACKING, job.getId(), job.getCode(), requestIdOf(job), job.getId());
+    }
+
     public static Subject authoritySubmission(AuthoritySubmission submission) {
         TransportJob job = submission.getJob();
         return new Subject(
