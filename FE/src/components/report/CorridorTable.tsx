@@ -47,6 +47,7 @@ export const CorridorTable: FC<{ report: RevenueReport }> = ({ report }) => {
       columns={columns}
       dataSource={report.corridors}
       pagination={false}
+      showColumnSettings={false}
       locale={{ emptyText: 'No job was settled in this period.' }}
     />
   );

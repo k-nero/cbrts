@@ -68,6 +68,7 @@ export const ClassTable: FC<{
         columns={columns}
         dataSource={view.serviceClasses}
         pagination={false}
+        showColumnSettings={false}
         ignoreKeys={['actions']}
       />
     </Panel>

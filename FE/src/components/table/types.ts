@@ -45,6 +45,11 @@ export type TableComponentProps<T extends object = object> = TableProps<T> & {
   ignoreKeys?: string[];
   resizableColumns?: boolean | ResizableColumnsConfig;
   columnVisibility?: boolean | ColumnVisibilityConfig;
+  /**
+   * Shows the "Show or hide columns" button in the toolbar row (default true). When false the
+   * button is hidden and every column is shown, ignoring any columns hidden earlier.
+   */
+  showColumnSettings?: boolean;
   columnPreferencesStorage?: ColumnPreferencesStorage;
   labels?: TableLabels;
   sorter?: SorterResult<T> | SorterResult<T>[] | null;
