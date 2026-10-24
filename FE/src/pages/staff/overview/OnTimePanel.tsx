@@ -1,12 +1,13 @@
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Flex, Select, Skeleton } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 
-import { OnTimeChart } from '@/components/report/OnTimeChart';
 import { Panel } from '@/components/ui';
 import { useOnTimeReport } from '@/hooks/report';
 import { formatDayTime, ict } from '@/lib/utils';
 import { duration } from '@/pages/staff/incidents/incidentFormat';
+
+const OnTimeChart = lazy(() => import('@/components/report/OnTimeChart'));
 
 type Period = '8w' | '6m' | '12m';
 
@@ -93,7 +94,9 @@ export const OnTimePanel: FC = () => {
             <Skeleton active paragraph={{ rows: 6 }} />
           ) : (
             <>
-              <OnTimeChart report={report} />
+              <Suspense fallback={<Skeleton.Node active className="h-55! w-full!" />}>
+                <OnTimeChart report={report} />
+              </Suspense>
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-6">
                 <table className="w-full border-collapse">
                   <caption className="type-label-s pb-2 text-left text-ink">By corridor</caption>
