@@ -64,6 +64,27 @@ export interface Incident {
   proposedByName: string | null;
   proposedAt: string | null;
   proposalNote: string | null;
+  /** The approved option (US-F5-03). */
+  decidedOptionId: string | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  /** What the customer was told, as written. */
+  customerMessage: string | null;
+  chargeCustomer: boolean | null;
+  /** The extra cost attached to the job for the final invoice. */
+  chargedAmount: number | null;
+  /** The route version the decision gave the trip. */
+  routePlanVersion: number | null;
+}
+
+/** The manager's approval of the proposed option (US-F5-03). */
+export interface DecideIncidentInput {
+  optionId: string;
+  note?: string;
+  /** Sent to the customer as written. */
+  customerMessage: string;
+  chargeCustomer: boolean;
 }
 
 /** An option considered for an incident, with its cost side by side (US-F5-02). */

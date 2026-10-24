@@ -108,7 +108,11 @@ export function IncidentOptions({ incident }: { incident: Incident }) {
                         {formatTime(option.createdAt)}
                       </p>
                     </div>
-                    {option.id === incident.proposedOptionId && <Chip tone="info">Proposed</Chip>}
+                    {option.id === incident.decidedOptionId ? (
+                      <Chip tone="ok">Approved</Chip>
+                    ) : (
+                      option.id === incident.proposedOptionId && <Chip tone="info">Proposed</Chip>
+                    )}
                     {editable && (
                       <Flex gap={8}>
                         <Button

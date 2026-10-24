@@ -25,7 +25,10 @@ public enum NotificationKind {
     TRIP_TIMES_CHANGED(NotificationTone.WARN),
     JOB_REPLANNED(NotificationTone.WARN),
     INCIDENT_RAISED(NotificationTone.BAD),
-    INCIDENT_PROPOSAL(NotificationTone.WARN);
+    INCIDENT_PROPOSAL(NotificationTone.WARN),
+    INCIDENT_DECIDED(NotificationTone.OK),
+    INCIDENT_RETURNED(NotificationTone.WARN),
+    INCIDENT_UPDATE(NotificationTone.WARN);
 
     private final NotificationTone tone;
 

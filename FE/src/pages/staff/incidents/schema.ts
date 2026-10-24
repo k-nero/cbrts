@@ -22,3 +22,21 @@ export const proposeSchema = z.object({
   note: z.string().trim().max(1000, 'At most 1000 characters.'),
 });
 export type ProposeForm = z.infer<typeof proposeSchema>;
+
+/** The manager's decision (US-F5-03): the customer's message is required and sent as written. */
+export const decideSchema = z.object({
+  customerMessage: z
+    .string()
+    .trim()
+    .min(1, 'Write what the customer is told; it is sent as written.')
+    .max(1000, 'At most 1000 characters.'),
+  note: z.string().trim().max(1000, 'At most 1000 characters.'),
+  chargeCustomer: z.boolean(),
+});
+export type DecideForm = z.infer<typeof decideSchema>;
+
+/** Sending a proposal back: why, for whoever proposed it. */
+export const returnSchema = z.object({
+  reason: z.string().trim().min(1, 'Say why, so another option can be proposed.').max(1000),
+});
+export type ReturnForm = z.infer<typeof returnSchema>;

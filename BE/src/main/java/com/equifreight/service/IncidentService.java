@@ -1,8 +1,10 @@
 package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Incident;
 import com.equifreight.entity.IncidentOption;
+import com.equifreight.entity.JobCharge;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripHorse;
@@ -18,15 +20,19 @@ import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
+import com.equifreight.model.incident.DecideIncidentRequest;
 import com.equifreight.model.incident.IncidentOptionResponse;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
+import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.model.trip.TripMapper;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
+import com.equifreight.repository.JobChargeRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.TripRecordRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
@@ -36,10 +42,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
@@ -52,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Incidents (Flow 5, docs/incidents-design.md). The escort reports an emergency from the cab in a few taps (US-F5-01):
  * the logistics manager who owns the job's incidents and the job's coordinator are alerted at once, and the report is
  * kept as written, with its time and author. The coordinator records the options, each with its cost and delay, and
- * proposes one for approval (US-F5-02).
+ * proposes one for approval (US-F5-02); the logistics manager approves it, with what it does to the route, the
+ * documents and the invoice, or sends it back (US-F5-03).
  */
 @Service
 @Log4j2
@@ -72,6 +82,10 @@ public class IncidentService {
     private final FileService files;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final RoutePlanService routePlans;
+    private final ClearanceService clearance;
+    private final JobChargeRepository charges;
+    private final TripRecordRepository records;
     private final Clock clock;
 
     public IncidentService(
@@ -83,6 +97,10 @@ public class IncidentService {
             FileService files,
             AuditService audit,
             NotificationService notifications,
+            RoutePlanService routePlans,
+            ClearanceService clearance,
+            JobChargeRepository charges,
+            TripRecordRepository records,
             Clock clock) {
         this.incidents = incidents;
         this.jobs = jobs;
@@ -92,6 +110,10 @@ public class IncidentService {
         this.files = files;
         this.audit = audit;
         this.notifications = notifications;
+        this.routePlans = routePlans;
+        this.clearance = clearance;
+        this.charges = charges;
+        this.records = records;
         this.clock = clock;
     }
 
@@ -274,6 +296,171 @@ public class IncidentService {
         return toResponse(saved);
     }
 
+    /**
+     * The logistics manager approves the proposed option (US-F5-03). An option that changes the route or adds a delay
+     * gives the trip a new confirmed route version, with the stops not yet reached moved by the delay, and re-runs the
+     * document check for the new dates; an extra cost the customer pays is attached to the job for the final invoice.
+     * The customer gets the manager's message as written; the coordinator, whoever proposed it and the crew are told.
+     */
+    @Transactional
+    public IncidentResponse decide(UUID id, DecideIncidentRequest request, User manager) {
+        Incident incident = incident(id);
+        IncidentOption option = requireProposal(incident);
+        if (!option.getId().equals(request.optionId())) {
+            throw new BusinessException("Approve the proposed option, \"" + option.getTitle()
+                    + "\", or send it back so another can be proposed");
+        }
+        TransportJob job = incident.getJob();
+        Instant now = clock.instant();
+        incident.setStatus(IncidentStatus.DECIDED);
+        incident.setDecidedOption(option);
+        incident.setDecidedBy(manager);
+        incident.setDecidedAt(now);
+        incident.setDecisionNote(blankToNull(request.note()));
+        incident.setCustomerMessage(request.customerMessage().strip());
+        incident.setChargeCustomer(request.chargeCustomer());
+
+        String reason = AuditText.fit("Incident on " + job.getCode() + ": " + option.getTitle());
+        Map<TransportJob, List<String>> documentsToCheck = new LinkedHashMap<>();
+        Trip trip = jobTrips.tripOf(job.getId());
+        if (option.isChangesRoute() || option.getDelayMinutes() > 0) {
+            Set<UUID> reached = new HashSet<>();
+            records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
+                    .filter(r -> r.getRouteStop() != null)
+                    .forEach(r -> reached.add(r.getRouteStop().getId()));
+            Map<UUID, Instant> arrivals = new HashMap<>();
+            jobTrips.jobsOn(trip).forEach(j -> arrivals.put(j.getId(), j.getPlannedArrivalAt()));
+            routePlans
+                    .reviseForIncident(trip, option.getDelayMinutes(), reached, reason, manager)
+                    .ifPresent(incident::setRoutePlan);
+            // Dates that moved re-run the document check (US-F2-10).
+            for (TransportJob onTrip : jobTrips.jobsOn(trip)) {
+                if (!Objects.equals(arrivals.get(onTrip.getId()), onTrip.getPlannedArrivalAt())) {
+                    List<String> red = clearance.recheckAfterReplan(onTrip.getId());
+                    if (!red.isEmpty()) documentsToCheck.put(onTrip, red);
+                }
+            }
+        }
+        if (request.chargeCustomer() && option.getExtraCost().signum() > 0) {
+            JobCharge charge = new JobCharge();
+            charge.setJob(job);
+            charge.setIncident(incident);
+            charge.setDescription(AuditText.fit(incident.getKind().label() + ": " + option.getTitle()));
+            charge.setAmount(option.getExtraCost());
+            charge.setCreatedBy(manager);
+            charges.save(charge);
+        }
+        Incident saved = incidents.save(incident);
+
+        String costs = costLine(option, currencyOf(incident));
+        audit.recordDecision(
+                manager,
+                "DECIDE_INCIDENT",
+                AuditText.fit("Approved \"" + option.getTitle() + "\" for the incident on " + job.getCode() + ": "
+                        + costs + (request.chargeCustomer() ? ", charged to the customer" : ", not charged")),
+                "INCIDENT",
+                incident.getId(),
+                job.getCode(),
+                incident.getDecisionNote(),
+                IncidentStatus.OPEN.name(),
+                IncidentStatus.DECIDED.name());
+
+        notifications.notify(
+                NotificationKind.INCIDENT_UPDATE,
+                Audience.club(job.getRequest().getClub().getId()),
+                Subject.incident(incident),
+                "Update on " + job.getCode(),
+                incident.getCustomerMessage(),
+                "INCIDENT_UPDATE:" + incident.getId());
+        String decided = nameOf(manager) + " approved \"" + option.getTitle() + "\": " + costs + "."
+                + (saved.getRoutePlan() == null
+                        ? ""
+                        : " Route version " + saved.getRoutePlan().getVersionNo() + " is confirmed.");
+        List<User> office = new ArrayList<>();
+        if (incident.getProposedBy() != null) office.add(incident.getProposedBy());
+        if (job.getCoordinator() != null && !office.contains(job.getCoordinator())) office.add(job.getCoordinator());
+        office.remove(manager);
+        if (!office.isEmpty()) {
+            notifications.notify(
+                    NotificationKind.INCIDENT_DECIDED,
+                    Audience.staff(office),
+                    Subject.incident(incident),
+                    "Approved: " + option.getTitle(),
+                    decided);
+        }
+        List<User> crewOnTrip = crew.findByTripVehicle_Trip_Id(trip.getId()).stream()
+                .map(CrewAssignment::getUser)
+                .distinct()
+                .toList();
+        if (!crewOnTrip.isEmpty()) {
+            notifications.notify(
+                    NotificationKind.INCIDENT_DECIDED,
+                    Audience.escorts(crewOnTrip),
+                    Subject.incident(incident),
+                    "Decision: " + option.getTitle(),
+                    nameOf(manager) + " decided: " + option.getTitle() + "."
+                            + (saved.getRoutePlan() == null ? "" : " The route times changed; check the next stops."));
+        }
+        documentsToCheck.forEach((onTrip, red) -> {
+            if (onTrip.getTransportSpecialist() == null) return;
+            notifications.notify(
+                    NotificationKind.INCIDENT_DECIDED,
+                    Audience.staff(onTrip.getTransportSpecialist()),
+                    Subject.documents(onTrip),
+                    "Documents to check for " + onTrip.getCode(),
+                    "The new arrival after the incident makes these no longer valid: " + String.join(", ", red) + ".");
+        });
+        return toResponse(saved);
+    }
+
+    /** The logistics manager sends the proposal back, saying why; the options unlock for another proposal. */
+    @Transactional
+    public IncidentResponse returnProposal(UUID id, ReturnProposalRequest request, User manager) {
+        Incident incident = incident(id);
+        IncidentOption option = requireProposal(incident);
+        User proposer = incident.getProposedBy();
+        incident.setProposedOption(null);
+        incident.setProposedBy(null);
+        incident.setProposedAt(null);
+        incident.setProposalNote(null);
+        Incident saved = incidents.save(incident);
+        String code = incident.getJob().getCode();
+        audit.recordDecision(
+                manager,
+                "RETURN_INCIDENT_PROPOSAL",
+                AuditText.fit("Sent back \"" + option.getTitle() + "\" for the incident on " + code),
+                "INCIDENT",
+                incident.getId(),
+                code,
+                request.reason().strip(),
+                option.getTitle(),
+                null);
+        if (proposer != null && !proposer.getId().equals(manager.getId())) {
+            notifications.notify(
+                    NotificationKind.INCIDENT_RETURNED,
+                    Audience.staff(proposer),
+                    Subject.incident(incident),
+                    "Sent back: " + option.getTitle(),
+                    nameOf(manager) + ": " + request.reason().strip());
+        }
+        return toResponse(saved);
+    }
+
+    private static IncidentOption requireProposal(Incident incident) {
+        if (incident.getStatus() != IncidentStatus.OPEN) {
+            throw new BusinessException(
+                    "The incident is already " + incident.getStatus().name().toLowerCase(Locale.ROOT));
+        }
+        if (incident.getProposedOption() == null) {
+            throw new BusinessException("Nothing has been proposed yet");
+        }
+        return incident.getProposedOption();
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.strip();
+    }
+
     private static void requireOpenWithoutProposal(Incident incident, String action) {
         if (incident.getStatus() != IncidentStatus.OPEN) {
             throw new BusinessException("The incident is "
@@ -412,7 +599,19 @@ public class IncidentService {
                 i.getProposedOption() == null ? null : i.getProposedOption().getId(),
                 nameOf(i.getProposedBy()),
                 i.getProposedAt(),
-                i.getProposalNote());
+                i.getProposalNote(),
+                i.getDecidedOption() == null ? null : i.getDecidedOption().getId(),
+                nameOf(i.getDecidedBy()),
+                i.getDecidedAt(),
+                i.getDecisionNote(),
+                i.getCustomerMessage(),
+                i.getChargeCustomer(),
+                i.getId() == null
+                        ? null
+                        : charges.findByIncident_Id(i.getId())
+                                .map(JobCharge::getAmount)
+                                .orElse(null),
+                i.getRoutePlan() == null ? null : i.getRoutePlan().getVersionNo());
     }
 
     static String nameOf(User user) {

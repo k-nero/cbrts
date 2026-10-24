@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.model.trip.TripPhotoResponse;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -41,4 +42,16 @@ public record IncidentResponse(
         UUID proposedOptionId,
         String proposedByName,
         Instant proposedAt,
-        String proposalNote) {}
+        String proposalNote,
+        /** The approved option (US-F5-03), or null. */
+        UUID decidedOptionId,
+        String decidedByName,
+        Instant decidedAt,
+        String decisionNote,
+        /** What the customer was told, as written. */
+        String customerMessage,
+        Boolean chargeCustomer,
+        /** The extra cost attached to the job for the final invoice, or null. */
+        BigDecimal chargedAmount,
+        /** The route version the decision gave the trip, or null. */
+        Short routePlanVersion) {}

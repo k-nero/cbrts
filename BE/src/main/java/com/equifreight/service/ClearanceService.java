@@ -537,19 +537,46 @@ public class ClearanceService {
         if (job.getDepartedAt() != null) {
             throw new BusinessException("Cannot recheck documents after job has departed");
         }
-        List<ChecklistItem> items = checklistItemRepository.findByJobId(jobId);
-        for (ChecklistItem item : items) {
+        reevaluate(job);
+        evaluateClearanceGate(jobId);
+    }
+
+    /**
+     * Re-runs the document check after an incident decision moved the job's dates (US-F5-03, US-F2-10), also once the
+     * horses are on the road: each item's validity is evaluated against the new schedule, and a cleared item that no
+     * longer holds goes back to review. A moving job's clearance gate isn't re-locked; the items that turned red are
+     * returned for the specialist to act on.
+     */
+    @Transactional
+    public List<String> recheckAfterReplan(UUID jobId) {
+        TransportJob job = findJobOrThrow(jobId);
+        List<String> red = reevaluate(job);
+        if (job.getDepartedAt() == null) evaluateClearanceGate(jobId);
+        return red;
+    }
+
+    /** Evaluates every uploaded item against the job's schedule; returns the items now red, in words. */
+    private List<String> reevaluate(TransportJob job) {
+        List<String> red = new ArrayList<>();
+        for (ChecklistItem item : checklistItemRepository.findByJobId(job.getId())) {
             if (item.getCurrentVersion() != null) {
                 ValidityEngine.Result result = validityEngine.evaluate(item, item.getCurrentVersion(), job);
+                boolean turnedRed = result.validity() == Validity.RED && item.getValidity() != Validity.RED;
                 item.setValidity(result.validity());
                 item.setValidityNote(result.note());
                 if (result.validity() == Validity.RED && item.getStatus() == ChecklistStatus.CLEARED) {
                     item.setStatus(ChecklistStatus.IN_REVIEW);
                 }
                 checklistItemRepository.save(item);
+                if (turnedRed) {
+                    red.add((item.getHorse() == null
+                                    ? "Shipment"
+                                    : item.getHorse().getName()) + " · "
+                            + item.getDocumentType().getName());
+                }
             }
         }
-        evaluateClearanceGate(jobId);
+        return red;
     }
 
     /**

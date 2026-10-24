@@ -1,6 +1,6 @@
 # Incidents (Flow 5)
 
-Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60) and recording the options (US-F5-02, #61). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
+Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60), recording the options (US-F5-02, #61) and the manager's decision (US-F5-03, #62). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
 
 ## Reporting an emergency (US-F5-01)
 
@@ -19,3 +19,13 @@ Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60) 
 - **An option** has a title (up to 160 characters), an optional description, its estimated extra cost in the job's quotation currency (`incident_options.extra_cost`, never negative), the minutes it adds to the arrival (`delay_minutes`, up to a week) and whether it takes the horses another way (`changes_route`). Who recorded it and when are kept. The page shows the three costs side by side (Arrival, Extra cost, Route), warn-toned where the option costs something.
 - **Proposing:** one option is proposed for approval, with an optional note saying why (`incidents.proposed_option_id`, `proposed_by`, `proposed_at`, `proposal_note`). The owner gets an `INCIDENT_PROPOSAL` notification ("Decision needed", Warn tone) with the option and its cost in one line.
 - **While a proposal waits,** the options can't be added to or removed; they unlock when the manager sends the proposal back. A decided or resolved incident takes no more options. Options are removed only before anything is proposed, and each addition, removal and proposal is in the audit log.
+
+## The manager's decision (US-F5-03)
+
+- **Who:** a logistics manager; the coordinator sees the proposal waiting but can't decide. Only the proposed option can be approved, once. The manager can instead send the proposal back with a reason; whoever proposed it hears why (`INCIDENT_RETURNED`), and the options unlock for another proposal.
+- **The composer** lists what approving will do, takes the message to the customer (required, sent as written), whether the customer pays the extra cost, and a note for the record. Its one gold action is "Approve and tell the customer".
+- **Route:** an option that changes the route or adds a delay gives the trip a new **confirmed** route version (`REVISE_ROUTE_PLAN`), superseding the last one. Every stop the trip hasn't reached yet (no trip record at it) is moved by the delay. Each job's planned arrival follows its delivery stop, and before departure its departure follows the first pickup. `incidents.route_plan_id` points at the new version. Choosing different stops after departure isn't possible yet: the new version keeps the stops and changes the times.
+- **Documents:** when a job's planned arrival moved, the document check runs again for the new dates (US-F2-10), also after departure (`ClearanceService.recheckAfterReplan`). A moving job's clearance gate isn't re-locked; a cleared item that no longer holds goes back to review, and the job's transport specialist is told which ones.
+- **Cost:** when the customer pays, the option's extra cost becomes a `job_charges` row on the job (one per incident), which the final invoice turns into an `ADJUSTMENT` line. When EquiFreight pays, nothing is attached and the audit row says "not charged".
+- **Who is told:** the job's club gets `INCIDENT_UPDATE` with the manager's message as written, opening the job's tracking. Whoever proposed it and the coordinator get `INCIDENT_DECIDED`, and so does the trip's crew, on the cab.
+- **Open:** on a shared trailer the delay moves every job on the trip, but only the incident's customer gets the manager's message, since it may name their horse. Telling the other clients about their new times after departure is still to decide (docs/shared-trips-design.md keeps that for incidents). Resolving an incident (`RESOLVED`) isn't built.
