@@ -129,7 +129,21 @@ public class Incident extends BaseEntity {
     @JoinColumn(name = "route_plan_id")
     private RoutePlan routePlan;
 
+    /** The arrival the latest delay alert announced (US-F5-04). */
+    private Instant etaAt;
+
     private Instant resolvedAt;
+
+    /** How it ended, and the logistics manager's closing note; both required to close it (US-F5-05). */
+    @Column(length = 300)
+    private String resolution;
+
+    @Column(length = 1000)
+    private String closingNote;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by")
+    private User resolvedBy;
 
     @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position")

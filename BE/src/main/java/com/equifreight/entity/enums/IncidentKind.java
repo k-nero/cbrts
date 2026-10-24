@@ -2,7 +2,8 @@ package com.equifreight.entity.enums;
 
 /**
  * {@code incidents.kind}. The escort reports a {@code VEHICLE} breakdown, a prolonged {@code TRAFFIC} jam, a horse
- * medical incident ({@code WELFARE}) or {@code OTHER} from the cab (US-F5-01).
+ * medical incident ({@code WELFARE}) or {@code OTHER} from the cab (US-F5-01). The coordinator's delay alert is about
+ * {@code TRAFFIC}, {@code WEATHER} or {@code BORDER_CONGESTION} (US-F5-04).
  */
 public enum IncidentKind {
     HELD,
@@ -12,7 +13,11 @@ public enum IncidentKind {
     TRAFFIC,
     OTHER,
     /** Another job's arrival pushed past its window by a decision (US-F5-06). */
-    LATE_ARRIVAL;
+    LATE_ARRIVAL,
+    /** A delay alert for bad weather (US-F5-04). */
+    WEATHER,
+    /** A delay alert for congestion at a border crossing (US-F5-04). */
+    BORDER_CONGESTION;
 
     /** The kind in words, as the cab and the incident page say it. */
     public String label() {
@@ -24,6 +29,8 @@ public enum IncidentKind {
             case TRAFFIC -> "Prolonged traffic jam";
             case OTHER -> "Other emergency";
             case LATE_ARRIVAL -> "Arrival past the window";
+            case WEATHER -> "Bad weather";
+            case BORDER_CONGESTION -> "Border congestion";
         };
     }
 }

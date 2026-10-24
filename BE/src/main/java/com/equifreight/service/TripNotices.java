@@ -6,6 +6,7 @@ import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.model.trip.TripMapper;
@@ -123,6 +124,35 @@ public class TripNotices {
                 "New arrival time for " + job.getCode(),
                 body.toString(),
                 "TRIP_TIMES_CHANGED:" + job.getId() + ":" + plan.getId());
+    }
+
+    /**
+     * A delay alert reaches the job's club (US-F5-04): why, the new arrival and how much later it is. Only the job the
+     * alert was raised on carries the coordinator's note, which may name its horses; another client on the trip hears
+     * the reason and its own time.
+     */
+    public void delayAlert(TransportJob job, IncidentKind reason, String note, int delayMinutes, UUID incidentId) {
+        if (job.getPlannedArrivalAt() == null) return;
+        StringBuilder body = new StringBuilder();
+        if (note != null) body.append(note).append(note.matches(".*[.!?]$") ? " " : ". ");
+        body.append("Your horses now arrive on ")
+                .append(at(job.getPlannedArrivalAt()))
+                .append(", about ")
+                .append(IncidentService.duration(delayMinutes))
+                .append(" later than planned");
+        if (job.getWindowEnd() != null) {
+            body.append(
+                    job.getPlannedArrivalAt().isAfter(job.getWindowEnd())
+                            ? ", after your window closes; we'll be in touch about it"
+                            : ", still inside your window");
+        }
+        body.append(". Your price doesn't change.");
+        notify(
+                NotificationKind.DELAY_ALERT,
+                job,
+                "Delay on " + job.getCode() + ": " + reason.label(),
+                body.toString(),
+                "DELAY_ALERT:" + job.getId() + ":" + incidentId);
     }
 
     private void tripShared(TransportJob job, RoutePlan plan) {

@@ -28,7 +28,9 @@ public enum NotificationKind {
     INCIDENT_PROPOSAL(NotificationTone.WARN),
     INCIDENT_DECIDED(NotificationTone.OK),
     INCIDENT_RETURNED(NotificationTone.WARN),
-    INCIDENT_UPDATE(NotificationTone.WARN);
+    INCIDENT_UPDATE(NotificationTone.WARN),
+    DELAY_ALERT(NotificationTone.WARN),
+    INCIDENT_RESOLVED(NotificationTone.OK);
 
     private final NotificationTone tone;
 
