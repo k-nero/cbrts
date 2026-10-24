@@ -100,6 +100,7 @@ class RequestServiceTest {
     QuotationRepository quotations;
     RateFeeBandRepository feeBands;
     NotificationService notifications;
+    RequestProgressService progress;
     RequestService service;
     User user;
     Club club;
@@ -125,6 +126,8 @@ class RequestServiceTest {
         quotations = mock(QuotationRepository.class);
         feeBands = mock(RateFeeBandRepository.class);
         notifications = mock(NotificationService.class);
+        progress = mock(RequestProgressService.class);
+        when(progress.of(any(), any())).thenReturn(new RequestProgressService.Progress(List.of(), null));
         service = new RequestService(
                 requests,
                 horses,
@@ -140,7 +143,8 @@ class RequestServiceTest {
                 estimator,
                 quotations,
                 feeBands,
-                notifications);
+                notifications,
+                progress);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -1200,7 +1204,8 @@ class RequestServiceTest {
                     estimator,
                     quotations,
                     feeBands,
-                    notifications);
+                    notifications,
+                    progress);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 

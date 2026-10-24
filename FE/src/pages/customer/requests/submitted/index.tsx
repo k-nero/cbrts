@@ -4,9 +4,11 @@ import { Navigate, useParams } from 'react-router-dom';
 
 import CancelRequestModal from '../CancelRequestModal';
 import DocumentsCallout from './DocumentsCallout';
+import { WhereItStands } from './WhereItStands';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
 
+import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, OwedItem, Panel } from '@/components/ui';
@@ -58,6 +60,7 @@ const RequestSubmittedPage: FC = () => {
     </>
   );
   const callout = request.quotation ? quotationCallout(request.quotation) : null;
+  const history = request.history?.length ? <HistoryPanel history={request.history} /> : null;
   const toList = () => router.push(router.paths.get('my-requests'));
   const back = { label: 'My requests', onClick: toList };
   const pass = (chip: ReturnType<typeof passChip>) => (
@@ -126,6 +129,8 @@ const RequestSubmittedPage: FC = () => {
                 </Flex>
               </div>
             </Panel>
+            <WhereItStands request={request} />
+            {history}
           </Flex>
           <Flex vertical gap={24}>
             {pass(passChip(request.status))}
@@ -200,12 +205,14 @@ const RequestSubmittedPage: FC = () => {
           ) : (
             <Panel title="Nothing needed from you right now">
               <p className="type-body-m m-0 text-ink-2">
-                Next: a logistics manager checks the route, dates and capacity, usually within 1
-                business day. The itemised quotation arrives in My requests.
+                The next step is with {request.nextStep?.owner ?? 'the logistics manager'}. The
+                itemised quotation arrives in My requests.
               </p>
             </Panel>
           )}
           {request.status === 'APPROVED' && <DocumentsCallout requestId={request.id} />}
+          <WhereItStands request={request} />
+          {history}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.
           </p>

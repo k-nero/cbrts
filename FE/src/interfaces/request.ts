@@ -110,6 +110,24 @@ export interface RequestHorse {
   missing: string[];
 }
 
+/** One line of a request's history, from the audit log (BR-F1-08). */
+export interface HistoryEntry {
+  occurredAt: string;
+  summary: string;
+  actorLabel: string;
+}
+
+/** What happens next on a request, and who does it (US-F1-08). */
+export interface NextStep {
+  action: string;
+  /** "You", "Vũ Hải Yến, logistics manager", or "A logistics manager" before one picks it up. */
+  owner: string;
+  /** The customer owes this step. */
+  yours: boolean;
+  /** YYYY-MM-DD; null when the step has no deadline. */
+  due: string | null;
+}
+
 /** A transport request (GET /customer/requests/{id}); `leadTime` and `blockers` only for a draft. */
 export interface TransportRequest {
   id: string;
@@ -118,6 +136,10 @@ export interface TransportRequest {
   estimateHigh: number | null;
   /** The latest issued quotation, on the customer's read; null until one is issued. */
   quotation?: QuotationIssuedRef | null;
+  /** Every status change, newest first, on the customer's read (US-F1-08). */
+  history?: HistoryEntry[];
+  /** What happens next, on the customer's read; null when nothing more happens. */
+  nextStep?: NextStep | null;
   /** Null until submitted. */
   code: string | null;
   status: RequestStatus;

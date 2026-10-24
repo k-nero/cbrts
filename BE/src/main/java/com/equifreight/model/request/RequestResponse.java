@@ -6,6 +6,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
+import com.equifreight.model.review.HistoryEntryResponse;
 import com.equifreight.model.route.RouteResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -60,4 +61,8 @@ public record RequestResponse(
         /** The customer's club; set on staff views only. */
         String club,
         /** The latest issued quotation; set on the customer's read of the request, null until one is issued. */
-        QuotationIssuedRefResponse quotation) {}
+        QuotationIssuedRefResponse quotation,
+        /** Every status change, newest first (US-F1-08, BR-F1-08); set on the customer's read of the request. */
+        List<HistoryEntryResponse> history,
+        /** What happens next and who does it (US-F1-08); null when nothing more happens, and on other reads. */
+        NextStepResponse nextStep) {}
