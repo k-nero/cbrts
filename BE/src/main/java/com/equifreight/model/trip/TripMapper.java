@@ -160,6 +160,12 @@ public final class TripMapper {
                 .confirmedByName(
                         h.getConfirmedBy() == null ? null : h.getConfirmedBy().displayName())
                 .lateMinutes(h.getLateMinutes())
+                .discrepancy(h.getDiscrepancy())
+                .discrepancyIncidentId(
+                        h.getDiscrepancyIncident() == null
+                                ? null
+                                : h.getDiscrepancyIncident().getId())
+                .acceptedByDefault(h.isAcceptedByDefault())
                 .build();
     }
 

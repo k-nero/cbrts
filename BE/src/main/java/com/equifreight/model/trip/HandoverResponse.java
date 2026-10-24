@@ -22,4 +22,9 @@ public record HandoverResponse(
         Instant confirmedAt,
         String confirmedByName,
         /** Minutes after the window closed; null without a window or before it's worked out. */
-        Integer lateMinutes) {}
+        Integer lateMinutes,
+        /** What the customer said went wrong, as written (US-F6-02), and the incident it opened. */
+        String discrepancy,
+        UUID discrepancyIncidentId,
+        /** No answer by the due time: taken as accepted. */
+        boolean acceptedByDefault) {}

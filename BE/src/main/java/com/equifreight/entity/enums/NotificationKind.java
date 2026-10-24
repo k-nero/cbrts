@@ -30,7 +30,8 @@ public enum NotificationKind {
     INCIDENT_RETURNED(NotificationTone.WARN),
     INCIDENT_UPDATE(NotificationTone.WARN),
     DELAY_ALERT(NotificationTone.WARN),
-    INCIDENT_RESOLVED(NotificationTone.OK);
+    INCIDENT_RESOLVED(NotificationTone.OK),
+    HANDOVER_ACCEPTED(NotificationTone.OK);
 
     private final NotificationTone tone;
 

@@ -67,4 +67,16 @@ public class Handover extends BaseEntity {
 
     /** The receiver confirmed on the tablet that they took the horses as recorded. */
     private boolean receiverConfirmed;
+
+    /** What the customer says went wrong, as written, when they raised a discrepancy (US-F6-02). */
+    @Column(length = 1000)
+    private String discrepancy;
+
+    /** The incident the discrepancy opened for the logistics manager. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discrepancy_incident")
+    private Incident discrepancyIncident;
+
+    /** No answer by {@code confirmDueAt}: the handover was taken as accepted. */
+    private boolean acceptedByDefault;
 }
