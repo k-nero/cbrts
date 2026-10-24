@@ -2,6 +2,7 @@ package com.equifreight.model.job;
 
 import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Flight;
+import com.equifreight.entity.FlightAllocation;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.LoadPlan;
 import com.equifreight.entity.RouteLeg;
@@ -139,8 +140,13 @@ public final class JobMapper {
                 .staffCode(u.getStaffCode())
                 .email(u.getEmail())
                 .crewRole(ca.getCrewRole())
-                .tripVehicleId(ca.getTripVehicle().getId())
-                .vehicleCode(ca.getTripVehicle().getVehicle().getCode())
+                .tripVehicleId(
+                        ca.getTripVehicle() == null ? null : ca.getTripVehicle().getId())
+                .vehicleCode(
+                        ca.getTripVehicle() == null
+                                ? null
+                                : ca.getTripVehicle().getVehicle().getCode())
+                .onFlight(ca.getTripVehicle() == null)
                 .build();
     }
 
@@ -257,15 +263,26 @@ public final class JobMapper {
                 .id(f.getId())
                 .airline(f.getAirline())
                 .flightNo(f.getFlightNo())
-                .airWaybill(f.getAirWaybill())
                 .aircraftType(f.getAircraftType())
-                .stallPositions(f.getStallPositions())
-                .serviceClass(f.getServiceClass())
+                .stallCapacity(f.getStallCapacity())
                 .scheduledDepartureAt(f.getScheduledDepartureAt())
                 .scheduledArrivalAt(f.getScheduledArrivalAt())
                 .estimatedDepartureAt(f.getEstimatedDepartureAt())
                 .estimatedArrivalAt(f.getEstimatedArrivalAt())
+                .allocations(f.getAllocations().stream()
+                        .map(JobMapper::toAllocationResponse)
+                        .toList())
                 .build();
+    }
+
+    public static FlightAllocationResponse toAllocationResponse(FlightAllocation a) {
+        return new FlightAllocationResponse(
+                a.getId(),
+                a.getJob().getId(),
+                a.getJob().getCode(),
+                a.getAirWaybill(),
+                a.getStallPositions(),
+                a.getServiceClass());
     }
 
     /** The pickup city: the request's origin place, else the corridor's origin. */

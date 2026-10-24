@@ -34,6 +34,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class Flow3ServiceTest {
 
     @Mock
+    private FlightService flightService;
+
+    @Mock
     private TripNotices tripNotices;
 
     @Mock
@@ -243,7 +246,8 @@ class Flow3ServiceTest {
                 jobTrips,
                 loadPlanRepository,
                 loadPlanStallRepository,
-                auditService);
+                auditService,
+                flightService);
         transportJobService = new TransportJobService(
                 transportJobRepository,
                 loadPlanService,
@@ -1031,9 +1035,7 @@ class Flow3ServiceTest {
                 .thenReturn(Optional.of(route));
         CrewAssignment driver = assignment(user("minh.tran@equifreight.vn", RoleName.ESCORT), CrewRole.DRIVER);
         CrewAssignment groom = assignment(user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
-        lenient()
-                .when(crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()))
-                .thenReturn(List.of(driver, groom));
+        lenient().when(crewAssignmentRepository.findByTrip_Id(trip.getId())).thenReturn(List.of(driver, groom));
         lenient()
                 .when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(trip.getId()), any(), any()))
                 .thenReturn(overlaps);

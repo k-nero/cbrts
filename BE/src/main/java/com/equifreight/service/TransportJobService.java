@@ -234,7 +234,7 @@ public class TransportJobService {
         }
 
         // Validate crew assigned: driver and groom ratio
-        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId());
+        List<CrewAssignment> crewAssignments = crewAssignmentRepository.findByTrip_Id(trip.getId());
         if (crewAssignments.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: No crew assigned to this job");
         }
@@ -243,7 +243,8 @@ public class TransportJobService {
             TripVehicle trailer = plan.getTripVehicle();
             String vehicleCode = trailer.getVehicle().getCode();
             List<CrewAssignment> onTrailer = crewAssignments.stream()
-                    .filter(c -> c.getTripVehicle().getId().equals(trailer.getId()))
+                    .filter(c -> c.getTripVehicle() != null
+                            && c.getTripVehicle().getId().equals(trailer.getId()))
                     .toList();
             if (onTrailer.stream().noneMatch(c -> c.getCrewRole() == CrewRole.DRIVER)) {
                 throw new BusinessException(
@@ -258,6 +259,11 @@ public class TransportJobService {
                 throw new BusinessException("Cannot sign off trip plan: " + vehicleCode + " requires " + reqGrooms
                         + " groom(s), found " + groomCount);
             }
+        }
+        // A trip that flies needs its flight crew too, counted for every horse on board (US-F3-15).
+        String flightCrew = crewAssignmentService.flightCrewShortfall(trip, routePlanOpt.get(), crewAssignments);
+        if (flightCrew != null) {
+            throw new BusinessException("Cannot sign off trip plan: " + flightCrew);
         }
 
         // The confirmed route has set the travel dates by now, so check every crew member is free for them
@@ -358,10 +364,11 @@ public class TransportJobService {
         if (routePlanOpt.isEmpty()) {
             return "Fleet & route coordinator";
         }
-        List<CrewAssignment> crew = crewAssignmentRepository.findByTripVehicle_Trip_Id(tripId);
+        List<CrewAssignment> crew = crewAssignmentRepository.findByTrip_Id(tripId);
         boolean everyTrailerHasADriver = loadPlans.stream()
                 .allMatch(p -> crew.stream()
                         .anyMatch(c -> c.getCrewRole() == CrewRole.DRIVER
+                                && c.getTripVehicle() != null
                                 && c.getTripVehicle()
                                         .getId()
                                         .equals(p.getTripVehicle().getId())));

@@ -52,6 +52,7 @@ public class TripSharingService {
     private final AuditService audit;
     private final BiosecurityService biosecurity;
     private final TripNotices notices;
+    private final FlightService flights;
     private final Clock clock;
 
     public TripSharingService(
@@ -64,6 +65,7 @@ public class TripSharingService {
             AuditService audit,
             BiosecurityService biosecurity,
             TripNotices notices,
+            FlightService flights,
             Clock clock) {
         this.jobs = jobs;
         this.jobTrips = jobTrips;
@@ -74,6 +76,7 @@ public class TripSharingService {
         this.audit = audit;
         this.biosecurity = biosecurity;
         this.notices = notices;
+        this.flights = flights;
         this.clock = clock;
     }
 
@@ -163,7 +166,7 @@ public class TripSharingService {
     /**
      * Whether {@code joining}, now on {@code from}, can join {@code trip} (US-F3-11): the days every job on it could
      * leave, or a refusal that says why (a departed trip, a private trailer, another corridor, no common day, a horse
-     * on both jobs, no room).
+     * on both jobs, no room on the trailers or the flight, other airports).
      */
     private Days fit(Trip trip, List<TransportJob> onTrip, TransportJob joining, Trip from) {
         for (TransportJob j : onTrip) {
@@ -216,6 +219,12 @@ public class TripSharingService {
                     "Not enough room on trip " + trip.getCode() + " for " + joining.getCode() + ": " + noRoom
                             + ". Add a trailer on the Load plan tab first.");
         }
+        // A trip that flies takes a job from the same airports, with room in its stall positions (US-F3-15).
+        String cantFly = flights.cantFly(trip, from, joining);
+        if (cantFly != null) {
+            throw new ConflictException(
+                    "FLIGHT_DOESNT_FIT", joining.getCode() + " can't fly with trip " + trip.getCode() + ": " + cantFly);
+        }
         return days;
     }
 
@@ -253,6 +262,7 @@ public class TripSharingService {
         String reason = joining.getCode() + " joined the trip";
         loadPlans.reopenTrip(trip, reason);
         routePlans.addJobStops(trip, joining);
+        flights.allocate(trip);
         joining.setSignedOffAt(null);
         joining.setSignedOffBy(null);
 
@@ -347,10 +357,11 @@ public class TripSharingService {
     private void leaveBehind(Trip trip, TransportJob job, String reason) {
         if (jobTrips.jobsOn(trip).isEmpty()) {
             bookings.deleteAll(bookings.findByTrip_Id(trip.getId()));
-            jobTrips.vehiclesOf(trip).forEach(tv -> crew.deleteByTripVehicleId(tv.getId()));
+            crew.deleteByTripId(trip.getId());
             return;
         }
         loadPlans.reopenTrip(trip, reason);
         routePlans.removeJobStops(trip, job);
+        flights.allocate(trip);
     }
 }

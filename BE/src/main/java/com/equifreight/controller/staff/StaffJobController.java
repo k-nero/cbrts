@@ -4,6 +4,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.model.job.*;
 import com.equifreight.service.CrewAssignmentService;
+import com.equifreight.service.FlightService;
 import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
 import com.equifreight.service.TransportJobService;
@@ -28,18 +29,21 @@ public class StaffJobController {
     private final RoutePlanService routePlanService;
     private final CrewAssignmentService crewAssignmentService;
     private final TripSharingService tripSharingService;
+    private final FlightService flightService;
 
     public StaffJobController(
             TransportJobService transportJobService,
             LoadPlanService loadPlanService,
             RoutePlanService routePlanService,
             CrewAssignmentService crewAssignmentService,
-            TripSharingService tripSharingService) {
+            TripSharingService tripSharingService,
+            FlightService flightService) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
         this.crewAssignmentService = crewAssignmentService;
         this.tripSharingService = tripSharingService;
+        this.flightService = flightService;
     }
 
     /**
@@ -248,6 +252,19 @@ public class StaffJobController {
             @Valid @RequestBody AssignCrewRequest request,
             @AuthenticationPrincipal User user) {
         return crewAssignmentService.assignCrew(jobId, request, user);
+    }
+
+    /**
+     * US-F3-15: Shared flight - set this job's consignment on its trip's flight: air waybill, stall positions, class.
+     */
+    @PutMapping("/{jobId}/flights/{flightId}/allocation")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public FlightAllocationResponse updateFlightAllocation(
+            @PathVariable UUID jobId,
+            @PathVariable UUID flightId,
+            @Valid @RequestBody UpdateFlightAllocationRequest request,
+            @AuthenticationPrincipal User user) {
+        return JobMapper.toAllocationResponse(flightService.updateAllocation(jobId, flightId, request, user));
     }
 
     /**

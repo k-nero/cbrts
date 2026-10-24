@@ -22,6 +22,8 @@ public record TripViewResponse(
         String vehicleCode,
         /** True when the trailer carries another job too; the customer is told only that, never whose. */
         boolean shared,
+        /** The confirmed route's flights; for the customer, with only their own consignment (US-F3-15). */
+        List<TripFlightResponse> flights,
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
         List<TripRecordResponse> records) {}

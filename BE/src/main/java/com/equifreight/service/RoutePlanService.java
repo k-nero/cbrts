@@ -100,9 +100,22 @@ public class RoutePlanService {
         // Find the trip's draft or create its next version
         Optional<RoutePlan> draftOpt = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
         RoutePlan plan;
+        // Each job's consignment on the trip's flight, kept when the flight is planned again (US-F3-15).
+        Map<UUID, FlightAllocation> consignments = new HashMap<>();
+        draftOpt.or(() -> routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .ifPresent(current -> current.getLegs().stream()
+                        .filter(leg -> leg.getMode() == TransportMode.AIR)
+                        .forEach(leg -> flightRepository
+                                .findByRouteLegId(leg.getId())
+                                .ifPresent(f -> f.getAllocations()
+                                        .forEach(a -> consignments.putIfAbsent(
+                                                a.getJob().getId(), a)))));
         if (draftOpt.isPresent()) {
             plan = draftOpt.get();
-            // Clear existing stops and legs
+            // Clear existing stops and legs, the legs' flights first
+            plan.getLegs()
+                    .forEach(leg ->
+                            flightRepository.findByRouteLegId(leg.getId()).ifPresent(flightRepository::delete));
             routeLegRepository.deleteAll(plan.getLegs());
             routeStopRepository.deleteAll(plan.getStops());
             plan.getLegs().clear();
@@ -195,12 +208,11 @@ public class RoutePlanService {
                 flight.setRouteLeg(savedLeg);
                 flight.setAirline(item.flight().airline());
                 flight.setFlightNo(item.flight().flightNo());
-                flight.setAirWaybill(item.flight().airWaybill());
                 flight.setAircraftType(item.flight().aircraftType());
-                flight.setStallPositions(item.flight().stallPositions());
-                flight.setServiceClass(item.flight().serviceClass());
+                flight.setStallCapacity(item.flight().stallCapacity());
                 flight.setScheduledDepartureAt(item.flight().scheduledDepartureAt());
                 flight.setScheduledArrivalAt(item.flight().scheduledArrivalAt());
+                allocate(flight, item.flight(), trip, job, consignments);
                 flightRepository.save(flight);
             }
 
@@ -467,10 +479,9 @@ public class RoutePlanService {
                 flight.setRouteLeg(savedLeg);
                 flight.setAirline(f.getAirline());
                 flight.setFlightNo(f.getFlightNo());
-                flight.setAirWaybill(f.getAirWaybill());
                 flight.setAircraftType(f.getAircraftType());
-                flight.setStallPositions(f.getStallPositions());
-                flight.setServiceClass(f.getServiceClass());
+                flight.setStallCapacity(f.getStallCapacity());
+                FlightService.copyAllocations(f, flight);
                 flight.setScheduledDepartureAt(f.getScheduledDepartureAt());
                 flight.setScheduledArrivalAt(f.getScheduledArrivalAt());
                 flight.setEstimatedDepartureAt(f.getEstimatedDepartureAt());
@@ -480,6 +491,57 @@ public class RoutePlanService {
             plan.getLegs().add(savedLeg);
         }
         return plan;
+    }
+
+    /**
+     * Gives the flight one consignment per job on the trip (US-F3-15): as the request lists them, else as the job had
+     * on the trip's flight before, else its quoted stall positions and class. A waybill is unique on the flight, and
+     * the positions fit in what the airline gives the trip.
+     */
+    private void allocate(
+            Flight flight,
+            CreateRoutePlanRequest.FlightItem item,
+            Trip trip,
+            TransportJob job,
+            Map<UUID, FlightAllocation> before) {
+        List<TransportJob> onTrip = jobTrips.jobsOn(trip);
+        if (onTrip.isEmpty()) onTrip = List.of(job);
+        Map<UUID, CreateRoutePlanRequest.AllocationItem> asked = new HashMap<>();
+        for (CreateRoutePlanRequest.AllocationItem a : item.allocations()) {
+            TransportJob owner = a.jobId() == null ? job : jobOnTrip(trip, a.jobId());
+            if (asked.put(owner.getId(), a) != null) {
+                throw new BusinessException(owner.getCode() + " has two allocations on flight " + item.flightNo());
+            }
+        }
+        Set<String> waybills = new HashSet<>();
+        int positions = 0;
+        for (TransportJob onFlight : onTrip) {
+            FlightAllocation a = FlightService.allocationFor(flight, onFlight);
+            CreateRoutePlanRequest.AllocationItem given = asked.get(onFlight.getId());
+            FlightAllocation had = before.get(onFlight.getId());
+            if (given != null) {
+                a.setAirWaybill(
+                        given.airWaybill() == null || given.airWaybill().isBlank()
+                                ? null
+                                : given.airWaybill().strip());
+                if (given.stallPositions() != null) a.setStallPositions(given.stallPositions());
+                if (given.serviceClass() != null) a.setServiceClass(given.serviceClass());
+            } else if (had != null) {
+                a.setAirWaybill(had.getAirWaybill());
+                a.setStallPositions(had.getStallPositions());
+                a.setServiceClass(had.getServiceClass());
+            }
+            if (a.getAirWaybill() != null && !waybills.add(a.getAirWaybill().toUpperCase(Locale.ROOT))) {
+                throw new BusinessException("Air waybill " + a.getAirWaybill() + " is given to two jobs on flight "
+                        + item.flightNo() + ": each consignment has its own");
+            }
+            positions += a.getStallPositions() == null ? 0 : a.getStallPositions();
+            flight.getAllocations().add(a);
+        }
+        if (flight.getStallCapacity() != null && positions > flight.getStallCapacity()) {
+            throw new BusinessException("The jobs on the trip take " + positions + " stall positions and flight "
+                    + item.flightNo() + " gives " + flight.getStallCapacity());
+        }
     }
 
     /** The job a stop is for; a stop that names none is the confirming job's. */
@@ -588,10 +650,9 @@ public class RoutePlanService {
                 Flight f = lc.flight();
                 copy.setAirline(f.getAirline());
                 copy.setFlightNo(f.getFlightNo());
-                copy.setAirWaybill(f.getAirWaybill());
                 copy.setAircraftType(f.getAircraftType());
-                copy.setStallPositions(f.getStallPositions());
-                copy.setServiceClass(f.getServiceClass());
+                copy.setStallCapacity(f.getStallCapacity());
+                FlightService.copyAllocations(f, copy);
                 copy.setScheduledDepartureAt(f.getScheduledDepartureAt());
                 copy.setScheduledArrivalAt(f.getScheduledArrivalAt());
                 copy.setEstimatedDepartureAt(f.getEstimatedDepartureAt());
@@ -600,6 +661,8 @@ public class RoutePlanService {
             }
         }
 
+        // The old flights go first: a flight still managed while its leg is deleted fails the flush.
+        flightRepository.deleteAll(oldFlights.values());
         routeLegRepository.deleteAll(draft.getLegs());
         draft.getLegs().clear();
         routeStopRepository.deleteAll(draft.getStops());

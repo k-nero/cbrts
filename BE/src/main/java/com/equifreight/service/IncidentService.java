@@ -130,7 +130,7 @@ public class IncidentService {
         TransportJob job = jobs.findByCode(jobCode).orElseThrow(() -> ResourceNotFoundException.of("Trip", jobCode));
         Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!released || !crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId())) {
+        if (!released || !crew.existsByTrip_IdAndUser_Id(trip.getId(), escort.getId())) {
             throw ResourceNotFoundException.of("Trip", jobCode);
         }
         if (!CAB_KINDS.contains(request.kind())) {
@@ -388,7 +388,7 @@ public class IncidentService {
                     "Approved: " + option.getTitle(),
                     decided);
         }
-        List<User> crewOnTrip = crew.findByTripVehicle_Trip_Id(trip.getId()).stream()
+        List<User> crewOnTrip = crew.findByTrip_Id(trip.getId()).stream()
                 .map(CrewAssignment::getUser)
                 .distinct()
                 .toList();

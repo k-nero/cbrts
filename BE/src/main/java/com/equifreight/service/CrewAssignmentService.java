@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.CrewAssignment;
+import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripVehicle;
@@ -33,6 +34,7 @@ public class CrewAssignmentService {
     private final LoadPlanRepository loadPlanRepository;
     private final LoadPlanStallRepository loadPlanStallRepository;
     private final AuditService auditService;
+    private final FlightService flights;
 
     public CrewAssignmentService(
             CrewAssignmentRepository crewAssignmentRepository,
@@ -41,7 +43,8 @@ public class CrewAssignmentService {
             JobTripService jobTrips,
             LoadPlanRepository loadPlanRepository,
             LoadPlanStallRepository loadPlanStallRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            FlightService flights) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
@@ -49,12 +52,13 @@ public class CrewAssignmentService {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.auditService = auditService;
+        this.flights = flights;
     }
 
     @Transactional(readOnly = true)
     public List<CrewMemberResponse> getCrew(UUID jobId) {
         return jobTrips.findTripOf(jobId)
-                .map(trip -> crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()).stream()
+                .map(trip -> crewAssignmentRepository.findByTrip_Id(trip.getId()).stream()
                         .map(JobMapper::toCrewMemberResponse)
                         .toList())
                 .orElse(List.of());
@@ -87,8 +91,11 @@ public class CrewAssignmentService {
             throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }
 
-        // The crew travels with a trailer, so the load plan names it first; in a convoy, say which (US-F3-10).
         Trip trip = jobTrips.tripOf(jobId);
+        if (request.flight()) {
+            return assignFlightCrew(job, trip, request, currentUser);
+        }
+        // The crew travels with a trailer, so the load plan names it first; in a convoy, say which (US-F3-10).
         List<TripVehicle> trailers = jobTrips.vehiclesOf(trip);
         if (trailers.isEmpty()) {
             throw new BusinessException(
@@ -107,8 +114,9 @@ public class CrewAssignmentService {
                     "The trip has " + trailers.size() + " trailers: say which one this crew is for");
         }
         // One person rides one trailer of the convoy.
-        Set<UUID> onOtherTrailers = crewAssignmentRepository.findByTripVehicle_Trip_Id(trip.getId()).stream()
-                .filter(c -> !c.getTripVehicle().getId().equals(tripVehicle.getId()))
+        Set<UUID> onOtherTrailers = crewAssignmentRepository.findByTrip_Id(trip.getId()).stream()
+                .filter(c -> c.getTripVehicle() != null
+                        && !c.getTripVehicle().getId().equals(tripVehicle.getId()))
                 .map(c -> c.getUser().getId())
                 .collect(java.util.stream.Collectors.toSet());
 
@@ -137,47 +145,10 @@ public class CrewAssignmentService {
         // checked again at sign-off (TransportJobService.signOffTripPlan).
         java.time.Instant startsAt = job.getPlannedDepartureAt();
         java.time.Instant endsAt = job.getPlannedArrivalAt();
-        boolean datesKnown = startsAt != null && endsAt != null;
 
         List<CrewAssignment> assignments = new ArrayList<>();
         for (AssignCrewRequest.CrewItem item : request.crew()) {
-            User user = userRepository
-                    .findById(item.userId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.userId()));
-
-            // Role check: User must have ESCORT role
-            boolean isEscort = user.getRoles() != null
-                    && user.getRoles().stream()
-                            .anyMatch(r -> "ESCORT".equalsIgnoreCase(r.getName())
-                                    || "ROLE_ESCORT".equalsIgnoreCase(r.getName()));
-            if (!isEscort) {
-                throw new BusinessException("User " + user.getEmail() + " does not have the ESCORT role");
-            }
-
-            // Escort kind matching check if kind is set
-            if (user.getEscortKind() != null) {
-                if (item.crewRole() == CrewRole.DRIVER
-                        && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.GROOM) {
-                    throw new BusinessException(
-                            "User " + user.getEmail() + " is registered as a GROOM and cannot be assigned as a DRIVER");
-                }
-                if ((item.crewRole() == CrewRole.GROOM || item.crewRole() == CrewRole.FLYING_GROOM)
-                        && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.DRIVER) {
-                    throw new BusinessException(
-                            "User " + user.getEmail() + " is registered as a DRIVER and cannot be assigned as a GROOM");
-                }
-            }
-
-            // Overlapping jobs check (US-F3-06)
-            if (datesKnown
-                    && !crewAssignmentRepository
-                            .findOverlappingAssignments(user.getId(), trip.getId(), startsAt, endsAt)
-                            .isEmpty()) {
-                throw new ConflictException(
-                        "CREW_OVERLAP",
-                        "Crew member " + user.getFirstName() + " " + user.getLastName()
-                                + " is already assigned to another overlapping trip");
-            }
+            User user = crewMember(item, trip, startsAt, endsAt);
 
             if (onOtherTrailers.contains(user.getId())) {
                 throw new BusinessException(
@@ -185,6 +156,7 @@ public class CrewAssignmentService {
             }
 
             CrewAssignment ca = new CrewAssignment();
+            ca.setTrip(trip);
             ca.setTripVehicle(tripVehicle);
             ca.setUser(user);
             ca.setCrewRole(item.crewRole());
@@ -212,5 +184,114 @@ public class CrewAssignmentService {
 
         log.info("Assigned {} crew members to job {}", saved.size(), job.getCode());
         return saved.stream().map(JobMapper::toCrewMemberResponse).toList();
+    }
+
+    /**
+     * The crew member {@code item} names, once checked: an escort whose kind fits the role, free for the trip's dates
+     * when they are known (US-F3-06).
+     */
+    private User crewMember(
+            AssignCrewRequest.CrewItem item, Trip trip, java.time.Instant startsAt, java.time.Instant endsAt) {
+        boolean datesKnown = startsAt != null && endsAt != null;
+        User user = userRepository
+                .findById(item.userId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.userId()));
+
+        // Role check: User must have ESCORT role
+        boolean isEscort = user.getRoles() != null
+                && user.getRoles().stream()
+                        .anyMatch(r ->
+                                "ESCORT".equalsIgnoreCase(r.getName()) || "ROLE_ESCORT".equalsIgnoreCase(r.getName()));
+        if (!isEscort) {
+            throw new BusinessException("User " + user.getEmail() + " does not have the ESCORT role");
+        }
+
+        // Escort kind matching check if kind is set
+        if (user.getEscortKind() != null) {
+            if (item.crewRole() == CrewRole.DRIVER
+                    && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.GROOM) {
+                throw new BusinessException(
+                        "User " + user.getEmail() + " is registered as a GROOM and cannot be assigned as a DRIVER");
+            }
+            if ((item.crewRole() == CrewRole.GROOM || item.crewRole() == CrewRole.FLYING_GROOM)
+                    && user.getEscortKind() == com.equifreight.entity.enums.EscortKind.DRIVER) {
+                throw new BusinessException(
+                        "User " + user.getEmail() + " is registered as a DRIVER and cannot be assigned as a GROOM");
+            }
+        }
+
+        // Overlapping jobs check (US-F3-06)
+        if (datesKnown
+                && !crewAssignmentRepository
+                        .findOverlappingAssignments(user.getId(), trip.getId(), startsAt, endsAt)
+                        .isEmpty()) {
+            throw new ConflictException(
+                    "CREW_OVERLAP",
+                    "Crew member " + user.getFirstName() + " " + user.getLastName()
+                            + " is already assigned to another overlapping trip");
+        }
+        return user;
+    }
+
+    /**
+     * The trip's flight crew (US-F3-15): flying grooms, one per three horses on the flight, and the flight vet. They
+     * look after every horse on board, whichever job it is on; the person may also ride a trailer to the airport.
+     */
+    private List<CrewMemberResponse> assignFlightCrew(
+            TransportJob job, Trip trip, AssignCrewRequest request, User currentUser) {
+        boolean flies = flights.currentRoute(trip)
+                .map(route -> !flights.flightsOf(route).isEmpty())
+                .orElse(false);
+        if (!flies) {
+            throw new BusinessException("Trip " + trip.getCode() + " has no flight: plan its air leg first");
+        }
+        Set<UUID> seen = new HashSet<>();
+        for (AssignCrewRequest.CrewItem item : request.crew()) {
+            if (!seen.add(item.userId())) {
+                throw new BusinessException("Duplicate crew member in assignment: " + item.userId());
+            }
+            if (item.crewRole() != CrewRole.FLYING_GROOM && item.crewRole() != CrewRole.VET) {
+                throw new BusinessException("The flight crew is flying grooms and the flight vet");
+            }
+        }
+        int horses = jobTrips.horsesOn(trip).size();
+        int requiredGrooms = (int) Math.ceil(horses / 3.0);
+        long flyingGrooms = request.crew().stream()
+                .filter(c -> c.crewRole() == CrewRole.FLYING_GROOM)
+                .count();
+        if (flyingGrooms < requiredGrooms) {
+            throw new BusinessException("At least " + requiredGrooms + " flying groom(s) required for " + horses
+                    + " horses on the flight (1 per 3 horses, rounded up). Found " + flyingGrooms);
+        }
+        List<CrewAssignment> assignments = new ArrayList<>();
+        for (AssignCrewRequest.CrewItem item : request.crew()) {
+            CrewAssignment ca = new CrewAssignment();
+            ca.setTrip(trip);
+            ca.setUser(crewMember(item, trip, job.getPlannedDepartureAt(), job.getPlannedArrivalAt()));
+            ca.setCrewRole(item.crewRole());
+            assignments.add(ca);
+        }
+        crewAssignmentRepository.deleteFlightCrew(trip.getId());
+        List<CrewAssignment> saved = crewAssignmentRepository.saveAll(assignments);
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
+        transportJobRepository.save(job);
+        auditService.recordDecision(
+                currentUser,
+                "ASSIGN_FLIGHT_CREW",
+                "Assigned " + saved.size() + " flight crew members to trip " + trip.getCode() + " (" + job.getCode()
+                        + ")",
+                "TRANSPORT_JOB",
+                job.getId(),
+                job.getCode(),
+                null,
+                null,
+                "FLIGHT_CREW_ASSIGNED");
+        return saved.stream().map(JobMapper::toCrewMemberResponse).toList();
+    }
+
+    /** What the trip's flight crew lacks for sign-off, or null (US-F3-15). */
+    public String flightCrewShortfall(Trip trip, RoutePlan confirmed, List<CrewAssignment> crew) {
+        return flights.flightCrewShortfall(trip, confirmed, crew);
     }
 }

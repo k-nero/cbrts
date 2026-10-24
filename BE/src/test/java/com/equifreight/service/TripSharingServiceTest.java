@@ -39,6 +39,9 @@ class TripSharingServiceTest {
     private static final Instant NOW = Instant.parse("2026-11-20T03:00:00Z");
 
     @Mock
+    private FlightService flights;
+
+    @Mock
     private TripNotices notices;
 
     @Mock
@@ -128,6 +131,7 @@ class TripSharingServiceTest {
                 audit,
                 biosecurity,
                 notices,
+                flights,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -143,6 +147,7 @@ class TripSharingServiceTest {
         verify(jobTrips).moveJob(joining, joiningTrip, hostTrip);
         verify(loadPlans).reopenTrip(hostTrip, "CBRT-2026-042 joined the trip");
         verify(routePlans).addJobStops(hostTrip, joining);
+        verify(flights).allocate(hostTrip);
         verify(audit)
                 .recordDecision(
                         eq(khoi),
@@ -157,6 +162,23 @@ class TripSharingServiceTest {
     }
 
     @Test
+    @DisplayName("A job that can't fly with the trip (other airports, no stall positions left) can't join it")
+    void aJobThatCantFlyStaysOff() {
+        when(flights.cantFly(hostTrip, joiningTrip, joining))
+                .thenReturn("flight CX766 has 1 of 4 stall positions free and CBRT-2026-042 needs 2");
+
+        ConflictException ex = assertThrows(
+                ConflictException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
+
+        assertEquals("FLIGHT_DOESNT_FIT", ex.getCode());
+        assertEquals(
+                "CBRT-2026-042 can't fly with trip TRP-2026-001: flight CX766 has 1 of 4 stall positions free and"
+                        + " CBRT-2026-042 needs 2",
+                ex.getMessage());
+        verify(jobTrips, never()).moveJob(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("The trip the job left, now empty, releases its trailers' bookings and crew")
     void theEmptyTripIsReleased() {
         TripVehicle tv = new TripVehicle();
@@ -168,7 +190,7 @@ class TripSharingServiceTest {
         service.share(host.getId(), joining.getId(), List.of(), khoi);
 
         verify(bookings).deleteAll(List.of(booking));
-        verify(crew).deleteByTripVehicleId(tv.getId());
+        verify(crew).deleteByTripId(joiningTrip.getId());
         verify(loadPlans, never()).reopenTrip(eq(joiningTrip), any());
     }
 
