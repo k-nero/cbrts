@@ -16,3 +16,4 @@ export * from './rates';
 export * from './quotation';
 export * from './notification';
 export * from './incident';
+export * from './invoice';

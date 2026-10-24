@@ -40,6 +40,8 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   DELAY_ALERT: 'Delay',
   INCIDENT_RESOLVED: 'Closed',
   HANDOVER_ACCEPTED: 'Accepted',
+  INVOICE_ISSUED: 'Invoice',
+  PAYMENT_RECORDED: 'Payment',
 };
 
 /** "Notifications, 3 unread": the bell says what its count counts. */

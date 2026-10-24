@@ -1,6 +1,7 @@
 import { FC, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
+  AccountBookOutlined,
   AlertOutlined,
   AuditOutlined,
   BarChartOutlined,
@@ -36,6 +37,7 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
         ['requests', 'Requests', <HistoryOutlined key="i" />],
         ['jobs', 'Jobs', <NodeIndexOutlined key="i" />],
         ['incidents', 'Incidents', <AlertOutlined key="i" />],
+        ['invoices', 'Invoices', <AccountBookOutlined key="i" />],
       ],
     },
     {

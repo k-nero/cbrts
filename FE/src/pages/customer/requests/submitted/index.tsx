@@ -4,6 +4,7 @@ import { Navigate, useParams } from 'react-router-dom';
 
 import CancelRequestModal from '../CancelRequestModal';
 import DocumentsCallout from './DocumentsCallout';
+import { InvoicesPanel } from './InvoicesPanel';
 import { WhereItStands } from './WhereItStands';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
@@ -212,6 +213,7 @@ const RequestSubmittedPage: FC = () => {
           )}
           {request.status === 'APPROVED' && <DocumentsCallout requestId={request.id} />}
           <WhereItStands request={request} />
+          <InvoicesPanel requestId={request.id} />
           {history}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.

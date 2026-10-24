@@ -28,6 +28,8 @@ export const NotificationKindEnum = {
   DELAY_ALERT: 'DELAY_ALERT',
   INCIDENT_RESOLVED: 'INCIDENT_RESOLVED',
   HANDOVER_ACCEPTED: 'HANDOVER_ACCEPTED',
+  INVOICE_ISSUED: 'INVOICE_ISSUED',
+  PAYMENT_RECORDED: 'PAYMENT_RECORDED',
 } as const;
 export type NotificationKind = (typeof NotificationKindEnum)[keyof typeof NotificationKindEnum];
 
