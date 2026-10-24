@@ -1,19 +1,32 @@
 import { type FC, useEffect, useState } from 'react';
 import { Flex, Skeleton } from 'antd';
+import { useSearchParams } from 'react-router-dom';
+
+import { QuotesOutView } from './QuotesOutView';
 
 import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
-import { Button, Callout, Panel } from '@/components/ui';
+import { Button, Callout, Panel, Tabs } from '@/components/ui';
 import { useReviewQueue } from '@/hooks/staffRequest';
 import type { QueueRow } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 import { useGeneratedRequestColumn } from '@/pages/staff/requests/useGeneratedRequestColumn.tsx';
 
+type View = 'queue' | 'quotes';
+
+const TABS: { key: View; label: string }[] = [
+  { key: 'queue', label: 'Review queue' },
+  { key: 'quotes', label: 'Quotes out' },
+];
+
 /**
- * Requests (spec §5.1): the logistics manager's review queue, oldest first. The order is the point,
- * so the table has no sort, filter or search (DESIGN.md, Review queues).
+ * Requests (spec §5.1): the logistics manager's review queue, oldest first, and the quotations out with customers,
+ * soonest to expire first (US-R-01). The order is the point, so neither table has sort, filter or search
+ * (DESIGN.md, Review queues). `?view=quotes` opens the second tab, as the Overview does.
  */
 const RequestsPage: FC = () => {
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get('view') === 'quotes' ? 'quotes' : 'queue';
   const router = useCustomRouter();
   const [page, setPage] = useState(0);
   const query = useReviewQueue(page);
@@ -34,8 +47,16 @@ const RequestsPage: FC = () => {
         title="Requests"
         summary="Oldest first. Requests waiting for feasibility review, or for your approval once the customer accepts."
       />
+      <Tabs
+        label="Request views"
+        activeKey={view}
+        onChange={(key) => setParams(key === 'quotes' ? { view: 'quotes' } : {})}
+        items={TABS}
+      />
 
-      {query.isError ? (
+      {view === 'quotes' ? (
+        <QuotesOutView />
+      ) : query.isError ? (
         <Callout
           tone="bad"
           title="The queue didn't load."
