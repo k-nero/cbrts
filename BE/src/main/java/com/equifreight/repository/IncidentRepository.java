@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -28,4 +30,8 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     /** A job's incidents, oldest first, with the people named on them (the job's trip record, US-F5-05). */
     @EntityGraph(attributePaths = {"owner", "resolvedBy"})
     List<Incident> findByJob_IdOrderByOpenedAtAsc(UUID jobId);
+
+    /** The decided incidents of some jobs, with the option decided: what each cost (US-R-02). */
+    @Query("select i from Incident i join fetch i.decidedOption where i.job.id in :jobIds")
+    List<Incident> findDecidedForJobs(@Param("jobIds") Collection<UUID> jobIds);
 }

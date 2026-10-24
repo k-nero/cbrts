@@ -18,6 +18,10 @@
   --color-card: #111b2c;
   --color-raised: #15223a;
   --color-muted: #182538;
+
+  /* Chart series (DESIGN.md, Charts): validated for colour-vision difference against the card in each mode. */
+  --color-chart-1: #5b93db;
+  --color-chart-2: #c7804f;
   /* Lines */
   --color-line: #1c2e44;
   --color-line-strong: #2a4266;
@@ -89,6 +93,8 @@
   --color-card: #ffffff;
   --color-raised: #f8f9fb;
   --color-muted: #eef1f5;
+  --color-chart-1: #3f72b8;
+  --color-chart-2: #b8662f;
   --color-line: #dde3ea;
   --color-line-strong: #c3cdd9;
   --color-ink: #0f1a28;
@@ -140,6 +146,8 @@
   --color-card: #111b2c;
   --color-raised: #15223a;
   --color-muted: #182538;
+  --color-chart-1: #5b93db;
+  --color-chart-2: #c7804f;
   --color-line: #1c2e44;
   --color-line-strong: #2a4266;
   --color-ink: #ede9e1;

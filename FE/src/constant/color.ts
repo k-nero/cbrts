@@ -32,6 +32,9 @@ export type Palette = {
   error: string;
   info: string;
   shadow: string;
+  /** Chart series 1 and 2 (DESIGN.md, Charts), validated for colour-vision difference on the card. */
+  chart1: string;
+  chart2: string;
 };
 
 /** Raw values, for AntD's seed tokens (its algorithm derives shades, so it needs real colours). */
@@ -59,6 +62,8 @@ export const PALETTE: Record<ThemeMode, Palette> = {
     error: '#EF6B6B',
     info: '#7FB0E8',
     shadow: 'rgba(0, 0, 0, 0.4)',
+    chart1: '#5B93DB',
+    chart2: '#C7804F',
   },
   light: {
     bgCanvas: '#F3F5F8',
@@ -83,6 +88,8 @@ export const PALETTE: Record<ThemeMode, Palette> = {
     error: '#B3261E',
     info: '#1F5FA8',
     shadow: 'rgba(15, 26, 40, 0.12)',
+    chart1: '#3F72B8',
+    chart2: '#B8662F',
   },
 };
 

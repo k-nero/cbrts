@@ -25,4 +25,7 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
             "select c from Corridor c where lower(c.originCity) = lower(:city) or lower(c.destinationCity) = lower(:city)"
                     + " order by c.code")
     List<Corridor> findTouchingCity(@Param("city") String city);
+
+    /** Every corridor, by code: the report's corridor filter. */
+    List<Corridor> findAllByOrderByCodeAsc();
 }
