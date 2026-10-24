@@ -76,4 +76,12 @@ public class User extends BaseEntity {
     public String displayName() {
         return (lastName + " " + firstName).strip();
     }
+
+    /**
+     * How a person is named on a record others read: a customer by their club ("Saigon Turf Club"), as the audit log
+     * labels them; anyone else by their own name.
+     */
+    public String recordName() {
+        return club != null ? club.getName() : displayName();
+    }
 }

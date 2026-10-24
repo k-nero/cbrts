@@ -1012,6 +1012,6 @@ public class IncidentService {
     }
 
     static String nameOf(User user) {
-        return user == null ? null : user.displayName();
+        return user == null ? null : user.recordName();
     }
 }

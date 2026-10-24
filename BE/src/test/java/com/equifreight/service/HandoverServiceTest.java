@@ -103,6 +103,8 @@ class HandoverServiceTest {
         assertEquals(HandoverOutcome.CONFIRMED_SOUND, r.customerOutcome());
         assertEquals(NOW, r.confirmedAt());
         assertEquals(customer, handover.getConfirmedBy());
+        // A customer is named by their club, as the audit log names them.
+        assertEquals("Saigon Turf Club", r.confirmedByName());
         assertFalse(r.acceptedByDefault());
         verify(audit)
                 .recordDecision(

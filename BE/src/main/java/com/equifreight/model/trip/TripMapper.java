@@ -158,7 +158,7 @@ public final class TripMapper {
                 .customerOutcome(h.getCustomerOutcome())
                 .confirmedAt(h.getConfirmedAt())
                 .confirmedByName(
-                        h.getConfirmedBy() == null ? null : h.getConfirmedBy().displayName())
+                        h.getConfirmedBy() == null ? null : h.getConfirmedBy().recordName())
                 .lateMinutes(h.getLateMinutes())
                 .discrepancy(h.getDiscrepancy())
                 .discrepancyIncidentId(
