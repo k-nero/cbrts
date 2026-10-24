@@ -10,7 +10,9 @@ public enum IncidentKind {
     WELFARE,
     VEHICLE,
     TRAFFIC,
-    OTHER;
+    OTHER,
+    /** Another job's arrival pushed past its window by a decision (US-F5-06). */
+    LATE_ARRIVAL;
 
     /** The kind in words, as the cab and the incident page say it. */
     public String label() {
@@ -21,6 +23,7 @@ public enum IncidentKind {
             case VEHICLE -> "Vehicle breakdown";
             case TRAFFIC -> "Prolonged traffic jam";
             case OTHER -> "Other emergency";
+            case LATE_ARRIVAL -> "Arrival past the window";
         };
     }
 }

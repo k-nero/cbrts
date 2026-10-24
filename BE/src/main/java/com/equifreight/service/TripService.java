@@ -155,12 +155,10 @@ public class TripService {
     @Transactional(readOnly = true)
     public TripViewResponse escortTrip(String code, User user) {
         TransportJob job = job(code);
-        Trip trip = jobTrips.tripOf(job.getId());
-        boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
+        Trip trip = crewedPart(job, user, code);
         // The cab surface is per trailer (US-F3-14): the escort sees the horses on the trailers they ride. The
         // flight crew looks after every horse on the flight, so they see them all (US-F3-15).
         List<CrewAssignment> places = crew.findByTrip_IdAndUser_Id(trip.getId(), user.getId());
-        if (places.isEmpty() || !released) throw ResourceNotFoundException.of("Trip", code);
         Set<UUID> trailers = new HashSet<>();
         places.stream()
                 .filter(c -> c.getTripVehicle() != null)
@@ -171,33 +169,79 @@ public class TripService {
 
     @Transactional(readOnly = true)
     public TripViewResponse coordinatorTrip(String code) {
+        return coordinatorTrip(code, null);
+    }
+
+    /** The job's trip, or with {@code tripId} one part of a job that spans trips (US-F5-06). */
+    @Transactional(readOnly = true)
+    public TripViewResponse coordinatorTrip(String code, UUID tripId) {
         TransportJob job = job(code);
-        return view(job, jobTrips.tripOf(job.getId()), true, null);
+        return view(job, partTrip(job, tripId, code), true, null);
     }
 
     @Transactional(readOnly = true)
     public TripViewResponse customerTrip(String code, User user) {
+        return customerTrip(code, user, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TripViewResponse customerTrip(String code, User user, UUID tripId) {
         TransportJob job = job(code);
         if (user.getClub() == null
                 || !job.getRequest().getClub().getId().equals(user.getClub().getId()))
             throw ResourceNotFoundException.of("Trip", code);
-        return view(job, jobTrips.tripOf(job.getId()), false, null);
+        return view(job, partTrip(job, tripId, code), false, null);
     }
 
     @Transactional
     public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request) {
         TransportJob job = jobForUpdate(code);
-        Trip trip = jobTrips.tripOf(job.getId());
-        boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!crew.existsByTrip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
-            throw ResourceNotFoundException.of("Trip", code);
-        return addRecord(job, trip, user, request, Channel.CAB_TABLET);
+        return addRecord(job, crewedPart(job, user, code), user, request, Channel.CAB_TABLET);
     }
 
     @Transactional
     public TripRecordResponse addCoordinatorRecord(String code, User user, TripRecordRequest request) {
+        return addCoordinatorRecord(code, user, request, null);
+    }
+
+    @Transactional
+    public TripRecordResponse addCoordinatorRecord(String code, User user, TripRecordRequest request, UUID tripId) {
         TransportJob job = jobForUpdate(code);
-        return addRecord(job, jobTrips.tripOf(job.getId()), user, request, Channel.WEB);
+        return addRecord(job, partTrip(job, tripId, code), user, request, Channel.WEB);
+    }
+
+    /**
+     * The part of the job this escort crews, once released to them (US-F5-06): on a job that spans trips, the crew of
+     * each trip sees and records their own part.
+     */
+    private Trip crewedPart(TransportJob job, User user, String code) {
+        List<TripJob> parts = new ArrayList<>(jobTrips.partsOf(job));
+        java.util.Collections.reverse(parts);
+        for (TripJob part : parts) {
+            if (part.released() && crew.existsByTrip_IdAndUser_Id(part.getTrip().getId(), user.getId())) {
+                return part.getTrip();
+            }
+        }
+        throw ResourceNotFoundException.of("Trip", code);
+    }
+
+    /**
+     * The part of the job a staff or customer page is about: {@code tripId} when given, else the part on the road
+     * (departed, not delivered), else the job's current trip (US-F5-06).
+     */
+    private Trip partTrip(TransportJob job, UUID tripId, String code) {
+        if (tripId != null) {
+            return jobTrips.partsOf(job).stream()
+                    .map(TripJob::getTrip)
+                    .filter(t -> t.getId().equals(tripId))
+                    .findFirst()
+                    .orElseThrow(() -> ResourceNotFoundException.of("Trip", code));
+        }
+        return jobTrips.activePartsOf(job).stream()
+                .filter(p -> p.departed() && p.getStatus() != TripStatus.DELIVERED)
+                .map(TripJob::getTrip)
+                .findFirst()
+                .orElseGet(() -> jobTrips.tripOf(job.getId()));
     }
 
     private TripRecordResponse addRecord(
@@ -233,7 +277,8 @@ public class TripService {
         if (request.kind() == TripRecordKind.HANDED_OVER && receiverName.isEmpty())
             throw new BusinessException("RECEIVER_REQUIRED", "Enter the name of the person who received the horses");
         if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
-            for (TransportJob riding : riding(trip, target)) requireDepartureAllowed(riding, request.occurredAt());
+            for (TransportJob riding : riding(trip, target))
+                requireDepartureAllowed(riding, jobTrips.partOf(trip, riding), request.occurredAt());
         TripRecord record = new TripRecord();
         record.setTrip(trip);
         record.setRouteStop(stop);
@@ -306,15 +351,20 @@ public class TripService {
      * The first departure needs the cleared dossier and the manager's sign-off of the trip plan (US-F2-08,
      * US-F3-08). A later FLIGHT_DEPARTED, the next leg of a trip already on its way, only re-checks the gate.
      */
-    private static void requireDepartureAllowed(TransportJob job, Instant occurredAt) {
-        if (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
-                || job.getClearanceReadyAt() == null
-                || job.getClearanceReadyAt().isAfter(occurredAt))
+    private void requireDepartureAllowed(TransportJob job, TripJob part, Instant occurredAt) {
+        // A part already on its way doesn't wait for the job's other part, whose documents are re-checked for its
+        // own new dates (US-F5-06).
+        boolean otherPartWaits =
+                part.getDepartedAt() != null && jobTrips.activePartsOf(job).size() > 1;
+        if (!otherPartWaits
+                && (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
+                        || job.getClearanceReadyAt() == null
+                        || job.getClearanceReadyAt().isAfter(occurredAt)))
             throw new BusinessException(
                     "CLEARANCE_REQUIRED",
                     "Departure cannot be recorded before the dossier of " + job.getCode()
                             + " is CLEARANCE_READY. On a shared trip, take that job off the trip so the others can leave.");
-        if (job.getDepartedAt() == null && job.getSignedOffAt() == null)
+        if (part.getDepartedAt() == null && part.getSignedOffAt() == null)
             throw new BusinessException(
                     "SIGN_OFF_REQUIRED",
                     "Departure cannot be recorded until the logistics manager signs off the trip plan");
@@ -328,7 +378,9 @@ public class TripService {
      */
     private boolean validateTransition(
             TransportJob job, Trip trip, TripRecordKind kind, Instant occurredAt, Channel channel) {
-        TripStatus status = job.getTripStatus();
+        // The job's part on this trip: a job that spans trips moves along each one separately (US-F5-06).
+        TripJob part = jobTrips.partOf(trip, job);
+        TripStatus status = part.getStatus();
         if (occurredAt.isAfter(Instant.now(clock).plus(CLOCK_SKEW)))
             throw new BusinessException(
                     "TRIP_RECORD_IN_FUTURE",
@@ -340,7 +392,7 @@ public class TripService {
                 .map(TripRecord::getOccurredAt)
                 .orElse(null);
         if (newestStatusEvent != null && occurredAt.isBefore(newestStatusEvent)) {
-            boolean afterDeparture = job.getDepartedAt() != null && !occurredAt.isBefore(job.getDepartedAt());
+            boolean afterDeparture = part.getDepartedAt() != null && !occurredAt.isBefore(part.getDepartedAt());
             if (!LOG_ONLY_WHEN_LATE.contains(kind) || !afterDeparture)
                 throw transitionConflict(
                         status,
@@ -418,43 +470,60 @@ public class TripService {
      */
     private void updateJobStatus(TransportJob target, Trip trip, TripRecordKind kind, Instant at, RouteStop stop) {
         List<TransportJob> riding = riding(trip, target);
+        TripJob targetPart = jobTrips.partOf(trip, target);
         switch (kind) {
             case DEPARTED, FLIGHT_DEPARTED ->
                 riding.forEach(job -> {
+                    TripJob part = jobTrips.partOf(trip, job);
+                    part.setStatus(TripStatus.DEPARTED);
+                    if (part.getDepartedAt() == null) part.setDepartedAt(at);
                     job.setTripStatus(TripStatus.DEPARTED);
                     job.setStage(JobStage.TRIP);
                     if (job.getDepartedAt() == null) job.setDepartedAt(at);
                 });
             case HELD ->
                 riding.forEach(job -> {
+                    jobTrips.partOf(trip, job).setStatus(TripStatus.HELD);
                     job.setTripStatus(TripStatus.HELD);
                     job.setStage(JobStage.TRIP);
                 });
             case LEFT_STOP, CLEARED_BORDER ->
                 riding.forEach(job -> {
+                    TripJob part = jobTrips.partOf(trip, job);
+                    if (part.getStatus() == TripStatus.HELD) part.setStatus(TripStatus.DEPARTED);
                     if (job.getTripStatus() == TripStatus.HELD) job.setTripStatus(TripStatus.DEPARTED);
                 });
             case FLIGHT_LANDED -> riding.forEach(job -> job.setStage(JobStage.TRIP));
             case ARRIVED_AT_STOP -> {
-                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY) target.setTripStatus(TripStatus.ARRIVED);
+                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY) {
+                    targetPart.setStatus(TripStatus.ARRIVED);
+                    target.setTripStatus(TripStatus.ARRIVED);
+                }
             }
             case DELIVERED -> {
+                targetPart.setStatus(TripStatus.DELIVERED);
+                if (targetPart.getDeliveredAt() == null) targetPart.setDeliveredAt(at);
                 target.setTripStatus(TripStatus.DELIVERED);
                 target.setStage(JobStage.HANDOVER);
                 if (target.getDeliveredAt() == null) target.setDeliveredAt(at);
             }
             case HANDED_OVER -> {
+                targetPart.setStatus(TripStatus.DELIVERED);
                 target.setTripStatus(TripStatus.DELIVERED);
                 target.setStage(JobStage.HANDOVER);
             }
             default -> {}
         }
-        if (target.getTripStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, target);
+        if (targetPart.getStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, target);
+        // The job's own status sums up its parts: a job that spans trips is delivered when every horse is.
+        java.util.LinkedHashSet<TransportJob> moved = new java.util.LinkedHashSet<>(riding);
+        moved.add(target);
+        moved.forEach(jobTrips::summarize);
         List<TransportJob> remaining = jobTrips.jobsOn(trip);
         trip.setStatus(
                 remaining.isEmpty()
-                        ? target.getTripStatus()
-                        : remaining.getFirst().getTripStatus());
+                        ? targetPart.getStatus()
+                        : jobTrips.partOf(trip, remaining.getFirst()).getStatus());
     }
 
     /**
@@ -463,6 +532,8 @@ public class TripService {
      */
     private void recordHandover(TransportJob job, TripRecordKind kind, Instant at, String receiverName) {
         if (kind != TripRecordKind.DELIVERED && kind != TripRecordKind.HANDED_OVER) return;
+        // A job that spans trips is handed over once its last horse is (US-F5-06).
+        if (job.getTripStatus() != TripStatus.DELIVERED) return;
         Handover handover = handovers.findByJob_Id(job.getId()).orElseGet(() -> {
             Handover created = new Handover();
             created.setJob(job);
@@ -579,6 +650,11 @@ public class TripService {
                 p -> p.getStalls().forEach(s -> stalls.put(s.getHorse().getId(), s)));
         // Staff and the crew see every horse that rode the trip (the escort those on their trailers); the customer
         // their own.
+        // A job split across trips (US-F5-06) shows this part's horses, status and times, and lists every part.
+        List<TripHorse> mine = riders.stream()
+                .filter(th -> th.getJob().getId().equals(job.getId()))
+                .toList();
+        TripMapper.Part part = partView(job, trip, confirmedRoute, staffView);
         List<Horse> horsesOnTrip;
         if (trailers != null) {
             horsesOnTrip = riders.stream()
@@ -586,7 +662,11 @@ public class TripService {
                     .filter(h -> stalls.containsKey(h.getId()))
                     .toList();
         } else {
-            horsesOnTrip = staffView ? riders.stream().map(TripHorse::getHorse).toList() : List.of();
+            horsesOnTrip = staffView
+                    ? riders.stream().map(TripHorse::getHorse).toList()
+                    : part.parts().isEmpty()
+                            ? List.of()
+                            : mine.stream().map(TripHorse::getHorse).toList();
             if (horsesOnTrip.isEmpty()) {
                 horsesOnTrip = requestHorses.findByRequest_Id(job.getRequest().getId()).stream()
                         .map(RequestHorse::getHorse)
@@ -614,7 +694,57 @@ public class TripService {
                 flights,
                 stops,
                 horses,
-                recordResponses);
+                recordResponses,
+                part);
+    }
+
+    /**
+     * This part of the job: on one trip, the job itself; split across trips, the part's status, its departure (the
+     * trip's) and its arrival (the job's delivery stop on that trip's confirmed route), with every part listed.
+     */
+    private TripMapper.Part partView(
+            TransportJob job, Trip trip, Optional<RoutePlan> confirmedRoute, boolean staffView) {
+        List<TripPartResponse> parts = new ArrayList<>();
+        TripMapper.Part current = TripMapper.Part.of(job);
+        for (TripJob p : jobTrips.partsOf(job)) {
+            List<TripHorse> onPart = jobTrips.horsesEverOn(p.getTrip()).stream()
+                    .filter(th -> th.getJob().getId().equals(job.getId()) && th.getStatus() != TripHorseStatus.MOVED)
+                    .toList();
+            if (onPart.isEmpty()) continue;
+            Optional<RoutePlan> route = p.getTrip().getId().equals(trip.getId())
+                    ? confirmedRoute
+                    : routes.findByTrip_IdAndStatus(p.getTrip().getId(), RoutePlanStatus.CONFIRMED);
+            Instant arrival = route.flatMap(r -> r.getStops().stream()
+                            .filter(st -> st.getKind() == RouteStopKind.DELIVERY
+                                    && st.getJob() != null
+                                    && st.getJob().getId().equals(job.getId()))
+                            .map(RouteStop::getPlannedAt)
+                            .filter(java.util.Objects::nonNull)
+                            .findFirst())
+                    .orElse(null);
+            boolean here = p.getTrip().getId().equals(trip.getId());
+            parts.add(new TripPartResponse(
+                    p.getTrip().getId(),
+                    staffView ? p.getTrip().getCode() : null,
+                    p.getStatus(),
+                    onPart.stream()
+                            .filter(th -> th.getStatus() != TripHorseStatus.LEFT_IN_CARE)
+                            .map(th -> th.getHorse().getName())
+                            .toList(),
+                    onPart.stream()
+                            .filter(th -> th.getStatus() == TripHorseStatus.LEFT_IN_CARE)
+                            .map(th -> th.getHorse().getName())
+                            .toList(),
+                    p.getTrip().getPlannedDepartureAt(),
+                    arrival,
+                    here));
+            if (here) {
+                // A part shows its own plan only: one still to be planned has no times yet.
+                current = new TripMapper.Part(p.getStatus(), p.getTrip().getPlannedDepartureAt(), arrival, List.of());
+            }
+        }
+        if (parts.size() <= 1) return TripMapper.Part.of(job);
+        return new TripMapper.Part(current.status(), current.plannedDepartureAt(), current.plannedArrivalAt(), parts);
     }
 
     /** A record with only the customer's own horses' welfare entries. */

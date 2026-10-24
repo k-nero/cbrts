@@ -165,6 +165,20 @@ class TripServiceTest {
         trip.setId(UUID.randomUUID());
         trip.setCode("TRP-2026-001");
         lenient().when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        // Each job's part on the trip, mirroring the job when first asked: one trip per job here.
+        java.util.Map<UUID, TripJob> parts = new java.util.HashMap<>();
+        java.util.function.Function<TransportJob, TripJob> partFor = j -> parts.computeIfAbsent(j.getId(), id -> {
+            TripJob part = new TripJob();
+            part.setTrip(trip);
+            part.setJob(j);
+            part.setStatus(j.getTripStatus());
+            part.setDepartedAt(j.getDepartedAt());
+            part.setSignedOffAt(j.getSignedOffAt());
+            return part;
+        });
+        lenient().when(jobTrips.partOf(any(), any())).thenAnswer(inv -> partFor.apply(inv.getArgument(1)));
+        lenient().when(jobTrips.partsOf(any())).thenAnswer(inv -> List.of(partFor.apply(inv.getArgument(0))));
+        lenient().when(jobTrips.activePartsOf(any())).thenAnswer(inv -> List.of(partFor.apply(inv.getArgument(0))));
 
         shadowfax = horse("Shadowfax");
         nightfall = horse("Nightfall");
@@ -720,6 +734,78 @@ class TripServiceTest {
                         .map(c -> c.airWaybill())
                         .toList());
         assertEquals(2, office.flights().getFirst().consignments().size());
+    }
+
+    // ---------- a job split across trips (US-F5-06) ----------
+
+    /** The job departed on the trip; an incident moved some horses to {@code later}, signed off or not. */
+    private Trip splitOnto(Instant laterSignedOff) {
+        departed();
+        Trip later = new Trip();
+        later.setId(UUID.randomUUID());
+        later.setCode("TRP-2026-009");
+        TripJob moving = new TripJob();
+        moving.setTrip(trip);
+        moving.setJob(job);
+        moving.setStatus(TripStatus.DEPARTED);
+        moving.setDepartedAt(job.getDepartedAt());
+        TripJob waiting = new TripJob();
+        waiting.setTrip(later);
+        waiting.setJob(job);
+        waiting.setSignedOffAt(laterSignedOff);
+        doReturn(List.of(moving, waiting)).when(jobTrips).partsOf(job);
+        doReturn(List.of(moving, waiting)).when(jobTrips).activePartsOf(job);
+        doReturn(waiting).when(jobTrips).partOf(later, job);
+        doReturn(moving).when(jobTrips).partOf(trip, job);
+        return later;
+    }
+
+    @Test
+    @DisplayName("The crew of a job's new part see and record that part, not the trip it left")
+    void eachPartHasItsOwnCrew() {
+        Trip later = splitOnto(NOW.minus(Duration.ofHours(1)));
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(crew.existsByTrip_IdAndUser_Id(trip.getId(), escort.getId())).thenReturn(false);
+        when(crew.existsByTrip_IdAndUser_Id(later.getId(), escort.getId())).thenReturn(true);
+        when(crew.findByTrip_IdAndUser_Id(later.getId(), escort.getId())).thenReturn(List.of(seat(trailer)));
+        when(routes.findByTrip_IdAndStatus(any(), eq(RoutePlanStatus.CONFIRMED)))
+                .thenReturn(Optional.empty());
+        when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(any())).thenReturn(List.of());
+
+        service.escortTrip(job.getCode(), escort);
+        service.addEscortRecord(job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null));
+
+        ArgumentCaptor<TripRecord> saved = ArgumentCaptor.forClass(TripRecord.class);
+        verify(records).save(saved.capture());
+        assertEquals(later, saved.getValue().getTrip());
+    }
+
+    @Test
+    @DisplayName("A job's new part needs its own sign-off to depart, though the job left long ago")
+    void aNewPartNeedsItsOwnSignOff() {
+        Trip later = splitOnto(null);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(later.getId()), anyCollection()))
+                .thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(), coordinator, request(TripRecordKind.DEPARTED, NOW, null), later.getId()));
+
+        assertEquals("SIGN_OFF_REQUIRED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("A record moves the job's part, and the job's own status is summed up from its parts")
+    void recordsMoveTheParts() {
+        TripJob part = jobTrips.partOf(trip, job);
+
+        record(TripRecordKind.DEPARTED, NOW);
+
+        assertEquals(TripStatus.DEPARTED, part.getStatus());
+        assertEquals(NOW, part.getDepartedAt());
+        verify(jobTrips).summarize(job);
     }
 
     @Test

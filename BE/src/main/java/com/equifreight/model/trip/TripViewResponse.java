@@ -26,4 +26,6 @@ public record TripViewResponse(
         List<TripFlightResponse> flights,
         List<TripStopResponse> stops,
         List<TripHorseResponse> horses,
-        List<TripRecordResponse> records) {}
+        List<TripRecordResponse> records,
+        /** Every part of a job an incident split across trips; empty while the job is on one trip (US-F5-06). */
+        List<TripPartResponse> parts) {}

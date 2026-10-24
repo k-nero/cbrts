@@ -36,6 +36,7 @@ public class ClearanceService {
     private final RegulationCatalogRepository regulationCatalogRepository;
     private final RegulationVersionRepository regulationVersionRepository;
     private final RegulationRuleRepository regulationRuleRepository;
+    private final JobTripService jobTrips;
     private final Clock clock;
 
     public ClearanceService(
@@ -51,6 +52,7 @@ public class ClearanceService {
             RegulationCatalogRepository regulationCatalogRepository,
             RegulationVersionRepository regulationVersionRepository,
             RegulationRuleRepository regulationRuleRepository,
+            JobTripService jobTrips,
             Clock clock) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -64,6 +66,7 @@ public class ClearanceService {
         this.regulationCatalogRepository = regulationCatalogRepository;
         this.regulationVersionRepository = regulationVersionRepository;
         this.regulationRuleRepository = regulationRuleRepository;
+        this.jobTrips = jobTrips;
         this.clock = clock;
     }
 
@@ -204,7 +207,7 @@ public class ClearanceService {
             throw new ConflictException(
                     "DOCUMENT_FROM_AUTHORITY", "This document is issued by an authority; we file it for you.");
         }
-        if (item.getJob().getDepartedAt() != null) {
+        if (frozen(item.getJob())) {
             throw new ConflictException("JOB_DEPARTED", "The horses have left, so this document can't change.");
         }
         if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
@@ -472,8 +475,9 @@ public class ClearanceService {
         TransportJob job = findJobOrThrow(jobId);
         GateAssessment gate = assess(job);
 
-        // If the trip has already departed, never modify the dossier state or clearance gate (Finding 2).
-        if (job.getDepartedAt() != null) {
+        // If the trip has already departed, never modify the dossier state or clearance gate (Finding 2); a job with
+        // a part still to leave is checked again for that part's departure (US-F5-06).
+        if (frozen(job)) {
             return gate.toResponse(job, destinationVersion(job.getId()).orElse(null));
         }
 
@@ -534,7 +538,7 @@ public class ClearanceService {
     @Transactional
     public void recheckJobDocuments(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
-        if (job.getDepartedAt() != null) {
+        if (frozen(job)) {
             throw new BusinessException("Cannot recheck documents after job has departed");
         }
         reevaluate(job);
@@ -551,7 +555,7 @@ public class ClearanceService {
     public List<String> recheckAfterReplan(UUID jobId) {
         TransportJob job = findJobOrThrow(jobId);
         List<String> red = reevaluate(job);
-        if (job.getDepartedAt() == null) evaluateClearanceGate(jobId);
+        if (!frozen(job)) evaluateClearanceGate(jobId);
         return red;
     }
 
@@ -949,5 +953,13 @@ public class ClearanceService {
                     completedQuarantines,
                     outstandingIssues);
         }
+    }
+
+    /**
+     * Whether the job's documents are settled: its horses have left and no part of it waits to leave. A job that an
+     * incident split keeps its documents open for the part still to depart (US-F5-06).
+     */
+    private boolean frozen(TransportJob job) {
+        return job.getDepartedAt() != null && !jobTrips.hasPartToLeave(job);
     }
 }

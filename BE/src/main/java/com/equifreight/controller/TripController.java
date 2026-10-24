@@ -62,17 +62,19 @@ public class TripController {
 
     @GetMapping("/api/v1/staff/trips/{jobCode}")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public TripViewResponse coordinatorTrip(@PathVariable String jobCode) {
-        return trips.coordinatorTrip(jobCode);
+    public TripViewResponse coordinatorTrip(
+            @PathVariable String jobCode, @RequestParam(value = "trip", required = false) java.util.UUID trip) {
+        return trips.coordinatorTrip(jobCode, trip);
     }
 
     @PostMapping("/api/v1/staff/trips/{jobCode}/records")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public TripRecordResponse coordinatorRecord(
             @PathVariable String jobCode,
+            @RequestParam(value = "trip", required = false) java.util.UUID trip,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody TripRecordRequest request) {
-        return trips.addCoordinatorRecord(jobCode, user, request);
+        return trips.addCoordinatorRecord(jobCode, user, request, trip);
     }
 
     @GetMapping("/api/v1/customer/trips")
@@ -84,7 +86,10 @@ public class TripController {
 
     @GetMapping("/api/v1/customer/trips/{jobCode}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public TripViewResponse customerTrip(@PathVariable String jobCode, @AuthenticationPrincipal User user) {
-        return trips.customerTrip(jobCode, user);
+    public TripViewResponse customerTrip(
+            @PathVariable String jobCode,
+            @RequestParam(value = "trip", required = false) java.util.UUID trip,
+            @AuthenticationPrincipal User user) {
+        return trips.customerTrip(jobCode, user, trip);
     }
 }

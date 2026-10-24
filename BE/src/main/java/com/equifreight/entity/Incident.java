@@ -119,6 +119,11 @@ public class Incident extends BaseEntity {
     /** Whether the customer pays the decided option's extra cost (a job charge for the final invoice). */
     private Boolean chargeCustomer;
 
+    /** The trip the leaving horses moved to (US-F5-06). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "new_trip_id")
+    private Trip newTrip;
+
     /** The route version the decision gave the trip, if it changed the route or the times. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_plan_id")

@@ -87,11 +87,10 @@ public class CrewAssignmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // The crew can change until departure; a change after sign-off clears it, so it needs a new one (US-F3-08).
-        if (job.getDepartedAt() != null) {
+        Trip trip = jobTrips.tripOf(jobId);
+        if (jobTrips.partDeparted(trip, job)) {
             throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }
-
-        Trip trip = jobTrips.tripOf(jobId);
         if (request.flight()) {
             return assignFlightCrew(job, trip, request, currentUser);
         }
@@ -169,6 +168,7 @@ public class CrewAssignmentService {
         // Invalidate prior sign-off when crew changes
         job.setSignedOffAt(null);
         job.setSignedOffBy(null);
+        jobTrips.clearSignOff(trip);
         transportJobRepository.save(job);
 
         auditService.recordDecision(
@@ -275,6 +275,7 @@ public class CrewAssignmentService {
         List<CrewAssignment> saved = crewAssignmentRepository.saveAll(assignments);
         job.setSignedOffAt(null);
         job.setSignedOffBy(null);
+        jobTrips.clearSignOff(trip);
         transportJobRepository.save(job);
         auditService.recordDecision(
                 currentUser,

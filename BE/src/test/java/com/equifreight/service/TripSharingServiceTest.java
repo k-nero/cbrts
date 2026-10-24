@@ -112,6 +112,11 @@ class TripSharingServiceTest {
 
     @BeforeEach
     void setUp() {
+        // A job's part departs with the job while it is on one trip.
+        lenient().when(jobTrips.partDeparted(any(), any())).thenAnswer(inv -> {
+            TransportJob j = inv.getArgument(1);
+            return j.getDepartedAt() != null || j.getTripStatus() != TripStatus.NOT_STARTED;
+        });
         corridor.setId(UUID.randomUUID());
         hostTrip.setCorridor(corridor);
         joiningTrip.setCorridor(corridor);

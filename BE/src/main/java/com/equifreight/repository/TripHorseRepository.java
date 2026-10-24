@@ -13,4 +13,7 @@ public interface TripHorseRepository extends JpaRepository<TripHorse, UUID> {
     List<TripHorse> findByTrip_IdAndStatusOrderByCreatedAt(UUID tripId, TripHorseStatus status);
 
     List<TripHorse> findByTrip_IdOrderByCreatedAt(UUID tripId);
+
+    /** Every row of the job's horses, on every trip, oldest first. */
+    List<TripHorse> findByJob_IdOrderByCreatedAt(UUID jobId);
 }

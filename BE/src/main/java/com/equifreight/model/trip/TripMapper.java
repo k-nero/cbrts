@@ -29,14 +29,15 @@ public final class TripMapper {
             List<TripFlightResponse> flights,
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
-            List<TripRecordResponse> records) {
+            List<TripRecordResponse> records,
+            Part part) {
         return new TripViewResponse(
                 job.getCode(),
                 tripCode,
-                job.getTripStatus(),
+                part.status(),
                 job.getDossierStatus() == DossierStatus.CLEARANCE_READY,
-                job.getPlannedDepartureAt(),
-                job.getPlannedArrivalAt(),
+                part.plannedDepartureAt(),
+                part.plannedArrivalAt(),
                 job.getWindowStart(),
                 job.getWindowEnd(),
                 job.getRequest().getOriginPlace() == null
@@ -50,7 +51,23 @@ public final class TripMapper {
                 flights,
                 stops,
                 horses,
-                records);
+                records,
+                part.parts());
+    }
+
+    /**
+     * The part of the job a view shows: its status and planned times on that trip, and every part of a job split
+     * across trips (US-F5-06). A job on one trip is its own part.
+     */
+    public record Part(
+            com.equifreight.entity.enums.TripStatus status,
+            java.time.Instant plannedDepartureAt,
+            java.time.Instant plannedArrivalAt,
+            List<TripPartResponse> parts) {
+
+        public static Part of(TransportJob job) {
+            return new Part(job.getTripStatus(), job.getPlannedDepartureAt(), job.getPlannedArrivalAt(), List.of());
+        }
     }
 
     /**

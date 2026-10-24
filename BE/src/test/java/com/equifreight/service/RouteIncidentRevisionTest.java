@@ -126,4 +126,39 @@ class RouteIncidentRevisionTest {
         assertThat(service.reviseForIncident(trip, 90, Set.of(), "x", new User()))
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("A job whose horses all left loses its stops not yet reached; the trip keeps the rest")
+    void aLeavingJobsStopsGo() {
+        TransportJob staying = new TransportJob();
+        staying.setId(UUID.randomUUID());
+        delivery.setJob(staying);
+        RouteStop leavingDelivery = stop(4, RouteStopKind.DELIVERY, job, 9);
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(staying));
+        when(legs.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(flights.findByRouteLegId(any())).thenReturn(Optional.empty());
+
+        RoutePlan v3 = service.reviseForIncident(
+                        trip, 0, Set.of(pickup.getId()), "Incident: unloaded", new User(), Set.of(job.getId()))
+                .orElseThrow();
+
+        // The pickup was reached, so it stays in the record; the job's delivery ahead is gone.
+        assertThat(v3.getStops())
+                .extracting(RouteStop::getKind)
+                .containsExactly(RouteStopKind.PICKUP, RouteStopKind.BORDER, RouteStopKind.DELIVERY);
+        assertThat(v3.getStops().getLast().getJob()).isSameAs(staying);
+        assertThat(leavingDelivery.getRoutePlan()).isSameAs(confirmed);
+    }
+
+    @Test
+    @DisplayName("On a moving trip the pickups count as passed, recorded or not")
+    void aMovingTripsPickupsStay() {
+        trip.setStatus(com.equifreight.entity.enums.TripStatus.DEPARTED);
+
+        RoutePlan v3 = service.reviseForIncident(trip, 60, Set.of(), "Incident", new User())
+                .orElseThrow();
+
+        assertThat(v3.getStops().getFirst().getPlannedAt()).isEqualTo(PICKUP);
+        assertThat(v3.getStops().getLast().getPlannedAt()).isEqualTo(PICKUP.plusSeconds(8 * 3600));
+    }
 }

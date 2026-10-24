@@ -161,7 +161,8 @@ public class TransportJobService {
                 loadPlan,
                 routePlan,
                 crew,
-                tripJobs);
+                tripJobs,
+                jobTrips.describeParts(job));
     }
 
     /**
@@ -201,12 +202,11 @@ public class TransportJobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // Only the logistics manager signs off (US-F3-08); enforced once, by @PreAuthorize on the controller.
-        if (job.getDepartedAt() != null) {
-            throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
-        }
-
         // Clearance gate check: every job on the trip must be CLEAR (US-F3-08, US-F3-11)
         Trip trip = jobTrips.tripOf(jobId);
+        if (jobTrips.partDeparted(trip, job)) {
+            throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
+        }
         List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
         if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
         for (TransportJob onTrip : jobsOnTrip) {
@@ -298,6 +298,8 @@ public class TransportJobService {
             onTrip.setSignedOffBy(currentUser);
             transportJobRepository.save(onTrip);
         }
+        // Each job's part on this trip is what departs; a job split by an incident is signed off per part (US-F5-06).
+        jobTrips.signOff(trip, currentUser, signedOffAt);
 
         auditService.recordDecision(
                 currentUser,

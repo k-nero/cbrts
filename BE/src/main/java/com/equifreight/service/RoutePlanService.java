@@ -237,7 +237,7 @@ public class RoutePlanService {
             throw new BusinessException("Route plan does not belong to job " + jobId);
         }
 
-        if (job.getDepartedAt() != null) {
+        if (jobTrips.partDeparted(trip, job)) {
             throw new BusinessException("Cannot change route plan after job has departed");
         }
 
@@ -322,6 +322,7 @@ public class RoutePlanService {
             // Re-evaluate document validity and clearance gate
             clearanceService.recheckJobDocuments(onTrip.getId());
         }
+        jobTrips.clearSignOff(trip);
 
         if (!reconfirm) {
             notices.confirmed(trip, saved, jobsOnTrip, before);
@@ -377,6 +378,16 @@ public class RoutePlanService {
     @Transactional
     public Optional<RoutePlan> reviseForIncident(
             Trip trip, int delayMinutes, Set<UUID> reachedStopIds, String reason, User user) {
+        return reviseForIncident(trip, delayMinutes, reachedStopIds, reason, user, Set.of());
+    }
+
+    /**
+     * As above, and the stops not yet reached of {@code leavingJobs}, jobs whose horses have all left the trip
+     * (US-F5-06), are taken off the new version, their neighbours joined.
+     */
+    @Transactional
+    public Optional<RoutePlan> reviseForIncident(
+            Trip trip, int delayMinutes, Set<UUID> reachedStopIds, String reason, User user, Set<UUID> leavingJobs) {
         Optional<RoutePlan> confirmed =
                 routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
         if (confirmed.isEmpty()) return Optional.empty();
@@ -390,15 +401,34 @@ public class RoutePlanService {
         revised.setConfirmedBy(user);
         revised.setConfirmedAt(Instant.now());
         Duration delay = Duration.ofMinutes(delayMinutes);
+        // A moving trip has left its pickups behind, whether or not the cab recorded each one.
+        Set<UUID> reached = new HashSet<>(reachedStopIds);
+        if (trip.getStatus() != null && trip.getStatus() != com.equifreight.entity.enums.TripStatus.NOT_STARTED) {
+            old.getStops().stream()
+                    .filter(st -> st.getKind() == RouteStopKind.PICKUP)
+                    .forEach(st -> reached.add(st.getId()));
+        }
         for (int i = 0; i < old.getStops().size(); i++) {
             RouteStop was = old.getStops().get(i);
             RouteStop now = revised.getStops().get(i);
-            if (was.getPlannedAt() != null && !reachedStopIds.contains(was.getId())) {
+            if (was.getPlannedAt() != null && !reached.contains(was.getId())) {
                 now.setPlannedAt(was.getPlannedAt().plus(delay));
                 routeStopRepository.save(now);
             }
         }
         RoutePlan saved = routePlanRepository.save(revised);
+        if (!leavingJobs.isEmpty()) {
+            List<StopCopy> kept = new ArrayList<>();
+            for (int i = 0; i < old.getStops().size(); i++) {
+                RouteStop was = old.getStops().get(i);
+                RouteStop now = saved.getStops().get(i);
+                boolean leaving = now.getJob() != null
+                        && leavingJobs.contains(now.getJob().getId());
+                if (leaving && !reachedStopIds.contains(was.getId())) continue;
+                kept.add(new StopCopy(now, now.getJob(), now.getKind(), now.getPlace(), now.getPlannedAt()));
+            }
+            rebuild(saved, kept);
+        }
 
         for (TransportJob onTrip : jobTrips.jobsOn(trip)) {
             saved.getStops().stream()

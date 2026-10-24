@@ -40,6 +40,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ClearanceServiceTest {
 
     @Mock
+    private JobTripService jobTrips;
+
+    @Mock
     private ChecklistItemRepository checklistItemRepository;
 
     @Mock

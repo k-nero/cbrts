@@ -102,6 +102,29 @@ public class TripNotices {
                 "JOB_REPLANNED:" + job.getId() + ":" + from.getId());
     }
 
+    /**
+     * Another job's arrival moved because an incident on its trip was decided (US-F5-06): the customer hears only what
+     * changes for them, never why or whose horses.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void arrivalMoved(TransportJob job, RoutePlan plan) {
+        if (job.getPlannedArrivalAt() == null) return;
+        StringBuilder body = new StringBuilder("Your horses now arrive on ").append(at(job.getPlannedArrivalAt()));
+        if (job.getWindowEnd() != null) {
+            body.append(
+                    job.getPlannedArrivalAt().isAfter(job.getWindowEnd())
+                            ? ", after your window closes; we'll be in touch about it"
+                            : ", still inside your window");
+        }
+        body.append(". Your price doesn't change.");
+        notify(
+                NotificationKind.TRIP_TIMES_CHANGED,
+                job,
+                "New arrival time for " + job.getCode(),
+                body.toString(),
+                "TRIP_TIMES_CHANGED:" + job.getId() + ":" + plan.getId());
+    }
+
     private void tripShared(TransportJob job, RoutePlan plan) {
         notify(
                 NotificationKind.TRIP_SHARED,
