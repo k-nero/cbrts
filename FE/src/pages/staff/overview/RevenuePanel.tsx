@@ -128,7 +128,7 @@ export const RevenuePanel: FC = () => {
               <span className="type-label-s text-ink">By corridor</span>
               <CorridorTable report={report} />
             </Flex>
-            <p className="type-caption m-0 text-ink-3">
+            <p className="type-body-s m-0 text-ink-3">
               Revenue is what each job was invoiced, deposit included; direct cost its priced lines
               as settled plus what its incidents cost. A job counts in the month its final invoice
               was issued.

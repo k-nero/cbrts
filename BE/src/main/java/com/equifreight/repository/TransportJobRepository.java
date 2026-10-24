@@ -115,4 +115,13 @@ public interface TransportJobRepository
                                       com.equifreight.entity.enums.JobStage.HANDOVER)
                     """)
     Page<TripSummaryResponse> findActiveTrips(Pageable pageable);
+
+    /** Jobs delivered in a period, with their club and corridor, optionally on one corridor (US-R-03). */
+    @Query("""
+            select j from TransportJob j join fetch j.request r join fetch r.club left join fetch r.corridor c
+            where j.deliveredAt >= :from and j.deliveredAt < :to and (:corridor is null or c.id = :corridor)
+            order by j.deliveredAt
+            """)
+    List<TransportJob> findDeliveredBetween(
+            @Param("from") java.time.Instant from, @Param("to") java.time.Instant to, @Param("corridor") UUID corridor);
 }

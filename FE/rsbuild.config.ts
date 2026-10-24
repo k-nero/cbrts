@@ -49,6 +49,15 @@ export default defineConfig({
       index: './src/main.tsx',
     },
   },
+  dev: {
+    lazyCompilation: {
+      imports: true,
+      entries: false,
+      // The Overview's two charts are imported lazily at the same moment and share @ant-design/plots; compiled on
+      // demand, one of them never resolved and its panel stayed on the skeleton until a reload. Compile them up front.
+      test: (module) => !/[\\/]src[\\/]components[\\/]report[\\/]/.test(module.identifier()),
+    },
+  },
   server: {
     port: 5173,
     proxy: {

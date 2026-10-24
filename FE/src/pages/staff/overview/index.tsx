@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Flex, Skeleton } from 'antd';
 
 import { ClearanceAtRisk } from './ClearanceAtRisk';
+import { OnTimePanel } from './OnTimePanel';
 import { OverviewTile } from './OverviewTile';
 import { ReviewQueuePreview } from './ReviewQueuePreview';
 import { RevenuePanel } from './RevenuePanel';
@@ -27,7 +28,7 @@ const OverviewPage: FC = () => {
         title="Overview"
         summary={`What needs you on ${formatDate(o.asOf)}. Each figure opens the list behind it.`}
       />
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-3 gap-4 xl:grid-cols-6">
         <OverviewTile
           figure={o.awaitingReview}
           label="Awaiting review"
@@ -83,11 +84,25 @@ const OverviewPage: FC = () => {
           }
           to="/staff/jobs?filter=THIS_WEEK"
         />
+        <OverviewTile
+          figure={o.onTimeRate == null ? '—' : `${o.onTimeRate}%`}
+          label="On time, 30 days"
+          tone={o.onTimeRate == null ? 'neutral' : o.onTimeRate >= 95 ? 'ok' : 'warn'}
+          lead={
+            o.deliveredLast30Days === 0
+              ? 'No delivery in 30 days'
+              : `${o.lateLast30Days} of ${o.deliveredLast30Days} ${
+                  o.deliveredLast30Days === 1 ? 'trip' : 'trips'
+                } late`
+          }
+          to="#on-time"
+        />
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_360px] items-start gap-6">
         <ReviewQueuePreview rows={o.reviewQueue} total={o.awaitingReview} asOf={o.asOf} />
         <ClearanceAtRisk jobs={o.clearanceAtRisk} total={o.jobsBlocked} />
       </div>
+      <OnTimePanel />
       <RevenuePanel />
     </Flex>
   );

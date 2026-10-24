@@ -118,13 +118,23 @@ class JobClosingServiceTest {
     @DisplayName("Without a window, on time is measured against the planned arrival")
     void withoutAWindow() {
         job.setWindowEnd(null);
-        job.setPlannedArrivalAt(handover.getDeliveredAt().minus(Duration.ofMinutes(40)));
+        // 70 minutes after the planned arrival: 40 past its 30 minutes' tolerance.
+        job.setPlannedArrivalAt(handover.getDeliveredAt().minus(Duration.ofMinutes(70)));
 
         JobClosingResponse r = service.close(job.getId(), yen);
 
         assertFalse(r.onTime());
         assertEquals(40, r.lateMinutes());
-        assertEquals("the planned arrival", r.measuredAgainst());
+        assertEquals("the planned arrival, with 30 minutes' tolerance", r.measuredAgainst());
+    }
+
+    @Test
+    @DisplayName("Without a window, up to 30 minutes after the planned arrival is on time")
+    void withinTheTolerance() {
+        job.setWindowEnd(null);
+        job.setPlannedArrivalAt(handover.getDeliveredAt().minus(Duration.ofMinutes(25)));
+
+        assertTrue(service.close(job.getId(), yen).onTime());
     }
 
     @Test

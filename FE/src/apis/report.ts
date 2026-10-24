@@ -1,7 +1,16 @@
 import client from '@/config/axios';
-import type { RevenueReport, RevenueReportParams } from '@/interfaces';
+import type {
+  OnTimeReport,
+  OnTimeReportParams,
+  RevenueReport,
+  RevenueReportParams,
+} from '@/interfaces';
 
 export const reportApi = {
+  /** US-R-03: the on-time delivery rate by week or month and corridor, with the late jobs. */
+  onTime: (params: OnTimeReportParams) =>
+    client.get<OnTimeReport>('/staff/reports/on-time', { params }).then((r) => r.data),
+
   /** US-R-02: revenue and direct cost by month and corridor. */
   revenue: (params: RevenueReportParams) =>
     client.get<RevenueReport>('/staff/reports/revenue', { params }).then((r) => r.data),
