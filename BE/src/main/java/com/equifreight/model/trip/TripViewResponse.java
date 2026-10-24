@@ -28,4 +28,6 @@ public record TripViewResponse(
         List<TripHorseResponse> horses,
         List<TripRecordResponse> records,
         /** Every part of a job an incident split across trips; empty while the job is on one trip (US-F5-06). */
-        List<TripPartResponse> parts) {}
+        List<TripPartResponse> parts,
+        /** The job's handover once its horses are delivered (US-F6-01); null before. */
+        HandoverResponse handover) {}

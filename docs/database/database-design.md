@@ -553,6 +553,7 @@ Index `(trip_id, occurred_at)`.
 | `job_id` | → `transport_jobs` unique | |
 | `delivered_at` | timestamptz | From the `DELIVERED` trip record. |
 | `receiving_name` | varchar(120) | "Sophea, receiving groom". |
+| `handed_over_at`, `handover_record_id`, `receiver_confirmed` | timestamptz, → `trip_records`, boolean | The handover (US-F6-01): when, the `HANDED_OVER` record with each horse's condition and photos, and the receiver's confirmation on the tablet. All three with the receiver's name together (`handovers_handed_over_check`); fixed once set (trigger `handovers_handover_fixed`). |
 | `confirm_due_at` | timestamptz | Within 2 days. Paused while an incident is open. |
 | `customer_outcome` | varchar(20) | `CONFIRMED_SOUND`, `PROBLEM_REPORTED`. |
 | `confirmed_by`, `confirmed_at` | | |

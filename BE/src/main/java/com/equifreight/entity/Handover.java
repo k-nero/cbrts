@@ -56,4 +56,15 @@ public class Handover extends BaseEntity {
      */
     @Column(precision = 14, scale = 2)
     private BigDecimal penaltyAmount;
+
+    /** When the horses were handed over, from the HANDED_OVER trip record; fixed once set (US-F6-01). */
+    private Instant handedOverAt;
+
+    /** The HANDED_OVER record: each horse's condition and photos, and what was handed over. */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handover_record_id")
+    private TripRecord handoverRecord;
+
+    /** The receiver confirmed on the tablet that they took the horses as recorded. */
+    private boolean receiverConfirmed;
 }

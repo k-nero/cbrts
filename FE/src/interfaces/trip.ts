@@ -83,6 +83,8 @@ export interface TripHorse {
   id: string;
   name: string;
   stall: string | null;
+  /** The job the horse travels under. */
+  jobCode: string;
 }
 /** The trip's flight as its people follow it (US-F3-15). */
 export interface TripFlight {
@@ -128,6 +130,21 @@ export interface TripPage {
   first: boolean;
   last: boolean;
 }
+/** A job's handover at the destination (US-F6-01), then the customer's answer (US-F6-02). */
+export interface Handover {
+  deliveredAt: string | null;
+  handedOverAt: string | null;
+  receiverName: string | null;
+  receiverConfirmed: boolean;
+  /** The HANDED_OVER record in the trip's records: each horse's condition and what was handed over. */
+  recordId: string | null;
+  confirmDueAt: string | null;
+  customerOutcome: 'CONFIRMED_SOUND' | 'PROBLEM_REPORTED' | null;
+  confirmedAt: string | null;
+  confirmedByName: string | null;
+  lateMinutes: number | null;
+}
+
 export interface TripView {
   jobCode: string;
   /** The trip's TRP code for staff and the crew; null for the customer, who never sees it. */
@@ -151,6 +168,8 @@ export interface TripView {
   records: TripRecord[];
   /** Every part of a job split across trips; empty while it is on one (US-F5-06). */
   parts: TripPart[];
+  /** The job's handover once its horses are delivered (US-F6-01). */
+  handover: Handover | null;
 }
 export interface TripRecordInput {
   routeStopId: string | null;
@@ -160,6 +179,8 @@ export interface TripRecordInput {
   text?: string;
   /** Who received the horses; required when kind is HANDED_OVER. */
   receiverName?: string;
+  /** The receiver confirmed on the tablet; required when kind is HANDED_OVER (US-F6-01). */
+  receiverConfirmed?: boolean;
   conditions?: Array<{
     horseId: string;
     condition: HorseCondition;
