@@ -5,6 +5,7 @@ import { Photo } from './Photo';
 import { formatTime, sentence } from './tripFormat';
 
 import { Chip, Panel } from '@/components/ui';
+import { formatDayTime } from '@/lib/utils';
 import type { TripView } from '@/interfaces';
 
 /** A horse's condition on arrival, toned as the cab records it: sound is ok, watch is warn, concern is bad. */
@@ -15,18 +16,51 @@ const conditionTone = (condition: string) =>
  * The handover as recorded (US-F6-01): who received the horses and confirmed it, when, what was handed over, and
  * each horse's condition on arrival with its photos. Quoted from the one stored record, never edited.
  */
+/** The customer's answer, in words (US-F6-02). */
+const answer = (trip: TripView) => {
+  const h = trip.handover!;
+  if (!h.customerOutcome || !h.confirmedAt) {
+    return h.confirmDueAt
+      ? `Waiting for the customer's answer; taken as accepted after ${formatDayTime(h.confirmDueAt)}.`
+      : null;
+  }
+  if (h.customerOutcome === 'PROBLEM_REPORTED')
+    return `Problem reported ${formatDayTime(h.confirmedAt)}${h.confirmedByName ? ` by ${h.confirmedByName}` : ''}: “${h.discrepancy}”`;
+  return h.acceptedByDefault
+    ? `Taken as accepted ${formatDayTime(h.confirmedAt)}: no answer by the due time.`
+    : `Accepted ${formatDayTime(h.confirmedAt)}${h.confirmedByName ? ` by ${h.confirmedByName}` : ''}.`;
+};
+
 export const HandoverRecord: FC<{ trip: TripView }> = ({ trip }) => {
   const handover = trip.handover;
   if (!handover?.handedOverAt) return null;
   const record = trip.records.find((r) => r.id === handover.recordId);
   return (
-    <Panel title="Handover" extra={<Chip tone="ok">Handed over</Chip>}>
+    <Panel
+      title="Handover"
+      extra={
+        handover.customerOutcome === 'PROBLEM_REPORTED' ? (
+          <Chip tone="bad">Problem reported</Chip>
+        ) : handover.customerOutcome ? (
+          <Chip tone="ok">Accepted</Chip>
+        ) : (
+          <Chip tone="ok">Handed over</Chip>
+        )
+      }
+    >
       <Flex vertical gap={16}>
         <p className="type-body-m m-0 text-ink">
           {handover.receiverName} received {trip.jobCode} on {formatTime(handover.handedOverAt)}
           {handover.receiverConfirmed ? ' and confirmed it on the tablet' : ''}.
           {record?.recordedBy ? ` Recorded by ${record.recordedBy}.` : ''}
         </p>
+        {answer(trip) && (
+          <p
+            className={`type-body-s m-0 ${handover.customerOutcome === 'PROBLEM_REPORTED' ? 'text-bad' : 'text-ink-2'}`}
+          >
+            {answer(trip)}
+          </p>
+        )}
         {record?.text && (
           <Flex vertical gap={2}>
             <span className="type-caption text-ink-3">What was handed over</span>

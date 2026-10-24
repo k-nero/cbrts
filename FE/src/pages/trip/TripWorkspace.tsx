@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { UploadFile } from 'antd';
 import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
 
+import { HandoverAnswer } from './HandoverAnswer';
 import { HandoverPanel } from './HandoverPanel';
 import { HandoverRecord } from './HandoverRecord';
 import { ReportEmergency } from './ReportEmergency';
@@ -317,6 +318,7 @@ export function TripWorkspace({
                 tripId={audience === 'staff' ? shownPart : undefined}
               />
             )}
+          {audience === 'customer' && trip && <HandoverAnswer trip={trip} />}
           {trip && <HandoverRecord trip={trip} />}
           {editable && trip && (
             <Panel
