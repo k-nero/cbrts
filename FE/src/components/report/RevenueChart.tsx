@@ -37,8 +37,10 @@ const RevenueChart: FC<{ months: RevenueReport['months'] }> = ({ months }) => {
   const p = PALETTE[mode];
   const config = useMemo<ColumnConfig>(() => {
     const latest = months[months.length - 1]?.month;
-    // Headroom above the tallest bar, so the latest revenue's label sits above it, not inside it.
-    const top = Math.max(1, ...months.flatMap((m) => [m.revenue, m.cost])) * 1.15;
+    // Headroom above the tallest bar, so the latest revenue's label sits above it, not inside it. A period with nothing
+    // settled draws $0 to $1k, not ticks a cent apart.
+    const max = Math.max(0, ...months.flatMap((m) => [m.revenue, m.cost]));
+    const top = max > 0 ? max * 1.15 : 1000;
     const byMonth = new Map(months.map((m) => [m.month, m]));
     return {
       data: months.flatMap((m) => [
