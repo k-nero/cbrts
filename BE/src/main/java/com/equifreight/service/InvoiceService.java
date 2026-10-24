@@ -3,7 +3,6 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Handover;
-import com.equifreight.entity.Incident;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.InvoiceLine;
 import com.equifreight.entity.JobCharge;
@@ -44,7 +43,6 @@ import com.equifreight.service.pricing.PricedTotals;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -503,17 +501,12 @@ public class InvoiceService {
      * its total. The minutes and the amount are kept on the handover.
      */
     BigDecimal latePenalty(TransportJob job, Quotation q, Handover handover) {
-        Instant end = job.getWindowEnd();
         Instant delivered = handover.getDeliveredAt() != null ? handover.getDeliveredAt() : job.getDeliveredAt();
-        if (end == null || delivered == null) {
-            handover.setLateMinutes(null);
-            handover.setPenaltyAmount(null);
-            return BigDecimal.ZERO;
-        }
-        long late = Math.max(0, Duration.between(end, delivered).toMinutes() - stoppedMinutes(job, end, delivered));
-        handover.setLateMinutes((int) late);
-        if (late == 0) {
-            handover.setPenaltyAmount(BigDecimal.ZERO);
+        Integer late = LateArrival.minutes(
+                job.getWindowEnd(), delivered, incidents.findByJob_IdAndStopsClockTrue(job.getId()));
+        handover.setLateMinutes(late);
+        if (late == null || late == 0) {
+            handover.setPenaltyAmount(late == null ? null : BigDecimal.ZERO);
             return BigDecimal.ZERO;
         }
         long hours = (late + 59) / 60;
@@ -522,19 +515,6 @@ public class InvoiceService {
         handover.setPenaltyAmount(amount);
         handovers.save(handover);
         return amount;
-    }
-
-    /** The minutes between the window's close and the delivery that an incident stopped the clock. */
-    private long stoppedMinutes(TransportJob job, Instant from, Instant to) {
-        long stopped = 0;
-        for (Incident incident : incidents.findByJob_IdAndStopsClockTrue(job.getId())) {
-            if (incident.getClockStoppedFrom() == null) continue;
-            Instant start = incident.getClockStoppedFrom().isAfter(from) ? incident.getClockStoppedFrom() : from;
-            Instant until = incident.getClockStoppedUntil() == null ? to : incident.getClockStoppedUntil();
-            Instant end = until.isBefore(to) ? until : to;
-            if (end.isAfter(start)) stopped += Duration.between(start, end).toMinutes();
-        }
-        return stopped;
     }
 
     private static BigDecimal perHour(Quotation q) {
