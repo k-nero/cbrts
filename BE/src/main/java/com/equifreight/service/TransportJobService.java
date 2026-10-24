@@ -99,6 +99,13 @@ public class TransportJobService {
                         predicates.add(cb.or(
                                 cb.equal(root.get("stage"), JobStage.DOCUMENTS),
                                 cb.equal(root.get("stage"), JobStage.CLEARANCE)));
+                    // Not left yet and due to leave in the next 7 days (US-R-01).
+                    case "THIS_WEEK" -> {
+                        Instant now = Instant.now();
+                        predicates.add(cb.between(
+                                root.get("plannedDepartureAt"), now, now.plus(java.time.Duration.ofDays(7))));
+                        predicates.add(cb.equal(root.get("tripStatus"), TripStatus.NOT_STARTED));
+                    }
                     // Closed jobs have left the active boards (US-F6-04); they have their own tab.
                     case "CLOSED" -> predicates.add(cb.equal(root.get("stage"), JobStage.CLOSED));
                     default -> {
