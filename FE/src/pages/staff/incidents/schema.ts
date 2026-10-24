@@ -54,3 +54,14 @@ export const returnSchema = z.object({
   reason: z.string().trim().min(1, 'Say why, so another option can be proposed.').max(1000),
 });
 export type ReturnForm = z.infer<typeof returnSchema>;
+
+/** Closing an incident (US-F5-05): how it ended and a closing note, both required. */
+export const resolveSchema = z.object({
+  resolution: z.string().trim().min(1, 'Say how it ended.').max(300, 'At most 300 characters.'),
+  closingNote: z
+    .string()
+    .trim()
+    .min(1, 'Write a closing note for the record.')
+    .max(1000, 'At most 1000 characters.'),
+});
+export type ResolveForm = z.infer<typeof resolveSchema>;

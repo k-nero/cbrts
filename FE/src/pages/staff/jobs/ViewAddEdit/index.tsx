@@ -11,6 +11,7 @@ import { AuthoritiesTab } from './AuthoritiesTab';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 import { Placeholder } from './Placeholder';
+import { TripTab } from './TripTab';
 
 /** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
@@ -48,11 +49,7 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       key: 'trip',
       label: 'Trip',
       owner: 'Escort (driver / groom)',
-      render: () => (
-        <Placeholder title="Trip Journey Log">
-          Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
-        </Placeholder>
-      ),
+      render: (job) => <TripTab job={job} />,
     },
   ];
 

@@ -3,10 +3,13 @@ import client from '@/config/axios';
 import { makeCrudApi } from './crudFactory';
 import type {
   DecideIncidentInput,
+  DelayAlertInput,
   Incident,
   IncidentOptionInput,
   IncidentSummary,
+  JobIncident,
   RaiseIncidentInput,
+  ResolveIncidentInput,
 } from '@/interfaces';
 
 /** The Incidents list (Flow 5), newest first; `status` narrows it. */
@@ -35,6 +38,18 @@ export const incidentApi = {
   /** US-F5-03: the logistics manager sends the proposal back, saying why. */
   returnProposal: (id: string, reason: string) =>
     client.post<Incident>(`/staff/incidents/${id}/proposal/return`, { reason }).then((r) => r.data),
+
+  /** US-F5-04: a delay alert on a job on the road; it opens an incident of that kind. */
+  sendDelayAlert: (jobId: string, input: DelayAlertInput) =>
+    client.post<Incident>(`/staff/jobs/${jobId}/delay-alerts`, input).then((r) => r.data),
+
+  /** US-F5-05: the logistics manager closes the incident with its resolution and a closing note. */
+  resolve: (id: string, input: ResolveIncidentInput) =>
+    client.post<Incident>(`/staff/incidents/${id}/resolution`, input).then((r) => r.data),
+
+  /** US-F5-05: the job's incidents with their timelines, oldest first. */
+  ofJob: (jobId: string) =>
+    client.get<JobIncident[]>(`/staff/jobs/${jobId}/incidents`).then((r) => r.data),
 
   /** US-F5-01: the escort reports an emergency on the trip the cab is open on. */
   raise: (jobCode: string, input: RaiseIncidentInput) =>

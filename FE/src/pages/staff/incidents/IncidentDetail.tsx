@@ -1,11 +1,14 @@
 import { Col, Flex, Row, Skeleton } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 
+import { CloseIncident } from './CloseIncident';
 import { IncidentDecided, IncidentDecision } from './IncidentDecision';
+import { IncidentResolved } from './IncidentResolved';
 import { INCIDENT_STATUS, openFor } from './incidentFormat';
 import { IncidentOptions } from './IncidentOptions';
 
 import PageHeader from '@/components/PageHeader';
+import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { Chip, Panel } from '@/components/ui';
 import { useIncident } from '@/hooks/incident';
 import type { Incident } from '@/interfaces';
@@ -54,7 +57,9 @@ export default function IncidentDetailPage() {
         summary={
           incident.status === IncidentStatusEnum.OPEN
             ? `Open for ${openFor(incident.openedAt)}, since ${formatTime(incident.openedAt)}`
-            : `Opened ${formatTime(incident.openedAt)}`
+            : incident.status === IncidentStatusEnum.RESOLVED && incident.resolvedAt
+              ? `Opened ${formatTime(incident.openedAt)}, closed ${formatTime(incident.resolvedAt)}`
+              : `Opened ${formatTime(incident.openedAt)}`
         }
         right={<Chip tone={status.tone}>{status.label}</Chip>}
       />
@@ -92,6 +97,15 @@ export default function IncidentDetailPage() {
             ) : (
               proposed && isManager && <IncidentDecision incident={incident} option={proposed} />
             )}
+            {incident.status === IncidentStatusEnum.RESOLVED ? (
+              <IncidentResolved incident={incident} />
+            ) : (
+              // A proposal waiting for a decision is decided or sent back before closing.
+              isManager &&
+              (incident.status === IncidentStatusEnum.DECIDED || !proposed) && (
+                <CloseIncident incident={incident} />
+              )
+            )}
             <IncidentOptions incident={incident} />
           </Flex>
         </Col>
@@ -113,6 +127,11 @@ export default function IncidentDetailPage() {
                 <Fact label="Route">
                   {incident.origin ?? 'Origin'} → {incident.destination ?? 'Destination'}
                 </Fact>
+                {incident.etaAt && (
+                  <Fact label="Arrival announced by the delay alert">
+                    {formatTime(incident.etaAt)}
+                  </Fact>
+                )}
               </Flex>
             </Panel>
             <Panel title="People">
@@ -122,6 +141,9 @@ export default function IncidentDetailPage() {
                 <Fact label="Reported by">{incident.reportedByName ?? 'Unknown'}</Fact>
               </Flex>
             </Panel>
+            {incident.timeline.length > 0 && (
+              <HistoryPanel title="Timeline" history={incident.timeline} />
+            )}
           </Flex>
         </Col>
       </Row>

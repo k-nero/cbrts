@@ -1,3 +1,4 @@
+import type { HistoryEntry } from './request';
 import type { TripPhoto, TripStatus } from './trip';
 
 /** What happened (BE IncidentKind). The cab reports the last four; HELD and CUSTOMER_REPORT come from elsewhere. */
@@ -9,6 +10,9 @@ export const IncidentKindEnum = {
   TRAFFIC: 'TRAFFIC',
   OTHER: 'OTHER',
   LATE_ARRIVAL: 'LATE_ARRIVAL',
+  /** A coordinator's delay alert for bad weather or a border queue (US-F5-04); traffic is TRAFFIC. */
+  WEATHER: 'WEATHER',
+  BORDER_CONGESTION: 'BORDER_CONGESTION',
 } as const;
 export type IncidentKind = (typeof IncidentKindEnum)[keyof typeof IncidentKindEnum];
 
@@ -81,6 +85,45 @@ export interface Incident {
   newTripCode: string | null;
   /** The job's horses on its moving trip, which an option can take off it. */
   riding: { id: string; name: string }[];
+  /** The arrival the latest delay alert announced (US-F5-04). */
+  etaAt: string | null;
+  /** How it ended and the closing note, once closed (US-F5-05). */
+  resolution: string | null;
+  closingNote: string | null;
+  resolvedAt: string | null;
+  resolvedByName: string | null;
+  /** What happened to the incident, from the audit trail, oldest first. */
+  timeline: HistoryEntry[];
+}
+
+/** One incident on a job's trip record, with its timeline (GET /staff/jobs/{id}/incidents, US-F5-05). */
+export interface JobIncident {
+  id: string;
+  kind: IncidentKind;
+  kindLabel: string;
+  status: IncidentStatus;
+  summary: string;
+  openedAt: string;
+  ownerName: string | null;
+  etaAt: string | null;
+  resolution: string | null;
+  closingNote: string | null;
+  resolvedAt: string | null;
+  resolvedByName: string | null;
+  timeline: HistoryEntry[];
+}
+
+/** A delay alert (US-F5-04): why, the job's new arrival (ISO with offset), and a note its customer and crew read. */
+export interface DelayAlertInput {
+  reason: 'TRAFFIC' | 'WEATHER' | 'BORDER_CONGESTION';
+  newEta: string;
+  note?: string;
+}
+
+/** Closing an incident (US-F5-05): both are required. */
+export interface ResolveIncidentInput {
+  resolution: string;
+  closingNote: string;
 }
 
 /** How horses leave a moving trip (BE LeavingKind, US-F5-06). */
