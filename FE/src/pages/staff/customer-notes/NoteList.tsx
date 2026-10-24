@@ -68,6 +68,7 @@ const NoteList: FC<Props> = ({ notes, loading, refreshing, onRefresh, selectedId
       refreshing={refreshing}
       resizableColumns={false}
       pagination={false}
+      showColumnSettings={false}
       rowClassName={(n) =>
         n.id === selectedId
           ? 'cursor-pointer *:bg-raised! *:first:border-l-3 *:first:border-l-gold'

@@ -85,6 +85,7 @@ export const LineTable: FC<{
         columns={columns}
         dataSource={view.lines}
         pagination={false}
+        showColumnSettings={false}
         ignoreKeys={['actions', 'certainty']}
       />
     </Panel>
