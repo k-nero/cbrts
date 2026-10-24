@@ -31,7 +31,9 @@ public enum NotificationKind {
     INCIDENT_UPDATE(NotificationTone.WARN),
     DELAY_ALERT(NotificationTone.WARN),
     INCIDENT_RESOLVED(NotificationTone.OK),
-    HANDOVER_ACCEPTED(NotificationTone.OK);
+    HANDOVER_ACCEPTED(NotificationTone.OK),
+    INVOICE_ISSUED(NotificationTone.INFO),
+    PAYMENT_RECORDED(NotificationTone.OK);
 
     private final NotificationTone tone;
 

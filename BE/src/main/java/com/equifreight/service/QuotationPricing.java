@@ -164,6 +164,23 @@ public class QuotationPricing {
         store(q, QuotePricer.retotal(in, rates, stored));
     }
 
+    /**
+     * The quotation's totals worked out again in their fixed order with some lines at a new amount: the final
+     * invoice's actual quantities (US-F6-03). The rates are the quotation's pinned catalog; nothing is stored.
+     */
+    public PricedTotals totalsWith(Quotation q, TransportRequest request, java.util.Map<UUID, BigDecimal> amounts) {
+        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
+                .forCorridor(request.getCorridor().getId());
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        List<PricedLine> lines = q.getLines().stream()
+                .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
+                        .thenComparing(QuotationLine::getPosition))
+                .map(l ->
+                        amounts.containsKey(l.getId()) ? withAmount(asPriced(l), amounts.get(l.getId())) : asPriced(l))
+                .toList();
+        return QuotePricer.retotal(in, rates, lines);
+    }
+
     /** The draft's answer, with the overrides a write could not carry. */
     public QuotationDraftResponse toResponse(Quotation q, TransportRequest request, List<String> dropped) {
         Integer latest = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)

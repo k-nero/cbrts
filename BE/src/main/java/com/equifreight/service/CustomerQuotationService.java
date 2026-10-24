@@ -47,6 +47,7 @@ public class CustomerQuotationService {
     private final Snapshots snapshots;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final InvoiceService invoices;
     private final Clock clock;
 
     public CustomerQuotationService(
@@ -57,6 +58,7 @@ public class CustomerQuotationService {
             Snapshots snapshots,
             AuditService audit,
             NotificationService notifications,
+            InvoiceService invoices,
             Clock clock) {
         this.requests = requests;
         this.quotations = quotations;
@@ -65,6 +67,7 @@ public class CustomerQuotationService {
         this.snapshots = snapshots;
         this.audit = audit;
         this.notifications = notifications;
+        this.invoices = invoices;
         this.clock = clock;
     }
 
@@ -98,6 +101,8 @@ public class CustomerQuotationService {
         request.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
         requests.save(request);
         Quotation saved = quotations.saveAndFlush(q);
+        // The deposit invoice comes with the acceptance (US-F6-03): the quotation's deposit % of its total.
+        invoices.issueDeposit(saved, customer);
 
         String label = label(q);
         audit.recordDecision(

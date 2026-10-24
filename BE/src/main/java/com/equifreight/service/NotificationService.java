@@ -142,6 +142,10 @@ public class NotificationService {
                         : "/staff/documents?jobId=" + subject.jobId();
             case INCIDENT ->
                 customer ? "/tracking?job=" + subject.code() : escort ? "/escort" : "/staff/incidents/" + subject.id();
+            case INVOICE ->
+                customer
+                        ? "/requests/" + subject.requestId() + "/invoices/" + subject.id()
+                        : "/staff/invoices/" + subject.id();
             case TRIP_TRACKING ->
                 customer
                         ? "/tracking?job=" + subject.code()
