@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171), suggestions (US-F3-13, #172) and the customer and escort views with the three customer notifications (US-F3-14, #173). The rest is in #174 and #175.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171), suggestions (US-F3-13, #172) the customer and escort views with the three customer notifications (US-F3-14, #173) and shared flights (US-F3-15, #175). Leaving a moving trip (#174) is still to build.
 
 ## Why
 
@@ -106,6 +106,7 @@ A trip's air leg has one flight, and every job on the trip flies on it. What sta
 - **Biosecurity.** The same warnings as for a trailer (see [Health status](#health-status)) apply to the horses sharing a flight's stalls.
 - **Leaving.** A job can't leave a flight in the air. A job or some of its horses can leave only at an airport, through the same incident options as on the road (see [Leaving a moving trip](#leaving-a-moving-trip)); a horse that misses the flight gets its own allocation on a later flight of its new trip.
 - **The customer** sees their own waybill and stall positions, and the same "travels with another client's horses" line, with nothing about the other consignment.
+- **As built (#175):** a flight has `stall_capacity`, the stall positions the airline gives the trip, and one `flight_allocations` row per job (waybill unique on the flight, positions, class); existing flights became one allocation each, with their positions as the capacity. A job joins a trip that flies only from the same AIRPORT_OUT and AIRPORT_IN places as its own route (when it has one) and when its positions (quoted, else one per horse) fit in what's left. Joining gives it a consignment on the draft's flight and leaving takes it off; a new route version copies the consignments. The flight crew is crew rows with no trailer (flying grooms and the vet), checked at sign-off for every horse on board. The coordinator fills each job's waybill on the Route tab; tracking shows the customer their own consignment only. Biosecurity warnings compare every horse on a trip that flies, whatever trailer it rides.
 - **Out of scope for now:** a trip using two flights for one air leg (splitting on air, when one flight can't take every horse). The trip has one flight per air leg; a job too big for that is planned as its own trip.
 
 ## Leaving a moving trip
