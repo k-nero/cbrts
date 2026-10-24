@@ -215,6 +215,37 @@ public class IncidentService {
         return toResponse(saved);
     }
 
+    /**
+     * A discrepancy the customer raised at the handover (US-F6-02): an incident of kind CUSTOMER_REPORT on the job,
+     * owned like any other, with what they wrote as its summary. The owner and the coordinator are alerted at once.
+     */
+    @Transactional
+    public Incident raiseFromCustomer(TransportJob job, User customer, String description) {
+        Instant now = clock.instant();
+        Incident incident = new Incident();
+        incident.setJob(job);
+        incident.setKind(IncidentKind.CUSTOMER_REPORT);
+        incident.setSource(IncidentSource.CUSTOMER);
+        incident.setStatus(IncidentStatus.OPEN);
+        incident.setSummary(description);
+        incident.setReportedBy(customer);
+        incident.setOwner(ownerOf(job));
+        incident.setOpenedAt(now);
+        Incident saved = incidents.save(incident);
+        audit.recordDecision(
+                customer,
+                "RAISE_INCIDENT",
+                AuditText.fit("Discrepancy reported on the handover of " + job.getCode()),
+                ENTITY_TYPE,
+                saved.getId(),
+                job.getCode(),
+                description,
+                null,
+                IncidentStatus.OPEN.name());
+        alert(saved, now);
+        return saved;
+    }
+
     @Transactional(readOnly = true)
     public Page<IncidentSummaryResponse> list(Collection<IncidentStatus> statuses, Pageable pageable) {
         Collection<IncidentStatus> shown =
@@ -981,6 +1012,6 @@ public class IncidentService {
     }
 
     static String nameOf(User user) {
-        return user == null ? null : user.displayName();
+        return user == null ? null : user.recordName();
     }
 }

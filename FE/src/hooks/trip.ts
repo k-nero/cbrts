@@ -31,3 +31,21 @@ export const useTripRecord = (audience: 'escort' | 'staff', code: string, tripId
     },
   });
 };
+
+/** The customer's answer to the handover (US-F6-02): the trip reloads with it. */
+const useHandoverAnswer = <V>(code: string, answer: (v: V) => Promise<unknown>) => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: answer,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: queryKeys.trips.one('customer', code) });
+      await client.invalidateQueries({ queryKey: queryKeys.trips.lists() });
+    },
+  });
+};
+
+export const useAcceptHandover = (code: string) =>
+  useHandoverAnswer(code, () => tripApi.acceptHandover(code));
+
+export const useReportDiscrepancy = (code: string) =>
+  useHandoverAnswer(code, (description: string) => tripApi.reportDiscrepancy(code, description));

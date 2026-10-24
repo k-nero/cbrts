@@ -143,6 +143,11 @@ export interface Handover {
   confirmedAt: string | null;
   confirmedByName: string | null;
   lateMinutes: number | null;
+  /** What the customer said went wrong, as written (US-F6-02), and the incident it opened. */
+  discrepancy: string | null;
+  discrepancyIncidentId: string | null;
+  /** No answer by the due time: taken as accepted. */
+  acceptedByDefault: boolean;
 }
 
 export interface TripView {

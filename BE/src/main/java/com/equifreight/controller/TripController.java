@@ -1,10 +1,13 @@
 package com.equifreight.controller;
 
 import com.equifreight.entity.User;
+import com.equifreight.model.trip.DiscrepancyRequest;
+import com.equifreight.model.trip.HandoverResponse;
 import com.equifreight.model.trip.TripRecordRequest;
 import com.equifreight.model.trip.TripRecordResponse;
 import com.equifreight.model.trip.TripSummaryResponse;
 import com.equifreight.model.trip.TripViewResponse;
+import com.equifreight.service.HandoverService;
 import com.equifreight.service.TripService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -19,9 +22,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 public class TripController {
     private final TripService trips;
+    private final HandoverService handovers;
 
-    public TripController(TripService trips) {
+    public TripController(TripService trips, HandoverService handovers) {
         this.trips = trips;
+        this.handovers = handovers;
     }
 
     /**
@@ -82,6 +87,23 @@ public class TripController {
     public Page<TripSummaryResponse> customerTrips(
             @AuthenticationPrincipal User user, @PageableDefault(size = 20) Pageable pageable) {
         return trips.customerTrips(user, sorted(pageable, Sort.by(Sort.Direction.DESC, "createdAt")));
+    }
+
+    /** US-F6-02: the customer accepts the handover. */
+    @PostMapping("/api/v1/customer/trips/{jobCode}/handover/accept")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public HandoverResponse acceptHandover(@PathVariable String jobCode, @AuthenticationPrincipal User user) {
+        return handovers.accept(jobCode, user);
+    }
+
+    /** US-F6-02: the customer raises a discrepancy with a description; the logistics manager is alerted. */
+    @PostMapping("/api/v1/customer/trips/{jobCode}/handover/discrepancy")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public HandoverResponse reportDiscrepancy(
+            @PathVariable String jobCode,
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody DiscrepancyRequest request) {
+        return handovers.reportDiscrepancy(jobCode, user, request.description());
     }
 
     @GetMapping("/api/v1/customer/trips/{jobCode}")

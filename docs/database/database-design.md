@@ -556,6 +556,7 @@ Index `(trip_id, occurred_at)`.
 | `handed_over_at`, `handover_record_id`, `receiver_confirmed` | timestamptz, → `trip_records`, boolean | The handover (US-F6-01): when, the `HANDED_OVER` record with each horse's condition and photos, and the receiver's confirmation on the tablet. All three with the receiver's name together (`handovers_handed_over_check`); fixed once set (trigger `handovers_handover_fixed`). |
 | `confirm_due_at` | timestamptz | Within 2 days. Paused while an incident is open. |
 | `customer_outcome` | varchar(20) | `CONFIRMED_SOUND`, `PROBLEM_REPORTED`. |
+| `discrepancy`, `discrepancy_incident`, `accepted_by_default` | varchar(1000), → `incidents`, boolean | The customer's answer (US-F6-02): what they said went wrong and the `CUSTOMER_REPORT` incident it opened; or no answer by `confirm_due_at`, taken as accepted. An answer needs `confirmed_at`, a discrepancy its text (`handovers_outcome_check`). |
 | `confirmed_by`, `confirmed_at` | | |
 | `late_minutes` | integer | With an arrival window: minutes after `window_end`, minus minutes the clock was stopped. Null when there's no window. |
 | `penalty_amount` | numeric(14,2) | ⌈late_minutes ÷ 60⌉ × pct × total, capped. Credited as a line on the final invoice (section 13A). |

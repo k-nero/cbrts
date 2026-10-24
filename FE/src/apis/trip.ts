@@ -1,5 +1,5 @@
 import apiV1Instance from '@/config/axios';
-import type { TripPage, TripRecord, TripRecordInput, TripView } from '@/interfaces';
+import type { Handover, TripPage, TripRecord, TripRecordInput, TripView } from '@/interfaces';
 
 export const tripApi = {
   list: async (audience: 'escort' | 'staff' | 'customer', page: number) =>
@@ -20,6 +20,16 @@ export const tripApi = {
     (
       await apiV1Instance.post<TripRecord>(`/${audience}/trips/${code}/records`, input, {
         params: tripId ? { trip: tripId } : undefined,
+      })
+    ).data,
+  /** US-F6-02: the customer accepts the handover. */
+  acceptHandover: async (code: string) =>
+    (await apiV1Instance.post<Handover>(`/customer/trips/${code}/handover/accept`)).data,
+  /** US-F6-02: the customer raises a discrepancy; the logistics manager is alerted. */
+  reportDiscrepancy: async (code: string, description: string) =>
+    (
+      await apiV1Instance.post<Handover>(`/customer/trips/${code}/handover/discrepancy`, {
+        description,
       })
     ).data,
 };

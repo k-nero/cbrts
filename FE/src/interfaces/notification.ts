@@ -27,6 +27,7 @@ export const NotificationKindEnum = {
   INCIDENT_UPDATE: 'INCIDENT_UPDATE',
   DELAY_ALERT: 'DELAY_ALERT',
   INCIDENT_RESOLVED: 'INCIDENT_RESOLVED',
+  HANDOVER_ACCEPTED: 'HANDOVER_ACCEPTED',
 } as const;
 export type NotificationKind = (typeof NotificationKindEnum)[keyof typeof NotificationKindEnum];
 
