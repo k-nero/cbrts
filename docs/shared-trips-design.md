@@ -1,6 +1,6 @@
 # Shared trips: several jobs in one trailer, one job across several trailers
 
-Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171), suggestions (US-F3-13, #172) the customer and escort views with the three customer notifications (US-F3-14, #173) and shared flights (US-F3-15, #175). Leaving a moving trip (#174) is still to build.
+Status: decided (23 Oct 2026). Built: the trip model, with every job as a one-job trip (US-F3-09, #168), convoys (US-F3-10, #169), shared trailers (US-F3-11, #170), biosecurity warnings (US-F3-12, #171), suggestions (US-F3-13, #172) the customer and escort views with the three customer notifications (US-F3-14, #173) shared flights (US-F3-15, #175) and leaving a moving trip (US-F5-06, #174; see docs/incidents-design.md).
 
 ## Why
 

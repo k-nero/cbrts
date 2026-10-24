@@ -1,6 +1,6 @@
 # Incidents (Flow 5)
 
-Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60), recording the options (US-F5-02, #61) and the manager's decision (US-F5-03, #62). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
+Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60), recording the options (US-F5-02, #61), the manager's decision (US-F5-03, #62) and leaving a moving trip (US-F5-06, #174). PRODUCT.md lists Flow 5's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain J) and the Incident page in `DESIGN.md`. Each is open to change.
 
 ## Reporting an emergency (US-F5-01)
 
@@ -29,3 +29,25 @@ Status: in progress. Built: reporting an emergency from the cab (US-F5-01, #60),
 - **Cost:** when the customer pays, the option's extra cost becomes a `job_charges` row on the job (one per incident), which the final invoice turns into an `ADJUSTMENT` line. When EquiFreight pays, nothing is attached and the audit row says "not charged".
 - **Who is told:** the job's club gets `INCIDENT_UPDATE` with the manager's message as written, opening the job's tracking. Whoever proposed it and the coordinator get `INCIDENT_DECIDED`, and so does the trip's crew, on the cab.
 - **Open:** on a shared trailer the delay moves every job on the trip, but only the incident's customer gets the manager's message, since it may name their horse. Telling the other clients about their new times after departure is still to decide (docs/shared-trips-design.md keeps that for incidents). Resolving an incident (`RESOLVED`) isn't built.
+
+## Leaving a moving trip (US-F5-06)
+
+After departure, only an incident decision takes a job, or some of its horses, off a trip. The coordinator's Load plan and Route actions are refused once the job's part on that trip has left.
+
+- **The option.** Besides its cost and delay, an option can say how horses leave: unload at a safe place and continue later (`UNLOAD`, needs the place), send a second vehicle (`SECOND_VEHICLE`, needs the vehicle), return to origin (`RETURN_TO_ORIGIN`), or leave in care (`LEAVE_IN_CARE`, needs the place). It names the horses: some or all of the incident's job's horses on its moving trip (`incident_option_horses`). It also records who bears the extra cost as proposed (`customer_pays`), which the decision composer starts from; the manager decides.
+- **Deciding it.**
+  - *Left in care:* the horses' `trip_horses` rows become `LEFT_IN_CARE` and they come off their stalls. That counts as delivered for this move.
+  - *Otherwise:* the horses move to a new trip of their own (`incidents.new_trip_id`); their old rows become `MOVED`, and records stay where they happened.
+    - A trailer whose confirmed placements are only those horses goes with them: its load plan, crew and booking move too. A trailer still carrying others stays.
+    - For a second vehicle, that vehicle joins the new trip.
+    - The new trip waits to be planned, signed off and departed like any other. Its documents are re-checked for its dates when its route is confirmed, so an AMBER or RED document locks the clearance gate and holds that departure.
+    - The job's transport specialist is told to confirm the shipment's permits still cover the horses.
+- **The trip carries on** with a new confirmed route version. A job whose horses all left loses its stops not yet reached. Pickups of a moving trip count as passed. The flight's consignments follow.
+  - Another customer whose arrival moved hears only their new time (`TRIP_TIMES_CHANGED`).
+  - A job pushed past its window gets an incident of its own (`LATE_ARRIVAL`), owned by its manager.
+- **A job on two trips.** A job's part on each trip is a `trip_jobs` row: status, departure, delivery and sign-off per part.
+  - Departure needs that part's sign-off and the job's clearance gate. A part already moving isn't held back by the other part's documents.
+  - Each trip's crew sees and records its own part.
+  - The job's own status sums up its parts (`JobTripService.summarize`): delivered, and handed over, only when every horse is delivered or left in care.
+  - The job page plans the newest part and says the job travels in parts. Tracking lists the parts and opens either one (`?trip=`).
+- **Not built:** a stop for the unloading place on the moving trip's route (the place is on the option and the incident). Planning the new trip uses the usual Load plan and Route tabs, and its route is entered as for any trip.
