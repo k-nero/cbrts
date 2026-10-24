@@ -14,6 +14,7 @@ import type {
   ShareSuggestion,
   ShareTripResult,
   TripJob,
+  JobClosing,
 } from '@/interfaces';
 
 export const jobApi = {
@@ -106,6 +107,13 @@ export const jobApi = {
 
   signOff: (jobId: string) =>
     client.post<JobDetail>(`/staff/jobs/${jobId}/sign-off`).then((r) => r.data),
+
+  /** US-F6-04: whether the job can close, and how it was closed. */
+  closing: (jobId: string) =>
+    client.get<JobClosing>(`/staff/jobs/${jobId}/closing`).then((r) => r.data),
+
+  close: (jobId: string) =>
+    client.post<JobClosing>(`/staff/jobs/${jobId}/close`).then((r) => r.data),
 };
 
 /**

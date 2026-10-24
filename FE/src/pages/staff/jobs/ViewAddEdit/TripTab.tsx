@@ -2,6 +2,7 @@ import { type FC, useState } from 'react';
 import { Flex } from 'antd';
 
 import { DelayAlertModal } from './DelayAlertModal';
+import { JobClosingPanel } from './JobClosingPanel';
 import { JobIncidents } from './JobIncidents';
 import { Placeholder } from './Placeholder';
 
@@ -29,6 +30,7 @@ export const TripTab: FC<{ job: JobDetail }> = ({ job }) => {
     null;
   return (
     <Flex vertical gap={24}>
+      <JobClosingPanel job={job} />
       <Placeholder title="Trip Journey Log">
         Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
       </Placeholder>

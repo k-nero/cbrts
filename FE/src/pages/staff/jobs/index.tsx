@@ -16,6 +16,7 @@ const TABS: { key: JobFilter; label: string }[] = [
   { key: JobFilterEnum.NEEDS_ME, label: 'Needs me' },
   { key: JobFilterEnum.BLOCKED, label: 'Blocked' },
   { key: JobFilterEnum.IN_TRANSIT, label: 'In transit' },
+  { key: JobFilterEnum.CLOSED, label: 'Closed' },
 ];
 
 /** "Sorted by departure, earliest first" / "Sorted by job, A to Z". */
