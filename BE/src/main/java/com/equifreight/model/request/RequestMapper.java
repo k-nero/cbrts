@@ -1,10 +1,12 @@
 package com.equifreight.model.request;
 
+import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.model.review.HistoryEntryResponse;
 import com.equifreight.model.route.RouteResponse;
 import com.equifreight.service.LeadTimePolicy;
 import com.equifreight.service.SubmissionCheck;
@@ -14,6 +16,23 @@ import java.util.List;
 public final class RequestMapper {
 
     private RequestMapper() {}
+
+    /**
+     * A status change as the customer reads it (US-F1-08). The manager opening the quotation draft is the review
+     * starting: the draft itself never reaches the customer.
+     */
+    public static HistoryEntryResponse toCustomerHistory(AuditLog a) {
+        String summary = switch (a.getAction()) {
+            case "QUOTATION_STARTED", "QUOTATION_RESUMED" ->
+                "Under review: the logistics manager is preparing your quotation.";
+            default -> a.getSummary();
+        };
+        return HistoryEntryResponse.builder()
+                .occurredAt(a.getOccurredAt())
+                .summary(summary)
+                .actorLabel(a.getActorLabel())
+                .build();
+    }
 
     public static RequestResponse toResponse(
             TransportRequest r, RouteResponse route, LeadTimeResponse leadTime, List<Blocker> blockers) {

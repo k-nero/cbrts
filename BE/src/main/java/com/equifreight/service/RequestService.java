@@ -116,6 +116,7 @@ public class RequestService {
     private final QuotationRepository quotations;
     private final RateFeeBandRepository feeBands;
     private final NotificationService notifications;
+    private final RequestProgressService progress;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -132,7 +133,8 @@ public class RequestService {
             RequestEstimator estimator,
             QuotationRepository quotations,
             RateFeeBandRepository feeBands,
-            NotificationService notifications) {
+            NotificationService notifications,
+            RequestProgressService progress) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -148,6 +150,7 @@ public class RequestService {
         this.quotations = quotations;
         this.feeBands = feeBands;
         this.notifications = notifications;
+        this.progress = progress;
     }
 
     @Transactional(readOnly = true)
@@ -179,11 +182,15 @@ public class RequestService {
         Club club = clubs.requireClub(user);
         TransportRequest request = requests.findByIdAndClubId(id, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", id));
-        return toResponse(request, editable(request.getStatus()) ? resolve(request) : null).toBuilder()
+        RequestResponse response = toResponse(request, editable(request.getStatus()) ? resolve(request) : null);
+        RequestProgressService.Progress where = progress.of(request, response.leadTime());
+        return response.toBuilder()
                 .quotation(quotations
                         .findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT)
                         .map(RequestService::issuedRef)
                         .orElse(null))
+                .history(where.history())
+                .nextStep(where.nextStep())
                 .build();
     }
 
