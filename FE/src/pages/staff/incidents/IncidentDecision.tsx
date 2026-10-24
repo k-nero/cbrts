@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
+import { useWatch } from 'react-hook-form';
 
 import { duration, money } from './incidentFormat';
 import { ReturnModal } from './ReturnModal';
@@ -16,6 +17,15 @@ import { formatTime } from '@/pages/trip/tripFormat';
 
 /** What approving the option will do, in the order it happens (DESIGN.md, Incident: the decision composer). */
 const consequences = (incident: Incident, option: IncidentOption, charge: boolean) => [
+  ...(option.leavingKind === 'LEAVE_IN_CARE'
+    ? [
+        `${option.horseNames.join(', ')} ${option.horseNames.length === 1 ? 'is' : 'are'} left in care at ${option.leavingPlace}, and count as delivered for this move.`,
+      ]
+    : option.leavingKind
+      ? [
+          `${option.horseNames.join(', ')} leave the trip for a new trip of their own (${option.leavingKindLabel?.toLowerCase()}), planned and signed off before it departs; a trailer carrying only them goes too. Their documents are checked again for the new dates.`,
+        ]
+      : []),
   option.changesRoute || option.delayMinutes > 0
     ? `The trip gets a new confirmed route version${
         option.delayMinutes > 0
@@ -49,9 +59,13 @@ export function IncidentDecision({
   const decide = useDecideIncident(incident.id);
   const methods = useFormCustom<DecideForm>({
     resolver: zodResolver(decideSchema),
-    defaultValues: { customerMessage: '', note: '', chargeCustomer: option.extraCost > 0 },
+    defaultValues: {
+      customerMessage: '',
+      note: '',
+      chargeCustomer: option.extraCost > 0 && option.customerPays,
+    },
   });
-  const charge = methods.watch('chargeCustomer');
+  const charge = useWatch({ control: methods.control, name: 'chargeCustomer' }) ?? false;
 
   const onSubmit = methods.handleSubmit((v) =>
     decide.mutate(
@@ -150,6 +164,9 @@ export function IncidentDecided({ incident }: { incident: Incident }) {
           </Flex>
         )}
         <ul className="type-body-s m-0 flex list-disc flex-col gap-1 pl-5 text-ink-2">
+          {incident.newTripCode && (
+            <li>{`The leaving horses travel on ${incident.newTripCode}, to be planned on the job page.`}</li>
+          )}
           <li>
             {incident.routePlanVersion
               ? `Route version ${incident.routePlanVersion} confirmed, with the new times.`

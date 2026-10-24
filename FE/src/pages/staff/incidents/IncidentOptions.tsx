@@ -103,6 +103,20 @@ export function IncidentOptions({ incident }: { incident: Incident }) {
                       {option.description && (
                         <p className="type-body-s m-0 text-ink-2">{option.description}</p>
                       )}
+                      {option.leavingKind && (
+                        <p className="type-body-s m-0 text-ink">
+                          {option.leavingKindLabel}: {option.horseNames.join(', ')}
+                          {option.leavingPlace ? ` → ${option.leavingPlace}` : ''}
+                          {option.vehicleCode ? ` · ${option.vehicleCode}` : ''}
+                        </p>
+                      )}
+                      <p className="type-caption m-0 text-ink-3">
+                        {option.extraCost > 0
+                          ? option.customerPays
+                            ? 'Proposed: the customer pays'
+                            : 'Proposed: EquiFreight pays'
+                          : null}
+                      </p>
                       <p className="type-caption m-0 text-ink-3">
                         Recorded by {option.createdByName ?? 'staff'},{' '}
                         {formatTime(option.createdAt)}

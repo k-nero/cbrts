@@ -74,7 +74,10 @@ export function TripWorkspace({
     summaries.find((item) => item.jobCode === code || item.jobCodes.includes(code))?.jobCode ??
     summaries[0]?.jobCode ??
     '';
-  const detailQuery = useTrip(audience, selectedCode);
+  // One part of a job an incident split across trips (US-F5-06); the cab always shows the part its crew rides.
+  const [partId, setPartId] = useState<string>();
+  const shownPart = audience === 'escort' ? undefined : partId;
+  const detailQuery = useTrip(audience, selectedCode, shownPart);
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [stopId, setStopId] = useState<string>();
@@ -87,7 +90,11 @@ export function TripWorkspace({
     condition: null,
   });
   const uploadedPhotos = useRef(new Map<string, string>());
-  const mutation = useTripRecord(audience === 'staff' ? 'staff' : 'escort', selectedCode);
+  const mutation = useTripRecord(
+    audience === 'staff' ? 'staff' : 'escort',
+    selectedCode,
+    audience === 'staff' ? shownPart : undefined,
+  );
   const [messageApi, contextHolder] = message.useMessage();
   const updateObservation = (horseId: string, update: Partial<Observation>) => {
     setConditionByHorse((current) => ({
@@ -226,6 +233,7 @@ export function TripWorkspace({
               value={selectedCode}
               onChange={(value) => {
                 setCode(value);
+                setPartId(undefined);
                 setStopId(undefined);
               }}
               options={summaries.map((item) => ({
@@ -508,7 +516,16 @@ export function TripWorkspace({
               </div>
             </Panel>
           )}
-          {trip && <TripDetails trip={trip} audience={audience} />}
+          {trip && (
+            <TripDetails
+              trip={trip}
+              audience={audience}
+              onShowPart={(id) => {
+                setPartId(id);
+                setStopId(undefined);
+              }}
+            />
+          )}
         </>
       )}
     </Flex>

@@ -96,6 +96,19 @@ export interface TripFlight {
   /** Every job's for staff and the crew; only their own for the customer. */
   consignments: FlightAllocation[];
 }
+/** One part of a job an incident split across trips (US-F5-06). */
+export interface TripPart {
+  tripId: string;
+  /** Staff and the crew only. */
+  tripCode: string | null;
+  status: TripStatus;
+  horses: string[];
+  leftInCare: string[];
+  plannedDepartureAt: string | null;
+  plannedArrivalAt: string | null;
+  /** The part this view shows. */
+  current: boolean;
+}
 export interface TripSummary {
   /** The job the trip's page opens with. */
   jobCode: string;
@@ -136,6 +149,8 @@ export interface TripView {
   stops: TripStop[];
   horses: TripHorse[];
   records: TripRecord[];
+  /** Every part of a job split across trips; empty while it is on one (US-F5-06). */
+  parts: TripPart[];
 }
 export interface TripRecordInput {
   routeStopId: string | null;
