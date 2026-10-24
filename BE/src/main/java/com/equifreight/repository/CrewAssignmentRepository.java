@@ -33,20 +33,24 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
     void deleteByTripId(@Param("tripId") UUID tripId);
 
     /**
-     * The escort's upcoming and active trips (US-F4-01), one row per job on a trip they crew, with the trip's code so
-     * the service can fold a shared trip into one row: closed jobs drop off the list. Trips are only released to the
-     * crew once signed off by the logistics manager (US-F3-08, US-F4-01).
+     * The escort's upcoming and active trips (US-F4-01), one row per job's part on a trip they crew, with the trip's
+     * code so the service can fold a shared trip into one row: closed jobs drop off the list, and so does a trip a
+     * job's horses moved off (US-F5-06). A part is released to the crew once the logistics manager signs off its
+     * trip (US-F3-08, US-F4-01).
      */
     @Query("""
             select new com.equifreight.model.trip.TripSummaryResponse(
-                j.code, j.tripStatus, o.name, d.name,
+                j.code, p.status, o.name, d.name,
                 (select max(r.occurredAt) from TripRecord r where r.trip = t),
                 t.code)
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d,
-                 Trip t
-            where t.id in (select th.trip.id from TripHorse th where th.job = j)
+                 TripJob p join p.trip t
+            where p.job = j
+              and exists (select 1 from TripHorse th
+                          where th.job = j and th.trip = t
+                            and th.status <> com.equifreight.entity.enums.TripHorseStatus.MOVED)
               and exists (select 1 from CrewAssignment c where c.trip = t and c.user.id = :userId)
-              and (j.signedOffAt is not null or j.tripStatus <> com.equifreight.entity.enums.TripStatus.NOT_STARTED)
+              and (p.signedOffAt is not null or p.status <> com.equifreight.entity.enums.TripStatus.NOT_STARTED)
               and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
             """)
     List<TripSummaryResponse> findTripRowsByUserId(@Param("userId") UUID userId, Sort sort);

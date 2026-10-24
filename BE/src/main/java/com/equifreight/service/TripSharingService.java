@@ -7,7 +7,6 @@ import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripHorse;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.TrailerType;
-import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -108,8 +107,9 @@ public class TripSharingService {
         return jobs.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
     }
 
-    private static boolean departed(TransportJob job) {
-        return job.getDepartedAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
+    /** Whether the job's part on its current trip has left: after that, only an incident moves it (US-F5-06). */
+    private boolean departed(TransportJob job) {
+        return jobTrips.partDeparted(jobTrips.tripOf(job.getId()), job);
     }
 
     private static void requireShared(TransportJob job) {
@@ -129,7 +129,7 @@ public class TripSharingService {
         TransportJob host = job(jobId);
         Trip trip = jobTrips.tripOf(jobId);
         List<TransportJob> onTrip = jobsOn(trip, host);
-        if (onTrip.stream().anyMatch(TripSharingService::departed)) return List.of();
+        if (onTrip.stream().anyMatch(this::departed)) return List.of();
         List<UUID> onTripIds = onTrip.stream().map(TransportJob::getId).toList();
         LocalDate planned = trip.getPlannedDepartureAt() == null
                 ? null

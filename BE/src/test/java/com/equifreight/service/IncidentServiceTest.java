@@ -21,10 +21,12 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripHorse;
+import com.equifreight.entity.TripJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
+import com.equifreight.entity.enums.LeavingKind;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.TripHorseStatus;
@@ -51,6 +53,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -106,6 +109,15 @@ class IncidentServiceTest {
     @Mock
     private TripRecordRepository records;
 
+    @Mock
+    private TripLeavingService leaving;
+
+    @Mock
+    private FlightService flights;
+
+    @Mock
+    private TripNotices notices;
+
     private IncidentService service;
     private User minh;
     private User yen;
@@ -160,6 +172,9 @@ class IncidentServiceTest {
                 clearance,
                 charges,
                 records,
+                leaving,
+                flights,
+                notices,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         minh = user("Minh", "Trần");
         yen = user("Hải Yến", "Vũ");
@@ -172,6 +187,17 @@ class IncidentServiceTest {
         job.setCoordinator(khoi);
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        when(leaving.movingTrip(any())).thenReturn(trip);
+        // The job's part on the trip, as released as the job is when it's asked for.
+        when(jobTrips.partsOf(any())).thenAnswer(inv -> {
+            TransportJob j = inv.getArgument(0);
+            TripJob part = new TripJob();
+            part.setTrip(trip);
+            part.setJob(j);
+            part.setStatus(j.getTripStatus());
+            part.setSignedOffAt(j.getSignedOffAt());
+            return List.of(part);
+        });
         when(jobTrips.findTripOf(any())).thenReturn(Optional.of(trip));
         when(crew.existsByTrip_IdAndUser_Id(trip.getId(), minh.getId())).thenReturn(true);
         when(incidents.findByClientRef(any())).thenReturn(Optional.empty());
@@ -450,7 +476,7 @@ class IncidentServiceTest {
         when(charges.findByIncident_Id(any())).thenReturn(Optional.empty());
         RoutePlan v3 = new RoutePlan();
         v3.setVersionNo((short) 3);
-        when(routePlans.reviseForIncident(eq(trip), eq(90), any(), anyString(), eq(yen)))
+        when(routePlans.reviseForIncident(eq(trip), eq(90), any(), anyString(), eq(yen), any()))
                 .thenAnswer(inv -> {
                     job.setPlannedArrivalAt(job.getPlannedArrivalAt().plusSeconds(90 * 60));
                     return Optional.of(v3);
@@ -550,7 +576,7 @@ class IncidentServiceTest {
         IncidentResponse r = service.decide(i.getId(), approve(i, true), yen);
 
         assertEquals(null, r.routePlanVersion());
-        verify(routePlans, never()).reviseForIncident(any(), anyInt(), any(), any(), any());
+        verify(routePlans, never()).reviseForIncident(any(), anyInt(), any(), any(), any(), any());
         verify(clearance, never()).recheckAfterReplan(any());
     }
 
@@ -570,5 +596,74 @@ class IncidentServiceTest {
                         eq("Sent back: Second trailer from Tây Ninh"),
                         eq("Vũ Hải Yến: Ask Tây Ninh first."));
         service.addOption(i.getId(), option("Wait for the mechanic", "0", 180, false), khoi);
+    }
+
+    // ---------- leaving a moving trip (US-F5-06) ----------
+
+    @Test
+    @DisplayName("A leaving option moves the job to a new trip; the trip carries on without its stops")
+    void theJobLeavesTheTrip() {
+        Incident i = proposed();
+        IncidentOption option = i.getProposedOption();
+        option.setLeavingKind(LeavingKind.UNLOAD);
+        option.setDelayMinutes(30);
+        Trip later = new Trip();
+        later.setId(UUID.randomUUID());
+        later.setCode("TRP-2026-009");
+        when(leaving.leave(eq(trip), eq(job), eq(option), eq(yen), any()))
+                .thenReturn(new TripLeavingService.Departure(later, true, List.of("Shadowfax")));
+        TransportJob other = job("CBRT-2026-042");
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        other.getRequest().setClub(club);
+        other.setApprovedBy(yen);
+        other.setPlannedArrivalAt(NOW.plusSeconds(5 * 3600));
+        other.setWindowEnd(NOW.plusSeconds(5 * 3600 + 600));
+        // Once the job has left, only the other job rides the trip; its arrival moves 30 minutes, past its window.
+        when(jobTrips.jobsOn(trip)).thenReturn(List.of(job, other), List.of(other));
+        RoutePlan v4 = new RoutePlan();
+        v4.setId(UUID.randomUUID());
+        v4.setVersionNo((short) 4);
+        when(routePlans.reviseForIncident(eq(trip), eq(30), any(), anyString(), eq(yen), eq(Set.of(job.getId()))))
+                .thenAnswer(inv -> {
+                    other.setPlannedArrivalAt(other.getPlannedArrivalAt().plusSeconds(30 * 60));
+                    return Optional.of(v4);
+                });
+        when(clearance.recheckAfterReplan(other.getId())).thenReturn(List.of());
+        job.setTransportSpecialist(user("Lan", "Nguyễn Thị"));
+
+        IncidentResponse r = service.decide(i.getId(), approve(i, false), yen);
+
+        assertEquals("TRP-2026-009", r.newTripCode());
+        assertEquals((short) 4, r.routePlanVersion());
+        verify(flights).allocate(trip, v4);
+        // The other customer hears only their new time; the missed window is an incident of its own.
+        verify(notices).arrivalMoved(other, v4);
+        ArgumentCaptor<Incident> late = ArgumentCaptor.forClass(Incident.class);
+        verify(incidents, org.mockito.Mockito.atLeastOnce()).save(late.capture());
+        Incident opened = late.getAllValues().stream()
+                .filter(x -> x.getKind() == IncidentKind.LATE_ARRIVAL)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(other, opened.getJob());
+        assertEquals(IncidentSource.STAFF, opened.getSource());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_DECIDED),
+                        any(Audience.StaffMembers.class),
+                        any(),
+                        eq("Check the permits for CBRT-2026-041 on trip TRP-2026-009"),
+                        anyString());
+    }
+
+    @Test
+    @DisplayName("An option that keeps everyone aboard leaves the trip's jobs as they are")
+    void noOneLeaves() {
+        Incident i = proposed();
+
+        service.decide(i.getId(), approve(i, true), yen);
+
+        verify(leaving, never()).leave(any(), any(), any(), any(), any());
+        verify(routePlans).reviseForIncident(eq(trip), eq(90), any(), anyString(), eq(yen), eq(Set.of()));
     }
 }

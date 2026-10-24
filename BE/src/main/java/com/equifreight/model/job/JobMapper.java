@@ -55,7 +55,8 @@ public final class JobMapper {
             TripLoadResponse loadPlan,
             RoutePlanResponse routePlan,
             List<CrewMemberResponse> crew,
-            List<TripJobResponse> tripJobs) {
+            List<TripJobResponse> tripJobs,
+            List<com.equifreight.model.trip.TripPartResponse> parts) {
         return JobDetailResponse.builder()
                 .id(job.getId())
                 .code(job.getCode())
@@ -80,6 +81,7 @@ public final class JobMapper {
                 .routePlan(routePlan)
                 .crew(crew)
                 .tripJobs(tripJobs)
+                .parts(parts)
                 .build();
     }
 

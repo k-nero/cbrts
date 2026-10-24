@@ -8,6 +8,7 @@ export const IncidentKindEnum = {
   VEHICLE: 'VEHICLE',
   TRAFFIC: 'TRAFFIC',
   OTHER: 'OTHER',
+  LATE_ARRIVAL: 'LATE_ARRIVAL',
 } as const;
 export type IncidentKind = (typeof IncidentKindEnum)[keyof typeof IncidentKindEnum];
 
@@ -76,7 +77,20 @@ export interface Incident {
   chargedAmount: number | null;
   /** The route version the decision gave the trip. */
   routePlanVersion: number | null;
+  /** The trip the leaving horses moved to (US-F5-06). */
+  newTripCode: string | null;
+  /** The job's horses on its moving trip, which an option can take off it. */
+  riding: { id: string; name: string }[];
 }
+
+/** How horses leave a moving trip (BE LeavingKind, US-F5-06). */
+export const LeavingKindEnum = {
+  UNLOAD: 'UNLOAD',
+  SECOND_VEHICLE: 'SECOND_VEHICLE',
+  RETURN_TO_ORIGIN: 'RETURN_TO_ORIGIN',
+  LEAVE_IN_CARE: 'LEAVE_IN_CARE',
+} as const;
+export type LeavingKind = (typeof LeavingKindEnum)[keyof typeof LeavingKindEnum];
 
 /** The manager's approval of the proposed option (US-F5-03). */
 export interface DecideIncidentInput {
@@ -100,6 +114,14 @@ export interface IncidentOption {
   changesRoute: boolean;
   createdByName: string | null;
   createdAt: string;
+  /** How horses leave the trip with this option, or null (US-F5-06). */
+  leavingKind: LeavingKind | null;
+  leavingKindLabel: string | null;
+  leavingPlace: string | null;
+  vehicleCode: string | null;
+  /** Who bears the extra cost as proposed. */
+  customerPays: boolean;
+  horseNames: string[];
 }
 
 export interface IncidentOptionInput {
@@ -108,6 +130,11 @@ export interface IncidentOptionInput {
   extraCost: number;
   delayMinutes: number;
   changesRoute: boolean;
+  leavingKind?: LeavingKind;
+  horseIds?: string[];
+  leavingPlace?: string;
+  vehicleId?: string;
+  customerPays: boolean;
 }
 
 /** An emergency reported from the cab (US-F5-01). */

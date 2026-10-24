@@ -8,6 +8,7 @@ import com.equifreight.entity.JobCharge;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripHorse;
+import com.equifreight.entity.TripJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.IncidentKind;
@@ -15,7 +16,6 @@ import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RoleName;
-import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -86,6 +86,9 @@ public class IncidentService {
     private final ClearanceService clearance;
     private final JobChargeRepository charges;
     private final TripRecordRepository records;
+    private final TripLeavingService leaving;
+    private final FlightService flights;
+    private final TripNotices notices;
     private final Clock clock;
 
     public IncidentService(
@@ -101,6 +104,9 @@ public class IncidentService {
             ClearanceService clearance,
             JobChargeRepository charges,
             TripRecordRepository records,
+            TripLeavingService leaving,
+            FlightService flights,
+            TripNotices notices,
             Clock clock) {
         this.incidents = incidents;
         this.jobs = jobs;
@@ -114,6 +120,9 @@ public class IncidentService {
         this.clearance = clearance;
         this.charges = charges;
         this.records = records;
+        this.leaving = leaving;
+        this.flights = flights;
+        this.notices = notices;
         this.clock = clock;
     }
 
@@ -128,11 +137,14 @@ public class IncidentService {
         if (existing.isPresent()) return toResponse(existing.get());
 
         TransportJob job = jobs.findByCode(jobCode).orElseThrow(() -> ResourceNotFoundException.of("Trip", jobCode));
-        Trip trip = jobTrips.tripOf(job.getId());
-        boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!released || !crew.existsByTrip_IdAndUser_Id(trip.getId(), escort.getId())) {
-            throw ResourceNotFoundException.of("Trip", jobCode);
-        }
+        // The part of the job this escort crews, once released to them: on a job split by an earlier incident, each
+        // trip's crew reports on their own part (US-F5-06).
+        Trip trip = jobTrips.partsOf(job).reversed().stream()
+                .filter(p -> p.released()
+                        && crew.existsByTrip_IdAndUser_Id(p.getTrip().getId(), escort.getId()))
+                .map(TripJob::getTrip)
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Trip", jobCode));
         if (!CAB_KINDS.contains(request.kind())) {
             throw new BusinessException("The cab reports a vehicle breakdown, a traffic jam, a horse medical incident"
                     + " or another emergency");
@@ -219,6 +231,8 @@ public class IncidentService {
         option.setDelayMinutes(request.delayMinutes());
         option.setChangesRoute(request.changesRoute());
         option.setCreatedBy(user);
+        // An option may take the job, or some of its horses, off the moving trip (US-F5-06).
+        leaving.prepare(incident.getJob(), option, request);
         incident.getOptions().add(option);
         Incident saved = incidents.saveAndFlush(incident);
         audit.recordDecision(
@@ -322,22 +336,40 @@ public class IncidentService {
 
         String reason = AuditText.fit("Incident on " + job.getCode() + ": " + option.getTitle());
         Map<TransportJob, List<String>> documentsToCheck = new LinkedHashMap<>();
-        Trip trip = jobTrips.tripOf(job.getId());
-        if (option.isChangesRoute() || option.getDelayMinutes() > 0) {
+        Trip trip = leaving.movingTrip(job);
+        Map<UUID, Instant> arrivals = new HashMap<>();
+        jobTrips.jobsOn(trip).forEach(j -> arrivals.put(j.getId(), j.getPlannedArrivalAt()));
+        // The option's horses leave the moving trip: to a new trip of their own, or into care (US-F5-06).
+        TripLeavingService.Departure departure = null;
+        if (option.getLeavingKind() != null) {
+            departure = leaving.leave(trip, job, option, manager, now);
+            incident.setNewTrip(departure.newTrip());
+        }
+        Set<UUID> leavingJobs = departure != null && departure.jobLeftTrip() ? Set.of(job.getId()) : Set.of();
+        List<User> lateOwners = new ArrayList<>();
+        if (option.isChangesRoute() || option.getDelayMinutes() > 0 || !leavingJobs.isEmpty()) {
             Set<UUID> reached = new HashSet<>();
             records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
                     .filter(r -> r.getRouteStop() != null)
                     .forEach(r -> reached.add(r.getRouteStop().getId()));
-            Map<UUID, Instant> arrivals = new HashMap<>();
-            jobTrips.jobsOn(trip).forEach(j -> arrivals.put(j.getId(), j.getPlannedArrivalAt()));
             routePlans
-                    .reviseForIncident(trip, option.getDelayMinutes(), reached, reason, manager)
-                    .ifPresent(incident::setRoutePlan);
-            // Dates that moved re-run the document check (US-F2-10).
+                    .reviseForIncident(trip, option.getDelayMinutes(), reached, reason, manager, leavingJobs)
+                    .ifPresent(plan -> {
+                        incident.setRoutePlan(plan);
+                        flights.allocate(trip, plan);
+                    });
             for (TransportJob onTrip : jobTrips.jobsOn(trip)) {
-                if (!Objects.equals(arrivals.get(onTrip.getId()), onTrip.getPlannedArrivalAt())) {
-                    List<String> red = clearance.recheckAfterReplan(onTrip.getId());
-                    if (!red.isEmpty()) documentsToCheck.put(onTrip, red);
+                if (Objects.equals(arrivals.get(onTrip.getId()), onTrip.getPlannedArrivalAt())) continue;
+                // Dates that moved re-run the document check (US-F2-10).
+                List<String> red = clearance.recheckAfterReplan(onTrip.getId());
+                if (!red.isEmpty()) documentsToCheck.put(onTrip, red);
+                if (onTrip.getId().equals(job.getId()) || incident.getRoutePlan() == null) continue;
+                // Another customer hears only what changes for them; a missed window is an incident of its own.
+                notices.arrivalMoved(onTrip, incident.getRoutePlan());
+                if (onTrip.getWindowEnd() != null
+                        && onTrip.getPlannedArrivalAt() != null
+                        && onTrip.getPlannedArrivalAt().isAfter(onTrip.getWindowEnd())) {
+                    lateOwners.add(lateArrival(onTrip, job, manager, now).getOwner());
                 }
             }
         }
@@ -388,10 +420,11 @@ public class IncidentService {
                     "Approved: " + option.getTitle(),
                     decided);
         }
-        List<User> crewOnTrip = crew.findByTrip_Id(trip.getId()).stream()
-                .map(CrewAssignment::getUser)
-                .distinct()
-                .toList();
+        List<CrewAssignment> crewRows = new ArrayList<>(crew.findByTrip_Id(trip.getId()));
+        if (incident.getNewTrip() != null)
+            crewRows.addAll(crew.findByTrip_Id(incident.getNewTrip().getId()));
+        List<User> crewOnTrip =
+                crewRows.stream().map(CrewAssignment::getUser).distinct().toList();
         if (!crewOnTrip.isEmpty()) {
             notifications.notify(
                     NotificationKind.INCIDENT_DECIDED,
@@ -410,6 +443,20 @@ public class IncidentService {
                     "Documents to check for " + onTrip.getCode(),
                     "The new arrival after the incident makes these no longer valid: " + String.join(", ", red) + ".");
         });
+        if (departure != null && departure.newTrip() != null && job.getTransportSpecialist() != null) {
+            // The horses' own documents are checked again when their new trip is planned; the shipment's permits
+            // are the specialist's to confirm (US-F5-06).
+            notifications.notify(
+                    NotificationKind.INCIDENT_DECIDED,
+                    Audience.staff(job.getTransportSpecialist()),
+                    Subject.documents(job),
+                    "Check the permits for " + job.getCode() + " on trip "
+                            + departure.newTrip().getCode(),
+                    String.join(", ", departure.horses()) + " left trip " + trip.getCode()
+                            + " and will travel on " + departure.newTrip().getCode()
+                            + ". Confirm the shipment's permits and declarations still cover them; their own documents"
+                            + " are checked again for the new dates when that trip is planned.");
+        }
         return toResponse(saved);
     }
 
@@ -444,6 +491,32 @@ public class IncidentService {
                     nameOf(manager) + ": " + request.reason().strip());
         }
         return toResponse(saved);
+    }
+
+    /**
+     * Another job on the trip now arrives after its window closes because of {@code cause}'s decision (US-F5-06): it
+     * gets an incident of its own, so its customer is told and the manager decides for them too.
+     */
+    private Incident lateArrival(TransportJob other, TransportJob cause, User manager, Instant now) {
+        Incident late = new Incident();
+        late.setJob(other);
+        late.setKind(IncidentKind.LATE_ARRIVAL);
+        late.setSource(IncidentSource.STAFF);
+        late.setStatus(IncidentStatus.OPEN);
+        late.setSummary(AuditText.fit("The decision on " + cause.getCode() + "'s incident moves " + other.getCode()
+                + "'s arrival to " + at(other.getPlannedArrivalAt()) + ", after its window closes at "
+                + at(other.getWindowEnd())));
+        late.setReportedBy(manager);
+        late.setOwner(ownerOf(other));
+        late.setOpenedAt(now);
+        Incident saved = incidents.save(late);
+        alert(saved, now);
+        return saved;
+    }
+
+    private static String at(Instant instant) {
+        return instant.atZone(BusinessTime.ZONE)
+                .format(java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm", java.util.Locale.ENGLISH));
     }
 
     private static IncidentOption requireProposal(Incident incident) {
@@ -522,9 +595,11 @@ public class IncidentService {
     private void alert(Incident incident, Instant at) {
         TransportJob job = incident.getJob();
         String title = incident.getKind().label() + ": " + job.getCode();
-        String body = incident.getSummary() + " · " + incident.getLocation() + ". Reported by "
-                + nameOf(incident.getReportedBy()) + " from the cab at "
-                + at.atZone(BusinessTime.ZONE).format(TIME) + ".";
+        String body = incident.getSource() == IncidentSource.CAB
+                ? incident.getSummary() + " · " + incident.getLocation() + ". Reported by "
+                        + nameOf(incident.getReportedBy()) + " from the cab at "
+                        + at.atZone(BusinessTime.ZONE).format(TIME) + "."
+                : incident.getSummary() + ".";
         List<User> named = new ArrayList<>(List.of(incident.getOwner()));
         User coordinator = job.getCoordinator();
         if (coordinator != null
@@ -594,7 +669,18 @@ public class IncidentService {
                                 o.getDelayMinutes(),
                                 o.isChangesRoute(),
                                 nameOf(o.getCreatedBy()),
-                                o.getCreatedAt()))
+                                o.getCreatedAt(),
+                                o.getLeavingKind(),
+                                o.getLeavingKind() == null
+                                        ? null
+                                        : o.getLeavingKind().label(),
+                                o.getLeavingPlace(),
+                                o.getVehicle() == null ? null : o.getVehicle().getCode(),
+                                o.isCustomerPays(),
+                                o.getHorses().stream()
+                                        .map(com.equifreight.entity.Horse::getName)
+                                        .sorted()
+                                        .toList()))
                         .toList(),
                 i.getProposedOption() == null ? null : i.getProposedOption().getId(),
                 nameOf(i.getProposedBy()),
@@ -611,7 +697,15 @@ public class IncidentService {
                         : charges.findByIncident_Id(i.getId())
                                 .map(JobCharge::getAmount)
                                 .orElse(null),
-                i.getRoutePlan() == null ? null : i.getRoutePlan().getVersionNo());
+                i.getRoutePlan() == null ? null : i.getRoutePlan().getVersionNo(),
+                i.getNewTrip() == null ? null : i.getNewTrip().getCode(),
+                i.getStatus() == IncidentStatus.OPEN
+                        ? jobTrips.horsesOn(leaving.movingTrip(job)).stream()
+                                .filter(th -> th.getJob().getId().equals(job.getId()))
+                                .map(th -> new IncidentResponse.RidingHorse(
+                                        th.getHorse().getId(), th.getHorse().getName()))
+                                .toList()
+                        : List.of());
     }
 
     static String nameOf(User user) {

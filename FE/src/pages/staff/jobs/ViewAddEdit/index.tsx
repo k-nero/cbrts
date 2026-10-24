@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
-import { ClearanceGate, StageMark } from '@/components/ui';
+import { Callout, ClearanceGate, StageMark } from '@/components/ui';
 import { useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
@@ -139,6 +139,21 @@ export default function JobDetailPage() {
           />
 
           {/* Clearance gate component */}
+          {job.parts.length > 0 && (
+            <Callout tone="info" title={`${job.code} travels in ${job.parts.length} parts`}>
+              {job.parts
+                .map(
+                  (part) =>
+                    `${part.tripCode} (${part.status.toLowerCase().replace('_', ' ')}): ${[
+                      ...part.horses,
+                      ...part.leftInCare.map((h) => `${h} in care`),
+                    ].join(', ')}`,
+                )
+                .join(' · ')}
+              . The tabs below plan {job.parts.find((p) => p.current)?.tripCode ?? job.tripCode};
+              the other part goes on as planned.
+            </Callout>
+          )}
           <ClearanceGate
             state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
           ></ClearanceGate>

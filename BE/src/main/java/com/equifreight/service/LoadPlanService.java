@@ -110,8 +110,8 @@ public class LoadPlanService {
     }
 
     /** Before departure only: after it, a trailer leaves the convoy only through an incident (US-F5-06). */
-    private static void requireNotDeparted(TransportJob job, String action) {
-        if (job.getDepartedAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED) {
+    private void requireNotDeparted(TransportJob job, String action) {
+        if (jobTrips.partDeparted(jobTrips.tripOf(job.getId()), job)) {
             throw new BusinessException("Cannot " + action
                     + ": the trip has departed. A trailer leaves a moving trip only through an incident.");
         }
@@ -350,11 +350,14 @@ public class LoadPlanService {
             onTrip.setSignedOffAt(null);
             onTrip.setSignedOffBy(null);
         }
+        jobTrips.clearSignOff(trip);
     }
 
-    private static void clearSignOff(TransportJob job) {
+    /** A change to the load plan needs a new sign-off of the trip, for its part of every job on it. */
+    private void clearSignOff(TransportJob job) {
         job.setSignedOffAt(null);
         job.setSignedOffBy(null);
+        jobTrips.clearSignOff(jobTrips.tripOf(job.getId()));
     }
 
     private Cargo cargo(Trip trip) {

@@ -3,7 +3,7 @@ import { Col, Flex, Row } from 'antd';
 import { eventLabels, formatTime, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
-import { Callout, Chip, Panel, TimelineStop } from '@/components/ui';
+import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
 import { SERVICE_CLASS_LABELS } from '@/lib/utils/request';
 import type { TripRecordKind, TripStop, TripView } from '@/interfaces';
 import { ON_THE_WAY, RouteStopKindEnum, TripRecordKindEnum } from '@/interfaces';
@@ -28,9 +28,12 @@ const handover = (stop: TripStop) =>
 export function TripDetails({
   trip,
   audience,
+  onShowPart,
 }: {
   trip: TripView;
   audience: 'escort' | 'staff' | 'customer';
+  /** Opens another part of a job split across trips (US-F5-06). */
+  onShowPart?: (tripId: string) => void;
 }) {
   const lastRecord = [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
   return (
@@ -48,6 +51,64 @@ export function TripDetails({
           They travel with another client's horses. Each horse keeps its own stall, and the escort
           cares for every horse on board. Stops for the other client show as a stop on the way.
         </Callout>
+      )}
+      {trip.parts.length > 0 && (
+        <Panel title={`Travelling in ${trip.parts.length} parts`}>
+          <Flex vertical gap={12}>
+            <p className="type-body-s m-0 text-ink-3">
+              {audience === 'customer'
+                ? 'After an incident on the road, your horses travel on separate trailers. Each part is followed on its own.'
+                : 'An incident split this job across trips; each part departs, travels and is delivered on its own.'}
+            </p>
+            {trip.parts.map((part, index) => (
+              <Flex
+                key={part.tripId}
+                wrap
+                align="center"
+                justify="space-between"
+                gap={12}
+                className="rounded-lg border border-line bg-card p-4"
+              >
+                <Flex vertical gap={2}>
+                  <span className="type-label-m text-ink">
+                    {part.tripCode ?? `Part ${index + 1}`} ·{' '}
+                    {part.horses.join(', ') || 'No horse travelling'}
+                  </span>
+                  <span className="type-body-s text-ink-3">
+                    {[
+                      part.plannedDepartureAt
+                        ? `Departs ${formatTime(part.plannedDepartureAt)}`
+                        : 'Departure to be planned',
+                      part.plannedArrivalAt ? `Arrives ${formatTime(part.plannedArrivalAt)}` : null,
+                      part.leftInCare.length > 0 ? `In care: ${part.leftInCare.join(', ')}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </Flex>
+                <Flex align="center" gap={8}>
+                  <Chip
+                    tone={
+                      part.status === 'DELIVERED' ? 'ok' : part.status === 'HELD' ? 'warn' : 'info'
+                    }
+                  >
+                    {sentence(part.status)}
+                  </Chip>
+                  {part.current ? (
+                    <Chip>Shown</Chip>
+                  ) : (
+                    onShowPart &&
+                    audience !== 'escort' && (
+                      <Button size="sm" onClick={() => onShowPart(part.tripId)}>
+                        Show this part
+                      </Button>
+                    )
+                  )}
+                </Flex>
+              </Flex>
+            ))}
+          </Flex>
+        </Panel>
       )}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>

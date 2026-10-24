@@ -1,7 +1,7 @@
 import type { BaseEntity } from './api';
 import type { DossierStatus } from './clearance';
 import type { ServiceClass } from './request';
-import type { TripStatus } from './trip';
+import type { TripPart, TripStatus } from './trip';
 import type { StallSide, StallType } from './vehicle';
 
 export const JobStageEnum = {
@@ -306,6 +306,8 @@ export interface JobDetail extends BaseEntity {
   crew: CrewMember[];
   /** Every job on the job's trip, this one included (US-F3-11). */
   tripJobs: TripJob[];
+  /** The job's parts once an incident split it across trips; empty while it is on one (US-F5-06). */
+  parts: TripPart[];
 }
 
 /** The Jobs list tabs (TransportJobService.search's filter). */

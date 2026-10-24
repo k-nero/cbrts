@@ -137,10 +137,16 @@ public class FlightService {
      */
     @Transactional
     public void allocate(Trip trip) {
-        Optional<RoutePlan> draft = routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
-        if (draft.isEmpty()) return;
+        routePlans
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .ifPresent(draft -> allocate(trip, draft));
+    }
+
+    /** As {@link #allocate(Trip)}, on any version of the trip's route: one an incident decision just revised. */
+    @Transactional
+    public void allocate(Trip trip, RoutePlan plan) {
         List<TransportJob> onTrip = jobTrips.jobsOn(trip);
-        for (Flight flight : flightsOf(draft.get())) {
+        for (Flight flight : flightsOf(plan)) {
             List<FlightAllocation> gone = flight.getAllocations().stream()
                     .filter(a -> onTrip.stream()
                             .noneMatch(j -> j.getId().equals(a.getJob().getId())))

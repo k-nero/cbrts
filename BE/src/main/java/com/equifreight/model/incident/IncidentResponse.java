@@ -54,4 +54,11 @@ public record IncidentResponse(
         /** The extra cost attached to the job for the final invoice, or null. */
         BigDecimal chargedAmount,
         /** The route version the decision gave the trip, or null. */
-        Short routePlanVersion) {}
+        Short routePlanVersion,
+        /** The trip the leaving horses moved to (US-F5-06), staff only. */
+        String newTripCode,
+        /** The job's horses on its moving trip, which an option can take off it (US-F5-06). */
+        List<RidingHorse> riding) {
+
+    public record RidingHorse(UUID id, String name) {}
+}
