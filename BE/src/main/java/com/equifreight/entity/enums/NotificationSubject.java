@@ -13,5 +13,7 @@ public enum NotificationSubject {
     /** A job's trip as it is followed: the customer's tracking, the staff Trip tab, the escort's cab. */
     TRIP_TRACKING,
     /** An incident: the staff incident page. */
-    INCIDENT
+    INCIDENT,
+    /** An invoice: the customer's invoice page under its request, the staff invoice page (US-F6-03). */
+    INVOICE
 }

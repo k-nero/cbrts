@@ -1,6 +1,6 @@
 # Handover and trip acceptance (Flow 6)
 
-Status: in progress. Built: recording the handover at the destination (US-F6-01, #66) and the customer's answer (US-F6-02, #67). PRODUCT.md lists Flow 6's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain I, handovers) and the Handover pages in `DESIGN.md`. Each is open to change. A drawn signature and PDF downloads are left for later: the receiver confirms by name and a tick on the tablet.
+Status: in progress. Built: recording the handover at the destination (US-F6-01, #66) the customer's answer (US-F6-02, #67), and the deposit and final invoices with payments (US-F6-03, #68). PRODUCT.md lists Flow 6's detail as undecided; the rules below are what the tickets asked for, built the smallest way that fits the schema in `docs/database/database-design.md` (Domain I, handovers) and the Handover pages in `DESIGN.md`. Each is open to change. A drawn signature and PDF downloads are left for later: the receiver confirms by name and a tick on the tablet.
 
 ## Recording the handover (US-F6-01)
 
@@ -21,3 +21,19 @@ Status: in progress. Built: recording the handover at the destination (US-F6-01,
 - **No answer:** the handover is due 2 days after it was recorded (`confirm_due_at`). The default is said up front, on the customer's owed item: "If you don't reply by …, the handover is taken as accepted." Every hour `HandoverConfirmationJob` takes the overdue ones as accepted (`accepted_by_default`, audited as the System), except while an incident on the job is still open or decided: then it waits until that is resolved.
 - **The record says it:** the Handover panel shows the answer in words ("Accepted 21 Oct, 09:12 by Saigon Turf Club", "Taken as accepted …", or "Problem reported …" quoting the customer), with an Accepted or Problem reported chip.
 - **Rules in the database:** an answer needs its time, and a discrepancy its description (`handovers_outcome_check`).
+
+## Invoices and payments (US-F6-03)
+
+Two invoices per job, generated, never typed (database-design.md, section 13A). Both are due 7 days after they are issued, carry no tax (`tax_pct` 0) and are coded `INV-YYYY-NNNN`. An issued invoice is never edited; voiding, replacing and credit notes are not built yet.
+
+- **The deposit invoice** is issued as the customer accepts the quotation (`CustomerQuotationService.accept`): one `DEPOSIT` line, the quotation's `deposit_pct` of its total. It has no job yet (the job is created at approval). The club is told (`INVOICE_ISSUED`).
+- **The final invoice** is the logistics manager's, once the handover is settled: accepted, taken as accepted, or a discrepancy whose incident is resolved. The Invoices page lists those jobs under "Ready for the final invoice"; preparing one makes a draft holding, in order:
+  - every line of the accepted quotation as quoted (`QUOTED`);
+  - each estimated line priced per unit (not overridden) at its actual quantity once the manager sets it (`ACTUALISED`), with the reason, which is required when the quantity differs and which the customer reads;
+  - the quotation's total rows (the volume break as a deduction, then arrival window, fuel, insurance, contingency, service fee) as quoted, or worked out again in the quotation's fixed order on the actual amounts (`QuotationPricing.totalsWith`, on the quotation's pinned catalog), marked actual when they moved;
+  - each cost approved on an incident that the customer pays (`job_charges`, an `ADJUSTMENT` line, US-F5-03);
+  - the late-arrival credit (`LATE_PENALTY_CREDIT`), with a window: the minutes the horses were delivered after it closed, less the minutes an incident stopped the clock; the quotation's % per started hour (10% until the rate is confirmed), capped (30%), of the quotation total. `handovers.late_minutes` and `penalty_amount` keep it;
+  - the deposit invoice's total, deducted (`DEPOSIT_DEDUCTION`).
+  Issuing it makes it due in 7 days and tells the club; a final invoice the deposit already covers is issued as paid.
+- **Payments** are recorded by hand on the invoice page (amount, prefilled with what is owed; bank transfer or card; the bank reference; the day received): never more than is owed, never dated ahead, never edited. The invoice becomes part paid or paid in the same transaction, and the club is told (`PAYMENT_RECORDED`). Refunds are not built.
+- **Screens:** the logistics manager's Invoices (sidebar): the ready jobs, then the list with To be paid, Overdue, Paid and All tabs, soonest due first; the invoice page with its lines (each tagged As quoted or Actual, an actual line raised with its reason and the quoted figure beside it), the gold "Issue the invoice" on a draft, Record a payment and the payments. The customer finds a move's invoices on its request page and opens each under it (`/requests/{id}/invoices/{invoiceId}`): the one owed item ("Pay INV-…", by when), the lines, how to pay (bank transfer with the invoice code as the reference; the bank details are a placeholder) and the payments. No PDF yet.

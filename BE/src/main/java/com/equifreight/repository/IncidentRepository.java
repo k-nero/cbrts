@@ -22,6 +22,9 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     /** Whether the job has an incident not yet resolved: it pauses the handover's default acceptance. */
     boolean existsByJob_IdAndStatusIn(UUID jobId, Collection<IncidentStatus> statuses);
 
+    /** A job's incidents that stopped the arrival-window clock (a hold, a welfare stop). */
+    List<Incident> findByJob_IdAndStopsClockTrue(UUID jobId);
+
     /** A job's incidents, oldest first, with the people named on them (the job's trip record, US-F5-05). */
     @EntityGraph(attributePaths = {"owner", "resolvedBy"})
     List<Incident> findByJob_IdOrderByOpenedAtAsc(UUID jobId);

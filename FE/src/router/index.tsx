@@ -13,6 +13,7 @@ import AddHorsePage from '@/pages/customer/horses/new';
 import HorseProfilePage from '@/pages/customer/horses/profile';
 import MyRequestsPage from '@/pages/customer/requests';
 import RequestDocumentPage from '@/pages/customer/requests/document';
+import RequestInvoicePage from '@/pages/customer/requests/invoice';
 import RequestDocumentsPage from '@/pages/customer/requests/documents';
 import RequestQuotationPage from '@/pages/customer/requests/quotation';
 import RequestSubmittedPage from '@/pages/customer/requests/submitted';
@@ -39,6 +40,8 @@ import CustomerNotesPage from '@/pages/staff/customer-notes';
 import RegulationsPage from '@/pages/staff/regulations';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 import IncidentsPage from '@/pages/staff/incidents';
+import InvoicesPage from '@/pages/staff/invoices';
+import InvoiceDetailPage from '@/pages/staff/invoices/InvoiceDetail';
 import IncidentDetailPage from '@/pages/staff/incidents/IncidentDetail';
 
 /**
@@ -84,6 +87,7 @@ export const router = createBrowserRouter([
           { path: '/requests/:id/quotation', element: <RequestQuotationPage /> },
           { path: '/requests/:id/documents', element: <RequestDocumentsPage /> },
           { path: '/requests/:id/documents/:itemId', element: <RequestDocumentPage /> },
+          { path: '/requests/:id/invoices/:invoiceId', element: <RequestInvoicePage /> },
           { path: '/tracking', element: <CustomerTripPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
         ],
@@ -104,6 +108,8 @@ export const router = createBrowserRouter([
           { path: 'requests', element: <RequestsPage /> },
           { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'requests/:id/quotation', element: <QuotationBuilderPage /> },
+          { path: 'invoices', element: <InvoicesPage /> },
+          { path: 'invoices/:id', element: <InvoiceDetailPage /> },
           { path: 'incidents', element: <IncidentsPage /> },
           { path: 'incidents/:id', element: <IncidentDetailPage /> },
           { path: 'users', element: <UsersPage /> },

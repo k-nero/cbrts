@@ -189,7 +189,9 @@ There's no per-job staff owner column yet, so staff audiences fan out by role.
 | `INCIDENT_RESOLVED` *(built, US-F5-05)* | `IncidentService.resolve`; the resolution | The coordinator, whoever proposed and the owner, unless they closed it; the escort who reported it | no | Incident / cab |
 | `HANDOVER_ACCEPTED` *(built, US-F6-02)* | `HandoverService.accept`, or `acceptByDefault` when the customer didn't answer by the due time | The manager who approved the job and its coordinator | no | Job |
 | `JOB_REPLANNED` *(built, US-F3-14)* | `TripSharingService.takeOff`, before departure, when the job had been given times; dedupe `JOB_REPLANNED:{jobId}:{tripId}` | Club accounts | yes | Tracking |
-| `INVOICE_ISSUED` / `INVOICE_OVERDUE` | invoicing; sweep | Club accounts | yes | Invoice |
+| `INVOICE_ISSUED` *(built, US-F6-03)* | `InvoiceService`: the deposit at acceptance, the final invoice when the manager issues it | Club accounts | yes | Invoice (`/requests/{id}/invoices/{invoiceId}`) |
+| `PAYMENT_RECORDED` *(built, US-F6-03)* | `InvoiceService.recordPayment` | Club accounts | yes | Invoice |
+| `INVOICE_OVERDUE` | sweep (not built) | Club accounts | yes | Invoice |
 | `NOTE_ROUTED` / `NOTE_ANSWERED` | customer notes | Routed role / club accounts | answered yes | Note |
 
 The rule behind the e-mail column: **customers get e-mail for anything that asks something of them or changes their move. Staff get e-mail only for escalations.** Routine staff work already shows up in their queues and badges.

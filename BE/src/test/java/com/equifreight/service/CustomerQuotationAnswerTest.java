@@ -45,6 +45,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     static final Instant AFTER_EXPIRY = Instant.parse("2026-10-27T17:30:00Z");
 
     NotificationService notifications;
+    InvoiceService invoices;
     QuotationIssueService issue;
     RateFeeBandRepository feeBands;
     ClubService clubs;
@@ -55,6 +56,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     @BeforeEach
     void setUpAnswer() {
         notifications = mock(NotificationService.class);
+        invoices = mock(InvoiceService.class);
         feeBands = mock(RateFeeBandRepository.class);
         clubs = mock(ClubService.class);
         issue = new QuotationIssueService(
@@ -91,6 +93,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 snapshots,
                 audit,
                 notifications,
+                invoices,
                 Clock.fixed(now, BusinessTime.ZONE));
     }
 
@@ -127,7 +130,8 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                         eq(Audience.staff(yen)),
                         eq(Subject.request(request)),
                         eq("Phnom Penh Royal Turf Club accepted Quotation Q-2026-0189 v1"),
-                        anyString());
+                        anyString()); // The deposit invoice comes with the acceptance (US-F6-03).
+        verify(invoices).issueDeposit(q, bookings);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.equifreight.service.notification;
 
 import com.equifreight.entity.AuthoritySubmission;
 import com.equifreight.entity.Incident;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -49,6 +50,16 @@ public record Subject(NotificationSubject type, UUID id, String code, UUID reque
         TransportJob job = incident.getJob();
         return new Subject(
                 NotificationSubject.INCIDENT, incident.getId(), job.getCode(), requestIdOf(job), job.getId());
+    }
+
+    /** An invoice: the customer opens it under its request (the deposit invoice comes before the job). */
+    public static Subject invoice(Invoice invoice) {
+        return new Subject(
+                NotificationSubject.INVOICE,
+                invoice.getId(),
+                invoice.getCode(),
+                invoice.getQuotation().getRequest().getId(),
+                invoice.getJob() == null ? null : invoice.getJob().getId());
     }
 
     public static Subject authoritySubmission(AuthoritySubmission submission) {
