@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import type { UploadFile } from 'antd';
 import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
 
+import { HandoverPanel } from './HandoverPanel';
+import { HandoverRecord } from './HandoverRecord';
 import { ReportEmergency } from './ReportEmergency';
 import { TripDetails } from './TripDetails';
 import { eventLabels, formatTime, sentence } from './tripFormat';
@@ -18,7 +20,10 @@ import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interf
 
 const eventKinds = Object.values(TripRecordKindEnum);
 
-const checkpointKinds = eventKinds.filter((kind) => kind !== TripRecordKindEnum.CONDITION_CHECK);
+// The handover has its own panel (US-F6-01), with each horse's condition and the receiver's confirmation.
+const checkpointKinds = eventKinds.filter(
+  (kind) => kind !== TripRecordKindEnum.CONDITION_CHECK && kind !== TripRecordKindEnum.HANDED_OVER,
+);
 
 const conditions = Object.values(HorseConditionEnum);
 
@@ -83,7 +88,6 @@ export function TripWorkspace({
   const [stopId, setStopId] = useState<string>();
   const [occurredAt, setOccurredAt] = useState(datetimeLocal);
   const [text, setText] = useState('');
-  const [receiverName, setReceiverName] = useState('');
   const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
   const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
     checkpoint: null,
@@ -114,13 +118,10 @@ export function TripWorkspace({
         occurredAt: new Date(occurredAt).toISOString(),
         clientRef,
         text: text || undefined,
-        receiverName:
-          kind === TripRecordKindEnum.HANDED_OVER ? receiverName.trim() || undefined : undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
-      setReceiverName('');
       setOccurredAt(datetimeLocal());
     } catch (error) {
       messageApi.error(errorMessage(error));
@@ -304,6 +305,19 @@ export function TripWorkspace({
             </Callout>
           )}
           {audience === 'escort' && trip && <ReportEmergency trip={trip} />}
+          {editable &&
+            audience !== 'customer' &&
+            trip &&
+            trip.tripStatus === TripStatusEnum.DELIVERED &&
+            !trip.handover?.handedOverAt && (
+              <HandoverPanel
+                trip={trip}
+                audience={audience}
+                code={selectedCode}
+                tripId={audience === 'staff' ? shownPart : undefined}
+              />
+            )}
+          {trip && <HandoverRecord trip={trip} />}
           {editable && trip && (
             <Panel
               title={
@@ -368,19 +382,6 @@ export function TripWorkspace({
                     />
                   </Flex>
                 </Col>
-                {kind === TripRecordKindEnum.HANDED_OVER && (
-                  <Col xs={24} md={12}>
-                    <Flex component="label" vertical gap={8} className="type-body-s">
-                      Received by
-                      <Input
-                        value={receiverName}
-                        onChange={(event) => setReceiverName(event.target.value)}
-                        maxLength={120}
-                        placeholder="Name of the receiving person"
-                      />
-                    </Flex>
-                  </Col>
-                )}
               </Row>
               {audience === 'escort' && (
                 <div className="mt-5 divide-y divide-line">
@@ -493,8 +494,7 @@ export function TripWorkspace({
                       mutation.isPending ||
                       ((kind === TripRecordKindEnum.DEPARTED ||
                         kind === TripRecordKindEnum.FLIGHT_DEPARTED) &&
-                        !trip.clearanceReady) ||
-                      (kind === TripRecordKindEnum.HANDED_OVER && !receiverName.trim())
+                        !trip.clearanceReady)
                     }
                     onClick={saveCheckpoint}
                   >
