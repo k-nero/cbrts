@@ -576,12 +576,16 @@ erDiagram
 | Column | Type | Rule |
 |---|---|---|
 | `job_id` | → `transport_jobs` not null | |
-| `kind` | varchar(20) | `HELD`, `CUSTOMER_REPORT`, `WELFARE`, `VEHICLE`. |
+| `kind` | `IncidentKind` | `HELD`, `CUSTOMER_REPORT`, `WELFARE` (a horse medical incident), `VEHICLE` (a breakdown), `TRAFFIC` (a prolonged jam), `OTHER`. The cab reports the last four (US-F5-01). |
 | `source` | varchar(12) | `CAB`, `CUSTOMER`, `STAFF`. |
 | `trip_record_id` | → `trip_records` | The escort's record, quoted verbatim. |
 | `owner_id` | → `users` not null | The logistics manager. Every incident has one owner. |
 | `status` | varchar(12) | `OPEN`, `DECIDED`, `RESOLVED`. |
-| `summary` | varchar(500) | |
+| `summary` | varchar(500) | What happened, as the reporter wrote it. |
+| `location` | varchar(200) | Where it happened, as written. |
+| `horse_id` | → `horses` | The horse it concerns; required for a horse medical incident. The incident is raised on that horse's job. |
+| `reported_by` | → `users` | The escort on the cab, or staff. |
+| `client_ref` | uuid, unique when set | The tablet's reference: a resend returns the incident already opened. |
 | `opened_at`, `reply_due_at` | timestamptz | A customer report is answered within 2 hours. |
 | `stops_clock` | boolean | True for an authority hold or a welfare stop: the arrival-window clock and the handover deadline pause while it is open. |
 | `clock_stopped_from`, `clock_stopped_until` | timestamptz | |
@@ -601,7 +605,7 @@ erDiagram
 |---|---|---|
 | `notes` | `club_id`, `request_id null`, `job_id null`, `checklist_item_id null`, `topic` (`DOCUMENTS`, `DATES_PRICE_CHANGES`, `TRIP`, `ROUTE`, `OTHER`), `routed_role`, `assignee_id`, `subject`, `body`, `attached_file_id null`, `created_by`, `reply_due_at`, `status` (`OPEN`, `ANSWERED`, `CLOSED`) | Check: at least one of `request_id`, `job_id` is set. `attached_file_id` is one optional file the customer attached (→ `files`), counted as attached so the orphan cleanup keeps it. The topic decides who answers (documents → transport specialist; dates, price or changes, and a route we don't run → logistics manager). Never a free chat. |
 | `note_replies` | `note_id`, `author_id`, `body` | |
-| `notifications` | `user_id`, `kind` (`NotificationKind`), `title`, `body`, `entity_type` (`NotificationSubject`: `TRANSPORT_REQUEST`, `QUOTATION`, `TRANSPORT_JOB`, `AUTHORITY_SUBMISSION`, `DOCUMENTS`, `TRIP_TRACKING`), `entity_id`, `entity_code`, `link_path`, `dedupe_key null`, `read_at`, `emailed_at` | The bell reads from it (US-00-07); sidebar badges count their own queues, not notifications. Every row links to its record: `entity_code` is the code the row shows (`REQ-2026-0031`), `link_path` the page this recipient opens it on, resolved when the row is written. Index `(user_id, read_at)`. Partial unique index `(user_id, dedupe_key) where read_at is null and dedupe_key is not null`: a repeated notice bumps the unread row instead of stacking. A notification is a pointer, never evidence; the audit log is. |
+| `notifications` | `user_id`, `kind` (`NotificationKind`), `title`, `body`, `entity_type` (`NotificationSubject`: `TRANSPORT_REQUEST`, `QUOTATION`, `TRANSPORT_JOB`, `AUTHORITY_SUBMISSION`, `DOCUMENTS`, `TRIP_TRACKING`, `INCIDENT`), `entity_id`, `entity_code`, `link_path`, `dedupe_key null`, `read_at`, `emailed_at` | The bell reads from it (US-00-07); sidebar badges count their own queues, not notifications. Every row links to its record: `entity_code` is the code the row shows (`REQ-2026-0031`), `link_path` the page this recipient opens it on, resolved when the row is written. Index `(user_id, read_at)`. Partial unique index `(user_id, dedupe_key) where read_at is null and dedupe_key is not null`: a repeated notice bumps the unread row instead of stacking. A notification is a pointer, never evidence; the audit log is. |
 
 ---
 

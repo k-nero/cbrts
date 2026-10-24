@@ -23,7 +23,8 @@ public enum NotificationKind {
     TRIP_HELD(NotificationTone.BAD),
     TRIP_SHARED(NotificationTone.INFO),
     TRIP_TIMES_CHANGED(NotificationTone.WARN),
-    JOB_REPLANNED(NotificationTone.WARN);
+    JOB_REPLANNED(NotificationTone.WARN),
+    INCIDENT_RAISED(NotificationTone.BAD);
 
     private final NotificationTone tone;
 

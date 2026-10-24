@@ -11,5 +11,7 @@ public enum NotificationSubject {
     /** A job's document checklist as a whole. */
     DOCUMENTS,
     /** A job's trip as it is followed: the customer's tracking, the staff Trip tab, the escort's cab. */
-    TRIP_TRACKING
+    TRIP_TRACKING,
+    /** An incident: the staff incident page. */
+    INCIDENT
 }
