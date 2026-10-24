@@ -512,24 +512,38 @@ export function LoadPlanTab({ job }: Props) {
                               : 'Assign driver and grooms'}
                           </span>
                         ) : (
-                          trailers.map((t) => {
-                            const onTrailer = job.crew.filter(
-                              (c) => c.tripVehicleId === t.tripVehicleId,
-                            );
-                            return (
-                              <span
-                                key={t.tripVehicleId}
-                                className="type-body-s text-ink-2 truncate"
-                              >
-                                {convoy && `${t.vehicleCode}: `}
-                                {onTrailer.length > 0
-                                  ? onTrailer
-                                      .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
-                                      .join(', ')
-                                  : 'No crew yet'}
+                          <>
+                            {trailers.map((t) => {
+                              const onTrailer = job.crew.filter(
+                                (c) => c.tripVehicleId === t.tripVehicleId,
+                              );
+                              return (
+                                <span
+                                  key={t.tripVehicleId}
+                                  className="type-body-s text-ink-2 truncate"
+                                >
+                                  {convoy && `${t.vehicleCode}: `}
+                                  {onTrailer.length > 0
+                                    ? onTrailer
+                                        .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
+                                        .join(', ')
+                                    : 'No crew yet'}
+                                </span>
+                              );
+                            })}
+                            {job.crew.some((c) => c.onFlight) && (
+                              <span className="type-body-s text-ink-2 truncate">
+                                Flight:{' '}
+                                {job.crew
+                                  .filter((c) => c.onFlight)
+                                  .map(
+                                    (c) =>
+                                      `${c.name} (${c.crewRole.toLowerCase().replace('_', ' ')})`,
+                                  )
+                                  .join(', ')}
                               </span>
-                            );
-                          })
+                            )}
+                          </>
                         )}
                       </Flex>
                     </Col>
