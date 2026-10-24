@@ -2,12 +2,14 @@ package com.equifreight.configuration;
 
 import com.equifreight.exception.*;
 import com.equifreight.model.common.ApiError;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -159,15 +163,39 @@ public class ControllerAdvise {
                         "This change conflicts with existing data. Reload and try again."));
     }
 
+    // The client went away mid-response (a tab closed while its notification stream was open): there is no one left
+    // to answer. Taking the response marks the request handled, so nothing more is written.
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientGone(AsyncRequestNotUsableException ex, HttpServletResponse response) {
+        log.debug("Client went away: {}", ex.getMessage());
+    }
+
+    // A long-lived response ran out its time (the notification stream, after 30 minutes): the browser opens a new
+    // one. Its headers are usually sent already, so there is nothing to write.
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncTimeout(AsyncRequestTimeoutException ex, HttpServletResponse response) {
+        if (!response.isCommitted()) {
+            response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        }
+    }
+
     // Anything else is our bug. Its message can carry SQL, ids or stack details, so the client gets a fixed text
-    // and the full exception goes to the log.
+    // and the full exception goes to the log. An event stream can't carry a JSON error, so it gets none.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleGeneric(Exception ex) {
+    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletResponse response) {
         log.error("Unhandled exception", ex);
+        if (isEventStream(response)) {
+            return null;
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of(
                         HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         "Internal Server Error",
                         "Something went wrong on our side. Try again, and tell us if it keeps happening."));
+    }
+
+    private static boolean isEventStream(HttpServletResponse response) {
+        String type = response.getContentType();
+        return type != null && MediaType.TEXT_EVENT_STREAM.isCompatibleWith(MediaType.parseMediaType(type));
     }
 }
