@@ -399,6 +399,7 @@ erDiagram
 | `window_start`, `window_end` | timestamptz | Copied from the request; the route is planned backwards from `window_end`. |
 | `signed_off_at`, `signed_off_by` | | Logistics manager only (US-F3-08); released to crew. |
 | `departed_at`, `delivered_at`, `closed_at` | timestamptz | |
+| `closed_by`, `on_time`, `late_minutes` | → `users`, boolean, integer | The closing (US-F6-04): who closed it, and whether the horses arrived on time (minutes after the window closed, less a stopped clock; without a window, after the planned arrival). Required on a `CLOSED` job (`transport_jobs_closed_check`). |
 
 Checks:
 - The clearance gate: `departed_at is null or (dossier_status = 'CLEARANCE_READY' and clearance_ready_at <= departed_at)` (BR-F2-03).

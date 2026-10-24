@@ -99,10 +99,16 @@ public class TransportJobService {
                         predicates.add(cb.or(
                                 cb.equal(root.get("stage"), JobStage.DOCUMENTS),
                                 cb.equal(root.get("stage"), JobStage.CLEARANCE)));
+                    // Closed jobs have left the active boards (US-F6-04); they have their own tab.
+                    case "CLOSED" -> predicates.add(cb.equal(root.get("stage"), JobStage.CLOSED));
                     default -> {
                         /* ALL - no extra predicate */
                     }
                 }
+            }
+
+            if (stage == null && !"CLOSED".equalsIgnoreCase(filter)) {
+                predicates.add(cb.notEqual(root.get("stage"), JobStage.CLOSED));
             }
 
             if (q != null && !q.isBlank()) {

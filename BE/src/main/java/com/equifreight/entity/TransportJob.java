@@ -89,6 +89,17 @@ public class TransportJob extends BaseEntity {
 
     private Instant closedAt;
 
+    /** The logistics manager who closed the job (US-F6-04). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "closed_by")
+    private User closedBy;
+
+    /** Delivered on time, as recorded at closing: within the window, or by the planned arrival without one. */
+    private Boolean onTime;
+
+    /** Minutes late at closing, less a stopped clock; 0 when on time. */
+    private Integer lateMinutes;
+
     private Instant signedOffAt;
 
     @ManyToOne(fetch = FetchType.LAZY)

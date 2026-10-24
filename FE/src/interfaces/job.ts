@@ -310,12 +310,26 @@ export interface JobDetail extends BaseEntity {
   parts: TripPart[];
 }
 
+/** Whether a job can be closed, what holds it, or how it was closed (US-F6-04). */
+export interface JobClosing {
+  closed: boolean;
+  /** What stops it closing now, in words; empty when it can close. */
+  blockers: string[];
+  closedAt: string | null;
+  closedByName: string | null;
+  onTime: boolean | null;
+  lateMinutes: number | null;
+  measuredAgainst: string | null;
+}
+
 /** The Jobs list tabs (TransportJobService.search's filter). */
 export const JobFilterEnum = {
   ALL: 'ALL',
   NEEDS_ME: 'NEEDS_ME',
   BLOCKED: 'BLOCKED',
   IN_TRANSIT: 'IN_TRANSIT',
+  /** Closed jobs have left the active boards (US-F6-04). */
+  CLOSED: 'CLOSED',
 } as const;
 export type JobFilter = (typeof JobFilterEnum)[keyof typeof JobFilterEnum];
 

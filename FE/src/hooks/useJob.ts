@@ -266,3 +266,23 @@ export const useUpdateFlightAllocation = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job'] }),
   });
 };
+
+/** Whether the job can close, what holds it, or how it was closed (US-F6-04). */
+export const useJobClosing = (jobId: string) =>
+  useQuery({
+    queryKey: ['job', jobId, 'closing'],
+    queryFn: () => jobApi.closing(jobId),
+    enabled: Boolean(jobId),
+  });
+
+/** Closes the job; it leaves the active boards. */
+export const useCloseJob = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => jobApi.close(jobId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
