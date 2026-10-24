@@ -185,6 +185,8 @@ There's no per-job staff owner column yet, so staff audiences fan out by role.
 | `INCIDENT_DECIDED` *(built, US-F5-03)* | `IncidentService.decide` | Whoever proposed it and the coordinator; the trip's crew; the job's specialist when documents turned red | no | Incident / cab / checklist |
 | `INCIDENT_RETURNED` *(built, US-F5-03)* | `IncidentService.returnProposal` | Whoever proposed it | no | Incident |
 | `INCIDENT_UPDATE` *(built, US-F5-03)* | `IncidentService.decide`; the manager's message as written; dedupe `INCIDENT_UPDATE:{incidentId}` | Club accounts | yes | Tracking |
+| `DELAY_ALERT` *(built, US-F5-04)* | `IncidentService.sendDelayAlert`; the reason and the new arrival, the note only to the job's own club; dedupe `DELAY_ALERT:{jobId}:{incidentId}` for clubs | Every club on the trip; the trip's crew; the owner and the coordinator, unless they sent it | yes | Tracking / cab / incident |
+| `INCIDENT_RESOLVED` *(built, US-F5-05)* | `IncidentService.resolve`; the resolution | The coordinator, whoever proposed and the owner, unless they closed it; the escort who reported it | no | Incident / cab |
 | `JOB_REPLANNED` *(built, US-F3-14)* | `TripSharingService.takeOff`, before departure, when the job had been given times; dedupe `JOB_REPLANNED:{jobId}:{tripId}` | Club accounts | yes | Tracking |
 | `INVOICE_ISSUED` / `INVOICE_OVERDUE` | invoicing; sweep | Club accounts | yes | Invoice |
 | `NOTE_ROUTED` / `NOTE_ANSWERED` | customer notes | Routed role / club accounts | answered yes | Note |
