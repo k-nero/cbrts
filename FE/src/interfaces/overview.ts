@@ -27,4 +27,8 @@ export interface Overview {
   newestIncident: IncidentSummary | null;
   departingThisWeek: number;
   nextDeparture: JobSummary | null;
+  /** Of the jobs delivered in the last 30 days, the share on time (null with none), and how many were late. */
+  onTimeRate: number | null;
+  deliveredLast30Days: number;
+  lateLast30Days: number;
 }

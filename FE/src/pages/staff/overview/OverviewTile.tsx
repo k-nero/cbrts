@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { cx, Icon, type Tone, TONE_FG } from '@/components/ui';
 
 type Props = {
-  figure: number;
+  figure: number | string;
   /** What it counts: "Awaiting review". */
   label: string;
   /** The one case that matters most, or what an empty tile means. */
