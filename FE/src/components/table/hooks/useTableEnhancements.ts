@@ -52,6 +52,7 @@ type UseTableEnhancementsOptions<T extends object> = {
   ignoreKeys?: string[];
   resizableColumns?: TableComponentProps<T>['resizableColumns'];
   columnVisibility?: TableComponentProps<T>['columnVisibility'];
+  showColumnSettings?: boolean;
   columnPreferencesStorage?: TableComponentProps<T>['columnPreferencesStorage'];
 };
 
@@ -64,9 +65,11 @@ export const useTableEnhancements = <T extends object>({
   ignoreKeys,
   resizableColumns,
   columnVisibility,
+  showColumnSettings: showColumnSettingsProp = true,
   columnPreferencesStorage,
 }: UseTableEnhancementsOptions<T>) => {
-  const visibilityEnabled = columnVisibility !== false;
+  // Without the button nobody could bring back a column hidden earlier, so every column shows.
+  const visibilityEnabled = columnVisibility !== false && showColumnSettingsProp;
   const visibilityIgnoreKeys = React.useMemo(() => {
     const extra = typeof columnVisibility === 'object' ? columnVisibility.ignoreKeys : ignoreKeys;
     return resolveTableIgnoreKeys(extra);
@@ -80,17 +83,18 @@ export const useTableEnhancements = <T extends object>({
     ignoreKeys: visibilityIgnoreKeys,
     storage: columnPreferencesStorage,
   });
+  const shownColumns = visibilityEnabled ? visibility.visibleColumns : columns;
 
   const visibleColumnKeysForWidths = React.useMemo(
-    () => collectLeafColumnKeys(visibility.visibleColumns),
-    [visibility.visibleColumns],
+    () => collectLeafColumnKeys(shownColumns),
+    [shownColumns],
   );
 
   const columnResize = useColumnResize<T>({
     enabled: resizableEnabled,
     id,
     columns,
-    visibleColumns: visibility.visibleColumns,
+    visibleColumns: shownColumns,
     visibleColumnKeys: visibleColumnKeysForWidths,
     tableRootRef: tableWrapperRef,
     storage: columnPreferencesStorage,
@@ -100,11 +104,9 @@ export const useTableEnhancements = <T extends object>({
   });
 
   const preparedVisibleColumns = React.useMemo((): TableColumnsType<T> => {
-    const base = resizableEnabled
-      ? columnResize.applyWidths(visibility.visibleColumns)
-      : visibility.visibleColumns;
+    const base = resizableEnabled ? columnResize.applyWidths(shownColumns) : shownColumns;
     return applyColumnEllipsis(base);
-  }, [columnResize, resizableEnabled, visibility.visibleColumns]);
+  }, [columnResize, resizableEnabled, shownColumns]);
 
   const resolvedScroll = React.useMemo(
     () => resolveScrollForResize(scroll, resizableEnabled, columnResize.contentWidth),

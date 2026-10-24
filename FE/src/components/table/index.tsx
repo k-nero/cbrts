@@ -64,6 +64,7 @@ const Table = <T extends object = object>({
   ignoreKeys,
   resizableColumns,
   columnVisibility,
+  showColumnSettings: showColumnSettingsProp,
   columnPreferencesStorage,
   pagination: paginationProp,
   onChange,
@@ -139,6 +140,7 @@ const Table = <T extends object = object>({
     ignoreKeys,
     resizableColumns,
     columnVisibility,
+    showColumnSettings: showColumnSettingsProp,
     columnPreferencesStorage,
   });
 
