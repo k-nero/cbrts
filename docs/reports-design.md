@@ -1,6 +1,6 @@
 # Reports (EPIC-R)
 
-Status: in progress. Built: the logistics manager's Overview (US-R-01, #71). Not built: the revenue and operating cost report (US-R-02, #72) and the on-time delivery KPI (US-R-03, #73), which the Overview's chart row and on-time tile will show (DESIGN.md, Overview; the Figma frame "Logistics manager · Overview").
+Status: in progress. Built: the logistics manager's Overview (US-R-01, #71) and the revenue and operating cost report (US-R-02, #72). Not built: the on-time delivery KPI (US-R-03, #73), which the Overview's on-time chart and tile will show (DESIGN.md, Overview; the Figma frame "Logistics manager · Overview").
 
 ## Overview (US-R-01)
 
@@ -18,3 +18,14 @@ Status: in progress. Built: the logistics manager's Overview (US-R-01, #71). Not
 - **Below the tiles:** the Review queue preview (the oldest five, each opening its review, with "View all N in Requests" instead of a pager), beside Clearance at risk (the four blocked jobs leaving soonest, each with what holds it in the Jobs list's own words, opening its Clearance tab).
 - **New lists it opens:** Requests gains a Quotes out tab (issued quotations, soonest to expire first; a row opens the request), and Jobs gains a This week tab. The Jobs and Requests tabs now live in the URL, so a tile opens its list already filtered.
 - **Freshness:** the Overview reloads every minute, as the review queue does.
+
+## Revenue and operating cost (US-R-02)
+
+- **Where:** on the Overview, below the queue, as the Figma frame draws it ("Revenue and direct cost by month"); revenue and margin live with this chart, never in a tile (DESIGN.md, Overview tiles).
+- **What a job counts as:** a job counts once it is settled, in the month (Indochina Time) its final invoice was issued. Drafts and void invoices don't count.
+  - **Revenue:** what the job was invoiced: its deposit invoice and its final invoice. That is after the volume break and any late-arrival credit, and includes incident costs charged on.
+  - **Direct cost:** the job's priced lines A–H as settled (the final invoice's quoted and actual lines that settle a quotation line), plus the extra cost of each incident option decided on the job, whoever paid it. The rate catalog records no separate supplier cost, so the priced lines stand for the cost base, as contingency is "of the cost base" (database-design.md, rate policies).
+  - **Margin:** revenue less direct cost: in effect the surcharges (fuel, insurance, arrival window), contingency and service fee, and charged incident costs, less discounts, credits and the incident costs EquiFreight absorbed.
+- **Filters:** the period (last 6 months, last 12 months, this year; the API takes any YYYY-MM to YYYY-MM up to 24 months, the last six by default) and one corridor or every corridor. All money is USD, the only quotation currency.
+- **The panel:** the subtitle states the period's revenue, gross margin and jobs settled; the legend; one chart of revenue (chart-1) beside direct cost (chart-2) per month, one axis, every month shown, the latest revenue labelled, a tooltip per month (jobs, revenue, cost, margin); then the corridors in a table, most revenue first, which is also the chart's table view. The two colours were checked with the palette validator in both modes (CVD ΔE about 20).
+- **Export:** "Export CSV" downloads one row per job (month, job, club, corridor, final invoice, revenue, line cost, incident cost, direct cost, margin) for the same period and corridor (`GET /staff/reports/revenue.csv`). It carries a UTF-8 byte-order mark so a spreadsheet reads the corridor arrows; a cell that starts with `=`, `+`, `-` or `@` is prefixed with a quote so it can't run as a formula.
