@@ -16,15 +16,3 @@ export const monthLabel = (ym: string, withYear = false) => {
   });
   return withYear ? `${name} ${y}` : name;
 };
-
-/** Round tick steps for a money axis: 1, 2 or 5 times a power of ten, about four ticks. */
-export const niceTicks = (max: number, count = 4) => {
-  if (max <= 0) return [0, 1];
-  const raw = max / count;
-  const power = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 5, 10].map((f) => f * power).find((s) => s >= raw) ?? raw;
-  const ticks: number[] = [];
-  for (let t = 0; t <= max + step * 0.001; t += step) ticks.push(t);
-  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
-  return ticks;
-};

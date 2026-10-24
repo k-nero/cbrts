@@ -1,51 +1,53 @@
 import type { FC } from 'react';
+import type { TableColumnsType } from 'antd';
 
+import Table from '@/components/table';
 import type { RevenueReport } from '@/interfaces';
 import { money } from '@/lib/utils';
 
-/** The report by corridor, most revenue first: the chart's figures as a table too (dataviz, accessibility). */
-export const CorridorTable: FC<{ report: RevenueReport }> = ({ report }) => (
-  <table className="w-full border-collapse">
-    <caption className="type-label-s pb-2 text-left text-ink">By corridor</caption>
-    <thead>
-      <tr className="border-b border-line">
-        {['Corridor', 'Jobs', 'Revenue', 'Direct cost', 'Margin'].map((h, i) => (
-          <th
-            key={h}
-            scope="col"
-            className={`type-caption py-2 font-normal text-ink-3 ${i === 0 ? 'text-left' : 'text-right'}`}
-          >
-            {h}
-          </th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {report.corridors.length === 0 ? (
-        <tr>
-          <td colSpan={5} className="type-body-s py-3 text-ink-3">
-            No job was settled in this period.
-          </td>
-        </tr>
-      ) : (
-        report.corridors.map((c) => (
-          <tr key={c.corridorId ?? 'none'} className="border-b border-line">
-            <th scope="row" className="type-body-s py-2 text-left font-normal text-ink">
-              {c.label}
-            </th>
-            <td className="type-data py-2 text-right text-ink-2">{c.jobs}</td>
-            <td className="type-data py-2 text-right text-ink">
-              {money(c.revenue, report.currency)}
-            </td>
-            <td className="type-data py-2 text-right text-ink-2">
-              {money(c.cost, report.currency)}
-            </td>
-            <td className="type-data py-2 text-right text-ink">
-              {c.marginPct == null ? '—' : `${c.marginPct}%`}
-            </td>
-          </tr>
-        ))
-      )}
-    </tbody>
-  </table>
-);
+type Row = RevenueReport['corridors'][number];
+
+/**
+ * The report by corridor, most revenue first: the chart's figures as a table too (dataviz, accessibility). A
+ * fixed-order table, so no sort, filter or pages (DESIGN.md, Tables).
+ */
+export const CorridorTable: FC<{ report: RevenueReport }> = ({ report }) => {
+  const m = (n: number) => money(n, report.currency);
+  const columns: TableColumnsType<Row> = [
+    { title: 'Corridor', key: 'label', dataIndex: 'label', width: 320 },
+    { title: 'Jobs', key: 'jobs', dataIndex: 'jobs', width: 80, align: 'right' },
+    {
+      title: 'Revenue',
+      key: 'revenue',
+      width: 160,
+      align: 'right',
+      render: (_, c) => <span className="type-data text-ink">{m(c.revenue)}</span>,
+    },
+    {
+      title: 'Direct cost',
+      key: 'cost',
+      width: 160,
+      align: 'right',
+      render: (_, c) => <span className="type-data text-ink-2">{m(c.cost)}</span>,
+    },
+    {
+      title: 'Margin',
+      key: 'marginPct',
+      width: 100,
+      align: 'right',
+      render: (_, c) => (
+        <span className="type-data text-ink">{c.marginPct == null ? '—' : `${c.marginPct}%`}</span>
+      ),
+    },
+  ];
+  return (
+    <Table<Row>
+      id="revenue-by-corridor"
+      rowKey={(c) => c.corridorId ?? 'none'}
+      columns={columns}
+      dataSource={report.corridors}
+      pagination={false}
+      locale={{ emptyText: 'No job was settled in this period.' }}
+    />
+  );
+};

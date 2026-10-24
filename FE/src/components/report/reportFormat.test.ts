@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { compactMoney, monthLabel, niceTicks } from './reportFormat';
+import { compactMoney, monthLabel } from './reportFormat';
 
 describe('report figures', () => {
   test('money is short on a chart', () => {
@@ -13,11 +13,5 @@ describe('report figures', () => {
   test('a month in words', () => {
     expect(monthLabel('2026-10')).toBe('Oct');
     expect(monthLabel('2026-01', true)).toBe('Jan 2026');
-  });
-
-  test('ticks are round and reach the top of the data', () => {
-    expect(niceTicks(412_800)).toEqual([0, 200_000, 400_000, 600_000]);
-    expect(niceTicks(9_575.79)).toEqual([0, 5_000, 10_000]);
-    expect(niceTicks(0)).toEqual([0, 1]);
   });
 });
