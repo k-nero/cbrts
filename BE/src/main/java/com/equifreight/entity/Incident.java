@@ -85,6 +85,20 @@ public class Incident extends BaseEntity {
 
     private Instant clockStoppedUntil;
 
+    /** The option the coordinator proposes for approval (US-F5-02); cleared when the manager sends it back. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_option_id")
+    private IncidentOption proposedOption;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_by")
+    private User proposedBy;
+
+    private Instant proposedAt;
+
+    @Column(length = 1000)
+    private String proposalNote;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "decided_option_id")
     private IncidentOption decidedOption;

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Incident;
+import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -25,7 +26,9 @@ import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.incident.AddIncidentOptionRequest;
 import com.equifreight.model.incident.IncidentResponse;
+import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
@@ -33,6 +36,7 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -277,5 +281,115 @@ class IncidentServiceTest {
                         any(),
                         anyString(),
                         anyString());
+    }
+
+    // ---------- options (US-F5-02) ----------
+
+    private Incident opened() {
+        Quotation quotation = new Quotation();
+        quotation.setCurrency("USD");
+        job.setQuotation(quotation);
+        Incident i = new Incident();
+        i.setId(UUID.randomUUID());
+        i.setJob(job);
+        i.setKind(IncidentKind.VEHICLE);
+        i.setSource(IncidentSource.CAB);
+        i.setStatus(IncidentStatus.OPEN);
+        i.setSummary("Rear tyre blew out");
+        i.setOwner(yen);
+        when(incidents.findById(i.getId())).thenReturn(Optional.of(i));
+        when(incidents.saveAndFlush(any())).thenAnswer(inv -> {
+            Incident saved = inv.getArgument(0);
+            saved.getOptions().stream().filter(o -> o.getId() == null).forEach(o -> o.setId(UUID.randomUUID()));
+            return saved;
+        });
+        return i;
+    }
+
+    private static AddIncidentOptionRequest option(String title, String cost, int delay, boolean route) {
+        return new AddIncidentOptionRequest(title, null, new BigDecimal(cost), delay, route);
+    }
+
+    @Test
+    @DisplayName("The coordinator records several options, each with its cost and delay, in order")
+    void optionsAreRecorded() {
+        Incident i = opened();
+
+        service.addOption(i.getId(), option("Wait for the roadside mechanic", "350", 180, false), khoi);
+        IncidentResponse r =
+                service.addOption(i.getId(), option("Second trailer from Tây Ninh", "1200", 90, true), khoi);
+
+        assertEquals(2, r.options().size());
+        assertEquals("USD", r.currency());
+        assertEquals(
+                List.of((short) 1, (short) 2),
+                r.options().stream().map(o -> o.position()).toList());
+        assertEquals(new BigDecimal("1200"), r.options().get(1).extraCost());
+        assertEquals("Đỗ Minh Khôi", r.options().get(1).createdByName());
+        verify(audit)
+                .recordDecision(
+                        eq(khoi),
+                        eq("ADD_INCIDENT_OPTION"),
+                        eq("Option \"Second trailer from Tây Ninh\" recorded for the incident on CBRT-2026-041:"
+                                + " + USD 1,200.00, + 1 h 30 min, new route"),
+                        eq("INCIDENT"),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any());
+    }
+
+    @Test
+    @DisplayName("Proposing an option tells the owner a decision waits, and freezes the options until then")
+    void proposingTellsTheOwner() {
+        Incident i = opened();
+        IncidentResponse r =
+                service.addOption(i.getId(), option("Second trailer from Tây Ninh", "1200", 90, true), khoi);
+        UUID optionId = r.options().getFirst().id();
+
+        r = service.propose(
+                i.getId(), new ProposeOptionRequest(optionId, "Fastest way to keep the 6-hour rule."), khoi);
+
+        assertEquals(optionId, r.proposedOptionId());
+        assertEquals("Đỗ Minh Khôi", r.proposedByName());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_PROPOSAL),
+                        eq(Audience.staff(yen)),
+                        any(),
+                        eq("Decision needed: Vehicle breakdown on CBRT-2026-041"),
+                        eq("Đỗ Minh Khôi proposes \"Second trailer from Tây Ninh\": + USD 1,200.00, + 1 h 30 min,"
+                                + " new route. Fastest way to keep the 6-hour rule."));
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addOption(i.getId(), option("Return to origin", "0", 300, true), khoi));
+        assertEquals(
+                "\"Second trailer from Tây Ninh\" waits for the logistics manager's decision: you can add an option"
+                        + " once they decide or send it back",
+                ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("An option can be taken off before anything is proposed; an unknown option is not found")
+    void optionsCanBeRemoved() {
+        Incident i = opened();
+        IncidentResponse r = service.addOption(i.getId(), option("Wait", "0", 60, false), khoi);
+
+        r = service.removeOption(i.getId(), r.options().getFirst().id(), khoi);
+
+        assertEquals(0, r.options().size());
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.propose(i.getId(), new ProposeOptionRequest(UUID.randomUUID(), null), khoi));
+    }
+
+    @Test
+    @DisplayName("A decided incident takes no more options")
+    void aDecidedIncidentIsClosedToOptions() {
+        Incident i = opened();
+        i.setStatus(IncidentStatus.DECIDED);
+
+        assertThrows(BusinessException.class, () -> service.addOption(i.getId(), option("Wait", "0", 60, false), khoi));
     }
 }

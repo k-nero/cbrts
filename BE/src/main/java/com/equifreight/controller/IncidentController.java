@@ -2,8 +2,10 @@ package com.equifreight.controller;
 
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.IncidentStatus;
+import com.equifreight.model.incident.AddIncidentOptionRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
+import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
 import com.equifreight.service.IncidentService;
 import jakarta.validation.Valid;
@@ -48,6 +50,33 @@ public class IncidentController {
                 status,
                 PageRequest.of(
                         pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "openedAt")));
+    }
+
+    /** US-F5-02: record an option for handling the incident, with its cost and delay. */
+    @PostMapping("/api/v1/staff/incidents/{id}/options")
+    @PreAuthorize("hasAnyRole('LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    public IncidentResponse addOption(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddIncidentOptionRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.addOption(id, request, user);
+    }
+
+    @DeleteMapping("/api/v1/staff/incidents/{id}/options/{optionId}")
+    @PreAuthorize("hasAnyRole('LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    public IncidentResponse removeOption(
+            @PathVariable UUID id, @PathVariable UUID optionId, @AuthenticationPrincipal User user) {
+        return incidents.removeOption(id, optionId, user);
+    }
+
+    /** US-F5-02: propose one option for the logistics manager's approval. */
+    @PostMapping("/api/v1/staff/incidents/{id}/proposal")
+    @PreAuthorize("hasAnyRole('LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    public IncidentResponse propose(
+            @PathVariable UUID id,
+            @Valid @RequestBody ProposeOptionRequest request,
+            @AuthenticationPrincipal User user) {
+        return incidents.propose(id, request, user);
     }
 
     @GetMapping("/api/v1/staff/incidents/{id}")

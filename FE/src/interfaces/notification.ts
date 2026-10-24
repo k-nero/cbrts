@@ -21,6 +21,7 @@ export const NotificationKindEnum = {
   TRIP_TIMES_CHANGED: 'TRIP_TIMES_CHANGED',
   JOB_REPLANNED: 'JOB_REPLANNED',
   INCIDENT_RAISED: 'INCIDENT_RAISED',
+  INCIDENT_PROPOSAL: 'INCIDENT_PROPOSAL',
 } as const;
 export type NotificationKind = (typeof NotificationKindEnum)[keyof typeof NotificationKindEnum];
 
