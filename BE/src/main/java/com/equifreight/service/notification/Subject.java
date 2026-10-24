@@ -3,6 +3,7 @@ package com.equifreight.service.notification;
 import com.equifreight.entity.AuthoritySubmission;
 import com.equifreight.entity.Incident;
 import com.equifreight.entity.Invoice;
+import com.equifreight.entity.Note;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -70,6 +71,19 @@ public record Subject(NotificationSubject type, UUID id, String code, UUID reque
                 job.getCode(),
                 requestIdOf(job),
                 job.getId());
+    }
+
+    /** A customer note: the customer reads it on the request's Ask a question page, staff on Customer notes. */
+    public static Subject note(Note note) {
+        TransportRequest request = note.getRequest();
+        TransportJob job = note.getJob();
+        String code = job != null ? job.getCode() : request.getCode();
+        return new Subject(
+                NotificationSubject.NOTE,
+                note.getId(),
+                code,
+                request != null ? request.getId() : requestIdOf(job),
+                job == null ? null : job.getId());
     }
 
     private static UUID requestIdOf(TransportJob job) {

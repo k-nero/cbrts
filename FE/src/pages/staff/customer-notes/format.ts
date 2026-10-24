@@ -6,7 +6,8 @@ import type { CustomerNote } from '@/interfaces';
 export const TOPIC_LABEL: Record<CustomerNote['topic'], string> = {
   DOCUMENTS: 'Documents',
   DATES_PRICE_CHANGES: 'Dates, price or changes',
-  THE_TRIP: 'The trip',
+  TRIP: 'The trip',
+  OTHER: 'Something else',
 };
 
 /** "Thu 22 Oct, 14:05". */

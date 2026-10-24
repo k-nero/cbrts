@@ -78,6 +78,7 @@ export const queryKeys = {
   customerNotes: {
     all: () => ['customer-notes'] as const,
     detail: (id: string) => ['customer-notes', id] as const,
+    request: (requestId: string) => ['customer-notes', 'request', requestId] as const,
   },
   regulations: {
     all: () => ['regulations'] as const,

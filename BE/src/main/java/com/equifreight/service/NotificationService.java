@@ -150,6 +150,10 @@ public class NotificationService {
                 customer
                         ? "/tracking?job=" + subject.code()
                         : escort ? "/escort" : "/staff/jobs/" + subject.jobId() + "?tab=trip";
+            case NOTE ->
+                customer
+                        ? "/requests/" + subject.requestId() + "/ask"
+                        : "/staff/customer-notes?note=" + subject.id();
         };
     }
 

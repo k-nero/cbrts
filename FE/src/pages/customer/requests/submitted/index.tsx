@@ -225,6 +225,14 @@ const RequestSubmittedPage: FC = () => {
             <Button variant="ghost" onClick={() => router.push(router.paths.get('request-new'))}>
               Request another move
             </Button>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                router.push(router.paths.get('request-ask', { pathParams: [request.id] }))
+              }
+            >
+              Ask a question
+            </Button>
             {cancelAction}
           </Flex>
         </Flex>

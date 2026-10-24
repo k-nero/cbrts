@@ -21,23 +21,23 @@ public class CustomerNoteController {
         this.noteService = noteService;
     }
 
-    /** List customer notes routed to the logged-in staff role (Transport Specialist or Logistics Manager). */
+    /** Customer notes routed to the signed-in role; the logistics manager reads every note (US-00-08). */
     @GetMapping
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
     public List<NoteResponse> listNotes(@AuthenticationPrincipal User user) {
         return noteService.listNotesForStaff(user);
     }
 
     /** Retrieve detailed note with replies. */
     @GetMapping("/{noteId}")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
-    public NoteResponse getNote(@PathVariable UUID noteId) {
-        return noteService.getNote(noteId);
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
+    public NoteResponse getNote(@PathVariable UUID noteId, @AuthenticationPrincipal User user) {
+        return noteService.getNote(noteId, user);
     }
 
     /** Reply to a customer note. */
     @PostMapping("/{noteId}/replies")
-    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyRole('TRANSPORT_SPECIALIST', 'LOGISTICS_MANAGER', 'FLEET_COORDINATOR')")
     public NoteResponse replyToNote(
             @PathVariable UUID noteId,
             @Valid @RequestBody CreateNoteReplyRequest request,

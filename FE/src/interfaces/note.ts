@@ -7,6 +7,9 @@ export interface NoteReply {
   createdAt: string;
 }
 
+/** What a note is about (BE NoteTopic); the topic decides who answers it. */
+export type NoteTopic = 'DOCUMENTS' | 'DATES_PRICE_CHANGES' | 'TRIP' | 'OTHER';
+
 export interface CustomerNote {
   id: string;
   clubId: string;
@@ -19,7 +22,7 @@ export interface CustomerNote {
   checklistItemName?: string | null;
   checklistItemDueDate?: string | null;
   checklistItemWarning?: string | null;
-  topic: 'DOCUMENTS' | 'DATES_PRICE_CHANGES' | 'THE_TRIP';
+  topic: NoteTopic;
   routedRole: string;
   subject: string;
   body: string;
@@ -27,7 +30,7 @@ export interface CustomerNote {
   createdByName: string;
   createdAt: string;
   replyDueAt: string | null;
-  status: 'OPEN' | 'RESOLVED' | 'ANSWERED';
+  status: 'OPEN' | 'ANSWERED' | 'CLOSED';
   dueToday: boolean;
   overdue: boolean;
   attachedFileId?: string | null;
@@ -41,4 +44,13 @@ export interface CreateNoteReplyRequest {
   moveDueDateTo?: string;
   /** Shown to the customer with the moved date. */
   reasonForMove?: string;
+}
+
+/** A customer's note on one of their requests (POST /customer/requests/{id}/notes). */
+export interface CreateCustomerNoteRequest {
+  topic: NoteTopic;
+  checklistItemId?: string;
+  body: string;
+  /** A file uploaded first through the file API. */
+  attachedFileId?: string;
 }

@@ -33,7 +33,11 @@ public enum NotificationKind {
     INCIDENT_RESOLVED(NotificationTone.OK),
     HANDOVER_ACCEPTED(NotificationTone.OK),
     INVOICE_ISSUED(NotificationTone.INFO),
-    PAYMENT_RECORDED(NotificationTone.OK);
+    PAYMENT_RECORDED(NotificationTone.OK),
+    /** A customer note routed to the role that answers it (US-00-08). */
+    NOTE_RECEIVED(NotificationTone.INFO),
+    /** Staff replied to the customer's note. */
+    NOTE_ANSWERED(NotificationTone.OK);
 
     private final NotificationTone tone;
 

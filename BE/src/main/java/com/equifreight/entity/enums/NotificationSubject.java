@@ -15,5 +15,7 @@ public enum NotificationSubject {
     /** An incident: the staff incident page. */
     INCIDENT,
     /** An invoice: the customer's invoice page under its request, the staff invoice page (US-F6-03). */
-    INVOICE
+    INVOICE,
+    /** A customer note: the customer's Ask a question page, the staff Customer notes page (US-00-08). */
+    NOTE
 }

@@ -112,6 +112,13 @@ export const routesConfig = [
             name: 'request-documents',
           },
           {
+            path: '/ask',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Ask a question',
+            name: 'request-ask',
+          },
+          {
             path: '/documents/{itemId}',
             roles: ['*'],
             type: 'authenticated',
@@ -278,7 +285,8 @@ export const routesConfig = [
       },
       {
         path: '/customer-notes',
-        roles: [TS],
+        // Each role answers the notes routed to it by topic; the logistics manager reads them all (US-00-08).
+        roles: [TS, LM, FRC],
         type: 'authenticated',
         breadcrumb: 'Customer notes',
         name: 'customer-notes',

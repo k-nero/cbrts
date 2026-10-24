@@ -1285,7 +1285,7 @@ public class DataSeeder implements ApplicationRunner {
             n1.setJob(job);
             n1.setRequest(job.getRequest());
             n1.setTopic(NoteTopic.DOCUMENTS);
-            n1.setRoutedRole("TRANSPORT_SPECIALIST");
+            n1.setRoutedRole(NoteTopic.DOCUMENTS.routedRole());
             n1.setCreatedBy(customer);
             n1.setSubject("Equine Influenza vaccination window");
             n1.setBody(
@@ -1309,7 +1309,7 @@ public class DataSeeder implements ApplicationRunner {
             n2.setJob(job);
             n2.setRequest(job.getRequest());
             n2.setTopic(NoteTopic.TRIP);
-            n2.setRoutedRole("FLEET_ROUTE_COORDINATOR");
+            n2.setRoutedRole(NoteTopic.TRIP.routedRole());
             n2.setCreatedBy(customer);
             n2.setSubject("Border transit timing at Mộc Bài – Bavet");
             n2.setBody(
