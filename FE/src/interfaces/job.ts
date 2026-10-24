@@ -328,6 +328,8 @@ export const JobFilterEnum = {
   NEEDS_ME: 'NEEDS_ME',
   BLOCKED: 'BLOCKED',
   IN_TRANSIT: 'IN_TRANSIT',
+  /** Not left yet, due to leave in the next 7 days (US-R-01). */
+  THIS_WEEK: 'THIS_WEEK',
   /** Closed jobs have left the active boards (US-F6-04). */
   CLOSED: 'CLOSED',
 } as const;

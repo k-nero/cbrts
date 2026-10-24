@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Button, Flex, Input } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 
 import JobList from './JobList';
 
@@ -16,6 +16,7 @@ const TABS: { key: JobFilter; label: string }[] = [
   { key: JobFilterEnum.NEEDS_ME, label: 'Needs me' },
   { key: JobFilterEnum.BLOCKED, label: 'Blocked' },
   { key: JobFilterEnum.IN_TRANSIT, label: 'In transit' },
+  { key: JobFilterEnum.THIS_WEEK, label: 'This week' },
   { key: JobFilterEnum.CLOSED, label: 'Closed' },
 ];
 
@@ -27,7 +28,11 @@ const sortNote = (field: string, order: 'ascend' | 'descend') =>
 
 /** Jobs (every staff role): the approved jobs, by tab, with the table kit Users & roles uses. */
 export default function JobsPage() {
-  const [filter, setFilter] = useState<JobFilter>(JobFilterEnum.ALL);
+  // The tab is in the URL (?filter=BLOCKED), so the Overview's tiles open the list already filtered.
+  const [params, setParams] = useSearchParams();
+  const filter =
+    TABS.find((t) => t.key === params.get('filter'))?.key ?? (JobFilterEnum.ALL as JobFilter);
+  const setFilter = (key: JobFilter) => setParams(key === JobFilterEnum.ALL ? {} : { filter: key });
   const crud = useJobList(filter);
   const { listQuery, pageState, setPageState, search } = crud;
   const total = listQuery.data?.totalElements;

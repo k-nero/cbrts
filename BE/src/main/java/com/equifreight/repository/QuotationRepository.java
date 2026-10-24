@@ -2,11 +2,15 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -38,4 +42,9 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
 
     /** How many quotations a catalog version is pinned to. */
     long countByRateCatalogVersionId(UUID versionId);
+
+    /** Issued quotations waiting for the customer's answer (US-R-01); sorted by the caller, soonest expiry first. */
+    @EntityGraph(attributePaths = {"request", "request.club"})
+    Page<Quotation> findByStatusAndRequest_Status(
+            QuotationStatus status, RequestStatus requestStatus, Pageable pageable);
 }

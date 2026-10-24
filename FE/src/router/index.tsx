@@ -41,6 +41,7 @@ import RegulationsPage from '@/pages/staff/regulations';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
 import IncidentsPage from '@/pages/staff/incidents';
 import InvoicesPage from '@/pages/staff/invoices';
+import OverviewPage from '@/pages/staff/overview';
 import InvoiceDetailPage from '@/pages/staff/invoices/InvoiceDetail';
 import IncidentDetailPage from '@/pages/staff/incidents/IncidentDetail';
 
@@ -104,7 +105,7 @@ export const router = createBrowserRouter([
           { path: 'jobs/:id', element: <JobDetailPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'trips', element: <StaffTripPage /> },
-          { path: 'overview', element: todo('Overview') },
+          { path: 'overview', element: <OverviewPage /> },
           { path: 'requests', element: <RequestsPage /> },
           { path: 'requests/:id', element: <RequestReviewPage /> },
           { path: 'requests/:id/quotation', element: <QuotationBuilderPage /> },
