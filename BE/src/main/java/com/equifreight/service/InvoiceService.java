@@ -432,7 +432,12 @@ public class InvoiceService {
         }
         // The rows worked out from the lines follow the quotation's fixed order on the actual amounts.
         PricedTotals totals = amounts.isEmpty() ? null : pricing.totalsWith(q, job.getRequest(), amounts);
-        addTotalRow(invoice, "Volume break", q.getVolumeBreak(), totals == null ? null : totals.volumeBreak());
+        // The volume break is stored as the discount it takes off (QuotePricer); on the invoice it is a negative line.
+        addTotalRow(
+                invoice,
+                "Volume break",
+                negate(q.getVolumeBreak()),
+                totals == null ? null : negate(totals.volumeBreak()));
         addTotalRow(
                 invoice,
                 "Arrival window",
@@ -470,6 +475,10 @@ public class InvoiceService {
         totalUp(invoice);
     }
 
+    private static BigDecimal negate(BigDecimal amount) {
+        return amount == null ? null : amount.negate();
+    }
+
     private static BigDecimal quotedAmount(QuotationLine ql) {
         BigDecimal amount = ql.getOverrideAmount() != null ? ql.getOverrideAmount() : ql.getCatalogAmount();
         return amount == null ? BigDecimal.ZERO : amount;
@@ -481,7 +490,10 @@ public class InvoiceService {
         if (amount == null || amount.signum() == 0) return;
         boolean moved = actual != null && quoted != null && actual.compareTo(quoted) != 0;
         InvoiceLine line = line(invoice, moved ? InvoiceLineKind.ACTUALISED : InvoiceLineKind.QUOTED, label, amount);
-        if (moved) line.setNote("Worked out again on the actual quantities; quoted " + quoted.toPlainString());
+        if (moved) {
+            line.setNote("Worked out again on the actual quantities; quoted "
+                    + money(invoice.getQuotation().getCurrency(), quoted));
+        }
         invoice.getLines().add(line);
     }
 

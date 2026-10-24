@@ -137,7 +137,9 @@ class InvoiceServiceTest {
         waiting = line("D", 1, "Waiting time at the border", "2", "95.00", LineCertainty.ESTIMATED);
         quotation.getLines().addAll(List.of(freight, waiting));
         quotation.setContingency(new BigDecimal("150.00"));
-        quotation.setTotal(new BigDecimal("3340.00"));
+        // Stored as the discount it takes off: 3,000 + 190 − 60 + 150.
+        quotation.setVolumeBreak(new BigDecimal("60.00"));
+        quotation.setTotal(new BigDecimal("3280.00"));
         quotation.setDepositPct(new BigDecimal("30"));
         quotation.setDepositAmount(new BigDecimal("1002.00"));
         job = new TransportJob();
@@ -247,11 +249,20 @@ class InvoiceServiceTest {
                         InvoiceLineKind.QUOTED,
                         InvoiceLineKind.QUOTED,
                         InvoiceLineKind.QUOTED,
+                        InvoiceLineKind.QUOTED,
                         InvoiceLineKind.ADJUSTMENT,
                         InvoiceLineKind.DEPOSIT_DEDUCTION),
                 draft.lines().stream().map(InvoiceLineResponse::kind).toList());
-        // 3,000 + 190 + 150 contingency + 1,200 incident cost − 1,002 deposit.
-        assertEquals(new BigDecimal("3538.00"), draft.total());
+        // 3,000 + 190 − 60 volume break + 150 contingency + 1,200 incident cost − 1,002 deposit: the quotation's
+        // 3,280 settled, plus the cost, less the deposit.
+        assertEquals(new BigDecimal("3478.00"), draft.total());
+        assertEquals(
+                new BigDecimal("-60.00"),
+                draft.lines().stream()
+                        .filter(l -> l.description().equals("Volume break"))
+                        .findFirst()
+                        .orElseThrow()
+                        .amount());
         assertTrue(lineOf(draft, InvoiceLineKind.QUOTED).description().startsWith("Road freight"));
         assertTrue(draft.lines().get(1).actualisable());
         assertEquals(
@@ -268,7 +279,7 @@ class InvoiceServiceTest {
                 .thenReturn(new PricedTotals(
                         null,
                         null,
-                        BigDecimal.ZERO,
+                        new BigDecimal("60.00"),
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
@@ -299,8 +310,9 @@ class InvoiceServiceTest {
                 .orElseThrow();
         assertEquals(InvoiceLineKind.ACTUALISED, contingency.kind());
         assertEquals(new BigDecimal("164.25"), contingency.amount());
-        // 3,000 + 285 + 164.25 − 1,002.
-        assertEquals(new BigDecimal("2447.25"), r.total());
+        assertEquals("Worked out again on the actual quantities; quoted USD 150.00", contingency.note());
+        // 3,000 + 285 − 60 + 164.25 − 1,002.
+        assertEquals(new BigDecimal("2387.25"), r.total());
 
         UUID fixedLine = r.lines().getFirst().id();
         assertThrows(
@@ -321,12 +333,12 @@ class InvoiceServiceTest {
 
         InvoiceResponse draft = drafted();
 
-        // 130 minutes late, 60 of them on a stopped clock: 70 minutes, 2 started hours × 10% of 3,340.
+        // 130 minutes late, 60 of them on a stopped clock: 70 minutes, 2 started hours × 10% of 3,280.
         InvoiceLineResponse credit = lineOf(draft, InvoiceLineKind.LATE_PENALTY_CREDIT);
-        assertEquals(new BigDecimal("-668.00"), credit.amount());
+        assertEquals(new BigDecimal("-656.00"), credit.amount());
         assertEquals("Late arrival credit: 1 h 10 min after the window closed", credit.description());
         assertEquals(70, handover.getLateMinutes());
-        assertEquals(new BigDecimal("668.00"), handover.getPenaltyAmount());
+        assertEquals(new BigDecimal("656.00"), handover.getPenaltyAmount());
     }
 
     @Test

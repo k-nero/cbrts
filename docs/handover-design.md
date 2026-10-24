@@ -30,7 +30,7 @@ Two invoices per job, generated, never typed (database-design.md, section 13A). 
 - **The final invoice** is the logistics manager's, once the handover is settled: accepted, taken as accepted, or a discrepancy whose incident is resolved. The Invoices page lists those jobs under "Ready for the final invoice"; preparing one makes a draft holding, in order:
   - every line of the accepted quotation as quoted (`QUOTED`);
   - each estimated line priced per unit (not overridden) at its actual quantity once the manager sets it (`ACTUALISED`), with the reason, which is required when the quantity differs and which the customer reads;
-  - the quotation's total rows (volume break, arrival window, fuel, insurance, contingency, service fee) as quoted, or worked out again in the quotation's fixed order on the actual amounts (`QuotationPricing.totalsWith`, on the quotation's pinned catalog), marked actual when they moved;
+  - the quotation's total rows (the volume break as a deduction, then arrival window, fuel, insurance, contingency, service fee) as quoted, or worked out again in the quotation's fixed order on the actual amounts (`QuotationPricing.totalsWith`, on the quotation's pinned catalog), marked actual when they moved;
   - each cost approved on an incident that the customer pays (`job_charges`, an `ADJUSTMENT` line, US-F5-03);
   - the late-arrival credit (`LATE_PENALTY_CREDIT`), with a window: the minutes the horses were delivered after it closed, less the minutes an incident stopped the clock; the quotation's % per started hour (10% until the rate is confirmed), capped (30%), of the quotation total. `handovers.late_minutes` and `penalty_amount` keep it;
   - the deposit invoice's total, deducted (`DEPOSIT_DEDUCTION`).
