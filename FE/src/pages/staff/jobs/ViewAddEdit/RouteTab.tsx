@@ -1,4 +1,5 @@
 import { Flex } from 'antd';
+import { FlightPanel } from './FlightPanel';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
@@ -96,6 +97,8 @@ export function RouteTab({ job }: Props) {
           </Flex>
         </Flex>
       </div>
+
+      <FlightPanel job={job} />
 
       {/* Timeline of Stops */}
       <Flex vertical gap={16}>

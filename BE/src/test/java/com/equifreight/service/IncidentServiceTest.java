@@ -173,8 +173,7 @@ class IncidentServiceTest {
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId())).thenReturn(trip);
         when(jobTrips.findTripOf(any())).thenReturn(Optional.of(trip));
-        when(crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), minh.getId()))
-                .thenReturn(true);
+        when(crew.existsByTrip_IdAndUser_Id(trip.getId(), minh.getId())).thenReturn(true);
         when(incidents.findByClientRef(any())).thenReturn(Optional.empty());
         when(incidents.save(any())).thenAnswer(inv -> {
             Incident i = inv.getArgument(0);

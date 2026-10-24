@@ -1,4 +1,4 @@
-import type { RouteStopKind } from './job';
+import type { FlightAllocation, RouteStopKind } from './job';
 export const TripRecordKindEnum = {
   LOADED: 'LOADED',
   DEPARTED: 'DEPARTED',
@@ -84,6 +84,18 @@ export interface TripHorse {
   name: string;
   stall: string | null;
 }
+/** The trip's flight as its people follow it (US-F3-15). */
+export interface TripFlight {
+  airline: string;
+  flightNo: string;
+  aircraftType: string | null;
+  scheduledDepartureAt: string | null;
+  scheduledArrivalAt: string | null;
+  estimatedDepartureAt: string | null;
+  estimatedArrivalAt: string | null;
+  /** Every job's for staff and the crew; only their own for the customer. */
+  consignments: FlightAllocation[];
+}
 export interface TripSummary {
   /** The job the trip's page opens with. */
   jobCode: string;
@@ -119,6 +131,8 @@ export interface TripView {
   vehicleCode: string | null;
   /** True when the trailer carries another job too. The customer is told only that, never whose. */
   shared: boolean;
+  /** The confirmed route's flights; for the customer, with only their own consignment (US-F3-15). */
+  flights: TripFlight[];
   stops: TripStop[];
   horses: TripHorse[];
   records: TripRecord[];

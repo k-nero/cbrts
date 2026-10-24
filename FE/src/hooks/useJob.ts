@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { jobApi, jobsListApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
 import {
+  type FlightAllocationInput,
   type JobDetail,
   type JobFilter,
   JobFilterEnum,
@@ -246,5 +247,22 @@ export const useTakeOffTrip = (jobId: string) => {
       queryClient.invalidateQueries({ queryKey: ['job'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
+  });
+};
+
+/** Sets a job's consignment on the trip's flight; the job pages of every job on the trip refetch. */
+export const useUpdateFlightAllocation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      flightId,
+      input,
+    }: {
+      jobId: string;
+      flightId: string;
+      input: FlightAllocationInput;
+    }) => jobApi.updateFlightAllocation(jobId, flightId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job'] }),
   });
 };

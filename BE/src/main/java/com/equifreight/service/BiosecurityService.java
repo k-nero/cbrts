@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Biosecurity warnings for horses sharing a trailer (US-F3-12, docs/shared-trips-design.md "Health status"). Health
+ * Biosecurity warnings for horses sharing a trailer or a flight (US-F3-12, US-F3-15, docs/shared-trips-design.md "Health status"). Health
  * status is never typed in: it is derived from each job's quarantine periods and clearance checklist. Every pair of
  * jobs on a trailer is compared for three differences: an isolation mismatch, different health tests required, and
  * health documents not yet clear. The warnings don't block; the coordinator accepts them, and an accepted warning
@@ -36,6 +36,7 @@ public class BiosecurityService {
     private final QuarantinePeriodRepository quarantine;
     private final TripWarningAcceptanceRepository acceptances;
     private final AuditService audit;
+    private final FlightService flights;
     private final Clock clock;
 
     public BiosecurityService(
@@ -46,6 +47,7 @@ public class BiosecurityService {
             QuarantinePeriodRepository quarantine,
             TripWarningAcceptanceRepository acceptances,
             AuditService audit,
+            FlightService flights,
             Clock clock) {
         this.jobTrips = jobTrips;
         this.loadPlans = loadPlans;
@@ -54,6 +56,7 @@ public class BiosecurityService {
         this.quarantine = quarantine;
         this.acceptances = acceptances;
         this.audit = audit;
+        this.flights = flights;
         this.clock = clock;
     }
 
@@ -76,8 +79,8 @@ public class BiosecurityService {
     }
 
     /**
-     * The trip's warnings now: per trailer from its placements; a trip with one trailer, or none yet, compares every
-     * horse on it.
+     * The trip's warnings now: per trailer from its placements; a trip with one trailer, or none yet, or one that flies
+     * (every horse shares the aircraft, US-F3-15) compares every horse on it.
      */
     @Transactional(readOnly = true)
     public List<BiosecurityWarningResponse> forTrip(Trip trip) {
@@ -87,7 +90,7 @@ public class BiosecurityService {
     private List<List<Rider>> groups(Trip trip) {
         List<TripHorse> onTrip = jobTrips.horsesOn(trip);
         List<LoadPlan> plans = loadPlans.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
-        if (plans.size() <= 1) {
+        if (plans.size() <= 1 || flies(trip)) {
             return List.of(onTrip.stream()
                     .map(th -> new Rider(th.getJob(), th.getHorse()))
                     .toList());
@@ -102,6 +105,12 @@ public class BiosecurityService {
                     .toList());
         }
         return groups;
+    }
+
+    private boolean flies(Trip trip) {
+        return flights.currentRoute(trip)
+                .map(route -> !flights.flightsOf(route).isEmpty())
+                .orElse(false);
     }
 
     private List<Warning> compare(Trip trip, List<List<Rider>> groups) {

@@ -26,6 +26,7 @@ public final class TripMapper {
             String tripCode,
             String vehicleCode,
             boolean shared,
+            List<TripFlightResponse> flights,
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records) {
@@ -46,6 +47,7 @@ public final class TripMapper {
                         : job.getRequest().getDestinationPlace().getName(),
                 vehicleCode,
                 shared,
+                flights,
                 stops,
                 horses,
                 records);

@@ -9,12 +9,21 @@ import lombok.Builder;
 /** The job's whole crew; a missing list is empty. */
 @Builder
 /**
- * The whole crew of one trailer on the trip. {@code tripVehicleId} may be left out while the trip has one trailer.
+ * The whole crew of one trailer on the trip, or of its flight. {@code tripVehicleId} may be left out while the trip
+ * has one trailer.
  */
-public record AssignCrewRequest(UUID tripVehicleId, List<CrewItem> crew) {
+public record AssignCrewRequest(
+        UUID tripVehicleId,
+        List<CrewItem> crew,
+        /** True for the trip's flight crew (flying grooms, the flight vet) instead of a trailer's (US-F3-15). */
+        boolean flight) {
 
     public AssignCrewRequest {
         crew = crew == null ? List.of() : crew;
+    }
+
+    public AssignCrewRequest(UUID tripVehicleId, List<CrewItem> crew) {
+        this(tripVehicleId, crew, false);
     }
 
     @Builder

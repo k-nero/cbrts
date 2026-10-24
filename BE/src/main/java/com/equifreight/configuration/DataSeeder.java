@@ -876,6 +876,7 @@ public class DataSeeder implements ApplicationRunner {
 
     private void assignCrewMember(TripVehicle tripVehicle, User user, CrewRole role) {
         CrewAssignment ca = new CrewAssignment();
+        ca.setTrip(tripVehicle.getTrip());
         ca.setTripVehicle(tripVehicle);
         ca.setUser(user);
         ca.setCrewRole(role);

@@ -36,6 +36,9 @@ class BiosecurityServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-23T03:00:00Z");
 
     @Mock
+    private FlightService flights;
+
+    @Mock
     private JobTripService jobTrips;
 
     @Mock
@@ -155,6 +158,7 @@ class BiosecurityServiceTest {
                 quarantine,
                 acceptances,
                 audit,
+                flights,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

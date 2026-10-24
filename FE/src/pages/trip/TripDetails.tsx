@@ -4,6 +4,7 @@ import { eventLabels, formatTime, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
 import { Callout, Chip, Panel, TimelineStop } from '@/components/ui';
+import { SERVICE_CLASS_LABELS } from '@/lib/utils/request';
 import type { TripRecordKind, TripStop, TripView } from '@/interfaces';
 import { ON_THE_WAY, RouteStopKindEnum, TripRecordKindEnum } from '@/interfaces';
 
@@ -36,7 +37,14 @@ export function TripDetails({
     <Flex vertical gap={16}>
       {/* The customer is told the trailer is shared, never with whom (US-F3-14). */}
       {trip.shared && audience === 'customer' && (
-        <Callout tone="info" title="Your horses share this trailer">
+        <Callout
+          tone="info"
+          title={
+            trip.flights.length > 0
+              ? 'Your horses share this trailer and flight'
+              : 'Your horses share this trailer'
+          }
+        >
           They travel with another client's horses. Each horse keeps its own stall, and the escort
           cares for every horse on board. Stops for the other client show as a stop on the way.
         </Callout>
@@ -73,6 +81,28 @@ export function TripDetails({
           </Panel>
         </Col>
       </Row>
+      {trip.flights.map((flight) => (
+        <Panel key={flight.flightNo} title={`Flight ${flight.flightNo} · ${flight.airline}`}>
+          <Flex vertical gap={8}>
+            <p className="type-body-s m-0 text-ink-3">
+              Departs {formatTime(flight.estimatedDepartureAt ?? flight.scheduledDepartureAt)} ·
+              Arrives {formatTime(flight.estimatedArrivalAt ?? flight.scheduledArrivalAt)}
+            </p>
+            {flight.consignments.map((c) => (
+              <p key={c.id} className="type-body-m m-0 text-ink">
+                {audience === 'customer' ? 'Your consignment' : c.jobCode}:{' '}
+                {[
+                  c.airWaybill ? `air waybill ${c.airWaybill}` : 'air waybill to come',
+                  `${c.stallPositions ?? '?'} ${c.stallPositions === 1 ? 'stall position' : 'stall positions'}`,
+                  c.serviceClass ? SERVICE_CLASS_LABELS[c.serviceClass].toLowerCase() : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            ))}
+          </Flex>
+        </Panel>
+      ))}
       <Panel title="Route progress">
         {trip.stops.length === 0 ? (
           <p className="type-body-s m-0 text-ink-3">The confirmed route has no checkpoints yet.</p>

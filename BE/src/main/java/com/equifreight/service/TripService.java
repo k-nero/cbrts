@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.job.JobMapper;
 import com.equifreight.model.trip.*;
 import com.equifreight.repository.*;
 import com.equifreight.service.notification.Audience;
@@ -71,6 +72,7 @@ public class TripService {
     private final AuditService audit;
     private final NotificationService notifications;
     private final JobTripService jobTrips;
+    private final FlightRepository flightsByLeg;
     private final Clock clock;
 
     public TripService(
@@ -85,6 +87,7 @@ public class TripService {
             AuditService audit,
             NotificationService notifications,
             JobTripService jobTrips,
+            FlightRepository flightsByLeg,
             Clock clock) {
         this.jobs = jobs;
         this.crew = crew;
@@ -97,6 +100,7 @@ public class TripService {
         this.audit = audit;
         this.notifications = notifications;
         this.jobTrips = jobTrips;
+        this.flightsByLeg = flightsByLeg;
         this.clock = clock;
     }
 
@@ -153,12 +157,16 @@ public class TripService {
         TransportJob job = job(code);
         Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        // The cab surface is per trailer (US-F3-14): the escort sees the horses on the trailers they ride.
+        // The cab surface is per trailer (US-F3-14): the escort sees the horses on the trailers they ride. The
+        // flight crew looks after every horse on the flight, so they see them all (US-F3-15).
+        List<CrewAssignment> places = crew.findByTrip_IdAndUser_Id(trip.getId(), user.getId());
+        if (places.isEmpty() || !released) throw ResourceNotFoundException.of("Trip", code);
         Set<UUID> trailers = new HashSet<>();
-        crew.findByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId())
+        places.stream()
+                .filter(c -> c.getTripVehicle() != null)
                 .forEach(c -> trailers.add(c.getTripVehicle().getId()));
-        if (trailers.isEmpty() || !released) throw ResourceNotFoundException.of("Trip", code);
-        return view(job, trip, true, trailers);
+        boolean onFlight = places.stream().anyMatch(c -> c.getTripVehicle() == null);
+        return view(job, trip, true, onFlight ? null : trailers);
     }
 
     @Transactional(readOnly = true)
@@ -181,7 +189,7 @@ public class TripService {
         TransportJob job = jobForUpdate(code);
         Trip trip = jobTrips.tripOf(job.getId());
         boolean released = job.getSignedOffAt() != null || job.getTripStatus() != TripStatus.NOT_STARTED;
-        if (!crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
+        if (!crew.existsByTrip_IdAndUser_Id(trip.getId(), user.getId()) || !released)
             throw ResourceNotFoundException.of("Trip", code);
         return addRecord(job, trip, user, request, Channel.CAB_TABLET);
     }
@@ -526,7 +534,29 @@ public class TripService {
         allRecords.stream()
                 .filter(r -> r.getRouteStop() != null)
                 .forEach(r -> latest.put(r.getRouteStop().getId(), r));
-        List<TripStopResponse> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+        Optional<RoutePlan> confirmedRoute = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
+        // The flight everyone on the trip shares; the customer sees their own consignment only (US-F3-15).
+        List<TripFlightResponse> flights = confirmedRoute
+                .map(p -> p.getLegs().stream()
+                        .filter(leg -> leg.getMode() == TransportMode.AIR)
+                        .sorted(Comparator.comparing(RouteLeg::getSeq))
+                        .flatMap(leg -> flightsByLeg.findByRouteLegId(leg.getId()).stream())
+                        .map(f -> new TripFlightResponse(
+                                f.getAirline(),
+                                f.getFlightNo(),
+                                f.getAircraftType(),
+                                f.getScheduledDepartureAt(),
+                                f.getScheduledArrivalAt(),
+                                f.getEstimatedDepartureAt(),
+                                f.getEstimatedArrivalAt(),
+                                f.getAllocations().stream()
+                                        .filter(a ->
+                                                staffView || a.getJob().getId().equals(job.getId()))
+                                        .map(JobMapper::toAllocationResponse)
+                                        .toList()))
+                        .toList())
+                .orElse(List.of());
+        List<TripStopResponse> stops = confirmedRoute
                 .map(p -> p.getStops().stream()
                         .map(s -> !staffView && !own.test(s)
                                 ? TripMapper.toStopOnTheWay(s, latest.get(s.getId()))
@@ -581,6 +611,7 @@ public class TripService {
                                         .map(p -> p.getVehicle().getCode())
                                         .toList()),
                 shared,
+                flights,
                 stops,
                 horses,
                 recordResponses);

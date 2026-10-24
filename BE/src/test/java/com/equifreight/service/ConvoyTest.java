@@ -12,6 +12,7 @@ import com.equifreight.entity.enums.*;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.job.AssignCrewRequest;
+import com.equifreight.model.job.CrewMemberResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.model.job.TripLoadResponse;
 import com.equifreight.repository.*;
@@ -79,6 +80,7 @@ class ConvoyTest {
     private final LoadPlan first = new LoadPlan();
     private final LoadPlan second = new LoadPlan();
     private final List<TripHorse> onTrip = new ArrayList<>();
+    private final FlightService flightService = mock(FlightService.class);
     /** Placements by plan, as the repository would return them. */
     private final Map<UUID, List<LoadPlanStall>> placed = new HashMap<>();
 
@@ -206,7 +208,8 @@ class ConvoyTest {
                 routePlanService,
                 mock(BiosecurityService.class),
                 audit);
-        crewService = new CrewAssignmentService(crew, jobs, users, jobTrips, loadPlans, placements, audit);
+        crewService =
+                new CrewAssignmentService(crew, jobs, users, jobTrips, loadPlans, placements, audit, flightService);
         jobService = new TransportJobService(
                 jobs,
                 service,
@@ -435,7 +438,7 @@ class ConvoyTest {
     @DisplayName("One person rides one trailer of the convoy")
     void onePersonOneTrailer() {
         User minh = user("Minh", RoleName.ESCORT);
-        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of(member(first, minh, CrewRole.DRIVER)));
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of(member(first, minh, CrewRole.DRIVER)));
         AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
                 .userId(minh.getId())
                 .crewRole(CrewRole.DRIVER)
@@ -451,6 +454,53 @@ class ConvoyTest {
     }
 
     @Test
+    @DisplayName("The flight crew is flying grooms and the vet, one groom per three horses on board, on no trailer")
+    void theFlightCrew() {
+        for (int i = 0; i < 4; i++) onTrip.add(new TripHorse());
+        RoutePlan route = new RoutePlan();
+        when(flightService.currentRoute(trip)).thenReturn(Optional.of(route));
+        when(flightService.flightsOf(route)).thenReturn(List.of(new Flight()));
+        when(crew.saveAll(any())).thenAnswer(i -> i.getArgument(0));
+        User lan = user("Lan", RoleName.ESCORT);
+        User hoa = user("Hoa", RoleName.ESCORT);
+        User vet = user("Vet", RoleName.ESCORT);
+        AssignCrewRequest.CrewItem g1 = new AssignCrewRequest.CrewItem(lan.getId(), CrewRole.FLYING_GROOM);
+        AssignCrewRequest.CrewItem g2 = new AssignCrewRequest.CrewItem(hoa.getId(), CrewRole.FLYING_GROOM);
+        AssignCrewRequest.CrewItem v = new AssignCrewRequest.CrewItem(vet.getId(), CrewRole.VET);
+
+        BusinessException few = assertThrows(
+                BusinessException.class,
+                () -> crewService.assignCrew(
+                        job.getId(), new AssignCrewRequest(null, List.of(g1, v), true), user("Khoi", "X")));
+        assertThat(few.getMessage()).contains("At least 2 flying groom(s) required for 4 horses on the flight");
+        BusinessException driver = assertThrows(
+                BusinessException.class,
+                () -> crewService.assignCrew(
+                        job.getId(),
+                        new AssignCrewRequest(
+                                null, List.of(new AssignCrewRequest.CrewItem(lan.getId(), CrewRole.DRIVER)), true),
+                        user("Khoi", "X")));
+        assertThat(driver.getMessage()).isEqualTo("The flight crew is flying grooms and the flight vet");
+
+        List<CrewMemberResponse> saved = crewService.assignCrew(
+                job.getId(), new AssignCrewRequest(null, List.of(g1, g2, v), true), user("Khoi", "X"));
+
+        assertThat(saved).allMatch(c -> c.onFlight() && c.tripVehicleId() == null);
+        verify(crew).deleteFlightCrew(trip.getId());
+    }
+
+    @Test
+    @DisplayName("A trip without a flight has no flight crew")
+    void noFlightCrewWithoutAFlight() {
+        when(flightService.currentRoute(trip)).thenReturn(Optional.empty());
+
+        assertThrows(
+                BusinessException.class,
+                () -> crewService.assignCrew(
+                        job.getId(), new AssignCrewRequest(null, List.of(), true), user("K", "X")));
+    }
+
+    @Test
     @DisplayName("Sign-off needs a driver on every trailer of the convoy")
     void signOffNeedsADriverOnEveryTrailer() {
         first.setStatus(LoadPlanStatus.CONFIRMED);
@@ -463,7 +513,7 @@ class ConvoyTest {
         when(routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
                 .thenReturn(Optional.of(new RoutePlan()));
         User minh = user("Minh", RoleName.ESCORT);
-        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of(member(first, minh, CrewRole.DRIVER)));
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of(member(first, minh, CrewRole.DRIVER)));
 
         BusinessException ex =
                 assertThrows(BusinessException.class, () -> jobService.signOffTripPlan(job.getId(), user("Yen", "X")));

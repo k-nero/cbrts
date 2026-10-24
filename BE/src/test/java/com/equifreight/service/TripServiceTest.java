@@ -81,6 +81,8 @@ class TripServiceTest {
     @Mock
     private JobTripService jobTrips;
 
+    private final FlightRepository flightsByLeg = mock(FlightRepository.class);
+
     private TripService service;
 
     private Trip trip;
@@ -144,6 +146,7 @@ class TripServiceTest {
                 audit,
                 notifications,
                 jobTrips,
+                flightsByLeg,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         TransportRequest request = new TransportRequest();
@@ -171,11 +174,10 @@ class TripServiceTest {
         when(records.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(trip.getId()), anyCollection()))
                 .thenReturn(Optional.empty());
-        when(crew.existsByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId()))
-                .thenReturn(true);
+        when(crew.existsByTrip_IdAndUser_Id(trip.getId(), escort.getId())).thenReturn(true);
         trailer = trailer(1, "TX-447");
         lenient()
-                .when(crew.findByTripVehicle_Trip_IdAndUser_Id(trip.getId(), escort.getId()))
+                .when(crew.findByTrip_IdAndUser_Id(trip.getId(), escort.getId()))
                 .thenReturn(List.of(seat(trailer)));
         when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.empty());
         when(handovers.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -678,6 +680,49 @@ class TripServiceTest {
     }
 
     @Test
+    @DisplayName("On a shared flight the customer sees their own waybill and stall positions, staff every job's")
+    void theCustomerSeesTheirOwnConsignment() {
+        TransportJob other = sharedWith();
+        Club club = new Club();
+        club.setId(UUID.randomUUID());
+        job.getRequest().setClub(club);
+        User customer = new User();
+        customer.setClub(club);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        RouteLeg air = new RouteLeg();
+        air.setId(UUID.randomUUID());
+        air.setSeq((short) 2);
+        air.setMode(TransportMode.AIR);
+        RoutePlan plan = new RoutePlan();
+        plan.setLegs(new ArrayList<>(List.of(air)));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+        Flight flight = new Flight();
+        flight.setAirline("Cathay Cargo");
+        flight.setFlightNo("CX766");
+        for (TransportJob owner : List.of(job, other)) {
+            FlightAllocation a = new FlightAllocation();
+            a.setFlight(flight);
+            a.setJob(owner);
+            a.setAirWaybill(owner == job ? "160-12345675" : "160-87654321");
+            a.setStallPositions((short) 1);
+            flight.getAllocations().add(a);
+        }
+        when(flightsByLeg.findByRouteLegId(air.getId())).thenReturn(Optional.of(flight));
+
+        TripViewResponse mine = service.customerTrip(job.getCode(), customer);
+        TripViewResponse office = service.coordinatorTrip(job.getCode());
+
+        assertEquals("CX766", mine.flights().getFirst().flightNo());
+        assertEquals(
+                List.of("160-12345675"),
+                mine.flights().getFirst().consignments().stream()
+                        .map(c -> c.airWaybill())
+                        .toList());
+        assertEquals(2, office.flights().getFirst().consignments().size());
+    }
+
+    @Test
     @DisplayName("Staff see the trip's TRP code; the customer never does")
     void onlyStaffSeeTheTripCode() {
         Club club = new Club();
@@ -803,7 +848,7 @@ class TripServiceTest {
                 .thenReturn(Optional.empty());
         when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
                 .thenReturn(List.of());
-        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of());
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
         assertDoesNotThrow(
@@ -820,7 +865,7 @@ class TripServiceTest {
                 .thenReturn(Optional.empty());
         when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
                 .thenReturn(List.of());
-        when(crew.findByTripVehicle_Trip_Id(trip.getId())).thenReturn(List.of());
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> service.escortTrip(job.getCode(), escort));
         assertDoesNotThrow(

@@ -6,7 +6,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * One person on the crew of a vehicle on a trip. Grooms = ⌈horses ÷ 3⌉ is checked by the application.
+ * One person on the crew of a trip: on one of its trailers, or on its flight. Grooms = ⌈horses ÷ 3⌉ is checked by the
+ * application.
  */
 @Setter
 @Getter
@@ -20,7 +21,12 @@ import lombok.Setter;
 public class CrewAssignment extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_vehicle_id", nullable = false)
+    @JoinColumn(name = "trip_id", nullable = false)
+    private Trip trip;
+
+    /** The trailer this person rides; null for the trip's flight crew (flying grooms and the flight vet, US-F3-15). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trip_vehicle_id")
     private TripVehicle tripVehicle;
 
     @ManyToOne(fetch = FetchType.LAZY)

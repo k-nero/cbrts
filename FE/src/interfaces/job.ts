@@ -1,5 +1,6 @@
 import type { BaseEntity } from './api';
 import type { DossierStatus } from './clearance';
+import type { ServiceClass } from './request';
 import type { TripStatus } from './trip';
 import type { StallSide, StallType } from './vehicle';
 
@@ -94,9 +95,11 @@ export interface CrewMember {
   staffCode?: string | null;
   email: string;
   crewRole: CrewRole;
-  /** The trailer this crew member travels with. */
-  tripVehicleId: string;
-  vehicleCode: string;
+  /** The trailer this crew member travels with; null for the flight crew. */
+  tripVehicleId: string | null;
+  vehicleCode: string | null;
+  /** True for the trip's flight crew: flying grooms and the flight vet (US-F3-15). */
+  onFlight: boolean;
 }
 
 export interface LoadPlanConflict {
@@ -183,16 +186,33 @@ export interface MoveHorse {
   expectedOccupantId: string | null;
 }
 
+/** One job's consignment on a flight (US-F3-15). */
+export interface FlightAllocation {
+  id: string;
+  jobId: string;
+  jobCode: string;
+  airWaybill: string | null;
+  stallPositions: number | null;
+  serviceClass: ServiceClass | null;
+}
+
+/** The flight of an air leg: shared by every job on the trip, with one consignment per job (US-F3-15). */
 export interface FlightInfo {
   id?: string;
   airline: string;
   flightNo: string;
-  airWaybill?: string | null;
   aircraftType?: string | null;
-  stallPositions?: number | null;
-  serviceClass?: string | null;
+  /** The stall positions the airline gives the trip; null until known. */
+  stallCapacity?: number | null;
   scheduledDepartureAt?: string | null;
   scheduledArrivalAt?: string | null;
+  allocations: FlightAllocation[];
+}
+
+export interface FlightAllocationInput {
+  airWaybill?: string;
+  stallPositions: number;
+  serviceClass?: ServiceClass;
 }
 
 export interface RouteStop {
