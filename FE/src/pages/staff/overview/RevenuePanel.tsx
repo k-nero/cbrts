@@ -1,13 +1,15 @@
-import { type FC, useState } from 'react';
+import { type FC, lazy, Suspense, useState } from 'react';
 import { App, Flex, Select, Skeleton } from 'antd';
 
 import { reportApi } from '@/apis/report';
 import { CorridorTable } from '@/components/report/CorridorTable';
-import { RevenueChart } from '@/components/report/RevenueChart';
 import { compactMoney, monthLabel } from '@/components/report/reportFormat';
 import { Button, Panel } from '@/components/ui';
 import { useRevenueReport } from '@/hooks/report';
 import { apiErrorMessage, downloadBlob, ict } from '@/lib/utils';
+
+// The chart library is loaded with the panel, not with the app (it is the only place that draws a chart).
+const RevenueChart = lazy(() => import('@/components/report/RevenueChart'));
 
 type Period = '6' | '12' | 'year';
 
@@ -119,8 +121,13 @@ export const RevenuePanel: FC = () => {
           <Skeleton active paragraph={{ rows: 6 }} />
         ) : (
           <>
-            <RevenueChart months={report.months} />
-            <CorridorTable report={report} />
+            <Suspense fallback={<Skeleton.Node active className="h-60! w-full!" />}>
+              <RevenueChart months={report.months} />
+            </Suspense>
+            <Flex vertical gap={8}>
+              <span className="type-label-s text-ink">By corridor</span>
+              <CorridorTable report={report} />
+            </Flex>
             <p className="type-body-s m-0 text-ink-3">
               Revenue is what each job was invoiced, deposit included; direct cost its priced lines
               as settled plus what its incidents cost. A job counts in the month its final invoice
