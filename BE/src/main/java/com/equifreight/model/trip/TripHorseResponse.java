@@ -4,4 +4,9 @@ import java.util.UUID;
 import lombok.Builder;
 
 @Builder
-public record TripHorseResponse(UUID id, String name, String stall) {}
+public record TripHorseResponse(
+        UUID id,
+        String name,
+        String stall,
+        /** The job it travels under. */
+        String jobCode) {}

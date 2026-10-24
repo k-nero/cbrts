@@ -266,16 +266,40 @@ public class TripService {
         boolean late = validateTransition(target, trip, request.kind(), request.occurredAt(), channel);
         boolean hasConditions =
                 request.conditions() != null && !request.conditions().isEmpty();
+        boolean handover = request.kind() == TripRecordKind.HANDED_OVER;
         if (request.kind() == TripRecordKind.CONDITION_CHECK && !hasConditions)
             throw new BusinessException(
                     "CONDITION_LOG_REQUIRED", "A condition check must include at least one horse observation");
-        if (request.kind() != TripRecordKind.CONDITION_CHECK && hasConditions)
+        if (request.kind() != TripRecordKind.CONDITION_CHECK && !handover && hasConditions)
             throw new BusinessException(
                     "CONDITION_CHECK_KIND_REQUIRED", "Horse observations must be submitted as a condition check");
         String receiverName =
                 request.receiverName() == null ? "" : request.receiverName().strip();
-        if (request.kind() == TripRecordKind.HANDED_OVER && receiverName.isEmpty())
-            throw new BusinessException("RECEIVER_REQUIRED", "Enter the name of the person who received the horses");
+        // The handover is the proof of a safe delivery (US-F6-01): who took the horses, their confirmation, and the
+        // condition of each horse handed over.
+        List<Horse> handedOver = handover ? handedOver(trip, target) : List.of();
+        if (handover) {
+            if (receiverName.isEmpty())
+                throw new BusinessException(
+                        "RECEIVER_REQUIRED", "Enter the name of the person who received the horses");
+            if (!Boolean.TRUE.equals(request.receiverConfirmed()))
+                throw new BusinessException(
+                        "RECEIVER_CONFIRMATION_REQUIRED",
+                        receiverName + " confirms on the tablet that they received the horses as recorded");
+            Set<UUID> given = hasConditions
+                    ? request.conditions().stream()
+                            .map(TripConditionRequest::horseId)
+                            .collect(java.util.stream.Collectors.toSet())
+                    : Set.of();
+            List<String> missing = handedOver.stream()
+                    .filter(h -> !given.contains(h.getId()))
+                    .map(Horse::getName)
+                    .toList();
+            if (!missing.isEmpty())
+                throw new BusinessException(
+                        "HANDOVER_CONDITION_REQUIRED",
+                        "Record the condition of every horse handed over; missing: " + String.join(", ", missing));
+        }
         if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
             for (TransportJob riding : riding(trip, target))
                 requireDepartureAllowed(riding, jobTrips.partOf(trip, riding), request.occurredAt());
@@ -296,9 +320,10 @@ public class TripService {
                 if (!seen.add(condition.horseId()))
                     throw new BusinessException(
                             "DUPLICATE_HORSE_CONDITION", "A horse can appear only once in a condition check");
-                // Any horse on the trip, whichever job it travels under.
-                Horse horse = jobTrips.horsesOn(trip).stream()
-                        .map(TripHorse::getHorse)
+                // Any horse on the trip, whichever job it travels under; at a handover, only the job's own.
+                Horse horse = (handover
+                                ? handedOver.stream()
+                                : jobTrips.horsesOn(trip).stream().map(TripHorse::getHorse))
                         .filter(h -> h.getId().equals(condition.horseId()))
                         .findFirst()
                         .orElseThrow(() -> ResourceNotFoundException.of("Horse on trip", condition.horseId()));
@@ -322,7 +347,7 @@ public class TripService {
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) {
             updateJobStatus(target, trip, request.kind(), request.occurredAt(), stop);
-            recordHandover(target, request.kind(), request.occurredAt(), receiverName);
+            recordHandover(target, saved, receiverName);
             if (request.kind() == TripRecordKind.HELD) alertHold(target, stop, request.text());
         }
         writeAudit(saved, target, user, channel, stop);
@@ -526,11 +551,23 @@ public class TripService {
                         : jobTrips.partOf(trip, remaining.getFirst()).getStatus());
     }
 
+    /** The job's horses delivered on this trip: the ones a handover hands over (not moved on, not left in care). */
+    private List<Horse> handedOver(Trip trip, TransportJob job) {
+        return jobTrips.horsesEverOn(trip).stream()
+                .filter(th -> th.getJob().getId().equals(job.getId()))
+                .filter(th -> th.getStatus() == TripHorseStatus.ON_TRIP || th.getStatus() == TripHorseStatus.DELIVERED)
+                .map(TripHorse::getHorse)
+                .toList();
+    }
+
     /**
-     * The job's handover row: opened by the delivery, completed by the handover with who received the horses
-     * and when the customer's confirmation is due. Late minutes and the penalty are Flow 5's to fill.
+     * The job's handover row: opened by the delivery, completed by the handover (US-F6-01) with who received the
+     * horses and confirmed it, when, the record that holds each horse's condition, and when the customer's
+     * confirmation is due. Once handed over, those never change (handovers_handover_fixed).
      */
-    private void recordHandover(TransportJob job, TripRecordKind kind, Instant at, String receiverName) {
+    private void recordHandover(TransportJob job, TripRecord record, String receiverName) {
+        TripRecordKind kind = record.getKind();
+        Instant at = record.getOccurredAt();
         if (kind != TripRecordKind.DELIVERED && kind != TripRecordKind.HANDED_OVER) return;
         // A job that spans trips is handed over once its last horse is (US-F5-06).
         if (job.getTripStatus() != TripStatus.DELIVERED) return;
@@ -544,6 +581,9 @@ public class TripService {
         } else {
             if (handover.getDeliveredAt() == null) handover.setDeliveredAt(job.getDeliveredAt());
             handover.setReceivingName(receiverName);
+            handover.setReceiverConfirmed(true);
+            handover.setHandedOverAt(at);
+            handover.setHandoverRecord(record);
             handover.setConfirmDueAt(at.plus(CONFIRM_WINDOW));
         }
         handovers.save(handover);
@@ -673,8 +713,14 @@ public class TripService {
                         .toList();
             }
         }
+        Map<UUID, String> jobOfHorse = new HashMap<>();
+        riders.forEach(th -> jobOfHorse.put(th.getHorse().getId(), th.getJob().getCode()));
         List<TripHorseResponse> horses = horsesOnTrip.stream()
-                .map(h -> TripMapper.toHorseResponse(h, stalls.get(h.getId()), confirmed.size() > 1))
+                .map(h -> TripMapper.toHorseResponse(
+                        h,
+                        stalls.get(h.getId()),
+                        confirmed.size() > 1,
+                        jobOfHorse.getOrDefault(h.getId(), job.getCode())))
                 .toList();
         List<TripRecordResponse> recordResponses = tripRecords.stream()
                 .map(TripMapper::toRecordResponse)
@@ -695,7 +741,9 @@ public class TripService {
                 stops,
                 horses,
                 recordResponses,
-                part);
+                part,
+                TripMapper.toHandoverResponse(
+                        handovers.findByJob_Id(job.getId()).orElse(null)));
     }
 
     /**

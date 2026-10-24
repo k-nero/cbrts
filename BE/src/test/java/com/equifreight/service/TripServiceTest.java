@@ -95,11 +95,24 @@ class TripServiceTest {
     private TripVehicle trailer;
 
     private static TripRecordRequest request(TripRecordKind kind, Instant at, List<TripConditionRequest> conditions) {
-        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null);
+        return new TripRecordRequest(null, kind, at, UUID.randomUUID(), null, conditions, null, null);
     }
 
-    private static TripRecordRequest handover(Instant at, String receiverName) {
-        return new TripRecordRequest(null, TripRecordKind.HANDED_OVER, at, UUID.randomUUID(), null, null, receiverName);
+    private TripRecordRequest handover(Instant at, String receiverName) {
+        return handover(at, receiverName, true, List.of(condition(shadowfax, List.of())));
+    }
+
+    private static TripRecordRequest handover(
+            Instant at, String receiverName, Boolean confirmed, List<TripConditionRequest> conditions) {
+        return new TripRecordRequest(
+                null,
+                TripRecordKind.HANDED_OVER,
+                at,
+                UUID.randomUUID(),
+                "Passport and two head collars",
+                conditions,
+                receiverName,
+                confirmed);
     }
 
     // ---------- clearance gate (US-F2-08 / US-F4-02) ----------
@@ -409,7 +422,14 @@ class TripServiceTest {
                 job.getCode(),
                 escort,
                 new TripRecordRequest(
-                        null, TripRecordKind.HELD, NOW, UUID.randomUUID(), "Vet check at the border", null, null));
+                        null,
+                        TripRecordKind.HELD,
+                        NOW,
+                        UUID.randomUUID(),
+                        "Vet check at the border",
+                        null,
+                        null,
+                        null));
 
         assertEquals(TripStatus.HELD, job.getTripStatus());
         verify(notifications)
@@ -593,7 +613,7 @@ class TripServiceTest {
                 job.getCode(),
                 coordinator,
                 new TripRecordRequest(
-                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null));
+                        stop.getId(), TripRecordKind.DELIVERED, NOW, UUID.randomUUID(), null, null, null, null));
 
         assertEquals(TripStatus.DELIVERED, other.getTripStatus());
         assertEquals(TripStatus.DEPARTED, job.getTripStatus());
@@ -848,6 +868,53 @@ class TripServiceTest {
         assertEquals("Sophea, receiving groom", open.getReceivingName());
         assertEquals(NOW.plus(Duration.ofDays(2)), open.getConfirmDueAt());
         assertEquals(NOW.minus(Duration.ofMinutes(30)), open.getDeliveredAt());
+        assertEquals(NOW, open.getHandedOverAt());
+        assertTrue(open.isReceiverConfirmed());
+        ArgumentCaptor<TripRecord> saved = ArgumentCaptor.forClass(TripRecord.class);
+        verify(records).save(saved.capture());
+        assertEquals(saved.getValue(), open.getHandoverRecord());
+        assertEquals("Passport and two head collars", saved.getValue().getText());
+        assertEquals(1, saved.getValue().getConditionLogs().size());
+        assertEquals(shadowfax, saved.getValue().getConditionLogs().getFirst().getHorse());
+    }
+
+    @Test
+    @DisplayName("The receiver confirms the handover on the tablet")
+    void handoverNeedsTheReceiversConfirmation() {
+        delivered();
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(),
+                        coordinator,
+                        handover(NOW, "Sophea", false, List.of(condition(shadowfax, List.of())))));
+        assertEquals("RECEIVER_CONFIRMATION_REQUIRED", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Every horse handed over has its condition recorded, and only the job's own horses")
+    void handoverRecordsEachHorse() {
+        delivered();
+
+        BusinessException missing = assertThrows(
+                BusinessException.class,
+                () -> service.addCoordinatorRecord(job.getCode(), coordinator, handover(NOW, "Sophea", true, null)));
+        assertEquals("HANDOVER_CONDITION_REQUIRED", missing.getCode());
+        assertEquals("Record the condition of every horse handed over; missing: Shadowfax", missing.getMessage());
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.addCoordinatorRecord(
+                        job.getCode(),
+                        coordinator,
+                        handover(
+                                NOW,
+                                "Sophea",
+                                true,
+                                List.of(condition(shadowfax, List.of()), condition(nightfall, List.of())))));
+        verify(records, never()).save(any());
     }
 
     // ---------- audit ----------
@@ -877,6 +944,9 @@ class TripServiceTest {
         job.setDeliveredAt(NOW.minus(Duration.ofMinutes(30)));
         when(records.existsByTrip_IdAndKind(trip.getId(), TripRecordKind.HANDED_OVER))
                 .thenReturn(false);
+        TripHorse delivered = rider(job, shadowfax);
+        delivered.setStatus(TripHorseStatus.DELIVERED);
+        when(jobTrips.horsesEverOn(trip)).thenReturn(List.of(delivered));
     }
 
     private void record(TripRecordKind kind, Instant at) {

@@ -30,7 +30,8 @@ public final class TripMapper {
             List<TripStopResponse> stops,
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records,
-            Part part) {
+            Part part,
+            HandoverResponse handover) {
         return new TripViewResponse(
                 job.getCode(),
                 tripCode,
@@ -52,7 +53,8 @@ public final class TripMapper {
                 stops,
                 horses,
                 records,
-                part.parts());
+                part.parts(),
+                handover);
     }
 
     /**
@@ -119,7 +121,7 @@ public final class TripMapper {
     }
 
     /** A horse on the trip and where it stands; in a convoy the place names the trailer. */
-    public static TripHorseResponse toHorseResponse(Horse horse, LoadPlanStall stall, boolean convoy) {
+    public static TripHorseResponse toHorseResponse(Horse horse, LoadPlanStall stall, boolean convoy, String jobCode) {
         return new TripHorseResponse(
                 horse.getId(),
                 horse.getName(),
@@ -136,7 +138,29 @@ public final class TripMapper {
                                         stall.getVehicleStall()
                                                 .getStallType()
                                                 .name()
-                                                .toLowerCase(Locale.ROOT)));
+                                                .toLowerCase(Locale.ROOT)),
+                jobCode);
+    }
+
+    /** The job's handover as its trip view shows it (US-F6-01); null until the horses are delivered. */
+    public static HandoverResponse toHandoverResponse(com.equifreight.entity.Handover h) {
+        if (h == null) return null;
+        return HandoverResponse.builder()
+                .deliveredAt(h.getDeliveredAt())
+                .handedOverAt(h.getHandedOverAt())
+                .receiverName(h.getReceivingName())
+                .receiverConfirmed(h.isReceiverConfirmed())
+                .recordId(
+                        h.getHandoverRecord() == null
+                                ? null
+                                : h.getHandoverRecord().getId())
+                .confirmDueAt(h.getConfirmDueAt())
+                .customerOutcome(h.getCustomerOutcome())
+                .confirmedAt(h.getConfirmedAt())
+                .confirmedByName(
+                        h.getConfirmedBy() == null ? null : h.getConfirmedBy().displayName())
+                .lateMinutes(h.getLateMinutes())
+                .build();
     }
 
     public static TripRecordResponse toRecordResponse(TripRecord record) {
