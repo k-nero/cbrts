@@ -18,3 +18,4 @@ export * from './notification';
 export * from './incident';
 export * from './invoice';
 export * from './overview';
+export * from './report';

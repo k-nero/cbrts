@@ -4,6 +4,7 @@ import { Flex, Skeleton } from 'antd';
 import { ClearanceAtRisk } from './ClearanceAtRisk';
 import { OverviewTile } from './OverviewTile';
 import { ReviewQueuePreview } from './ReviewQueuePreview';
+import { RevenuePanel } from './RevenuePanel';
 
 import PageHeader from '@/components/PageHeader';
 import { useOverview } from '@/hooks/overview';
@@ -87,6 +88,7 @@ const OverviewPage: FC = () => {
         <ReviewQueuePreview rows={o.reviewQueue} total={o.awaitingReview} asOf={o.asOf} />
         <ClearanceAtRisk jobs={o.clearanceAtRisk} total={o.jobsBlocked} />
       </div>
+      <RevenuePanel />
     </Flex>
   );
 };
