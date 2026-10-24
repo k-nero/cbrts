@@ -81,10 +81,8 @@ public class JobClosingService {
         Handover handover = handovers.findByJob_Id(job.getId()).orElseThrow();
         Instant delivered = handover.getDeliveredAt() != null ? handover.getDeliveredAt() : job.getDeliveredAt();
         boolean window = job.getWindowEnd() != null;
-        Integer late = LateArrival.minutes(
-                window ? job.getWindowEnd() : job.getPlannedArrivalAt(),
-                delivered,
-                window ? incidents.findByJob_IdAndStopsClockTrue(job.getId()) : List.of());
+        Integer late = LateArrival.of(
+                job, delivered, window ? incidents.findByJob_IdAndStopsClockTrue(job.getId()) : List.of());
         int lateMinutes = late == null ? 0 : late;
         JobStage before = job.getStage();
         job.setStage(JobStage.CLOSED);
@@ -100,7 +98,7 @@ public class JobClosingService {
                         + (lateMinutes == 0
                                 ? "delivered on time"
                                 : "delivered " + IncidentService.duration(lateMinutes) + " late")
-                        + (window ? " against the arrival window" : " against the planned arrival")),
+                        + " against " + LateArrival.measuredAgainst(job)),
                 ENTITY_TYPE,
                 job.getId(),
                 job.getCode(),
@@ -143,7 +141,7 @@ public class JobClosingService {
                         job.getClosedBy() == null ? null : job.getClosedBy().displayName())
                 .onTime(job.getOnTime())
                 .lateMinutes(job.getLateMinutes())
-                .measuredAgainst(job.getWindowEnd() != null ? "the arrival window" : "the planned arrival")
+                .measuredAgainst(LateArrival.measuredAgainst(job))
                 .build();
     }
 

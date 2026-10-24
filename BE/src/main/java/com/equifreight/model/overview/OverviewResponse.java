@@ -28,4 +28,8 @@ public record OverviewResponse(
         IncidentSummaryResponse newestIncident,
         /** Jobs departing in the next 7 days, and the next to leave. */
         long departingThisWeek,
-        JobSummaryResponse nextDeparture) {}
+        JobSummaryResponse nextDeparture,
+        /** Of the jobs delivered in the last 30 days, the share on time (null with none), and how many were late. */
+        java.math.BigDecimal onTimeRate,
+        int deliveredLast30Days,
+        int lateLast30Days) {}

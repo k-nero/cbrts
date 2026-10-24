@@ -46,11 +46,18 @@ class OverviewServiceTest {
     private final TransportJobService jobs = mock(TransportJobService.class);
     private final IncidentService incidents = mock(IncidentService.class);
     private final QuotationRepository quotations = mock(QuotationRepository.class);
+    private final OnTimeReportService onTime = mock(OnTimeReportService.class);
     private OverviewService service;
 
     @BeforeEach
     void setUp() {
-        service = new OverviewService(requests, jobs, incidents, quotations, Clock.fixed(NOW, BusinessTime.ZONE));
+        service =
+                new OverviewService(requests, jobs, incidents, quotations, onTime, Clock.fixed(NOW, BusinessTime.ZONE));
+        when(onTime.report(any(), any(), any(), any()))
+                .thenReturn(com.equifreight.model.report.OnTimeReportResponse.builder()
+                        .totals(new com.equifreight.model.report.OnTimeReportResponse.Totals(
+                                56, 2, new BigDecimal("96.4")))
+                        .build());
     }
 
     private static <T> Page<T> page(List<T> rows, long total) {
@@ -135,6 +142,15 @@ class OverviewServiceTest {
         assertEquals(incident, r.newestIncident());
         assertEquals(1, r.departingThisWeek());
         assertEquals("CBRT-2026-042", r.nextDeparture().code());
+        assertEquals(new BigDecimal("96.4"), r.onTimeRate());
+        assertEquals(2, r.lateLast30Days());
+        // The last 30 days, today included: 25 Sep to 24 Oct in Ho Chi Minh City.
+        verify(onTime)
+                .report(
+                        java.time.LocalDate.of(2026, 9, 25),
+                        java.time.LocalDate.of(2026, 10, 24),
+                        OnTimeReportService.By.WEEK,
+                        null);
     }
 
     @Test

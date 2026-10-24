@@ -1,9 +1,13 @@
 package com.equifreight.controller.staff;
 
+import com.equifreight.model.report.OnTimeReportResponse;
 import com.equifreight.model.report.RevenueReportResponse;
+import com.equifreight.service.OnTimeReportService;
 import com.equifreight.service.RevenueReportService;
 import io.swagger.v3.oas.annotations.Operation;
+import java.time.LocalDate;
 import java.util.UUID;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +22,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class StaffReportController {
 
     private final RevenueReportService revenue;
+    private final OnTimeReportService onTime;
 
-    public StaffReportController(RevenueReportService revenue) {
+    public StaffReportController(RevenueReportService revenue, OnTimeReportService onTime) {
         this.revenue = revenue;
+        this.onTime = onTime;
+    }
+
+    @Operation(summary = "US-R-03: the on-time delivery rate by week or month and corridor, with the late jobs")
+    @GetMapping("/api/v1/staff/reports/on-time")
+    public OnTimeReportResponse onTime(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) OnTimeReportService.By by,
+            @RequestParam(required = false) UUID corridorId) {
+        return onTime.report(from, to, by, corridorId);
     }
 
     @Operation(summary = "US-R-02: revenue and direct cost by month and corridor; from/to are YYYY-MM, both inclusive")

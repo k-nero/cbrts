@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import com.equifreight.entity.Incident;
+import com.equifreight.entity.TransportJob;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -11,7 +12,36 @@ import java.util.List;
  */
 public final class LateArrival {
 
+    /**
+     * Without an arrival window, the planned arrival plus this much still counts as on time (US-R-03). A window is
+     * the promise itself, so it has none.
+     */
+    public static final Duration PLANNED_ARRIVAL_TOLERANCE = Duration.ofMinutes(30);
+
     private LateArrival() {}
+
+    /** When the job is due: its window's close, or its planned arrival plus the tolerance; null with neither. */
+    public static Instant dueOf(TransportJob job) {
+        if (job.getWindowEnd() != null) return job.getWindowEnd();
+        return job.getPlannedArrivalAt() == null
+                ? null
+                : job.getPlannedArrivalAt().plus(PLANNED_ARRIVAL_TOLERANCE);
+    }
+
+    /**
+     * How late the job's horses arrived, as closing a job and the on-time rate both count it: past the window less a
+     * stopped clock, or past the planned arrival and its tolerance. Zero when on time; null without a due time.
+     */
+    public static Integer of(TransportJob job, Instant delivered, List<Incident> clockStops) {
+        return minutes(dueOf(job), delivered, job.getWindowEnd() != null ? clockStops : List.of());
+    }
+
+    /** What on time was measured against, in words. */
+    public static String measuredAgainst(TransportJob job) {
+        return job.getWindowEnd() != null
+                ? "the arrival window"
+                : "the planned arrival, with " + PLANNED_ARRIVAL_TOLERANCE.toMinutes() + " minutes' tolerance";
+    }
 
     /** Zero when delivered by {@code due}; null when either time is missing. */
     public static Integer minutes(Instant due, Instant delivered, List<Incident> clockStops) {

@@ -34,4 +34,7 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     /** The decided incidents of some jobs, with the option decided: what each cost (US-R-02). */
     @Query("select i from Incident i join fetch i.decidedOption where i.job.id in :jobIds")
     List<Incident> findDecidedForJobs(@Param("jobIds") Collection<UUID> jobIds);
+
+    /** Some jobs' incidents that stopped the arrival-window clock (US-R-03). */
+    List<Incident> findByJob_IdInAndStopsClockTrue(Collection<UUID> jobIds);
 }

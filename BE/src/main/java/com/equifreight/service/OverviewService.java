@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.QuotationStatus;
@@ -36,6 +37,7 @@ public class OverviewService {
     private final TransportJobService jobs;
     private final IncidentService incidents;
     private final QuotationRepository quotations;
+    private final OnTimeReportService onTime;
     private final Clock clock;
 
     public OverviewService(
@@ -43,11 +45,13 @@ public class OverviewService {
             TransportJobService jobs,
             IncidentService incidents,
             QuotationRepository quotations,
+            OnTimeReportService onTime,
             Clock clock) {
         this.requests = requests;
         this.jobs = jobs;
         this.incidents = incidents;
         this.quotations = quotations;
+        this.onTime = onTime;
         this.clock = clock;
     }
 
@@ -60,8 +64,15 @@ public class OverviewService {
         Page<JobSummaryResponse> thisWeek = jobs.search(null, null, "THIS_WEEK", PageRequest.of(0, 1, soonest));
         Page<IncidentSummaryResponse> open = incidents.list(
                 List.of(IncidentStatus.OPEN), PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "openedAt")));
+        // The last 30 days, today included, as the on-time tile reads.
+        java.time.LocalDate today = java.time.LocalDate.now(clock.withZone(BusinessTime.ZONE));
+        var month = onTime.report(today.minusDays(29), today, OnTimeReportService.By.WEEK, null)
+                .totals();
         return OverviewResponse.builder()
                 .asOf(clock.instant())
+                .onTimeRate(month.rate())
+                .deliveredLast30Days(month.delivered())
+                .lateLast30Days(month.late())
                 .awaitingReview(queue.getTotalElements())
                 .reviewQueue(queue.getContent())
                 .quotesOut(quotes.getTotalElements())
