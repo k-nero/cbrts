@@ -13,6 +13,8 @@ import org.springframework.data.core.PropertyPath;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 class ControllerAdviseTest {
 
@@ -68,7 +70,8 @@ class ControllerAdviseTest {
 
     @Test
     void anUnexpectedErrorAnswersWithAFixedMessage() {
-        ResponseEntity<ApiError> response = advice.handleGeneric(new IllegalStateException(SQL_LEAK));
+        ResponseEntity<ApiError> response =
+                advice.handleGeneric(new IllegalStateException(SQL_LEAK), new MockHttpServletResponse());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody().error()).isEqualTo("Internal Server Error");
@@ -88,5 +91,24 @@ class ControllerAdviseTest {
                 .doesNotContain("transport_requests")
                 .doesNotContain("Failing row");
         assertThat(response.getBody().details()).isNull();
+    }
+
+    /** The bell's notification stream: once it is open, a JSON error can't be written onto it. */
+    @Test
+    void anEventStreamGetsNoErrorBody() {
+        MockHttpServletResponse stream = new MockHttpServletResponse();
+        stream.setContentType("text/event-stream;charset=UTF-8");
+
+        assertThat(advice.handleGeneric(new IllegalStateException("boom"), stream))
+                .isNull();
+    }
+
+    @Test
+    void aStreamThatTimedOutBeforeItsHeadersIsUnavailable() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        advice.handleAsyncTimeout(new AsyncRequestTimeoutException(), response);
+
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
     }
 }
