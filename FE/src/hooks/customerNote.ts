@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { customerNoteApi } from '@/apis/customerNote';
 import { queryKeys } from '@/constant/query';
-import type { CreateNoteReplyRequest, CustomerNote } from '@/interfaces';
+import type { CreateCustomerNoteRequest, CreateNoteReplyRequest, CustomerNote } from '@/interfaces';
 
 /**
  * Open customer notes routed to the current staff role.
@@ -44,6 +44,31 @@ export const useReplyCustomerNote = () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.customerNotes.detail(variables.id),
       });
+    },
+  });
+};
+
+/**
+ * The customer's notes on one of their requests, with the replies under each (US-00-08).
+ */
+export const useRequestNotes = (requestId: string) =>
+  useQuery({
+    queryKey: queryKeys.customerNotes.request(requestId),
+    queryFn: async (): Promise<CustomerNote[]> =>
+      (await customerNoteApi.getRequestNotes(requestId)).data,
+    enabled: Boolean(requestId),
+  });
+
+/**
+ * Sends a customer note on a request; the topic routes it to the role that answers it.
+ */
+export const useCreateRequestNote = (requestId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateCustomerNoteRequest) =>
+      (await customerNoteApi.createRequestNote(requestId, data)).data,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.customerNotes.request(requestId) });
     },
   });
 };

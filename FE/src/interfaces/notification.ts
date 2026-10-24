@@ -30,6 +30,8 @@ export const NotificationKindEnum = {
   HANDOVER_ACCEPTED: 'HANDOVER_ACCEPTED',
   INVOICE_ISSUED: 'INVOICE_ISSUED',
   PAYMENT_RECORDED: 'PAYMENT_RECORDED',
+  NOTE_RECEIVED: 'NOTE_RECEIVED',
+  NOTE_ANSWERED: 'NOTE_ANSWERED',
 } as const;
 export type NotificationKind = (typeof NotificationKindEnum)[keyof typeof NotificationKindEnum];
 

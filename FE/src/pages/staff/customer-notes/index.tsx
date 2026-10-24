@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Col, Flex, Row } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 
 import { isDue } from './format';
 import NoteDetail from './NoteDetail';
@@ -9,11 +10,15 @@ import PageHeader from '@/components/PageHeader';
 import { Chip } from '@/components/ui';
 import { useCustomerNotes } from '@/hooks/customerNote';
 
-/** Customer notes (transport specialist, logistics manager): list and detail, oldest first. */
+/**
+ * Customer notes: list and detail, oldest first. Each staff role sees the notes routed to it by topic; the logistics
+ * manager sees them all. A notification opens the page on its note (?note=).
+ */
 const CustomerNotesPage = () => {
   const notesQuery = useCustomerNotes();
   const notes = notesQuery.data ?? [];
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(params.get('note'));
   // The first note until one is picked, and again if the picked one leaves the queue.
   const selected = notes.find((n) => n.id === selectedId) ?? notes[0] ?? null;
   const dueCount = notes.filter(isDue).length;
