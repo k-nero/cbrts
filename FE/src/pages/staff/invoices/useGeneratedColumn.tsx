@@ -13,6 +13,7 @@ export const useGeneratedInvoiceColumn = () =>
       {
         title: 'Invoice',
         key: 'code',
+        width: 200,
         render: (_, i) => (
           <Flex vertical gap={2}>
             <span className="type-data text-ink">{i.code}</span>
@@ -25,6 +26,7 @@ export const useGeneratedInvoiceColumn = () =>
       {
         title: 'Club',
         key: 'club',
+        width: 220,
         render: (_, i) => (
           <Flex vertical gap={2}>
             <span className="type-body-s text-ink">{i.clubName}</span>
@@ -37,6 +39,7 @@ export const useGeneratedInvoiceColumn = () =>
       {
         title: 'Amount due',
         key: 'amountDue',
+        width: 180,
         align: 'right',
         render: (_, i) => (
           <Flex vertical gap={2} align="end">
