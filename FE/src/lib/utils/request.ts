@@ -1,6 +1,7 @@
 import { formatDay } from './horse';
-import { formatDate, ict } from './time';
+import { daysUntil, dueLeft, formatDate, ict } from './time';
 
+import type { Stage } from '@/components/ui/StageMark';
 import type { Tone } from '@/components/ui/tone';
 import type {
   ArrivalMode,
@@ -8,6 +9,7 @@ import type {
   Endpoint,
   Horse,
   InsuranceOption,
+  NextStep,
   RequestDraftInput,
   RequestHorse,
   RequestStatus,
@@ -629,3 +631,51 @@ export const passChip = (status: RequestStatus): { tone: Tone; label: string } =
         : status === 'REJECTED'
           ? { tone: 'bad', label: 'Rejected' }
           : { tone: 'neutral', label: 'Submitted' };
+
+/**
+ * The stage a request is at (DESIGN.md, Process Vocabulary): Request until it is quoted, Quotation while
+ * the customer answers it, Approval once accepted, Documents once approved. A cancelled request has none.
+ */
+export const requestStage = (status: RequestStatus): Stage | null => {
+  switch (status) {
+    case 'QUOTED':
+    case 'EXPIRED':
+      return 'Quotation';
+    case 'CUSTOMER_ACCEPTED':
+      return 'Approval';
+    case 'APPROVED':
+      return 'Documents';
+    case 'CANCELLED':
+      return null;
+    default:
+      return 'Request';
+  }
+};
+
+/**
+ * The next step's two-line deadline (DESIGN.md, Two-Line Deadline Rule): time left then the date when it
+ * has one; a review promises 1 business day from the latest version sent; anything else is not dated.
+ */
+export const nextStepDeadline = (
+  step: NextStep,
+  r: Pick<TransportRequest, 'status' | 'submittedAt' | 'revisions'>,
+  now: string,
+): { left: string; date: string; tone: Tone } | null => {
+  if (step.due) {
+    const days = daysUntil(step.due, now);
+    return {
+      left: dueLeft(step.due, now),
+      date: formatDate(step.due),
+      tone: days < 0 ? 'bad' : days <= 3 && step.yours ? 'warn' : 'neutral',
+    };
+  }
+  if (r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW') {
+    const sent = r.revisions.at(-1)?.submittedAt ?? r.submittedAt;
+    return {
+      left: 'Usually within 1 business day',
+      date: sent ? `Sent ${formatDate(sent)}` : '',
+      tone: 'neutral',
+    };
+  }
+  return null;
+};

@@ -17,7 +17,9 @@ import {
   holdsStep,
   liveBlockers,
   passRows,
+  nextStepDeadline,
   pickableHorses,
+  requestStage,
   requestStatusChip,
   retiredRefusals,
   revealSelector,
@@ -720,5 +722,47 @@ describe("the pass's chip", () => {
     expect(passChip('CANCELLED')).toEqual({ tone: 'neutral', label: 'Cancelled' });
     expect(passChip('REJECTED')).toEqual({ tone: 'bad', label: 'Rejected' });
     expect(passChip('SUBMITTED')).toEqual({ tone: 'neutral', label: 'Submitted' });
+  });
+});
+
+describe('where a request stands (US-F1-08)', () => {
+  test('the stage follows the request through quotation and approval', () => {
+    expect(requestStage('UNDER_REVIEW')).toBe('Request');
+    expect(requestStage('INFO_REQUIRED')).toBe('Request');
+    expect(requestStage('QUOTED')).toBe('Quotation');
+    expect(requestStage('CUSTOMER_ACCEPTED')).toBe('Approval');
+    expect(requestStage('APPROVED')).toBe('Documents');
+    expect(requestStage('CANCELLED')).toBeNull();
+  });
+
+  const now = '2026-10-18T02:00:00Z';
+  const step = { action: 'Accept or decline', owner: 'You', yours: true, due: '2026-10-20' };
+  const sent = { status: 'QUOTED' as const, submittedAt: '2026-10-01T03:00:00Z', revisions: [] };
+
+  test('a dated step shows the time left, then the date, in the warn tone when it is close', () => {
+    expect(nextStepDeadline(step, sent, now)).toEqual({
+      left: 'Due in 2 days',
+      date: '20 Oct 2026',
+      tone: 'warn',
+    });
+    expect(nextStepDeadline({ ...step, due: '2026-10-17' }, sent, now)?.tone).toBe('bad');
+  });
+
+  test('a review promises 1 business day from the latest version sent', () => {
+    const review = { action: 'Prepare', owner: 'A logistics manager', yours: false, due: null };
+    const v2 = {
+      ...sent,
+      status: 'SUBMITTED' as const,
+      revisions: [
+        { revisionNo: 1, submittedAt: '2026-10-01T03:00:00Z', note: null, returnedAt: null },
+        { revisionNo: 2, submittedAt: '2026-10-16T03:00:00Z', note: null, returnedAt: null },
+      ],
+    };
+    expect(nextStepDeadline(review, v2, now)).toEqual({
+      left: 'Usually within 1 business day',
+      date: 'Sent 16 Oct 2026',
+      tone: 'neutral',
+    });
+    expect(nextStepDeadline(review, { ...v2, status: 'CUSTOMER_ACCEPTED' }, now)).toBeNull();
   });
 });

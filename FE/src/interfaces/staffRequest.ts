@@ -1,6 +1,6 @@
 import type { TransportMode } from './job';
 import type { QuotationRef } from './quotation';
-import type { RequestStatus, TransportRequest } from './request';
+import type { HistoryEntry, RequestStatus, TransportRequest } from './request';
 
 /** One row of the logistics manager's review queue (US-F1-03, GET /staff/requests). */
 export interface QueueRow {
@@ -38,12 +38,6 @@ export interface ReviewRevision {
   note: string | null;
   returnedAt: string | null;
   payload: Partial<TransportRequest>;
-}
-
-export interface HistoryEntry {
-  occurredAt: string;
-  summary: string;
-  actorLabel: string;
 }
 
 /** "3 of 4", oldest first, with the neighbours to open next. */

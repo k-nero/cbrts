@@ -4,9 +4,9 @@ import { useParams } from 'react-router-dom';
 
 import { ChecksPanel } from './ChecksPanel';
 import { DecisionPanel } from './DecisionPanel';
-import { HistoryPanel } from './HistoryPanel';
 import { SentPanel } from './SentPanel';
 
+import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import { RequestNotFound } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
