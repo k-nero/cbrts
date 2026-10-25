@@ -272,7 +272,7 @@ public final class TripMapper {
         };
     }
 
-    private static String fullName(User user) {
+    public static String fullName(User user) {
         return user == null ? null : (user.getFirstName() + " " + user.getLastName()).strip();
     }
 }

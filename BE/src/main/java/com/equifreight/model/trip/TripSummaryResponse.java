@@ -1,5 +1,7 @@
 package com.equifreight.model.trip;
 
+import com.equifreight.entity.enums.Channel;
+import com.equifreight.entity.enums.TripRecordKind;
 import com.equifreight.entity.enums.TripStatus;
 import java.time.Instant;
 import java.util.List;
@@ -19,7 +21,40 @@ public record TripSummaryResponse(
         /** The trip's TRP code on the escort's list; null elsewhere. */
         String tripCode,
         /** The jobs on the escort's trip; the one job elsewhere. */
-        List<String> jobCodes) {
+        List<String> jobCodes,
+        /** Where the trip stands, on the office board only (US-F4-04); null elsewhere. */
+        Progress progress) {
+
+    /**
+     * The leg the trip is on, from the last stop with a checkpoint to the next stop on its confirmed route, and its
+     * last checkpoint with who recorded it and from where (the cab, or the office on the escort's behalf).
+     */
+    public record Progress(
+            String tripCode,
+            String legFrom,
+            String legTo,
+            TripRecordKind lastKind,
+            String lastStop,
+            Instant lastAt,
+            String lastRecordedBy,
+            Channel lastChannel) {}
+
+    /** All the escort's or the customer's fields, without the office's progress. */
+    public TripSummaryResponse(
+            String jobCode,
+            TripStatus tripStatus,
+            String origin,
+            String destination,
+            Instant lastUpdate,
+            String tripCode,
+            List<String> jobCodes) {
+        this(jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, null);
+    }
+
+    public TripSummaryResponse withProgress(Progress progress) {
+        return new TripSummaryResponse(
+                jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, progress);
+    }
 
     /** A job's row, as the customer's and the office's lists select it. */
     public TripSummaryResponse(

@@ -5,7 +5,7 @@ export function EscortTripPage() {
     <TripWorkspace
       audience="escort"
       editable
-      title="Cab trip log"
+      title="Trip log"
       summary="Record assigned trip checkpoints and each horse's observed condition."
     />
   );

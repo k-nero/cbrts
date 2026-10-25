@@ -155,6 +155,38 @@ public class TripNotices {
                 "DELAY_ALERT:" + job.getId() + ":" + incidentId);
     }
 
+    /**
+     * The horses of {@code job} cleared customs at {@code stop} (US-F4-05). Keyed by the border, so a second record of
+     * the same crossing replaces an unread notice.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void clearedCustoms(TransportJob job, RouteStop stop, Instant at, UUID recordId) {
+        String place = stop == null ? "the border" : TripMapper.stopName(stop);
+        notify(
+                NotificationKind.HORSES_CLEARED_CUSTOMS,
+                job,
+                "Your horses cleared customs at " + place,
+                job.getCode() + " cleared customs at " + place + " on " + at(at)
+                        + " and is on its way. Follow it leg by leg on the tracking page.",
+                "HORSES_CLEARED_CUSTOMS:" + job.getId() + ":" + (stop == null ? recordId : stop.getId()));
+    }
+
+    /**
+     * The horses of {@code job} reached the handover point (US-F4-05). Keyed by the job and trip, so a second arrival
+     * record replaces an unread notice.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void arrived(TransportJob job, Trip trip, RouteStop stop, Instant at) {
+        String place = stop == null ? "the handover point" : TripMapper.stopName(stop);
+        notify(
+                NotificationKind.HORSES_ARRIVED,
+                job,
+                "Your horses have arrived at " + place,
+                job.getCode() + " reached " + place + " on " + at(at)
+                        + ". The escort hands the horses over there, and you confirm the handover on the tracking page.",
+                "HORSES_ARRIVED:" + job.getId() + ":" + trip.getId());
+    }
+
     private void tripShared(TransportJob job, RoutePlan plan) {
         notify(
                 NotificationKind.TRIP_SHARED,

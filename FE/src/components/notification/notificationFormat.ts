@@ -33,6 +33,8 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   TRIP_SHARED: 'Shared trailer',
   TRIP_TIMES_CHANGED: 'New times',
   JOB_REPLANNED: 'Being replanned',
+  HORSES_CLEARED_CUSTOMS: 'Cleared customs',
+  HORSES_ARRIVED: 'Arrived',
   INCIDENT_RAISED: 'Incident',
   INCIDENT_PROPOSAL: 'Decision needed',
   INCIDENT_DECIDED: 'Decided',

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Flex } from 'antd';
 
 import { Photo } from './Photo';
-import { formatTime, recordLabel, sentence } from './tripFormat';
+import { formatTime, recordedByLine, recordLabel, sentence } from './tripFormat';
 
 import { Chip, Panel } from '@/components/ui';
 import type { TripView } from '@/interfaces';
@@ -33,6 +33,11 @@ export function TripRecords({ trip }: { trip: TripView }) {
                 </strong>
                 <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
               </Flex>
+              {recordedByLine(record.recordedBy, record.channel) && (
+                <p className="type-caption mb-0 mt-1 text-ink-3">
+                  {recordedByLine(record.recordedBy, record.channel)}
+                </p>
+              )}
               {record.text && <p className="type-body-s mb-2 mt-1 text-ink-2">{record.text}</p>}
               {record.conditions.map((condition) => (
                 <div key={condition.horseId} className="mt-3 rounded-lg bg-raised p-3">

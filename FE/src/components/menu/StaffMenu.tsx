@@ -81,6 +81,7 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
       ],
     },
   ],
+  [RoleNameEnum.ESCORT]: [{ items: [['escort', 'Trip log', <HistoryOutlined key="i" />]] }],
 };
 
 const StaffMenu: FC = () => {

@@ -130,10 +130,24 @@ export interface TripSummary {
   tripCode: string | null;
   /** Every job the escort's trip carries; the one job elsewhere. */
   jobCodes: string[];
+  /** Where the trip stands, on the office board only (US-F4-04); null elsewhere. */
+  progress: TripProgress | null;
+}
+/** The leg a trip is on and its last checkpoint, from recorded checkpoints only (BE TripSummaryResponse.Progress). */
+export interface TripProgress {
+  tripCode: string;
+  legFrom: string | null;
+  legTo: string | null;
+  lastKind: TripRecordKind | null;
+  lastStop: string | null;
+  lastAt: string | null;
+  lastRecordedBy: string | null;
+  lastChannel: TripRecord['channel'] | null;
 }
 export interface TripPage {
   content: TripSummary[];
   number: number;
+  totalElements: number;
   totalPages: number;
   first: boolean;
   last: boolean;

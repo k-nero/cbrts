@@ -71,6 +71,7 @@ public class TripService {
     private final FileService files;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final TripNotices notices;
     private final JobTripService jobTrips;
     private final FlightRepository flightsByLeg;
     private final Clock clock;
@@ -86,6 +87,7 @@ public class TripService {
             FileService files,
             AuditService audit,
             NotificationService notifications,
+            TripNotices notices,
             JobTripService jobTrips,
             FlightRepository flightsByLeg,
             Clock clock) {
@@ -99,6 +101,7 @@ public class TripService {
         this.files = files;
         this.audit = audit;
         this.notifications = notifications;
+        this.notices = notices;
         this.jobTrips = jobTrips;
         this.flightsByLeg = flightsByLeg;
         this.clock = clock;
@@ -141,9 +144,53 @@ public class TripService {
                 rows.stream().map(TripSummaryResponse::jobCode).sorted().toList());
     }
 
+    /** The records that place a trip on its route; a condition check or a note says nothing about where it is. */
+    private static final Set<TripRecordKind> POSITION_KINDS =
+            EnumSet.complementOf(EnumSet.of(TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE));
+
     @Transactional(readOnly = true)
     public Page<TripSummaryResponse> coordinatorTrips(Pageable pageable) {
-        return jobs.findActiveTrips(pageable);
+        return jobs.findActiveTrips(pageable).map(this::withProgress);
+    }
+
+    /**
+     * An office board row with where its trip stands (US-F4-04). Positions come only from recorded checkpoints, never
+     * an estimate (DESIGN.md, Trip progress): the leg runs from the last stop with a checkpoint to the next stop.
+     */
+    private TripSummaryResponse withProgress(TripSummaryResponse row) {
+        TransportJob job = job(row.jobCode());
+        Optional<Trip> found = jobTrips.activePartsOf(job).stream()
+                .filter(p -> p.departed() && p.getStatus() != TripStatus.DELIVERED)
+                .map(TripJob::getTrip)
+                .findFirst()
+                .or(() -> jobTrips.findTripOf(job.getId()));
+        if (found.isEmpty()) return row;
+        Trip trip = found.get();
+        List<TripRecord> positions = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
+                .filter(r -> POSITION_KINDS.contains(r.getKind()))
+                .toList();
+        TripRecord last = positions.isEmpty() ? null : positions.getLast();
+        List<RouteStop> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                .map(RoutePlan::getStops)
+                .orElse(List.of());
+        Set<UUID> reachedStops = new HashSet<>();
+        positions.forEach(r -> {
+            if (r.getRouteStop() != null) reachedStops.add(r.getRouteStop().getId());
+        });
+        int reached = -1;
+        for (int i = 0; i < stops.size(); i++)
+            if (reachedStops.contains(stops.get(i).getId())) reached = i;
+        // A trip with a checkpoint but none at a stop (a departure recorded without its stop) has left the first one.
+        if (reached < 0 && last != null && !stops.isEmpty()) reached = 0;
+        return row.withProgress(new TripSummaryResponse.Progress(
+                trip.getCode(),
+                reached < 0 ? null : TripMapper.stopName(stops.get(reached)),
+                reached + 1 < stops.size() ? TripMapper.stopName(stops.get(reached + 1)) : null,
+                last == null ? null : last.getKind(),
+                last == null || last.getRouteStop() == null ? null : TripMapper.stopName(last.getRouteStop()),
+                last == null ? null : last.getOccurredAt(),
+                last == null ? null : TripMapper.fullName(last.getRecordedBy()),
+                last == null ? null : last.getChannel()));
     }
 
     @Transactional(readOnly = true)
@@ -354,7 +401,9 @@ public class TripService {
         TripRecord saved = records.save(record);
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) {
+            List<TransportJob> ridingBefore = riding(trip, target);
             updateJobStatus(target, trip, request.kind(), request.occurredAt(), stop);
+            tellTheCustomer(saved, target, trip, stop, ridingBefore);
             recordHandover(target, saved, receiverName);
             if (request.kind() == TripRecordKind.HELD) alertHold(target, stop, request.text());
         }
@@ -628,6 +677,24 @@ public class TripService {
     }
 
     /** A hold stops the horses on the road: tell the people who decide when it moves on. */
+    /**
+     * The checkpoints a customer is told about (US-F4-05): customs cleared, for every job on board, and the arrival at
+     * the job's handover point (its delivery stop, which a delivery always follows; a transfer to the next trip of its
+     * chain is not the handover).
+     */
+    private void tellTheCustomer(
+            TripRecord record, TransportJob target, Trip trip, RouteStop stop, List<TransportJob> ridingBefore) {
+        switch (record.getKind()) {
+            case CLEARED_BORDER ->
+                ridingBefore.forEach(job -> notices.clearedCustoms(job, stop, record.getOccurredAt(), record.getId()));
+            case ARRIVED_AT_STOP -> {
+                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY)
+                    notices.arrived(target, trip, stop, record.getOccurredAt());
+            }
+            default -> {}
+        }
+    }
+
     private void alertHold(TransportJob job, RouteStop stop, String reason) {
         String place = stop == null ? "" : " at " + TripMapper.stopName(stop);
         String title = "Trip %s held%s".formatted(job.getCode(), place);
