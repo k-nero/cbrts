@@ -78,7 +78,7 @@ export const RequoteModal: FC<{
               )}
               <Flex justify="end" gap={8}>
                 <CancelButton label="Not now" />
-                <SubmitButton label="Ask for a re-quote" />
+                <SubmitButton type="primary" label="Ask for a re-quote" />
               </Flex>
             </>
           )}
