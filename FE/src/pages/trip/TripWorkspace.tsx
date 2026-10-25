@@ -7,6 +7,7 @@ import { HandoverAnswer } from './HandoverAnswer';
 import { HandoverPanel } from './HandoverPanel';
 import { HandoverRecord } from './HandoverRecord';
 import { ReportEmergency } from './ReportEmergency';
+import { TripBoard } from './TripBoard';
 import { TripDetails } from './TripDetails';
 import { eventLabels, formatTime, sentence } from './tripFormat';
 
@@ -215,46 +216,61 @@ export function TripWorkspace({
           <p className="type-body-s m-0 text-ink-2">No trips are available for this account yet.</p>
         </Panel>
       )}
+      {audience === 'staff' && summariesQuery.data && summaries.length > 0 && (
+        <TripBoard
+          data={summariesQuery.data}
+          loading={summariesQuery.isFetching}
+          selectedCode={selectedCode}
+          onSelect={(value) => {
+            setCode(value);
+            setPartId(undefined);
+            setStopId(undefined);
+          }}
+          onPageChange={pageChange}
+        />
+      )}
       {summaries.length > 0 && (
         <>
-          <Flex wrap align="center" justify="space-between" gap={12}>
-            <Select
-              aria-label="Select trip"
-              value={selectedCode}
-              onChange={(value) => {
-                setCode(value);
-                setPartId(undefined);
-                setStopId(undefined);
-              }}
-              options={summaries.map((item) => ({
-                value: item.jobCode,
-                // The escort's row is a trip: its TRP code and every job on the trailer.
-                label: `${item.tripCode ? `${item.tripCode} · ${item.jobCodes.join(', ')}` : item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
-              }))}
-              className="min-w-72 flex-1"
-            />
-            {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
-              <Flex align="center" gap={8}>
-                <Button
-                  size="sm"
-                  disabled={summariesQuery.data.first}
-                  onClick={() => pageChange(page - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="type-body-s text-ink-3">
-                  Page {page + 1} of {summariesQuery.data.totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  disabled={summariesQuery.data.last}
-                  onClick={() => pageChange(page + 1)}
-                >
-                  Next
-                </Button>
-              </Flex>
-            )}
-          </Flex>
+          {audience !== 'staff' && (
+            <Flex wrap align="center" justify="space-between" gap={12}>
+              <Select
+                aria-label="Select trip"
+                value={selectedCode}
+                onChange={(value) => {
+                  setCode(value);
+                  setPartId(undefined);
+                  setStopId(undefined);
+                }}
+                options={summaries.map((item) => ({
+                  value: item.jobCode,
+                  // The escort's row is a trip: its TRP code and every job on the trailer.
+                  label: `${item.tripCode ? `${item.tripCode} · ${item.jobCodes.join(', ')}` : item.jobCode} · ${item.origin ?? 'Origin'} → ${item.destination ?? 'Destination'}`,
+                }))}
+                className="min-w-72 flex-1"
+              />
+              {summariesQuery.data && summariesQuery.data.totalPages > 1 && (
+                <Flex align="center" gap={8}>
+                  <Button
+                    size="sm"
+                    disabled={summariesQuery.data.first}
+                    onClick={() => pageChange(page - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <span className="type-body-s text-ink-3">
+                    Page {page + 1} of {summariesQuery.data.totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={summariesQuery.data.last}
+                    onClick={() => pageChange(page + 1)}
+                  >
+                    Next
+                  </Button>
+                </Flex>
+              )}
+            </Flex>
+          )}
           {selectedSummary && (
             <Panel
               title={

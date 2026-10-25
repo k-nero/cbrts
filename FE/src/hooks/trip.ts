@@ -7,6 +7,8 @@ export const useTrips = (audience: 'escort' | 'staff' | 'customer', page: number
   useQuery({
     queryKey: queryKeys.trips.list(audience, page),
     queryFn: () => tripApi.list(audience, page),
+    // The office board follows the trips on the road (US-F4-04).
+    refetchInterval: audience === 'staff' ? 30_000 : false,
   });
 
 export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string, tripId?: string) =>

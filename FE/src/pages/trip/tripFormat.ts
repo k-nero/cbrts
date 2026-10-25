@@ -1,4 +1,4 @@
-import type { TripRecordKind } from '@/interfaces';
+import type { TripRecord, TripRecordKind } from '@/interfaces';
 import { RouteStopKindEnum, TripRecordKindEnum } from '@/interfaces';
 
 export const eventLabels: Record<TripRecordKind, string> = {
@@ -31,6 +31,20 @@ const timeOptions = { dateStyle: 'medium', timeStyle: 'short' } as const;
 
 export const formatTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('en-GB', timeOptions) : 'Not recorded';
+
+/**
+ * Who recorded an entry and from where (US-F4-04): the cab, or the office on the escort's behalf.
+ * Null when the record doesn't say who.
+ */
+export const recordedByLine = (
+  recordedBy: string | null,
+  channel: TripRecord['channel'] | null,
+): string | null => {
+  if (!recordedBy) return null;
+  if (channel === 'WEB') return `Recorded by ${recordedBy} from the office, for the escort`;
+  if (channel === 'CAB_TABLET') return `Recorded by ${recordedBy} in the cab`;
+  return `Recorded by ${recordedBy}`;
+};
 
 /** Status in words (DESIGN.md: a tone plus a word, never a raw enum). */
 export const sentence = (value: string) =>

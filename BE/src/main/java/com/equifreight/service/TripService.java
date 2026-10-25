@@ -144,9 +144,51 @@ public class TripService {
                 rows.stream().map(TripSummaryResponse::jobCode).sorted().toList());
     }
 
+    /** The records that place a trip on its route; a condition check or a note says nothing about where it is. */
+    private static final Set<TripRecordKind> POSITION_KINDS =
+            EnumSet.complementOf(EnumSet.of(TripRecordKind.CONDITION_CHECK, TripRecordKind.NOTE));
+
     @Transactional(readOnly = true)
     public Page<TripSummaryResponse> coordinatorTrips(Pageable pageable) {
-        return jobs.findActiveTrips(pageable);
+        return jobs.findActiveTrips(pageable).map(this::withProgress);
+    }
+
+    /**
+     * An office board row with where its trip stands (US-F4-04). Positions come only from recorded checkpoints, never
+     * an estimate (DESIGN.md, Trip progress): the leg runs from the last stop with a checkpoint to the next stop.
+     */
+    private TripSummaryResponse withProgress(TripSummaryResponse row) {
+        TransportJob job = job(row.jobCode());
+        Optional<Trip> found = jobTrips.activePartsOf(job).stream()
+                .filter(p -> p.departed() && p.getStatus() != TripStatus.DELIVERED)
+                .map(TripJob::getTrip)
+                .findFirst()
+                .or(() -> jobTrips.findTripOf(job.getId()));
+        if (found.isEmpty()) return row;
+        Trip trip = found.get();
+        List<TripRecord> positions = records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()).stream()
+                .filter(r -> POSITION_KINDS.contains(r.getKind()))
+                .toList();
+        TripRecord last = positions.isEmpty() ? null : positions.getLast();
+        List<RouteStop> stops = routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                .map(RoutePlan::getStops)
+                .orElse(List.of());
+        Set<UUID> reachedStops = new HashSet<>();
+        positions.forEach(r -> {
+            if (r.getRouteStop() != null) reachedStops.add(r.getRouteStop().getId());
+        });
+        int reached = -1;
+        for (int i = 0; i < stops.size(); i++)
+            if (reachedStops.contains(stops.get(i).getId())) reached = i;
+        return row.withProgress(new TripSummaryResponse.Progress(
+                trip.getCode(),
+                reached < 0 ? null : TripMapper.stopName(stops.get(reached)),
+                reached + 1 < stops.size() ? TripMapper.stopName(stops.get(reached + 1)) : null,
+                last == null ? null : last.getKind(),
+                last == null || last.getRouteStop() == null ? null : TripMapper.stopName(last.getRouteStop()),
+                last == null ? null : last.getOccurredAt(),
+                last == null ? null : TripMapper.fullName(last.getRecordedBy()),
+                last == null ? null : last.getChannel()));
     }
 
     @Transactional(readOnly = true)

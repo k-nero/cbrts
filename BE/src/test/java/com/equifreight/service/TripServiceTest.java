@@ -40,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
@@ -768,6 +769,57 @@ class TripServiceTest {
         assertEquals("CBRT-2026-041", shared.jobCode());
         assertEquals(List.of("CBRT-2026-041", "CBRT-2026-042"), shared.jobCodes());
         assertEquals(List.of("CBRT-2026-050"), page.getContent().get(1).jobCodes());
+    }
+
+    @Test
+    @DisplayName("The office board shows each trip's leg and last checkpoint, with who recorded it from where")
+    void theBoardShowsWhereEachTripIs() {
+        departed();
+        RouteStop pickup = namedStop(1, RouteStopKind.PICKUP, "Hồ Chí Minh City");
+        RouteStop border = namedStop(2, RouteStopKind.BORDER, "Mộc Bài");
+        RouteStop delivery = namedStop(3, RouteStopKind.DELIVERY, "Phnom Penh");
+        RoutePlan plan = new RoutePlan();
+        plan.setStops(new ArrayList<>(List.of(pickup, border, delivery)));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+        TripRecord left = stored(TripRecordKind.DEPARTED, NOW.minus(Duration.ofHours(3)));
+        left.setRouteStop(pickup);
+        left.setRecordedBy(escort);
+        left.setChannel(Channel.CAB_TABLET);
+        TripRecord cleared = stored(TripRecordKind.CLEARED_BORDER, NOW.minus(Duration.ofHours(1)));
+        cleared.setRouteStop(border);
+        cleared.setRecordedBy(coordinator);
+        cleared.setChannel(Channel.WEB);
+        TripRecord check = stored(TripRecordKind.CONDITION_CHECK, NOW);
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId())).thenReturn(List.of(left, cleared, check));
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(jobs.findActiveTrips(any()))
+                .thenReturn(new PageImpl<>(
+                        List.of(new TripSummaryResponse(job.getCode(), TripStatus.DEPARTED, "HCM", "PNH", NOW))));
+
+        TripSummaryResponse.Progress progress = service.coordinatorTrips(PageRequest.of(0, 20))
+                .getContent()
+                .getFirst()
+                .progress();
+
+        assertEquals("TRP-2026-001", progress.tripCode());
+        assertEquals("Mộc Bài", progress.legFrom());
+        assertEquals("Phnom Penh", progress.legTo());
+        assertEquals(TripRecordKind.CLEARED_BORDER, progress.lastKind());
+        assertEquals("Mộc Bài", progress.lastStop());
+        assertEquals(NOW.minus(Duration.ofHours(1)), progress.lastAt());
+        assertEquals(Channel.WEB, progress.lastChannel());
+    }
+
+    private static RouteStop namedStop(int seq, RouteStopKind kind, String name) {
+        RouteStop stop = new RouteStop();
+        stop.setId(UUID.randomUUID());
+        stop.setSeq((short) seq);
+        stop.setKind(kind);
+        Place place = new Place();
+        place.setName(name);
+        stop.setPlace(place);
+        return stop;
     }
 
     @Test
