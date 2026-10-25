@@ -27,9 +27,15 @@ type Props = {
   children: React.ReactNode;
   /** The staff sidebar's items. Without it the layout is the customer portal (top header). */
   menu?: React.ReactNode;
+  /** Where the staff shell's bell leads; the escort has a notifications page of their own. */
+  notificationsPage?: 'staff-notifications' | 'escort-notifications';
 };
 
-const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
+const AuthenticateLayout: FC<Props> = ({
+  children,
+  menu,
+  notificationsPage = 'staff-notifications',
+}) => {
   const { pathname } = useLocation();
   const roles = useAuthStore((state) => state.roles);
   const role = primaryRole(roles);
@@ -60,7 +66,7 @@ const AuthenticateLayout: FC<Props> = ({ children, menu }) => {
           <span className="font-mono text-[12px] text-ink-3">
             {dayjs().format('ddd D MMM YYYY')}
           </span>
-          <NotificationBell page="staff-notifications" />
+          <NotificationBell page={notificationsPage} />
           <ThemeToggle />
         </Flex>
       </Flex>

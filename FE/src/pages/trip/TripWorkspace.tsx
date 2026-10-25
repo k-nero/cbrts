@@ -13,7 +13,6 @@ import { eventLabels, formatTime, sentence } from './tripFormat';
 import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Checkbox, Chip, Panel } from '@/components/ui';
-import { useAuth } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib/utils';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
 import type { HorseCondition, TripRecordKind, TripSummary } from '@/interfaces';
@@ -69,7 +68,6 @@ export function TripWorkspace({
   summary: string;
   editable?: boolean;
 }) {
-  const { logout } = useAuth();
   const [page, setPage] = useState(0);
   const summariesQuery = useTrips(audience, page);
   const summaries = summariesQuery.data?.content ?? [];
@@ -201,17 +199,7 @@ export function TripWorkspace({
   return (
     <Flex vertical gap={24}>
       {contextHolder}
-      <PageHeader
-        title={title}
-        summary={summary}
-        right={
-          audience === 'escort' ? (
-            <Button variant="secondary" onClick={logout}>
-              Sign out
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title={title} summary={summary} />
       {summariesQuery.isPending && (
         <div className="py-12 text-center">
           <Spin />

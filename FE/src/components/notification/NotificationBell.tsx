@@ -9,8 +9,8 @@ import { useNotificationStream, useUnreadCount } from '@/hooks/notification';
 import { type RouteName, useCustomRouter } from '@/router/route.hook';
 
 type Props = {
-  /** The shell's notifications page: the owner portal's or the staff one. */
-  page: Extract<RouteName, 'notifications' | 'staff-notifications'>;
+  /** The shell's notifications page: the owner portal's, the staff one or the escort's. */
+  page: Extract<RouteName, 'notifications' | 'staff-notifications' | 'escort-notifications'>;
 };
 
 /**

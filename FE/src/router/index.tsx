@@ -127,7 +127,19 @@ export const router = createBrowserRouter([
           { path: 'vehicles', element: <VehiclesPage /> },
         ],
       },
-      { path: '/escort', element: <EscortTripPage /> },
+      {
+        // The escort works in the staff shell too: sidebar, top bar and bell.
+        path: '/escort',
+        element: (
+          <AuthenticateLayout menu={<StaffMenu />} notificationsPage="escort-notifications">
+            <Outlet />
+          </AuthenticateLayout>
+        ),
+        children: [
+          { index: true, element: <EscortTripPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
+        ],
+      },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

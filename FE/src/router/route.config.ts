@@ -325,7 +325,17 @@ export const routesConfig = [
     path: '/escort',
     roles: ['ESCORT'],
     type: 'authenticated',
-    breadcrumb: 'Cab surface',
+    breadcrumb: 'Trip log',
     name: 'escort',
+    children: [
+      {
+        // The bell in the escort's top bar opens it, as in the staff shell.
+        path: '/notifications',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Notifications',
+        name: 'escort-notifications',
+      },
+    ],
   },
 ] as const satisfies readonly RouteConfigItem[];
