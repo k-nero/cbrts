@@ -39,7 +39,8 @@ public class PricingInputs {
         this.sizeClasses = sizeClasses;
     }
 
-    public PricingInput inputFor(TransportRequest request, ServiceClass airClass) {
+    /** {@code weightsRequired}: true for a quotation, false for the customer's estimate on a draft (BR-Q-16). */
+    public PricingInput inputFor(TransportRequest request, ServiceClass airClass, boolean weightsRequired) {
         Corridor corridor = request.getCorridor();
         Place origin = request.getOriginPlace();
         Place destination = request.getDestinationPlace();
@@ -62,7 +63,8 @@ public class PricingInputs {
                 request.isVetEscort(),
                 quarantineDays(origin, destinationCountry),
                 horses,
-                request.getArrivalMode() == ArrivalMode.WINDOW);
+                request.getArrivalMode() == ArrivalMode.WINDOW,
+                weightsRequired);
     }
 
     /** A move within one country has no quarantine; otherwise the destination's published minimum, or null. */
@@ -91,6 +93,7 @@ public class PricingInputs {
                 rh.getSizeClassCode(),
                 widthOf.apply(rh.getSizeClassCode()),
                 rh.isWithFoal(),
-                rh.getDeclaredValue());
+                rh.getDeclaredValue(),
+                rh.getWeightKg() == null ? null : rh.getWeightKg().intValue());
     }
 }

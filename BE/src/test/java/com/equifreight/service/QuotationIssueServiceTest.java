@@ -120,7 +120,8 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                         "XL",
                         96,
                         false,
-                        new BigDecimal("175000")));
+                        new BigDecimal("175000"),
+                        500));
         startedWithIds();
 
         assertBlocked("Nightfall is size XL (96 in); business gives 48 in.");

@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -97,7 +98,7 @@ class RequestEstimatorTest {
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.of(v5));
         when(loader.load(v5)).thenAnswer(i -> new CatalogRows(v5, classes, lines, List.of(), policies, List.of()));
-        when(inputs.inputFor(any(), any())).thenAnswer(i -> input(i.getArgument(0), i.getArgument(1)));
+        when(inputs.inputFor(any(), any(), anyBoolean())).thenAnswer(i -> input(i.getArgument(0), i.getArgument(1)));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.AIR))).thenReturn(resolution(air, Set.of()));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.ROAD))).thenReturn(resolution(road, Set.of()));
     }
@@ -160,7 +161,8 @@ class RequestEstimatorTest {
                         "M",
                         32,
                         false,
-                        rh.getDeclaredValue()))
+                        rh.getDeclaredValue(),
+                        500))
                 .toList();
         return new PricingInput(
                 c.getMode(),
@@ -176,7 +178,8 @@ class RequestEstimatorTest {
                 false,
                 0,
                 horses,
-                r.getArrivalMode() == ArrivalMode.WINDOW);
+                r.getArrivalMode() == ArrivalMode.WINDOW,
+                false);
     }
 
     TransportRequest request(Corridor corridor) {

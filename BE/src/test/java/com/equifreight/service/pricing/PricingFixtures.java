@@ -24,12 +24,17 @@ final class PricingFixtures {
         return new BigDecimal(value);
     }
 
+    /** A horse of 500 kg. */
     static PricingHorse horse(String name, HorseSex sex, String size, Integer widthIn, String value) {
-        return new PricingHorse(UUID.randomUUID(), name, sex, size, widthIn, false, d(value));
+        return horse(name, sex, size, widthIn, value, 500);
+    }
+
+    static PricingHorse horse(String name, HorseSex sex, String size, Integer widthIn, String value, Integer weightKg) {
+        return new PricingHorse(UUID.randomUUID(), name, sex, size, widthIn, false, d(value), weightKg);
     }
 
     static PricingHorse foal(String name, String size, int widthIn, String value) {
-        return new PricingHorse(UUID.randomUUID(), name, HorseSex.MARE, size, widthIn, true, d(value));
+        return new PricingHorse(UUID.randomUUID(), name, HorseSex.MARE, size, widthIn, true, d(value), 500);
     }
 
     static RateRow line(String code, String group, String description, RateBasis basis, String rate) {
@@ -122,6 +127,8 @@ final class PricingFixtures {
         policies.put(RatePolicyKey.HIGH_VALUE_THRESHOLD, d("250000"));
         policies.put(RatePolicyKey.ARRIVAL_WINDOW_PCT, d("20"));
         policies.put(RatePolicyKey.ESTIMATE_BAND_PCT, d("15"));
+        policies.put(RatePolicyKey.STALL_PAYLOAD_KG, d("5504"));
+        policies.put(RatePolicyKey.AIR_SHIPMENT_MAX_KG, d("20000"));
         return policies;
     }
 
@@ -180,7 +187,8 @@ final class PricingFixtures {
                 false,
                 14,
                 horses,
-                false);
+                false,
+                true);
     }
 
     static PricingInput pnhHkgBusiness() {
@@ -206,7 +214,8 @@ final class PricingFixtures {
                 false,
                 7,
                 horses,
-                false);
+                false,
+                true);
     }
 
     /** The same input asking for an arrival window. */
@@ -225,6 +234,39 @@ final class PricingFixtures {
                 in.vetEscort(),
                 in.quarantineDays(),
                 in.horses(),
-                true);
+                true,
+                in.weightsRequired());
+    }
+
+    /** The same input as the customer's estimate prices it: a draft's missing weight isn't refused. */
+    static PricingInput estimateOf(PricingInput in) {
+        return new PricingInput(
+                in.mode(),
+                in.corridorCode(),
+                in.fromCity(),
+                in.toCity(),
+                in.destinationCountryName(),
+                in.distanceKm(),
+                in.crossingCount(),
+                in.airClass(),
+                in.trailer(),
+                in.insurance(),
+                in.vetEscort(),
+                in.quarantineDays(),
+                in.horses(),
+                in.arrivalWindow(),
+                false);
+    }
+
+    /** The same rates with one policy set to {@code value}, or removed when it is null. */
+    static RateSet withPolicy(RateSet rates, RatePolicyKey key, String value) {
+        Map<RatePolicyKey, BigDecimal> policies = new EnumMap<>(RatePolicyKey.class);
+        policies.putAll(rates.policies());
+        if (value == null) {
+            policies.remove(key);
+        } else {
+            policies.put(key, d(value));
+        }
+        return new RateSet(rates.versionNo(), rates.classes(), rates.lines(), rates.breaks(), policies);
     }
 }

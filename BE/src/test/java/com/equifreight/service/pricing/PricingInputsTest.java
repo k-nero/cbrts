@@ -123,7 +123,7 @@ class PricingInputsTest {
     void aReversedCorridorTakesTheRequestsCitiesAndDestinationCountry() {
         TransportRequest reversed = request(place("Hong Kong", hongKong), place("Phnom Penh", cambodia));
 
-        PricingInput in = inputs.inputFor(reversed, ServiceClass.FIRST);
+        PricingInput in = inputs.inputFor(reversed, ServiceClass.FIRST, true);
 
         assertThat(in.fromCity()).isEqualTo("Hong Kong");
         assertThat(in.toCity()).isEqualTo("Phnom Penh");
@@ -140,7 +140,7 @@ class PricingInputsTest {
     @Test
     void quarantineDaysComeFromTheNewestPublishedVersion() {
         PricingInput in = inputs.inputFor(
-                request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong)), ServiceClass.BUSINESS);
+                request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong)), ServiceClass.BUSINESS, true);
         assertThat(in.quarantineDays()).isEqualTo(14);
     }
 
@@ -150,7 +150,7 @@ class PricingInputsTest {
         when(catalogs.findByCountryCode("LA")).thenReturn(Optional.empty());
 
         PricingInput in = inputs.inputFor(
-                request(place("Phnom Penh", cambodia), place("Vientiane", laos)), ServiceClass.BUSINESS);
+                request(place("Phnom Penh", cambodia), place("Vientiane", laos)), ServiceClass.BUSINESS, true);
 
         assertThat(in.quarantineDays()).isNull();
         assertThat(in.destinationCountryName()).isEqualTo("Laos");
@@ -161,7 +161,7 @@ class PricingInputsTest {
         published(vietnam, 7);
 
         PricingInput in = inputs.inputFor(
-                request(place("Ho Chi Minh City", vietnam), place("Hanoi", vietnam)), ServiceClass.BUSINESS);
+                request(place("Ho Chi Minh City", vietnam), place("Hanoi", vietnam)), ServiceClass.BUSINESS, true);
 
         assertThat(in.quarantineDays()).isZero();
     }
@@ -169,7 +169,7 @@ class PricingInputsTest {
     @Test
     void widthsComeFromTheSizeClasses() {
         PricingInput in = inputs.inputFor(
-                request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong)), ServiceClass.BUSINESS);
+                request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong)), ServiceClass.BUSINESS, true);
 
         PricingHorse horse = in.horses().getFirst();
         assertThat(horse.name()).isEqualTo("Nightfall");
@@ -187,7 +187,10 @@ class PricingInputsTest {
         TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
         r.getHorses().getFirst().setSizeClassCode("Z");
 
-        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).horses().getFirst().widthIn())
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true)
+                        .horses()
+                        .getFirst()
+                        .widthIn())
                 .isNull();
     }
 
@@ -196,15 +199,17 @@ class PricingInputsTest {
         TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
         r.getCorridor().setDistanceKm(null);
 
-        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).distanceKm()).isNull();
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true).distanceKm()).isNull();
     }
 
     @Test
     void aWindowRequestPricesTheWindow() {
         TransportRequest r = request(place("Phnom Penh", cambodia), place("Hong Kong", hongKong));
-        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).arrivalWindow()).isFalse();
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true).arrivalWindow())
+                .isFalse();
 
         r.setArrivalMode(com.equifreight.entity.enums.ArrivalMode.WINDOW);
-        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS).arrivalWindow()).isTrue();
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true).arrivalWindow())
+                .isTrue();
     }
 }

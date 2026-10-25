@@ -82,7 +82,7 @@ public class QuotationPricing {
         q.setAirClass(pricedClass(q, request));
         CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
         RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, q.getAirClass());
+        PricingInput in = inputs.inputFor(request, q.getAirClass(), true);
         PricedQuote priced = QuotePricer.price(in, rates);
 
         Map<String, QuotationLine> overrides = new LinkedHashMap<>();
@@ -155,7 +155,7 @@ public class QuotationPricing {
     public void retotal(Quotation q, TransportRequest request) {
         RateSet rates = loader.load(q.getRateCatalogVersion().getId())
                 .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
         List<PricedLine> stored = q.getLines().stream()
                 .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
                         .thenComparing(QuotationLine::getPosition))
@@ -171,7 +171,7 @@ public class QuotationPricing {
     public PricedTotals totalsWith(Quotation q, TransportRequest request, java.util.Map<UUID, BigDecimal> amounts) {
         RateSet rates = loader.load(q.getRateCatalogVersion().getId())
                 .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
         List<PricedLine> lines = q.getLines().stream()
                 .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
                         .thenComparing(QuotationLine::getPosition))
@@ -234,7 +234,7 @@ public class QuotationPricing {
     public Evaluation evaluate(Quotation q, TransportRequest request) {
         RateSet rates = loader.load(q.getRateCatalogVersion().getId())
                 .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request));
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
         PricedQuote now = QuotePricer.price(in, rates);
         PricedTotals expected = QuotePricer.retotal(in, rates, adjusted(now.lines(), q.getLines()));
         boolean stale = QuotationMapper.repriceNeeded(q, now, expected);

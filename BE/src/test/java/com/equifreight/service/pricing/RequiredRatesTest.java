@@ -207,7 +207,8 @@ class RequiredRatesTest {
                 false,
                 14,
                 pnhHkgBusiness().horses(),
-                false);
+                false,
+                true);
         Map<RatePolicyKey, BigDecimal> noInsurance = new java.util.EnumMap<>(standardPolicies());
         noInsurance.remove(RatePolicyKey.INSURANCE_PCT);
         RateSet rates = new RateSet(2, pnhHkgRates().classes(), pnhHkgLines(), standardBreaks(), noInsurance);
@@ -230,7 +231,8 @@ class RequiredRatesTest {
                 in.vetEscort(),
                 days,
                 in.horses(),
-                in.arrivalWindow());
+                in.arrivalWindow(),
+                true);
     }
 
     @Test
