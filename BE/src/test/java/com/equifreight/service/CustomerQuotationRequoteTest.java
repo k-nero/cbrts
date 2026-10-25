@@ -148,6 +148,7 @@ class CustomerQuotationRequoteTest extends QuotationServiceFixture {
         assertThat(request.getStatus()).isEqualTo(RequestStatus.EXPIRED);
         assertThat(v1.getStatus()).isEqualTo(QuotationStatus.EXPIRED);
         assertThat(r.versionNo()).isEqualTo((short) 1);
+        assertThat(r.nextVersion()).isEqualTo(2);
         verify(audit)
                 .recordDecision(
                         eq(bookings),

@@ -155,6 +155,25 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void nextVersionNamesTheDraft() {
+        Quotation v1 = issuedV1();
+        Quotation v2 = issued();
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(v2, v1));
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void nextVersionIsNullWithoutADraft() {
+        Quotation v1 = issuedV1();
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(v1));
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isNull();
+    }
+
+    @Test
     void versionsAreIssuedOnlyNewestFirstWithTheirReasons() {
         Quotation v2 = issuedV1();
         v2.setVersionNo((short) 2);

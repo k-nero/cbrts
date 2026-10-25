@@ -98,7 +98,11 @@ public class RequestProgressService {
             case EXPIRED ->
                 issued(request)
                         .filter(q -> q.getStatus() != QuotationStatus.DECLINED)
-                        .map(q -> theirs("Re-price the quotation from the rate catalog in force now", manager(q)))
+                        .map(q -> requoting(request)
+                                .map(draft -> theirs(
+                                        "Issue version " + draft.getVersionNo() + " of the quotation", manager(draft)))
+                                .orElseGet(() -> theirs(
+                                        "Re-price the quotation from the rate catalog in force now", manager(q))))
                         .orElse(null);
             case APPROVED ->
                 jobs.findByRequestId(request.getId()).map(this::documents).orElse(null);
@@ -127,6 +131,13 @@ public class RequestProgressService {
 
     private Optional<Quotation> issued(TransportRequest request) {
         return quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT);
+    }
+
+    /** The next version being drafted, after a re-quote (A4) or the manager's own revise. */
+    private Optional<Quotation> requoting(TransportRequest request) {
+        return quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(request.getId())
+                .filter(q -> q.getStatus() == QuotationStatus.DRAFT);
     }
 
     /** The manager who prepares the request's quotation; anyone in the role until one has started it. */

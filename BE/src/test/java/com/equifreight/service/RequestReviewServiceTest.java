@@ -380,6 +380,28 @@ class RequestReviewServiceTest {
     }
 
     @Test
+    void anExpiredRequestInTheQueueHasAPosition() {
+        // An EXPIRED request with a re-quote drafted is in the queue (A4); the id list decides it.
+        TransportRequest r = inReview(RequestStatus.EXPIRED);
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        when(requests.findQueueIds(any())).thenReturn(List.of(a, r.getId(), b));
+
+        var queue = service.view(r.getId()).getQueue();
+
+        assertThat(queue.getPosition()).isEqualTo(2);
+        assertThat(queue.getTotal()).isEqualTo(3);
+    }
+
+    @Test
+    void anExpiredRequestOutOfTheQueueHasNoPosition() {
+        TransportRequest r = inReview(RequestStatus.EXPIRED);
+        when(requests.findQueueIds(any())).thenReturn(List.of(UUID.randomUUID()));
+
+        assertThat(service.view(r.getId()).getQueue()).isNull();
+    }
+
+    @Test
     void aRequestOutOfTheQueueHasNoPosition() {
         TransportRequest r = inReview(RequestStatus.INFO_REQUIRED);
 

@@ -24,6 +24,8 @@ import lombok.Builder;
  * @param estimate the range kept at submission against this total; null when none was kept
  * @param latePenalty the late-arrival terms when the move has an arrival window; null otherwise
  * @param versions every version that was issued, newest first
+ * @param nextVersion the number of the version being drafted after this one (a re-quote, A4), else null; its
+ *     content stays with the logistics manager until it is issued
  * @param requestStatus where the request stands; a cancelled request can't be answered whatever this version's status
  * @param acceptedAt when the customer accepted this version (US-F1-06); null until then
  * @param declinedAt when the customer declined this version; null unless declined
@@ -53,7 +55,8 @@ public record CustomerQuotationResponse(
         Cancellation cancellation,
         LatePenalty latePenalty,
         PreparedBy preparedBy,
-        List<Version> versions) {
+        List<Version> versions,
+        Integer nextVersion) {
 
     /** The request as quoted. */
     public record Request(

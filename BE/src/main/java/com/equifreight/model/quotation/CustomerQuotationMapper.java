@@ -110,7 +110,15 @@ public final class CustomerQuotationMapper {
                                 v.getValidUntil(),
                                 v.getSupersededReason()))
                         .toList())
+                .nextVersion(nextVersion(versions))
                 .build();
+    }
+
+    /** The draft's number when the newest version is one: a new version is being prepared. */
+    private static Integer nextVersion(List<Quotation> versions) {
+        return versions.isEmpty() || versions.getFirst().getStatus() != QuotationStatus.DRAFT
+                ? null
+                : (int) versions.getFirst().getVersionNo();
     }
 
     private static List<CustomerQuotationResponse.Group> groups(Quotation q, QuotationSnapshot.Facts facts) {
