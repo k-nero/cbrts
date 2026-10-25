@@ -1,11 +1,13 @@
 import client from '@/config/axios';
 import type {
+  AddRegulationRuleRequest,
   Authority,
   AuthorityKind,
   AuthoritySubmission,
   ChecklistItem,
   ClearanceStatus,
   CreateAuthoritySubmissionRequest,
+  CountryRequest,
   CreateQuarantinePeriodRequest,
   DocumentType,
   DocumentUploadRequest,
@@ -16,7 +18,8 @@ import type {
   ClearanceJobSummary,
   PagedResponse,
   QuarantinePeriod,
-  RegulationCatalog,
+  RegulationCountry,
+  RegulationParametersRequest,
   RegulationVersion,
   ReviewDocumentRequest,
   UpdateAuthoritySubmissionRequest,
@@ -84,7 +87,22 @@ export const clearanceApi = {
     client.post<QuarantinePeriod>(`/staff/clearance/quarantines/${quarantineId}/complete`),
 
   // Regulations
-  getRegulationCatalogs: () => client.get<RegulationCatalog[]>('/staff/regulations/catalogs'),
+  getRegulationCountries: () => client.get<RegulationCountry[]>('/staff/regulations/countries'),
+
+  addCountry: (data: CountryRequest) =>
+    client.post<RegulationCountry>('/staff/regulations/countries', data),
+
+  createRegulationCatalog: (countryId: string, data: RegulationParametersRequest) =>
+    client.post<RegulationVersion>(`/staff/regulations/countries/${countryId}/catalog`, data),
+
+  updateRegulationParameters: (versionId: string, data: RegulationParametersRequest) =>
+    client.put<RegulationVersion>(`/staff/regulations/versions/${versionId}`, data),
+
+  addRegulationRule: (versionId: string, data: AddRegulationRuleRequest) =>
+    client.post<RegulationVersion>(`/staff/regulations/versions/${versionId}/rules`, data),
+
+  removeRegulationRule: (ruleId: string) =>
+    client.delete<RegulationVersion>(`/staff/regulations/rules/${ruleId}`),
 
   getRegulationVersionDetails: (versionId: string) =>
     client.get<RegulationVersion>(`/staff/regulations/versions/${versionId}`),

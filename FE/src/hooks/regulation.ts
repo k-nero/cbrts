@@ -2,22 +2,124 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clearanceApi } from '@/apis/clearance';
 import { queryKeys } from '@/constant/query';
 import type {
+  AddRegulationRuleRequest,
+  CountryRequest,
   DocumentType,
-  RegulationCatalog,
+  RegulationCountry,
+  RegulationParametersRequest,
   RegulationVersion,
   UpdateRegulationRuleRequest,
 } from '@/interfaces';
 
 /**
- * List all regulation catalogs by destination.
+ * Every country we serve, by name, with its regulation catalog or none yet.
  */
-export const useRegulationCatalogs = () => {
+export const useRegulationCountries = () => {
   return useQuery({
-    queryKey: queryKeys.regulations.catalogs(),
-    queryFn: async (): Promise<RegulationCatalog[]> => {
-      const res = await clearanceApi.getRegulationCatalogs();
+    queryKey: queryKeys.regulations.countries(),
+    queryFn: async (): Promise<RegulationCountry[]> => {
+      const res = await clearanceApi.getRegulationCountries();
       return res.data;
     },
+  });
+};
+
+/** Reloads the country list and the version a write answered with. */
+const useVersionWriteSuccess = () => {
+  const queryClient = useQueryClient();
+  return (version?: RegulationVersion) => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.regulations.all() });
+    if (version?.id) queryClient.setQueryData(queryKeys.regulations.version(version.id), version);
+  };
+};
+
+/**
+ * Add a country by its ISO 3166-1 alpha-2 code and name.
+ */
+export const useAddCountry = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CountryRequest) => {
+      const res = await clearanceApi.addCountry(data);
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.regulations.countries() });
+    },
+  });
+};
+
+/**
+ * Create a country's regulation catalog with its first draft version.
+ */
+export const useCreateRegulationCatalog = () => {
+  const onSuccess = useVersionWriteSuccess();
+  return useMutation({
+    mutationFn: async ({
+      countryId,
+      data,
+    }: {
+      countryId: string;
+      data: RegulationParametersRequest;
+    }) => {
+      const res = await clearanceApi.createRegulationCatalog(countryId, data);
+      return res.data;
+    },
+    onSuccess,
+  });
+};
+
+/**
+ * Change a draft version's lead times, quarantine minimum and arrival buffer.
+ */
+export const useUpdateRegulationParameters = () => {
+  const onSuccess = useVersionWriteSuccess();
+  return useMutation({
+    mutationFn: async ({
+      versionId,
+      data,
+    }: {
+      versionId: string;
+      data: RegulationParametersRequest;
+    }) => {
+      const res = await clearanceApi.updateRegulationParameters(versionId, data);
+      return res.data;
+    },
+    onSuccess,
+  });
+};
+
+/**
+ * Add a document rule to a draft version.
+ */
+export const useAddRegulationRule = () => {
+  const onSuccess = useVersionWriteSuccess();
+  return useMutation({
+    mutationFn: async ({
+      versionId,
+      data,
+    }: {
+      versionId: string;
+      data: AddRegulationRuleRequest;
+    }) => {
+      const res = await clearanceApi.addRegulationRule(versionId, data);
+      return res.data;
+    },
+    onSuccess,
+  });
+};
+
+/**
+ * Remove a document rule from a draft version.
+ */
+export const useRemoveRegulationRule = () => {
+  const onSuccess = useVersionWriteSuccess();
+  return useMutation({
+    mutationFn: async (ruleId: string) => {
+      const res = await clearanceApi.removeRegulationRule(ruleId);
+      return res.data;
+    },
+    onSuccess,
   });
 };
 

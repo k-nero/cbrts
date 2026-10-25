@@ -152,7 +152,7 @@ erDiagram
 
 | Table | Columns | Notes |
 |---|---|---|
-| `countries` | `code char(2) primary key`, `name` | ISO 3166-1 alpha-2. Seeded with the launch region: VN, KH, TH, LA, MY, HK; any other country is added as a row, with its regulation catalog (section 7). The one table keyed by a natural code. |
+| `countries` | `code char(2)` unique, `name` | ISO 3166-1 alpha-2, check `code ~ '^[A-Z]{2}$'` (V21). Seeded with the launch region: VN, KH, TH, LA, MY, HK. The transport specialist adds any other country in the app (US-F2-12, #207), then creates its regulation catalog (section 7). A code can't be added twice, and a country is never deleted: there is no delete, so a catalog, place or corridor that uses one keeps it. Other tables reference it by `id` (`country_id`). |
 | `places` | `name`, `kind`, `city`, `country_code`, `address` | `kind`: `TRAINING_CENTRE`, `STUD`, `RACECOURSE`, `STABLE`, `AIRPORT`, `CARGO_TERMINAL`, `QUARANTINE`, `WELFARE_STOP`. |
 | `border_crossings` | `name`, `from_country`, `to_country`, `road_only boolean` | "Mộc Bài – Bavet", "Poipet – Aranyaprathet". |
 | `corridors` | `code` unique, `mode`, `origin_city`, `destination_city`, `distance_km`, `date_flex_days` | `mode`: `ROAD`, `AIR`. "RD HCM → PNH", "AIR PNH → HKG". `date_flex_days` smallint not null default 3, check 0–7 (#115): how far a request's flexible dates can move on this route, set by the fleet & route coordinator; 0 means fixed dates only. |
@@ -242,12 +242,14 @@ erDiagram
 
 | Table | Columns | Rules |
 |---|---|---|
-| `regulation_catalogs` | `country_code` unique, `name` | "Cambodia import". |
-| `regulation_versions` | `catalog_id`, `version_no`, `status` (`DRAFT`, `PUBLISHED`, `RETIRED`), `published_at`, `published_by`, `lead_time_days` (the cross-border lead time into this country: 21, Laos 30 in the demo), `domestic_lead_time_days` (a move within the country: 3), `quarantine_min_days` (7), `arrival_buffer_days` (2) | Unique `(catalog_id, version_no)`. Immutable once published. |
+| `regulation_catalogs` | `country_id` unique, `name` | "Cambodia import". One per country, created in the app with its first version as a `DRAFT` (US-F2-12). |
+| `regulation_versions` | `catalog_id`, `version_no`, `status` (`DRAFT`, `PUBLISHED`, `RETIRED`), `published_at`, `published_by`, `lead_time_days` (the cross-border lead time into this country: 21, Laos 30 in the demo), `domestic_lead_time_days` (a move within the country: 3), `quarantine_min_days` (7), `arrival_buffer_days` (2) | Unique `(catalog_id, version_no)`; at most one `DRAFT` per catalog (`regulation_versions_draft_idx`). Immutable once published: only a draft's parameters and rules change. A version with no rules can't be published, since it would clear every job into the country without checking a document. |
 | `document_types` | `code` unique, `name`, `scope`, `provided_by`, `category` | `scope`: `PER_HORSE`, `PER_SHIPMENT`, `PER_CROSSING`. `provided_by`: `CUSTOMER`, `AUTHORITY`. `category`: `HEALTH`, `IDENTITY`, `PERMIT`, `TRANSPORT`; the `HEALTH` documents decide a horse's health status for the biosecurity warnings on a shared trip (US-F3-12). Codes: `EQUINE_PASSPORT`, `PROOF_OF_OWNERSHIP` (identity), `INFLUENZA_VACCINATION`, `EIA_TEST`, `PIROPLASMOSIS_TEST`, `EXPORT_HEALTH_CERT` (health), `IMPORT_PERMIT` (permit), `TRANSIT_INSURANCE`, `CUSTOMS_VALUE_DECLARATION` (transport). |
-| `regulation_rules` | `version_id`, `document_type_id`, `mandatory`, `rule_kind`, `min_days`, `max_days`, `description` | `rule_kind`: `WINDOW_BEFORE_DEPARTURE` (EIA sampled within 60 days), `VALID_THROUGH_ARRIVAL_PLUS` (passport valid through arrival + 2 days), `BOOSTER_WINDOW` (influenza 7–180 days before), `PRESENCE_ONLY`. Unique `(version_id, document_type_id)`. |
+| `regulation_rules` | `version_id`, `document_type_id`, `mandatory`, `rule_kind`, `min_days`, `max_days`, `description` | `rule_kind`: `WINDOW_BEFORE_DEPARTURE` (EIA sampled within 60 days), `VALID_THROUGH_ARRIVAL_PLUS` (passport valid through arrival + 2 days), `BOOSTER_WINDOW` (influenza 7–180 days before), `PRESENCE_ONLY`. Unique `(version_id, document_type_id)`. Rules are added, edited and removed only in a draft; the days follow the kind (`WINDOW_BEFORE_DEPARTURE` and `VALID_THROUGH_ARRIVAL_PLUS` take `max_days`, `BOOSTER_WINDOW` both with `min_days <= max_days`, `PRESENCE_ONLY` none). |
 
 A rule is data with parameters, not code, so the validity engine (BR-F2-02) evaluates `GREEN`, `AMBER` or `RED` against the job's dates.
+
+Every change to a catalog (country added, catalog created, draft parameters changed, rule added, edited or removed, draft created, discarded or published) writes an `audit_log` row through `AuditService.recordDecision`, with the version as `KH v8`. Only the transport specialist makes them.
 
 ---
 

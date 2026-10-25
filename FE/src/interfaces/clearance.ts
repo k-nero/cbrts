@@ -320,12 +320,13 @@ export interface RegulationVersion {
   publishedAt?: string;
   publishedByName?: string;
   leadTimeDays: number;
+  domesticLeadTimeDays: number;
   quarantineMinDays: number;
   arrivalBufferDays: number;
   rules: RegulationRule[];
-  pinnedJobsCount?: number;
-  changesCount?: number;
-  changeNote?: string;
+  pinnedJobsCount: number;
+  /** The draft's new, changed and removed rules and changed parameters, against the published version. */
+  changesCount: number;
 }
 
 export interface RegulationCatalog {
@@ -337,12 +338,37 @@ export interface RegulationCatalog {
   versions?: RegulationVersion[];
 }
 
+/** A country we serve, with its regulation catalog or null when it has none yet (US-F2-12). */
+export interface RegulationCountry {
+  id: string;
+  code: string;
+  name: string;
+  catalog: RegulationCatalog | null;
+}
+
+export interface CountryRequest {
+  code: string;
+  name: string;
+}
+
+/** A draft version's parameters in days; a new catalog's first draft starts from them. */
+export interface RegulationParametersRequest {
+  leadTimeDays: number;
+  domesticLeadTimeDays: number;
+  quarantineMinDays: number;
+  arrivalBufferDays: number;
+}
+
 export interface UpdateRegulationRuleRequest {
-  ruleKind?: RegulationRuleKind;
-  minDays?: number;
-  maxDays?: number;
-  mandatory?: boolean;
-  description?: string;
+  ruleKind: RegulationRuleKind;
+  minDays: number | null;
+  maxDays: number | null;
+  mandatory: boolean;
+  description: string | null;
+}
+
+export interface AddRegulationRuleRequest extends UpdateRegulationRuleRequest {
+  documentTypeId: string;
 }
 
 export interface ClearanceJobSummary {

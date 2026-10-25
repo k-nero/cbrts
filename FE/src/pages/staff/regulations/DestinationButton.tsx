@@ -3,7 +3,7 @@ import { Flex } from 'antd';
 import { Chip } from '@/components/ui';
 import type { DestinationItem } from './constants';
 
-/** One destination row: its code, its name, and its version or a Draft chip. */
+/** One destination row: its code, its name, and its version, a Draft chip, or No catalog. */
 export const DestinationButton: FC<{
   item: DestinationItem;
   selected: boolean;
@@ -31,12 +31,14 @@ export const DestinationButton: FC<{
         {item.label}
       </span>
     </Flex>
-    {item.hasDraft ? (
-      <Chip tone="warn" dot={false} className="px-1.5 py-0.5 text-[11px]">
+    {item.version === null ? (
+      <span className="type-caption shrink-0 text-ink-3">No catalog</span>
+    ) : item.hasDraft ? (
+      <Chip tone="warn" dot={false}>
         Draft
       </Chip>
     ) : (
-      <span className="type-mono shrink-0 text-[11px] text-ink-3">{item.version}</span>
+      <span className="type-caption shrink-0 text-ink-3">{item.version}</span>
     )}
   </button>
 );
