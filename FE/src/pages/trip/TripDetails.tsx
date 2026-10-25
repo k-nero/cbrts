@@ -36,6 +36,8 @@ export function TripDetails({
   onShowPart?: (tripId: string) => void;
 }) {
   const lastRecord = [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+  // A job planned as a chain of trips, road, air, road (US-F3-16), rather than split by an incident.
+  const journey = trip.parts.some((part) => part.handsOn);
   return (
     <Flex vertical gap={16}>
       {/* The customer is told the trailer is shared, never with whom (US-F3-14). */}
@@ -53,12 +55,22 @@ export function TripDetails({
         </Callout>
       )}
       {trip.parts.length > 0 && (
-        <Panel title={`Travelling in ${trip.parts.length} parts`}>
+        <Panel
+          title={
+            journey
+              ? `A journey of ${trip.parts.length} trips`
+              : `Travelling in ${trip.parts.length} parts`
+          }
+        >
           <Flex vertical gap={12}>
             <p className="type-body-s m-0 text-ink-3">
-              {audience === 'customer'
-                ? 'After an incident on the road, your horses travel on separate trailers. Each part is followed on its own.'
-                : 'An incident split this job across trips; each part departs, travels and is delivered on its own.'}
+              {journey
+                ? audience === 'customer'
+                  ? 'Your horses travel by road and air, each trip handing them on to the next. Each trip is followed on its own.'
+                  : 'This job is planned as a chain of trips; each hands the horses on to the next, and only the last delivers them.'
+                : audience === 'customer'
+                  ? 'After an incident on the road, your horses travel on separate trailers. Each part is followed on its own.'
+                  : 'An incident split this job across trips; each part departs, travels and is delivered on its own.'}
             </p>
             {trip.parts.map((part, index) => (
               <Flex
@@ -71,8 +83,16 @@ export function TripDetails({
               >
                 <Flex vertical gap={2}>
                   <span className="type-label-m text-ink">
-                    {part.tripCode ?? `Part ${index + 1}`} ·{' '}
-                    {part.horses.join(', ') || 'No horse travelling'}
+                    {journey
+                      ? [
+                          `${index + 1}`,
+                          part.mode === 'AIR' ? 'Flight' : 'Road',
+                          part.corridorCode,
+                          part.tripCode,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : `${part.tripCode ?? `Part ${index + 1}`} · ${part.horses.join(', ') || 'No horse travelling'}`}
                   </span>
                   <span className="type-body-s text-ink-3">
                     {[

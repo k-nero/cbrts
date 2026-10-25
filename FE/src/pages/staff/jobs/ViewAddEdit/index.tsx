@@ -1,11 +1,11 @@
 import { type ReactNode, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
+import { Flex, Segmented, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
 import { Callout, ClearanceGate, StageMark } from '@/components/ui';
-import { useJobDetail } from '@/hooks/useJob';
-import type { JobDetail } from '@/interfaces';
+import { JobTripContext, useJobDetail } from '@/hooks/useJob';
+import type { JobDetail, TripPart } from '@/interfaces';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { LoadPlanTab } from './LoadPlanTab';
@@ -67,11 +67,33 @@ const STAGE_MAP: Record<
   CLOSED: 'Handover',
 };
 
+/** "1 · Road · RD HCM -> PNH": one trip of a job's journey, as the trip switcher names it. */
+const partLabel = (part: TripPart, index: number) =>
+  [
+    String(index + 1),
+    part.mode === 'AIR' ? 'Flight' : part.mode === 'ROAD' ? 'Road' : null,
+    part.corridorCode ?? part.tripCode,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
 export default function JobDetailPage() {
+  // The trip of the job's journey the tabs plan (US-F3-16) lives in the URL too (?trip=…).
+  const [searchParams] = useSearchParams();
+  return (
+    <JobTripContext value={searchParams.get('trip') ?? undefined}>
+      <JobWorkspace />
+    </JobTripContext>
+  );
+}
+
+function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = TABS.find((tab) => tab.key === searchParams.get('tab')) ?? TABS[0];
+  const showTrip = (trip: string) =>
+    setSearchParams({ tab: activeTab.key, trip }, { replace: true });
 
   // A failed load (404 included) goes to the error boundary; until the job arrives, the page is a skeleton.
   const { data: job } = useJobDetail(id || '');
@@ -135,8 +157,34 @@ export default function JobDetailPage() {
             right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
           />
 
-          {/* Clearance gate component */}
-          {job.parts.length > 0 && (
+          {/* A journey of several trips (US-F3-16): the tabs plan the trip chosen here. */}
+          {job.parts.some((part) => part.handsOn) && (
+            <Flex vertical gap={8}>
+              <p className="type-body-m m-0 text-ink-2">
+                {job.code} travels as a journey of {job.parts.length} trips, each handing the horses
+                on to the next. The tabs below plan the trip chosen here.
+              </p>
+              {/* A long journey scrolls sideways rather than squeezing its trips. */}
+              <div className="max-w-full overflow-x-auto">
+                <Segmented
+                  value={job.parts.find((part) => part.current)?.tripId}
+                  onChange={(trip) => showTrip(String(trip))}
+                  options={job.parts.map((part, index) => ({
+                    value: part.tripId,
+                    label: (
+                      <span className="flex items-center gap-2 px-1 py-0.5">
+                        <span className="type-label-s">{partLabel(part, index)}</span>
+                        <span className="type-mono-label text-ink-3">
+                          {part.status.toLowerCase().replace('_', ' ')}
+                        </span>
+                      </span>
+                    ),
+                  }))}
+                />
+              </div>
+            </Flex>
+          )}
+          {job.parts.length > 0 && !job.parts.some((part) => part.handsOn) && (
             <Callout tone="info" title={`${job.code} travels in ${job.parts.length} parts`}>
               {job.parts
                 .map(
@@ -158,7 +206,10 @@ export default function JobDetailPage() {
 
         <Tabs
           activeKey={activeTab.key}
-          onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
+          onChange={(key) => {
+            const trip = searchParams.get('trip');
+            setSearchParams(trip ? { tab: key, trip } : { tab: key }, { replace: true });
+          }}
           items={items}
           // Unmount a tab when it's left, as before, so its forms start fresh on return.
           destroyOnHidden

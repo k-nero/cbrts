@@ -30,6 +30,8 @@ export const RouteStopKindEnum = {
   AIRPORT_IN: 'AIRPORT_IN',
   QUARANTINE: 'QUARANTINE',
   REFUELLING: 'REFUELLING',
+  /** Where the job's horses leave this trip for the next trip of its journey (US-F3-16). */
+  TRANSFER: 'TRANSFER',
 } as const;
 export type RouteStopKind = (typeof RouteStopKindEnum)[keyof typeof RouteStopKindEnum];
 
@@ -38,6 +40,15 @@ export const TransportModeEnum = {
   AIR: 'AIR',
 } as const;
 export type TransportMode = (typeof TransportModeEnum)[keyof typeof TransportModeEnum];
+
+/** A catalog corridor, as the fleet & route coordinator picks one for the next trip of a journey. */
+export interface Corridor {
+  id: string;
+  code: string;
+  mode: TransportMode;
+  originCity: string;
+  destinationCity: string;
+}
 
 export interface JobHorse {
   id: string;

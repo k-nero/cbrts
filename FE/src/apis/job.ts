@@ -14,79 +14,125 @@ import type {
   ShareSuggestion,
   ShareTripResult,
   TripJob,
+  TripPart,
   JobClosing,
+  Corridor,
 } from '@/interfaces';
 
+/**
+ * Every planning call takes an optional `trip`: one trip of the job's journey when it travels as a
+ * chain of trips (US-F3-16). Left out, the server plans the job's current trip.
+ */
 export const jobApi = {
-  getDetail: (id: string) => client.get<JobDetail>(`/staff/jobs/${id}`).then((r) => r.data),
+  getDetail: (id: string, trip?: string) =>
+    client.get<JobDetail>(`/staff/jobs/${id}`, { params: { trip } }).then((r) => r.data),
 
-  getLoadPlan: (jobId: string) =>
-    client.get<TripLoad>(`/staff/jobs/${jobId}/load-plan`).then((r) => r.data),
-
-  createLoadPlan: (jobId: string, vehicleId?: string) =>
+  getLoadPlan: (jobId: string, trip?: string) =>
     client
-      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan`, null, { params: { vehicleId } })
+      .get<TripLoad>(`/staff/jobs/${jobId}/load-plan`, { params: { trip } })
       .then((r) => r.data),
 
-  changeLoadPlanVehicle: (jobId: string, vehicleId: string, tripVehicleId?: string) =>
+  createLoadPlan: (jobId: string, vehicleId?: string, trip?: string) =>
+    client
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan`, null, { params: { vehicleId, trip } })
+      .then((r) => r.data),
+
+  changeLoadPlanVehicle: (
+    jobId: string,
+    vehicleId: string,
+    tripVehicleId?: string,
+    trip?: string,
+  ) =>
     client
       .put<TripLoad>(`/staff/jobs/${jobId}/load-plan/vehicle`, null, {
-        params: { vehicleId, tripVehicleId },
+        params: { vehicleId, tripVehicleId, trip },
       })
       .then((r) => r.data),
 
   /** Adds a trailer to the trip's convoy (US-F3-10); the trip's plans reopen. */
-  addTrailer: (jobId: string, vehicleId: string) =>
+  addTrailer: (jobId: string, vehicleId: string, trip?: string) =>
     client
-      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/vehicles`, null, { params: { vehicleId } })
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/vehicles`, null, {
+        params: { vehicleId, trip },
+      })
       .then((r) => r.data),
 
   /** Takes a trailer out of the convoy with its placements, crew and booking. */
-  removeTrailer: (jobId: string, tripVehicleId: string) =>
+  removeTrailer: (jobId: string, tripVehicleId: string, trip?: string) =>
     client
-      .delete<TripLoad>(`/staff/jobs/${jobId}/load-plan/vehicles/${tripVehicleId}`)
+      .delete<TripLoad>(`/staff/jobs/${jobId}/load-plan/vehicles/${tripVehicleId}`, {
+        params: { trip },
+      })
       .then((r) => r.data),
 
-  moveHorse: (jobId: string, move: MoveHorse) =>
-    client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/move`, move).then((r) => r.data),
-
-  autoArrange: (jobId: string) =>
-    client.post<TripLoad>(`/staff/jobs/${jobId}/load-plan/auto-arrange`).then((r) => r.data),
-
-  confirmLoadPlan: (jobId: string, acceptedWarnings: string[] = []) =>
+  moveHorse: (jobId: string, move: MoveHorse, trip?: string) =>
     client
-      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/confirm`, { acceptedWarnings })
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/move`, move, { params: { trip } })
       .then((r) => r.data),
 
-  getRoutePlans: (jobId: string) =>
-    client.get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`).then((r) => r.data),
+  autoArrange: (jobId: string, trip?: string) =>
+    client
+      .post<TripLoad>(`/staff/jobs/${jobId}/load-plan/auto-arrange`, null, { params: { trip } })
+      .then((r) => r.data),
 
-  confirmRoutePlan: (jobId: string, planId: string, changeReason?: string) =>
+  confirmLoadPlan: (jobId: string, acceptedWarnings: string[] = [], trip?: string) =>
+    client
+      .post<TripLoad>(
+        `/staff/jobs/${jobId}/load-plan/confirm`,
+        { acceptedWarnings },
+        { params: { trip } },
+      )
+      .then((r) => r.data),
+
+  getRoutePlans: (jobId: string, trip?: string) =>
+    client
+      .get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`, { params: { trip } })
+      .then((r) => r.data),
+
+  confirmRoutePlan: (jobId: string, planId: string, changeReason?: string, trip?: string) =>
     client
       .post<RoutePlan>(`/staff/jobs/${jobId}/route-plans/${planId}/confirm`, null, {
-        params: { changeReason },
+        params: { changeReason, trip },
       })
       .then((r) => r.data),
 
   /** Approved jobs that could share this job's trailer, with what combining means (US-F3-13). */
-  getShareSuggestions: (jobId: string) =>
-    client.get<ShareSuggestion[]>(`/staff/jobs/${jobId}/trip/suggestions`).then((r) => r.data),
+  getShareSuggestions: (jobId: string, trip?: string) =>
+    client
+      .get<ShareSuggestion[]>(`/staff/jobs/${jobId}/trip/suggestions`, { params: { trip } })
+      .then((r) => r.data),
 
   /** Puts another job on this job's trip; the trip's plans reopen. */
-  shareTrip: (jobId: string, otherJobId: string, acceptedWarnings: string[] = []) =>
+  shareTrip: (jobId: string, otherJobId: string, acceptedWarnings: string[] = [], trip?: string) =>
     client
-      .post<ShareTripResult>(`/staff/jobs/${jobId}/trip/jobs`, {
-        jobId: otherJobId,
-        acceptedWarnings,
-      })
+      .post<ShareTripResult>(
+        `/staff/jobs/${jobId}/trip/jobs`,
+        { jobId: otherJobId, acceptedWarnings },
+        { params: { trip } },
+      )
       .then((r) => r.data),
 
   /** Takes a job off this job's trip onto a trip of its own. */
-  takeOffTrip: (jobId: string, otherJobId: string) =>
-    client.delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`).then((r) => r.data),
+  takeOffTrip: (jobId: string, otherJobId: string, trip?: string) =>
+    client
+      .delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`, { params: { trip } })
+      .then((r) => r.data),
 
-  getCrew: (jobId: string) =>
-    client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`).then((r) => r.data),
+  /**
+   * US-F3-16: continues the job's journey on a new trip of `corridorId`, from the airport or
+   * quarantine stop `stopSeq` of the route of `trip` (its current trip when left out).
+   */
+  continueOnTrip: (jobId: string, stopSeq: number, corridorId: string, trip?: string) =>
+    client
+      .post<TripPart[]>(`/staff/jobs/${jobId}/trip/chain`, { tripId: trip, stopSeq, corridorId })
+      .then((r) => r.data),
+
+  /** US-F3-16: takes a later trip out of the job's journey; it travels on the trip before again. */
+  removeChainedTrip: (jobId: string, trip: string) =>
+    client.delete<TripPart[]>(`/staff/jobs/${jobId}/trip/chain/${trip}`).then((r) => r.data),
+
+  getCrew: (jobId: string, trip?: string) =>
+    client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`, { params: { trip } }).then((r) => r.data),
 
   /** A trailer's crew, or with `flight` the trip's flight crew (flying grooms, the flight vet). */
   assignCrew: (
@@ -94,19 +140,33 @@ export const jobApi = {
     crew: { userId: string; crewRole: string }[],
     tripVehicleId?: string,
     flight = false,
+    trip?: string,
   ) =>
     client
-      .post<CrewMember[]>(`/staff/jobs/${jobId}/crew`, { tripVehicleId, crew, flight })
+      .post<CrewMember[]>(
+        `/staff/jobs/${jobId}/crew`,
+        { tripVehicleId, crew, flight },
+        { params: { trip } },
+      )
       .then((r) => r.data),
 
   /** US-F3-15: one job's consignment on its trip's flight: air waybill, stall positions, class. */
-  updateFlightAllocation: (jobId: string, flightId: string, input: FlightAllocationInput) =>
+  updateFlightAllocation: (
+    jobId: string,
+    flightId: string,
+    input: FlightAllocationInput,
+    trip?: string,
+  ) =>
     client
-      .put<FlightAllocation>(`/staff/jobs/${jobId}/flights/${flightId}/allocation`, input)
+      .put<FlightAllocation>(`/staff/jobs/${jobId}/flights/${flightId}/allocation`, input, {
+        params: { trip },
+      })
       .then((r) => r.data),
 
-  signOff: (jobId: string) =>
-    client.post<JobDetail>(`/staff/jobs/${jobId}/sign-off`).then((r) => r.data),
+  signOff: (jobId: string, trip?: string) =>
+    client
+      .post<JobDetail>(`/staff/jobs/${jobId}/sign-off`, null, { params: { trip } })
+      .then((r) => r.data),
 
   /** US-F6-04: whether the job can close, and how it was closed. */
   closing: (jobId: string) =>
@@ -121,3 +181,11 @@ export const jobApi = {
  * Jobs are created by approving a request and change on the job page, so only `list` is ever called.
  */
 export const jobsListApi = makeCrudApi<JobSummary, never, JobListParams>('/staff/jobs');
+
+/** The catalog corridors, for the next trip of a journey (US-F3-16); there are a few dozen at most. */
+export const corridorApi = {
+  list: () =>
+    client
+      .get<{ content: Corridor[] }>('/staff/corridors', { params: { size: 200, sort: 'code' } })
+      .then((r) => r.data.content),
+};
