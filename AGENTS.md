@@ -4,7 +4,7 @@ Instructions for AI coding agents working in this repository. Read this before c
 
 ## What this is
 
-**EquiFreight**, the Cross-Border Racehorse Transport System (CBRTS), is the SWP391 group project. Racing clubs request road or air transport for their horses across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
+**EquiFreight**, the Cross-Border Racehorse Transport System (CBRTS), is the SWP391 group project. Racing clubs request road or air transport for their horses across borders, starting with Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong; the countries are catalog data. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
 
 - `BE/`: Spring Boot 4 REST API (Java 25, Gradle, PostgreSQL, Flyway, Spring Security with JWT, SpringDoc).
 - `FE/`: React 19 SPA (Rsbuild, Ant Design 6, Tailwind 4, React Router 7, TanStack Query, React Hook Form with Zod).
