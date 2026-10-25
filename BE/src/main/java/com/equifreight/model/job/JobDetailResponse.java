@@ -40,5 +40,5 @@ public record JobDetailResponse(
         List<CrewMemberResponse> crew,
         /** Every job on the job's trip, this one included (US-F3-11). */
         List<TripJobResponse> tripJobs,
-        /** The job's parts once an incident split it across trips; empty while it is on one (US-F5-06). */
+        /** The job's trips in journey order, one while it travels on one trip (US-F5-06, US-F3-16). */
         List<com.equifreight.model.trip.TripPartResponse> parts) {}

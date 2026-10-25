@@ -386,7 +386,7 @@ export interface JobDetail extends BaseEntity {
   crew: CrewMember[];
   /** Every job on the job's trip, this one included (US-F3-11). */
   tripJobs: TripJob[];
-  /** The job's parts once an incident split it across trips; empty while it is on one (US-F5-06). */
+  /** The job's trips in journey order, one while it travels on one trip (US-F5-06, US-F3-16). */
   parts: TripPart[];
 }
 

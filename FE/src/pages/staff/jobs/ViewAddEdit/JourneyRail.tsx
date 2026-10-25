@@ -14,8 +14,8 @@ const when = (iso: string | null) =>
     : 'Not planned';
 
 /**
- * The trips of a job's journey, in order, beside the job's tabs (US-F3-16): the tabs plan the one
- * chosen here. Each names its mode, corridor, trip code, where it stands and when it leaves; the
+ * The job's trips, in journey order, beside the job's tabs (US-F3-16): one for a job on one trip,
+ * and the tabs plan the one chosen here. Each names its mode, corridor, trip code, where it stands and when it leaves; the
  * chosen one is the Nav item's active pill (Muted Navy, Gold Ink label).
  */
 export const JourneyRail: FC<{
@@ -23,7 +23,9 @@ export const JourneyRail: FC<{
   onShow: (tripId: string) => void;
 }> = ({ parts, onShow }) => (
   <nav aria-label="Journey" className="sticky top-4 flex w-60 shrink-0 flex-col gap-2">
-    <span className="type-mono-label px-3 text-ink-3">Journey · {parts.length} trips</span>
+    <span className="type-mono-label px-3 text-ink-3">
+      Journey · {parts.length} {parts.length === 1 ? 'trip' : 'trips'}
+    </span>
     <ol className="m-0 flex list-none flex-col gap-1 p-0">
       {parts.map((part, index) => (
         <li key={part.tripId}>

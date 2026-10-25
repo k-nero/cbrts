@@ -107,8 +107,8 @@ function JobWorkspace() {
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
   // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
   const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
-  // A journey of several trips (US-F3-16): the tabs plan the trip chosen in the rail beside them.
-  const journey = job.parts.some((part) => part.handsOn);
+  // Every job lists its trips in the rail beside the tabs, which plan the one chosen there (US-F3-16).
+  const journey = job.parts.length > 0;
 
   const tabsView = (
     <Tabs
@@ -161,7 +161,7 @@ function JobWorkspace() {
             right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
           />
 
-          {job.parts.length > 0 && !job.parts.some((part) => part.handsOn) && (
+          {job.parts.length > 1 && !job.parts.some((part) => part.handsOn) && (
             <Callout tone="info" title={`${job.code} travels in ${job.parts.length} parts`}>
               {job.parts
                 .map(
