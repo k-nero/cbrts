@@ -44,7 +44,21 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
     Page<TransportRequest> findByClubIdAndStatus(UUID clubId, RequestStatus status, Pageable pageable);
 
     /**
-     * The review queue (US-F1-03, US-F1-07): requests waiting for review or approval, oldest first by when they entered the queue,
+     * Who is in the review queue: a status in {@code :statuses}, or an expired request with its next version in draft
+     * (the customer's re-quote, A4, or the manager's own revise) whose latest issued version wasn't declined, since a
+     * decline is final. Only the latest counts, as the decline rule and the next step read it.
+     */
+    String IN_QUEUE = " (r.status in :statuses"
+            + " or (r.status = com.equifreight.entity.enums.RequestStatus.EXPIRED"
+            + " and exists (select dq.id from Quotation dq where dq.request = r"
+            + " and dq.status = com.equifreight.entity.enums.QuotationStatus.DRAFT)"
+            + " and not exists (select xq.id from Quotation xq where xq.request = r"
+            + " and xq.status = com.equifreight.entity.enums.QuotationStatus.DECLINED"
+            + " and xq.versionNo = (select max(lq.versionNo) from Quotation lq where lq.request = r"
+            + " and lq.status <> com.equifreight.entity.enums.QuotationStatus.DRAFT))))";
+
+    /**
+     * The review queue (US-F1-03, US-F1-07, A4): requests waiting for review, approval or a re-quote's issue, oldest first by when they entered the queue,
      * which is their latest version's submission. The order is fixed, so the derived columns are never sorted
      * by the client.
      */
@@ -56,15 +70,15 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
                             + " max(v.submittedAt) as waitingSince, max(v.revisionNo) as revisionNo"
                             + " from RequestRevision v join v.request r join r.club c"
                             + " left join r.originPlace o left join r.destinationPlace d"
-                            + " where r.status in :statuses"
+                            + " where" + IN_QUEUE
                             + " group by r.id, r.code, r.status, c.name, o.city, d.city, r.mode, r.departureDate,"
                             + " r.dateFlexDays"
                             + " order by max(v.submittedAt) asc, r.code asc",
-            countQuery = "select count(distinct r) from RequestRevision v join v.request r where r.status in :statuses")
+            countQuery = "select count(distinct r) from RequestRevision v join v.request r where" + IN_QUEUE)
     Page<QueueRow> findQueue(@Param("statuses") Collection<RequestStatus> statuses, Pageable pageable);
 
     /** The same queue, ids only and in the same order, for "3 of 4" and the next request. */
-    @Query("select r.id from RequestRevision v join v.request r where r.status in :statuses"
+    @Query("select r.id from RequestRevision v join v.request r where" + IN_QUEUE
             + " group by r.id, r.code order by max(v.submittedAt) asc, r.code asc")
     List<UUID> findQueueIds(@Param("statuses") Collection<RequestStatus> statuses);
 

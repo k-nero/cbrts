@@ -23,6 +23,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.IssueRequest;
@@ -94,6 +95,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 audit,
                 notifications,
                 invoices,
+                issue,
                 Clock.fixed(now, BusinessTime.ZONE));
     }
 
@@ -208,8 +210,8 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
 
     @Test
     void decliningClosesTheRequestWithTheReason() {
-        CustomerQuotationResponse r =
-                customer().decline(bookings, request.getId(), new DeclineRequest("  Owner chose another carrier  "));
+        CustomerQuotationResponse r = customer()
+                .decline(bookings, request.getId(), new DeclineRequest("  Owner chose another carrier  ", null));
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.DECLINED);
         assertThat(q.getDeclinedAt()).isEqualTo(ISSUED_AT.plusSeconds(3_600));
@@ -239,7 +241,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
 
     @Test
     void aReasonIsOptionalWhenDeclining() {
-        customer().decline(bookings, request.getId(), new DeclineRequest("   "));
+        customer().decline(bookings, request.getId(), new DeclineRequest("   ", null));
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.DECLINED);
         assertThat(q.getDeclineReason()).isNull();
@@ -266,6 +268,76 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                         eq(Subject.request(request)),
                         anyString(),
                         anyString());
+    }
+
+    // --- the answer names the version the customer read (requote spec §4.2) ---------------------------------
+
+    static final String REPLACED = "Version 1 was replaced by version 2. Read it before you answer.";
+
+    /** The customer's page still shows v1, but v2 is now the latest issued version. */
+    void replacedByV2() {
+        q.setVersionNo((short) 2);
+    }
+
+    @Test
+    void acceptingAReplacedVersionIsRefused() {
+        replacedByV2();
+
+        assertThatThrownBy(() -> customer().accept(bookings, request.getId(), new AcceptRequest(1)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(REPLACED)
+                .extracting("code")
+                .isEqualTo("QUOTATION_VERSION_CHANGED");
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ISSUED);
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.QUOTED);
+        verify(invoices, never()).issueDeposit(any(), any());
+        assertNothingWritten();
+    }
+
+    @Test
+    void decliningAReplacedVersionIsRefused() {
+        replacedByV2();
+
+        assertThatThrownBy(() -> customer().decline(bookings, request.getId(), new DeclineRequest("Too dear", 1)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage(REPLACED)
+                .extracting("code")
+                .isEqualTo("QUOTATION_VERSION_CHANGED");
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ISSUED);
+        assertThat(q.getDeclineReason()).isNull();
+        assertNothingWritten();
+    }
+
+    @Test
+    void aReplacedVersionIsNamedBeforeItsExpiry() {
+        replacedByV2();
+
+        assertThatThrownBy(() -> at(AFTER_EXPIRY).accept(bookings, request.getId(), new AcceptRequest(1)))
+                .extracting("code")
+                .isEqualTo("QUOTATION_VERSION_CHANGED");
+    }
+
+    @Test
+    void acceptWithTheShownVersionNoIsAccepted() {
+        customer().accept(bookings, request.getId(), new AcceptRequest(1));
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+        verify(invoices).issueDeposit(q, bookings);
+    }
+
+    @Test
+    void acceptWithoutAVersionNoIsUnchanged() {
+        customer().accept(bookings, request.getId(), null);
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+    }
+
+    @Test
+    void declineWithoutAVersionNoIsUnchanged() {
+        customer().decline(bookings, request.getId(), new DeclineRequest(null, null));
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.DECLINED);
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.EXPIRED);
     }
 
     void assertNothingWritten() {

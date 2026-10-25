@@ -81,18 +81,24 @@ public class QuotationIssueService {
         this.clock = clock;
     }
 
+    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body) {
+        return issue(manager, requestId, body, null);
+    }
+
     /**
      * Issues the draft. Everything is checked before anything is written; the request row is locked first, so a
-     * second issue (another manager, a double click) finds the version issued and is refused.
+     * second issue (another manager, a double click) finds the version issued and is refused. {@code version}, when
+     * named, must still be the latest draft.
      */
     @Transactional
-    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body) {
+    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body, Integer version) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        QuotationRules.requireWritable(request, q);
+        QuotationRules.requireVersion(version, q);
+        QuotationRules.requireWritable(request, q, QuotationDraftService.previousOf(quotations, q));
         QuotationPricing.Evaluation e = pricing.evaluate(q, request);
         if (!e.blockers().isEmpty()) {
             throw new ConflictException("QUOTATION_NOT_READY", "This quotation isn't ready to issue.", e.blockers());
@@ -189,33 +195,12 @@ public class QuotationIssueService {
         if (!REVISABLE.contains(latest.getStatus())) {
             throw new ConflictException("NOTHING_TO_REVISE", "There is no issued quotation to revise.");
         }
-        RateCatalogVersion published = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
-                .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
-
-        Quotation q = new Quotation();
-        q.setCode(latest.getCode());
-        q.setRequest(request);
-        q.setVersionNo((short) (latest.getVersionNo() + 1));
-        q.setStatus(QuotationStatus.DRAFT);
-        q.setRateCatalogVersion(published);
-        q.setCurrency(latest.getCurrency());
-        q.setPreparedBy(manager);
-        q.setAirClass(latest.getAirClass());
-        for (QuotationLine line : latest.getLines()) {
-            q.getLines().add(adjustmentOf(line, q));
-        }
-        List<String> dropped = pricing.price(q, request);
-        try {
-            q = quotations.saveAndFlush(q);
-        } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException(
-                    "DRAFT_EXISTS", "Someone else just started the next version. Reload the page to see it.");
-        }
-        StringBuilder summary = new StringBuilder("Quotation " + q.getCode() + " v" + q.getVersionNo()
-                + " drafted from v" + latest.getVersionNo() + " on rate catalog v" + published.getVersionNo());
-        for (String gone : dropped) {
-            summary.append("; override on ").append(gone, 0, gone.indexOf(':')).append(" dropped");
-        }
+        Drafted d = draftNext(latest, request, manager);
+        Quotation q = d.draft();
+        StringBuilder summary = new StringBuilder(
+                "Quotation " + q.getCode() + " v" + q.getVersionNo() + " drafted from v" + latest.getVersionNo()
+                        + " on rate catalog v" + d.catalog().getVersionNo());
+        appendDropped(summary, d.dropped());
         audit.recordDecision(
                 manager,
                 "QUOTATION_REVISED",
@@ -226,17 +211,66 @@ public class QuotationIssueService {
                 null,
                 null,
                 null);
-        return new StartResult(pricing.toResponse(q, request, dropped), true);
+        return new StartResult(pricing.toResponse(q, request, d.dropped()), true);
     }
 
-    /** Discards a revision's draft; the version it was drafted from stands. The first version is never discarded. */
-    @Transactional
+    /** The next version as drafted: the catalog it was priced on, and the overrides that couldn't be carried. */
+    record Drafted(Quotation draft, RateCatalogVersion catalog, List<String> dropped) {}
+
+    /**
+     * Drafts the version after {@code from}, prepared by {@code preparedBy} (null stays null): its class, overrides
+     * and added lines are carried onto the latest published catalog. The manager's revise and the customer's re-quote
+     * (A4) both draft through here; each checks its own rules and writes its own audit first.
+     */
+    Drafted draftNext(Quotation from, TransportRequest request, User preparedBy) {
+        RateCatalogVersion published = versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
+                .orElseThrow(() -> new ConflictException("NO_PUBLISHED_CATALOG", "No rate catalog is published yet."));
+
+        Quotation q = new Quotation();
+        q.setCode(from.getCode());
+        q.setRequest(request);
+        q.setVersionNo((short) (from.getVersionNo() + 1));
+        q.setStatus(QuotationStatus.DRAFT);
+        q.setRateCatalogVersion(published);
+        q.setCurrency(from.getCurrency());
+        q.setPreparedBy(preparedBy);
+        q.setAirClass(from.getAirClass());
+        for (QuotationLine line : from.getLines()) {
+            q.getLines().add(adjustmentOf(line, q));
+        }
+        List<String> dropped = pricing.price(q, request);
+        try {
+            q = quotations.saveAndFlush(q);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(
+                    "DRAFT_EXISTS", "Someone else just started the next version. Reload the page to see it.");
+        }
+        return new Drafted(q, published, dropped);
+    }
+
+    /** "; override on Flight veterinarian dropped" for each override the new catalog no longer quotes. */
+    static void appendDropped(StringBuilder summary, List<String> dropped) {
+        for (String gone : dropped) {
+            summary.append("; override on ").append(gone, 0, gone.indexOf(':')).append(" dropped");
+        }
+    }
+
     public void discardDraft(User manager, UUID requestId) {
+        discardDraft(manager, requestId, null);
+    }
+
+    /**
+     * Discards a revision's draft; the version it was drafted from stands. The first version is never discarded. A
+     * draft after a declined version can still be discarded: that is all that is left to do with it.
+     */
+    @Transactional
+    public void discardDraft(User manager, UUID requestId, Integer version) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
+        QuotationRules.requireVersion(version, q);
         QuotationRules.requireDraft(q);
         if (q.getVersionNo() == 1) {
             throw new ConflictException("FIRST_VERSION", "The first version can't be discarded.");

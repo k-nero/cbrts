@@ -232,7 +232,8 @@ public class RequestReviewService {
     }
 
     private QueuePositionResponse position(TransportRequest request) {
-        if (!QUEUE.contains(request.getStatus())) {
+        // An expired request is in the queue only with a re-quote drafted (A4); the id list decides that.
+        if (!QUEUE.contains(request.getStatus()) && request.getStatus() != RequestStatus.EXPIRED) {
             return null;
         }
         List<UUID> ids = requests.findQueueIds(QUEUE);

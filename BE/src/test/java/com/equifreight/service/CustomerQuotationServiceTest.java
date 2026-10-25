@@ -59,6 +59,7 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 audit,
                 notifications,
                 mock(InvoiceService.class),
+                issue,
                 clock);
         Club club = request.getClub();
         club.setId(UUID.randomUUID());
@@ -154,6 +155,53 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void nextVersionNamesTheDraft() {
+        Quotation v1 = expiredV1WithV2Draft();
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isEqualTo(2);
+        assertThat(v1.getStatus()).isEqualTo(QuotationStatus.EXPIRED);
+    }
+
+    /** v1 issued then expired, the request EXPIRED, and v2 drafted: a re-quote in progress (A4). */
+    Quotation expiredV1WithV2Draft() {
+        Quotation v1 = issuedV1();
+        v1.setStatus(QuotationStatus.EXPIRED);
+        request.setStatus(RequestStatus.EXPIRED);
+        Quotation v2 = issued();
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(v2, v1));
+        return v1;
+    }
+
+    @Test
+    void nextVersionIsNullAfterADecline() {
+        // A decline is final: a draft left behind is not a re-quote the customer waits for.
+        Quotation v1 = expiredV1WithV2Draft();
+        v1.setStatus(QuotationStatus.DECLINED);
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isNull();
+    }
+
+    @Test
+    void nextVersionIsNullWhileTheQuotationIsOpen() {
+        // The manager's own revise of an open quotation: the customer still answers v1.
+        Quotation v1 = expiredV1WithV2Draft();
+        v1.setStatus(QuotationStatus.ISSUED);
+        request.setStatus(RequestStatus.QUOTED);
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isNull();
+    }
+
+    @Test
+    void nextVersionIsNullWithoutADraft() {
+        Quotation v1 = issuedV1();
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(v1));
+
+        assertThat(customer.get(bookings, request.getId()).nextVersion()).isNull();
+    }
+
+    @Test
     void versionsAreIssuedOnlyNewestFirstWithTheirReasons() {
         Quotation v2 = issuedV1();
         v2.setVersionNo((short) 2);
@@ -236,6 +284,7 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 audit,
                 notifications,
                 mock(InvoiceService.class),
+                issue,
                 Clock.fixed(Instant.parse("2026-10-22T04:00:00Z"), BusinessTime.ZONE));
         CustomerQuotationResponse.Cancellation boundary =
                 twoDaysLater.get(bookings, request.getId()).cancellation();

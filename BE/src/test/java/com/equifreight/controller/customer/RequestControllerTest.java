@@ -2,7 +2,9 @@ package com.equifreight.controller.customer;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,8 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.equifreight.configuration.ControllerAdvise;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
+import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.DepositResponse;
+import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.service.CustomerQuotationService;
 import com.equifreight.service.RequestService;
 import java.math.BigDecimal;
@@ -121,5 +126,56 @@ class RequestControllerTest {
                 .andExpect(jsonPath("$.estimate.inside").value(true))
                 .andExpect(jsonPath("$.cancellation.bands[0].current").value(true))
                 .andExpect(jsonPath("$.versions[0].versionNo").value(2));
+    }
+
+    @Test
+    void acceptWithoutABodyStillAnswers() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/accept"))
+                .andExpect(status().isOk());
+
+        verify(quotations).accept(any(), eq(id), isNull());
+    }
+
+    @Test
+    void acceptAndDeclineBindTheVersionNo() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/accept")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"versionNo\":2}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/decline")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Too dear\",\"versionNo\":2}"))
+                .andExpect(status().isOk());
+
+        verify(quotations).accept(any(), eq(id), eq(new AcceptRequest(2)));
+        verify(quotations).decline(any(), eq(id), eq(new DeclineRequest("Too dear", 2)));
+    }
+
+    @Test
+    void aRequoteAnswers201AndBindsTheBody() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/requote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"versionNo\":2,\"note\":\"Two horses now\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/requote"))
+                .andExpect(status().isCreated());
+
+        verify(quotations).requote(any(), eq(id), eq(new RequoteRequest(2, "Two horses now")));
+        verify(quotations).requote(any(), eq(id), isNull());
+    }
+
+    @Test
+    void aRequoteNoteOver500CharactersAnswers400() throws Exception {
+        mvc.perform(post("/api/v1/customer/requests/" + UUID.randomUUID() + "/quotation/requote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"" + "x".repeat(501) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation Failed"));
     }
 }

@@ -13,6 +13,8 @@ public enum NotificationKind {
     QUOTATION_EXPIRED(NotificationTone.WARN),
     QUOTATION_ACCEPTED(NotificationTone.OK),
     QUOTATION_DECLINED(NotificationTone.NEUTRAL),
+    /** The customer asked for a re-quote of an expired quotation; the next version is drafted (A4). */
+    QUOTATION_REQUOTE_ASKED(NotificationTone.INFO),
     JOB_ASSIGNED(NotificationTone.INFO),
     AUTHORITY_INFO_REQUIRED(NotificationTone.WARN),
     DOSSIER_BLOCKED(NotificationTone.WARN),

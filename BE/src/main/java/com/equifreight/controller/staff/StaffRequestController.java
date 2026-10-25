@@ -128,19 +128,29 @@ public class StaffRequestController {
         return quotations.get(id, version);
     }
 
-    @Operation(summary = "Price the draft quotation with another air class, on the catalog version it pins")
+    @Operation(
+            summary = "Price the draft quotation with another air class, on the catalog version it pins; 409"
+                    + " QUOTATION_VERSION_CHANGED when {version} is named and is no longer the latest draft")
     @PutMapping("/{id}/quotation")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public QuotationDraftResponse changeQuotationClass(
-            @PathVariable UUID id, @Valid @RequestBody AirClassRequest body, @AuthenticationPrincipal User user) {
-        return quotations.changeClass(user, id, body.airClass());
+            @PathVariable UUID id,
+            @Valid @RequestBody AirClassRequest body,
+            @RequestParam(required = false) Integer version,
+            @AuthenticationPrincipal User user) {
+        return quotations.changeClass(user, id, body.airClass(), version);
     }
 
-    @Operation(summary = "Re-price the draft quotation on the latest published rate catalog")
+    @Operation(
+            summary = "Re-price the draft quotation on the latest published rate catalog; {version}, when named, must"
+                    + " still be the latest draft")
     @PostMapping("/{id}/quotation/reprice")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
-    public QuotationDraftResponse repriceQuotation(@PathVariable UUID id, @AuthenticationPrincipal User user) {
-        return quotations.reprice(user, id);
+    public QuotationDraftResponse repriceQuotation(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Integer version,
+            @AuthenticationPrincipal User user) {
+        return quotations.reprice(user, id, version);
     }
 
     @Operation(summary = "Override a priced line's amount with a reason; the totals are computed again")
@@ -162,13 +172,18 @@ public class StaffRequestController {
         return quotations.removeOverride(user, id, lineId);
     }
 
-    @Operation(summary = "Add a line the catalog doesn't know, with a reason (201)")
+    @Operation(
+            summary = "Add a line the catalog doesn't know, with a reason (201); {version}, when named, must still be"
+                    + " the latest draft")
     @PostMapping("/{id}/quotation/lines")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     @ResponseStatus(HttpStatus.CREATED)
     public QuotationDraftResponse addLine(
-            @PathVariable UUID id, @Valid @RequestBody ManualLineRequest body, @AuthenticationPrincipal User user) {
-        return quotations.addLine(user, id, body);
+            @PathVariable UUID id,
+            @Valid @RequestBody ManualLineRequest body,
+            @RequestParam(required = false) Integer version,
+            @AuthenticationPrincipal User user) {
+        return quotations.addLine(user, id, body, version);
     }
 
     @Operation(summary = "Change a line the manager added")
@@ -191,12 +206,16 @@ public class StaffRequestController {
     }
 
     @Operation(
-            summary = "Issue the draft: it becomes a document valid for the catalog's days; 409 names what blocks it")
+            summary = "Issue the draft: it becomes a document valid for the catalog's days; 409 names what blocks it,"
+                    + " or QUOTATION_VERSION_CHANGED when {version} is named and is no longer the latest draft")
     @PostMapping("/{id}/quotation/issue")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     public QuotationDraftResponse issueQuotation(
-            @PathVariable UUID id, @Valid @RequestBody IssueRequest body, @AuthenticationPrincipal User user) {
-        return issues.issue(user, id, body);
+            @PathVariable UUID id,
+            @Valid @RequestBody IssueRequest body,
+            @RequestParam(required = false) Integer version,
+            @AuthenticationPrincipal User user) {
+        return issues.issue(user, id, body, version);
     }
 
     @Operation(
@@ -208,11 +227,16 @@ public class StaffRequestController {
         return issues.revise(user, id).quotation();
     }
 
-    @Operation(summary = "Discard a revision's draft; the version it came from stands")
+    @Operation(
+            summary = "Discard a revision's draft; the version it came from stands. {version}, when named, must still"
+                    + " be the latest draft")
     @DeleteMapping("/{id}/quotation/draft")
     @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void discardRevision(@PathVariable UUID id, @AuthenticationPrincipal User user) {
-        issues.discardDraft(user, id);
+    public void discardRevision(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Integer version,
+            @AuthenticationPrincipal User user) {
+        issues.discardDraft(user, id, version);
     }
 }

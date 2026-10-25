@@ -151,10 +151,14 @@ public class QuotationDraftService {
         return pricing.toResponse(q, request, List.of());
     }
 
+    public QuotationDraftResponse changeClass(User manager, UUID requestId, ServiceClass airClass) {
+        return changeClass(manager, requestId, airClass, null);
+    }
+
     /** Prices the draft with another air class, on the version it already pins. */
     @Transactional
-    public QuotationDraftResponse changeClass(User manager, UUID requestId, ServiceClass airClass) {
-        Draft d = draftForWrite(requestId);
+    public QuotationDraftResponse changeClass(User manager, UUID requestId, ServiceClass airClass, Integer version) {
+        Draft d = draftForWrite(requestId, version);
         TransportRequest request = d.request();
         Quotation q = d.quotation();
         if (request.getMode() != TransportMode.AIR) {
@@ -165,10 +169,14 @@ public class QuotationDraftService {
         return pricing.toResponse(quotations.save(q), request, dropped);
     }
 
+    public QuotationDraftResponse reprice(User manager, UUID requestId) {
+        return reprice(manager, requestId, null);
+    }
+
     /** Pins the latest published catalog and prices the draft again from the request as it is now. */
     @Transactional
-    public QuotationDraftResponse reprice(User manager, UUID requestId) {
-        Draft d = draftForWrite(requestId);
+    public QuotationDraftResponse reprice(User manager, UUID requestId, Integer version) {
+        Draft d = draftForWrite(requestId, version);
         TransportRequest request = d.request();
         Quotation q = d.quotation();
         RateCatalogVersion published = latestPublished();
@@ -234,10 +242,14 @@ public class QuotationDraftService {
         return saved(manager, d, "QUOTATION_OVERRIDE_REMOVED", summary, null);
     }
 
+    public QuotationDraftResponse addLine(User manager, UUID requestId, ManualLineRequest body) {
+        return addLine(manager, requestId, body, null);
+    }
+
     /** Adds a line the catalog doesn't know, at the end of its group. */
     @Transactional
-    public QuotationDraftResponse addLine(User manager, UUID requestId, ManualLineRequest body) {
-        Draft d = draftForWrite(requestId);
+    public QuotationDraftResponse addLine(User manager, UUID requestId, ManualLineRequest body, Integer version) {
+        Draft d = draftForWrite(requestId, version);
         checkNote(body);
         Quotation q = d.quotation();
         QuotationLine line = new QuotationLine();
@@ -391,15 +403,33 @@ public class QuotationDraftService {
 
     private record Draft(TransportRequest request, Quotation quotation) {}
 
-    /** Locks the request row, then reads its latest version, which must be a draft the request can still take. */
+    /** A line write: the line's id already belongs to one version, so it names none. */
     private Draft draftForWrite(UUID requestId) {
+        return draftForWrite(requestId, null);
+    }
+
+    /**
+     * Locks the request row, then reads its latest version, which must be the one the manager is looking at (when
+     * named), a draft the request can still take, and drafted from a version the customer didn't decline.
+     */
+    private Draft draftForWrite(UUID requestId, Integer version) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        QuotationRules.requireWritable(request, q);
+        QuotationRules.requireVersion(version, q);
+        QuotationRules.requireWritable(request, q, previousOf(quotations, q));
         return new Draft(request, q);
+    }
+
+    /** The version a revision was drafted from; null for the first version. */
+    static Quotation previousOf(QuotationRepository quotations, Quotation q) {
+        return q.getVersionNo() > 1
+                ? quotations
+                        .findByRequestIdAndVersionNo(q.getRequest().getId(), (short) (q.getVersionNo() - 1))
+                        .orElse(null)
+                : null;
     }
 
     private static void requireInReview(TransportRequest request) {

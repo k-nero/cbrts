@@ -218,6 +218,52 @@ class RequestProgressServiceTest {
         assertThat(next(RequestStatus.EXPIRED)).isNull();
     }
 
+    private Quotation draft(short versionNo, User by) {
+        Quotation d = quotation(QuotationStatus.DRAFT);
+        d.setVersionNo(versionNo);
+        d.setPreparedBy(by);
+        return d;
+    }
+
+    @Test
+    @DisplayName("Expired with the next version drafted (a re-quote, A4): its manager issues it")
+    void expiredWithADraftNamesTheIssue() {
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(quotation(QuotationStatus.EXPIRED)));
+        when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
+                .thenReturn(Optional.of(draft((short) 3, user("Lan", "Nguyễn Thị"))));
+
+        NextStepResponse step = next(RequestStatus.EXPIRED);
+
+        assertThat(step.action()).isEqualTo("Issue version 3 of the quotation");
+        assertThat(step.owner()).isEqualTo("Nguyễn Thị Lan, logistics manager");
+        assertThat(step.yours()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Declined, a leftover draft doesn't bring the next step back: a decline is final")
+    void expiredWithADraftAfterADeclineHasNoNextStep() {
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(quotation(QuotationStatus.DECLINED)));
+        when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
+                .thenReturn(Optional.of(draft((short) 3, yen)));
+
+        assertThat(next(RequestStatus.EXPIRED)).isNull();
+    }
+
+    @Test
+    @DisplayName("Expired with no draft is unchanged: its manager re-prices it")
+    void expiredWithoutADraftIsUnchanged() {
+        Quotation expired = quotation(QuotationStatus.EXPIRED);
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(expired));
+        when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
+                .thenReturn(Optional.of(expired));
+
+        assertThat(next(RequestStatus.EXPIRED).action())
+                .isEqualTo("Re-price the quotation from the rate catalog in force now");
+    }
+
     @Test
     @DisplayName("Approved, the customer sends the documents and the job's transport specialist checks them")
     void approvedSendsDocuments() {
