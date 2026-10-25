@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import lombok.Builder;
 
-@Builder
+@Builder(toBuilder = true)
 public record TripViewResponse(
         String jobCode,
         /** The trip's TRP code for staff and the crew; null for the customer, who never sees it. */

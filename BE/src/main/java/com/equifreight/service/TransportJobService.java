@@ -298,24 +298,18 @@ public class TransportJobService {
             throw new BusinessException("Cannot sign off trip plan: " + flightCrew);
         }
 
-        // The confirmed route has set the travel dates by now, so check every crew member is free for them
+        // The confirmed route has set the trip's times by now, so check every crew member is free for them
         // (US-F3-06). Crew assigned before the route was confirmed couldn't be checked then.
-        if (job.getPlannedDepartureAt() != null && job.getPlannedArrivalAt() != null) {
-            for (CrewAssignment member : crewAssignments) {
-                if (!crewAssignmentRepository
-                        .findOverlappingAssignments(
-                                member.getUser().getId(),
-                                trip.getId(),
-                                job.getPlannedDepartureAt(),
-                                job.getPlannedArrivalAt())
-                        .isEmpty()) {
-                    throw new ConflictException(
-                            "CREW_OVERLAP",
-                            "Cannot sign off trip plan: "
-                                    + member.getUser().getFirstName() + " "
-                                    + member.getUser().getLastName()
-                                    + " is already on another trip at the same time");
-                }
+        for (CrewAssignment member : crewAssignments) {
+            if (crewAssignmentService
+                    .overlapping(member.getUser().getId(), trip)
+                    .isPresent()) {
+                throw new ConflictException(
+                        "CREW_OVERLAP",
+                        "Cannot sign off trip plan: "
+                                + member.getUser().getFirstName() + " "
+                                + member.getUser().getLastName()
+                                + " is already on another trip at the same time");
             }
         }
 

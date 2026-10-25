@@ -61,7 +61,8 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
     boolean existsByTrip_IdAndUser_Id(UUID tripId, UUID userId);
 
     /**
-     * The user's assignments on other trips that carry a job travelling between {@code start} and {@code end}.
+     * The user's assignments on other trips that still carry an open job, whatever their dates: the caller compares
+     * each trip's own planned span, since a job travelling on a chain of trips (US-F3-16) spans all of them.
      */
     @Query("""
             select c from CrewAssignment c
@@ -70,15 +71,7 @@ public interface CrewAssignmentRepository extends JpaRepository<CrewAssignment, 
               and exists (
                   select 1 from TripHorse th join th.job j
                   where th.trip = c.trip
-                    and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED
-                    and j.plannedDepartureAt is not null
-                    and j.plannedArrivalAt is not null
-                    and j.plannedDepartureAt < :end
-                    and j.plannedArrivalAt > :start)
+                    and j.stage <> com.equifreight.entity.enums.JobStage.CLOSED)
             """)
-    List<CrewAssignment> findOverlappingAssignments(
-            @Param("userId") UUID userId,
-            @Param("tripId") UUID tripId,
-            @Param("start") java.time.Instant start,
-            @Param("end") java.time.Instant end);
+    List<CrewAssignment> findOnOtherOpenTrips(@Param("userId") UUID userId, @Param("tripId") UUID tripId);
 }

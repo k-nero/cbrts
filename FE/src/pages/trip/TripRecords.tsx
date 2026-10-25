@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Flex } from 'antd';
 
 import { Photo } from './Photo';
-import { eventLabels, formatTime, sentence } from './tripFormat';
+import { formatTime, recordLabel, sentence } from './tripFormat';
 
 import { Chip, Panel } from '@/components/ui';
 import type { TripView } from '@/interfaces';
@@ -13,6 +13,10 @@ export function TripRecords({ trip }: { trip: TripView }) {
   const records = useMemo(
     () => [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
     [trip.records],
+  );
+  const stopKinds = useMemo(
+    () => new Map(trip.stops.map((stop) => [stop.id, stop.kind])),
+    [trip.stops],
   );
   return (
     <Panel title="Trip journey log">
@@ -24,7 +28,8 @@ export function TripRecords({ trip }: { trip: TripView }) {
             <li key={record.id} className="py-4">
               <Flex wrap align="center" justify="space-between" gap={8}>
                 <strong className="type-body-m">
-                  {record.checkpointName ?? 'Trip update'} · {eventLabels[record.kind]}
+                  {record.checkpointName ?? 'Trip update'} ·{' '}
+                  {recordLabel(record.kind, stopKinds.get(record.routeStopId ?? ''))}
                 </strong>
                 <span className="type-data text-ink-3">{formatTime(record.occurredAt)}</span>
               </Flex>

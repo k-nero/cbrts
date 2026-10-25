@@ -394,9 +394,21 @@ public class JobTripService {
      */
     @Transactional(readOnly = true)
     public Optional<TripJob> partBefore(Trip trip, TransportJob job) {
+        return partsBefore(trip, job).stream().findFirst();
+    }
+
+    /** Every part of the job that hands on to its part on {@code trip}, oldest first; two after an incident split. */
+    @Transactional(readOnly = true)
+    public List<TripJob> partsBefore(Trip trip, TransportJob job) {
         return parts.findByTrip_IdAndJob_Id(trip.getId(), job.getId())
-                .flatMap(p ->
-                        parts.findByNext_IdOrderByCreatedAt(p.getId()).stream().findFirst());
+                .map(p -> parts.findByNext_IdOrderByCreatedAt(p.getId()))
+                .orElse(List.of());
+    }
+
+    /** The job's part on the next trip of its chain after {@code trip}; empty on the last trip of its journey. */
+    @Transactional(readOnly = true)
+    public Optional<TripJob> partAfter(Trip trip, TransportJob job) {
+        return parts.findByTrip_IdAndJob_Id(trip.getId(), job.getId()).map(TripJob::getNext);
     }
 
     /**

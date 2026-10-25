@@ -240,6 +240,25 @@ class TripSharingServiceTest {
     }
 
     @Test
+    @DisplayName("On a later trip of its journey, a job can't leave before the trip before has its horses ready")
+    void aLaterTripLeavesNoEarlierThanTheHandOn() {
+        TripJob part = new TripJob();
+        when(jobTrips.partBefore(joiningTrip, joining)).thenReturn(Optional.of(part));
+        corridor.setDateFlexDays((short) 1);
+        when(routePlans.pickupOn(joiningTrip, joining)).thenReturn(Optional.of(Instant.parse("2026-12-08T02:00:00Z")));
+        // The horses are out of quarantine on 8 Dec, so 7 Dec is no longer a day they could leave.
+        when(routePlans.readyOn(joiningTrip, joining)).thenReturn(Optional.of(Instant.parse("2026-12-08T01:00:00Z")));
+        host.getRequest().setDepartureDate(LocalDate.of(2026, 12, 8));
+        host.getRequest().setDateFlexDays((short) 1);
+        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(hostTrip));
+
+        assertThat(service.joinable(joining.getId(), null)).singleElement().satisfies(t -> {
+            assertThat(t.departFrom()).isEqualTo(LocalDate.of(2026, 12, 8));
+            assertThat(t.departTo()).isEqualTo(LocalDate.of(2026, 12, 9));
+        });
+    }
+
+    @Test
     @DisplayName("A job joins another job's trip on the days both allow, and the trip reopens with its stops")
     void aJobJoinsTheTrip() {
         ShareTripResponse result = service.share(host.getId(), joining.getId(), List.of(), khoi);

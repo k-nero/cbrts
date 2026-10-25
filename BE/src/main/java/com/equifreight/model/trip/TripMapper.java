@@ -10,6 +10,8 @@ import com.equifreight.entity.TripRecord;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.TripRecordKind;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -55,6 +57,42 @@ public final class TripMapper {
                 records,
                 part.parts(),
                 handover);
+    }
+
+    /**
+     * A job planned as a chain of trips (US-F3-16), as its customer follows it: one timeline across {@code legs}, each
+     * trip's own customer view in chain order. The stops follow each other, numbered across the journey, without a
+     * later trip's pickup at the place the trip before handed the horses on; the records are in the order they
+     * happened, and every trip's flights are listed. The job's own status and times stand for the journey, no part is
+     * the one shown, and {@code current} (the view of the trip the horses are on) gives the rest.
+     */
+    public static TripViewResponse toJourneyResponse(
+            TransportJob job, TripViewResponse current, List<TripViewResponse> legs) {
+        List<TripStopResponse> stops = new ArrayList<>();
+        List<TripRecordResponse> records = new ArrayList<>();
+        List<TripFlightResponse> flights = new ArrayList<>();
+        for (int i = 0; i < legs.size(); i++) {
+            TripViewResponse leg = legs.get(i);
+            for (TripStopResponse stop : leg.stops()) {
+                if (i > 0 && "PICKUP".equals(stop.kind())) continue;
+                stops.add(stop.toBuilder().sequence((short) (stops.size() + 1)).build());
+            }
+            records.addAll(leg.records());
+            flights.addAll(leg.flights());
+        }
+        records.sort(Comparator.comparing(TripRecordResponse::occurredAt));
+        return current.toBuilder()
+                .tripStatus(job.getTripStatus())
+                .plannedDepartureAt(job.getPlannedDepartureAt())
+                .plannedArrivalAt(job.getPlannedArrivalAt())
+                .shared(legs.stream().anyMatch(TripViewResponse::shared))
+                .flights(flights)
+                .stops(stops)
+                .records(records)
+                .parts(current.parts().stream()
+                        .map(p -> p.toBuilder().current(false).build())
+                        .toList())
+                .build();
     }
 
     /**

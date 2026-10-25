@@ -87,10 +87,10 @@ class CatalogSeederTest {
 
         seeder.seed();
 
-        verify(places, times(7)).save(any(Place.class));
+        verify(places, times(10)).save(any(Place.class));
         verify(crossings, times(5)).save(any(BorderCrossing.class));
         ArgumentCaptor<Corridor> corridor = ArgumentCaptor.forClass(Corridor.class);
-        verify(corridors, times(9)).save(corridor.capture());
+        verify(corridors, times(10)).save(corridor.capture());
         Corridor hcmBkk = corridor.getAllValues().stream()
                 .filter(c -> c.getCode().equals("RD HCM → BKK"))
                 .findFirst()
@@ -139,7 +139,7 @@ class CatalogSeederTest {
         seeder.seed();
 
         ArgumentCaptor<Corridor> corridor = ArgumentCaptor.forClass(Corridor.class);
-        verify(corridors, times(9)).save(corridor.capture());
+        verify(corridors, times(10)).save(corridor.capture());
         assertThat(corridor.getAllValues())
                 .extracting(Corridor::getCode)
                 .contains("RD HCM -> PNH")

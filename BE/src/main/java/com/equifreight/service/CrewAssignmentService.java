@@ -2,11 +2,13 @@ package com.equifreight.service;
 
 import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.RoutePlan;
+import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripVehicle;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CrewRole;
+import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -16,8 +18,11 @@ import com.equifreight.model.job.JobMapper;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.LoadPlanRepository;
 import com.equifreight.repository.LoadPlanStallRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.UserRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
@@ -35,6 +40,7 @@ public class CrewAssignmentService {
     private final LoadPlanStallRepository loadPlanStallRepository;
     private final AuditService auditService;
     private final FlightService flights;
+    private final RoutePlanRepository routePlans;
 
     public CrewAssignmentService(
             CrewAssignmentRepository crewAssignmentRepository,
@@ -44,7 +50,8 @@ public class CrewAssignmentService {
             LoadPlanRepository loadPlanRepository,
             LoadPlanStallRepository loadPlanStallRepository,
             AuditService auditService,
-            FlightService flights) {
+            FlightService flights,
+            RoutePlanRepository routePlans) {
         this.crewAssignmentRepository = crewAssignmentRepository;
         this.transportJobRepository = transportJobRepository;
         this.userRepository = userRepository;
@@ -53,6 +60,61 @@ public class CrewAssignmentService {
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.auditService = auditService;
         this.flights = flights;
+        this.routePlans = routePlans;
+    }
+
+    /** When a trip travels: from its first planned time to its last. */
+    private record Span(Instant from, Instant to) {
+        boolean overlaps(Span other) {
+            return from.isBefore(other.to) && to.isAfter(other.from);
+        }
+    }
+
+    /**
+     * When {@code trip} travels (US-F3-06): from its route's first planned stop to its last (plus that stop's stay),
+     * on the confirmed route, else the draft. Without planned times, the planned departure and arrival of the jobs on
+     * it, which for a job travelling on a chain of trips (US-F3-16) is its whole journey. Empty when nothing is
+     * planned yet.
+     */
+    private Optional<Span> spanOf(Trip trip) {
+        Optional<Span> route = routePlans
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                .or(() -> routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT))
+                .flatMap(plan -> {
+                    List<RouteStop> timed = plan.getStops().stream()
+                            .filter(st -> st.getPlannedAt() != null)
+                            .toList();
+                    if (timed.size() < 2) return Optional.empty();
+                    RouteStop last = timed.getLast();
+                    Instant end = last.getPlannedStayMin() == null
+                            ? last.getPlannedAt()
+                            : last.getPlannedAt().plus(Duration.ofMinutes(last.getPlannedStayMin()));
+                    return Optional.of(new Span(timed.getFirst().getPlannedAt(), end));
+                });
+        if (route.isPresent()) return route;
+        Instant from = null;
+        Instant to = null;
+        for (TransportJob job : jobTrips.jobsOn(trip)) {
+            if (job.getPlannedDepartureAt() == null || job.getPlannedArrivalAt() == null) continue;
+            if (from == null || job.getPlannedDepartureAt().isBefore(from)) from = job.getPlannedDepartureAt();
+            if (to == null || job.getPlannedArrivalAt().isAfter(to)) to = job.getPlannedArrivalAt();
+        }
+        return from == null ? Optional.empty() : Optional.of(new Span(from, to));
+    }
+
+    /**
+     * The user's crew assignment on another trip that travels while {@code trip} does (US-F3-06); empty while
+     * {@code trip}'s times aren't planned. Each trip is compared on its own span, so a groom who rides the trailer to
+     * the airport can fly with the horses on the next trip of their journey.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CrewAssignment> overlapping(UUID userId, Trip trip) {
+        Optional<Span> span = spanOf(trip);
+        if (span.isEmpty()) return Optional.empty();
+        return crewAssignmentRepository.findOnOtherOpenTrips(userId, trip.getId()).stream()
+                .filter(other ->
+                        spanOf(other.getTrip()).map(span.get()::overlaps).orElse(false))
+                .findFirst();
     }
 
     @Transactional(readOnly = true)
@@ -152,14 +214,11 @@ public class CrewAssignmentService {
                     + " horses (1 per 3 horses, rounded up). Found " + groomCount);
         }
 
-        // Overlaps can only be checked once the confirmed route has set the travel dates; until then they are
-        // checked again at sign-off (TransportJobService.signOffTripPlan).
-        java.time.Instant startsAt = job.getPlannedDepartureAt();
-        java.time.Instant endsAt = job.getPlannedArrivalAt();
-
+        // Overlaps can only be checked once the route has the trip's times; until then they are checked again at
+        // sign-off (TransportJobService.signOffTripPlan).
         List<CrewAssignment> assignments = new ArrayList<>();
         for (AssignCrewRequest.CrewItem item : request.crew()) {
-            User user = crewMember(item, trip, startsAt, endsAt);
+            User user = crewMember(item, trip);
 
             if (onOtherTrailers.contains(user.getId())) {
                 throw new BusinessException(
@@ -199,12 +258,10 @@ public class CrewAssignmentService {
     }
 
     /**
-     * The crew member {@code item} names, once checked: an escort whose kind fits the role, free for the trip's dates
-     * when they are known (US-F3-06).
+     * The crew member {@code item} names, once checked: an escort whose kind fits the role, free for the trip's
+     * times when they are known (US-F3-06).
      */
-    private User crewMember(
-            AssignCrewRequest.CrewItem item, Trip trip, java.time.Instant startsAt, java.time.Instant endsAt) {
-        boolean datesKnown = startsAt != null && endsAt != null;
+    private User crewMember(AssignCrewRequest.CrewItem item, Trip trip) {
         User user = userRepository
                 .findById(item.userId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + item.userId()));
@@ -233,10 +290,7 @@ public class CrewAssignmentService {
         }
 
         // Overlapping jobs check (US-F3-06)
-        if (datesKnown
-                && !crewAssignmentRepository
-                        .findOverlappingAssignments(user.getId(), trip.getId(), startsAt, endsAt)
-                        .isEmpty()) {
+        if (overlapping(user.getId(), trip).isPresent()) {
             throw new ConflictException(
                     "CREW_OVERLAP",
                     "Crew member " + user.getFirstName() + " " + user.getLastName()
@@ -279,7 +333,7 @@ public class CrewAssignmentService {
         for (AssignCrewRequest.CrewItem item : request.crew()) {
             CrewAssignment ca = new CrewAssignment();
             ca.setTrip(trip);
-            ca.setUser(crewMember(item, trip, job.getPlannedDepartureAt(), job.getPlannedArrivalAt()));
+            ca.setUser(crewMember(item, trip));
             ca.setCrewRole(item.crewRole());
             assignments.add(ca);
         }
