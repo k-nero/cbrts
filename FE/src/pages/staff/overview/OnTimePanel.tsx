@@ -156,7 +156,7 @@ export const OnTimePanel: FC = () => {
                       {report.lateJobs.map((j) => (
                         <li key={j.jobId} className="border-b border-line">
                           <Link
-                            to={`/staff/jobs/${j.jobId}?tab=trip`}
+                            to={`/staff/jobs/${j.jobId}?tab=route`}
                             className="grid grid-cols-[130px_minmax(0,1fr)_auto] items-center gap-3 py-2 text-inherit no-underline hover:bg-raised"
                           >
                             <span className="type-data text-ink">{j.jobCode}</span>

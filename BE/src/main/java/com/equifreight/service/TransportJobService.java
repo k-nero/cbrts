@@ -131,18 +131,27 @@ public class TransportJobService {
 
     @Transactional(readOnly = true)
     public JobDetailResponse getJobDetail(UUID id) {
+        return getJobDetail(id, null);
+    }
+
+    /**
+     * The job with the plan of {@code tripId}, one trip of its chain (US-F3-16): that trip's load, route, crew and
+     * jobs. Its current trip when null.
+     */
+    @Transactional(readOnly = true)
+    public JobDetailResponse getJobDetail(UUID id, UUID tripId) {
         TransportJob job = transportJobRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + id));
 
         List<JobHorseResponse> horses = getJobHorses(job);
         TripLoadResponse loadPlan =
-                loadPlanService.getActiveLoadPlan(job.getId()).orElse(null);
+                loadPlanService.getActiveLoadPlan(job.getId(), tripId).orElse(null);
 
         RoutePlanResponse routePlan =
-                routePlanService.findActiveRoutePlan(job.getId()).orElse(null);
+                routePlanService.findActiveRoutePlan(job.getId(), tripId).orElse(null);
 
-        List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId());
+        List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId(), tripId);
 
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(job.getId());
         boolean isClear = gate.clearanceReady();
@@ -158,14 +167,14 @@ public class TransportJobService {
                     gate.outstandingIssues().size());
         }
 
-        List<TripJobResponse> tripJobs = jobTrips.findTripOf(job.getId())
+        List<TripJobResponse> tripJobs = jobTrips.findTripOf(job.getId(), tripId)
                 .map(trip -> jobTrips.jobsOn(trip).stream()
                         .map(JobMapper::toTripJobResponse)
                         .toList())
                 .orElse(List.of());
         return JobMapper.toDetailResponse(
                 job,
-                jobTrips.findTripOf(job.getId()).map(Trip::getCode).orElse(null),
+                jobTrips.findTripOf(job.getId(), tripId).map(Trip::getCode).orElse(null),
                 getBlockingReason(job),
                 getNextStepOwner(job),
                 gateState,
@@ -175,7 +184,7 @@ public class TransportJobService {
                 routePlan,
                 crew,
                 tripJobs,
-                jobTrips.describeParts(job));
+                jobTrips.describeParts(job, tripId));
     }
 
     /**
@@ -210,13 +219,19 @@ public class TransportJobService {
 
     @Transactional
     public JobDetailResponse signOffTripPlan(UUID jobId, User currentUser) {
+        return signOffTripPlan(jobId, null, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public JobDetailResponse signOffTripPlan(UUID jobId, UUID tripId, User currentUser) {
         TransportJob job = transportJobRepository
                 .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // Only the logistics manager signs off (US-F3-08); enforced once, by @PreAuthorize on the controller.
         // Clearance gate check: every job on the trip must be CLEAR (US-F3-08, US-F3-11)
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         if (jobTrips.partDeparted(trip, job)) {
             throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
         }
@@ -233,17 +248,21 @@ public class TransportJobService {
             }
         }
 
-        // Validate the trip's load plans confirmed
-        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
-        if (loadPlans.isEmpty() || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
-            throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
-        }
-
         // Validate route plan confirmed
         Optional<RoutePlan> routePlanOpt =
                 routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED);
         if (routePlanOpt.isEmpty()) {
             throw new BusinessException("Cannot sign off trip plan: Route plan is not confirmed yet");
+        }
+
+        // Validate the trip's load plans confirmed. A trip that only flies (a flight of a job's chain, US-F3-16) has
+        // its flight as its carrier: no trailer, so no load plan or driver.
+        boolean drives = routePlanOpt.get().getLegs().stream()
+                .anyMatch(leg -> leg.getMode() == com.equifreight.entity.enums.TransportMode.ROAD);
+        List<LoadPlan> loadPlans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
+        if ((drives && loadPlans.isEmpty())
+                || loadPlans.stream().anyMatch(p -> p.getStatus() != LoadPlanStatus.CONFIRMED)) {
+            throw new BusinessException("Cannot sign off trip plan: Load plan is not confirmed yet");
         }
 
         // Validate crew assigned: driver and groom ratio
@@ -341,7 +360,7 @@ public class TransportJobService {
                 notifBody);
 
         log.info("Logistics manager {} signed off trip plan for job {}", currentUser.getEmail(), job.getCode());
-        return getJobDetail(jobId);
+        return getJobDetail(jobId, tripId);
     }
 
     private JobSummaryResponse toSummaryResponse(TransportJob job) {

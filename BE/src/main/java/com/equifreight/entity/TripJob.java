@@ -44,6 +44,15 @@ public class TripJob extends BaseEntity {
     @JoinColumn(name = "signed_off_by")
     private User signedOffBy;
 
+    /**
+     * The job's part on the next trip of its chain (US-F3-16): where this part's horses go when it hands them on.
+     * Null on the last part. Two parts can hand on to one: an incident that moved some horses off a trip of the chain
+     * keeps them on the journey.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "next_trip_job_id")
+    private TripJob next;
+
     /** Whether this part has left: the trip is moving with it, or has delivered it. */
     public boolean departed() {
         return status != TripStatus.NOT_STARTED;

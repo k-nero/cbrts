@@ -4,14 +4,14 @@ import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
 import { Callout, ClearanceGate, StageMark } from '@/components/ui';
-import { useJobDetail } from '@/hooks/useJob';
+import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
+import { JourneyRail } from './JourneyRail';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 import { Placeholder } from './Placeholder';
-import { TripTab } from './TripTab';
 
 /** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
@@ -45,12 +45,6 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       owner: 'Transport specialist',
       render: (job) => <AuthoritiesTab job={job} />,
     },
-    {
-      key: 'trip',
-      label: 'Trip',
-      owner: 'Escort (driver / groom)',
-      render: (job) => <TripTab job={job} />,
-    },
   ];
 
 const STAGE_MAP: Record<
@@ -68,10 +62,24 @@ const STAGE_MAP: Record<
 };
 
 export default function JobDetailPage() {
+  // The trip of the job's journey the tabs plan (US-F3-16) lives in the URL too (?trip=…).
+  const [searchParams] = useSearchParams();
+  return (
+    <JobTripContext value={searchParams.get('trip') ?? undefined}>
+      <JobWorkspace />
+    </JobTripContext>
+  );
+}
+
+function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = TABS.find((tab) => tab.key === searchParams.get('tab')) ?? TABS[0];
+  // The Trip tab's incidents and closing moved to the Route tab; older links (notifications) still say ?tab=trip.
+  const tabKey = searchParams.get('tab') === 'trip' ? 'route' : searchParams.get('tab');
+  const activeTab = TABS.find((tab) => tab.key === tabKey) ?? TABS[0];
+  const showTrip = (trip: string) =>
+    setSearchParams({ tab: activeTab.key, trip }, { replace: true });
 
   // A failed load (404 included) goes to the error boundary; until the job arrives, the page is a skeleton.
   const { data: job } = useJobDetail(id || '');
@@ -104,6 +112,29 @@ export default function JobDetailPage() {
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
   // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
   const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
+  // A journey of several trips (US-F3-16): the tabs plan the trip chosen in the rail beside them.
+  const journey = job.parts.some((part) => part.handsOn);
+
+  const tabsView = (
+    <Tabs
+      activeKey={activeTab.key}
+      onChange={(key) => {
+        const trip = searchParams.get('trip');
+        setSearchParams(trip ? { tab: key, trip } : { tab: key }, { replace: true });
+      }}
+      items={items}
+      // Unmount a tab when it's left, as before, so its forms start fresh on return.
+      destroyOnHidden
+      tabBarExtraContent={
+        <span className="hidden sm:block">
+          <Flex component="span" gap={8} align="center">
+            <span className="type-body-s text-ink-3">Owner:</span>
+            <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
+          </Flex>
+        </span>
+      }
+    />
+  );
 
   return (
     <div className="p-4">
@@ -135,8 +166,7 @@ export default function JobDetailPage() {
             right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
           />
 
-          {/* Clearance gate component */}
-          {job.parts.length > 0 && (
+          {job.parts.length > 0 && !job.parts.some((part) => part.handsOn) && (
             <Callout tone="info" title={`${job.code} travels in ${job.parts.length} parts`}>
               {job.parts
                 .map(
@@ -156,21 +186,14 @@ export default function JobDetailPage() {
           ></ClearanceGate>
         </Flex>
 
-        <Tabs
-          activeKey={activeTab.key}
-          onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
-          items={items}
-          // Unmount a tab when it's left, as before, so its forms start fresh on return.
-          destroyOnHidden
-          tabBarExtraContent={
-            <span className="hidden sm:block">
-              <Flex component="span" gap={8} align="center">
-                <span className="type-body-s text-ink-3">Owner:</span>
-                <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
-              </Flex>
-            </span>
-          }
-        />
+        {journey ? (
+          <Flex gap={24} align="start">
+            <JourneyRail parts={job.parts} onShow={showTrip} />
+            <div className="min-w-0 flex-1">{tabsView}</div>
+          </Flex>
+        ) : (
+          tabsView
+        )}
       </Flex>
     </div>
   );

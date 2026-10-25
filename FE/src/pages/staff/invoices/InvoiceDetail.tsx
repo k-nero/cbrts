@@ -98,7 +98,7 @@ export default function InvoiceDetailPage() {
                 {invoice.jobId && (
                   <Fact label="Job">
                     <Link
-                      to={`/staff/jobs/${invoice.jobId}?tab=trip`}
+                      to={`/staff/jobs/${invoice.jobId}?tab=route`}
                       className="text-ink! underline"
                     >
                       {invoice.jobCode}

@@ -57,7 +57,13 @@ public class CrewAssignmentService {
 
     @Transactional(readOnly = true)
     public List<CrewMemberResponse> getCrew(UUID jobId) {
-        return jobTrips.findTripOf(jobId)
+        return getCrew(jobId, null);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional(readOnly = true)
+    public List<CrewMemberResponse> getCrew(UUID jobId, UUID tripId) {
+        return jobTrips.findTripOf(jobId, tripId)
                 .map(trip -> crewAssignmentRepository.findByTrip_Id(trip.getId()).stream()
                         .map(JobMapper::toCrewMemberResponse)
                         .toList())
@@ -82,12 +88,18 @@ public class CrewAssignmentService {
 
     @Transactional
     public List<CrewMemberResponse> assignCrew(UUID jobId, AssignCrewRequest request, User currentUser) {
+        return assignCrew(jobId, null, request, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public List<CrewMemberResponse> assignCrew(UUID jobId, UUID tripId, AssignCrewRequest request, User currentUser) {
         TransportJob job = transportJobRepository
                 .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // The crew can change until departure; a change after sign-off clears it, so it needs a new one (US-F3-08).
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         if (jobTrips.partDeparted(trip, job)) {
             throw new BusinessException("Cannot modify crew assignments: the job departed on " + job.getDepartedAt());
         }

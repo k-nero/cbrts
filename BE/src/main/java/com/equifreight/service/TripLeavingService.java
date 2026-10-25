@@ -45,6 +45,7 @@ public class TripLeavingService {
     private final CrewAssignmentRepository crew;
     private final VehicleBookingRepository bookings;
     private final VehicleRepository vehicles;
+    private final RoutePlanService routePlans;
 
     public TripLeavingService(
             JobTripService jobTrips,
@@ -52,13 +53,15 @@ public class TripLeavingService {
             LoadPlanRepository loadPlanRows,
             CrewAssignmentRepository crew,
             VehicleBookingRepository bookings,
-            VehicleRepository vehicles) {
+            VehicleRepository vehicles,
+            RoutePlanService routePlans) {
         this.jobTrips = jobTrips;
         this.loadPlans = loadPlans;
         this.loadPlanRows = loadPlanRows;
         this.crew = crew;
         this.bookings = bookings;
         this.vehicles = vehicles;
+        this.routePlans = routePlans;
     }
 
     /** What deciding a leaving option did: the horses' new trip (null when left in care), and whether the job left. */
@@ -145,6 +148,7 @@ public class TripLeavingService {
         if (option.getLeavingKind() == LeavingKind.LEAVE_IN_CARE) {
             jobTrips.leaveInCare(trip, job, ids);
             loadPlans.unload(trip, ids);
+            leaveJourney(trip, job, ids);
             jobTrips.summarize(job);
             return new Departure(null, noneLeftOn(trip, job), names);
         }
@@ -164,7 +168,10 @@ public class TripLeavingService {
             }
         }
         loadPlans.unload(trip, ids);
-        jobTrips.moveHorses(job, ids, trip, newTrip);
+        // Returned to their origin, the horses leave the job's journey; otherwise they still go on to its next trip.
+        boolean staysOnJourney = option.getLeavingKind() != LeavingKind.RETURN_TO_ORIGIN;
+        jobTrips.moveHorses(job, ids, trip, newTrip, staysOnJourney);
+        if (!staysOnJourney) leaveJourney(trip, job, ids);
         if (option.getLeavingKind() == LeavingKind.SECOND_VEHICLE
                 && jobTrips.vehiclesOf(newTrip).stream()
                         .noneMatch(tv -> tv.getVehicle()
@@ -174,6 +181,24 @@ public class TripLeavingService {
         }
         jobTrips.summarize(job);
         return new Departure(newTrip, noneLeftOn(trip, job), names);
+    }
+
+    /**
+     * Horses that leave the job's journey come off its later trips (US-F3-16): out of their stalls there, and a later
+     * trip nobody rides any more releases its trailers' bookings and crew; one others still ride reopens without them.
+     */
+    private void leaveJourney(Trip trip, TransportJob job, Set<UUID> ids) {
+        for (Trip later : jobTrips.withdrawFromJourney(trip, job, ids)) {
+            loadPlans.unload(later, ids);
+            if (jobTrips.jobsOn(later).isEmpty()) {
+                bookings.deleteAll(bookings.findByTrip_Id(later.getId()));
+                crew.deleteByTripId(later.getId());
+            } else {
+                loadPlans.reopenTrip(later, job.getCode() + "'s horses left the journey");
+                // None of its horses go this far: the job's pickup and transfer come off the trip's route.
+                if (!jobTrips.jobsOn(later).contains(job)) routePlans.removeJobStops(later, job);
+            }
+        }
     }
 
     private boolean noneLeftOn(Trip trip, TransportJob job) {

@@ -98,7 +98,10 @@ export interface TripFlight {
   /** Every job's for staff and the crew; only their own for the customer. */
   consignments: FlightAllocation[];
 }
-/** One part of a job an incident split across trips (US-F5-06). */
+/**
+ * One part of a job that spans trips: split by an incident (US-F5-06), or planned as a chain of
+ * trips, road, air, road (US-F3-16).
+ */
 export interface TripPart {
   tripId: string;
   /** Staff and the crew only. */
@@ -110,6 +113,11 @@ export interface TripPart {
   plannedArrivalAt: string | null;
   /** The part this view shows. */
   current: boolean;
+  /** The trip's catalog corridor, "RD HCM -> PNH", and whether it drives or flies. */
+  corridorCode: string | null;
+  mode: 'ROAD' | 'AIR' | null;
+  /** True when this part hands its horses on to the next trip of the journey. */
+  handsOn: boolean;
 }
 export interface TripSummary {
   /** The job the trip's page opens with. */
