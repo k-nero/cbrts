@@ -393,3 +393,29 @@ export const useSaveRouteDraft = (jobId: string) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job', jobId] }),
   });
 };
+
+/** The confirmed trips this job's trip could join (US-F3-18). */
+export const useJoinableTrips = (jobId: string, enabled: boolean) => {
+  const trip = useJobTrip();
+  return useQuery({
+    queryKey: [...jobKey(jobId, trip), 'joinable'],
+    queryFn: () => jobApi.getJoinableTrips(jobId, trip),
+    enabled: Boolean(jobId) && enabled,
+    // A side panel: a refusal is shown in it, never sent to the page's error boundary.
+    throwOnError: false,
+  });
+};
+
+/** Puts this job's trip on a confirmed trip (US-F3-18); every job's page refetches. */
+export const useJoinTrip = (jobId: string) => {
+  const queryClient = useQueryClient();
+  const trip = useJobTrip();
+  return useMutation({
+    mutationFn: ({ tripId, acceptedWarnings }: { tripId: string; acceptedWarnings: string[] }) =>
+      jobApi.joinTrip(jobId, tripId, acceptedWarnings, trip),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};

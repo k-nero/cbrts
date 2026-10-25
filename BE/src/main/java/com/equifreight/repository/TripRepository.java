@@ -1,6 +1,7 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.Trip;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,4 +27,19 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             limit 1
             """)
     Optional<Trip> findCurrentByJobId(@Param("jobId") UUID jobId);
+
+    /**
+     * Trips a job on {@code corridorId} could join (US-F3-18): their route confirmed, not departed, other than
+     * {@code exceptId}, soonest first.
+     */
+    @Query("""
+            select t from Trip t
+            where t.corridor.id = :corridorId
+              and t.id <> :exceptId
+              and t.status = com.equifreight.entity.enums.TripStatus.NOT_STARTED
+              and exists (select 1 from RoutePlan rp
+                          where rp.trip = t and rp.status = com.equifreight.entity.enums.RoutePlanStatus.CONFIRMED)
+            order by t.plannedDepartureAt asc nulls last, t.code
+            """)
+    List<Trip> findJoinable(@Param("corridorId") UUID corridorId, @Param("exceptId") UUID exceptId);
 }

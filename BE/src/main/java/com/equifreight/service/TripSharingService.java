@@ -1,22 +1,28 @@
 package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripHorse;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.BiosecurityWarningResponse;
 import com.equifreight.model.job.JobMapper;
+import com.equifreight.model.job.JoinableTripResponse;
 import com.equifreight.model.job.ShareSuggestionResponse;
 import com.equifreight.model.job.ShareTripResponse;
 import com.equifreight.model.job.TripJobResponse;
+import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -52,6 +58,8 @@ public class TripSharingService {
     private final BiosecurityService biosecurity;
     private final TripNotices notices;
     private final FlightService flights;
+    private final TripRepository trips;
+    private final ChecklistItemRepository checklist;
     private final Clock clock;
 
     public TripSharingService(
@@ -65,6 +73,8 @@ public class TripSharingService {
             BiosecurityService biosecurity,
             TripNotices notices,
             FlightService flights,
+            TripRepository trips,
+            ChecklistItemRepository checklist,
             Clock clock) {
         this.jobs = jobs;
         this.jobTrips = jobTrips;
@@ -76,6 +86,8 @@ public class TripSharingService {
         this.biosecurity = biosecurity;
         this.notices = notices;
         this.flights = flights;
+        this.trips = trips;
+        this.checklist = checklist;
         this.clock = clock;
     }
 
@@ -170,6 +182,23 @@ public class TripSharingService {
     }
 
     /**
+     * The days {@code job} may leave on {@code trip}: on the first trip of its journey, its requested date moved by up
+     * to its flex days; on a later one (US-F3-16), that trip's own pickup moved by up to the corridor's flex days
+     * (US-F3-18), since it leaves when the trip before has handed the horses on.
+     */
+    private Days daysOn(TransportJob job, Trip trip) {
+        if (jobTrips.partBefore(trip, job).isEmpty()) return Days.of(job);
+        return routePlans
+                .pickupOn(trip, job)
+                .map(at -> {
+                    LocalDate day = at.atZone(BusinessTime.ZONE).toLocalDate();
+                    int flex = trip.getCorridor().getDateFlexDays();
+                    return new Days(day.minusDays(flex), day.plusDays(flex));
+                })
+                .orElseGet(() -> Days.of(job));
+    }
+
+    /**
      * Whether {@code joining}, now on {@code from}, can join {@code trip} (US-F3-11): the days every job on it could
      * leave, or a refusal that says why (a departed trip, a private trailer, another corridor, no common day, a horse
      * on both jobs, no room on the trailers or the flight, other airports).
@@ -188,14 +217,16 @@ public class TripSharingService {
             throw new BusinessException(joining.getCode() + " travels on another corridor than trip " + trip.getCode());
         }
 
-        // One departure day inside every job's allowed days.
-        Days days = Days.of(joining);
+        // One departure day inside every job's allowed days on these trips.
+        Days joiningDays = daysOn(joining, from);
+        Days days = joiningDays;
         for (TransportJob j : onTrip) {
-            Days together = days.and(Days.of(j));
+            Days theirs = daysOn(j, trip);
+            Days together = days.and(theirs);
             if (together.isEmpty()) {
                 throw new ConflictException(
                         "DATES_DONT_FIT",
-                        joining.getCode() + " can leave " + Days.of(joining) + " and " + j.getCode() + " " + Days.of(j)
+                        joining.getCode() + " can leave " + joiningDays + " and " + j.getCode() + " " + theirs
                                 + ": no departure day suits both");
             }
             days = together;
@@ -252,10 +283,25 @@ public class TripSharingService {
         TransportJob joining = job(joiningJobId);
         Trip trip = jobTrips.tripOf(hostJobId, tripId);
         Trip from = jobTrips.tripOf(joiningJobId);
+        return putOn(trip, jobsOn(trip, host), joining, from, acceptedWarnings, currentUser, " with " + host.getCode());
+    }
+
+    /**
+     * Puts {@code joining}'s horses on {@code from} onto {@code trip} (US-F3-11, US-F3-18), once every check of joining
+     * passes and its biosecurity warnings are accepted: their stops follow them, the trip reopens, and the trip they
+     * leave releases its bookings and crew when nobody rides it any more.
+     */
+    private ShareTripResponse putOn(
+            Trip trip,
+            List<TransportJob> onTrip,
+            TransportJob joining,
+            Trip from,
+            Collection<String> acceptedWarnings,
+            User currentUser,
+            String with) {
         if (from.getId().equals(trip.getId())) {
             throw new BusinessException(joining.getCode() + " is already on trip " + trip.getCode());
         }
-        List<TransportJob> onTrip = jobsOn(trip, host);
         Days days = fit(trip, onTrip, joining, from);
 
         // Different health status warns but doesn't block: the coordinator accepts what it says (US-F3-12).
@@ -267,11 +313,12 @@ public class TripSharingService {
                 .toList();
         loadPlans.unload(from, horses);
         jobTrips.moveJob(joining, from, trip);
-        leaveBehind(from, joining, joining.getCode() + " moved to trip " + trip.getCode());
 
         String reason = joining.getCode() + " joined the trip";
         loadPlans.reopenTrip(trip, reason);
-        routePlans.addJobStops(trip, joining);
+        // The job's stops on the trip it leaves (its pickup, its delivery or transfer) come with it.
+        routePlans.copyJobStops(from, trip, joining);
+        leaveBehind(from, joining, joining.getCode() + " moved to trip " + trip.getCode());
         flights.allocate(trip);
         joining.setSignedOffAt(null);
         joining.setSignedOffBy(null);
@@ -279,8 +326,7 @@ public class TripSharingService {
         audit.recordDecision(
                 currentUser,
                 "SHARE_TRIP",
-                AuditText.fit(joining.getCode() + " put on trip " + trip.getCode() + " with " + host.getCode()
-                        + "; departure " + days),
+                AuditText.fit(joining.getCode() + " put on trip " + trip.getCode() + with + "; departure " + days),
                 "TRIP",
                 trip.getId(),
                 trip.getCode(),
@@ -298,6 +344,79 @@ public class TripSharingService {
                 .departTo(days.to())
                 .jobs(now)
                 .build();
+    }
+
+    /**
+     * The confirmed trips on {@code jobId}'s corridor that its trip {@code tripId} (its current trip when null) could
+     * join (US-F3-18): route confirmed, not departed, with someone on them. Those passing every check of joining come
+     * first, with the departure days that suit both, the stalls left and the biosecurity warnings to accept; the others
+     * follow with the reason they can't be joined. Each names the jobs on it, how many of them are cleared and the
+     * earliest document deadline still open. A trip that has departed lists nothing.
+     */
+    @Transactional(readOnly = true)
+    public List<JoinableTripResponse> joinable(UUID jobId, UUID tripId) {
+        TransportJob joining = job(jobId);
+        Trip from = jobTrips.tripOf(jobId, tripId);
+        if (departed(joining, from)) return List.of();
+        List<JoinableTripResponse> fitting = new ArrayList<>();
+        List<JoinableTripResponse> notFitting = new ArrayList<>();
+        for (Trip trip : trips.findJoinable(from.getCorridor().getId(), from.getId())) {
+            List<TransportJob> onTrip = jobTrips.jobsOn(trip);
+            if (onTrip.isEmpty()) continue;
+            JoinableTripResponse.JoinableTripResponseBuilder row = JoinableTripResponse.builder()
+                    .tripId(trip.getId())
+                    .tripCode(trip.getCode())
+                    .corridorCode(trip.getCorridor().getCode())
+                    .mode(trip.getCorridor().getMode())
+                    .plannedDepartureAt(trip.getPlannedDepartureAt())
+                    .jobs(onTrip.stream().map(TransportJob::getCode).sorted().toList())
+                    .jobsCleared((int) onTrip.stream()
+                            .filter(j -> j.getDossierStatus() == DossierStatus.CLEARANCE_READY)
+                            .count())
+                    .documentsDueBy(onTrip.stream()
+                            .flatMap(j -> checklist.findByJobId(j.getId()).stream())
+                            .filter(item -> item.getStatus() != ChecklistStatus.CLEARED && item.getDueDate() != null)
+                            .map(ChecklistItem::getDueDate)
+                            .min(LocalDate::compareTo)
+                            .orElse(null));
+            Days days;
+            try {
+                days = fit(trip, onTrip, joining, from);
+            } catch (BusinessException | ConflictException doesNotFit) {
+                // Listed all the same, so the coordinator sees why: dates, room, airports, a private trailer.
+                notFitting.add(row.fits(false)
+                        .reason(doesNotFit.getMessage())
+                        .warnings(List.of())
+                        .build());
+                continue;
+            }
+            fitting.add(row.fits(true)
+                    .departFrom(days.from())
+                    .departTo(days.to())
+                    .stallsLeft(loadPlans.stallsLeft(trip, joining))
+                    .warnings(biosecurity.forJoin(trip, joining))
+                    .build());
+        }
+        fitting.addAll(notFitting);
+        return fitting;
+    }
+
+    /**
+     * Puts {@code jobId}'s trip {@code tripId} (its current trip when null) on the confirmed trip {@code targetTripId}
+     * (US-F3-18): the reverse of {@link #share}, from the joining job's page. The same checks, warnings and reopening
+     * apply.
+     */
+    @Transactional
+    public ShareTripResponse join(
+            UUID jobId, UUID tripId, UUID targetTripId, Collection<String> acceptedWarnings, User currentUser) {
+        TransportJob joining = job(jobId);
+        Trip from = jobTrips.tripOf(jobId, tripId);
+        Trip trip = trips.findById(targetTripId).orElseThrow(() -> ResourceNotFoundException.of("Trip", targetTripId));
+        List<TransportJob> onTrip = jobTrips.jobsOn(trip);
+        if (onTrip.isEmpty()) {
+            throw new BusinessException("Nobody rides trip " + trip.getCode() + ": there is nothing to join");
+        }
+        return putOn(trip, onTrip, joining, from, acceptedWarnings, currentUser, "");
     }
 
     /**

@@ -13,6 +13,7 @@ import type {
   RoutePlan,
   ShareSuggestion,
   ShareTripResult,
+  JoinableTrip,
   TripJob,
   TripPart,
   JobClosing,
@@ -117,6 +118,22 @@ export const jobApi = {
       .post<ShareTripResult>(
         `/staff/jobs/${jobId}/trip/jobs`,
         { jobId: otherJobId, acceptedWarnings },
+        { params: { trip } },
+      )
+      .then((r) => r.data),
+
+  /** US-F3-18: the confirmed trips this job's trip could join. */
+  getJoinableTrips: (jobId: string, trip?: string) =>
+    client
+      .get<JoinableTrip[]>(`/staff/jobs/${jobId}/trip/joinable`, { params: { trip } })
+      .then((r) => r.data),
+
+  /** US-F3-18: puts this job's trip on a confirmed trip; both trips' plans reopen. */
+  joinTrip: (jobId: string, tripId: string, acceptedWarnings: string[], trip?: string) =>
+    client
+      .post<ShareTripResult>(
+        `/staff/jobs/${jobId}/trip/join`,
+        { tripId, acceptedWarnings },
         { params: { trip } },
       )
       .then((r) => r.data),

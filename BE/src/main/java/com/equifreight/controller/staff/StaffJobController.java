@@ -235,6 +235,30 @@ public class StaffJobController {
     }
 
     /**
+     * US-F3-18: Confirmed trips this job's trip could join: same corridor, route confirmed, not departed, and every
+     * check of joining passed, with each trip's clearance state and the warnings to accept.
+     */
+    @GetMapping("/{jobId}/trip/joinable")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<JoinableTripResponse> joinableTrips(
+            @PathVariable UUID jobId, @RequestParam(value = "trip", required = false) UUID trip) {
+        return tripSharingService.joinable(jobId, trip);
+    }
+
+    /**
+     * US-F3-18: Put this job's trip on a confirmed trip; both trips' plans reopen.
+     */
+    @PostMapping("/{jobId}/trip/join")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public ShareTripResponse joinTrip(
+            @PathVariable UUID jobId,
+            @RequestParam(value = "trip", required = false) UUID trip,
+            @Valid @RequestBody JoinTripRequest request,
+            @AuthenticationPrincipal User user) {
+        return tripSharingService.join(jobId, trip, request.tripId(), request.acceptedWarnings(), user);
+    }
+
+    /**
      * US-F3-16: Chain of trips - continue the job's journey on a new trip of another corridor, from an airport or
      * quarantine stop of its trip's route, before that trip departs.
      */

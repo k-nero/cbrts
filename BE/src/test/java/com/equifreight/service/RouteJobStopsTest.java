@@ -134,4 +134,59 @@ class RouteJobStopsTest {
         assertThat(draft.getLegs()).hasSize(2);
         assertThat(draft.getStops()).allMatch(s -> s.getJob() == null || s.getJob() == a);
     }
+
+    @Test
+    @DisplayName(
+            "A job joining a trip that flies from its airport stands beside the trip's own stops there, so the flight"
+                    + " still leaves from the airport (US-F3-18)")
+    void aJobJoiningAFlightKeepsTheFlight() {
+        Place airport = new Place();
+        airport.setId(UUID.randomUUID());
+        airport.setName("Techo International Airport cargo");
+        Place hkg = new Place();
+        hkg.setId(UUID.randomUUID());
+        hkg.setName("HKIA animal reception");
+        draft.getStops().clear();
+        draft.getLegs().clear();
+        RouteStop up = stop(1, RouteStopKind.PICKUP, a, airport);
+        RouteStop off = stop(2, RouteStopKind.TRANSFER, a, hkg);
+        RouteLeg flight = new RouteLeg();
+        flight.setId(UUID.randomUUID());
+        flight.setSeq((short) 1);
+        flight.setFromStop(up);
+        flight.setToStop(off);
+        flight.setMode(TransportMode.AIR);
+        draft.getLegs().add(flight);
+        // b's own flight trip, which it leaves for a's.
+        Trip bTrip = new Trip();
+        bTrip.setId(UUID.randomUUID());
+        RoutePlan bPlan = new RoutePlan();
+        for (RouteStop st : List.of(
+                own(bPlan, 1, RouteStopKind.PICKUP, b, airport), own(bPlan, 2, RouteStopKind.TRANSFER, b, hkg))) {
+            bPlan.getStops().add(st);
+        }
+        when(plans.findByTrip_IdAndStatus(bTrip.getId(), RoutePlanStatus.DRAFT)).thenReturn(Optional.of(bPlan));
+
+        service.copyJobStops(bTrip, trip, b);
+
+        assertThat(draft.getStops())
+                .extracting(s -> s.getKind() + " " + s.getJob().getCode())
+                .containsExactly(
+                        "PICKUP CBRT-2026-042",
+                        "PICKUP CBRT-2026-041",
+                        "TRANSFER CBRT-2026-041",
+                        "TRANSFER CBRT-2026-042");
+        assertThat(draft.getLegs()).extracting(l -> l.getMode().name()).containsExactly("ROAD", "AIR", "ROAD");
+    }
+
+    private static RouteStop own(RoutePlan plan, int seq, RouteStopKind kind, TransportJob job, Place place) {
+        RouteStop stop = new RouteStop();
+        stop.setId(UUID.randomUUID());
+        stop.setRoutePlan(plan);
+        stop.setSeq((short) seq);
+        stop.setKind(kind);
+        stop.setJob(job);
+        stop.setPlace(place);
+        return stop;
+    }
 }
