@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { corridorApi, jobApi, jobsListApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
+import { useAuthStore } from '@/stores/authStore';
 import {
   type FlightAllocationInput,
   type JobDetail,
@@ -11,6 +12,7 @@ import {
   type JobSummary,
   type TripLoad,
   type MoveHorse,
+  RoleNameEnum,
 } from '@/interfaces';
 
 /** The Jobs list's paging, sort and search (as Users & roles); `filter` is the active tab. */
@@ -243,7 +245,20 @@ export const useShareSuggestions = (jobId: string, enabled: boolean) => {
     queryKey: [...jobKey(jobId, trip), 'share-suggestions'],
     queryFn: () => jobApi.getShareSuggestions(jobId, trip),
     enabled: Boolean(jobId) && enabled,
+    // A side panel: a refusal is shown in it, never sent to the page's error boundary.
+    throwOnError: false,
   });
+};
+
+/**
+ * Whether the signed-in staff member plans trips: the fleet & route coordinator or the logistics manager, the roles
+ * the sharing and chain endpoints allow. Other staff see a job's trip but not the controls that change it.
+ */
+export const useCanPlanTrips = () => {
+  const roles = useAuthStore((state) => state.roles) as string[];
+  return (
+    roles.includes(RoleNameEnum.FLEET_COORDINATOR) || roles.includes(RoleNameEnum.LOGISTICS_MANAGER)
+  );
 };
 
 /** Puts another job on this job's trip; both jobs' plans reopen. */

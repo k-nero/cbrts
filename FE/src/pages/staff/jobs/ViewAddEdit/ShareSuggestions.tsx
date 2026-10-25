@@ -4,7 +4,7 @@ import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { allowedDays, day } from './tripJobs';
 
 import { Button } from '@/components/ui';
-import { useShareSuggestions, useShareTrip } from '@/hooks/useJob';
+import { useCanPlanTrips, useShareSuggestions, useShareTrip } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
 
@@ -15,7 +15,9 @@ import { apiErrorMessage } from '@/lib/utils/error';
  */
 export function ShareSuggestions({ job }: { job: JobDetail }) {
   const { message } = App.useApp();
-  const beforeDeparture = job.tripStatus === 'NOT_STARTED';
+  // Only the roles that plan trips may load suggestions (US-F3-13); the others never ask.
+  const canPlan = useCanPlanTrips();
+  const beforeDeparture = job.tripStatus === 'NOT_STARTED' && canPlan;
   const suggestions = useShareSuggestions(job.id, beforeDeparture);
   const share = useShareTrip(job.id);
 

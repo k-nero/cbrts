@@ -7,7 +7,7 @@ import { OnTheRoad } from './OnTheRoad';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
-import { useRemoveChainedTrip, useRoutePlans } from '@/hooks/useJob';
+import { useCanPlanTrips, useRemoveChainedTrip, useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail, RouteStop, RouteStopKind } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
@@ -31,6 +31,8 @@ export function RouteTab({ job }: Props) {
   const part = index < 0 ? null : job.parts[index];
   const before = index > 0 && job.parts[index - 1].handsOn ? job.parts[index - 1] : null;
   const departed = (part?.status ?? job.tripStatus) !== 'NOT_STARTED';
+  // Splitting the journey, taking a trip out and sharing are the trip planners' (US-F3-16, US-F3-11).
+  const planning = useCanPlanTrips() && !departed;
 
   const takeOut = () =>
     modal.confirm({
@@ -59,7 +61,7 @@ export function RouteTab({ job }: Props) {
             The horses join this trip when the trip before hands them on at its transfer stop; it
             can’t depart before then.
           </span>
-          {!departed && (
+          {planning && (
             <div>
               <Button variant="secondary" size="sm" onClick={takeOut}>
                 Take this trip out of the journey
@@ -72,7 +74,7 @@ export function RouteTab({ job }: Props) {
 
   // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13).
   const sharePanel =
-    job.tripStatus === 'NOT_STARTED' ? (
+    job.tripStatus === 'NOT_STARTED' && planning ? (
       <Panel title="Could share this trailer" className="p-4">
         <ShareSuggestions job={job} />
       </Panel>
@@ -193,7 +195,7 @@ export function RouteTab({ job }: Props) {
             const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
 
             // Before departure, the journey can continue on another trip from an airport or quarantine stop.
-            const canSplit = !departed && SPLITS.includes(stop.kind);
+            const canSplit = planning && SPLITS.includes(stop.kind);
             return (
               <TimelineStop
                 key={stop.id}
