@@ -19,10 +19,11 @@ const leaves = (iso: string | null) =>
     : 'Departure not planned yet';
 
 /**
- * Confirmed trips this job's trip could join (US-F3-18): same corridor, route confirmed, not departed, and every check
- * of joining passed. Each row says when it leaves, the room left, the jobs on it and how many are cleared, and the
- * earliest document deadline still open, so a trip waiting on someone's documents is a choice made knowingly. Joining
- * reopens the trip's plans; nothing combines until one is chosen.
+ * Confirmed trips on this job's corridor (US-F3-18), those it could join first. Each row says when it leaves, the jobs
+ * on it and how many are cleared, and the earliest document deadline still open, so a trip waiting on someone's
+ * documents is a choice made knowingly; one it fits adds the days that suit both, the room left and the warnings to
+ * accept. A trip it doesn't fit is greyed out with the reason (dates, room, airports, a private trailer), and can't be
+ * chosen. Joining reopens the trip's plans; nothing combines until one is chosen.
  */
 export function JoinableTrips({ job, enabled }: { job: JobDetail; enabled: boolean }) {
   const { message } = App.useApp();
@@ -41,15 +42,22 @@ export function JoinableTrips({ job, enabled }: { job: JobDetail; enabled: boole
   if (trips.data.length === 0) {
     return (
       <span className="type-body-s text-ink-3">
-        No confirmed trip fits: same corridor, a shared trailer, a departure day both allow, room on
-        the trailers or the flight, and the same airports.
+        No other trip on this corridor has a confirmed route yet.
       </span>
     );
   }
+  const fitting = trips.data.filter((t) => t.fits);
+  const notFitting = trips.data.filter((t) => !t.fits);
 
   return (
     <Flex vertical gap={12}>
-      {trips.data.map((t) => {
+      {fitting.length === 0 && (
+        <span className="type-body-s text-ink-3">
+          No confirmed trip fits yet: same corridor, a shared trailer, a departure day both allow,
+          room on the trailers or the flight, and the same airports. Each says why below.
+        </span>
+      )}
+      {fitting.map((t) => {
         const toAccept = t.warnings.filter((w) => !w.accepted);
         const allCleared = t.jobsCleared === t.jobs.length;
         return (
@@ -118,6 +126,31 @@ export function JoinableTrips({ job, enabled }: { job: JobDetail; enabled: boole
           </div>
         );
       })}
+      {notFitting.length > 0 && (
+        <span className="type-mono-label pt-2 text-ink-3">Can’t join · {notFitting.length}</span>
+      )}
+      {notFitting.map((t) => (
+        // Greyed out: shown so the coordinator sees why, never chosen.
+        <div
+          key={t.tripId}
+          aria-disabled
+          className="rounded-lg border border-line bg-muted/40 p-4 text-ink-3"
+        >
+          <Flex gap={12} align="center" justify="space-between" wrap>
+            <Flex vertical gap={2}>
+              <span className="type-label-s">
+                <span className="font-mono">{t.tripCode}</span> ·{' '}
+                {t.mode === 'AIR' ? 'Flight' : 'Road'} · {t.corridorCode}
+              </span>
+              <span className="type-body-s">
+                {leaves(t.plannedDepartureAt)} · with {t.jobs.join(', ')}
+              </span>
+              <span className="type-body-s text-ink-2">{t.reason}</span>
+            </Flex>
+            <Chip tone="neutral">Doesn’t fit</Chip>
+          </Flex>
+        </div>
+      ))}
     </Flex>
   );
 }

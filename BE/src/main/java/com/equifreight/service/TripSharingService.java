@@ -347,36 +347,28 @@ public class TripSharingService {
     }
 
     /**
-     * The confirmed trips {@code jobId}'s trip {@code tripId} (its current trip when null) could join (US-F3-18): on its
-     * corridor, route confirmed, not departed, with someone on them, and passing every check of joining. Each comes
-     * with the departure days that suit both, the stalls left, the jobs on it, how many of them are cleared and the
-     * earliest document deadline still open, and the biosecurity warnings to accept. A trip that has departed lists
-     * nothing.
+     * The confirmed trips on {@code jobId}'s corridor that its trip {@code tripId} (its current trip when null) could
+     * join (US-F3-18): route confirmed, not departed, with someone on them. Those passing every check of joining come
+     * first, with the departure days that suit both, the stalls left and the biosecurity warnings to accept; the others
+     * follow with the reason they can't be joined. Each names the jobs on it, how many of them are cleared and the
+     * earliest document deadline still open. A trip that has departed lists nothing.
      */
     @Transactional(readOnly = true)
     public List<JoinableTripResponse> joinable(UUID jobId, UUID tripId) {
         TransportJob joining = job(jobId);
         Trip from = jobTrips.tripOf(jobId, tripId);
         if (departed(joining, from)) return List.of();
-        List<JoinableTripResponse> joinable = new ArrayList<>();
+        List<JoinableTripResponse> fitting = new ArrayList<>();
+        List<JoinableTripResponse> notFitting = new ArrayList<>();
         for (Trip trip : trips.findJoinable(from.getCorridor().getId(), from.getId())) {
             List<TransportJob> onTrip = jobTrips.jobsOn(trip);
             if (onTrip.isEmpty()) continue;
-            Days days;
-            try {
-                days = fit(trip, onTrip, joining, from);
-            } catch (BusinessException | ConflictException doesNotFit) {
-                continue;
-            }
-            joinable.add(JoinableTripResponse.builder()
+            JoinableTripResponse.JoinableTripResponseBuilder row = JoinableTripResponse.builder()
                     .tripId(trip.getId())
                     .tripCode(trip.getCode())
                     .corridorCode(trip.getCorridor().getCode())
                     .mode(trip.getCorridor().getMode())
                     .plannedDepartureAt(trip.getPlannedDepartureAt())
-                    .departFrom(days.from())
-                    .departTo(days.to())
-                    .stallsLeft(loadPlans.stallsLeft(trip, joining))
                     .jobs(onTrip.stream().map(TransportJob::getCode).sorted().toList())
                     .jobsCleared((int) onTrip.stream()
                             .filter(j -> j.getDossierStatus() == DossierStatus.CLEARANCE_READY)
@@ -386,11 +378,27 @@ public class TripSharingService {
                             .filter(item -> item.getStatus() != ChecklistStatus.CLEARED && item.getDueDate() != null)
                             .map(ChecklistItem::getDueDate)
                             .min(LocalDate::compareTo)
-                            .orElse(null))
+                            .orElse(null));
+            Days days;
+            try {
+                days = fit(trip, onTrip, joining, from);
+            } catch (BusinessException | ConflictException doesNotFit) {
+                // Listed all the same, so the coordinator sees why: dates, room, airports, a private trailer.
+                notFitting.add(row.fits(false)
+                        .reason(doesNotFit.getMessage())
+                        .warnings(List.of())
+                        .build());
+                continue;
+            }
+            fitting.add(row.fits(true)
+                    .departFrom(days.from())
+                    .departTo(days.to())
+                    .stallsLeft(loadPlans.stallsLeft(trip, joining))
                     .warnings(biosecurity.forJoin(trip, joining))
                     .build());
         }
-        return joinable;
+        fitting.addAll(notFitting);
+        return fitting;
     }
 
     /**

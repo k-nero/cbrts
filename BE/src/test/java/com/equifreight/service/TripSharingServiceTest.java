@@ -186,12 +186,26 @@ class TripSharingServiceTest {
     }
 
     @Test
-    @DisplayName("A trip the job doesn't fit (a private trailer here) isn't listed")
-    void aTripTheJobDoesntFitIsNotListed() {
-        host.getRequest().setTrailer(TrailerType.PRIVATE);
-        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(hostTrip));
+    @DisplayName("A trip the job doesn't fit (a private trailer here) is listed after the others, with the reason")
+    void aTripTheJobDoesntFitShowsWhy() {
+        Trip privateTrip = trip("TRP-2026-007");
+        privateTrip.setCorridor(corridor);
+        TransportJob alone = job("CBRT-2026-047", LocalDate.of(2026, 12, 2), 3, privateTrip);
+        alone.getRequest().setTrailer(TrailerType.PRIVATE);
+        when(jobTrips.jobsOn(privateTrip)).thenReturn(List.of(alone));
+        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(privateTrip, hostTrip));
 
-        assertThat(service.joinable(joining.getId(), null)).isEmpty();
+        List<JoinableTripResponse> listed = service.joinable(joining.getId(), null);
+
+        assertThat(listed).extracting(JoinableTripResponse::tripCode).containsExactly("TRP-2026-001", "TRP-2026-007");
+        assertThat(listed.get(0).fits()).isTrue();
+        assertThat(listed.get(1)).satisfies(t -> {
+            assertThat(t.fits()).isFalse();
+            assertThat(t.reason()).isEqualTo("CBRT-2026-047's customer booked a private trailer, so it travels alone");
+            assertThat(t.departFrom()).isNull();
+            assertThat(t.warnings()).isEmpty();
+            assertThat(t.jobs()).containsExactly("CBRT-2026-047");
+        });
     }
 
     @Test

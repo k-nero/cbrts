@@ -139,13 +139,17 @@ export interface ShareSuggestion {
 /** A confirmed trip a job could join (US-F3-18), with its clearance state and the warnings joining raises. */
 export interface JoinableTrip {
   tripId: string;
+  /** Whether the job passes every check of joining; when not, `reason` says which fails. */
+  fits: boolean;
+  reason: string | null;
   tripCode: string;
   corridorCode: string;
   mode: TransportMode;
   plannedDepartureAt: string | null;
+  /** Null when the job doesn't fit. */
   departFrom: string;
   departTo: string;
-  /** Stalls left on the trailers once the job is on; null for a trip that only flies. */
+  /** Stalls left on the trailers once the job is on; null for a trip that only flies, or one it doesn't fit. */
   stallsLeft: number | null;
   jobs: string[];
   jobsCleared: number;
