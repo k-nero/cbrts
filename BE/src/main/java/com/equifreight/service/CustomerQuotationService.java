@@ -14,6 +14,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationMapper;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
@@ -79,18 +80,24 @@ public class CustomerQuotationService {
         return toResponse(request, latestIssued(requestId));
     }
 
+    public CustomerQuotationResponse accept(User customer, UUID requestId) {
+        return accept(customer, requestId, null);
+    }
+
     /**
      * Accepts the version the club sees (US-F1-06): only while it is the open answer and before it expires. That
      * version becomes ACCEPTED, binding its price and lines, and the request CUSTOMER_ACCEPTED for the logistics
      * manager's approval. The request row is locked first, so a double click or a manager issuing the next version at
-     * the same moment is refused rather than accepted twice.
+     * the same moment is refused rather than accepted twice; a {@code versionNo} the customer read that is no longer
+     * the latest is refused too, so the customer never accepts a price they didn't see (US-Q-07).
      */
     @Transactional
-    public CustomerQuotationResponse accept(User customer, UUID requestId) {
+    public CustomerQuotationResponse accept(User customer, UUID requestId, AcceptRequest body) {
         Club club = clubs.requireClub(customer);
         TransportRequest request = requests.findForUpdate(requestId, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = latestIssued(requestId);
+        requireShown(body == null ? null : body.versionNo(), q);
         Instant now = clock.instant();
         requireOpen(request, q, now);
 
@@ -134,6 +141,7 @@ public class CustomerQuotationService {
         TransportRequest request = requests.findForUpdate(requestId, club.getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = latestIssued(requestId);
+        requireShown(body == null ? null : body.versionNo(), q);
         Instant now = clock.instant();
         requireOpen(request, q, now);
         String reason = body == null || body.reason() == null || body.reason().isBlank()
@@ -172,6 +180,19 @@ public class CustomerQuotationService {
         return quotations
                 .findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(requestId, QuotationStatus.DRAFT)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation for request not issued: " + requestId));
+    }
+
+    /**
+     * The answer names the version the customer read (requote spec §4.2): a newer one issued since is refused before
+     * anything else is checked, so the customer reads it first. {@code versionNo} null skips the check.
+     */
+    private static void requireShown(Integer versionNo, Quotation latest) {
+        if (versionNo != null && versionNo != latest.getVersionNo()) {
+            throw new ConflictException(
+                    "QUOTATION_VERSION_CHANGED",
+                    "Version " + versionNo + " was replaced by version " + latest.getVersionNo()
+                            + ". Read it before you answer.");
+        }
     }
 
     /**

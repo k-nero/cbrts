@@ -3,6 +3,7 @@ package com.equifreight.controller.customer;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.estimate.EstimateResponse;
+import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.request.RequestDraftRequest;
@@ -99,15 +100,19 @@ public class RequestController {
 
     @Operation(
             summary = "Accept the latest issued quotation (US-F1-06): only before it expires; the request becomes"
-                    + " CUSTOMER_ACCEPTED and that version is bound")
+                    + " CUSTOMER_ACCEPTED and that version is bound. An optional body names the version read; 409"
+                    + " QUOTATION_VERSION_CHANGED when a newer one was issued since")
     @PostMapping("/requests/{id}/quotation/accept")
-    public CustomerQuotationResponse accept(@AuthenticationPrincipal User user, @PathVariable UUID id) {
-        return quotations.accept(user, id);
+    public CustomerQuotationResponse accept(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @RequestBody(required = false) AcceptRequest body) {
+        return quotations.accept(user, id, body);
     }
 
     @Operation(
             summary = "Decline the latest issued quotation (US-F1-06), with an optional reason; the request ends"
-                    + " EXPIRED")
+                    + " EXPIRED. {versionNo}, when given, must still be the latest issued version")
     @PostMapping("/requests/{id}/quotation/decline")
     public CustomerQuotationResponse decline(
             @AuthenticationPrincipal User user,
