@@ -78,7 +78,10 @@ public final class RequiredRates {
         requirePolicy(missing, rates, RatePolicyKey.SERVICE_FEE_PCT, "Service fee");
         if (in.mode() == TransportMode.AIR) {
             requirePolicy(missing, rates, RatePolicyKey.FUEL_PCT, "Fuel surcharge");
-            weightLimits(missing, rates);
+            // Weight never prices a line: only a quotation being built needs the limits to check it against.
+            if (in.weightsRequired()) {
+                weightLimits(missing, rates);
+            }
         }
         if (in.insurance() == InsuranceOption.EQUIFREIGHT) {
             requirePolicy(missing, rates, RatePolicyKey.INSURANCE_PCT, "Transit insurance");

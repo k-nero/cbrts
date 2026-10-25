@@ -39,7 +39,10 @@ public class PricingInputs {
         this.sizeClasses = sizeClasses;
     }
 
-    /** {@code weightsRequired}: true for a quotation, false for the customer's estimate on a draft (BR-Q-16). */
+    /**
+     * {@code weightsRequired}: true for a quotation being built or issued; false for the customer's estimate on a draft
+     * and for re-totalling an accepted quotation on the final invoice (BR-Q-16).
+     */
     public PricingInput inputFor(TransportRequest request, ServiceClass airClass, boolean weightsRequired) {
         Corridor corridor = request.getCorridor();
         Place origin = request.getOriginPlace();

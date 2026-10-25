@@ -171,7 +171,8 @@ public class QuotationPricing {
     public PricedTotals totalsWith(Quotation q, TransportRequest request, java.util.Map<UUID, BigDecimal> amounts) {
         RateSet rates = loader.load(q.getRateCatalogVersion().getId())
                 .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
+        // An accepted quotation may predate the weight check (no limits in its pinned version, no snapshot weights).
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), false);
         List<PricedLine> lines = q.getLines().stream()
                 .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
                         .thenComparing(QuotationLine::getPosition))

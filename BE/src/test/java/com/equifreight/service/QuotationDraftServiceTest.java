@@ -301,6 +301,16 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void theFinalInvoiceRetotalsWithoutRequiringWeights() {
+        service.start(yen, request.getId());
+
+        pricing.totalsWith(stored.orElseThrow(), request, new java.util.HashMap<>());
+
+        // BR-Q-16: weight never prices a line, so an accepted quote's totals don't wait on weights or limits.
+        verify(inputs).inputFor(eq(request), any(), eq(false));
+    }
+
+    @Test
     void aReadyQuoteSaysSoAndNamesItsBases() {
         QuotationDraftResponse response = service.start(yen, request.getId()).quotation();
 

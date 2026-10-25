@@ -442,6 +442,28 @@ class QuotePricerTest {
     }
 
     @Test
+    void anAcceptedQuoteRetotalsWithoutWeightsOrLimits() {
+        // An air quote accepted before weights were kept: pinned to a version without the limits, a horse unweighed.
+        PricingInput accepted = estimateOf(air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("Storm", HorseSex.GELDING, "M", 32, "1000", null),
+                        horse("Nightfall", HorseSex.MARE, "M", 32, "1000"))));
+        RateSet pinned = withPolicy(
+                withPolicy(pnhHkgRates(), RatePolicyKey.STALL_PAYLOAD_KG, null),
+                RatePolicyKey.AIR_SHIPMENT_MAX_KG,
+                null);
+        PricedQuote quote = QuotePricer.price(accepted, pinned);
+
+        PricedTotals totals = QuotePricer.retotal(accepted, pinned, quote.lines());
+
+        assertThat(totals.fuel()).isNotNull();
+        assertThat(totals.contingency()).isNotNull();
+        assertThat(totals.serviceFee()).isNotNull();
+        assertThat(totals.total()).isNotNull();
+    }
+
+    @Test
     void roadIsNotWeighed() {
         PricingInput unweighed =
                 road(TrailerType.PRIVATE, 850, 1, List.of(horse("Storm", HorseSex.GELDING, "M", 32, "1000", null)));

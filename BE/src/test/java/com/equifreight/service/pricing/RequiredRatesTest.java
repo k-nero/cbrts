@@ -2,6 +2,7 @@ package com.equifreight.service.pricing;
 
 import static com.equifreight.service.pricing.PricingFixtures.air;
 import static com.equifreight.service.pricing.PricingFixtures.classRow;
+import static com.equifreight.service.pricing.PricingFixtures.estimateOf;
 import static com.equifreight.service.pricing.PricingFixtures.horse;
 import static com.equifreight.service.pricing.PricingFixtures.kmLine;
 import static com.equifreight.service.pricing.PricingFixtures.line;
@@ -312,6 +313,14 @@ class RequiredRatesTest {
                                 null,
                                 "Air shipment weight limit",
                                 "Rate catalog v2 has no air shipment weight limit value."));
+    }
+
+    @Test
+    void theEstimateAndAnAcceptedQuoteNeedNoWeightLimits() {
+        RateSet rates = withoutWeightLimits(pnhHkgRates().classes(), pnhHkgLines());
+
+        assertThat(RequiredRates.forRequest(estimateOf(pnhHkgBusiness()), rates))
+                .isEmpty();
     }
 
     @Test

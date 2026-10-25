@@ -229,6 +229,16 @@ class RequestEstimatorTest {
     }
 
     @Test
+    void aCatalogWithoutTheWeightLimitsStillGivesARange() {
+        policies.removeIf(
+                p -> p.getKey() == RatePolicyKey.STALL_PAYLOAD_KG || p.getKey() == RatePolicyKey.AIR_SHIPMENT_MAX_KG);
+
+        RequestEstimator.View view = estimator.estimate(request(air), resolution(air, Set.of()));
+
+        assertThat(view.result().status()).isEqualTo(EstimateStatus.READY);
+    }
+
+    @Test
     void aDraftOverTheShipmentLimitIsUnavailable() {
         policies.removeIf(p -> p.getKey() == RatePolicyKey.AIR_SHIPMENT_MAX_KG);
         policy(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "1000");
