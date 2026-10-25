@@ -5,12 +5,14 @@ import com.equifreight.entity.enums.TripStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 
 /**
  * One part of a job that spans trips: split by an incident (US-F5-06), or planned as a chain of trips (US-F3-16).
  * Which of its horses are on that trip, where the part stands and when it is planned to leave and arrive.
  * {@code tripCode} is for staff and the crew; the customer tells parts apart by their horses and their route.
  */
+@Builder(toBuilder = true)
 public record TripPartResponse(
         UUID tripId,
         String tripCode,

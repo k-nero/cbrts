@@ -249,7 +249,8 @@ class Flow3ServiceTest {
                 loadPlanRepository,
                 loadPlanStallRepository,
                 auditService,
-                flightService);
+                flightService,
+                routePlanRepository);
         transportJobService = new TransportJobService(
                 transportJobRepository,
                 loadPlanService,
@@ -717,8 +718,11 @@ class Flow3ServiceTest {
         TripVehicle otherVehicle = new TripVehicle();
         otherVehicle.setTrip(otherTrip);
         overlapping.setTripVehicle(otherVehicle);
+        overlapping.setTrip(otherTrip);
+        // Both trips carry the job between 06:00 and 14:00, so the driver can't be on both.
+        lenient().when(jobTrips.jobsOn(any())).thenReturn(List.of(job));
 
-        when(crewAssignmentRepository.findOverlappingAssignments(eq(driverId), eq(trip.getId()), any(), any()))
+        when(crewAssignmentRepository.findOnOtherOpenTrips(driverId, trip.getId()))
                 .thenReturn(List.of(overlapping));
 
         AssignCrewRequest.CrewItem driverItem = AssignCrewRequest.CrewItem.builder()
@@ -762,6 +766,129 @@ class Flow3ServiceTest {
         when(clearanceService.getClearanceStatus(jobId)).thenReturn(gate);
 
         assertThrows(BusinessException.class, () -> transportJobService.signOffTripPlan(jobId, manager));
+    }
+
+    private static RouteStop stop(RouteStopKind kind, String at) {
+        RouteStop st = new RouteStop();
+        st.setKind(kind);
+        st.setPlannedAt(at == null ? null : Instant.parse(at));
+        return st;
+    }
+
+    private static RoutePlan planOf(Trip on, RouteStop... stops) {
+        RoutePlan plan = new RoutePlan();
+        plan.setId(UUID.randomUUID());
+        plan.setTrip(on);
+        plan.setVersionNo((short) 1);
+        plan.getStops().addAll(List.of(stops));
+        return plan;
+    }
+
+    /** The trip before {@code trip} in the job's journey, whose route hands its horses on at BKK airport. */
+    private Trip tripBefore(TransportJob job, RouteStop... stops) {
+        Trip before = new Trip();
+        before.setId(UUID.randomUUID());
+        before.setCode("TRP-2026-000");
+        TripJob part = new TripJob();
+        part.setTrip(before);
+        part.setJob(job);
+        when(jobTrips.partsBefore(trip, job)).thenReturn(List.of(part));
+        when(routePlanRepository.findByTrip_IdAndStatus(before.getId(), RoutePlanStatus.DRAFT))
+                .thenReturn(Optional.of(planOf(before, stops)));
+        return before;
+    }
+
+    private static RouteStop transferAtBkk(String at, Integer stayMin) {
+        Place bkk = new Place();
+        bkk.setId(UUID.randomUUID());
+        bkk.setName("BKK cargo terminal");
+        RouteStop transfer = stop(RouteStopKind.TRANSFER, at);
+        transfer.setPlace(bkk);
+        transfer.setPlannedStayMin(stayMin == null ? null : stayMin.shortValue());
+        return transfer;
+    }
+
+    private TransportJob chainedJob(UUID jobId) {
+        TransportJob job = new TransportJob();
+        job.setId(jobId);
+        job.setCode("CBRT-2026-041");
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        return job;
+    }
+
+    @Test
+    @DisplayName("A later trip of a journey can't collect the horses before the trip before hands them on (US-F3-16)")
+    void routePlan_refusesPickupBeforeThePreviousTransfer() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = chainedJob(jobId);
+        // Handed on at 08:00 after a 24-hour stay, so ready on 19 Oct 08:00 UTC.
+        tripBefore(
+                job,
+                stop(RouteStopKind.PICKUP, "2026-10-17T02:00:00Z"),
+                transferAtBkk("2026-10-18T08:00:00Z", 24 * 60));
+        RoutePlan plan = planOf(
+                trip,
+                stop(RouteStopKind.PICKUP, "2026-10-19T06:00:00Z"),
+                stop(RouteStopKind.DELIVERY, "2026-10-19T12:00:00Z"));
+        when(routePlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+
+        BusinessException refused = assertThrows(
+                BusinessException.class,
+                () -> routePlanService.confirmRoutePlan(jobId, plan.getId(), "Test", new User()));
+        assertThat(refused.getMessage()).contains("BKK cargo terminal", "TRP-2026-000", "19 Oct 15:00");
+    }
+
+    @Test
+    @DisplayName("A later trip of a journey may collect the horses once their stay at the transfer is over")
+    void routePlan_acceptsPickupAfterThePreviousTransferAndStay() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = chainedJob(jobId);
+        tripBefore(
+                job,
+                stop(RouteStopKind.PICKUP, "2026-10-17T02:00:00Z"),
+                transferAtBkk("2026-10-18T08:00:00Z", 24 * 60));
+        RoutePlan plan = planOf(
+                trip,
+                stop(RouteStopKind.PICKUP, "2026-10-19T08:00:00Z"),
+                stop(RouteStopKind.DELIVERY, "2026-10-19T12:00:00Z"));
+        when(routePlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(routePlanRepository.save(any(RoutePlan.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        routePlanService.confirmRoutePlan(jobId, plan.getId(), "Test", new User());
+
+        assertEquals(RoutePlanStatus.CONFIRMED, plan.getStatus());
+    }
+
+    @Test
+    @DisplayName("A trip can't hand the horses on after the next trip of the journey collects them (US-F3-16)")
+    void routePlan_refusesTransferAfterTheNextPickup() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = chainedJob(jobId);
+        when(jobTrips.handsOn(trip, job)).thenReturn(true);
+        Trip next = new Trip();
+        next.setId(UUID.randomUUID());
+        next.setCode("TRP-2026-002");
+        TripJob nextPart = new TripJob();
+        nextPart.setTrip(next);
+        nextPart.setJob(job);
+        when(jobTrips.partAfter(trip, job)).thenReturn(Optional.of(nextPart));
+        when(routePlanRepository.findByTrip_IdAndStatus(next.getId(), RoutePlanStatus.DRAFT))
+                .thenReturn(Optional.empty());
+        when(routePlanRepository.findByTrip_IdAndStatus(next.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(planOf(
+                        next,
+                        stop(RouteStopKind.PICKUP, "2026-10-18T10:00:00Z"),
+                        stop(RouteStopKind.DELIVERY, "2026-10-18T14:00:00Z"))));
+        RoutePlan plan = planOf(
+                trip,
+                stop(RouteStopKind.PICKUP, "2026-10-18T02:00:00Z"),
+                transferAtBkk("2026-10-18T08:00:00Z", 4 * 60));
+        when(routePlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+
+        BusinessException refused = assertThrows(
+                BusinessException.class,
+                () -> routePlanService.confirmRoutePlan(jobId, plan.getId(), "Test", new User()));
+        assertThat(refused.getMessage()).contains("TRP-2026-002", "18 Oct 17:00", "18 Oct 19:00");
     }
 
     @Test
@@ -829,11 +956,43 @@ class Flow3ServiceTest {
     }
 
     @Test
+    @DisplayName("A groom who rides the trailer to the airport is free for the flight of the next trip (US-F3-16)")
+    void crewOverlap_comparesEachTripOfAJourneyOnItsOwnTimes() {
+        Trip road = trip();
+        when(routePlanRepository.findByTrip_IdAndStatus(road.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(planOf(
+                        road,
+                        stop(RouteStopKind.PICKUP, "2026-11-20T00:00:00Z"),
+                        stop(RouteStopKind.TRANSFER, "2026-11-20T06:00:00Z"))));
+        when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(planOf(
+                        trip,
+                        stop(RouteStopKind.PICKUP, "2026-11-20T10:00:00Z"),
+                        stop(RouteStopKind.TRANSFER, "2026-11-20T14:00:00Z"))));
+        CrewAssignment onTheTrailer = new CrewAssignment();
+        onTheTrailer.setTrip(road);
+        UUID groom = UUID.randomUUID();
+        when(crewAssignmentRepository.findOnOtherOpenTrips(groom, trip.getId())).thenReturn(List.of(onTheTrailer));
+
+        assertThat(crewAssignmentService.overlapping(groom, trip)).isEmpty();
+
+        // Had the trailer been planned to reach the airport after the flight left, the groom couldn't be on both.
+        when(routePlanRepository.findByTrip_IdAndStatus(road.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(planOf(
+                        road,
+                        stop(RouteStopKind.PICKUP, "2026-11-20T00:00:00Z"),
+                        stop(RouteStopKind.TRANSFER, "2026-11-20T11:00:00Z"))));
+        assertThat(crewAssignmentService.overlapping(groom, trip)).contains(onTheTrailer);
+    }
+
+    @Test
     @DisplayName("Sign-off refuses a crew member who is on another trip at the same time (US-F3-06)")
     void signOff_refusesOverlappingCrew() {
         TransportJob job = readyJob();
         CrewAssignment busy = new CrewAssignment();
         busy.setTripVehicle(new TripVehicle());
+        busy.setTrip(trip());
+        lenient().when(jobTrips.jobsOn(any())).thenReturn(List.of(job));
         stubPlansAndCrew(job, List.of(busy));
 
         ConflictException ex = assertThrows(
@@ -1039,7 +1198,7 @@ class Flow3ServiceTest {
         CrewAssignment groom = assignment(user("hoa.le@equifreight.vn", RoleName.ESCORT), CrewRole.GROOM);
         lenient().when(crewAssignmentRepository.findByTrip_Id(trip.getId())).thenReturn(List.of(driver, groom));
         lenient()
-                .when(crewAssignmentRepository.findOverlappingAssignments(any(), eq(trip.getId()), any(), any()))
+                .when(crewAssignmentRepository.findOnOtherOpenTrips(any(), eq(trip.getId())))
                 .thenReturn(overlaps);
     }
 

@@ -52,7 +52,12 @@ public class CatalogSeeder {
             new DemoPlace("Chao Phraya Racing Stables", PlaceKind.STABLE, "Bangkok", "TH"),
             new DemoPlace("Vientiane racing stables", PlaceKind.STABLE, "Vientiane", "LA"),
             new DemoPlace("Kuala Lumpur equestrian centre", PlaceKind.STABLE, "Kuala Lumpur", "MY"),
-            new DemoPlace("Sha Tin stables", PlaceKind.STABLE, "Hong Kong", "HK"));
+            new DemoPlace("Sha Tin stables", PlaceKind.STABLE, "Hong Kong", "HK"),
+            // Where a journey of several trips changes carrier (US-F3-16): road to the airport, the flight, road again.
+            new DemoPlace("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.AIRPORT, "Ho Chi Minh City", "VN"),
+            new DemoPlace("Techo International Airport cargo terminal (PNH)", PlaceKind.AIRPORT, "Phnom Penh", "KH"),
+            new DemoPlace(
+                    "Hong Kong International Airport cargo terminal (HKG)", PlaceKind.AIRPORT, "Hong Kong", "HK"));
 
     private static final List<DemoCrossing> CROSSINGS = List.of(
             new DemoCrossing("Mộc Bài – Bavet", "VN", "KH"),
@@ -96,7 +101,9 @@ public class CatalogSeeder {
                     "RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 780, List.of("Cầu Treo – Nam Phao")),
             new DemoCorridor("RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", 1700, List.of()),
             new DemoCorridor("AIR PNH → HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1550, List.of()),
-            new DemoCorridor("AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of()));
+            new DemoCorridor("AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of()),
+            // The road trip after the flight, from Hong Kong airport to the stables (US-F3-16).
+            new DemoCorridor("RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of()));
 
     /** The frames' version numbers; Laos needs 30 days (Request review · Override). */
     private static final List<DemoRegulation> REGULATIONS = List.of(
