@@ -48,7 +48,7 @@ Success means:
 - **Authorities have no API.** Every interaction with veterinary, customs and quarantine authorities happens offline and is recorded by hand by the Transport Specialist. TRACES is an external system the specialist works in, not a document type.
 - **Catalogs are versioned and pinned.** The Country Regulation Catalog is pinned to each job and the rate catalog to each quotation. A later change never silently alters an in-flight case or an issued quote.
 - **Nothing is overwritten.** Re-uploading a document creates a new version, because the history is the legal evidence for a border crossing.
-- **Region.** The demo data and target region are Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong, by road and air. Only routes in the catalog (a corridor with its border crossings and rates) can be estimated or quoted; a customer may still name any city, and a route we don't run is shown as such, with the nearest route we run and a way to ask.
+- **Region.** The demo data and launch region are Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong, by road and air. The region is catalog data, not a limit of the product: countries, places, border crossings, corridors, rates and each country's regulation catalog are all data, so a new country (the United States for a Hong Kong → New York move, say) is added by giving it a regulation catalog, its places and the corridors and rates that reach it, with no change to the flows. Only routes in the catalog (a corridor with its border crossings and rates) can be estimated or quoted; a customer may still name any city, and a route we don't run is shown as such, with the nearest route we run and a way to ask.
 
 ## Capabilities and Constraints
 

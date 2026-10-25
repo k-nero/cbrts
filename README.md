@@ -1,6 +1,6 @@
 # EquiFreight: Cross-Border Racehorse Transport System (CBRTS)
 
-SWP391 project. Racing clubs request road or air transport for their horses across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
+SWP391 project. Racing clubs request road or air transport for their horses across borders, starting with Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong; the countries are catalog data. Staff turn each request into a legally movable, priced and staffed job, then carry it through clearance, planning, the trip and handover.
 
 ## Layout
 

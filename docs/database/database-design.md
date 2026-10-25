@@ -152,7 +152,7 @@ erDiagram
 
 | Table | Columns | Notes |
 |---|---|---|
-| `countries` | `code char(2) primary key`, `name` | VN, KH, TH, LA, MY, HK. The one table keyed by a natural code. |
+| `countries` | `code char(2) primary key`, `name` | ISO 3166-1 alpha-2. Seeded with the launch region: VN, KH, TH, LA, MY, HK; any other country is added as a row, with its regulation catalog (section 7). The one table keyed by a natural code. |
 | `places` | `name`, `kind`, `city`, `country_code`, `address` | `kind`: `TRAINING_CENTRE`, `STUD`, `RACECOURSE`, `STABLE`, `AIRPORT`, `CARGO_TERMINAL`, `QUARANTINE`, `WELFARE_STOP`. |
 | `border_crossings` | `name`, `from_country`, `to_country`, `road_only boolean` | "Mộc Bài – Bavet", "Poipet – Aranyaprathet". |
 | `corridors` | `code` unique, `mode`, `origin_city`, `destination_city`, `distance_km`, `date_flex_days` | `mode`: `ROAD`, `AIR`. "RD HCM → PNH", "AIR PNH → HKG". `date_flex_days` smallint not null default 3, check 0–7 (#115): how far a request's flexible dates can move on this route, set by the fleet & route coordinator; 0 means fixed dates only. |
