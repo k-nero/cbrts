@@ -97,6 +97,7 @@ class TripSharingServiceTest {
         job.setTripStatus(TripStatus.NOT_STARTED);
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(eq(job.getId()), isNull())).thenReturn(trip);
         return job;
     }
 
@@ -217,6 +218,7 @@ class TripSharingServiceTest {
         Corridor other = new Corridor();
         other.setId(UUID.randomUUID());
         joining.getRequest().setCorridor(other);
+        joiningTrip.setCorridor(other);
 
         assertThrows(BusinessException.class, () -> service.share(host.getId(), joining.getId(), List.of(), khoi));
         verify(jobTrips, never()).moveJob(any(), any(), any());
@@ -305,7 +307,7 @@ class TripSharingServiceTest {
         TripHorse joiningHorse = horse(hostTrip, joining);
         when(jobTrips.horsesOn(hostTrip)).thenReturn(List.of(horse(hostTrip, host), joiningHorse));
         Trip own = trip("TRP-2026-003");
-        when(jobTrips.newTripFor(joining, khoi, NOW)).thenReturn(own);
+        when(jobTrips.newTrip(corridor, khoi, NOW)).thenReturn(own);
         joining.setSignedOffAt(NOW);
 
         service.takeOff(host.getId(), joining.getId(), khoi);
@@ -333,7 +335,7 @@ class TripSharingServiceTest {
     @DisplayName("A job alone on its trip has nothing to be taken off")
     void aJobAloneStays() {
         assertThrows(BusinessException.class, () -> service.takeOff(host.getId(), host.getId(), khoi));
-        verify(jobTrips, never()).newTripFor(any(), any(), any());
+        verify(jobTrips, never()).newTrip(any(), any(), any());
     }
 
     // ---------- suggestions (US-F3-13) ----------

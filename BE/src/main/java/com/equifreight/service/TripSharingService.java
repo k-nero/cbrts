@@ -107,9 +107,9 @@ public class TripSharingService {
         return jobs.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
     }
 
-    /** Whether the job's part on its current trip has left: after that, only an incident moves it (US-F5-06). */
-    private boolean departed(TransportJob job) {
-        return jobTrips.partDeparted(jobTrips.tripOf(job.getId()), job);
+    /** Whether the job's part on {@code trip} has left: after that, only an incident moves it (US-F5-06). */
+    private boolean departed(TransportJob job, Trip trip) {
+        return jobTrips.partDeparted(trip, job);
     }
 
     private static void requireShared(TransportJob job) {
@@ -126,10 +126,16 @@ public class TripSharingService {
      */
     @Transactional(readOnly = true)
     public List<ShareSuggestionResponse> suggestions(UUID jobId) {
+        return suggestions(jobId, null);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional(readOnly = true)
+    public List<ShareSuggestionResponse> suggestions(UUID jobId, UUID tripId) {
         TransportJob host = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<TransportJob> onTrip = jobsOn(trip, host);
-        if (onTrip.stream().anyMatch(this::departed)) return List.of();
+        if (onTrip.stream().anyMatch(j -> departed(j, trip))) return List.of();
         List<UUID> onTripIds = onTrip.stream().map(TransportJob::getId).toList();
         LocalDate planned = trip.getPlannedDepartureAt() == null
                 ? null
@@ -170,18 +176,15 @@ public class TripSharingService {
      */
     private Days fit(Trip trip, List<TransportJob> onTrip, TransportJob joining, Trip from) {
         for (TransportJob j : onTrip) {
-            if (departed(j)) throw new BusinessException("Trip " + trip.getCode() + " has departed");
+            if (departed(j, trip)) throw new BusinessException("Trip " + trip.getCode() + " has departed");
         }
-        if (departed(joining)) throw new BusinessException(joining.getCode() + " has departed");
+        if (departed(joining, from)) throw new BusinessException(joining.getCode() + " has departed");
 
         for (TransportJob j : onTrip) requireShared(j);
         requireShared(joining);
 
-        if (joining.getRequest().getCorridor() == null
-                || !joining.getRequest()
-                        .getCorridor()
-                        .getId()
-                        .equals(trip.getCorridor().getId())) {
+        // The corridor of the trip the joining job is on: its request's, or one trip of its chain's (US-F3-16).
+        if (!from.getCorridor().getId().equals(trip.getCorridor().getId())) {
             throw new BusinessException(joining.getCode() + " travels on another corridor than trip " + trip.getCode());
         }
 
@@ -238,9 +241,16 @@ public class TripSharingService {
     @Transactional
     public ShareTripResponse share(
             UUID hostJobId, UUID joiningJobId, Collection<String> acceptedWarnings, User currentUser) {
+        return share(hostJobId, null, joiningJobId, acceptedWarnings, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public ShareTripResponse share(
+            UUID hostJobId, UUID tripId, UUID joiningJobId, Collection<String> acceptedWarnings, User currentUser) {
         TransportJob host = job(hostJobId);
         TransportJob joining = job(joiningJobId);
-        Trip trip = jobTrips.tripOf(hostJobId);
+        Trip trip = jobTrips.tripOf(hostJobId, tripId);
         Trip from = jobTrips.tripOf(joiningJobId);
         if (from.getId().equals(trip.getId())) {
             throw new BusinessException(joining.getCode() + " is already on trip " + trip.getCode());
@@ -296,7 +306,13 @@ public class TripSharingService {
      */
     @Transactional(readOnly = true)
     public List<BiosecurityWarningResponse> warnings(UUID jobId, UUID withJobId) {
-        Trip trip = jobTrips.tripOf(jobId);
+        return warnings(jobId, null, withJobId);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional(readOnly = true)
+    public List<BiosecurityWarningResponse> warnings(UUID jobId, UUID tripId, UUID withJobId) {
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         return withJobId == null ? biosecurity.forTrip(trip) : biosecurity.forJoin(trip, job(withJobId));
     }
 
@@ -306,9 +322,15 @@ public class TripSharingService {
      */
     @Transactional
     public TripJobResponse takeOff(UUID hostJobId, UUID leavingJobId, User currentUser) {
+        return takeOff(hostJobId, null, leavingJobId, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripJobResponse takeOff(UUID hostJobId, UUID tripId, UUID leavingJobId, User currentUser) {
         job(hostJobId);
         TransportJob leaving = job(leavingJobId);
-        Trip trip = jobTrips.tripOf(hostJobId);
+        Trip trip = jobTrips.tripOf(hostJobId, tripId);
         List<TransportJob> onTrip = jobTrips.jobsOn(trip);
         if (onTrip.stream().noneMatch(j -> j.getId().equals(leavingJobId))) {
             throw new BusinessException(leaving.getCode() + " is not on trip " + trip.getCode());
@@ -317,7 +339,7 @@ public class TripSharingService {
             throw new BusinessException(leaving.getCode() + " already travels alone on trip " + trip.getCode());
         }
         for (TransportJob j : onTrip) {
-            if (departed(j)) {
+            if (departed(j, trip)) {
                 throw new BusinessException("Trip " + trip.getCode()
                         + " has departed: a job leaves a moving trip only through an incident");
             }
@@ -328,7 +350,8 @@ public class TripSharingService {
                 .map(th -> th.getHorse().getId())
                 .toList();
         loadPlans.unload(trip, horses);
-        Trip own = jobTrips.newTripFor(leaving, currentUser, clock.instant());
+        // On the trip's corridor: one trip of the leaving job's chain keeps its own (US-F3-16).
+        Trip own = jobTrips.newTrip(trip.getCorridor(), currentUser, clock.instant());
         jobTrips.moveJob(leaving, trip, own);
         leaveBehind(trip, leaving, leaving.getCode() + " taken off the trip");
         leaving.setSignedOffAt(null);

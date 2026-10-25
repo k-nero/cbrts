@@ -15,4 +15,7 @@ public interface TripJobRepository extends JpaRepository<TripJob, UUID> {
     List<TripJob> findByJob_IdOrderByCreatedAt(UUID jobId);
 
     List<TripJob> findByTrip_Id(UUID tripId);
+
+    /** The parts that hand on to {@code nextId} (US-F3-16): one, or more after an incident split the trip before. */
+    List<TripJob> findByNext_IdOrderByCreatedAt(UUID nextId);
 }
