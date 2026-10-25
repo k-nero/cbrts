@@ -108,11 +108,19 @@ export const useQuotation = (requestId: string | undefined, version?: number) =>
       query.state.data === undefined && (error as AxiosError).response?.status !== 404,
   });
 
+/**
+ * The version on screen, sent with every draft write that isn't addressed by a line id: a write on a
+ * version that moved on answers 409 QUOTATION_VERSION_CHANGED instead of landing on one nobody saw.
+ */
+type Shown = { version: number };
+
 /** A quotation write: its answer becomes the builder's data, and the review reloads (status, quotation). */
-const useQuotationWrite = <V>(write: (requestId: string, value: V) => Promise<QuotationDraft>) => {
+const useQuotationWrite = <V, E = object>(
+  write: (vars: { requestId: string; value: V } & E) => Promise<QuotationDraft>,
+) => {
   const qc = useQueryClient();
-  return useMutation<QuotationDraft, unknown, { requestId: string; value: V }>({
-    mutationFn: ({ requestId, value }) => write(requestId, value),
+  return useMutation<QuotationDraft, unknown, { requestId: string; value: V } & E>({
+    mutationFn: write,
     onSuccess: (draft, { requestId }) => {
       const latest = queryKeys.staffRequests.quotation(requestId);
       qc.setQueryData(latest, draft);
@@ -128,41 +136,51 @@ const useQuotationWrite = <V>(write: (requestId: string, value: V) => Promise<Qu
   });
 };
 
-export const useStartQuotation = () => useQuotationWrite<void>((id) => startQuotation(id));
+export const useStartQuotation = () =>
+  useQuotationWrite<void>(({ requestId }) => startQuotation(requestId));
 
 export const useChangeQuotationClass = () =>
-  useQuotationWrite<ServiceClass>((id, airClass) => changeQuotationClass(id, airClass));
+  useQuotationWrite<ServiceClass, Shown>(({ requestId, value, version }) =>
+    changeQuotationClass(requestId, value, version),
+  );
 
-export const useRepriceQuotation = () => useQuotationWrite<void>((id) => repriceQuotation(id));
+export const useRepriceQuotation = () =>
+  useQuotationWrite<void, Shown>(({ requestId, version }) => repriceQuotation(requestId, version));
 
 export const useOverrideLine = () =>
-  useQuotationWrite<{ lineId: string; body: OverrideInput }>((id, v) =>
-    overrideLine(id, v.lineId, v.body),
+  useQuotationWrite<{ lineId: string; body: OverrideInput }>(({ requestId, value }) =>
+    overrideLine(requestId, value.lineId, value.body),
   );
 
 export const useRemoveOverride = () =>
-  useQuotationWrite<string>((id, lineId) => removeOverride(id, lineId));
+  useQuotationWrite<string>(({ requestId, value }) => removeOverride(requestId, value));
 
-export const useAddLine = () => useQuotationWrite<ManualLineInput>((id, body) => addLine(id, body));
+export const useAddLine = () =>
+  useQuotationWrite<ManualLineInput, Shown>(({ requestId, value, version }) =>
+    addLine(requestId, value, version),
+  );
 
 export const useEditLine = () =>
-  useQuotationWrite<{ lineId: string; body: ManualLineInput }>((id, v) =>
-    editLine(id, v.lineId, v.body),
+  useQuotationWrite<{ lineId: string; body: ManualLineInput }>(({ requestId, value }) =>
+    editLine(requestId, value.lineId, value.body),
   );
 
 export const useRemoveLine = () =>
-  useQuotationWrite<string>((id, lineId) => removeLine(id, lineId));
+  useQuotationWrite<string>(({ requestId, value }) => removeLine(requestId, value));
 
 export const useIssueQuotation = () =>
-  useQuotationWrite<string | null>((id, changeNote) => issueQuotation(id, changeNote));
+  useQuotationWrite<string | null, Shown>(({ requestId, value, version }) =>
+    issueQuotation(requestId, value, version),
+  );
 
-export const useReviseQuotation = () => useQuotationWrite<void>((id) => reviseQuotation(id));
+export const useReviseQuotation = () =>
+  useQuotationWrite<void>(({ requestId }) => reviseQuotation(requestId));
 
 /** Discard a revision: the latest version is the one it came from again, so every view reloads. */
 export const useDiscardRevision = () => {
   const qc = useQueryClient();
-  return useMutation<void, unknown, { requestId: string }>({
-    mutationFn: ({ requestId }) => discardRevision(requestId),
+  return useMutation<void, unknown, { requestId: string } & Shown>({
+    mutationFn: ({ requestId, version }) => discardRevision(requestId, version),
     onSuccess: (_, { requestId }) => {
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.quotations(requestId) });
       void qc.invalidateQueries({ queryKey: queryKeys.staffRequests.one(requestId), exact: true });

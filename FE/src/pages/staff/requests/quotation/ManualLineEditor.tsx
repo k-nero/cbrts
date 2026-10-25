@@ -17,11 +17,13 @@ import type { QuoteLineRow } from '@/interfaces';
 export const ManualLineEditor: FC<{
   requestId: string;
   group: string;
+  /** The version on screen; an added line names it (an edited line's id already does). */
+  version: number;
   editing: QuoteLineRow | null;
   currency: string;
   run: RunWrite;
   onClose: () => void;
-}> = ({ requestId, group, editing, currency, run, onClose }) => {
+}> = ({ requestId, group, version, editing, currency, run, onClose }) => {
   const add = useAddLine();
   const edit = useEditLine();
   // Set once when the editor opens: a background refetch hands the ledger a new line object, and resetting
@@ -56,7 +58,7 @@ export const ManualLineEditor: FC<{
           () => edit.mutateAsync({ requestId, value: { lineId: editing.id, body } }),
           'Line saved',
         )
-      : await run(() => add.mutateAsync({ requestId, value: body }), 'Line added');
+      : await run(() => add.mutateAsync({ requestId, value: body, version }), 'Line added');
     if (ok) onClose();
   });
 

@@ -6,6 +6,8 @@ import {
   changedSince,
   classOptions,
   conflictMessage,
+  declinedBefore,
+  declinedTitle,
   depositText,
   issueBlocker,
   statusActions,
@@ -19,7 +21,7 @@ import {
   repriceOffer,
 } from './quotation';
 
-import type { QuotationDraft, StallFit } from '@/interfaces';
+import type { QuotationDraft, QuotationVersion, StallFit } from '@/interfaces';
 
 describe('money', () => {
   test('dollars with grouping and cents', () => {
@@ -350,5 +352,54 @@ describe('statusActions', () => {
     expect(
       statusActions({ versionNo: 1, status: 'EXPIRED', versions: [v(1, 'EXPIRED')] }).canRevise,
     ).toBe(true);
+  });
+});
+
+describe('declinedBefore', () => {
+  const version = (versionNo: number, status: QuotationVersion['status']): QuotationVersion => ({
+    versionNo,
+    status,
+    issuedAt: '2026-10-20T04:00:00Z',
+    validUntil: '2026-10-27T16:59:59.999Z',
+    total: 8756.73,
+    supersededReason: null,
+    declinedAt: status === 'DECLINED' ? '2026-10-24T03:00:00Z' : null,
+    declineReason: status === 'DECLINED' ? 'Too dear' : null,
+  });
+
+  test('the version a draft came from, when the customer declined it', () => {
+    const v1 = version(1, 'DECLINED');
+    expect(declinedBefore([version(2, 'DRAFT'), v1], 2)).toBe(v1);
+  });
+
+  test('nothing when that version only expired, or for the first version', () => {
+    expect(declinedBefore([version(2, 'DRAFT'), version(1, 'EXPIRED')], 2)).toBeNull();
+    expect(declinedBefore([version(1, 'DRAFT')], 1)).toBeNull();
+  });
+});
+
+describe('declinedTitle', () => {
+  const declined = (reason: string | null) => ({
+    versionNo: 1,
+    declinedAt: '2026-10-24T03:00:00Z',
+    declineReason: reason,
+  });
+
+  test('the date, the reason and the closed request (spec §5.1)', () => {
+    expect(declinedTitle(declined('Too dear'), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026: Too dear. REQ-2026-0202 is closed.',
+    );
+  });
+
+  test('a reason that ends its own sentence is not doubled', () => {
+    expect(declinedTitle(declined('Too dear.'), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026: Too dear. REQ-2026-0202 is closed.',
+    );
+  });
+
+  test('without a reason', () => {
+    expect(declinedTitle(declined(null), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026. REQ-2026-0202 is closed.',
+    );
   });
 });

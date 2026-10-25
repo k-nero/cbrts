@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import type { CustomerQuoteGroup } from '@/interfaces';
+import type { CustomerQuotation, CustomerQuoteGroup } from '@/interfaces';
 
 import {
   quotedPassChip,
@@ -123,11 +123,35 @@ describe('deadlineText', () => {
 });
 
 describe('owedKind', () => {
+  const today = '2026-10-25';
+  const q = (
+    status: CustomerQuotation['status'],
+    departureDate: string | null = '2026-11-20',
+    nextVersion: number | null = null,
+  ) => ({ status, nextVersion, request: { departureDate } });
+
   test('only an issued quotation waits for an answer', () => {
-    expect(owedKind('ISSUED')).toBe('answer');
-    expect(owedKind('EXPIRED')).toBe('expired');
-    expect(owedKind('ACCEPTED')).toBe('accepted');
-    expect(owedKind('DECLINED')).toBe('declined');
+    expect(owedKind(q('ISSUED'), today)).toBe('answer');
+    expect(owedKind(q('ACCEPTED'), today)).toBe('accepted');
+    expect(owedKind(q('DECLINED'), today)).toBe('declined');
+  });
+
+  test('a decline is final, even with a draft left behind', () => {
+    expect(owedKind(q('DECLINED', '2026-11-20', 3), today)).toBe('declined');
+  });
+
+  test('expired before the departure, the customer can ask for a re-quote (A4)', () => {
+    expect(owedKind(q('EXPIRED', '2026-10-26'), today)).toBe('requote');
+  });
+
+  test('once asked, the next version is being prepared', () => {
+    expect(owedKind(q('EXPIRED', '2026-11-20', 3), today)).toBe('requoting');
+  });
+
+  test('a departure today or before leaves nothing to re-quote', () => {
+    expect(owedKind(q('EXPIRED', '2026-10-25'), today)).toBe('expired');
+    expect(owedKind(q('EXPIRED', '2026-10-01'), today)).toBe('expired');
+    expect(owedKind(q('EXPIRED', null), today)).toBe('expired');
   });
 });
 

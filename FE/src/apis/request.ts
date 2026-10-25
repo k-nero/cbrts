@@ -44,13 +44,37 @@ export const getEstimate = (input: RequestDraftInput): Promise<Estimate> =>
 export const getCustomerQuotation = (id: string): Promise<CustomerQuotation> =>
   client.get<CustomerQuotation>(`${BASE}/${id}/quotation`).then((r) => r.data);
 
-/** Accept the latest issued quotation before it expires (US-F1-06); the request becomes CUSTOMER_ACCEPTED. */
-export const acceptQuotation = (id: string): Promise<CustomerQuotation> =>
-  client.post<CustomerQuotation>(`${BASE}/${id}/quotation/accept`).then((r) => r.data);
+/**
+ * Accept the version the customer read, before it expires (US-F1-06); the request becomes
+ * CUSTOMER_ACCEPTED. 409 QUOTATION_VERSION_CHANGED when a newer version was issued since.
+ */
+export const acceptQuotation = (id: string, versionNo: number): Promise<CustomerQuotation> =>
+  client
+    .post<CustomerQuotation>(`${BASE}/${id}/quotation/accept`, { versionNo })
+    .then((r) => r.data);
 
-/** Decline the latest issued quotation, with an optional reason; the request ends EXPIRED. */
-export const declineQuotation = (id: string, reason: string | null): Promise<CustomerQuotation> =>
-  client.post<CustomerQuotation>(`${BASE}/${id}/quotation/decline`, { reason }).then((r) => r.data);
+/** Decline the version the customer read, with an optional reason; the request ends EXPIRED. */
+export const declineQuotation = (
+  id: string,
+  reason: string | null,
+  versionNo: number,
+): Promise<CustomerQuotation> =>
+  client
+    .post<CustomerQuotation>(`${BASE}/${id}/quotation/decline`, { reason, versionNo })
+    .then((r) => r.data);
+
+/**
+ * Ask for a re-quote of an expired quotation (A4), with an optional note: the next version is
+ * drafted for the logistics manager. Answers the expired version, with `nextVersion` set.
+ */
+export const requestQuote = (
+  id: string,
+  versionNo: number,
+  note: string | null,
+): Promise<CustomerQuotation> =>
+  client
+    .post<CustomerQuotation>(`${BASE}/${id}/quotation/requote`, { versionNo, note })
+    .then((r) => r.data);
 
 /** Cancel a submitted request before approval; the fee band follows the days left (BR-F1-07). */
 export const cancelRequest = (id: string): Promise<TransportRequest> =>

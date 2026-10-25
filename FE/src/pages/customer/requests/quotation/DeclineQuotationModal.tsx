@@ -11,14 +11,16 @@ import BaseModal from '@/components/modal/BaseModal';
 import { Callout } from '@/components/ui';
 import { useDeclineQuotation } from '@/hooks/request';
 import type { CustomerQuotation } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
+import { apiErrorCode, apiErrorMessage } from '@/lib/utils';
 
 /** Decline the quotation (US-F1-06): it closes the request; the reason is optional. */
 export const DeclineQuotationModal: FC<{
   quotation: CustomerQuotation;
   open: boolean;
   onClose: () => void;
-}> = ({ quotation, open, onClose }) => {
+  /** A newer version was issued since the page loaded: the panel says so and reloads it. */
+  onVersionChanged: (sentence: string) => void;
+}> = ({ quotation, open, onClose, onVersionChanged }) => {
   const { message } = App.useApp();
   const decline = useDeclineQuotation(quotation.request.id);
   const manager = quotation.preparedBy?.name ?? 'the logistics manager';
@@ -34,12 +36,20 @@ export const DeclineQuotationModal: FC<{
   };
 
   const onSubmit = methods.handleSubmit((v) =>
-    decline.mutate(v.reason || null, {
-      onSuccess: () => {
-        message.success(`You declined version ${quotation.versionNo}.`);
-        close();
+    decline.mutate(
+      { reason: v.reason || null, versionNo: quotation.versionNo },
+      {
+        onSuccess: () => {
+          message.success(`You declined version ${quotation.versionNo}.`);
+          close();
+        },
+        onError: (error) => {
+          if (apiErrorCode(error) !== 'QUOTATION_VERSION_CHANGED') return;
+          close();
+          onVersionChanged(apiErrorMessage(error, 'A newer version was issued. Read it first.'));
+        },
       },
-    }),
+    ),
   );
 
   return (

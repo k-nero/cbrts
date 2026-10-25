@@ -14,6 +14,7 @@ import {
   queueWords,
   reviewSubject,
   reviewSummary,
+  waitingFor,
 } from './review';
 import { formatDayTime } from './time';
 
@@ -210,5 +211,14 @@ describe('teamOption', () => {
     expect(teamOption({ id: 'b', name: 'Đỗ Minh Khôi', openJobs: 0 }).label).toBe(
       'Đỗ Minh Khôi · 0 open jobs',
     );
+  });
+});
+
+describe('waitingFor', () => {
+  test('the queue says what each request waits for', () => {
+    expect(waitingFor('SUBMITTED')).toEqual({ tone: 'info', label: 'Review' });
+    expect(waitingFor('UNDER_REVIEW')).toEqual({ tone: 'info', label: 'Review' });
+    expect(waitingFor('CUSTOMER_ACCEPTED')).toEqual({ tone: 'ok', label: 'Approval' });
+    expect(waitingFor('EXPIRED')).toEqual({ tone: 'warn', label: 'Re-quote' });
   });
 });

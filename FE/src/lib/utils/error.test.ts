@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { apiErrorView, formRefusal } from './error';
+import { apiErrorCode, apiErrorView, formRefusal } from './error';
 
 const FALLBACK = 'Something went wrong. Try again.';
 const refused = (status: number, data: object) => ({ response: { status, data } });
@@ -80,5 +80,20 @@ describe('formRefusal', () => {
       form: 'In use.',
       focus: null,
     });
+  });
+});
+
+describe('apiErrorCode', () => {
+  test('the code a refusal carries', () => {
+    const changed = refused(409, {
+      error: 'QUOTATION_VERSION_CHANGED',
+      message: 'Version 1 was replaced by version 2. Read it before you answer.',
+    });
+    expect(apiErrorCode(changed)).toBe('QUOTATION_VERSION_CHANGED');
+  });
+
+  test('nothing without an ApiError body', () => {
+    expect(apiErrorCode(new Error('Network Error'))).toBeNull();
+    expect(apiErrorCode(undefined)).toBeNull();
   });
 });

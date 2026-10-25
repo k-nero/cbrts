@@ -11,6 +11,7 @@ import {
   getRoutes,
   requestApi,
   requestListApi,
+  requestQuote,
   submitRequest,
 } from '@/apis/request';
 import { queryKeys } from '@/constant/query';
@@ -156,12 +157,12 @@ const useRefreshRequest = () => {
   };
 };
 
-/** Accept the issued quotation (US-F1-06). */
+/** Accept the issued quotation (US-F1-06): the version the customer read. */
 export const useAcceptQuotation = (id: string) => {
   const qc = useQueryClient();
   const refresh = useRefreshRequest();
-  return useMutation<CustomerQuotation, Error, void>({
-    mutationFn: () => acceptQuotation(id),
+  return useMutation<CustomerQuotation, Error, number>({
+    mutationFn: (versionNo) => acceptQuotation(id, versionNo),
     onSuccess: (q) => {
       qc.setQueryData(queryKeys.requests.quotation(id), q);
       refresh(id);
@@ -169,12 +170,25 @@ export const useAcceptQuotation = (id: string) => {
   });
 };
 
-/** Decline the issued quotation, with an optional reason. */
+/** Decline the issued quotation the customer read, with an optional reason. */
 export const useDeclineQuotation = (id: string) => {
   const qc = useQueryClient();
   const refresh = useRefreshRequest();
-  return useMutation<CustomerQuotation, Error, string | null>({
-    mutationFn: (reason) => declineQuotation(id, reason),
+  return useMutation<CustomerQuotation, Error, { reason: string | null; versionNo: number }>({
+    mutationFn: ({ reason, versionNo }) => declineQuotation(id, reason, versionNo),
+    onSuccess: (q) => {
+      qc.setQueryData(queryKeys.requests.quotation(id), q);
+      refresh(id);
+    },
+  });
+};
+
+/** Ask for a re-quote of the expired quotation (A4); the answer carries the drafted `nextVersion`. */
+export const useRequestQuote = (id: string) => {
+  const qc = useQueryClient();
+  const refresh = useRefreshRequest();
+  return useMutation<CustomerQuotation, Error, { versionNo: number; note: string | null }>({
+    mutationFn: ({ versionNo, note }) => requestQuote(id, versionNo, note),
     onSuccess: (q) => {
       qc.setQueryData(queryKeys.requests.quotation(id), q);
       refresh(id);
