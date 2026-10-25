@@ -205,13 +205,13 @@ class RequestProgressServiceTest {
     }
 
     @Test
-    @DisplayName("An expired quotation is re-priced by its manager; a declined one has no next step")
+    @DisplayName("An expired quotation waits for the customer's re-quote (A4); a declined one has no next step")
     void expiredOrDeclined() {
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(quotation(QuotationStatus.EXPIRED)));
         NextStepResponse step = next(RequestStatus.EXPIRED);
-        assertThat(step.action()).isEqualTo("Re-price the quotation from the rate catalog in force now");
-        assertThat(step.owner()).isEqualTo("Vũ Hải Yến, logistics manager");
+        assertThat(step.action()).isEqualTo("Ask for a re-quote of quotation Q-2026-0004 v2");
+        assertThat(step.yours()).isTrue();
 
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(quotation(QuotationStatus.DECLINED)));
@@ -252,16 +252,38 @@ class RequestProgressServiceTest {
     }
 
     @Test
-    @DisplayName("Expired with no draft is unchanged: its manager re-prices it")
-    void expiredWithoutADraftIsUnchanged() {
+    @DisplayName("Expired with no draft, the customer asks for a re-quote by the day before departure")
+    void expiredWithoutADraftIsTheCustomersReQuote() {
+        Quotation expired = quotation(QuotationStatus.EXPIRED);
+        request.setDepartureDate(LocalDate.of(2026, 11, 20));
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(expired));
+        when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
+                .thenReturn(Optional.of(expired));
+
+        NextStepResponse step = next(RequestStatus.EXPIRED);
+
+        assertThat(step.action()).isEqualTo("Ask for a re-quote of quotation Q-2026-0004 v2");
+        assertThat(step.owner()).isEqualTo("You");
+        assertThat(step.yours()).isTrue();
+        assertThat(step.due()).isEqualTo(LocalDate.of(2026, 11, 19));
+    }
+
+    @Test
+    @DisplayName("Expired with the departure today or past, nothing more happens: a re-quote is refused")
+    void expiredAfterTheDepartureHasNoNextStep() {
         Quotation expired = quotation(QuotationStatus.EXPIRED);
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(expired));
         when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
                 .thenReturn(Optional.of(expired));
 
-        assertThat(next(RequestStatus.EXPIRED).action())
-                .isEqualTo("Re-price the quotation from the rate catalog in force now");
+        // 18 Oct 2026 is today in Ho Chi Minh City.
+        request.setDepartureDate(LocalDate.of(2026, 10, 18));
+        assertThat(next(RequestStatus.EXPIRED)).isNull();
+
+        request.setDepartureDate(LocalDate.of(2026, 10, 19));
+        assertThat(next(RequestStatus.EXPIRED)).isNotNull();
     }
 
     @Test

@@ -98,15 +98,28 @@ public class RequestProgressService {
             case EXPIRED ->
                 issued(request)
                         .filter(q -> q.getStatus() != QuotationStatus.DECLINED)
-                        .map(q -> requoting(request)
+                        .flatMap(q -> requoting(request)
                                 .map(draft -> theirs(
                                         "Issue version " + draft.getVersionNo() + " of the quotation", manager(draft)))
-                                .orElseGet(() -> theirs(
-                                        "Re-price the quotation from the rate catalog in force now", manager(q))))
+                                .or(() -> requote(request, q)))
                         .orElse(null);
             case APPROVED ->
                 jobs.findByRequestId(request.getId()).map(this::documents).orElse(null);
         };
+    }
+
+    /**
+     * An expired quotation is priced again only when the customer asks (A4), up to the day before departure, as
+     * {@code CustomerQuotationService.requote} allows; with the departure today or past there is nothing left to do.
+     */
+    private Optional<NextStepResponse> requote(TransportRequest request, Quotation expired) {
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.now(clock.withZone(BusinessTime.ZONE)))) {
+            return Optional.empty();
+        }
+        return Optional.of(yours(
+                "Ask for a re-quote of quotation " + expired.getCode() + " v" + expired.getVersionNo(),
+                departure == null ? null : departure.minusDays(1)));
     }
 
     /** The checklist is generated at approval; the transport specialist checks what the customer sends. */

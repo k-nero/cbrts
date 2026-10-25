@@ -113,13 +113,13 @@ public class QuotationExpiryJob {
             return;
         }
         String manager = q.getPreparedBy() == null
-                ? "The logistics manager"
+                ? "the logistics manager"
                 : q.getPreparedBy().displayName();
         notify(
                 q,
                 NotificationKind.QUOTATION_EXPIRED,
                 "Quotation " + q.getCode() + " has expired",
-                manager + " can re-price it from the rate catalog in force now.");
+                "Ask " + manager + " for a re-quote to have it priced again from the rate catalog in force now.");
     }
 
     private void remind(Quotation q, Instant now) {
