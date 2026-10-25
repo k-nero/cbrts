@@ -1,17 +1,15 @@
 package com.equifreight.model.clearance;
 
 import com.equifreight.entity.enums.RegulationRuleKind;
-import lombok.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 
-@Getter
-@Setter
+/** A draft rule's new values; the document type stays. The days follow the kind, as in {@link RegulationRuleRequest}. */
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class RegulationRuleUpdateRequest {
-    private RegulationRuleKind ruleKind;
-    private Short minDays;
-    private Short maxDays;
-    private Boolean mandatory;
-    private String description;
+public record RegulationRuleUpdateRequest(
+        @NotNull RegulationRuleKind ruleKind, Short minDays, Short maxDays, Boolean mandatory, String description) {
+
+    public RegulationRuleUpdateRequest {
+        mandatory = mandatory == null ? Boolean.TRUE : mandatory;
+    }
 }

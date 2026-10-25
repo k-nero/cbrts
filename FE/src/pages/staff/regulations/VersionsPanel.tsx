@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Flex } from 'antd';
 import { Chip, Panel } from '@/components/ui';
 import { CatalogStatusEnum, type RegulationCatalog, type RegulationVersion } from '@/interfaces';
-import { formatDay } from './constants';
+import { catalogCountry, formatDay } from './constants';
 
 /** "Published 22 Sep 2026 by Nguyễn Thị Lan · 3 jobs pinned", from the version's own record. */
 const publishedLine = (version: RegulationVersion) => {
@@ -20,7 +20,7 @@ const publishedLine = (version: RegulationVersion) => {
 const VersionsPanel: FC<{ catalog: RegulationCatalog }> = ({ catalog }) => {
   const versions = [...(catalog.versions ?? [])].sort((a, b) => b.versionNo - a.versionNo);
   return (
-    <Panel title={`Versions · ${catalog.name.replace(' import', '')}`} className="h-full">
+    <Panel title={`Versions · ${catalogCountry(catalog.name)}`} className="h-full">
       <Flex vertical className="divide-y divide-line">
         {versions.map((version) => (
           <div key={version.id} className="py-3">

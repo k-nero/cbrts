@@ -2,16 +2,22 @@ package com.equifreight.model.clearance;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Country;
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.RegulationCatalog;
+import com.equifreight.entity.RegulationRule;
 import com.equifreight.entity.RegulationVersion;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.DocumentScope;
 import com.equifreight.entity.enums.DossierStatus;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
 public final class ClearanceMapper {
 
@@ -69,14 +75,42 @@ public final class ClearanceMapper {
                 .build();
     }
 
-    /** A country's regulation catalog; {@code activeVersion} is its latest published version, or null. */
+    /**
+     * A country's regulation catalog from its versions, newest first. {@code pinnedJobs} counts the jobs pinned to
+     * each version id; a version with none may be absent.
+     */
     public static RegulationCatalogResponse toCatalogResponse(
-            RegulationCatalog catalog, RegulationVersion activeVersion) {
+            RegulationCatalog catalog,
+            String countryCode,
+            List<RegulationVersion> versions,
+            Map<UUID, Long> pinnedJobs) {
+        Function<RegulationVersion, RegulationVersionResponse> summary =
+                v -> toVersionResponse(v, pinnedJobs.getOrDefault(v.getId(), 0L).intValue(), List.of(), 0);
+        RegulationVersion active = versions.stream()
+                .filter(v -> v.getStatus() == CatalogStatus.PUBLISHED)
+                .findFirst()
+                .orElse(null);
+        RegulationVersion draft = versions.stream()
+                .filter(v -> v.getStatus() == CatalogStatus.DRAFT)
+                .findFirst()
+                .orElse(null);
         return RegulationCatalogResponse.builder()
                 .id(catalog.getId())
-                .countryCode(catalog.getCountry() != null ? catalog.getCountry().getCode() : null)
+                .countryCode(countryCode)
                 .name(catalog.getName())
-                .activeVersion(activeVersion != null ? toVersionResponse(activeVersion) : null)
+                .activeVersion(active == null ? null : summary.apply(active))
+                .draftVersion(draft == null ? null : summary.apply(draft))
+                .versions(versions.stream().map(summary).toList())
+                .build();
+    }
+
+    /** A country on the regulation catalog page, with its catalog or null when it has none yet. */
+    public static RegulationCountryResponse toCountryResponse(Country country, RegulationCatalogResponse catalog) {
+        return RegulationCountryResponse.builder()
+                .id(country.getId())
+                .code(country.getCode())
+                .name(country.getName())
+                .catalog(catalog)
                 .build();
     }
 
@@ -190,29 +224,30 @@ public final class ClearanceMapper {
                 .build();
     }
 
-    public static RegulationRuleResponse toRuleResponse(com.equifreight.entity.RegulationRule rule) {
-        if (rule == null) return null;
-        String param = "—";
-        if (rule.getRuleKind() != null) {
-            switch (rule.getRuleKind()) {
-                case VALID_THROUGH_ARRIVAL_PLUS ->
-                    param = rule.getMaxDays() != null ? "arrival + " + rule.getMaxDays() + " d" : "arrival";
-                case BOOSTER_WINDOW ->
-                    param = (rule.getMinDays() != null ? rule.getMinDays() : 0) + "–"
-                            + (rule.getMaxDays() != null ? rule.getMaxDays() : 0) + " d before";
-                case WINDOW_BEFORE_DEPARTURE ->
-                    param = rule.getMaxDays() != null ? "within " + rule.getMaxDays() + " d" : "before departure";
-                case PRESENCE_ONLY -> {
-                    if (rule.getDocumentType() != null
-                            && "CUSTOMS_VALUE_DECLARATION"
-                                    .equals(rule.getDocumentType().getCode())) {
-                        param = "1 per crossing";
-                    } else {
-                        param = "—";
-                    }
-                }
-            }
-        }
+    /** "within 45 d", "arrival + 2 d", "7–180 d before", "1 per crossing" or "—": a rule's parameter in words. */
+    public static String parameterText(RegulationRule rule) {
+        if (rule.getRuleKind() == null) return "—";
+        return switch (rule.getRuleKind()) {
+            case VALID_THROUGH_ARRIVAL_PLUS ->
+                rule.getMaxDays() != null ? "arrival + " + rule.getMaxDays() + " d" : "arrival";
+            case BOOSTER_WINDOW ->
+                (rule.getMinDays() != null ? rule.getMinDays() : 0) + "–"
+                        + (rule.getMaxDays() != null ? rule.getMaxDays() : 0) + " d before";
+            case WINDOW_BEFORE_DEPARTURE ->
+                rule.getMaxDays() != null ? "within " + rule.getMaxDays() + " d" : "before departure";
+            case PRESENCE_ONLY ->
+                rule.getDocumentType() != null && rule.getDocumentType().getScope() == DocumentScope.PER_CROSSING
+                        ? "1 per crossing"
+                        : "—";
+        };
+    }
+
+    /**
+     * A version's rule. {@code diffStatus} and {@code parameterDisplay} come from the service's comparison with the
+     * published version ("within 45 d (was 60 d)").
+     */
+    public static RegulationRuleResponse toRuleResponse(
+            RegulationRule rule, String diffStatus, String parameterDisplay) {
         return RegulationRuleResponse.builder()
                 .id(rule.getId())
                 .documentType(toDocumentTypeResponse(rule.getDocumentType()))
@@ -221,24 +256,28 @@ public final class ClearanceMapper {
                 .minDays(rule.getMinDays())
                 .maxDays(rule.getMaxDays())
                 .description(rule.getDescription())
-                .parameterDisplay(param)
+                .diffStatus(diffStatus)
+                .parameterDisplay(parameterDisplay)
                 .build();
     }
 
-    public static RegulationVersionResponse toVersionResponse(com.equifreight.entity.RegulationVersion rv) {
-        if (rv == null) return null;
-        String pubName = rv.getPublishedBy() != null ? formatUserName(rv.getPublishedBy()) : null;
+    /** A regulation version with the counts and rules the service worked out (empty rules for a list row). */
+    public static RegulationVersionResponse toVersionResponse(
+            RegulationVersion rv, int pinnedJobsCount, List<RegulationRuleResponse> rules, int changesCount) {
         return RegulationVersionResponse.builder()
                 .id(rv.getId())
                 .catalogId(rv.getCatalog() != null ? rv.getCatalog().getId() : null)
                 .versionNo(rv.getVersionNo())
                 .status(rv.getStatus())
                 .publishedAt(rv.getPublishedAt())
-                .publishedByName(pubName)
+                .publishedByName(rv.getPublishedBy() != null ? formatUserName(rv.getPublishedBy()) : null)
                 .leadTimeDays(rv.getLeadTimeDays())
+                .domesticLeadTimeDays(rv.getDomesticLeadTimeDays())
                 .quarantineMinDays(rv.getQuarantineMinDays())
                 .arrivalBufferDays(rv.getArrivalBufferDays())
-                .rules(java.util.List.of())
+                .rules(rules)
+                .pinnedJobsCount(pinnedJobsCount)
+                .changesCount(changesCount)
                 .build();
     }
 

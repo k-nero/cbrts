@@ -82,7 +82,7 @@ export const queryKeys = {
   },
   regulations: {
     all: () => ['regulations'] as const,
-    catalogs: () => ['regulations', 'catalogs'] as const,
+    countries: () => ['regulations', 'countries'] as const,
     version: (id: string) => ['regulations', 'version', id] as const,
     documentTypes: () => ['regulations', 'document-types'] as const,
   },

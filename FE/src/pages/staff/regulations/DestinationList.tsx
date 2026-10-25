@@ -4,10 +4,14 @@ import { SearchOutlined } from '@ant-design/icons';
 import type { DestinationItem } from './constants';
 import { DestinationButton } from './DestinationButton';
 
+import { Button } from '@/components/ui';
+
 type Props = {
   countries: DestinationItem[];
   selectedId: string;
   onSelect: (id: string) => void;
+  /** Opens Add country; absent for a role that only reads the catalogs. */
+  onAdd?: () => void;
 };
 
 const matches = (item: DestinationItem, query: string) =>
@@ -17,15 +21,24 @@ const matches = (item: DestinationItem, query: string) =>
  * The destinations sidebar: one regulation catalog per country. Rules for a crossing live in the
  * country catalog as "Per crossing" documents, so crossings have no catalog of their own.
  */
-const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
+const DestinationList: FC<Props> = ({ countries, selectedId, onSelect, onAdd }) => {
   const [search, setSearch] = useState('');
   const query = search.trim().toLowerCase();
   const shown = query ? countries.filter((c) => matches(c, query)) : countries;
 
   return (
-    <div className="w-full shrink-0 rounded-lg border border-line bg-card p-3 lg:w-64">
+    <div className="w-full rounded-lg border border-line bg-card p-3">
       <Flex vertical gap={12}>
-        <span className="type-h4 px-1 pt-1 text-ink">Destinations</span>
+        <div className="px-1 pt-1">
+          <Flex align="center" justify="space-between" gap={8}>
+            <span className="type-h4 text-ink">Destinations</span>
+            {onAdd && (
+              <Button size="sm" variant="ghost" leadingIcon="plus" onClick={onAdd}>
+                Add country
+              </Button>
+            )}
+          </Flex>
+        </div>
 
         <Input
           prefix={<SearchOutlined className="text-ink-3" />}
@@ -46,7 +59,11 @@ const DestinationList: FC<Props> = ({ countries, selectedId, onSelect }) => {
             />
           ))}
           {shown.length === 0 && (
-            <span className="type-body-s px-1 text-ink-3">No country matches.</span>
+            <span className="type-body-s px-1 text-ink-3">
+              {countries.length === 0
+                ? 'No countries yet. Add the first one.'
+                : 'No country matches.'}
+            </span>
           )}
         </Flex>
       </Flex>

@@ -16,9 +16,14 @@ public interface RegulationRuleRepository
         extends JpaRepository<RegulationRule, UUID>, JpaSpecificationExecutor<RegulationRule> {
 
     /**
-     * Every document rule of one regulation version.
+     * Every document rule of one regulation version, with its document type.
      */
+    @EntityGraph(attributePaths = "documentType")
     List<RegulationRule> findByVersionId(UUID versionId);
+
+    boolean existsByVersionIdAndDocumentTypeId(UUID versionId, UUID documentTypeId);
+
+    long countByVersionId(UUID versionId);
 
     /**
      * The mandatory rules of one version.

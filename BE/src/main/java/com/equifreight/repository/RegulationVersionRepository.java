@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.CatalogStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -20,6 +21,12 @@ public interface RegulationVersionRepository
      * Every version of one country's catalog.
      */
     List<RegulationVersion> findByCatalogId(UUID catalogId);
+
+    /**
+     * Every version of every catalog with its publisher, newest version first: the catalog list, in one query.
+     */
+    @EntityGraph(attributePaths = "publishedBy")
+    List<RegulationVersion> findAllByOrderByVersionNoDesc();
 
     /**
      * A catalog's versions in one status, newest version first.
