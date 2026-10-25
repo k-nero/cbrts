@@ -180,6 +180,8 @@ public class TripService {
         int reached = -1;
         for (int i = 0; i < stops.size(); i++)
             if (reachedStops.contains(stops.get(i).getId())) reached = i;
+        // A trip with a checkpoint but none at a stop (a departure recorded without its stop) has left the first one.
+        if (reached < 0 && last != null && !stops.isEmpty()) reached = 0;
         return row.withProgress(new TripSummaryResponse.Progress(
                 trip.getCode(),
                 reached < 0 ? null : TripMapper.stopName(stops.get(reached)),

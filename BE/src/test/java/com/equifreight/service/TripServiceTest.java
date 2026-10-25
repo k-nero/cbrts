@@ -811,6 +811,33 @@ class TripServiceTest {
         assertEquals(Channel.WEB, progress.lastChannel());
     }
 
+    @Test
+    @DisplayName("A departure recorded without its stop puts the trip on its first leg")
+    void aDepartureWithoutAStopIsTheFirstLeg() {
+        departed();
+        RouteStop pickup = namedStop(1, RouteStopKind.PICKUP, "Hồ Chí Minh City");
+        RouteStop border = namedStop(2, RouteStopKind.BORDER, "Mộc Bài");
+        RoutePlan plan = new RoutePlan();
+        plan.setStops(new ArrayList<>(List.of(pickup, border)));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+        when(records.findByTrip_IdOrderByOccurredAtAsc(trip.getId()))
+                .thenReturn(List.of(stored(TripRecordKind.DEPARTED, NOW.minus(Duration.ofHours(1)))));
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(jobs.findActiveTrips(any()))
+                .thenReturn(new PageImpl<>(
+                        List.of(new TripSummaryResponse(job.getCode(), TripStatus.DEPARTED, "HCM", "PNH", NOW))));
+
+        TripSummaryResponse.Progress progress = service.coordinatorTrips(PageRequest.of(0, 20))
+                .getContent()
+                .getFirst()
+                .progress();
+
+        assertEquals("Hồ Chí Minh City", progress.legFrom());
+        assertEquals("Mộc Bài", progress.legTo());
+        assertNull(progress.lastStop());
+    }
+
     private static RouteStop namedStop(int seq, RouteStopKind kind, String name) {
         RouteStop stop = new RouteStop();
         stop.setId(UUID.randomUUID());
