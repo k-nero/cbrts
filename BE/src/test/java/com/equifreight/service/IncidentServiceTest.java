@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -197,6 +199,7 @@ class IncidentServiceTest {
         job.setCoordinator(khoi);
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(eq(job.getId()), isNull())).thenReturn(trip);
         when(leaving.movingTrip(any())).thenReturn(trip);
         // The job's part on the trip, as released as the job is when it's asked for.
         when(jobTrips.partsOf(any())).thenAnswer(inv -> {
@@ -209,6 +212,7 @@ class IncidentServiceTest {
             return List.of(part);
         });
         when(jobTrips.findTripOf(any())).thenReturn(Optional.of(trip));
+        lenient().when(jobTrips.findTripOf(any(), isNull())).thenReturn(Optional.of(trip));
         when(crew.existsByTrip_IdAndUser_Id(trip.getId(), minh.getId())).thenReturn(true);
         when(incidents.findByClientRef(any())).thenReturn(Optional.empty());
         when(incidents.save(any())).thenAnswer(inv -> {

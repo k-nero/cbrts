@@ -76,8 +76,14 @@ public class LoadPlanService {
     /** The job's trip load; empty until a vehicle is chosen. */
     @Transactional(readOnly = true)
     public Optional<TripLoadResponse> getActiveLoadPlan(UUID jobId) {
+        return getActiveLoadPlan(jobId, null);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional(readOnly = true)
+    public Optional<TripLoadResponse> getActiveLoadPlan(UUID jobId, UUID tripId) {
         TransportJob job = job(jobId);
-        return jobTrips.findTripOf(jobId).flatMap(trip -> {
+        return jobTrips.findTripOf(jobId, tripId).flatMap(trip -> {
             List<LoadPlan> plans = loadPlanRepository.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId());
             return plans.isEmpty() ? Optional.empty() : Optional.of(buildResponse(trip, plans, job));
         });
@@ -110,8 +116,8 @@ public class LoadPlanService {
     }
 
     /** Before departure only: after it, a trailer leaves the convoy only through an incident (US-F5-06). */
-    private void requireNotDeparted(TransportJob job, String action) {
-        if (jobTrips.partDeparted(jobTrips.tripOf(job.getId()), job)) {
+    private void requireNotDeparted(TransportJob job, UUID tripId, String action) {
+        if (jobTrips.partDeparted(jobTrips.tripOf(job.getId(), tripId), job)) {
             throw new BusinessException("Cannot " + action
                     + ": the trip has departed. A trailer leaves a moving trip only through an incident.");
         }
@@ -123,8 +129,14 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse createLoadPlan(UUID jobId, UUID vehicleId) {
+        return createLoadPlan(jobId, null, vehicleId);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse createLoadPlan(UUID jobId, UUID tripId, UUID vehicleId) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         Vehicle vehicle = vehicleId != null
                 ? vehicle(vehicleId)
                 : vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
@@ -134,7 +146,7 @@ public class LoadPlanService {
 
         Optional<TripVehicle> first = jobTrips.vehicleOf(trip);
         if (first.isPresent()) {
-            return changeLoadPlanVehicle(jobId, first.get().getId(), vehicle.getId());
+            return changeLoadPlanVehicle(jobId, tripId, first.get().getId(), vehicle.getId());
         }
         LoadPlan plan = new LoadPlan();
         plan.setTripVehicle(jobTrips.useVehicle(trip, vehicle));
@@ -150,8 +162,14 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse changeLoadPlanVehicle(UUID jobId, UUID tripVehicleId, UUID vehicleId) {
+        return changeLoadPlanVehicle(jobId, null, tripVehicleId, vehicleId);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse changeLoadPlanVehicle(UUID jobId, UUID tripId, UUID tripVehicleId, UUID vehicleId) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         Vehicle vehicle = activeVehicle(vehicle(vehicleId), "used for load plan");
         List<LoadPlan> plans = lockedPlans(trip, jobId);
         LoadPlan plan = tripVehicleId == null ? plans.getFirst() : planOf(plans, tripVehicleId);
@@ -181,9 +199,15 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse addVehicle(UUID jobId, UUID vehicleId, User currentUser) {
+        return addVehicle(jobId, null, vehicleId, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse addVehicle(UUID jobId, UUID tripId, UUID vehicleId, User currentUser) {
         TransportJob job = job(jobId);
-        requireNotDeparted(job, "add a trailer");
-        Trip trip = jobTrips.tripOf(jobId);
+        requireNotDeparted(job, tripId, "add a trailer");
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         Vehicle vehicle = activeVehicle(vehicle(vehicleId), "added to the trip");
         List<LoadPlan> plans = lockedPlans(trip, jobId);
 
@@ -214,9 +238,15 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse removeVehicle(UUID jobId, UUID tripVehicleId, User currentUser) {
+        return removeVehicle(jobId, null, tripVehicleId, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse removeVehicle(UUID jobId, UUID tripId, UUID tripVehicleId, User currentUser) {
         TransportJob job = job(jobId);
-        requireNotDeparted(job, "remove a trailer");
-        Trip trip = jobTrips.tripOf(jobId);
+        requireNotDeparted(job, tripId, "remove a trailer");
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<LoadPlan> plans = new ArrayList<>(lockedPlans(trip, jobId));
         LoadPlan plan = planOf(plans, tripVehicleId);
         if (plans.size() == 1) {
@@ -354,10 +384,10 @@ public class LoadPlanService {
     }
 
     /** A change to the load plan needs a new sign-off of the trip, for its part of every job on it. */
-    private void clearSignOff(TransportJob job) {
+    private void clearSignOff(TransportJob job, Trip trip) {
         job.setSignedOffAt(null);
         job.setSignedOffBy(null);
-        jobTrips.clearSignOff(jobTrips.tripOf(job.getId()));
+        jobTrips.clearSignOff(trip);
     }
 
     private Cargo cargo(Trip trip) {
@@ -416,8 +446,14 @@ public class LoadPlanService {
 
     @Transactional
     public TripLoadResponse assignStall(UUID jobId, UUID vehicleStallId, UUID horseId) {
+        return assignStall(jobId, null, vehicleStallId, horseId);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse assignStall(UUID jobId, UUID tripId, UUID vehicleStallId, UUID horseId) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
 
         VehicleStall stall = vehicleStallRepository
@@ -443,7 +479,7 @@ public class LoadPlanService {
             place(plan, stall, horse);
         }
 
-        clearSignOff(job);
+        clearSignOff(job, trip);
         return buildResponse(trip, plans, job);
     }
 
@@ -455,8 +491,14 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse moveHorse(UUID jobId, MoveHorseRequest request) {
+        return moveHorse(jobId, null, request);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse moveHorse(UUID jobId, UUID tripId, MoveHorseRequest request) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
 
         if (request.toStallId() == null && request.expectedOccupantId() != null) {
@@ -539,7 +581,7 @@ public class LoadPlanService {
                     "Someone else changed the load plan at the same moment; check the refreshed plan and try again.");
         }
 
-        clearSignOff(job);
+        clearSignOff(job, trip);
         return buildResponse(trip, plans, job);
     }
 
@@ -554,8 +596,14 @@ public class LoadPlanService {
     /** Places every horse on the trip across all its trailers with no rule broken, replacing the placements. */
     @Transactional
     public TripLoadResponse autoArrange(UUID jobId) {
+        return autoArrange(jobId, null);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse autoArrange(UUID jobId, UUID tripId) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
         if (plans.stream().anyMatch(p -> p.getStatus() == LoadPlanStatus.CONFIRMED)) {
             throw new BusinessException("Cannot auto-arrange a CONFIRMED load plan");
@@ -593,7 +641,7 @@ public class LoadPlanService {
             place(planWithStall(plans, entry.getValue()), entry.getValue(), entry.getKey());
         }
 
-        clearSignOff(job);
+        clearSignOff(job, trip);
         return buildResponse(trip, plans, job);
     }
 
@@ -612,8 +660,15 @@ public class LoadPlanService {
      */
     @Transactional
     public TripLoadResponse confirmLoadPlan(UUID jobId, Collection<String> acceptedWarnings, User currentUser) {
+        return confirmLoadPlan(jobId, null, acceptedWarnings, currentUser);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public TripLoadResponse confirmLoadPlan(
+            UUID jobId, UUID tripId, Collection<String> acceptedWarnings, User currentUser) {
         TransportJob job = job(jobId);
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
 
         for (LoadPlan plan : plans) {
@@ -668,7 +723,7 @@ public class LoadPlanService {
         }
 
         // Invalidate prior sign-off when load plan is re-confirmed
-        clearSignOff(job);
+        clearSignOff(job, trip);
 
         String vehicles = plans.stream().map(p -> p.getVehicle().getCode()).collect(Collectors.joining(", "));
         auditService.recordDecision(
