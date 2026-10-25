@@ -33,6 +33,7 @@ import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
+import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.model.quotation.QuotationVersionResponse;
 import com.equifreight.model.quotation.QuoteTotalRowResponse;
 import com.equifreight.model.quotation.StartResult;
@@ -44,9 +45,12 @@ import com.equifreight.service.quotation.QuotationSnapshot;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -457,6 +461,118 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                 .extracting("code")
                 .isEqualTo("FIRST_VERSION");
         verify(quotations, never()).delete(any());
+    }
+
+    // --- a decline is final (requote spec §4.1) ------------------------------------------------------------
+
+    static final Instant DECLINED_AT = Instant.parse("2026-10-24T03:00:00Z");
+
+    /** v1 issued with an override and an added line, v2 drafted from it, then the customer declined v1. */
+    Quotation declinedV1WithV2Draft() {
+        Quotation v1 = issuedV1WithAdjustments();
+        issue.revise(yen, request.getId());
+        stored.orElseThrow().getLines().forEach(l -> l.setId(UUID.randomUUID()));
+        v1.setStatus(QuotationStatus.DECLINED);
+        v1.setDeclinedAt(DECLINED_AT);
+        v1.setDeclineReason("Too dear");
+        request.setStatus(RequestStatus.EXPIRED);
+        when(quotations.findByRequestIdAndVersionNo(request.getId(), (short) 1)).thenReturn(Optional.of(v1));
+        clearInvocations(quotations, audit, notifications);
+        return v1;
+    }
+
+    @Test
+    void everyDraftWriteAfterADeclineIsRefused() {
+        declinedV1WithV2Draft();
+        UUID groom = lineKeyed("GROOM").getId();
+        UUID ferry = stored.orElseThrow().getLines().stream()
+                .filter(l -> l.getManualReason() != null)
+                .findFirst()
+                .orElseThrow()
+                .getId();
+        Map<String, ThrowingCallable> writes = new LinkedHashMap<>();
+        writes.put("changeClass", () -> service.changeClass(yen, request.getId(), ServiceClass.BUSINESS));
+        writes.put("reprice", () -> service.reprice(yen, request.getId()));
+        writes.put("override", () -> service.override(yen, request.getId(), groom, override("1100.00")));
+        writes.put("removeOverride", () -> service.removeOverride(yen, request.getId(), groom));
+        writes.put("addLine", () -> service.addLine(yen, request.getId(), ferry("95.00", RateCertainty.FIXED, null)));
+        writes.put(
+                "editLine",
+                () -> service.editLine(yen, request.getId(), ferry, ferry("95.00", RateCertainty.FIXED, null)));
+        writes.put("removeLine", () -> service.removeLine(yen, request.getId(), ferry));
+
+        writes.forEach((name, write) -> {
+            assertThatThrownBy(write)
+                    .as(name)
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("The customer declined version 1 on 24 Oct 2026, so REQ-2026-0199 is closed."
+                            + " Discard this draft.")
+                    .extracting("code")
+                    .isEqualTo("QUOTATION_DECLINED");
+        });
+        verify(quotations, never()).save(any());
+        verify(quotations, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void issuingAfterADeclineIsRefused() {
+        declinedV1WithV2Draft();
+        Quotation v2 = stored.orElseThrow();
+
+        assertThatThrownBy(() -> issue.issue(yen, request.getId(), note("Cheaper groom.")))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("QUOTATION_DECLINED");
+        assertThat(v2.getStatus()).isEqualTo(QuotationStatus.DRAFT);
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.EXPIRED);
+        verify(quotations, never()).saveAndFlush(any());
+        verifyNoInteractions(audit, notifications);
+    }
+
+    @Test
+    void discardStillWorksAfterADecline() {
+        declinedV1WithV2Draft();
+        Quotation v2 = stored.orElseThrow();
+
+        issue.discardDraft(yen, request.getId());
+
+        verify(quotations).delete(v2);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_DRAFT_DISCARDED"),
+                        eq("Quotation Q-2026-0189 v2 draft discarded; v1 stands"),
+                        any(),
+                        any(),
+                        any(),
+                        isNull(),
+                        isNull(),
+                        isNull());
+    }
+
+    @Test
+    void aDraftAfterAnExpiredVersionIsStillWritable() {
+        Quotation v1 = issuedV1WithAdjustments();
+        v1.setStatus(QuotationStatus.EXPIRED);
+        request.setStatus(RequestStatus.EXPIRED);
+        when(quotations.findByRequestIdAndVersionNo(request.getId(), (short) 1)).thenReturn(Optional.of(v1));
+        issue.revise(yen, request.getId());
+
+        QuotationDraftResponse repriced = service.reprice(yen, request.getId());
+
+        assertThat(repriced.versionNo()).isEqualTo((short) 2);
+        assertThat(stored.orElseThrow().getStatus()).isEqualTo(QuotationStatus.DRAFT);
+    }
+
+    @Test
+    void theVersionListCarriesTheDecline() {
+        Quotation v1 = declinedV1WithV2Draft();
+
+        QuotationVersionResponse row = QuotationMapper.toVersion(v1);
+
+        assertThat(row.declinedAt()).isEqualTo(DECLINED_AT);
+        assertThat(row.declineReason()).isEqualTo("Too dear");
     }
 
     // --- reading an issued version (spec §5.5) -----------------------------------------------------------

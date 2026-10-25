@@ -92,7 +92,7 @@ public class QuotationIssueService {
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        QuotationRules.requireWritable(request, q);
+        QuotationRules.requireWritable(request, q, QuotationDraftService.previousOf(quotations, q));
         QuotationPricing.Evaluation e = pricing.evaluate(q, request);
         if (!e.blockers().isEmpty()) {
             throw new ConflictException("QUOTATION_NOT_READY", "This quotation isn't ready to issue.", e.blockers());

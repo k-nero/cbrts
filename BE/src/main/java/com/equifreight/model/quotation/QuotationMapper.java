@@ -200,7 +200,9 @@ public final class QuotationMapper {
                 q.getIssuedAt(),
                 q.getValidUntil(),
                 q.getTotal(),
-                q.getSupersededReason());
+                q.getSupersededReason(),
+                q.getDeclinedAt(),
+                q.getDeclineReason());
     }
 
     /** The version a revision replaces: its total and each keyed line's amount. */

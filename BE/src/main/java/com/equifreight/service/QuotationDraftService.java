@@ -391,15 +391,27 @@ public class QuotationDraftService {
 
     private record Draft(TransportRequest request, Quotation quotation) {}
 
-    /** Locks the request row, then reads its latest version, which must be a draft the request can still take. */
+    /**
+     * Locks the request row, then reads its latest version, which must be a draft the request can still take and
+     * whose previous version the customer didn't decline.
+     */
     private Draft draftForWrite(UUID requestId) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        QuotationRules.requireWritable(request, q);
+        QuotationRules.requireWritable(request, q, previousOf(quotations, q));
         return new Draft(request, q);
+    }
+
+    /** The version a revision was drafted from; null for the first version. */
+    static Quotation previousOf(QuotationRepository quotations, Quotation q) {
+        return q.getVersionNo() > 1
+                ? quotations
+                        .findByRequestIdAndVersionNo(q.getRequest().getId(), (short) (q.getVersionNo() - 1))
+                        .orElse(null)
+                : null;
     }
 
     private static void requireInReview(TransportRequest request) {
