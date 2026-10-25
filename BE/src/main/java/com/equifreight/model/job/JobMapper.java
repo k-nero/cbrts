@@ -63,6 +63,16 @@ public final class JobMapper {
                 .tripCode(tripCode)
                 .originCity(originCity(job))
                 .destinationCity(destinationCity(job))
+                .originPlace(
+                        job.getRequest() == null || job.getRequest().getOriginPlace() == null
+                                ? null
+                                : com.equifreight.model.route.RouteMapper.toResponse(
+                                        job.getRequest().getOriginPlace()))
+                .destinationPlace(
+                        job.getRequest() == null || job.getRequest().getDestinationPlace() == null
+                                ? null
+                                : com.equifreight.model.route.RouteMapper.toResponse(
+                                        job.getRequest().getDestinationPlace()))
                 .stage(job.getStage())
                 .dossierStatus(job.getDossierStatus())
                 .tripStatus(job.getTripStatus())

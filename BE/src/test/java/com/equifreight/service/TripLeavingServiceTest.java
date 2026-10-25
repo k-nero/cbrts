@@ -111,7 +111,8 @@ class TripLeavingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TripLeavingService(jobTrips, loadPlans, loadPlanRows, crew, bookings, vehicles);
+        service = new TripLeavingService(
+                jobTrips, loadPlans, loadPlanRows, crew, bookings, vehicles, mock(RoutePlanService.class));
         trip = new Trip();
         trip.setId(UUID.randomUUID());
         trip.setCode("TRP-2026-001");
@@ -204,6 +205,40 @@ class TripLeavingServiceTest {
     }
 
     @Test
+    @DisplayName(
+            "On a journey of trips, a horse left in care comes off its later trips; an empty one releases its crew")
+    void leftInCareLeavesTheJourney() {
+        Trip flight = new Trip();
+        flight.setId(UUID.randomUUID());
+        when(jobTrips.withdrawFromJourney(trip, job, Set.of(nightfall.getId()))).thenReturn(List.of(flight));
+        when(jobTrips.jobsOn(flight)).thenReturn(List.of());
+
+        service.leave(trip, job, option(LeavingKind.LEAVE_IN_CARE, nightfall), new User(), NOW);
+
+        verify(loadPlans).unload(flight, Set.of(nightfall.getId()));
+        verify(bookings).deleteAll(any());
+        verify(crew).deleteByTripId(flight.getId());
+    }
+
+    @Test
+    @DisplayName("Returned to their origin, the horses leave the journey: their new trip doesn't hand them on")
+    void returnedToOriginLeavesTheJourney() {
+        when(jobTrips.horsesOn(trip)).thenReturn(List.of(rider(other, ivory)));
+        Trip flight = new Trip();
+        flight.setId(UUID.randomUUID());
+        Set<UUID> both = Set.of(shadowfax.getId(), nightfall.getId());
+        when(jobTrips.withdrawFromJourney(trip, job, both)).thenReturn(List.of(flight));
+        when(jobTrips.jobsOn(flight)).thenReturn(List.of(other));
+
+        service.leave(trip, job, option(LeavingKind.RETURN_TO_ORIGIN, shadowfax, nightfall), new User(), NOW);
+
+        verify(jobTrips).moveHorses(job, both, trip, later, false);
+        verify(loadPlans).unload(flight, both);
+        verify(loadPlans).reopenTrip(eq(flight), any());
+        verify(crew, never()).deleteByTripId(flight.getId());
+    }
+
+    @Test
     @DisplayName("Unloaded to continue later, the horses move to a new trip; a trailer with only them goes along")
     void unloadedToContinueLater() {
         LoadPlan theirs = trailer("TK-102", shadowfax, nightfall);
@@ -229,7 +264,7 @@ class TripLeavingServiceTest {
         verify(jobTrips, never()).moveVehicle(shared.getTripVehicle(), later);
         assertEquals(later, hoa.getTrip());
         assertEquals(later, booking.getTrip());
-        verify(jobTrips).moveHorses(job, Set.of(shadowfax.getId(), nightfall.getId()), trip, later);
+        verify(jobTrips).moveHorses(job, Set.of(shadowfax.getId(), nightfall.getId()), trip, later, true);
         assertEquals(List.of("Nightfall", "Shadowfax"), d.horses());
     }
 

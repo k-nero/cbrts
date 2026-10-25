@@ -1,6 +1,6 @@
 import type { BaseEntity } from './api';
 import type { DossierStatus } from './clearance';
-import type { ServiceClass } from './request';
+import type { Place, ServiceClass } from './request';
 import type { TripPart, TripStatus } from './trip';
 import type { StallSide, StallType } from './vehicle';
 
@@ -30,6 +30,8 @@ export const RouteStopKindEnum = {
   AIRPORT_IN: 'AIRPORT_IN',
   QUARANTINE: 'QUARANTINE',
   REFUELLING: 'REFUELLING',
+  /** Where the job's horses leave this trip for the next trip of its journey (US-F3-16). */
+  TRANSFER: 'TRANSFER',
 } as const;
 export type RouteStopKind = (typeof RouteStopKindEnum)[keyof typeof RouteStopKindEnum];
 
@@ -38,6 +40,59 @@ export const TransportModeEnum = {
   AIR: 'AIR',
 } as const;
 export type TransportMode = (typeof TransportModeEnum)[keyof typeof TransportModeEnum];
+
+/** A draft of one trip's route, as the Route tab's editor saves it (US-F3-17). */
+export interface RouteDraftInput {
+  distanceKm?: number | null;
+  durationMin?: number | null;
+  changeReason?: string;
+  stops: {
+    seq: number;
+    kind: RouteStopKind;
+    /** The job a pickup, delivery or transfer is for; the job in the URL when left out. */
+    jobId?: string | null;
+    placeId?: string | null;
+    borderCrossingId?: string | null;
+    plannedAt?: string | null;
+    plannedStayMin?: number | null;
+    details?: string | null;
+  }[];
+  legs: {
+    seq: number;
+    fromStopSeq: number;
+    toStopSeq: number;
+    mode: TransportMode;
+    vehicleId?: string | null;
+    distanceKm?: number | null;
+    plannedMin?: number | null;
+    flight?: {
+      airline: string;
+      flightNo: string;
+      aircraftType?: string | null;
+      stallCapacity?: number | null;
+      scheduledDepartureAt?: string | null;
+      scheduledArrivalAt?: string | null;
+    } | null;
+  }[];
+}
+
+/** A border crossing a route can stop at. */
+export interface BorderCrossing {
+  id: string;
+  name: string;
+  fromCountry: string;
+  toCountry: string;
+  roadOnly: boolean;
+}
+
+/** A catalog corridor, as the fleet & route coordinator picks one for the next trip of a journey. */
+export interface Corridor {
+  id: string;
+  code: string;
+  mode: TransportMode;
+  originCity: string;
+  destinationCity: string;
+}
 
 export interface JobHorse {
   id: string;
@@ -78,6 +133,28 @@ export interface ShareSuggestion {
   horsesAdded: number;
   /** Null while the trip has no trailer. */
   stallsLeft?: number | null;
+  warnings: BiosecurityWarning[];
+}
+
+/** A confirmed trip a job could join (US-F3-18), with its clearance state and the warnings joining raises. */
+export interface JoinableTrip {
+  tripId: string;
+  /** Whether the job passes every check of joining; when not, `reason` says which fails. */
+  fits: boolean;
+  reason: string | null;
+  tripCode: string;
+  corridorCode: string;
+  mode: TransportMode;
+  plannedDepartureAt: string | null;
+  /** Null when the job doesn't fit. */
+  departFrom: string;
+  departTo: string;
+  /** Stalls left on the trailers once the job is on; null for a trip that only flies, or one it doesn't fit. */
+  stallsLeft: number | null;
+  jobs: string[];
+  jobsCleared: number;
+  /** The earliest due date of a document not cleared yet, of every job on it; null when none is open. */
+  documentsDueBy: string | null;
   warnings: BiosecurityWarning[];
 }
 
@@ -286,6 +363,9 @@ export interface JobDetail extends BaseEntity {
   tripCode?: string | null;
   originCity: string;
   destinationCity: string;
+  /** The request's pickup and delivery places, where a first route draft starts and ends. */
+  originPlace?: Place | null;
+  destinationPlace?: Place | null;
   stage: JobStage;
   dossierStatus: DossierStatus;
   tripStatus: TripStatus;

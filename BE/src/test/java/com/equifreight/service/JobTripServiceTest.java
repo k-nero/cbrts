@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -294,7 +295,7 @@ class JobTripServiceTest {
         TransportJob job = new TransportJob();
         job.setId(UUID.randomUUID());
         TripHorse th = row(t, job, horse("Shadowfax"), TripHorseStatus.ON_TRIP);
-        when(tripHorses.findByTrip_IdAndStatusOrderByCreatedAt(t.getId(), TripHorseStatus.ON_TRIP))
+        when(tripHorses.findByTrip_IdAndStatusInOrderByCreatedAt(eq(t.getId()), any()))
                 .thenReturn(List.of(th));
         TripJob p = part(t, job, TripStatus.NOT_STARTED, null);
         when(parts.findByTrip_IdAndJob_Id(t.getId(), job.getId())).thenReturn(Optional.of(p));

@@ -202,7 +202,9 @@ class Flow3ServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(jobTrips.findTripOf(any())).thenReturn(Optional.of(trip));
+        lenient().when(jobTrips.findTripOf(any(), isNull())).thenReturn(Optional.of(trip));
         lenient().when(jobTrips.tripOf(any())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(any(), isNull())).thenReturn(trip);
         // The vehicle the load plan chose, which the crew travels with; tests with a load plan replace it.
         TripVehicle chosen = new TripVehicle();
         chosen.setId(UUID.randomUUID());
