@@ -15,7 +15,8 @@ import { type RegulationRuleKind, RegulationRuleKindEnum } from '@/interfaces';
 export const RuleFields: FC<{ disabled?: boolean }> = ({ disabled = false }) => {
   const { FormField } = useFormWrapperCtx<RuleFormValues>();
   const shape = useWatch<RuleFormValues, 'ruleKind'>({ name: 'ruleKind' });
-  const kind = (shape?.value ?? RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE) as RegulationRuleKind;
+  const kind = (shape?.value ??
+    RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE) as RegulationRuleKind;
 
   return (
     <>

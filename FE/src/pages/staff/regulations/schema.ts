@@ -76,7 +76,11 @@ export type RuleFormValues = z.infer<typeof ruleSchema>;
 export const addRuleSchema = z
   .object({
     ...ruleShape,
-    documentType: option.nullable().refine((v) => v !== null, 'Choose a document.'),
+    documentType: option.nullable(),
   })
-  .superRefine(refineDays);
+  .superRefine((v, ctx) => {
+    if (!v.documentType)
+      ctx.addIssue({ code: 'custom', path: ['documentType'], message: 'Choose a document.' });
+    refineDays(v, ctx);
+  });
 export type AddRuleForm = z.infer<typeof addRuleSchema>;

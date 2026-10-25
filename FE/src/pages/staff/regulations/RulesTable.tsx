@@ -1,113 +1,157 @@
 import type { FC } from 'react';
-import { Flex } from 'antd';
-import { Chip, Panel } from '@/components/ui';
+import { Flex, type TableColumnsType } from 'antd';
+
+import { RULE_SHAPE_LABELS, scopeLabel } from './constants';
+
+import Table from '@/components/table';
+import { Button, Chip, Panel } from '@/components/ui';
 import { DocumentScopeEnum, type RegulationRule, RegulationRuleDiffEnum } from '@/interfaces';
-import { RULE_SHAPE_LABELS, SCOPE_OPTIONS } from './constants';
+import { rowActionLabels } from '@/lib/utils';
 
 type Props = {
   title: string;
   rules: RegulationRule[];
   selectedRuleId?: string;
+  /** Rules can be added and removed only in a draft. */
+  editable: boolean;
   onEdit: (rule: RegulationRule) => void;
+  onAdd: () => void;
+  onRemove: (rule: RegulationRule) => void;
 };
 
-/** The catalog's document rules, with the draft's changed and new rules marked. */
-const RulesTable: FC<Props> = ({ title, rules, selectedRuleId, onEdit }) => (
-  <Panel
-    title={title}
-    extra={
-      <span className="type-body-s text-ink-3">
-        Each rule is evaluated against the job’s travel dates, never against today.
-      </span>
-    }
-    flush
-  >
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left">
-        <thead>
-          <tr className="border-b border-line bg-sunken/40">
-            <th className="type-label-s px-6 py-2.5 font-medium text-ink-3">Document</th>
-            <th className="type-label-s w-[170px] px-4 py-2.5 font-medium text-ink-3">
-              Rule shape
-            </th>
-            <th className="type-label-s w-[180px] px-4 py-2.5 font-medium text-ink-3">Parameter</th>
-            <th className="type-label-s w-[120px] px-4 py-2.5 font-medium text-ink-3">
-              Applies to
-            </th>
-            <th className="type-label-s w-[90px] px-4 py-2.5 font-medium text-ink-3">Blocks</th>
-            <th className="type-label-s w-[60px] px-6 py-2.5 text-right font-medium text-ink-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map((rule) => {
-            const isSelected = rule.id === selectedRuleId;
-            const isChanged = rule.diffStatus === RegulationRuleDiffEnum.CHANGED;
-            const isNew = rule.diffStatus === RegulationRuleDiffEnum.NEW;
-            const scope = rule.documentType?.scope;
-            const scopeLabel =
-              SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? 'Per horse';
-            const blocksLabel =
-              scope === DocumentScopeEnum.PER_CROSSING
-                ? 'Per crossing'
-                : rule.mandatory
-                  ? 'Yes'
-                  : 'Optional';
+/** "Yes", "Optional", or "Per crossing" for a crossing document. */
+const blocksLabel = (rule: RegulationRule) =>
+  rule.documentType?.scope === DocumentScopeEnum.PER_CROSSING
+    ? 'Per crossing'
+    : rule.mandatory
+      ? 'Yes'
+      : 'Optional';
 
-            return (
-              <tr
-                key={rule.id}
-                className={`border-b border-line/70 transition-colors ${
-                  isSelected
-                    ? 'border-l-2 border-l-gold bg-sunken/80'
-                    : isChanged || isNew
-                      ? 'bg-amber-500/5 hover:bg-amber-500/10'
-                      : 'hover:bg-sunken/30'
-                }`}
+/**
+ * The version's document rules, with a draft's new and changed rules marked. A fixed-order table: no sort,
+ * no filters, no pages (DESIGN.md, Tables).
+ */
+const RulesTable: FC<Props> = ({
+  title,
+  rules,
+  selectedRuleId,
+  editable,
+  onEdit,
+  onAdd,
+  onRemove,
+}) => {
+  const columns: TableColumnsType<RegulationRule> = [
+    {
+      key: 'document',
+      title: 'Document',
+      width: 200,
+      render: (_, rule) => (
+        <Flex component="span" align="center" gap={8} wrap>
+          <span className="type-label-s text-ink">{rule.documentType?.name ?? 'Document'}</span>
+          {rule.diffStatus === RegulationRuleDiffEnum.NEW && (
+            <Chip tone="warn" dot={false}>
+              New
+            </Chip>
+          )}
+          {rule.diffStatus === RegulationRuleDiffEnum.CHANGED && (
+            <Chip tone="warn" dot={false}>
+              Changed
+            </Chip>
+          )}
+        </Flex>
+      ),
+    },
+    {
+      key: 'shape',
+      title: 'Rule shape',
+      width: 150,
+      render: (_, rule) => (
+        <Chip tone="neutral" dot={false}>
+          {RULE_SHAPE_LABELS[rule.ruleKind] ?? rule.ruleKind}
+        </Chip>
+      ),
+    },
+    {
+      key: 'parameter',
+      title: 'Parameter',
+      width: 160,
+      render: (_, rule) => (
+        <span className="type-data text-ink-2">{rule.parameterDisplay ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'scope',
+      title: 'Applies to',
+      width: 100,
+      render: (_, rule) => (
+        <span className="type-body-s text-ink-2">{scopeLabel(rule.documentType?.scope)}</span>
+      ),
+    },
+    {
+      key: 'blocks',
+      title: 'Blocks',
+      width: 60,
+      render: (_, rule) => <span className="type-body-s text-ink-2">{blocksLabel(rule)}</span>,
+    },
+    {
+      key: 'actions',
+      width: editable ? 130 : 70,
+      align: 'right',
+      render: (_, rule) => {
+        const labels = rowActionLabels(rule.documentType?.name ?? 'rule');
+        return (
+          <Flex component="span" justify="end" gap={4}>
+            <Button size="sm" variant="ghost" aria-label={labels.edit} onClick={() => onEdit(rule)}>
+              {editable ? 'Edit' : 'View'}
+            </Button>
+            {editable && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={labels.remove}
+                onClick={() => onRemove(rule)}
               >
-                <td className="px-6 py-3">
-                  <Flex align="center" gap={8}>
-                    <span className="type-label-s font-medium text-ink">
-                      {rule.documentType?.name ?? 'Document'}
-                    </span>
-                    {(isChanged || isNew) && (
-                      <Chip tone="warn" dot={false} className="px-1.5 py-0 text-[11px]">
-                        {isNew ? 'New' : 'Changed'}
-                      </Chip>
-                    )}
-                  </Flex>
-                </td>
-                <td className="px-4 py-3">
-                  <Chip tone="neutral" dot={false} className="text-[12px]">
-                    {RULE_SHAPE_LABELS[rule.ruleKind] ?? rule.ruleKind}
-                  </Chip>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="type-mono text-[13px] text-ink-2">
-                    {rule.parameterDisplay ?? '—'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="type-body-s text-ink-2">{scopeLabel}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="type-body-s text-ink-2">{blocksLabel}</span>
-                </td>
-                <td className="px-6 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(rule)}
-                    className="type-label-s cursor-pointer font-medium text-ink-3 hover:text-ink"
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  </Panel>
-);
+                Remove
+              </Button>
+            )}
+          </Flex>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Panel
+      title={title}
+      extra={
+        editable && (
+          <Button size="sm" variant="secondary" onClick={onAdd}>
+            Add rule
+          </Button>
+        )
+      }
+      flush
+    >
+      <p className="type-body-s m-0 px-6 pb-3 text-ink-3">
+        Each rule is evaluated against the job’s travel dates, never against today.
+      </p>
+      <Table<RegulationRule>
+        id="regulation-rules"
+        rowKey="id"
+        columns={columns}
+        dataSource={rules}
+        pagination={false}
+        showColumnSettings={false}
+        ignoreKeys={['actions']}
+        rowClassName={(rule) => (rule.id === selectedRuleId ? 'bg-sunken' : '')}
+        locale={{
+          emptyText: editable
+            ? 'No document rules yet. Add the documents this country requires.'
+            : 'This version has no document rules.',
+        }}
+      />
+    </Panel>
+  );
+};
 
 export default RulesTable;

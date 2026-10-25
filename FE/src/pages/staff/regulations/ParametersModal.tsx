@@ -17,7 +17,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
 } & (
-  | { /** Create this country's catalog with a first draft. */ country: RegulationCountry; draft?: never }
+  | {
+      /** Create this country's catalog with a first draft. */ country: RegulationCountry;
+      draft?: never;
+    }
   | { /** Change this draft's parameters. */ draft: RegulationVersion; country?: never }
 );
 
@@ -57,7 +60,7 @@ export const ParametersModal: FC<Props> = ({ open, onClose, country, draft }) =>
       onClose();
     } catch (error) {
       methods.setError('form_error', {
-        message: apiErrorMessage(error, "Nothing was saved. Try again."),
+        message: apiErrorMessage(error, 'Nothing was saved. Try again.'),
       });
     }
   });
@@ -66,7 +69,9 @@ export const ParametersModal: FC<Props> = ({ open, onClose, country, draft }) =>
     <BaseModal
       open={open}
       onCancel={onClose}
-      title={country ? `Create catalog · ${country.name}` : `Parameters · draft v${draft.versionNo}`}
+      title={
+        country ? `Create catalog · ${country.name}` : `Parameters · draft v${draft.versionNo}`
+      }
     >
       <FormWrapper
         methods={methods}
@@ -120,10 +125,7 @@ export const ParametersModal: FC<Props> = ({ open, onClose, country, draft }) =>
             </Row>
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />
-              <SubmitButton
-                type="primary"
-                label={country ? 'Create catalog' : 'Save to draft'}
-              />
+              <SubmitButton type="primary" label={country ? 'Create catalog' : 'Save to draft'} />
             </Flex>
           </>
         )}
