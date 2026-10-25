@@ -4,25 +4,24 @@ import com.equifreight.entity.enums.CatalogStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import lombok.*;
+import lombok.Builder;
 
-@Getter
-@Setter
-@Builder(toBuilder = true)
-@NoArgsConstructor
-@AllArgsConstructor
-public class RegulationVersionResponse {
-    private UUID id;
-    private UUID catalogId;
-    private int versionNo;
-    private CatalogStatus status;
-    private Instant publishedAt;
-    private String publishedByName;
-    private short leadTimeDays;
-    private short quarantineMinDays;
-    private short arrivalBufferDays;
-    private List<RegulationRuleResponse> rules;
-    private Integer pinnedJobsCount;
-    private Integer changesCount;
-    private String changeNote;
-}
+/**
+ * A regulation catalog version. The catalog list leaves {@code rules} empty; the version detail fills it, with
+ * {@code changesCount} counting the draft's new, changed and removed rules against the published version.
+ */
+@Builder
+public record RegulationVersionResponse(
+        UUID id,
+        UUID catalogId,
+        int versionNo,
+        CatalogStatus status,
+        Instant publishedAt,
+        String publishedByName,
+        short leadTimeDays,
+        short domesticLeadTimeDays,
+        short quarantineMinDays,
+        short arrivalBufferDays,
+        List<RegulationRuleResponse> rules,
+        int pinnedJobsCount,
+        int changesCount) {}

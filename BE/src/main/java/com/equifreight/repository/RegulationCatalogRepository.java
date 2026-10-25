@@ -18,4 +18,6 @@ public interface RegulationCatalogRepository
     Optional<RegulationCatalog> findByCountryCode(String countryCode);
 
     boolean existsByCountryCode(String countryCode);
+
+    boolean existsByCountryId(UUID countryId);
 }
