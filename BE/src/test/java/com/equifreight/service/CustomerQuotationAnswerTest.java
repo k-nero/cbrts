@@ -95,6 +95,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 audit,
                 notifications,
                 invoices,
+                issue,
                 Clock.fixed(now, BusinessTime.ZONE));
     }
 

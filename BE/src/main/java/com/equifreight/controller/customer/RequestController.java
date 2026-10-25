@@ -6,6 +6,7 @@ import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
+import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
@@ -119,6 +120,20 @@ public class RequestController {
             @PathVariable UUID id,
             @Valid @RequestBody(required = false) DeclineRequest body) {
         return quotations.decline(user, id, body);
+    }
+
+    @Operation(
+            summary =
+                    "Ask for a re-quote of an expired quotation (A4), with an optional note (201): the next version is"
+                            + " drafted for the logistics manager to review and issue; the answer is still the expired version,"
+                            + " with nextVersion")
+    @PostMapping("/requests/{id}/quotation/requote")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CustomerQuotationResponse requote(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) RequoteRequest body) {
+        return quotations.requote(user, id, body);
     }
 
     @Operation(

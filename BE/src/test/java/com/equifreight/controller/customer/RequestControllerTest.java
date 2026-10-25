@@ -17,6 +17,7 @@ import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.DepositResponse;
+import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.service.CustomerQuotationService;
 import com.equifreight.service.RequestService;
 import java.math.BigDecimal;
@@ -152,5 +153,29 @@ class RequestControllerTest {
 
         verify(quotations).accept(any(), eq(id), eq(new AcceptRequest(2)));
         verify(quotations).decline(any(), eq(id), eq(new DeclineRequest("Too dear", 2)));
+    }
+
+    @Test
+    void aRequoteAnswers201AndBindsTheBody() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/requote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"versionNo\":2,\"note\":\"Two horses now\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/customer/requests/" + id + "/quotation/requote"))
+                .andExpect(status().isCreated());
+
+        verify(quotations).requote(any(), eq(id), eq(new RequoteRequest(2, "Two horses now")));
+        verify(quotations).requote(any(), eq(id), isNull());
+    }
+
+    @Test
+    void aRequoteNoteOver500CharactersAnswers400() throws Exception {
+        mvc.perform(post("/api/v1/customer/requests/" + UUID.randomUUID() + "/quotation/requote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"" + "x".repeat(501) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation Failed"));
     }
 }

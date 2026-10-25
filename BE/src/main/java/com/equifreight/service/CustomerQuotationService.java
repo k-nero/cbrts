@@ -18,6 +18,7 @@ import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationMapper;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
+import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.TransportRequestRepository;
@@ -49,6 +50,7 @@ public class CustomerQuotationService {
     private final AuditService audit;
     private final NotificationService notifications;
     private final InvoiceService invoices;
+    private final QuotationIssueService issues;
     private final Clock clock;
 
     public CustomerQuotationService(
@@ -60,6 +62,7 @@ public class CustomerQuotationService {
             AuditService audit,
             NotificationService notifications,
             InvoiceService invoices,
+            QuotationIssueService issues,
             Clock clock) {
         this.requests = requests;
         this.quotations = quotations;
@@ -69,6 +72,7 @@ public class CustomerQuotationService {
         this.audit = audit;
         this.notifications = notifications;
         this.invoices = invoices;
+        this.issues = issues;
         this.clock = clock;
     }
 
@@ -174,6 +178,94 @@ public class CustomerQuotationService {
                 club.getName() + " declined " + label,
                 reason == null ? request.getCode() + " is closed. No reason was given." : "\u201c" + reason + "\u201d");
         return toResponse(request, saved);
+    }
+
+    /**
+     * Asks for a re-quote of an expired quotation (core flows A4): the next version is drafted on the rate catalog in
+     * force now, carrying the class, overrides and added lines, for the manager who prepared the expired one, who is
+     * told and reviews it before issuing. The customer never sees the draft, and the request stays EXPIRED until it is
+     * issued. The request row is locked first, so a double click drafts one version and refuses the second ask.
+     */
+    @Transactional
+    public CustomerQuotationResponse requote(User customer, UUID requestId, RequoteRequest body) {
+        Club club = clubs.requireClub(customer);
+        TransportRequest request = requests.findForUpdate(requestId, club.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        Quotation latest = latestIssued(requestId);
+        requireShown(body == null ? null : body.versionNo(), latest);
+        requireRequotable(request, latest);
+        String note = body == null || body.note() == null || body.note().isBlank()
+                ? null
+                : body.note().strip();
+
+        QuotationIssueService.Drafted d = issues.draftNext(latest, request, latest.getPreparedBy());
+        Quotation draft = d.draft();
+        int catalog = d.catalog().getVersionNo();
+        StringBuilder summary = new StringBuilder(club.getName() + " asked for a re-quote of " + latest.getCode() + " v"
+                + latest.getVersionNo() + "; v" + draft.getVersionNo() + " drafted on rate catalog v" + catalog);
+        QuotationIssueService.appendDropped(summary, d.dropped());
+        // The request's status doesn't move, so there is no before or after (and #192's history leaves it out).
+        audit.recordDecision(
+                customer,
+                "QUOTATION_REQUOTE_ASKED",
+                AuditText.fit(summary.toString()),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                note,
+                null,
+                null);
+        tellManagers(
+                latest,
+                request,
+                NotificationKind.QUOTATION_REQUOTE_ASKED,
+                club.getName() + " asked for a re-quote of " + latest.getCode(),
+                note == null
+                        ? request.getCode() + " · version " + draft.getVersionNo() + " is drafted on rate catalog v"
+                                + catalog + ". Review it and issue it."
+                        : "“" + note + "”");
+        return toResponse(request, latest);
+    }
+
+    /**
+     * A re-quote is for an elapsed window only (spec §4.3), refused in this order: a version already being prepared,
+     * a quotation the customer already answered (a decline is final), a cancelled request, a quotation still open, and
+     * a departure that has come (counted in Vietnam time).
+     */
+    private void requireRequotable(TransportRequest request, Quotation latest) {
+        Quotation newest = quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(request.getId())
+                .orElse(latest);
+        if (newest.getStatus() == QuotationStatus.DRAFT) {
+            throw new ConflictException(
+                    "REQUOTE_IN_PROGRESS", "Version " + newest.getVersionNo() + " is already being prepared.");
+        }
+        String v = "version " + latest.getVersionNo();
+        switch (latest.getStatus()) {
+            case ACCEPTED ->
+                throw new ConflictException(
+                        "QUOTATION_ANSWERED", "You accepted " + v + " on " + day(latest.getAcceptedAt()) + ".");
+            case DECLINED ->
+                throw new ConflictException(
+                        "QUOTATION_ANSWERED", "You declined " + v + " on " + day(latest.getDeclinedAt()) + ".");
+            default -> {}
+        }
+        if (request.getStatus() == RequestStatus.CANCELLED) {
+            throw new ConflictException(
+                    "REQUEST_CANCELLED", request.getCode() + " was cancelled, so its quotation can't be answered.");
+        }
+        if (latest.getStatus() != QuotationStatus.EXPIRED || request.getStatus() != RequestStatus.EXPIRED) {
+            throw new ConflictException(
+                    "QUOTATION_NOT_EXPIRED",
+                    "Version " + latest.getVersionNo() + " hasn't expired. You can still accept or decline it.");
+        }
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.now(clock.withZone(BusinessTime.ZONE)))) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(departure)
+                            + " has passed. Start a new request for a later date.");
+        }
     }
 
     private Quotation latestIssued(UUID requestId) {
