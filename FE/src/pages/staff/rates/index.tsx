@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { CorridorList } from './CorridorList';
 import { DraftPanel } from './DraftPanel';
+import { ReaderPanel } from './ReaderPanel';
 import { BreaksModal } from './BreaksModal';
 import { ClassModal } from './ClassModal';
 import { LineModal } from './LineModal';
@@ -22,13 +23,14 @@ import {
   useRateCorridor,
 } from '@/hooks/rates';
 import { type RateLine, RoleNameEnum, type ServiceClassRow } from '@/interfaces';
-import { apiErrorMessage, draftRefusal, pickCorridor } from '@/lib/utils';
+import { apiErrorMessage, draftRefusal, pickCorridor, ratesReading } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Rate catalog (US-Q-10, spec §7.1): rates for each corridor and service class, read from the draft when
  * one is open and from the current version otherwise. A quotation pins the version it was built from.
- * The transport specialist keeps the catalog; the logistics manager reads the current version (US-Q-04).
+ * The transport specialist keeps the catalog; the logistics manager reads the current version (US-Q-04), with a
+ * panel that says which version that is and whether a draft is being prepared.
  */
 const RatesPage: FC = () => {
   const canEdit = useAuthStore((state) => state.roles).includes(RoleNameEnum.TRANSPORT_SPECIALIST);
@@ -37,11 +39,8 @@ const RatesPage: FC = () => {
   const [params, setParams] = useSearchParams();
   const picked = pickCorridor(catalog?.corridors ?? [], params.get('corridor'));
   const corridorId = picked.id;
-  const versionId = catalog
-    ? canEdit
-      ? (catalog.draftVersionId ?? catalog.currentVersionId)
-      : catalog.currentVersionId
-    : null;
+  const reading = catalog ? ratesReading(catalog, canEdit) : null;
+  const versionId = reading?.versionId ?? null;
   const viewQuery = useRateCorridor(versionId, corridorId);
   const shown = catalog?.versions.find((v) => v.id === versionId);
 
@@ -189,7 +188,11 @@ const RatesPage: FC = () => {
                 Create a new draft to make further changes.
               </Callout>
             )}
-            {canEdit && <DraftPanel catalog={catalog} onDraftGone={onDraftGone} />}
+            {canEdit ? (
+              <DraftPanel catalog={catalog} onDraftGone={onDraftGone} />
+            ) : (
+              <ReaderPanel catalog={catalog} hiddenDraft={reading?.hiddenDraft ?? false} />
+            )}
             {!corridorId ? (
               <Panel title="No corridors yet">
                 <p className="type-body-m m-0 text-ink-2">

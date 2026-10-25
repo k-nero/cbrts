@@ -5,6 +5,7 @@ import { TRAILER_LABELS } from './request';
 import type {
   ApiError,
   FeeBand,
+  RateCatalog,
   RateLine,
   RateCorridor,
   RatePolicyKey,
@@ -254,6 +255,18 @@ export const pickCorridor = (
   if (param && corridors.some((c) => c.id === param)) return { id: param, unknown: false };
   return { id: corridors[0]?.id ?? null, unknown: param != null };
 };
+
+/**
+ * The version the Rates page reads: the specialist edits the open draft; a reader who can't edit (the logistics
+ * manager, US-Q-04) reads the published version quotations are priced from, and is told when a draft is open.
+ */
+export const ratesReading = (
+  catalog: Pick<RateCatalog, 'currentVersionId' | 'draftVersionId'>,
+  canEdit: boolean,
+): { versionId: string | null; hiddenDraft: boolean } =>
+  canEdit
+    ? { versionId: catalog.draftVersionId ?? catalog.currentVersionId, hiddenDraft: false }
+    : { versionId: catalog.currentVersionId, hiddenDraft: catalog.draftVersionId != null };
 
 /** Accessible names for a table row's Edit and Remove buttons. */
 export const rowActionLabels = (name: string): { edit: string; remove: string } => ({
