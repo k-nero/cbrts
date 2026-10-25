@@ -24,7 +24,8 @@ public record QuotationSnapshot(List<Row> rows, Fit fit, String stallNote, Facts
     /** A totals row as issued: "Contingency", "5% of $33,353.25", $1,667.66. */
     public record Row(String key, String label, String baseText, BigDecimal amount) {}
 
-    public record Fit(int positions, int widthUsedIn) {}
+    /** {@code totalWeightKg} is null on snapshots written before weights were kept (BR-Q-16). */
+    public record Fit(int positions, int widthUsedIn, Integer totalWeightKg) {}
 
     public record Facts(
             String fromCity,

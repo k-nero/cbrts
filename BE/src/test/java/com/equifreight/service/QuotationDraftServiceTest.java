@@ -306,6 +306,8 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
 
         assertThat(response.readiness().ready()).isTrue();
         assertThat(response.fit().positions()).isEqualTo(1);
+        // BR-Q-16: the two fixture horses at 500 kg each.
+        assertThat(response.fit().totalWeightKg()).isEqualTo(1000);
         assertThat(response.totals().rows())
                 .extracting(r -> r.key())
                 .containsExactly("FUEL", "INSURANCE", "CONTINGENCY", "SERVICE_FEE");

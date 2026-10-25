@@ -208,6 +208,7 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                 .containsExactly("Nightfall", "Shadowfax");
         assertThat(snapshot.request().fromCity()).isEqualTo("Phnom Penh");
         assertThat(snapshot.stallNote()).startsWith("Nightfall and Shadowfax fly business class at 48 in each");
+        assertThat(snapshot.fit().totalWeightKg()).isEqualTo(1000);
         assertThat(request.getStatus()).isEqualTo(RequestStatus.QUOTED);
         verify(audit)
                 .recordDecision(
