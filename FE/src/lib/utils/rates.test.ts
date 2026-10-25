@@ -12,6 +12,7 @@ import {
   pctText,
   pickCorridor,
   policyRows,
+  ratesReading,
   rowActionLabels,
 } from './rates';
 
@@ -321,6 +322,28 @@ describe('rowActionLabels', () => {
     expect(rowActionLabels('Flying groom')).toEqual({
       edit: 'Edit Flying groom',
       remove: 'Remove Flying groom',
+    });
+  });
+});
+
+describe('ratesReading', () => {
+  const both = { currentVersionId: 'v4', draftVersionId: 'v5' };
+  const published = { currentVersionId: 'v4', draftVersionId: null };
+
+  test('the specialist reads the open draft, else the current version', () => {
+    expect(ratesReading(both, true)).toEqual({ versionId: 'v5', hiddenDraft: false });
+    expect(ratesReading(published, true)).toEqual({ versionId: 'v4', hiddenDraft: false });
+  });
+
+  test('a reader who cannot edit reads the current version and is told a draft is open', () => {
+    expect(ratesReading(both, false)).toEqual({ versionId: 'v4', hiddenDraft: true });
+    expect(ratesReading(published, false)).toEqual({ versionId: 'v4', hiddenDraft: false });
+  });
+
+  test('with nothing published, a reader who cannot edit has no version to read', () => {
+    expect(ratesReading({ currentVersionId: null, draftVersionId: 'v1' }, false)).toEqual({
+      versionId: null,
+      hiddenDraft: true,
     });
   });
 });
