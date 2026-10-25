@@ -78,6 +78,7 @@ public final class RequiredRates {
         requirePolicy(missing, rates, RatePolicyKey.SERVICE_FEE_PCT, "Service fee");
         if (in.mode() == TransportMode.AIR) {
             requirePolicy(missing, rates, RatePolicyKey.FUEL_PCT, "Fuel surcharge");
+            weightLimits(missing, rates);
         }
         if (in.insurance() == InsuranceOption.EQUIFREIGHT) {
             requirePolicy(missing, rates, RatePolicyKey.INSURANCE_PCT, "Transit insurance");
@@ -122,7 +123,16 @@ public final class RequiredRates {
         requirePolicy(missing, rates, RatePolicyKey.FUEL_PCT, "Fuel surcharge");
         requirePolicy(missing, rates, RatePolicyKey.INSURANCE_PCT, "Transit insurance");
         requirePolicy(missing, rates, RatePolicyKey.ESTIMATE_BAND_PCT, "Estimate band");
+        if (mode == TransportMode.AIR) {
+            weightLimits(missing, rates);
+        }
         return missing;
+    }
+
+    /** The two limits an air stall fit checks the horses' weight against (BR-Q-16). */
+    private static void weightLimits(List<MissingRate> missing, RateSet rates) {
+        requirePolicy(missing, rates, RatePolicyKey.STALL_PAYLOAD_KG, "Stall payload");
+        requirePolicy(missing, rates, RatePolicyKey.AIR_SHIPMENT_MAX_KG, "Air shipment weight limit");
     }
 
     /** The sex a horse is priced as: a colt at the stallion rate, a filly at the mare rate (as the load plan). */

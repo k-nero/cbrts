@@ -214,7 +214,9 @@ abstract class QuotationServiceFixture {
                 RatePolicyKey.CONTINGENCY_PCT,
                 RatePolicyKey.SERVICE_FEE_PCT,
                 RatePolicyKey.QUOTE_VALIDITY_DAYS,
-                RatePolicyKey.DEPOSIT_PCT)) {
+                RatePolicyKey.DEPOSIT_PCT,
+                RatePolicyKey.STALL_PAYLOAD_KG,
+                RatePolicyKey.AIR_SHIPMENT_MAX_KG)) {
             RatePolicy p = new RatePolicy();
             p.setVersion(v);
             p.setKey(key);
@@ -222,6 +224,8 @@ abstract class QuotationServiceFixture {
                     switch (key) {
                         case QUOTE_VALIDITY_DAYS -> new BigDecimal("7");
                         case DEPOSIT_PCT -> new BigDecimal("30");
+                        case STALL_PAYLOAD_KG -> new BigDecimal("5504");
+                        case AIR_SHIPMENT_MAX_KG -> new BigDecimal("20000");
                         default -> BigDecimal.TEN;
                     });
             policies.add(p);

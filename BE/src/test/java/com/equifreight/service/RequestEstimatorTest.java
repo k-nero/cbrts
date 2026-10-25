@@ -94,6 +94,8 @@ class RequestEstimatorTest {
         policy(RatePolicyKey.SERVICE_FEE_PCT, "12");
         policy(RatePolicyKey.ARRIVAL_WINDOW_PCT, "20");
         policy(RatePolicyKey.ESTIMATE_BAND_PCT, "15");
+        policy(RatePolicyKey.STALL_PAYLOAD_KG, "5504");
+        policy(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "20000");
 
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.of(v5));

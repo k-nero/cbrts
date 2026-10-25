@@ -147,6 +147,8 @@ class RequiredRatesTest {
                         "Contingency",
                         "Service fee",
                         "Fuel surcharge",
+                        "Stall payload",
+                        "Air shipment weight limit",
                         "Transit insurance",
                         "Flight vet threshold",
                         "High value threshold");
@@ -287,6 +289,52 @@ class RequiredRatesTest {
 
         assertThat(RequiredRates.forCorridor(TransportMode.AIR, "AIR PNH → HKG", "Phnom Penh", "Hong Kong", 0, rates))
                 .containsExactly(new MissingRate(null, "Estimate band", "Rate catalog v2 has no estimate band value."));
+    }
+
+    // --- the weight limits (BR-Q-16) ---------------------------------------------------------------------
+
+    private static RateSet withoutWeightLimits(
+            List<com.equifreight.service.pricing.ClassRow> classes, List<RateRow> lines) {
+        Map<RatePolicyKey, BigDecimal> policies = new java.util.EnumMap<>(standardPolicies());
+        policies.remove(RatePolicyKey.STALL_PAYLOAD_KG);
+        policies.remove(RatePolicyKey.AIR_SHIPMENT_MAX_KG);
+        return new RateSet(2, classes, lines, standardBreaks(), policies);
+    }
+
+    @Test
+    void anAirRequestNeedsTheWeightLimits() {
+        RateSet rates = withoutWeightLimits(pnhHkgRates().classes(), pnhHkgLines());
+
+        assertThat(RequiredRates.forRequest(pnhHkgBusiness(), rates))
+                .containsExactly(
+                        new MissingRate(null, "Stall payload", "Rate catalog v2 has no stall payload value."),
+                        new MissingRate(
+                                null,
+                                "Air shipment weight limit",
+                                "Rate catalog v2 has no air shipment weight limit value."));
+    }
+
+    @Test
+    void aRoadRequestDoesNotNeedTheWeightLimits() {
+        List<com.equifreight.service.pricing.PricingHorse> horses =
+                List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"));
+        RateSet rates = withoutWeightLimits(List.of(), roadLines(kmLine("ROAD", "Road freight", null, "3", null)));
+
+        assertThat(descriptions(RequiredRates.forRequest(road(TrailerType.SHARED, 700, 0, horses), rates)))
+                .doesNotContain("Stall payload", "Air shipment weight limit");
+    }
+
+    @Test
+    void anAirCorridorListsTheWeightLimits() {
+        RateSet rates = withoutWeightLimits(pnhHkgRates().classes(), pnhHkgLines());
+
+        assertThat(RequiredRates.forCorridor(TransportMode.AIR, "AIR PNH → HKG", "Phnom Penh", "Hong Kong", 0, rates))
+                .containsExactly(
+                        new MissingRate(null, "Stall payload", "Rate catalog v2 has no stall payload value."),
+                        new MissingRate(
+                                null,
+                                "Air shipment weight limit",
+                                "Rate catalog v2 has no air shipment weight limit value."));
     }
 
     @Test
