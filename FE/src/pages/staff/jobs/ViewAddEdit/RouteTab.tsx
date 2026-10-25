@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { App, Flex } from 'antd';
 import { ContinueTripModal } from './ContinueTripModal';
 import { FlightPanel } from './FlightPanel';
+import { OnTheRoad } from './OnTheRoad';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
@@ -85,6 +86,7 @@ export function RouteTab({ job }: Props) {
         </div>
         {chainPanel}
         {sharePanel}
+        <OnTheRoad job={job} />
       </Flex>
     );
   }
@@ -273,6 +275,7 @@ export function RouteTab({ job }: Props) {
           </Flex>
         </Flex>
       )}
+      <OnTheRoad job={job} />
     </Flex>
   );
 }

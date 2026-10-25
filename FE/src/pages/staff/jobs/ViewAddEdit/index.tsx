@@ -12,7 +12,6 @@ import { JourneyRail } from './JourneyRail';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 import { Placeholder } from './Placeholder';
-import { TripTab } from './TripTab';
 
 /** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
@@ -46,12 +45,6 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       owner: 'Transport specialist',
       render: (job) => <AuthoritiesTab job={job} />,
     },
-    {
-      key: 'trip',
-      label: 'Trip',
-      owner: 'Escort (driver / groom)',
-      render: (job) => <TripTab job={job} />,
-    },
   ];
 
 const STAGE_MAP: Record<
@@ -82,7 +75,9 @@ function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = TABS.find((tab) => tab.key === searchParams.get('tab')) ?? TABS[0];
+  // The Trip tab's incidents and closing moved to the Route tab; older links (notifications) still say ?tab=trip.
+  const tabKey = searchParams.get('tab') === 'trip' ? 'route' : searchParams.get('tab');
+  const activeTab = TABS.find((tab) => tab.key === tabKey) ?? TABS[0];
   const showTrip = (trip: string) =>
     setSearchParams({ tab: activeTab.key, trip }, { replace: true });
 
