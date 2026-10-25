@@ -11,9 +11,13 @@ import { useCustomRouter } from '@/router/route.hook';
 
 /**
  * Start quotation, or open the one already started (pricing slice, spec §7.3). A double click sends one
- * start; the builder opens once it answers.
+ * start; the builder opens once it answers. `primary` makes opening it the panel's one gold action, for a
+ * re-quote waiting to be issued.
  */
-export const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
+export const QuotationAction: FC<{ review: RequestReview; primary?: boolean }> = ({
+  review,
+  primary = false,
+}) => {
   const router = useCustomRouter();
   const start = useStartQuotation();
   const qc = useQueryClient();
@@ -25,7 +29,7 @@ export const QuotationAction: FC<{ review: RequestReview }> = ({ review }) => {
   if (action === null) return null;
   if (action === 'open' && review.quotation) {
     return (
-      <Button variant="secondary" block onClick={open}>
+      <Button variant={primary ? 'primary' : 'secondary'} block onClick={open}>
         {`Open quotation ${review.quotation.code} · v${review.quotation.versionNo}`}
       </Button>
     );

@@ -25,12 +25,14 @@ import {
   NOTE_MAX,
   noteState,
   requestStatusChip,
+  restingPanel,
 } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
  * The decision (spec §5.2): in review, ask for information, start the quotation or reject; once the
- * customer accepts, approve into a job or reject (US-F1-07); once approved, the job and its team. After a
+ * customer accepts, approve into a job or reject (US-F1-07); once approved, the job and its team; once
+ * expired with a re-quote in draft, the draft to issue (A4). After a
  * return, the page opens the next request the queue held before it, or goes back to Requests.
  */
 export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
@@ -69,14 +71,14 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   if (!inReview(request.status)) {
     const chip = requestStatusChip(request.status);
     const returned = review.revisions[review.revisions.length - 1];
+    const resting = restingPanel(review);
     return (
-      <Panel
-        title={request.status === 'INFO_REQUIRED' ? 'Waiting for the customer' : 'Not in review'}
-        extra={<Chip tone={chip.tone}>{chip.label}</Chip>}
-      >
+      <Panel title={resting.title} extra={<Chip tone={chip.tone}>{chip.label}</Chip>}>
         <Flex vertical gap={16}>
           {conflictCallout}
-          {request.infoRequiredNote ? (
+          {resting.requote ? (
+            <p className="type-body-s m-0 text-ink-2">{resting.requote}</p>
+          ) : request.infoRequiredNote ? (
             <Flex vertical gap={4}>
               <p className="type-label-s m-0 text-ink-2">
                 Returned{returned?.returnedAt ? ` ${formatDate(returned.returnedAt)}` : ''} with:
@@ -95,7 +97,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               This request isn&apos;t waiting for review.
             </p>
           )}
-          <QuotationAction review={review} />
+          <QuotationAction review={review} primary={resting.requote !== null} />
         </Flex>
       </Panel>
     );
