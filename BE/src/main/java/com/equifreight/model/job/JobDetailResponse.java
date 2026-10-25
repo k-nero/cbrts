@@ -3,6 +3,7 @@ package com.equifreight.model.job;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.TripStatus;
+import com.equifreight.model.route.PlaceResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +17,9 @@ public record JobDetailResponse(
         String tripCode,
         String originCity,
         String destinationCity,
+        /** The request's pickup and delivery places, where a first route draft starts and ends (US-F3-17). */
+        PlaceResponse originPlace,
+        PlaceResponse destinationPlace,
         JobStage stage,
         DossierStatus dossierStatus,
         TripStatus tripStatus,

@@ -1,6 +1,6 @@
 import type { BaseEntity } from './api';
 import type { DossierStatus } from './clearance';
-import type { ServiceClass } from './request';
+import type { Place, ServiceClass } from './request';
 import type { TripPart, TripStatus } from './trip';
 import type { StallSide, StallType } from './vehicle';
 
@@ -40,6 +40,50 @@ export const TransportModeEnum = {
   AIR: 'AIR',
 } as const;
 export type TransportMode = (typeof TransportModeEnum)[keyof typeof TransportModeEnum];
+
+/** A draft of one trip's route, as the Route tab's editor saves it (US-F3-17). */
+export interface RouteDraftInput {
+  distanceKm?: number | null;
+  durationMin?: number | null;
+  changeReason?: string;
+  stops: {
+    seq: number;
+    kind: RouteStopKind;
+    /** The job a pickup, delivery or transfer is for; the job in the URL when left out. */
+    jobId?: string | null;
+    placeId?: string | null;
+    borderCrossingId?: string | null;
+    plannedAt?: string | null;
+    plannedStayMin?: number | null;
+    details?: string | null;
+  }[];
+  legs: {
+    seq: number;
+    fromStopSeq: number;
+    toStopSeq: number;
+    mode: TransportMode;
+    vehicleId?: string | null;
+    distanceKm?: number | null;
+    plannedMin?: number | null;
+    flight?: {
+      airline: string;
+      flightNo: string;
+      aircraftType?: string | null;
+      stallCapacity?: number | null;
+      scheduledDepartureAt?: string | null;
+      scheduledArrivalAt?: string | null;
+    } | null;
+  }[];
+}
+
+/** A border crossing a route can stop at. */
+export interface BorderCrossing {
+  id: string;
+  name: string;
+  fromCountry: string;
+  toCountry: string;
+  roadOnly: boolean;
+}
 
 /** A catalog corridor, as the fleet & route coordinator picks one for the next trip of a journey. */
 export interface Corridor {
@@ -297,6 +341,9 @@ export interface JobDetail extends BaseEntity {
   tripCode?: string | null;
   originCity: string;
   destinationCity: string;
+  /** The request's pickup and delivery places, where a first route draft starts and ends. */
+  originPlace?: Place | null;
+  destinationPlace?: Place | null;
   stage: JobStage;
   dossierStatus: DossierStatus;
   tripStatus: TripStatus;
