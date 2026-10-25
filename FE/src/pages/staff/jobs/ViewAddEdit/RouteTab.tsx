@@ -4,10 +4,16 @@ import { App, Flex } from 'antd';
 import { ContinueTripModal } from './ContinueTripModal';
 import { FlightPanel } from './FlightPanel';
 import { OnTheRoad } from './OnTheRoad';
+import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
-import { useCanPlanTrips, useRemoveChainedTrip, useRoutePlans } from '@/hooks/useJob';
+import {
+  useCanPlanTrips,
+  useConfirmRoutePlan,
+  useRemoveChainedTrip,
+  useRoutePlans,
+} from '@/hooks/useJob';
 import type { JobDetail, RouteStop, RouteStopKind } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
@@ -25,13 +31,16 @@ export function RouteTab({ job }: Props) {
   const [, setSearchParams] = useSearchParams();
   const [splitAt, setSplitAt] = useState<RouteStop | null>(null);
   const removeTrip = useRemoveChainedTrip(job.id);
+  const confirmRoute = useConfirmRoutePlan(job.id);
+  const [editing, setEditing] = useState(false);
 
   // The trip of the journey this tab plans, and the one that hands the horses on to it (US-F3-16).
   const index = job.parts.findIndex((part) => part.current);
   const part = index < 0 ? null : job.parts[index];
   const before = index > 0 && job.parts[index - 1].handsOn ? job.parts[index - 1] : null;
   const departed = (part?.status ?? job.tripStatus) !== 'NOT_STARTED';
-  // Splitting the journey, taking a trip out and sharing are the trip planners' (US-F3-16, US-F3-11).
+  // Splitting the journey, taking a trip out, sharing and editing the route are the trip planners' (US-F3-16,
+  // US-F3-11, US-F3-17).
   const planning = useCanPlanTrips() && !departed;
 
   const takeOut = () =>
@@ -72,6 +81,54 @@ export function RouteTab({ job }: Props) {
       </Callout>
     ) : null;
 
+  // The trip's draft, newer than its confirmed route if it has one: edited and confirmed here (US-F3-17).
+  const draft = allVersions?.find((v) => v.status === 'DRAFT') ?? null;
+  const confirmed = allVersions?.find((v) => v.status === 'CONFIRMED') ?? null;
+  const editor =
+    editing && planning ? (
+      <RouteEditor
+        job={job}
+        from={draft ?? confirmed}
+        supersedes={confirmed !== null}
+        onClose={() => setEditing(false)}
+      />
+    ) : null;
+  const draftPanel =
+    draft && planning && !editing ? (
+      <Callout tone="warn" title={`Draft v${draft.versionNo} isn’t confirmed yet`}>
+        <Flex vertical gap={12}>
+          <span>
+            {confirmed
+              ? `The trip still runs on v${confirmed.versionNo} until you confirm the draft.`
+              : 'Confirm it to set the trip’s dates; the load plan and sign-off follow.'}
+            {draft.changeReason ? ` Reason: ${draft.changeReason}` : ''}
+          </span>
+          <Flex gap={8}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={confirmRoute.isPending}
+              onClick={() =>
+                confirmRoute.mutate(
+                  { planId: draft.id },
+                  {
+                    onSuccess: () => message.success(`Route v${draft.versionNo} confirmed.`),
+                    onError: (error) =>
+                      message.error(apiErrorMessage(error, 'The route was not confirmed.')),
+                  },
+                )
+              }
+            >
+              {confirmRoute.isPending ? 'Confirming...' : `Confirm draft v${draft.versionNo}`}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+              Edit draft
+            </Button>
+          </Flex>
+        </Flex>
+      </Callout>
+    ) : null;
+
   // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13).
   const sharePanel =
     job.tripStatus === 'NOT_STARTED' && planning ? (
@@ -83,10 +140,19 @@ export function RouteTab({ job }: Props) {
   if (!routePlan) {
     return (
       <Flex vertical gap={24}>
-        <div className="p-8 text-center">
-          <p className="type-body-s text-ink-3">No route plan has been created for this job yet.</p>
-        </div>
         {chainPanel}
+        {editor ?? (
+          <div className="p-8 text-center">
+            <Flex vertical gap={12} align="center">
+              <p className="type-body-s m-0 text-ink-3">This trip has no route yet.</p>
+              {planning && (
+                <Button variant="primary" size="md" onClick={() => setEditing(true)}>
+                  Plan the route
+                </Button>
+              )}
+            </Flex>
+          </div>
+        )}
         {sharePanel}
         <OnTheRoad job={job} />
       </Flex>
@@ -127,6 +193,8 @@ export function RouteTab({ job }: Props) {
   return (
     <Flex vertical gap={32}>
       {chainPanel}
+      {draftPanel}
+      {editor}
       {sharePanel}
       <ContinueTripModal job={job} stop={splitAt} onClose={() => setSplitAt(null)} />
 
@@ -174,7 +242,19 @@ export function RouteTab({ job }: Props) {
       <Flex vertical gap={16}>
         <Flex align="center" justify="space-between">
           <h3 className="type-h3 text-ink">Timeline</h3>
-          <Chip tone="neutral">Version {routePlan.versionNo}</Chip>
+          <Flex gap={8} align="center">
+            {planning && !draft && !editing && (
+              <Button
+                variant="secondary"
+                size="sm"
+
+                onClick={() => setEditing(true)}
+              >
+                Edit route
+              </Button>
+            )}
+            <Chip tone="neutral">Version {routePlan.versionNo}</Chip>
+          </Flex>
         </Flex>
 
         <Flex vertical gap={16}>

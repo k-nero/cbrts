@@ -75,6 +75,7 @@ class RouteServiceTest {
         service = new RouteService(
                 corridors,
                 places,
+                org.mockito.Mockito.mock(com.equifreight.repository.BorderCrossingRepository.class),
                 catalogs,
                 versions,
                 Clock.fixed(Instant.parse("2026-09-26T03:00:00Z"), BusinessTime.ZONE));

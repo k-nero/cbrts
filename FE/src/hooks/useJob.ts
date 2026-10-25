@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { corridorApi, jobApi, jobsListApi } from '@/apis/job';
+import { corridorApi, jobApi, jobsListApi, routeStopApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -12,6 +12,7 @@ import {
   type JobSummary,
   type TripLoad,
   type MoveHorse,
+  type RouteDraftInput,
   RoleNameEnum,
 } from '@/interfaces';
 
@@ -371,5 +372,24 @@ export const useRemoveChainedTrip = (jobId: string) => {
       });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
+  });
+};
+
+/** The border crossings a route's border stops pick from (US-F3-17). */
+export const useBorderCrossings = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['border-crossings'],
+    queryFn: routeStopApi.borderCrossings,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+
+/** Saves the trip's route draft (US-F3-17); the Route tab and its versions refetch. */
+export const useSaveRouteDraft = (jobId: string) => {
+  const queryClient = useQueryClient();
+  const trip = useJobTrip();
+  return useMutation({
+    mutationFn: (draft: RouteDraftInput) => jobApi.saveRouteDraft(jobId, draft, trip),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job', jobId] }),
   });
 };

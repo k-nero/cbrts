@@ -17,6 +17,9 @@ import type {
   TripPart,
   JobClosing,
   Corridor,
+  RouteDraftInput,
+  BorderCrossing,
+  Place,
 } from '@/interfaces';
 
 /**
@@ -87,6 +90,12 @@ export const jobApi = {
   getRoutePlans: (jobId: string, trip?: string) =>
     client
       .get<RoutePlan[]>(`/staff/jobs/${jobId}/route-plans`, { params: { trip } })
+      .then((r) => r.data),
+
+  /** US-F3-17: saves the trip's route draft, a new version when its route is confirmed. */
+  saveRouteDraft: (jobId: string, draft: RouteDraftInput, trip?: string) =>
+    client
+      .post<RoutePlan>(`/staff/jobs/${jobId}/route-plans`, draft, { params: { trip } })
       .then((r) => r.data),
 
   confirmRoutePlan: (jobId: string, planId: string, changeReason?: string, trip?: string) =>
@@ -188,4 +197,14 @@ export const corridorApi = {
     client
       .get<{ content: Corridor[] }>('/staff/corridors', { params: { size: 200, sort: 'code' } })
       .then((r) => r.data.content),
+};
+
+/** What a route plan's stops can be (US-F3-17): every catalogued place, and the border crossings. */
+export const routeStopApi = {
+  places: (q: string) =>
+    client
+      .get<{ content: Place[] }>('/staff/places', { params: { q, size: 20 } })
+      .then((r) => r.data.content),
+  borderCrossings: () =>
+    client.get<BorderCrossing[]>('/staff/border-crossings').then((r) => r.data),
 };
