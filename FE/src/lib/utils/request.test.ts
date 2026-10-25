@@ -28,6 +28,8 @@ import {
   routePlanLine,
   routeSentence,
   routeStops,
+  departureHint,
+  flexLabel,
   serviceLine,
   shownBlockers,
   stepOfBlocker,
@@ -170,6 +172,12 @@ describe('toDraftInput', () => {
 });
 
 describe('fromRequest', () => {
+  test("flexible dates read back as flexible whatever the route's flex (#115)", () => {
+    expect(fromRequest(draft({ dateFlexDays: 5 })).flexible).toBe(true);
+    expect(fromRequest(draft({ dateFlexDays: 3 })).flexible).toBe(true);
+    expect(fromRequest(draft({ dateFlexDays: 0 })).flexible).toBe(false);
+  });
+
   test('a saved window reads back as the same Vietnam day and times', () => {
     const v = fromRequest(
       draft({
@@ -354,6 +362,7 @@ const route = (over: Partial<Route>): Route => ({
   crossBorder: true,
   leadTimeDays: 21,
   earliestDeparture: '2026-11-07',
+  dateFlexDays: 3,
   ...over,
 });
 const hcmBkk = route({});
@@ -490,6 +499,14 @@ describe('the draft pass', () => {
     ]);
   });
 
+  test("the pass shows the route's own flex, and none on a fixed-date route (#115)", () => {
+    const values = { ...EMPTY_WIZARD, departureDate: '2026-10-30', flexible: true };
+    expect(passRows(values, [], route({ dateFlexDays: 5 }), false)[0].value).toBe(
+      '30 Oct 2026 · ±5 d',
+    );
+    expect(passRows(values, [], route({ dateFlexDays: 0 }), false)[0].value).toBe('30 Oct 2026');
+  });
+
   test('a window, air, and a route we do not run', () => {
     const win = passRows(
       {
@@ -553,6 +570,12 @@ describe('review', () => {
       ['Service', 'service'],
       ['Insurance', 'service'],
     ]);
+  });
+
+  test("the departure row shows the request's own flex (#115)", () => {
+    const departure = (r: TransportRequest) => reviewRows(r).find((x) => x.label === 'Departure');
+    expect(departure({ ...full, dateFlexDays: 5 })?.value).toBe('30 Oct 2026 · ±5 days');
+    expect(departure({ ...full, dateFlexDays: 0 })?.value).toBe('30 Oct 2026');
   });
 
   test('row values', () => {
@@ -764,5 +787,32 @@ describe('where a request stands (US-F1-08)', () => {
       tone: 'neutral',
     });
     expect(nextStepDeadline(review, { ...v2, status: 'CUSTOMER_ACCEPTED' }, now)).toBeNull();
+  });
+});
+
+describe("the route's flexible dates (#115)", () => {
+  test("the tick names the route's flex, ±3 before a route is known, and is hidden on a fixed route", () => {
+    expect(flexLabel(route({ dateFlexDays: 5 }))).toBe('My dates can move by ±5 days');
+    expect(flexLabel(route({ dateFlexDays: 1 }))).toBe('My dates can move by ±1 day');
+    expect(flexLabel(null)).toBe('My dates can move by ±3 days');
+    expect(flexLabel(route({ dateFlexDays: 0 }))).toBeNull();
+  });
+
+  test('the departure hint adds the flex to the lead time, as the server counts it', () => {
+    expect(departureHint(route({}), false)).toBe('Earliest departure 7 Nov 2026 · 21 days’ notice');
+    expect(departureHint(route({}), true)).toBe(
+      'Earliest departure 10 Nov 2026 · 21 days’ notice, plus 3 for dates that can move',
+    );
+    expect(departureHint(route({ dateFlexDays: 0 }), true)).toBe(
+      'Earliest departure 7 Nov 2026 · 21 days’ notice',
+    );
+    expect(departureHint(route({ earliestDeparture: null }), true)).toBeUndefined();
+    expect(departureHint(null, true)).toBeUndefined();
+  });
+
+  test('the hint crosses a month end as a calendar day', () => {
+    expect(departureHint(route({ earliestDeparture: '2026-11-29', dateFlexDays: 3 }), true)).toBe(
+      'Earliest departure 2 Dec 2026 · 21 days’ notice, plus 3 for dates that can move',
+    );
   });
 });

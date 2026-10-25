@@ -77,8 +77,10 @@ export interface Route {
   countries: string[] | null;
   crossBorder: boolean | null;
   leadTimeDays: number | null;
-  /** YYYY-MM-DD. */
+  /** YYYY-MM-DD, with fixed dates. */
   earliestDeparture: string | null;
+  /** How far flexible dates can move on this route, 0 to 7 days (#115); 0 runs on fixed dates only. */
+  dateFlexDays: number;
 }
 
 export interface LeadTime {

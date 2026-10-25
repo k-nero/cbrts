@@ -81,6 +81,7 @@ describe('the queue', () => {
 
   test('departs with its flexibility', () => {
     expect(departsWords('2026-10-30', 3)).toBe('30 Oct ±3 d');
+    expect(departsWords('2026-10-30', 5)).toBe('30 Oct ±5 d');
     expect(departsWords('2026-10-30', 0)).toBe('30 Oct');
   });
 
@@ -116,6 +117,9 @@ describe('the review page', () => {
     } as typeof r;
     expect(reviewSummary(air)).toBe(
       'Saigon Turf Club · 2 horses · air, business class · departs 30 Oct 2026',
+    );
+    expect(reviewSummary({ ...r, dateFlexDays: 5 })).toBe(
+      'Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±5 d',
     );
   });
 
