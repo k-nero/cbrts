@@ -526,6 +526,10 @@ export function TripWorkspace({
                 setPartId(id);
                 setStopId(undefined);
               }}
+              onShowJourney={() => {
+                setPartId(undefined);
+                setStopId(undefined);
+              }}
             />
           )}
         </>

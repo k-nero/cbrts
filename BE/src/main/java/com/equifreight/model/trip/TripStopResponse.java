@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
 
-@Builder
+@Builder(toBuilder = true)
 public record TripStopResponse(
         UUID id,
         short sequence,

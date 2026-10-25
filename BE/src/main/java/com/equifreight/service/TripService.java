@@ -190,7 +190,13 @@ public class TripService {
         if (user.getClub() == null
                 || !job.getRequest().getClub().getId().equals(user.getClub().getId()))
             throw ResourceNotFoundException.of("Trip", code);
-        return view(job, partTrip(job, tripId, code), false, null);
+        TripViewResponse shown = view(job, partTrip(job, tripId, code), false, null);
+        // A journey of several trips (US-F3-16) is followed on one timeline, unless the customer opens one trip.
+        List<TripJob> parts = jobTrips.partsOf(job);
+        if (tripId != null || parts.stream().noneMatch(p -> p.getNext() != null)) return shown;
+        List<TripViewResponse> legs =
+                parts.stream().map(p -> view(job, p.getTrip(), false, null)).toList();
+        return TripMapper.toJourneyResponse(job, shown, legs);
     }
 
     @Transactional

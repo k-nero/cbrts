@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.RouteStopKind;
@@ -10,6 +11,7 @@ import com.equifreight.model.job.*;
 import com.equifreight.repository.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
@@ -145,6 +147,8 @@ public class RoutePlanService {
             routeStopRepository.deleteAll(plan.getStops());
             plan.getLegs().clear();
             plan.getStops().clear();
+            // The new stops reuse the old sequence numbers (route_stops_route_plan_id_seq_key): delete before insert.
+            routeStopRepository.flush();
         } else {
             short nextVersion = 1;
             Optional<RoutePlan> latest = routePlanRepository.findFirstByTrip_IdOrderByVersionNoDesc(trip.getId());
@@ -315,6 +319,7 @@ public class RoutePlanService {
                                     + " is after the arrival window close " + onTrip.getWindowEnd());
                         });
             }
+            requireInOrder(trip, plan.getStops(), onTrip, job);
         }
 
         // Reconfirming the plan already confirmed changes nothing the customer was told.
@@ -625,6 +630,106 @@ public class RoutePlanService {
     /** The stop kinds that name the job they are for. */
     static boolean namesJob(RouteStopKind kind) {
         return kind == RouteStopKind.PICKUP || kind == RouteStopKind.DELIVERY || kind == RouteStopKind.TRANSFER;
+    }
+
+    private static final DateTimeFormatter AT =
+            DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH).withZone(BusinessTime.ZONE);
+
+    /** Where and when a job's horses are ready to leave a trip's transfer stop for the next trip of its journey. */
+    private record Handoff(Place place, Instant at) {}
+
+    /**
+     * The trips of a journey follow each other (US-F3-16): {@code onTrip} is collected on {@code trip} only once each
+     * trip before has handed its horses on and the wait there (the transfer's planned stay, quarantine say) is over,
+     * and the next trip collects them only after {@code stops}, the route being confirmed, hands them on. A stop with
+     * no planned time isn't checked; the other trip's draft is read before its confirmed route.
+     */
+    private void requireInOrder(Trip trip, List<RouteStop> stops, TransportJob onTrip, TransportJob confirming) {
+        Optional<Instant> pickup =
+                ownStop(stops, onTrip, confirming, RouteStopKind.PICKUP).map(RouteStop::getPlannedAt);
+        for (TripJob before : jobTrips.partsBefore(trip, onTrip)) {
+            Trip previous = before.getTrip();
+            Optional<Handoff> ready = activePlan(previous).flatMap(p -> handoffOf(p.getStops(), onTrip, onTrip));
+            if (pickup.isPresent()
+                    && ready.isPresent()
+                    && pickup.get().isBefore(ready.get().at())) {
+                throw new BusinessException(onTrip.getCode() + "'s pickup on trip " + trip.getCode() + " is planned at "
+                        + AT.format(pickup.get()) + ", before its horses are ready at "
+                        + ready.get().place().getName() + " at "
+                        + AT.format(ready.get().at()) + " (trip "
+                        + previous.getCode() + "'s transfer plus the stay there): plan it at or after then");
+            }
+        }
+        jobTrips.partAfter(trip, onTrip).ifPresent(after -> {
+            Trip next = after.getTrip();
+            Optional<Handoff> ready = handoffOf(stops, onTrip, confirming);
+            Optional<Instant> collected = activePlan(next)
+                    .flatMap(p -> ownStop(p.getStops(), onTrip, onTrip, RouteStopKind.PICKUP))
+                    .map(RouteStop::getPlannedAt);
+            if (ready.isPresent()
+                    && collected.isPresent()
+                    && collected.get().isBefore(ready.get().at())) {
+                throw new BusinessException("Trip " + next.getCode() + " collects " + onTrip.getCode() + "'s horses at "
+                        + AT.format(collected.get()) + ", before this route has them ready at "
+                        + ready.get().place().getName() + " at "
+                        + AT.format(ready.get().at())
+                        + ": move that trip's pickup first, or hand them on earlier");
+            }
+        });
+    }
+
+    /** The job's stop of {@code kind} on a route; a stop that names no job is {@code confirming}'s. */
+    private static Optional<RouteStop> ownStop(
+            List<RouteStop> stops, TransportJob job, TransportJob confirming, RouteStopKind kind) {
+        return stops.stream()
+                .filter(st ->
+                        st.getKind() == kind && ownerOf(st, confirming).getId().equals(job.getId()))
+                .findFirst();
+    }
+
+    /**
+     * When the job's horses are ready to leave its TRANSFER on a route: the transfer's planned time plus its stay, or
+     * the stay of the stop just before it at the same place when the transfer was added beside a stop other jobs share.
+     */
+    private static Optional<Handoff> handoffOf(List<RouteStop> stops, TransportJob job, TransportJob confirming) {
+        for (int i = 0; i < stops.size(); i++) {
+            RouteStop st = stops.get(i);
+            if (st.getKind() != RouteStopKind.TRANSFER
+                    || !ownerOf(st, confirming).getId().equals(job.getId())
+                    || st.getPlannedAt() == null) continue;
+            Short stay = st.getPlannedStayMin();
+            if (stay == null && i > 0) {
+                RouteStop before = stops.get(i - 1);
+                if (before.getPlace() != null
+                        && st.getPlace() != null
+                        && before.getPlace().getId().equals(st.getPlace().getId())) {
+                    stay = before.getPlannedStayMin();
+                }
+            }
+            Instant at = stay == null ? st.getPlannedAt() : st.getPlannedAt().plus(Duration.ofMinutes(stay));
+            return Optional.of(new Handoff(st.getPlace(), at));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * When {@code job}'s horses can be collected on {@code trip}, a later trip of its journey (US-F3-16): the latest of
+     * the trips before's transfers plus their stays. Empty on the first trip, or while no transfer before has a time.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Instant> readyOn(Trip trip, TransportJob job) {
+        return jobTrips.partsBefore(trip, job).stream()
+                .flatMap(
+                        before -> activePlan(before.getTrip()).flatMap(p -> handoffOf(p.getStops(), job, job)).stream())
+                .map(Handoff::at)
+                .max(Comparator.naturalOrder());
+    }
+
+    /** The route the coordinator is working on for {@code trip}: its draft, else its confirmed version. */
+    private Optional<RoutePlan> activePlan(Trip trip) {
+        return routePlanRepository
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .or(() -> routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED));
     }
 
     /** The draft of {@code trip}'s route, after superseding a confirmed version with {@code reason}. */

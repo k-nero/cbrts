@@ -1,6 +1,6 @@
 import { Col, Flex, Row } from 'antd';
 
-import { eventLabels, formatTime, sentence } from './tripFormat';
+import { formatTime, recordLabel, sentence } from './tripFormat';
 import { TripRecords } from './TripRecords';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
@@ -29,15 +29,20 @@ export function TripDetails({
   trip,
   audience,
   onShowPart,
+  onShowJourney,
 }: {
   trip: TripView;
   audience: 'escort' | 'staff' | 'customer';
   /** Opens another part of a job split across trips (US-F5-06). */
   onShowPart?: (tripId: string) => void;
+  /** Back to the customer's one timeline across a journey's trips (US-F3-16). */
+  onShowJourney?: () => void;
 }) {
   const lastRecord = [...trip.records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
   // A job planned as a chain of trips, road, air, road (US-F3-16), rather than split by an incident.
   const journey = trip.parts.some((part) => part.handsOn);
+  // The customer follows a journey on one timeline across its trips until they open one trip.
+  const wholeJourney = journey && !trip.parts.some((part) => part.current);
   return (
     <Flex vertical gap={16}>
       {/* The customer is told the trailer is shared, never with whom (US-F3-14). */}
@@ -66,7 +71,9 @@ export function TripDetails({
             <p className="type-body-s m-0 text-ink-3">
               {journey
                 ? audience === 'customer'
-                  ? 'Your horses travel by road and air, each trip handing them on to the next. Each trip is followed on its own.'
+                  ? wholeJourney
+                    ? 'Your horses travel by road and air, each trip handing them on to the next. The timeline below follows them across every trip; open a trip to see only its stops and updates.'
+                    : 'Your horses travel by road and air, each trip handing them on to the next. Below is one trip of the journey.'
                   : 'This job is planned as a chain of trips; each hands the horses on to the next, and only the last delivers them.'
                 : audience === 'customer'
                   ? 'After an incident on the road, your horses travel on separate trailers. Each part is followed on its own.'
@@ -112,7 +119,9 @@ export function TripDetails({
                       part.status === 'DELIVERED' ? 'ok' : part.status === 'HELD' ? 'warn' : 'info'
                     }
                   >
-                    {sentence(part.status)}
+                    {part.handsOn && part.status === 'DELIVERED'
+                      ? 'Handed on'
+                      : sentence(part.status)}
                   </Chip>
                   {part.current ? (
                     <Chip>Shown</Chip>
@@ -120,20 +129,32 @@ export function TripDetails({
                     onShowPart &&
                     audience !== 'escort' && (
                       <Button size="sm" onClick={() => onShowPart(part.tripId)}>
-                        Show this part
+                        {journey ? 'Show this trip' : 'Show this part'}
                       </Button>
                     )
                   )}
                 </Flex>
               </Flex>
             ))}
+            {journey && !wholeJourney && audience === 'customer' && onShowJourney && (
+              <Flex>
+                <Button size="sm" onClick={onShowJourney}>
+                  Show the whole journey
+                </Button>
+              </Flex>
+            )}
           </Flex>
         </Panel>
       )}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
           <Panel title="Trip status">
-            <div className="type-h3">{sentence(trip.tripStatus)}</div>
+            <div className="type-h3">
+              {trip.parts.some((part) => part.current && part.handsOn) &&
+              trip.tripStatus === 'DELIVERED'
+                ? 'Handed on'
+                : sentence(trip.tripStatus)}
+            </div>
             <p className="type-body-s mb-0 mt-2 text-ink-3">
               Last update:{' '}
               {lastRecord
@@ -199,7 +220,9 @@ export function TripDetails({
                 .filter(Boolean)
                 .join(' · ');
               const status = stop.latestStatus ? (
-                <Chip tone={kindTone(stop.latestStatus)}>{eventLabels[stop.latestStatus]}</Chip>
+                <Chip tone={kindTone(stop.latestStatus)}>
+                  {recordLabel(stop.latestStatus, stop.kind)}
+                </Chip>
               ) : (
                 <Chip>Waiting for update</Chip>
               );

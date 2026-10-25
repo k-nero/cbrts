@@ -184,11 +184,11 @@ public class TripSharingService {
     /**
      * The days {@code job} may leave on {@code trip}: on the first trip of its journey, its requested date moved by up
      * to its flex days; on a later one (US-F3-16), that trip's own pickup moved by up to the corridor's flex days
-     * (US-F3-18), since it leaves when the trip before has handed the horses on.
+     * (US-F3-18), since it leaves when the trip before has handed the horses on: never before the day they are ready.
      */
     private Days daysOn(TransportJob job, Trip trip) {
         if (jobTrips.partBefore(trip, job).isEmpty()) return Days.of(job);
-        return routePlans
+        Days days = routePlans
                 .pickupOn(trip, job)
                 .map(at -> {
                     LocalDate day = at.atZone(BusinessTime.ZONE).toLocalDate();
@@ -196,6 +196,12 @@ public class TripSharingService {
                     return new Days(day.minusDays(flex), day.plusDays(flex));
                 })
                 .orElseGet(() -> Days.of(job));
+        return routePlans
+                .readyOn(trip, job)
+                .map(at -> at.atZone(BusinessTime.ZONE).toLocalDate())
+                .filter(ready -> ready.isAfter(days.from()))
+                .map(ready -> new Days(ready, days.to()))
+                .orElse(days);
     }
 
     /**
