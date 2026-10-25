@@ -300,9 +300,11 @@ public class TripService {
                         "HANDOVER_CONDITION_REQUIRED",
                         "Record the condition of every horse handed over; missing: " + String.join(", ", missing));
         }
-        if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED)
+        if (request.kind() == TripRecordKind.DEPARTED || request.kind() == TripRecordKind.FLIGHT_DEPARTED) {
+            requireHandedOn(trip);
             for (TransportJob riding : riding(trip, target))
                 requireDepartureAllowed(riding, jobTrips.partOf(trip, riding), request.occurredAt());
+        }
         TripRecord record = new TripRecord();
         record.setTrip(trip);
         record.setRouteStop(stop);
@@ -373,6 +375,22 @@ public class TripService {
     }
 
     /**
+     * A later trip of a job's chain leaves only once the trip before has handed the horses on (US-F3-16): it can't
+     * depart with horses still waiting at the airport or quarantine station for it.
+     */
+    private void requireHandedOn(Trip trip) {
+        List<String> waiting = jobTrips.waitingFor(trip).stream()
+                .map(th -> th.getJob().getCode())
+                .distinct()
+                .toList();
+        if (!waiting.isEmpty())
+            throw new BusinessException(
+                    "HANDOVER_FROM_PREVIOUS_TRIP_REQUIRED",
+                    "Trip " + trip.getCode() + " can't leave before the trip before it hands on the horses of "
+                            + String.join(", ", waiting) + ": record their delivery at the transfer first");
+    }
+
+    /**
      * The first departure needs the cleared dossier and the manager's sign-off of the trip plan (US-F2-08,
      * US-F3-08). A later FLIGHT_DEPARTED, the next leg of a trip already on its way, only re-checks the gate.
      */
@@ -412,6 +430,11 @@ public class TripService {
                     "A trip update can't be recorded for a time that hasn't happened yet. Check the device clock.");
         if (job.getStage() == JobStage.CLOSED)
             throw transitionConflict(status, "A closed trip cannot receive new journey events.");
+        if (kind == TripRecordKind.HANDED_OVER && part.getNext() != null)
+            throw transitionConflict(
+                    status,
+                    "The horses are handed on to the next trip of the journey here; the handover to the receiver "
+                            + "is recorded at the delivery on the last trip.");
 
         Instant newestStatusEvent = records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(trip.getId(), STATUS_EVENTS)
                 .map(TripRecord::getOccurredAt)
@@ -496,6 +519,8 @@ public class TripService {
     private void updateJobStatus(TransportJob target, Trip trip, TripRecordKind kind, Instant at, RouteStop stop) {
         List<TransportJob> riding = riding(trip, target);
         TripJob targetPart = jobTrips.partOf(trip, target);
+        // A part that continues on a later trip of the job's chain is handed on there, not delivered (US-F3-16).
+        boolean handsOn = targetPart.getNext() != null;
         switch (kind) {
             case DEPARTED, FLIGHT_DEPARTED ->
                 riding.forEach(job -> {
@@ -524,13 +549,17 @@ public class TripService {
                     targetPart.setStatus(TripStatus.ARRIVED);
                     target.setTripStatus(TripStatus.ARRIVED);
                 }
+                // At its transfer the job's part has arrived; the job itself travels on (US-F3-16).
+                if (stop != null && stop.getKind() == RouteStopKind.TRANSFER) targetPart.setStatus(TripStatus.ARRIVED);
             }
             case DELIVERED -> {
                 targetPart.setStatus(TripStatus.DELIVERED);
                 if (targetPart.getDeliveredAt() == null) targetPart.setDeliveredAt(at);
-                target.setTripStatus(TripStatus.DELIVERED);
-                target.setStage(JobStage.HANDOVER);
-                if (target.getDeliveredAt() == null) target.setDeliveredAt(at);
+                if (!handsOn) {
+                    target.setTripStatus(TripStatus.DELIVERED);
+                    target.setStage(JobStage.HANDOVER);
+                    if (target.getDeliveredAt() == null) target.setDeliveredAt(at);
+                }
             }
             case HANDED_OVER -> {
                 targetPart.setStatus(TripStatus.DELIVERED);
@@ -539,7 +568,10 @@ public class TripService {
             }
             default -> {}
         }
-        if (targetPart.getStatus() == TripStatus.DELIVERED) jobTrips.markDelivered(trip, target);
+        if (targetPart.getStatus() == TripStatus.DELIVERED) {
+            if (handsOn) jobTrips.handOn(trip, target);
+            else jobTrips.markDelivered(trip, target);
+        }
         // The job's own status sums up its parts: a job that spans trips is delivered when every horse is.
         java.util.LinkedHashSet<TransportJob> moved = new java.util.LinkedHashSet<>(riding);
         moved.add(target);
@@ -785,7 +817,14 @@ public class TripService {
                             .toList(),
                     p.getTrip().getPlannedDepartureAt(),
                     arrival,
-                    here));
+                    here,
+                    Optional.ofNullable(p.getTrip().getCorridor())
+                            .map(c -> c.getCode())
+                            .orElse(null),
+                    Optional.ofNullable(p.getTrip().getCorridor())
+                            .map(c -> c.getMode())
+                            .orElse(null),
+                    p.getNext() != null));
             if (here) {
                 // A part shows its own plan only: one still to be planned has no times yet.
                 current = new TripMapper.Part(p.getStatus(), p.getTrip().getPlannedDepartureAt(), arrival, List.of());

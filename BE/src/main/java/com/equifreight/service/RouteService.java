@@ -14,6 +14,7 @@ import com.equifreight.model.route.CrossingResponse;
 import com.equifreight.model.route.PlaceResponse;
 import com.equifreight.model.route.RouteMapper;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.RegulationCatalogRepository;
@@ -48,6 +49,7 @@ public class RouteService {
 
     private final CorridorRepository corridors;
     private final PlaceRepository places;
+    private final BorderCrossingRepository crossings;
     private final RegulationCatalogRepository catalogs;
     private final RegulationVersionRepository versions;
     private final Clock clock;
@@ -55,11 +57,13 @@ public class RouteService {
     public RouteService(
             CorridorRepository corridors,
             PlaceRepository places,
+            BorderCrossingRepository crossings,
             RegulationCatalogRepository catalogs,
             RegulationVersionRepository versions,
             Clock clock) {
         this.corridors = corridors;
         this.places = places;
+        this.crossings = crossings;
         this.catalogs = catalogs;
         this.versions = versions;
         this.clock = clock;
@@ -75,6 +79,32 @@ public class RouteService {
                     cb.or(cb.like(cb.lower(root.get("name")), like), cb.like(cb.lower(root.get("city")), like)));
         }
         return places.findAll(spec, pageable).map(RouteMapper::toResponse);
+    }
+
+    /** Every catalogued place a route plan can stop at (US-F3-17), welfare stops included, by name or city. */
+    @Transactional(readOnly = true)
+    public Page<PlaceResponse> stopPlaces(String q, Pageable pageable) {
+        Specification<Place> spec = Specification.unrestricted();
+        if (q != null && !q.isBlank()) {
+            String like = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+            spec = spec.and((root, query, cb) ->
+                    cb.or(cb.like(cb.lower(root.get("name")), like), cb.like(cb.lower(root.get("city")), like)));
+        }
+        return places.findAll(spec, pageable).map(RouteMapper::toResponse);
+    }
+
+    /** Every border crossing, by name, for a route plan's border stops (US-F3-17). */
+    @Transactional(readOnly = true)
+    public List<com.equifreight.model.route.BorderCrossingResponse> borderCrossings() {
+        return crossings.findAll(org.springframework.data.domain.Sort.by("name")).stream()
+                .map(c -> com.equifreight.model.route.BorderCrossingResponse.builder()
+                        .id(c.getId())
+                        .name(c.getName())
+                        .fromCountry(c.getFromCountry().getName())
+                        .toCountry(c.getToCountry().getName())
+                        .roadOnly(c.isRoadOnly())
+                        .build())
+                .toList();
     }
 
     /**

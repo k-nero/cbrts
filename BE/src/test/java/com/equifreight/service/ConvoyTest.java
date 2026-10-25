@@ -186,7 +186,9 @@ class ConvoyTest {
 
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(eq(job.getId()), isNull())).thenReturn(trip);
         when(jobTrips.findTripOf(job.getId())).thenReturn(Optional.of(trip));
+        lenient().when(jobTrips.findTripOf(eq(job.getId()), isNull())).thenReturn(Optional.of(trip));
         when(jobTrips.horsesOn(trip)).thenReturn(onTrip);
         when(jobTrips.jobsOn(trip)).thenReturn(List.of(job));
         when(jobTrips.vehiclesOf(trip)).thenReturn(List.of(first.getTripVehicle(), second.getTripVehicle()));

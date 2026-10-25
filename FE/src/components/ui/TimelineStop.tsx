@@ -17,6 +17,7 @@ const KIND: Record<StopKind, { icon: IconName; label: string }> = {
   quarantine: { icon: 'shield', label: 'Quarantine' },
   airport_out: { icon: 'plane', label: 'Airport departure' },
   airport_in: { icon: 'plane', label: 'Airport arrival' },
+  transfer: { icon: 'arrow-right', label: 'Hands on to the next trip' },
   on_the_way: { icon: 'truck', label: 'Shared trailer' },
 };
 

@@ -149,11 +149,9 @@ public class NotificationService {
             case TRIP_TRACKING ->
                 customer
                         ? "/tracking?job=" + subject.code()
-                        : escort ? "/escort" : "/staff/jobs/" + subject.jobId() + "?tab=trip";
+                        : escort ? "/escort" : "/staff/jobs/" + subject.jobId() + "?tab=route";
             case NOTE ->
-                customer
-                        ? "/requests/" + subject.requestId() + "/ask"
-                        : "/staff/customer-notes?note=" + subject.id();
+                customer ? "/requests/" + subject.requestId() + "/ask" : "/staff/customer-notes?note=" + subject.id();
         };
     }
 

@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -116,6 +118,8 @@ class FlightServiceTest {
         leg.setId(UUID.randomUUID());
         leg.setMode(TransportMode.AIR);
         leg.setSeq((short) 1);
+        leg.setFromStop(dep);
+        leg.setToStop(arr);
         plan.setLegs(new ArrayList<>(List.of(leg)));
         when(flights.findByRouteLegId(leg.getId())).thenReturn(Optional.ofNullable(onLeg));
         when(routePlans.findByTrip_IdAndStatus(t.getId(), status)).thenReturn(Optional.of(plan));
@@ -229,6 +233,7 @@ class FlightServiceTest {
         allocation(flight, joining, null, 1);
         route(trip, RoutePlanStatus.CONFIRMED, sgn, hkg, flight);
         when(jobTrips.tripOf(joining.getId())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(eq(joining.getId()), isNull())).thenReturn(trip);
         when(jobs.findById(joining.getId())).thenReturn(Optional.of(joining));
         User khoi = new User();
 

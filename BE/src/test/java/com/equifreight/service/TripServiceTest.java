@@ -178,6 +178,7 @@ class TripServiceTest {
         trip.setId(UUID.randomUUID());
         trip.setCode("TRP-2026-001");
         lenient().when(jobTrips.tripOf(job.getId())).thenReturn(trip);
+        lenient().when(jobTrips.tripOf(eq(job.getId()), isNull())).thenReturn(trip);
         // Each job's part on the trip, mirroring the job when first asked: one trip per job here.
         java.util.Map<UUID, TripJob> parts = new java.util.HashMap<>();
         java.util.function.Function<TransportJob, TripJob> partFor = j -> parts.computeIfAbsent(j.getId(), id -> {

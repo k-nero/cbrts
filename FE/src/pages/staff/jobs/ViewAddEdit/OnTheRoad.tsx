@@ -4,7 +4,6 @@ import { Flex } from 'antd';
 import { DelayAlertModal } from './DelayAlertModal';
 import { JobClosingPanel } from './JobClosingPanel';
 import { JobIncidents } from './JobIncidents';
-import { Placeholder } from './Placeholder';
 
 import { Button } from '@/components/ui';
 import type { JobDetail } from '@/interfaces';
@@ -15,10 +14,11 @@ import { useAuthStore } from '@/stores/authStore';
 const ON_THE_ROAD: string[] = [TripStatusEnum.DEPARTED, TripStatusEnum.HELD];
 
 /**
- * The Trip tab: the journey log (still to build), then the job's incidents with their timelines (US-F5-05). The
- * coordinator or the logistics manager sends a delay alert from here while the job is on the road (US-F5-04).
+ * The end of the Route tab: closing the job once it is handed over (US-F6-04), then the job's incidents with their
+ * timelines (US-F5-05). The coordinator or the logistics manager sends a delay alert from here while the job is on the
+ * road (US-F5-04). The journey log itself is the Trip progress page.
  */
-export const TripTab: FC<{ job: JobDetail }> = ({ job }) => {
+export const OnTheRoad: FC<{ job: JobDetail }> = ({ job }) => {
   const [alerting, setAlerting] = useState(false);
   const roles = useAuthStore((state) => state.roles) as string[];
   const canAlert =
@@ -31,9 +31,6 @@ export const TripTab: FC<{ job: JobDetail }> = ({ job }) => {
   return (
     <Flex vertical gap={24}>
       <JobClosingPanel job={job} />
-      <Placeholder title="Trip Journey Log">
-        Recorded by escort crew. Checkpoints and condition checks from the cab tablet.
-      </Placeholder>
       <JobIncidents
         jobId={job.id}
         action={

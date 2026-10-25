@@ -1,6 +1,6 @@
 # One job, several trips: road, air, road
 
-Status: draft (25 Oct 2026). Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
+Status: built (US-F3-16, #206), 25 Oct 2026. See [As built](#as-built) for where the build differs from the plan below. Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
 
 ## Why
 
@@ -42,7 +42,7 @@ Each trip can still be shared with other jobs on its own corridor, and each is p
 | Table | Today | Becomes |
 | --- | --- | --- |
 | `trips` | `corridor_id`, any mode; one trip per job before departure | Unchanged columns. The trip's mode is its corridor's. A road trip carries trailers (`trip_vehicles`, load plans, drivers, grooms); an air trip carries one flight and no trailers. |
-| `trip_jobs` | One row per part of a job on a trip | Adds `seq smallint` (the part's place in the job's journey, unique `(job_id, seq)`) and `next_trip_job_id null` (unique), so the chain is explicit and survives an incident moving horses. |
+| `trip_jobs` | One row per part of a job on a trip | Adds `next_trip_job_id null`, the part it hands on to, so the chain is explicit and survives an incident moving horses. |
 | `trip_horses.status` | `ON_TRIP`, `MOVED`, `DELIVERED`, `LEFT_IN_CARE` | Adds `PLANNED` (on a later trip of the chain, not loaded yet) and `HANDED_ON` (left this trip for the next trip of the chain). The "one trip at a time" index (`status = 'ON_TRIP'`) is unchanged, so a horse is `PLANNED` on trip 3 while it is `ON_TRIP` on trip 1. |
 | `route_stops.kind` | `PICKUP`, `DELIVERY`, … name the job | Adds `TRANSFER`, which names the job like `PICKUP` and `DELIVERY` do: the stop where that job's horses leave this trip for the next one. A trip that hands on ends at a `TRANSFER`; the next one starts at a `PICKUP` at the same place. `DELIVERY` (and so the handover) only exists on the last trip of the chain. |
 | `flights` | One per air `route_leg` | Unchanged. On an air trip the flight is the carrier; its `flight_allocations` are the per-job "load plan" (stall positions, waybill). |
@@ -70,9 +70,19 @@ Removing a trip from the chain is the reverse, before either trip departs.
 
 ## Screens
 
-- **Job › Route / Load plan / Crew tabs:** a trip switcher above the tabs ("1 · Road VTE → BKK · 2 · Air BKK → HKG · 3 · Road HKG → Sha Tin"). Every job-scoped endpoint that today resolves "the job's current trip" (`TripRepository.findCurrentByJobId`, used by about 38 call sites in 12 services) takes an optional `tripId`, defaulting to the current trip. On an air trip the Load plan tab shows the flight's allocations instead of trailers.
+- **Job › Route / Load plan / Crew tabs:** a journey rail to the left of the tabs (as built; DESIGN.md, Job page), first planned as a trip switcher above the tabs ("1 · Road VTE → BKK · 2 · Air BKK → HKG · 3 · Road HKG → Sha Tin"). Every job-scoped endpoint that today resolves "the job's current trip" (`TripRepository.findCurrentByJobId`, used by about 38 call sites in 12 services) takes an optional `tripId`, defaulting to the current trip. On an air trip the Load plan tab shows the flight's allocations instead of trailers.
 - **Customer tracking:** one timeline across the job's trips, in chain order, still without trip codes or other clients.
 - **Fleet calendar:** unchanged; each road trip's bookings show on their own dates.
+
+## As built
+
+- **No `seq` column.** The order of a journey follows `next_trip_job_id`; the job's parts are listed in that order. The column isn't unique: an incident that moves some horses off a trip of the journey links their new trip to the same next trip, so they join the others there.
+- **Handing on is the delivery at the transfer.** On a part that hands on, `ARRIVED_AT_STOP` at the `TRANSFER` stop and then `DELIVERED` hand the horses on to the next trip instead of delivering the job; a `HANDED_OVER` record there is refused. The airline records (`ACCEPTED_BY_AIRLINE`, `RELEASED_BY_AIRLINE`) stay entries in the log.
+- **Where a journey splits.** Only at an `AIRPORT_OUT`, `AIRPORT_IN` or `QUARANTINE` stop before the job's delivery. A stop shared with other jobs on the trip stays, and the job's `TRANSFER` is added after it. The next trip's pickup is planned at the stop's time plus its stay; later edits of either route aren't checked against each other.
+- **Joining an existing trip** is the shared-trip flow on the later trip (its Load plan tab), not part of "continue on another trip". The date check of that flow still uses the job's own departure window, so a later trip of a journey rarely fits; fixing that is a follow-up.
+- **Air trips.** A trip whose confirmed route has no road leg is signed off without load plans or drivers; its flight crew is checked as for any flight. The airports a flight joins on are read from its air legs, not from the `AIRPORT_OUT` and `AIRPORT_IN` stops.
+- **Incidents branch the journey.** Horses moved to a second vehicle, or unloaded to continue later, keep going: their new trip hands on to the journey's next trip, where they join the others. Horses left in care, or returned to their origin, leave the journey: they come off every later trip (out of their stalls there), a later trip with none of the job's horses left drops out of the chain, and it releases its trailers and crew when nobody else rides it, or reopens without the job's stops when others do.
+- **Every job-scoped planning endpoint** takes `?trip=`; the job page keeps the chosen trip in its URL.
 
 ## Not in scope
 

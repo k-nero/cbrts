@@ -6,8 +6,8 @@ import com.equifreight.entity.FlightAllocation;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RequestHorse;
+import com.equifreight.entity.RouteLeg;
 import com.equifreight.entity.RoutePlan;
-import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.User;
@@ -16,7 +16,6 @@ import com.equifreight.entity.enums.CrewRole;
 import com.equifreight.entity.enums.RateBasis;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RoutePlanStatus;
-import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -260,8 +259,15 @@ public class FlightService {
     @Transactional
     public FlightAllocation updateAllocation(
             UUID jobId, UUID flightId, UpdateFlightAllocationRequest request, User user) {
+        return updateAllocation(jobId, null, flightId, request, user);
+    }
+
+    /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
+    @Transactional
+    public FlightAllocation updateAllocation(
+            UUID jobId, UUID tripId, UUID flightId, UpdateFlightAllocationRequest request, User user) {
         TransportJob job = jobs.findById(jobId).orElseThrow(() -> ResourceNotFoundException.of("Job", jobId));
-        Trip trip = jobTrips.tripOf(jobId);
+        Trip trip = jobTrips.tripOf(jobId, tripId);
         // The flight of the trip's draft or confirmed route: the job page may show either.
         Flight flight = java.util.stream.Stream.of(RoutePlanStatus.DRAFT, RoutePlanStatus.CONFIRMED)
                 .flatMap(status -> routePlans.findByTrip_IdAndStatus(trip.getId(), status).stream())
@@ -326,7 +332,10 @@ public class FlightService {
                         : ", " + a.getServiceClass().name().toLowerCase());
     }
 
-    /** The airports an air route leaves from and lands at: its first AIRPORT_OUT and last AIRPORT_IN stop. */
+    /**
+     * The airports an air route leaves from and lands at: where its first air leg starts and its last one ends. A trip
+     * of a job's chain that only flies starts at its pickup and ends at its transfer there (US-F3-16).
+     */
     record Airports(Place out, Place in) {
         static final Airports NONE = new Airports(null, null);
 
@@ -347,9 +356,12 @@ public class FlightService {
     static Airports airportsOf(RoutePlan plan) {
         Place out = null;
         Place in = null;
-        for (RouteStop stop : plan.getStops()) {
-            if (stop.getKind() == RouteStopKind.AIRPORT_OUT && out == null) out = stop.getPlace();
-            if (stop.getKind() == RouteStopKind.AIRPORT_IN) in = stop.getPlace();
+        for (RouteLeg leg : plan.getLegs().stream()
+                .sorted(java.util.Comparator.comparing(RouteLeg::getSeq))
+                .toList()) {
+            if (leg.getMode() != TransportMode.AIR) continue;
+            if (out == null) out = leg.getFromStop().getPlace();
+            in = leg.getToStop().getPlace();
         }
         return new Airports(out, in);
     }
