@@ -3,7 +3,7 @@ import type { FC } from 'react';
 
 import { Panel, Tabs } from '@/components/ui';
 import type { QuotationDraft, ServiceClass } from '@/interfaces';
-import { classOptions } from '@/lib/utils';
+import { classOptions, fitLine } from '@/lib/utils';
 
 /** The air class the draft is priced with; a refusal names the classes the horses fit. */
 export const StallChoice: FC<{
@@ -36,9 +36,7 @@ export const StallChoice: FC<{
             </span>
           </Flex>
         ) : fit ? (
-          <span className="type-body-s text-ink-2">
-            {`${fit.widthUsedIn} in across ${fit.positions} ${fit.positions === 1 ? 'position' : 'positions'} of 96 in.`}
-          </span>
+          <span className="type-body-s text-ink-2">{fitLine(fit)}</span>
         ) : (
           <span className="type-body-s text-ink-3">
             This class has no stall rate in the catalog.

@@ -48,6 +48,16 @@ const CLASSES = (Object.keys(SERVICE_CLASS_LABELS) as ServiceClass[]).map((value
  * horse fits are marked as fitting. An air class with no catalog row has no fit, and every class is offered,
  * so the manager can move to one that is priced.
  */
+/** The builder's fit line: "144 in across 2 positions of 96 in · 1,540 kg of horses." (BR-Q-16). */
+export const fitLine = (
+  fit: Pick<StallFit, 'positions' | 'widthUsedIn' | 'totalWeightKg'>,
+): string => {
+  const positions = `${fit.positions} ${fit.positions === 1 ? 'position' : 'positions'}`;
+  const weight =
+    fit.totalWeightKg == null ? '' : ` · ${fit.totalWeightKg.toLocaleString('en-US')} kg of horses`;
+  return `${fit.widthUsedIn} in across ${positions} of 96 in${weight}.`;
+};
+
 export const classOptions = (
   mode: TransportMode,
   fit: StallFit | null,
