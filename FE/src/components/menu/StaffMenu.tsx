@@ -42,6 +42,10 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
       ],
     },
     {
+      label: 'Catalogs',
+      items: [['rates', 'Rates', <TagOutlined key="i" />]],
+    },
+    {
       label: 'Admin',
       items: [
         ['users', 'Users & roles', <TeamOutlined key="i" />],

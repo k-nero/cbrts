@@ -298,7 +298,13 @@ export const routesConfig = [
         breadcrumb: 'Regulations',
         name: 'regulations',
       },
-      { path: '/rates', roles: [TS], type: 'authenticated', breadcrumb: 'Rates', name: 'rates' },
+      {
+        path: '/rates',
+        roles: [TS, LM],
+        type: 'authenticated',
+        breadcrumb: 'Rates',
+        name: 'rates',
+      },
       {
         path: '/fleet-calendar',
         roles: [FRC],

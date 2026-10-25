@@ -21,20 +21,27 @@ import {
   useRateCatalog,
   useRateCorridor,
 } from '@/hooks/rates';
-import type { RateLine, ServiceClassRow } from '@/interfaces';
+import { type RateLine, RoleNameEnum, type ServiceClassRow } from '@/interfaces';
 import { apiErrorMessage, draftRefusal, pickCorridor } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Rate catalog (US-Q-10, spec §7.1): rates for each corridor and service class, read from the draft when
  * one is open and from the current version otherwise. A quotation pins the version it was built from.
+ * The transport specialist keeps the catalog; the logistics manager reads the current version (US-Q-04).
  */
 const RatesPage: FC = () => {
+  const canEdit = useAuthStore((state) => state.roles).includes(RoleNameEnum.TRANSPORT_SPECIALIST);
   const catalogQuery = useRateCatalog();
   const catalog = catalogQuery.data;
   const [params, setParams] = useSearchParams();
   const picked = pickCorridor(catalog?.corridors ?? [], params.get('corridor'));
   const corridorId = picked.id;
-  const versionId = catalog ? (catalog.draftVersionId ?? catalog.currentVersionId) : null;
+  const versionId = catalog
+    ? canEdit
+      ? (catalog.draftVersionId ?? catalog.currentVersionId)
+      : catalog.currentVersionId
+    : null;
   const viewQuery = useRateCorridor(versionId, corridorId);
   const shown = catalog?.versions.find((v) => v.id === versionId);
 
@@ -102,7 +109,7 @@ const RatesPage: FC = () => {
 
   const view = viewQuery.data;
   const editing: Editing | null =
-    shown?.status === 'DRAFT' && view
+    canEdit && shown?.status === 'DRAFT' && view
       ? {
           onAddClass: () => setModalOpen({ kind: 'class', row: null }),
           onEditClass: (row) => setModalOpen({ kind: 'class', row }),
@@ -182,7 +189,7 @@ const RatesPage: FC = () => {
                 Create a new draft to make further changes.
               </Callout>
             )}
-            <DraftPanel catalog={catalog} onDraftGone={onDraftGone} />
+            {canEdit && <DraftPanel catalog={catalog} onDraftGone={onDraftGone} />}
             {!corridorId ? (
               <Panel title="No corridors yet">
                 <p className="type-body-m m-0 text-ink-2">

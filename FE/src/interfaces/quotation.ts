@@ -35,6 +35,8 @@ export interface QuotationRequestFacts {
   club: string | null;
   fromCity: string;
   toCity: string;
+  /** The corridor the rates come from; the missing-rates callout opens it in the rate catalog. */
+  corridorId: string;
   mode: TransportMode;
   trailer: TrailerType | null;
   /** The customer's own class; the draft may be priced with another. */
