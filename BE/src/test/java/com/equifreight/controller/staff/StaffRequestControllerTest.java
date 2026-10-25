@@ -3,6 +3,7 @@ package com.equifreight.controller.staff;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -154,8 +155,9 @@ class StaffRequestControllerTest {
     void getPutAndRepriceMapToTheService() throws Exception {
         UUID id = UUID.randomUUID();
         when(quotations.get(id, null)).thenReturn(draft());
-        when(quotations.changeClass(any(), eq(id), eq(ServiceClass.FIRST))).thenReturn(draft());
-        when(quotations.reprice(any(), eq(id))).thenReturn(draft());
+        when(quotations.changeClass(any(), eq(id), eq(ServiceClass.FIRST), isNull()))
+                .thenReturn(draft());
+        when(quotations.reprice(any(), eq(id), isNull())).thenReturn(draft());
 
         mvc.perform(get("/api/v1/staff/requests/" + id + "/quotation")).andExpect(status().isOk());
         mvc.perform(put("/api/v1/staff/requests/" + id + "/quotation")
@@ -165,8 +167,8 @@ class StaffRequestControllerTest {
         mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/reprice")).andExpect(status().isOk());
 
         verify(quotations).get(id, null);
-        verify(quotations).changeClass(any(), eq(id), eq(ServiceClass.FIRST));
-        verify(quotations).reprice(any(), eq(id));
+        verify(quotations).changeClass(any(), eq(id), eq(ServiceClass.FIRST), isNull());
+        verify(quotations).reprice(any(), eq(id), isNull());
     }
 
     @Test
@@ -187,7 +189,7 @@ class StaffRequestControllerTest {
         UUID line = UUID.randomUUID();
         when(quotations.override(any(), eq(id), eq(line), any())).thenReturn(draft());
         when(quotations.removeOverride(any(), eq(id), eq(line))).thenReturn(draft());
-        when(quotations.addLine(any(), eq(id), any())).thenReturn(draft());
+        when(quotations.addLine(any(), eq(id), any(), isNull())).thenReturn(draft());
         when(quotations.editLine(any(), eq(id), eq(line), any())).thenReturn(draft());
         when(quotations.removeLine(any(), eq(id), eq(line))).thenReturn(draft());
         String base = "/api/v1/staff/requests/" + id + "/quotation/lines";
@@ -224,7 +226,7 @@ class StaffRequestControllerTest {
     @Test
     void issuePassesTheNoteAndAnswersTheBlockers() throws Exception {
         UUID id = UUID.randomUUID();
-        when(issues.issue(any(), eq(id), any())).thenReturn(draft());
+        when(issues.issue(any(), eq(id), any(), isNull())).thenReturn(draft());
         mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/issue")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"changeNote\":\"Departure moved\"}"))
@@ -232,7 +234,7 @@ class StaffRequestControllerTest {
                 .andExpect(jsonPath("$.code").value("Q-2026-0189"));
 
         UUID blocked = UUID.randomUUID();
-        when(issues.issue(any(), eq(blocked), any()))
+        when(issues.issue(any(), eq(blocked), any(), isNull()))
                 .thenThrow(new ConflictException(
                         "QUOTATION_NOT_READY",
                         "This quotation isn't ready to issue.",
@@ -259,6 +261,55 @@ class StaffRequestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("Q-2026-0189"));
 
-        verify(issues).discardDraft(any(), eq(id));
+        verify(issues).discardDraft(any(), eq(id), isNull());
+    }
+
+    @Test
+    void draftWritesBindTheVersionTheyNamed() throws Exception {
+        UUID id = UUID.randomUUID();
+        String base = "/api/v1/staff/requests/" + id + "/quotation";
+        when(quotations.changeClass(any(), eq(id), eq(ServiceClass.FIRST), eq(2)))
+                .thenReturn(draft());
+        when(quotations.reprice(any(), eq(id), eq(2))).thenReturn(draft());
+        when(quotations.addLine(any(), eq(id), any(), eq(2))).thenReturn(draft());
+        when(issues.issue(any(), eq(id), any(), eq(2))).thenReturn(draft());
+
+        mvc.perform(put(base)
+                        .param("version", "2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"airClass\":\"FIRST\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(base + "/reprice").param("version", "2")).andExpect(status().isOk());
+        mvc.perform(post(base + "/lines")
+                        .param("version", "2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"group\":\"H\",\"description\":\"Ferry booking fee\",\"quantity\":2,"
+                                + "\"unitRate\":90,\"certainty\":\"FIXED\",\"reason\":\"Ferry\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post(base + "/issue")
+                        .param("version", "2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changeNote\":\"Departure moved\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(delete(base + "/draft").param("version", "2")).andExpect(status().isNoContent());
+
+        verify(quotations).changeClass(any(), eq(id), eq(ServiceClass.FIRST), eq(2));
+        verify(quotations).reprice(any(), eq(id), eq(2));
+        verify(quotations).addLine(any(), eq(id), any(), eq(2));
+        verify(issues).issue(any(), eq(id), any(), eq(2));
+        verify(issues).discardDraft(any(), eq(id), eq(2));
+    }
+
+    @Test
+    void aVersionChangeAnswers409WithItsCode() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(quotations.reprice(any(), eq(id), eq(1)))
+                .thenThrow(new ConflictException(
+                        "QUOTATION_VERSION_CHANGED",
+                        "You're looking at version 1; version 2 is the current one now. Reload to see it."));
+
+        mvc.perform(post("/api/v1/staff/requests/" + id + "/quotation/reprice").param("version", "1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("QUOTATION_VERSION_CHANGED"));
     }
 }

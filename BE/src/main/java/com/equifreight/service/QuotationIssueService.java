@@ -81,17 +81,23 @@ public class QuotationIssueService {
         this.clock = clock;
     }
 
+    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body) {
+        return issue(manager, requestId, body, null);
+    }
+
     /**
      * Issues the draft. Everything is checked before anything is written; the request row is locked first, so a
-     * second issue (another manager, a double click) finds the version issued and is refused.
+     * second issue (another manager, a double click) finds the version issued and is refused. {@code version}, when
+     * named, must still be the latest draft.
      */
     @Transactional
-    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body) {
+    public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body, Integer version) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
+        QuotationRules.requireVersion(version, q);
         QuotationRules.requireWritable(request, q, QuotationDraftService.previousOf(quotations, q));
         QuotationPricing.Evaluation e = pricing.evaluate(q, request);
         if (!e.blockers().isEmpty()) {
@@ -229,14 +235,22 @@ public class QuotationIssueService {
         return new StartResult(pricing.toResponse(q, request, dropped), true);
     }
 
-    /** Discards a revision's draft; the version it was drafted from stands. The first version is never discarded. */
-    @Transactional
     public void discardDraft(User manager, UUID requestId) {
+        discardDraft(manager, requestId, null);
+    }
+
+    /**
+     * Discards a revision's draft; the version it was drafted from stands. The first version is never discarded. A
+     * draft after a declined version can still be discarded: that is all that is left to do with it.
+     */
+    @Transactional
+    public void discardDraft(User manager, UUID requestId, Integer version) {
         TransportRequest request = requests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
         Quotation q = quotations
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
+        QuotationRules.requireVersion(version, q);
         QuotationRules.requireDraft(q);
         if (q.getVersionNo() == 1) {
             throw new ConflictException("FIRST_VERSION", "The first version can't be discarded.");

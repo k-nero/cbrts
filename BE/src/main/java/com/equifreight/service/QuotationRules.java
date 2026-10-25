@@ -29,6 +29,28 @@ final class QuotationRules {
     }
 
     /**
+     * The version a staff write was made against (requote spec §4.2): when named, it must still be the latest, and
+     * still a draft, so a builder left open never writes to a version the manager didn't see. Checked right after the
+     * request lock, before every other rule; {@code expected} null skips it.
+     */
+    static void requireVersion(Integer expected, Quotation latest) {
+        if (expected == null) {
+            return;
+        }
+        if (latest.getVersionNo() != expected) {
+            throw new ConflictException(
+                    "QUOTATION_VERSION_CHANGED",
+                    "You're looking at version " + expected + "; version " + latest.getVersionNo()
+                            + " is the current one now. Reload to see it.");
+        }
+        if (latest.getStatus() != QuotationStatus.DRAFT) {
+            throw new ConflictException(
+                    "QUOTATION_VERSION_CHANGED",
+                    "Version " + expected + " was issued since you opened it. Reload to see it.");
+        }
+    }
+
+    /**
      * The draft is checked first, so a write that lands after an issue says so rather than naming the status. Then
      * the version it was drafted from ({@code previous}, null for the first version): once the customer declined it,
      * the draft can only be discarded.
