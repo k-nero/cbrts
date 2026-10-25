@@ -5,6 +5,7 @@ import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateFeeBand;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.service.pricing.PricingText;
 import com.equifreight.service.quotation.CancellationFee;
 import com.equifreight.service.quotation.QuotationSnapshot;
@@ -110,15 +111,23 @@ public final class CustomerQuotationMapper {
                                 v.getValidUntil(),
                                 v.getSupersededReason()))
                         .toList())
-                .nextVersion(nextVersion(versions))
+                .nextVersion(nextVersion(q, request, versions))
                 .build();
     }
 
-    /** The draft's number when the newest version is one: a new version is being prepared. */
-    private static Integer nextVersion(List<Quotation> versions) {
-        return versions.isEmpty() || versions.getFirst().getStatus() != QuotationStatus.DRAFT
-                ? null
-                : (int) versions.getFirst().getVersionNo();
+    /**
+     * The draft's number while a re-quote is being prepared (A4): the request expired, the version shown wasn't
+     * declined (a decline is final), and the newest version is a draft. A manager's own revise of an open quotation
+     * isn't one: the customer still answers the version shown.
+     */
+    private static Integer nextVersion(Quotation shown, TransportRequest request, List<Quotation> versions) {
+        if (request.getStatus() != RequestStatus.EXPIRED
+                || shown.getStatus() == QuotationStatus.DECLINED
+                || versions.isEmpty()
+                || versions.getFirst().getStatus() != QuotationStatus.DRAFT) {
+            return null;
+        }
+        return (int) versions.getFirst().getVersionNo();
     }
 
     private static List<CustomerQuotationResponse.Group> groups(Quotation q, QuotationSnapshot.Facts facts) {

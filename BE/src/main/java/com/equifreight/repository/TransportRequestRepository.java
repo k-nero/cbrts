@@ -45,14 +45,17 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
 
     /**
      * Who is in the review queue: a status in {@code :statuses}, or an expired request with its next version in draft
-     * (the customer's re-quote, A4, or the manager's own revise) and no declined version, since a decline is final.
+     * (the customer's re-quote, A4, or the manager's own revise) whose latest issued version wasn't declined, since a
+     * decline is final. Only the latest counts, as the decline rule and the next step read it.
      */
     String IN_QUEUE = " (r.status in :statuses"
             + " or (r.status = com.equifreight.entity.enums.RequestStatus.EXPIRED"
-            + " and exists (select q.id from Quotation q where q.request = r"
-            + " and q.status = com.equifreight.entity.enums.QuotationStatus.DRAFT)"
-            + " and not exists (select d.id from Quotation d where d.request = r"
-            + " and d.status = com.equifreight.entity.enums.QuotationStatus.DECLINED)))";
+            + " and exists (select dq.id from Quotation dq where dq.request = r"
+            + " and dq.status = com.equifreight.entity.enums.QuotationStatus.DRAFT)"
+            + " and not exists (select xq.id from Quotation xq where xq.request = r"
+            + " and xq.status = com.equifreight.entity.enums.QuotationStatus.DECLINED"
+            + " and xq.versionNo = (select max(lq.versionNo) from Quotation lq where lq.request = r"
+            + " and lq.status <> com.equifreight.entity.enums.QuotationStatus.DRAFT))))";
 
     /**
      * The review queue (US-F1-03, US-F1-07, A4): requests waiting for review, approval or a re-quote's issue, oldest first by when they entered the queue,
