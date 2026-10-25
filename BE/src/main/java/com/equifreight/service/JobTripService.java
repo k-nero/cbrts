@@ -516,8 +516,8 @@ public class JobTripService {
     }
 
     /**
-     * The job's parts for staff (US-F5-06): each trip it has horses on, with its status, horses and planned departure;
-     * empty while the job is on one trip.
+     * The job's trips for staff (US-F5-06, US-F3-16): each trip it has horses on, with its status, horses and planned
+     * departure, in journey order. A job on one trip has one; the job page lists them in its journey rail.
      */
     @Transactional(readOnly = true)
     public List<com.equifreight.model.trip.TripPartResponse> describeParts(TransportJob job) {
@@ -559,7 +559,7 @@ public class JobTripService {
                             .orElse(null),
                     part.getNext() != null));
         }
-        return described.size() > 1 ? described : List.of();
+        return described;
     }
 
     /** The job's parts that still have horses on their trip, oldest first: two while the job spans trips. */
