@@ -149,6 +149,26 @@ export const quotationAction = (
   return status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'start' : null;
 };
 
+/**
+ * The decision panel once the request is out of review. An expired request waits for its re-quote's issue
+ * when the queue lists it, which it does only with the next version in draft (A4), so the page says what
+ * the queue's "Re-quote" row said; a returned request waits for the customer; any other is not in review.
+ */
+export const restingPanel = (
+  review: Pick<RequestReview, 'request' | 'queue' | 'quotation'>,
+): { title: string; requote: string | null } => {
+  const { request, queue, quotation } = review;
+  if (request.status === 'EXPIRED' && queue && quotation?.status === 'DRAFT')
+    return {
+      title: 'Waiting for the re-quote',
+      requote: `Issue version ${quotation.versionNo} of the quotation.`,
+    };
+  return {
+    title: request.status === 'INFO_REQUIRED' ? 'Waiting for the customer' : 'Not in review',
+    requote: null,
+  };
+};
+
 /** A team member as a select option: "Nguyễn Thị Lan · 2 open jobs". */
 export const teamOption = (m: { id: string; name: string; openJobs: number }) => ({
   value: m.id,

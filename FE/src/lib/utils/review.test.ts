@@ -12,6 +12,7 @@ import {
   queueRoute,
   quotationAction,
   queueWords,
+  restingPanel,
   reviewSubject,
   reviewSummary,
   waitingFor,
@@ -220,5 +221,45 @@ describe('waitingFor', () => {
     expect(waitingFor('UNDER_REVIEW')).toEqual({ tone: 'info', label: 'Review' });
     expect(waitingFor('CUSTOMER_ACCEPTED')).toEqual({ tone: 'ok', label: 'Approval' });
     expect(waitingFor('EXPIRED')).toEqual({ tone: 'warn', label: 'Re-quote' });
+  });
+});
+
+describe('restingPanel', () => {
+  const queue = { position: 2, total: 3, previousId: 'r0', nextId: 'r2' };
+  const draft = { code: 'Q-2026-0191', versionNo: 2, status: 'DRAFT' as const };
+  const review = (
+    status: RequestReview['request']['status'],
+    over: Partial<Pick<RequestReview, 'queue' | 'quotation'>> = {},
+  ) =>
+    ({
+      request: { status },
+      queue: null,
+      quotation: null,
+      ...over,
+    }) as unknown as RequestReview;
+
+  test('an expired request the queue lists with its next version in draft waits for the re-quote', () => {
+    expect(restingPanel(review('EXPIRED', { queue, quotation: draft }))).toEqual({
+      title: 'Waiting for the re-quote',
+      requote: 'Issue version 2 of the quotation.',
+    });
+  });
+
+  test('an expired request the queue leaves out is not in review, draft or not', () => {
+    expect(restingPanel(review('EXPIRED', { quotation: draft }))).toEqual({
+      title: 'Not in review',
+      requote: null,
+    });
+    expect(
+      restingPanel(review('EXPIRED', { queue, quotation: { ...draft, status: 'EXPIRED' } })),
+    ).toEqual({ title: 'Not in review', requote: null });
+  });
+
+  test('a returned request waits for the customer; a closed one is not in review', () => {
+    expect(restingPanel(review('INFO_REQUIRED', { queue }))).toEqual({
+      title: 'Waiting for the customer',
+      requote: null,
+    });
+    expect(restingPanel(review('REJECTED'))).toEqual({ title: 'Not in review', requote: null });
   });
 });
