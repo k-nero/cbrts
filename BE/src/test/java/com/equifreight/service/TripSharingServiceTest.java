@@ -8,14 +8,21 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.equifreight.entity.*;
+import com.equifreight.entity.ChecklistItem;
+import com.equifreight.entity.TripJob;
 import com.equifreight.entity.enums.*;
+import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.job.BiosecurityWarningResponse;
+import com.equifreight.model.job.JoinableTripResponse;
 import com.equifreight.model.job.ShareSuggestionResponse;
 import com.equifreight.model.job.ShareTripResponse;
+import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -67,6 +74,12 @@ class TripSharingServiceTest {
 
     @Mock
     private BiosecurityService biosecurity;
+
+    @Mock
+    private TripRepository trips;
+
+    @Mock
+    private ChecklistItemRepository checklist;
 
     private TripSharingService service;
 
@@ -138,7 +151,78 @@ class TripSharingServiceTest {
                 biosecurity,
                 notices,
                 flights,
+                trips,
+                checklist,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    @DisplayName("A job lists the confirmed trips it fits, each with its clearance state and earliest open deadline")
+    void joinableTripsShowTheirClearance() {
+        host.setDossierStatus(DossierStatus.CLEARANCE_READY);
+        TransportJob stuck = job("CBRT-2026-043", LocalDate.of(2026, 12, 2), 3, hostTrip);
+        when(jobTrips.jobsOn(hostTrip)).thenReturn(List.of(host, stuck));
+        ChecklistItem owed = new ChecklistItem();
+        owed.setStatus(ChecklistStatus.AWAITING_UPLOAD);
+        owed.setDueDate(LocalDate.of(2026, 11, 20));
+        ChecklistItem done = new ChecklistItem();
+        done.setStatus(ChecklistStatus.CLEARED);
+        done.setDueDate(LocalDate.of(2026, 11, 10));
+        when(checklist.findByJobId(stuck.getId())).thenReturn(List.of(owed, done));
+        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(hostTrip));
+        when(loadPlans.stallsLeft(hostTrip, joining)).thenReturn(2);
+
+        List<JoinableTripResponse> joinable = service.joinable(joining.getId(), null);
+
+        assertThat(joinable).singleElement().satisfies(t -> {
+            assertThat(t.tripCode()).isEqualTo("TRP-2026-001");
+            assertThat(t.jobs()).containsExactly("CBRT-2026-041", "CBRT-2026-043");
+            assertThat(t.jobsCleared()).isEqualTo(1);
+            assertThat(t.documentsDueBy()).isEqualTo(LocalDate.of(2026, 11, 20));
+            assertThat(t.stallsLeft()).isEqualTo(2);
+            assertThat(t.departFrom()).isEqualTo(LocalDate.of(2026, 11, 30));
+            assertThat(t.departTo()).isEqualTo(LocalDate.of(2026, 12, 4));
+        });
+    }
+
+    @Test
+    @DisplayName("A trip the job doesn't fit (a private trailer here) isn't listed")
+    void aTripTheJobDoesntFitIsNotListed() {
+        host.getRequest().setTrailer(TrailerType.PRIVATE);
+        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(hostTrip));
+
+        assertThat(service.joinable(joining.getId(), null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Joining a confirmed trip from the joining job's side moves it there, as sharing from the host does")
+    void aJobJoinsAConfirmedTrip() {
+        when(trips.findById(hostTrip.getId())).thenReturn(Optional.of(hostTrip));
+
+        ShareTripResponse result = service.join(joining.getId(), null, hostTrip.getId(), List.of(), khoi);
+
+        assertThat(result.tripCode()).isEqualTo("TRP-2026-001");
+        verify(jobTrips).moveJob(joining, joiningTrip, hostTrip);
+        verify(routePlans).copyJobStops(joiningTrip, hostTrip, joining);
+        verify(loadPlans).reopenTrip(eq(hostTrip), any());
+    }
+
+    @Test
+    @DisplayName("On a later trip of its journey, a job's days come from that trip's own pickup, not its request")
+    void aLaterTripLeavesOnItsOwnDay() {
+        TripJob part = new TripJob();
+        when(jobTrips.partBefore(joiningTrip, joining)).thenReturn(Optional.of(part));
+        corridor.setDateFlexDays((short) 1);
+        // The flight leaves a week after the job's requested day; the host's request allows 8 Dec ± 1 day.
+        when(routePlans.pickupOn(joiningTrip, joining)).thenReturn(Optional.of(Instant.parse("2026-12-08T02:00:00Z")));
+        host.getRequest().setDepartureDate(LocalDate.of(2026, 12, 8));
+        host.getRequest().setDateFlexDays((short) 1);
+        when(trips.findJoinable(corridor.getId(), joiningTrip.getId())).thenReturn(List.of(hostTrip));
+
+        assertThat(service.joinable(joining.getId(), null)).singleElement().satisfies(t -> {
+            assertThat(t.departFrom()).isEqualTo(LocalDate.of(2026, 12, 7));
+            assertThat(t.departTo()).isEqualTo(LocalDate.of(2026, 12, 9));
+        });
     }
 
     @Test
@@ -152,7 +236,7 @@ class TripSharingServiceTest {
         assertThat(result.jobs()).extracting(j -> j.code()).containsExactly("CBRT-2026-041", "CBRT-2026-042");
         verify(jobTrips).moveJob(joining, joiningTrip, hostTrip);
         verify(loadPlans).reopenTrip(hostTrip, "CBRT-2026-042 joined the trip");
-        verify(routePlans).addJobStops(hostTrip, joining);
+        verify(routePlans).copyJobStops(joiningTrip, hostTrip, joining);
         verify(flights).allocate(hostTrip);
         verify(audit)
                 .recordDecision(

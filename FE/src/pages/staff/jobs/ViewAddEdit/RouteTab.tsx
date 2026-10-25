@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { App, Flex } from 'antd';
 import { ContinueTripModal } from './ContinueTripModal';
 import { FlightPanel } from './FlightPanel';
+import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
 import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
@@ -129,12 +130,22 @@ export function RouteTab({ job }: Props) {
       </Callout>
     ) : null;
 
-  // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13).
+  // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13), and the confirmed
+  // trips this one could join instead (US-F3-18).
   const sharePanel =
-    job.tripStatus === 'NOT_STARTED' ? (
-      <Panel title="Could share this trailer" className="p-4">
-        <ShareSuggestions job={job} />
-      </Panel>
+    job.tripStatus === 'NOT_STARTED' || planning ? (
+      <Flex vertical gap={24}>
+        {job.tripStatus === 'NOT_STARTED' && (
+          <Panel title="Could share this trailer" className="p-4">
+            <ShareSuggestions job={job} />
+          </Panel>
+        )}
+        {planning && (
+          <Panel title="Join a confirmed trip" className="p-4">
+            <JoinableTrips job={job} enabled={planning} />
+          </Panel>
+        )}
+      </Flex>
     ) : null;
 
   if (!routePlan) {

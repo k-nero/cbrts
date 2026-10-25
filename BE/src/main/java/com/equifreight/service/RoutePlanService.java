@@ -835,22 +835,82 @@ public class RoutePlanService {
 
     /**
      * Puts {@code job}'s own stops, {@code own} (its pickup first, its delivery or transfer last), on the trip's draft
-     * route (US-F3-16): the pickup after the last pickup, the rest after the last delivery or transfer.
+     * route (US-F3-16, US-F3-18). A stop at a place the route already stops at goes beside that stop (the pickup just
+     * before it, the end just after it), so the legs and flights between the trip's stops stay as they are: on a trip
+     * that flies from an airport, the flight still leaves from there. Elsewhere the pickup goes after the last pickup and
+     * the end at the end of the route.
      */
     private void addJobStops(Trip trip, TransportJob job, List<StopCopy> own) {
         Optional<RoutePlan> draft = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
         if (draft.isEmpty()) return;
         List<StopCopy> stops = new ArrayList<>();
         for (RouteStop st : draft.get().getStops()) stops.add(copy(st));
-        int lastPickup = -1;
-        for (int i = 0; i < stops.size(); i++) if (stops.get(i).kind() == RouteStopKind.PICKUP) lastPickup = i;
         StopCopy pickup = own.getFirst();
-        stops.add(lastPickup + 1, new StopCopy(null, job, RouteStopKind.PICKUP, pickup.place(), pickup.plannedAt()));
+        int at = -1;
+        for (int i = 0; i < stops.size() && at < 0; i++) if (samePlace(stops.get(i), pickup)) at = i;
+        if (at < 0) {
+            for (int i = 0; i < stops.size(); i++) if (stops.get(i).kind() == RouteStopKind.PICKUP) at = i + 1;
+            if (at < 0) at = 0;
+        }
+        stops.add(at, new StopCopy(null, job, RouteStopKind.PICKUP, pickup.place(), pickup.plannedAt()));
         for (StopCopy rest : own.subList(1, own.size())) {
             if (rest.job() == null) continue;
-            stops.add(new StopCopy(null, job, rest.kind(), rest.place(), rest.plannedAt()));
+            int after = -1;
+            for (int i = 0; i < stops.size(); i++) if (samePlace(stops.get(i), rest)) after = i;
+            StopCopy added = new StopCopy(null, job, rest.kind(), rest.place(), rest.plannedAt());
+            if (after < 0) stops.add(added);
+            else stops.add(after + 1, added);
         }
         rebuild(draft.get(), stops);
+    }
+
+    private static boolean samePlace(StopCopy a, StopCopy b) {
+        Place pa = a.from() != null ? a.from().getPlace() : a.place();
+        Place pb = b.from() != null ? b.from().getPlace() : b.place();
+        return pa != null && pb != null && pa.getId() != null && pa.getId().equals(pb.getId());
+    }
+
+    /**
+     * Puts {@code job}'s stops on {@code from} (its pickup, then its delivery or transfer) on {@code to}'s draft route,
+     * as when it joins {@code to} (US-F3-11, US-F3-18): on a later trip of a journey these are where it is collected and
+     * handed on, not its request's ends. A job with no stops on {@code from} yet brings its request's pickup and
+     * delivery. Call it before {@code from}'s route loses the job's stops.
+     */
+    @Transactional
+    public void copyJobStops(Trip from, Trip to, TransportJob job) {
+        List<StopCopy> own = routePlanRepository
+                .findByTrip_IdAndStatus(from.getId(), RoutePlanStatus.DRAFT)
+                .or(() -> routePlanRepository.findByTrip_IdAndStatus(from.getId(), RoutePlanStatus.CONFIRMED))
+                .map(plan -> plan.getStops().stream()
+                        .filter(st -> st.getJob() != null && st.getJob().getId().equals(job.getId()))
+                        .sorted(Comparator.comparing(st -> st.getKind() == RouteStopKind.PICKUP ? 0 : 1))
+                        .map(RoutePlanService::copy)
+                        .toList())
+                .orElse(List.of());
+        if (own.isEmpty() || own.getFirst().kind() != RouteStopKind.PICKUP) {
+            addJobStops(to, job);
+            return;
+        }
+        addJobStops(to, job, own);
+    }
+
+    /**
+     * When {@code job} is collected on {@code trip}: its pickup's planned time on the trip's draft, else its confirmed
+     * route, else the trip's planned departure (US-F3-18). A later trip of a journey leaves on its own day.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Instant> pickupOn(Trip trip, TransportJob job) {
+        return routePlanRepository
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .or(() -> routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .flatMap(plan -> plan.getStops().stream()
+                        .filter(st -> st.getKind() == RouteStopKind.PICKUP
+                                && st.getJob() != null
+                                && st.getJob().getId().equals(job.getId())
+                                && st.getPlannedAt() != null)
+                        .map(RouteStop::getPlannedAt)
+                        .findFirst())
+                .or(() -> Optional.ofNullable(trip.getPlannedDepartureAt()));
     }
 
     /** Takes {@code job}'s pickup and delivery off the trip's draft route, joining its neighbours. */

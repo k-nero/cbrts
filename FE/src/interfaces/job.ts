@@ -136,6 +136,24 @@ export interface ShareSuggestion {
   warnings: BiosecurityWarning[];
 }
 
+/** A confirmed trip a job could join (US-F3-18), with its clearance state and the warnings joining raises. */
+export interface JoinableTrip {
+  tripId: string;
+  tripCode: string;
+  corridorCode: string;
+  mode: TransportMode;
+  plannedDepartureAt: string | null;
+  departFrom: string;
+  departTo: string;
+  /** Stalls left on the trailers once the job is on; null for a trip that only flies. */
+  stallsLeft: number | null;
+  jobs: string[];
+  jobsCleared: number;
+  /** The earliest due date of a document not cleared yet, of every job on it; null when none is open. */
+  documentsDueBy: string | null;
+  warnings: BiosecurityWarning[];
+}
+
 /** The trip after a job joined it: the days every job on it can leave. */
 export interface ShareTripResult {
   tripCode: string;
