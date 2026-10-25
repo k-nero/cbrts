@@ -8,10 +8,10 @@ import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
+import { ClearanceTab } from './ClearanceTab';
 import { JourneyRail } from './JourneyRail';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
-import { Placeholder } from './Placeholder';
 
 /** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
@@ -32,12 +32,7 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       key: 'clearance',
       label: 'Clearance',
       owner: 'Transport specialist',
-      render: (job) => (
-        <Placeholder title="Clearance Checklist">
-          Owned by transport specialist.{' '}
-          {job.clearanceGateSummary || 'Clearance documents and permits'}.
-        </Placeholder>
-      ),
+      render: (job) => <ClearanceTab job={job} />,
     },
     {
       key: 'authorities',

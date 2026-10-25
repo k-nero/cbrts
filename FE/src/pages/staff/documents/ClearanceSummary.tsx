@@ -4,8 +4,15 @@ import { Button, Callout, ClearanceGate, StatTile } from '@/components/ui';
 import { useEvaluateClearanceGate } from '@/hooks/clearance';
 import type { ClearanceStatus } from '@/interfaces';
 
+type Props = {
+  jobId: string;
+  status: ClearanceStatus;
+  /** The gate itself. The Documents page shows it; the job page has the gate in its header. */
+  withGate?: boolean;
+};
+
 /** The job's clearance gate, its counts and what still holds departure. */
-const ClearanceSummary: FC<{ jobId: string; status: ClearanceStatus }> = ({ jobId, status }) => {
+const ClearanceSummary: FC<Props> = ({ jobId, status, withGate = true }) => {
   const evaluateGate = useEvaluateClearanceGate(jobId);
   const remaining = Math.max(0, status.mandatoryItems - status.clearedMandatoryItems);
 
@@ -19,29 +26,31 @@ const ClearanceSummary: FC<{ jobId: string; status: ClearanceStatus }> = ({ jobI
 
   return (
     <>
-      <ClearanceGate
-        state={gateState}
-        title={gateTitle}
-        action={
-          !isDeparted && (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={evaluateGate.isPending}
-              // A failure shows in the mutation's state; the gate keeps its last result.
-              onClick={() => evaluateGate.mutateAsync(jobId).catch(() => undefined)}
-            >
-              {evaluateGate.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
-            </Button>
-          )
-        }
-      >
-        {isDeparted
-          ? 'The job has departed. The dossier is frozen.'
-          : status.clearanceReady
-            ? 'Every mandatory document is approved and GREEN, quarantines are complete and every permit is issued.'
-            : `${status.clearedMandatoryItems} of ${status.mandatoryItems} mandatory documents cleared · ${status.outstandingIssues.length} outstanding.`}
-      </ClearanceGate>
+      {withGate && (
+        <ClearanceGate
+          state={gateState}
+          title={gateTitle}
+          action={
+            !isDeparted && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={evaluateGate.isPending}
+                // A failure shows in the mutation's state; the gate keeps its last result.
+                onClick={() => evaluateGate.mutateAsync(jobId).catch(() => undefined)}
+              >
+                {evaluateGate.isPending ? 'Evaluating...' : 'Re-evaluate gate'}
+              </Button>
+            )
+          }
+        >
+          {isDeparted
+            ? 'The job has departed. The dossier is frozen.'
+            : status.clearanceReady
+              ? 'Every mandatory document is approved and GREEN, quarantines are complete and every permit is issued.'
+              : `${status.clearedMandatoryItems} of ${status.mandatoryItems} mandatory documents cleared · ${status.outstandingIssues.length} outstanding.`}
+        </ClearanceGate>
+      )}
 
       <Row gutter={[16, 16]}>
         <Col xs={12} md={6}>
