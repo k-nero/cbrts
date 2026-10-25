@@ -1,13 +1,14 @@
 import { type ReactNode, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Flex, Segmented, Skeleton, Tabs, type TabsProps } from 'antd';
+import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
 import { Callout, ClearanceGate, StageMark } from '@/components/ui';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
-import type { JobDetail, TripPart } from '@/interfaces';
+import type { JobDetail } from '@/interfaces';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
+import { JourneyRail } from './JourneyRail';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 import { Placeholder } from './Placeholder';
@@ -67,16 +68,6 @@ const STAGE_MAP: Record<
   CLOSED: 'Handover',
 };
 
-/** "1 · Road · RD HCM -> PNH": one trip of a job's journey, as the trip switcher names it. */
-const partLabel = (part: TripPart, index: number) =>
-  [
-    String(index + 1),
-    part.mode === 'AIR' ? 'Flight' : part.mode === 'ROAD' ? 'Road' : null,
-    part.corridorCode ?? part.tripCode,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
 export default function JobDetailPage() {
   // The trip of the job's journey the tabs plan (US-F3-16) lives in the URL too (?trip=…).
   const [searchParams] = useSearchParams();
@@ -126,6 +117,29 @@ function JobWorkspace() {
   const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
   // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
   const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
+  // A journey of several trips (US-F3-16): the tabs plan the trip chosen in the rail beside them.
+  const journey = job.parts.some((part) => part.handsOn);
+
+  const tabsView = (
+    <Tabs
+      activeKey={activeTab.key}
+      onChange={(key) => {
+        const trip = searchParams.get('trip');
+        setSearchParams(trip ? { tab: key, trip } : { tab: key }, { replace: true });
+      }}
+      items={items}
+      // Unmount a tab when it's left, as before, so its forms start fresh on return.
+      destroyOnHidden
+      tabBarExtraContent={
+        <span className="hidden sm:block">
+          <Flex component="span" gap={8} align="center">
+            <span className="type-body-s text-ink-3">Owner:</span>
+            <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
+          </Flex>
+        </span>
+      }
+    />
+  );
 
   return (
     <div className="p-4">
@@ -157,33 +171,6 @@ function JobWorkspace() {
             right={<StageMark stage={STAGE_MAP[job.stage] || 'Approval'} />}
           />
 
-          {/* A journey of several trips (US-F3-16): the tabs plan the trip chosen here. */}
-          {job.parts.some((part) => part.handsOn) && (
-            <Flex vertical gap={8}>
-              <p className="type-body-m m-0 text-ink-2">
-                {job.code} travels as a journey of {job.parts.length} trips, each handing the horses
-                on to the next. The tabs below plan the trip chosen here.
-              </p>
-              {/* A long journey scrolls sideways rather than squeezing its trips. */}
-              <div className="max-w-full overflow-x-auto">
-                <Segmented
-                  value={job.parts.find((part) => part.current)?.tripId}
-                  onChange={(trip) => showTrip(String(trip))}
-                  options={job.parts.map((part, index) => ({
-                    value: part.tripId,
-                    label: (
-                      <span className="flex items-center gap-2 px-1 py-0.5">
-                        <span className="type-label-s">{partLabel(part, index)}</span>
-                        <span className="type-mono-label text-ink-3">
-                          {part.status.toLowerCase().replace('_', ' ')}
-                        </span>
-                      </span>
-                    ),
-                  }))}
-                />
-              </div>
-            </Flex>
-          )}
           {job.parts.length > 0 && !job.parts.some((part) => part.handsOn) && (
             <Callout tone="info" title={`${job.code} travels in ${job.parts.length} parts`}>
               {job.parts
@@ -204,24 +191,14 @@ function JobWorkspace() {
           ></ClearanceGate>
         </Flex>
 
-        <Tabs
-          activeKey={activeTab.key}
-          onChange={(key) => {
-            const trip = searchParams.get('trip');
-            setSearchParams(trip ? { tab: key, trip } : { tab: key }, { replace: true });
-          }}
-          items={items}
-          // Unmount a tab when it's left, as before, so its forms start fresh on return.
-          destroyOnHidden
-          tabBarExtraContent={
-            <span className="hidden sm:block">
-              <Flex component="span" gap={8} align="center">
-                <span className="type-body-s text-ink-3">Owner:</span>
-                <span className="type-label-s font-medium text-ink">{activeTab.owner}</span>
-              </Flex>
-            </span>
-          }
-        />
+        {journey ? (
+          <Flex gap={24} align="start">
+            <JourneyRail parts={job.parts} onShow={showTrip} />
+            <div className="min-w-0 flex-1">{tabsView}</div>
+          </Flex>
+        ) : (
+          tabsView
+        )}
       </Flex>
     </div>
   );

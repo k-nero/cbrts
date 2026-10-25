@@ -232,6 +232,46 @@ class TripChainTest {
     }
 
     @Test
+    @DisplayName("A horse that leaves the journey comes off its later trips; the job's others still go on")
+    void aHorseLeavingTheJourneyComesOffLaterTrips() {
+        TripJob first = part(road);
+        TripJob second = part(air);
+        first.setNext(second);
+        TripHorse leaving = row(air, nightfall, TripHorseStatus.PLANNED);
+        when(tripHorses.findByTrip_IdOrderByCreatedAt(air.getId()))
+                .thenReturn(List.of(row(air, shadowfax, TripHorseStatus.PLANNED), leaving));
+
+        List<Trip> touched = service.withdrawFromJourney(road, job, List.of(nightfall.getId()));
+
+        assertThat(touched).containsExactly(air);
+        verify(tripHorses).deleteAll(List.of(leaving));
+        assertThat(first.getNext()).isSameAs(second);
+        verify(parts, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("When none of the job's horses go on, its later trips drop out of the chain")
+    void theLaterTripsDropOutWhenNoHorseGoesOn() {
+        Trip last = trip("TRP-2026-043");
+        TripJob first = part(road);
+        TripJob second = part(air);
+        TripJob third = part(last);
+        first.setNext(second);
+        second.setNext(third);
+        when(parts.findByNext_IdOrderByCreatedAt(second.getId())).thenReturn(List.of(first));
+        when(tripHorses.findByTrip_IdOrderByCreatedAt(air.getId()))
+                .thenReturn(List.of(row(air, shadowfax, TripHorseStatus.PLANNED)));
+        when(tripHorses.findByTrip_IdOrderByCreatedAt(last.getId()))
+                .thenReturn(List.of(row(last, shadowfax, TripHorseStatus.PLANNED)));
+
+        List<Trip> touched = service.withdrawFromJourney(road, job, List.of(shadowfax.getId()));
+
+        assertThat(touched).containsExactly(air, last);
+        verify(parts).delete(second);
+        verify(parts).delete(third);
+    }
+
+    @Test
     @DisplayName("A later trip is taken out of the chain only while the job's horses are just planned on it")
     void aTripIsTakenOutOnlyBeforeHandOn() {
         TripJob first = part(road);

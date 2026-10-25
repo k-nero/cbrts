@@ -70,7 +70,7 @@ Removing a trip from the chain is the reverse, before either trip departs.
 
 ## Screens
 
-- **Job › Route / Load plan / Crew tabs:** a trip switcher above the tabs ("1 · Road VTE → BKK · 2 · Air BKK → HKG · 3 · Road HKG → Sha Tin"). Every job-scoped endpoint that today resolves "the job's current trip" (`TripRepository.findCurrentByJobId`, used by about 38 call sites in 12 services) takes an optional `tripId`, defaulting to the current trip. On an air trip the Load plan tab shows the flight's allocations instead of trailers.
+- **Job › Route / Load plan / Crew tabs:** a journey rail to the left of the tabs (as built; DESIGN.md, Job page), first planned as a trip switcher above the tabs ("1 · Road VTE → BKK · 2 · Air BKK → HKG · 3 · Road HKG → Sha Tin"). Every job-scoped endpoint that today resolves "the job's current trip" (`TripRepository.findCurrentByJobId`, used by about 38 call sites in 12 services) takes an optional `tripId`, defaulting to the current trip. On an air trip the Load plan tab shows the flight's allocations instead of trailers.
 - **Customer tracking:** one timeline across the job's trips, in chain order, still without trip codes or other clients.
 - **Fleet calendar:** unchanged; each road trip's bookings show on their own dates.
 
@@ -81,6 +81,7 @@ Removing a trip from the chain is the reverse, before either trip departs.
 - **Where a journey splits.** Only at an `AIRPORT_OUT`, `AIRPORT_IN` or `QUARANTINE` stop before the job's delivery. A stop shared with other jobs on the trip stays, and the job's `TRANSFER` is added after it. The next trip's pickup is planned at the stop's time plus its stay; later edits of either route aren't checked against each other.
 - **Joining an existing trip** is the shared-trip flow on the later trip (its Load plan tab), not part of "continue on another trip". The date check of that flow still uses the job's own departure window, so a later trip of a journey rarely fits; fixing that is a follow-up.
 - **Air trips.** A trip whose confirmed route has no road leg is signed off without load plans or drivers; its flight crew is checked as for any flight. The airports a flight joins on are read from its air legs, not from the `AIRPORT_OUT` and `AIRPORT_IN` stops.
+- **Incidents branch the journey.** Horses moved to a second vehicle, or unloaded to continue later, keep going: their new trip hands on to the journey's next trip, where they join the others. Horses left in care, or returned to their origin, leave the journey: they come off every later trip (out of their stalls there), a later trip with none of the job's horses left drops out of the chain, and it releases its trailers and crew when nobody else rides it, or reopens without the job's stops when others do.
 - **Every job-scoped planning endpoint** takes `?trip=`; the job page keeps the chosen trip in its URL.
 
 ## Not in scope

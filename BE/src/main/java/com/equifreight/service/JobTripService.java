@@ -405,6 +405,15 @@ public class JobTripService {
      */
     @Transactional
     public void moveHorses(TransportJob job, Collection<UUID> horseIds, Trip from, Trip to) {
+        moveHorses(job, horseIds, from, to, true);
+    }
+
+    /**
+     * As above; {@code staysOnJourney} is false when the horses leave the job's journey (returned to their origin), so
+     * their new trip doesn't hand them on to the next trip of the chain (US-F3-16).
+     */
+    @Transactional
+    public void moveHorses(TransportJob job, Collection<UUID> horseIds, Trip from, Trip to, boolean staysOnJourney) {
         List<TripHorse> moving =
                 tripHorses.findByTrip_IdAndJob_IdAndStatus(from.getId(), job.getId(), TripHorseStatus.ON_TRIP).stream()
                         .filter(th -> horseIds.contains(th.getHorse().getId()))
@@ -424,10 +433,53 @@ public class JobTripService {
         TripJob next = parts.findByTrip_IdAndJob_Id(from.getId(), job.getId())
                 .map(TripJob::getNext)
                 .orElse(null);
-        if (next != null && part.getNext() == null) {
+        if (staysOnJourney && next != null && part.getNext() == null) {
             part.setNext(next);
             parts.saveAndFlush(part);
         }
+    }
+
+    /**
+     * Horses that leave the job's journey on {@code trip} (left in care, or returned to their origin) come off its later
+     * trips (US-F3-16): their planned rows there go, and a later trip with none of the job's horses left drops out of
+     * the chain. Returns the later trips touched, oldest first, so the caller frees their stalls and plans.
+     */
+    @Transactional
+    public List<Trip> withdrawFromJourney(Trip trip, TransportJob job, Collection<UUID> horseIds) {
+        List<Trip> touched = new ArrayList<>();
+        TripJob next = parts.findByTrip_IdAndJob_Id(trip.getId(), job.getId())
+                .map(TripJob::getNext)
+                .orElse(null);
+        Set<UUID> seen = new HashSet<>();
+        while (next != null && seen.add(next.getId())) {
+            Trip later = next.getTrip();
+            List<TripHorse> rows = tripHorses.findByTrip_IdOrderByCreatedAt(later.getId()).stream()
+                    .filter(th -> th.getJob().getId().equals(job.getId()))
+                    .toList();
+            List<TripHorse> gone = rows.stream()
+                    .filter(th -> th.getStatus() == TripHorseStatus.PLANNED
+                            && horseIds.contains(th.getHorse().getId()))
+                    .toList();
+            TripJob after = next.getNext();
+            if (!gone.isEmpty()) {
+                touched.add(later);
+                tripHorses.deleteAll(gone);
+                tripHorses.flush();
+                if (gone.size() == rows.size()) {
+                    // None of the job's horses go this far any more: the part drops out of the chain.
+                    for (TripJob before : parts.findByNext_IdOrderByCreatedAt(next.getId())) {
+                        before.setNext(after);
+                        parts.saveAndFlush(before);
+                    }
+                    next.setNext(null);
+                    parts.saveAndFlush(next);
+                    parts.delete(next);
+                    parts.flush();
+                }
+            }
+            next = after;
+        }
+        return touched;
     }
 
     /** Some of the job's horses stay at a vet clinic or a stable and won't travel on (US-F5-06). */
