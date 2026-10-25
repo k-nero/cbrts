@@ -7,6 +7,7 @@ import {
   classOptions,
   conflictMessage,
   declinedBefore,
+  declinedTitle,
   depositText,
   issueBlocker,
   statusActions,
@@ -374,5 +375,31 @@ describe('declinedBefore', () => {
   test('nothing when that version only expired, or for the first version', () => {
     expect(declinedBefore([version(2, 'DRAFT'), version(1, 'EXPIRED')], 2)).toBeNull();
     expect(declinedBefore([version(1, 'DRAFT')], 1)).toBeNull();
+  });
+});
+
+describe('declinedTitle', () => {
+  const declined = (reason: string | null) => ({
+    versionNo: 1,
+    declinedAt: '2026-10-24T03:00:00Z',
+    declineReason: reason,
+  });
+
+  test('the date, the reason and the closed request (spec §5.1)', () => {
+    expect(declinedTitle(declined('Too dear'), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026: Too dear. REQ-2026-0202 is closed.',
+    );
+  });
+
+  test('a reason that ends its own sentence is not doubled', () => {
+    expect(declinedTitle(declined('Too dear.'), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026: Too dear. REQ-2026-0202 is closed.',
+    );
+  });
+
+  test('without a reason', () => {
+    expect(declinedTitle(declined(null), 'REQ-2026-0202')).toBe(
+      'The customer declined version 1 on 24 Oct 2026. REQ-2026-0202 is closed.',
+    );
   });
 });

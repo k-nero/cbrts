@@ -1,6 +1,8 @@
 import type { FC } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { App, Flex } from 'antd';
+import type { AxiosError } from 'axios';
 
 import { type RequoteForm, requoteSchema } from './schema';
 
@@ -9,6 +11,7 @@ import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import BaseModal from '@/components/modal/BaseModal';
 import { Callout } from '@/components/ui';
+import { queryKeys } from '@/constant/query';
 import { useRequestQuote } from '@/hooks/request';
 import type { CustomerQuotation } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
@@ -23,6 +26,7 @@ export const RequoteModal: FC<{
   onClose: () => void;
 }> = ({ quotation, open, onClose }) => {
   const { message } = App.useApp();
+  const qc = useQueryClient();
   const requote = useRequestQuote(quotation.request.id);
   const manager = quotation.preparedBy?.name ?? 'the logistics manager';
   const methods = useFormCustom<RequoteForm>({
@@ -43,6 +47,12 @@ export const RequoteModal: FC<{
         onSuccess: () => {
           message.success('Re-quote asked');
           close();
+        },
+        // Refused because things moved on (asked in another tab, revised or issued meanwhile): reload, so
+        // the panel shows where the quotation stands instead of offering the same ask again.
+        onError: (error) => {
+          if ((error as AxiosError).response?.status !== 409) return;
+          void qc.invalidateQueries({ queryKey: queryKeys.requests.one(quotation.request.id) });
         },
       },
     ),
@@ -67,7 +77,7 @@ export const RequoteModal: FC<{
             <>
               <FormField
                 name="note"
-                label="What should change? (optional)"
+                label="What should change?"
                 component="textarea"
                 componentProps={{ rows: 3, maxLength: 500 }}
               />

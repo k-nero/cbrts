@@ -35,7 +35,9 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
   const close = () => setOpen(null);
   const onVersionChanged = (sentence: string) => {
     setChanged(sentence);
-    void qc.invalidateQueries({ queryKey: queryKeys.requests.quotation(quotation.request.id) });
+    // The request's key prefixes its quotation's: the page, its next step and the quotation all reload.
+    void qc.invalidateQueries({ queryKey: queryKeys.requests.one(quotation.request.id) });
+    void qc.invalidateQueries({ queryKey: queryKeys.requests.pages() });
   };
   const changedCallout = changed && <Callout tone="warn" title={changed} />;
 

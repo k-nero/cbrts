@@ -30,6 +30,7 @@ import {
   apiErrorMessage,
   conflictMessage,
   declinedBefore,
+  declinedTitle,
   formatDate,
   ict,
   money,
@@ -183,10 +184,12 @@ const QuotationBuilderPage: FC = () => {
   const onDiscard = () =>
     modal.confirm({
       title: `Discard draft v${q.versionNo}?`,
-      content: `Every change in it is lost. Version ${q.versionNo - 1} stands as issued.`,
+      content: declined
+        ? `Version ${declined.versionNo} stays declined, and ${q.request.code} stays closed.`
+        : `Every change in it is lost. Version ${q.versionNo - 1} stands as issued.`,
       okText: 'Discard draft',
       okButtonProps: { danger: true },
-      cancelText: 'Keep editing',
+      cancelText: declined ? 'Keep it' : 'Keep editing',
       onOk: async () => {
         const ok = await write(() => discard.mutateAsync(shown), `Draft v${q.versionNo} discarded`);
         if (ok) showVersion(null);
@@ -214,18 +217,14 @@ const QuotationBuilderPage: FC = () => {
       />
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <Flex vertical gap={24} className="min-w-0">
-          {conflict && (
+          {/* After a decline the warn callout below says it all; the refused write's sentence would repeat it. */}
+          {conflict && !declined && (
             <Callout tone="bad" title={conflict}>
               The quotation has been reloaded to show where it stands now.
             </Callout>
           )}
           {declined && (
-            <Callout
-              tone="warn"
-              title={`The customer declined version ${declined.versionNo}${
-                declined.declinedAt ? ` on ${formatDate(declined.declinedAt)}` : ''
-              }${declined.declineReason ? `: ${declined.declineReason}` : ''}. ${q.request.code} is closed.`}
-            >
+            <Callout tone="warn" title={declinedTitle(declined, q.request.code)}>
               This draft can't be issued. Discard it.
             </Callout>
           )}

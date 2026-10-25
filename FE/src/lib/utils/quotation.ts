@@ -128,6 +128,19 @@ export const declinedBefore = (
 ): QuotationVersion | null =>
   versions.find((v) => v.versionNo === versionNo - 1 && v.status === 'DECLINED') ?? null;
 
+/**
+ * The builder's callout on a draft after a decline (spec §5.1): "The customer declined version 1 on
+ * 24 Oct 2026: Too dear. REQ-… is closed." A reason that ends its own sentence isn't doubled.
+ */
+export const declinedTitle = (
+  declined: Pick<QuotationVersion, 'versionNo' | 'declinedAt' | 'declineReason'>,
+  requestCode: string,
+): string => {
+  const on = declined.declinedAt ? ` on ${formatDate(declined.declinedAt)}` : '';
+  const reason = declined.declineReason?.trim().replace(/[.!?…]+$/, '');
+  return `The customer declined version ${declined.versionNo}${on}${reason ? `: ${reason}` : ''}. ${requestCode} is closed.`;
+};
+
 /** The server's sentence when a quotation write was refused because things moved on (409), else null. */
 export const conflictMessage = (error: unknown): string | null => {
   const response = (error as AxiosError<Partial<ApiError>> | undefined)?.response;
