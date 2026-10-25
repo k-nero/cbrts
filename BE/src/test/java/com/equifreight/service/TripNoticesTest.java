@@ -317,4 +317,36 @@ class TripNoticesTest {
 
         assertTrue(sent().getFirst().body().startsWith("The plan for the trailer leaving on 18 Oct changed, so"));
     }
+
+    @Test
+    @DisplayName("Customs cleared tells the club where and when, keyed by the border")
+    void customsClearedIsAnnounced() {
+        RouteStop border = stop(a, RouteStopKind.BORDER, ARRIVE);
+        border.getPlace().setName("Mộc Bài");
+
+        notices.clearedCustoms(a, border, ARRIVE, UUID.randomUUID());
+
+        Sent sent = sent().getFirst();
+        assertEquals(NotificationKind.HORSES_CLEARED_CUSTOMS, sent.kind());
+        assertEquals("Your horses cleared customs at Mộc Bài", sent.title());
+        assertEquals(
+                "CBRT-2026-041 cleared customs at Mộc Bài on 20 Oct at 18:00 and is on its way."
+                        + " Follow it leg by leg on the tracking page.",
+                sent.body());
+        assertEquals("HORSES_CLEARED_CUSTOMS:" + a.getId() + ":" + border.getId(), sent.key());
+    }
+
+    @Test
+    @DisplayName("Arrival tells the club its horses reached the handover point, once per trip")
+    void arrivalIsAnnounced() {
+        RouteStop delivery = stop(a, RouteStopKind.DELIVERY, ARRIVE);
+
+        notices.arrived(a, trip, delivery, ARRIVE);
+
+        Sent sent = sent().getFirst();
+        assertEquals(NotificationKind.HORSES_ARRIVED, sent.kind());
+        assertEquals("Your horses have arrived at Bangkok", sent.title());
+        assertTrue(sent.body().startsWith("CBRT-2026-041 reached Bangkok on 20 Oct at 18:00."));
+        assertEquals("HORSES_ARRIVED:" + a.getId() + ":" + trip.getId(), sent.key());
+    }
 }

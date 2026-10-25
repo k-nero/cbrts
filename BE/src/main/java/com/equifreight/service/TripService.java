@@ -71,6 +71,7 @@ public class TripService {
     private final FileService files;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final TripNotices notices;
     private final JobTripService jobTrips;
     private final FlightRepository flightsByLeg;
     private final Clock clock;
@@ -86,6 +87,7 @@ public class TripService {
             FileService files,
             AuditService audit,
             NotificationService notifications,
+            TripNotices notices,
             JobTripService jobTrips,
             FlightRepository flightsByLeg,
             Clock clock) {
@@ -99,6 +101,7 @@ public class TripService {
         this.files = files;
         this.audit = audit;
         this.notifications = notifications;
+        this.notices = notices;
         this.jobTrips = jobTrips;
         this.flightsByLeg = flightsByLeg;
         this.clock = clock;
@@ -354,7 +357,9 @@ public class TripService {
         TripRecord saved = records.save(record);
         // A record synced late from the cab joins the log in time order but never moves the status back.
         if (!late) {
+            List<TransportJob> ridingBefore = riding(trip, target);
             updateJobStatus(target, trip, request.kind(), request.occurredAt(), stop);
+            tellTheCustomer(saved, target, trip, stop, ridingBefore);
             recordHandover(target, saved, receiverName);
             if (request.kind() == TripRecordKind.HELD) alertHold(target, stop, request.text());
         }
@@ -628,6 +633,24 @@ public class TripService {
     }
 
     /** A hold stops the horses on the road: tell the people who decide when it moves on. */
+    /**
+     * The checkpoints a customer is told about (US-F4-05): customs cleared, for every job on board, and the arrival at
+     * the job's handover point (its delivery stop, which a delivery always follows; a transfer to the next trip of its
+     * chain is not the handover).
+     */
+    private void tellTheCustomer(
+            TripRecord record, TransportJob target, Trip trip, RouteStop stop, List<TransportJob> ridingBefore) {
+        switch (record.getKind()) {
+            case CLEARED_BORDER ->
+                ridingBefore.forEach(job -> notices.clearedCustoms(job, stop, record.getOccurredAt(), record.getId()));
+            case ARRIVED_AT_STOP -> {
+                if (stop != null && stop.getKind() == RouteStopKind.DELIVERY)
+                    notices.arrived(target, trip, stop, record.getOccurredAt());
+            }
+            default -> {}
+        }
+    }
+
     private void alertHold(TransportJob job, RouteStop stop, String reason) {
         String place = stop == null ? "" : " at " + TripMapper.stopName(stop);
         String title = "Trip %s held%s".formatted(job.getCode(), place);

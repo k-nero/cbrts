@@ -26,6 +26,10 @@ public enum NotificationKind {
     TRIP_SHARED(NotificationTone.INFO),
     TRIP_TIMES_CHANGED(NotificationTone.WARN),
     JOB_REPLANNED(NotificationTone.WARN),
+    /** The horses cleared customs at a border (US-F4-05). */
+    HORSES_CLEARED_CUSTOMS(NotificationTone.INFO),
+    /** The horses reached the handover point (US-F4-05). */
+    HORSES_ARRIVED(NotificationTone.OK),
     INCIDENT_RAISED(NotificationTone.BAD),
     INCIDENT_PROPOSAL(NotificationTone.WARN),
     INCIDENT_DECIDED(NotificationTone.OK),

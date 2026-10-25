@@ -79,6 +79,9 @@ class TripServiceTest {
     private NotificationService notifications;
 
     @Mock
+    private TripNotices notices;
+
+    @Mock
     private JobTripService jobTrips;
 
     private final FlightRepository flightsByLeg = mock(FlightRepository.class);
@@ -158,6 +161,7 @@ class TripServiceTest {
                 files,
                 audit,
                 notifications,
+                notices,
                 jobTrips,
                 flightsByLeg,
                 Clock.fixed(NOW, ZoneOffset.UTC));
@@ -488,6 +492,58 @@ class TripServiceTest {
 
         assertEquals(TripStatus.DELIVERED, trip.getStatus());
         verify(jobTrips).markDelivered(trip, job);
+    }
+
+    // ---------- what the customer is told (US-F4-05) ----------
+
+    @Test
+    @DisplayName("Customs cleared tells every job on board")
+    void customsClearedTellsEveryJob() {
+        departed();
+        TransportJob other = sharedWith();
+
+        record(TripRecordKind.CLEARED_BORDER, NOW);
+
+        verify(notices).clearedCustoms(eq(job), isNull(), eq(NOW), any());
+        verify(notices).clearedCustoms(eq(other), isNull(), eq(NOW), any());
+    }
+
+    @Test
+    @DisplayName("Arriving at the job's delivery stop tells its customer")
+    void arrivalAtDeliveryIsAnnounced() {
+        departed();
+        RouteStop stop = deliveryOf(job);
+
+        service.addCoordinatorRecord(
+                job.getCode(),
+                coordinator,
+                new TripRecordRequest(
+                        stop.getId(), TripRecordKind.ARRIVED_AT_STOP, NOW, UUID.randomUUID(), null, null, null, null));
+
+        verify(notices).arrived(job, trip, stop, NOW);
+    }
+
+    @Test
+    @DisplayName("The delivery after the arrival doesn't tell the customer again")
+    void deliveryAfterArrivalIsQuiet() {
+        departed();
+        job.setTripStatus(TripStatus.ARRIVED);
+
+        record(TripRecordKind.DELIVERED, NOW);
+
+        verify(notices, never()).arrived(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A checkpoint synced late tells nobody")
+    void lateRecordIsQuiet() {
+        departed();
+        when(records.findTopByTrip_IdAndKindInOrderByOccurredAtDesc(eq(trip.getId()), anyCollection()))
+                .thenReturn(Optional.of(stored(TripRecordKind.LEFT_STOP, NOW.minus(Duration.ofMinutes(5)))));
+
+        record(TripRecordKind.CLEARED_BORDER, NOW.minus(Duration.ofMinutes(30)));
+
+        verify(notices, never()).clearedCustoms(any(), any(), any(), any());
     }
 
     // ---------- a shared trailer (US-F3-11) ----------
