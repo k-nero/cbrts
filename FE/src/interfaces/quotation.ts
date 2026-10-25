@@ -121,6 +121,9 @@ export interface QuotationVersion {
   validUntil: string | null;
   total: number | null;
   supersededReason: string | null;
+  /** When the customer declined this version; a decline is final, so the draft after it closes. */
+  declinedAt: string | null;
+  declineReason: string | null;
 }
 
 /** The version a revision replaces, for "Changed since": each keyed line's amount. */
@@ -270,6 +273,8 @@ export interface CustomerQuotation {
     validUntil: string | null;
     supersededReason: string | null;
   }[];
+  /** The version being drafted after this one (a re-quote, A4); null when none is. */
+  nextVersion: number | null;
 }
 
 /** The request's latest issued quotation, on the request and its list row. */

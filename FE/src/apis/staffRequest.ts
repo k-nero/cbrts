@@ -50,13 +50,25 @@ export const getQuotation = (id: string, version?: number): Promise<QuotationDra
 export const startQuotation = (id: string): Promise<QuotationDraft> =>
   client.post<QuotationDraft>(`${BASE}/${id}/quotation`).then((r) => r.data);
 
-/** Price the draft with another air class, on the catalog version it pins. */
-export const changeQuotationClass = (id: string, airClass: ServiceClass): Promise<QuotationDraft> =>
-  client.put<QuotationDraft>(`${BASE}/${id}/quotation`, { airClass }).then((r) => r.data);
+/**
+ * Price the draft with another air class, on the catalog version it pins. `version` is the version
+ * on screen: 409 QUOTATION_VERSION_CHANGED when it is no longer the latest draft (so on every write
+ * below that takes it).
+ */
+export const changeQuotationClass = (
+  id: string,
+  airClass: ServiceClass,
+  version: number,
+): Promise<QuotationDraft> =>
+  client
+    .put<QuotationDraft>(`${BASE}/${id}/quotation`, { airClass }, { params: { version } })
+    .then((r) => r.data);
 
 /** Re-price the draft on the latest published catalog. */
-export const repriceQuotation = (id: string): Promise<QuotationDraft> =>
-  client.post<QuotationDraft>(`${BASE}/${id}/quotation/reprice`).then((r) => r.data);
+export const repriceQuotation = (id: string, version: number): Promise<QuotationDraft> =>
+  client
+    .post<QuotationDraft>(`${BASE}/${id}/quotation/reprice`, undefined, { params: { version } })
+    .then((r) => r.data);
 
 /** Override a priced line's amount with a reason (US-Q-02); the totals are worked out again. */
 export const overrideLine = (
@@ -75,8 +87,14 @@ export const removeOverride = (id: string, lineId: string): Promise<QuotationDra
     .then((r) => r.data);
 
 /** Add a line the catalog doesn't know (US-F1-05). */
-export const addLine = (id: string, body: ManualLineInput): Promise<QuotationDraft> =>
-  client.post<QuotationDraft>(`${BASE}/${id}/quotation/lines`, body).then((r) => r.data);
+export const addLine = (
+  id: string,
+  body: ManualLineInput,
+  version: number,
+): Promise<QuotationDraft> =>
+  client
+    .post<QuotationDraft>(`${BASE}/${id}/quotation/lines`, body, { params: { version } })
+    .then((r) => r.data);
 
 /** Change a line the manager added; a catalog line answers 409 NOT_A_MANUAL_LINE. */
 export const editLine = (
@@ -91,13 +109,19 @@ export const removeLine = (id: string, lineId: string): Promise<QuotationDraft> 
   client.delete<QuotationDraft>(`${BASE}/${id}/quotation/lines/${lineId}`).then((r) => r.data);
 
 /** Issue the draft: 409 QUOTATION_NOT_READY lists what blocks it in details; from v2 a change note is required. */
-export const issueQuotation = (id: string, changeNote: string | null): Promise<QuotationDraft> =>
-  client.post<QuotationDraft>(`${BASE}/${id}/quotation/issue`, { changeNote }).then((r) => r.data);
+export const issueQuotation = (
+  id: string,
+  changeNote: string | null,
+  version: number,
+): Promise<QuotationDraft> =>
+  client
+    .post<QuotationDraft>(`${BASE}/${id}/quotation/issue`, { changeNote }, { params: { version } })
+    .then((r) => r.data);
 
 /** Draft the next version from the latest issued or expired one (201). */
 export const reviseQuotation = (id: string): Promise<QuotationDraft> =>
   client.post<QuotationDraft>(`${BASE}/${id}/quotation/revise`).then((r) => r.data);
 
 /** Discard a revision's draft (204); the version it came from stands. */
-export const discardRevision = (id: string): Promise<void> =>
-  client.delete(`${BASE}/${id}/quotation/draft`).then(() => undefined);
+export const discardRevision = (id: string, version: number): Promise<void> =>
+  client.delete(`${BASE}/${id}/quotation/draft`, { params: { version } }).then(() => undefined);

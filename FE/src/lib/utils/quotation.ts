@@ -3,6 +3,7 @@ import type {
   Deposit,
   PreviousVersion,
   QuotationDraft,
+  QuotationVersion,
   QuoteLineRow,
   Readiness,
   ServiceClass,
@@ -116,6 +117,16 @@ export const readinessView = (
   }
   return { tone: 'neutral', chip: 'Not ready', text: readinessText(q.readiness) };
 };
+
+/**
+ * The version a draft was made from, when the customer declined it: a decline is final, so the
+ * draft can only be discarded. Null for a first version or when that version wasn't declined.
+ */
+export const declinedBefore = (
+  versions: QuotationVersion[],
+  versionNo: number,
+): QuotationVersion | null =>
+  versions.find((v) => v.versionNo === versionNo - 1 && v.status === 'DECLINED') ?? null;
 
 /** The server's sentence when a quotation write was refused because things moved on (409), else null. */
 export const conflictMessage = (error: unknown): string | null => {

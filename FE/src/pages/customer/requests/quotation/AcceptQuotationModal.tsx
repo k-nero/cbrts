@@ -5,7 +5,7 @@ import BaseModal from '@/components/modal/BaseModal';
 import { Button, Callout } from '@/components/ui';
 import { useAcceptQuotation } from '@/hooks/request';
 import type { CustomerQuotation } from '@/interfaces';
-import { apiErrorMessage, cancellationToday, depositText, money } from '@/lib/utils';
+import { apiErrorCode, apiErrorMessage, cancellationToday, depositText, money } from '@/lib/utils';
 
 /**
  * Accept the quotation (US-F1-06): says what the club commits to before it does, the total, the
@@ -15,7 +15,9 @@ export const AcceptQuotationModal: FC<{
   quotation: CustomerQuotation;
   open: boolean;
   onClose: () => void;
-}> = ({ quotation, open, onClose }) => {
+  /** A newer version was issued since the page loaded: the panel says so and reloads it. */
+  onVersionChanged: (sentence: string) => void;
+}> = ({ quotation, open, onClose, onVersionChanged }) => {
   const { message } = App.useApp();
   const accept = useAcceptQuotation(quotation.request.id);
   const manager = quotation.preparedBy?.name ?? 'The logistics manager';
@@ -26,11 +28,17 @@ export const AcceptQuotationModal: FC<{
     onClose();
   };
 
+  // The answer binds the version on screen; a newer one is refused, never accepted unseen (US-Q-07).
   const confirm = () =>
-    accept.mutate(undefined, {
+    accept.mutate(quotation.versionNo, {
       onSuccess: () => {
         message.success(`You accepted version ${quotation.versionNo}.`);
         close();
+      },
+      onError: (error) => {
+        if (apiErrorCode(error) !== 'QUOTATION_VERSION_CHANGED') return;
+        close();
+        onVersionChanged(apiErrorMessage(error, 'A newer version was issued. Read it first.'));
       },
     });
 

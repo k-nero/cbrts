@@ -87,17 +87,24 @@ export const deadlineText = (validUntil: string, now: string): { line1: string; 
   return { line1, line2: formatDate(validUntil) };
 };
 
-/** What the owed panel says: only an issued quotation waits for the club's answer. */
+/**
+ * What the owed panel says: only an issued quotation waits for the club's answer. An expired one can
+ * be re-quoted (A4) while the departure is still ahead (`today` is YYYY-MM-DD in Vietnam time), and
+ * once asked, the next version is being prepared. A decline is final.
+ */
 export const owedKind = (
-  status: CustomerQuotation['status'],
-): 'answer' | 'expired' | 'accepted' | 'declined' =>
-  status === 'EXPIRED'
-    ? 'expired'
-    : status === 'ACCEPTED'
-      ? 'accepted'
-      : status === 'DECLINED'
-        ? 'declined'
-        : 'answer';
+  q: Pick<CustomerQuotation, 'status' | 'nextVersion'> & {
+    request: Pick<CustomerQuotation['request'], 'departureDate'>;
+  },
+  today: string,
+): 'answer' | 'requote' | 'requoting' | 'expired' | 'accepted' | 'declined' => {
+  if (q.status === 'ACCEPTED') return 'accepted';
+  if (q.status === 'DECLINED') return 'declined';
+  if (q.status !== 'EXPIRED') return 'answer';
+  if (q.nextVersion != null) return 'requoting';
+  // The departure is a calendar day, so the ISO strings compare as days.
+  return q.request.departureDate && q.request.departureDate > today ? 'requote' : 'expired';
+};
 
 /** "1 Dec 2026 ±3 d": the departure is a calendar day, read as written (no time zone may shift it). */
 export const departsText = (day: string | null, flexDays: number): string =>

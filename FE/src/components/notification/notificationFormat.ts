@@ -21,6 +21,7 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   QUOTATION_EXPIRED: 'Expired',
   QUOTATION_ACCEPTED: 'Accepted',
   QUOTATION_DECLINED: 'Declined',
+  QUOTATION_REQUOTE_ASKED: 'Re-quote asked',
   JOB_ASSIGNED: 'Assigned to you',
   AUTHORITY_INFO_REQUIRED: 'Information needed',
   DOSSIER_BLOCKED: 'Dossier blocked',

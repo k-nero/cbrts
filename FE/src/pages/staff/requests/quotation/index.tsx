@@ -29,6 +29,7 @@ import { queryKeys } from '@/constant/query';
 import {
   apiErrorMessage,
   conflictMessage,
+  declinedBefore,
   formatDate,
   ict,
   money,
@@ -142,17 +143,19 @@ const QuotationBuilderPage: FC = () => {
   }
 
   const q = query.data;
+  // Every write names the version on screen, so one that moved on answers 409 and reloads.
+  const shown = { requestId: q.request.id, version: q.versionNo };
   const onClass = (airClass: ServiceClass) =>
     void write(
-      () => changeClass.mutateAsync({ requestId: q.request.id, value: airClass }),
+      () => changeClass.mutateAsync({ ...shown, value: airClass }),
       `Priced with ${airClass.toLowerCase()}`,
     );
   const onReprice = () =>
-    void write(
-      () => reprice.mutateAsync({ requestId: q.request.id, value: undefined }),
-      'Quotation re-priced',
-    );
+    void write(() => reprice.mutateAsync({ ...shown, value: undefined }), 'Quotation re-priced');
   const draft = q.status === 'DRAFT';
+  // A decline is final: the draft after a declined version can only be discarded.
+  const declined = draft ? declinedBefore(q.versions, q.versionNo) : null;
+  const editable = draft && !declined;
   const actions = statusActions(q);
   const onIssue = (changeNote: string | null) =>
     modal.confirm({
@@ -166,7 +169,7 @@ const QuotationBuilderPage: FC = () => {
       cancelText: 'Not yet',
       onOk: async () => {
         const ok = await write(
-          () => issue.mutateAsync({ requestId: q.request.id, value: changeNote }),
+          () => issue.mutateAsync({ ...shown, value: changeNote }),
           `${q.code} v${q.versionNo} issued`,
         );
         if (ok) showVersion(null);
@@ -185,13 +188,8 @@ const QuotationBuilderPage: FC = () => {
       okButtonProps: { danger: true },
       cancelText: 'Keep editing',
       onOk: async () => {
-        try {
-          await discard.mutateAsync({ requestId: q.request.id });
-          message.success(`Draft v${q.versionNo} discarded`);
-          showVersion(null);
-        } catch (error) {
-          message.error(apiErrorMessage(error, "The draft wasn't discarded. Try again."));
-        }
+        const ok = await write(() => discard.mutateAsync(shown), `Draft v${q.versionNo} discarded`);
+        if (ok) showVersion(null);
       },
     });
 
@@ -221,7 +219,17 @@ const QuotationBuilderPage: FC = () => {
               The quotation has been reloaded to show where it stands now.
             </Callout>
           )}
-          {draft && <MissingCallout quotation={q} />}
+          {declined && (
+            <Callout
+              tone="warn"
+              title={`The customer declined version ${declined.versionNo}${
+                declined.declinedAt ? ` on ${formatDate(declined.declinedAt)}` : ''
+              }${declined.declineReason ? `: ${declined.declineReason}` : ''}. ${q.request.code} is closed.`}
+            >
+              This draft can't be issued. Discard it.
+            </Callout>
+          )}
+          {editable && <MissingCallout quotation={q} />}
           {!draft && (
             <Callout
               tone="info"
@@ -230,20 +238,31 @@ const QuotationBuilderPage: FC = () => {
               An issued quotation is a document: it reads as it was issued and is never edited.
             </Callout>
           )}
-          {draft && q.repriceNeeded && (
+          {editable && q.repriceNeeded && (
             <Callout tone="warn" title="The request changed since this was priced">
               The lines below are as priced; re-price to work them out from the request as it is
               now.
             </Callout>
           )}
-          {draft && q.request.mode === 'AIR' && (
+          {editable && q.request.mode === 'AIR' && (
             <StallChoice quotation={q} pending={changeClass.isPending} onChange={onClass} />
           )}
-          <Ledger key={`${q.versionNo}-${q.status}`} quotation={q} editable={draft} run={write} />
+          <Ledger
+            key={`${q.versionNo}-${q.status}`}
+            quotation={q}
+            editable={editable}
+            run={write}
+          />
           <TotalsPanel quotation={q} />
         </Flex>
         <Flex vertical gap={24}>
-          {draft ? (
+          {declined ? (
+            <Panel title="Nothing to issue">
+              <Button variant="ghost" block disabled={discard.isPending} onClick={onDiscard}>
+                {`Discard draft v${q.versionNo}`}
+              </Button>
+            </Panel>
+          ) : draft ? (
             <IssuePanel
               quotation={q}
               repricing={reprice.isPending}

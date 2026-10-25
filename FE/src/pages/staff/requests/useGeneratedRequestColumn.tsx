@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Button, Chip } from '@/components/ui';
 import { Flex, TableColumnsType } from 'antd';
 import type { PagedResponse, QueueRow } from '@/interfaces';
-import { ageWords, departsWords, queueRoute } from '@/lib';
+import { ageWords, departsWords, queueRoute, waitingFor } from '@/lib';
 import { UseQueryResult } from '@tanstack/react-query';
 
 interface Props {
@@ -30,12 +30,10 @@ export const useGeneratedRequestColumn = ({ query }: Props): TableColumnsType<Qu
         key: 'status',
         title: 'Waiting for',
         width: 150,
-        render: (_, r) =>
-          r.status === 'CUSTOMER_ACCEPTED' ? (
-            <Chip tone="ok">Approval</Chip>
-          ) : (
-            <Chip tone="info">Review</Chip>
-          ),
+        render: (_, r) => {
+          const waiting = waitingFor(r.status);
+          return <Chip tone={waiting.tone}>{waiting.label}</Chip>;
+        },
       },
       { key: 'club', title: 'Customer', width: 200, dataIndex: 'club' },
       {

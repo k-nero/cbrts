@@ -197,6 +197,7 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
                 <ManualLineEditor
                   requestId={requestId}
                   group={g.code}
+                  version={quotation.versionNo}
                   editing={l}
                   currency={currency}
                   run={run}
@@ -209,6 +210,7 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
             <ManualLineEditor
               requestId={requestId}
               group={g.code}
+              version={quotation.versionNo}
               editing={null}
               currency={currency}
               run={run}

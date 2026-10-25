@@ -46,6 +46,17 @@ export const checkTally = (checks: ReviewCheck[]): string =>
 
 export const checkTone = (state: ReviewCheck['state']): Tone => (state === 'OK' ? 'ok' : 'bad');
 
+/**
+ * The queue's "Waiting for": review, the manager's approval of an accepted quotation, or the issue
+ * of a re-quote the customer asked for after expiry (A4; only an expired request with a draft is listed).
+ */
+export const waitingFor = (status: RequestStatus): { tone: Tone; label: string } =>
+  status === 'CUSTOMER_ACCEPTED'
+    ? { tone: 'ok', label: 'Approval' }
+    : status === 'EXPIRED'
+      ? { tone: 'warn', label: 'Re-quote' }
+      : { tone: 'info', label: 'Review' };
+
 /** "Saigon Turf Club · 2 horses · road, shared load · departs 30 Oct 2026 ±3 d". */
 export const reviewSummary = (r: TransportRequest & { club: string }): string => {
   const n = r.horses.length;

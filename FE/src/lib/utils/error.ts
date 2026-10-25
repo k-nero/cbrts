@@ -13,6 +13,10 @@ export const apiErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+/** The code a refusal carries (QUOTATION_VERSION_CHANGED, HORSE_NAME_TAKEN), else null. */
+export const apiErrorCode = (error: unknown): string | null =>
+  (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data?.error ?? null;
+
 /**
  * Where a refusal goes on a form. A 400 "Validation Failed" maps each `details` line ("heightHh: must
  * not be null") onto its field; a code listed in `fieldsByCode` (HORSE_NAME_TAKEN → name) puts the
