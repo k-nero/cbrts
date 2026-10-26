@@ -54,6 +54,8 @@ export interface StallFit {
   widthUsedIn: number;
   refusal: string | null;
   achievableClasses: ServiceClass[];
+  /** The horses' total weight (BR-Q-16); null while one is unknown, or on a quotation issued before weights were kept. */
+  totalWeightKg: number | null;
 }
 
 /**
