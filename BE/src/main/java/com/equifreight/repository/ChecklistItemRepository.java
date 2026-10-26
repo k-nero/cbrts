@@ -61,4 +61,21 @@ public interface ChecklistItemRepository
             ORDER BY j.code, ci.dueDate
             """)
     List<ChecklistItem> findOwedByCustomerDueOn(@Param("days") Collection<LocalDate> days);
+
+    /**
+     * Every checklist item of the club's jobs that haven't left or closed, soonest due first: the Home's owed
+     * documents and each horse's cleared count.
+     */
+    @Query("""
+            SELECT ci FROM ChecklistItem ci
+            JOIN FETCH ci.job j
+            JOIN FETCH ci.documentType
+            LEFT JOIN FETCH ci.horse
+            LEFT JOIN FETCH ci.currentVersion
+            WHERE j.request.club.id = :clubId
+              AND j.departedAt IS NULL
+              AND j.closedAt IS NULL
+            ORDER BY ci.dueDate NULLS LAST
+            """)
+    List<ChecklistItem> findOnUndepartedJobsOfClub(@Param("clubId") UUID clubId);
 }

@@ -7,14 +7,17 @@ import { formatDate, formatTime, spanUntil } from '@/lib/utils';
 
 /* ---------- the lead block: nothing owed ---------- */
 
-const nextDate = (e: NextEvent) =>
+const nextDate = (e: NextEvent, at: string) =>
   e.dateStyle === 'time'
-    ? formatTime(e.at)
+    ? formatTime(at)
     : e.dateStyle === 'dayTime'
-      ? `${formatDate(e.at)}, ${formatTime(e.at)}`
-      : formatDate(e.at);
+      ? `${formatDate(at)}, ${formatTime(at)}`
+      : formatDate(at);
 
-/** "Nothing needed from you", with the next event stated twice. Nothing on the page is gold. */
+/**
+ * "Nothing needed from you", with the next event stated twice; without a date yet, only the words.
+ * Nothing on the page is gold.
+ */
 export const NothingOwed: FC<{ event: NextEvent; asOf: string }> = ({ event, asOf }) => (
   <section className="rounded-lg border border-line bg-card p-5">
     <Flex align="center" gap={16}>
@@ -30,12 +33,14 @@ export const NothingOwed: FC<{ event: NextEvent; asOf: string }> = ({ event, asO
         <h2 className="type-h3 m-0 text-ink">{event.title}</h2>
         <p className="type-body-m m-0 text-ink-2">{event.body}</p>
       </Flex>
-      <Flex component="span" vertical align="end" gap={2} className="w-40 shrink-0 text-right">
-        <span className="type-label-s text-info">
-          {event.verb} in {spanUntil(event.at, asOf)}
-        </span>
-        <span className="type-caption text-ink-3">{nextDate(event)}</span>
-      </Flex>
+      {event.at && (
+        <Flex component="span" vertical align="end" gap={2} className="w-40 shrink-0 text-right">
+          <span className="type-label-s text-info">
+            {event.verb} in {spanUntil(event.at, asOf)}
+          </span>
+          <span className="type-caption text-ink-3">{nextDate(event, event.at)}</span>
+        </Flex>
+      )}
     </Flex>
   </section>
 );
