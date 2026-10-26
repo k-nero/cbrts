@@ -22,6 +22,11 @@ interface AuthState {
   /** Derived from the access token, kept in sync by {@link AuthState.setSession}. */
   roles: string[];
   me: User | null;
+  /**
+   * True once the user signed out on purpose, until the next sign-in. The route guard then sends
+   * them to sign-in without remembering the page they were on: the next account may be someone else.
+   */
+  signedOut: boolean;
   setMe: (user: User | null) => void;
   setSession: (tokens: AuthTokens | null) => void;
   logout: () => void;
@@ -73,6 +78,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   tokens: initialTokens,
   roles: rolesFromAccessToken(initialTokens?.accessToken),
   me: null,
+  signedOut: false,
   setMe: (user) => set({ me: user }),
   setSession: (newTokens) => {
     if (newTokens !== null) {
@@ -83,10 +89,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       tokens: newTokens,
       roles: rolesFromAccessToken(newTokens?.accessToken),
-      ...(newTokens === null ? { me: null } : {}),
+      ...(newTokens === null ? { me: null } : { signedOut: false }),
     });
   },
   logout: () => {
+    // Before the session goes, so the guard never sees it gone without the flag.
+    set({ signedOut: true });
     const refreshToken = useAuthStore.getState().tokens?.refreshToken;
     if (refreshToken !== undefined && refreshToken !== '') {
       // Best-effort server-side revocation so the refresh token can't be
