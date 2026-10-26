@@ -85,13 +85,18 @@ export interface BorderCrossing {
   roadOnly: boolean;
 }
 
-/** A catalog corridor, as the fleet & route coordinator picks one for the next trip of a journey. */
+/** A route we run, from the catalog: picked for a journey's next trip, and listed on Routes. */
 export interface Corridor {
   id: string;
   code: string;
   mode: TransportMode;
   originCity: string;
   destinationCity: string;
+  distanceKm: number | null;
+  /** How far a request's flexible dates can move on this route; 0 means fixed dates only. */
+  dateFlexDays: number;
+  /** The border crossings it takes, in order from the origin. */
+  crossings: string[];
 }
 
 export interface JobHorse {
