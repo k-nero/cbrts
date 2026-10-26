@@ -106,6 +106,30 @@ export const owedKind = (
   return q.request.departureDate && q.request.departureDate > today ? 'requote' : 'expired';
 };
 
+/**
+ * The owed panel's sentence on an expired quotation (A4): nobody re-prices it unless the customer asks for a
+ * re-quote, which is possible only while the departure is still ahead (`kind` from owedKind).
+ */
+export const expiredSentence = (
+  q: Pick<CustomerQuotation, 'validUntil'> & {
+    request: Pick<CustomerQuotation['request'], 'departureDate'>;
+  },
+  kind: 'requote' | 'expired',
+  manager: string,
+): string => {
+  const expired = `This quotation expired on ${q.validUntil ? formatDate(q.validUntil) : '—'}`;
+  if (kind === 'requote')
+    return `${expired}. Ask ${manager} for a re-quote: a new version priced from the rate catalog in force now.`;
+  const departure = q.request.departureDate ? ` on ${formatDay(q.request.departureDate)}` : '';
+  return `${expired}, and the departure${departure} has come, so it can’t be re-quoted. Start a new request for a later date.`;
+};
+
+/** How long an issued version holds its price, and what the customer can do once it expires (A4). */
+export const holdsReason = (issuedAt: string, validUntil: string, manager: string): string => {
+  const days = daysUntil(validUntil, issuedAt);
+  return `It holds its price for ${days} ${days === 1 ? 'day' : 'days'} from ${formatDate(issuedAt)}. After ${formatDate(validUntil)} it expires, and you can ask ${manager} for a re-quote.`;
+};
+
 /** "1 Dec 2026 ±3 d": the departure is a calendar day, read as written (no time zone may shift it). */
 export const departsText = (day: string | null, flexDays: number): string =>
   day ? `${formatDay(day)}${flexDays ? ` ±${flexDays} d` : ''}` : '—';
@@ -120,13 +144,13 @@ export const quotationCallout = (
     return {
       tone: 'info',
       title: `Your quotation ${label} expired${until ? ` on ${until}` : ''}.`,
-      body: 'A logistics manager can re-price it from the rate catalog in force now.',
+      body: 'Open it to ask for a re-quote, priced from the rate catalog in force now.',
     };
   if (ref.status === 'DECLINED')
     return {
       tone: 'info',
       title: `You declined quotation ${label}.`,
-      body: 'A logistics manager can re-price it if you change your mind.',
+      body: 'Declining closed the request. To move these horses after all, start a new request.',
     };
   if (ref.status === 'ACCEPTED')
     return {
@@ -196,7 +220,6 @@ export const quotedPassSub = (
   if (q.status === 'ACCEPTED')
     return `Accepted${on(q.acceptedAt)}. Once the job is approved, this becomes your travel pass.`;
   if (q.status === 'DECLINED') return `Declined${on(q.declinedAt)}.`;
-  if (q.status === 'EXPIRED')
-    return `Expired${on(q.validUntil)}. It is re-priced from the rate catalog in force now.`;
+  if (q.status === 'EXPIRED') return `Expired${on(q.validUntil)}. It no longer holds its price.`;
   return `Valid until ${q.validUntil ? formatDate(q.validUntil) : '—'}. Once you accept and the job is approved, this becomes your travel pass.`;
 };

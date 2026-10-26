@@ -64,7 +64,7 @@ class SnapshotsTest {
         Snapshots snapshots = new Snapshots(JsonMapper.builder().build());
         QuotationSnapshot snapshot = new QuotationSnapshot(
                 List.of(new QuotationSnapshot.Row("CONTINGENCY", "Contingency", "5% of $33,353.25", d("1667.66"))),
-                new QuotationSnapshot.Fit(1, 96),
+                new QuotationSnapshot.Fit(1, 96, 1000),
                 "Nightfall flies business class.",
                 new QuotationSnapshot.Facts(
                         "Phnom Penh",
@@ -83,5 +83,14 @@ class SnapshotsTest {
                         false));
 
         assertThat(snapshots.read(snapshots.write(snapshot))).isEqualTo(snapshot);
+    }
+
+    @Test
+    void anOldSnapshotHasNoWeight() {
+        QuotationSnapshot.Fit fit = JsonMapper.builder()
+                .build()
+                .readValue("{\"positions\":1,\"widthUsedIn\":48}", QuotationSnapshot.Fit.class);
+
+        assertThat(fit.totalWeightKg()).isNull();
     }
 }

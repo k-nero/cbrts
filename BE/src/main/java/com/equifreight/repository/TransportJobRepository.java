@@ -28,6 +28,8 @@ public interface TransportJobRepository
 
     Optional<TransportJob> findByRequestId(UUID requestId);
 
+    List<TransportJob> findByRequestIdIn(Collection<UUID> requestIds);
+
     boolean existsByRequestId(UUID requestId);
 
     /** Open jobs (not closed) per transport specialist, for the approval's team choice (US-F1-07). */

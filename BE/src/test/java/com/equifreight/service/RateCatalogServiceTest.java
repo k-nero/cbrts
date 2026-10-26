@@ -175,6 +175,14 @@ class RateCatalogServiceTest {
             p.setValue(BigDecimal.TEN);
             list.add(p);
         }
+        // The air weight limits (BR-Q-16), so a complete corridor misses nothing.
+        for (RatePolicyKey key : List.of(RatePolicyKey.STALL_PAYLOAD_KG, RatePolicyKey.AIR_SHIPMENT_MAX_KG)) {
+            RatePolicy p = new RatePolicy();
+            p.setVersion(v);
+            p.setKey(key);
+            p.setValue(new BigDecimal(key == RatePolicyKey.STALL_PAYLOAD_KG ? "5504" : "20000"));
+            list.add(p);
+        }
         return list;
     }
 

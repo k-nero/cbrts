@@ -17,5 +17,9 @@ public enum RatePolicyKey {
     LATE_PENALTY_PCT_PER_HOUR,
     LATE_PENALTY_CAP_PCT,
     /** The estimate's minimum half-width in percent; the band is never narrower than the ESTIMATED share (BR-Q-11). */
-    ESTIMATE_BAND_PCT
+    ESTIMATE_BAND_PCT,
+    /** The kilograms one air stall carries; the heaviest horses that could share a stall must not exceed it (BR-Q-16). */
+    STALL_PAYLOAD_KG,
+    /** The most kilograms of horses one air shipment may carry (BR-Q-16). */
+    AIR_SHIPMENT_MAX_KG
 }

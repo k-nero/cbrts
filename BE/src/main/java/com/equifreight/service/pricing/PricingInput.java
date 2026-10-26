@@ -26,4 +26,10 @@ public record PricingInput(
         Integer quarantineDays,
         List<PricingHorse> horses,
         /** The request asks for an arrival window (road, private trailer). */
-        boolean arrivalWindow) {}
+        boolean arrivalWindow,
+        /**
+         * A quotation being built or issued needs every horse's weight and the catalog's two weight limits (BR-Q-16).
+         * The customer's estimate on a draft, and the final invoice re-totalling an accepted quotation, don't: weight
+         * never prices a line.
+         */
+        boolean weightsRequired) {}

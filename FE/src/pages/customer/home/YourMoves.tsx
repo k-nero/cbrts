@@ -13,7 +13,9 @@ const holdsTone = (tone: Tone) => (tone === 'neutral' ? 'text-ink-2' : TONE_FG[t
 const departs = (m: MoveEntry, asOf: string) =>
   m.arrivesAt
     ? { left: `Arrives in ${spanUntil(m.arrivesAt, asOf)}`, date: formatDayTime(m.arrivesAt) }
-    : { left: `In ${spanUntil(m.departsAt, asOf)}`, date: formatDate(m.departsAt) };
+    : m.departsAt
+      ? { left: `In ${spanUntil(m.departsAt, asOf)}`, date: formatDate(m.departsAt) }
+      : { left: 'No date yet', date: 'Choose it in the draft' };
 
 type MovesProps = { home: CustomerHome; onOpen: (m: MoveEntry) => void; onAll: () => void };
 
@@ -29,15 +31,20 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
           Your moves
         </h2>
         <p className="type-body-s m-0 text-ink-3">
-          {home.moves.length} in progress,{' '}
-          {home.owed.length ? 'the one that needs you most first' : 'soonest departure first'}. Each
-          opens its request.
+          {home.moves.length === 0
+            ? 'Each request you send appears here until its horses are handed over.'
+            : `${home.moves.length} in progress, ${home.owed.length ? 'the one that needs you most first' : 'soonest departure first'}. Each opens its request.`}
         </p>
       </Flex>
       <Button size="sm" variant="ghost" trailingIcon="arrow-right" onClick={onAll}>
         My requests
       </Button>
     </Flex>
+    {home.moves.length === 0 && (
+      <div className="rounded-lg border border-dashed border-line-strong bg-card px-5 py-8 text-center">
+        <p className="type-body-m m-0 text-ink-2">No moves in progress.</p>
+      </div>
+    )}
     <Flex component="ul" vertical gap={12} className="list-none">
       {home.moves.map((m) => {
         const d = departs(m, home.asOf);

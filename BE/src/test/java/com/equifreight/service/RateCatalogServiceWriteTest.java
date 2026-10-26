@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -612,6 +613,31 @@ class RateCatalogServiceWriteTest {
         nullValue.put(RatePolicyKey.CONTINGENCY_PCT, null);
         assertRefused(() -> service.putPolicies(lan, nullValue, view), "CONTINGENCY_PCT", "Contingency needs a value.");
         verify(policies, never()).save(any());
+    }
+
+    @Test
+    void theWeightLimitsAreWholeKilogramsUpTo99999() {
+        UUID view = pnhHkg.getId();
+        assertRefused(
+                () -> service.putPolicies(lan, Map.of(RatePolicyKey.STALL_PAYLOAD_KG, BigDecimal.ZERO), view),
+                "STALL_PAYLOAD_KG",
+                "The stall payload must be a whole number of kilograms from 1 to 99,999.");
+        assertRefused(
+                () -> service.putPolicies(
+                        lan, Map.of(RatePolicyKey.AIR_SHIPMENT_MAX_KG, new BigDecimal("100000")), view),
+                "AIR_SHIPMENT_MAX_KG",
+                "The air shipment limit must be a whole number of kilograms from 1 to 99,999.");
+        assertRefused(
+                () -> service.putPolicies(lan, Map.of(RatePolicyKey.STALL_PAYLOAD_KG, new BigDecimal("5504.5")), view),
+                "STALL_PAYLOAD_KG",
+                "The stall payload must be a whole number of kilograms from 1 to 99,999.");
+        verify(policies, never()).save(any());
+
+        Map<RatePolicyKey, BigDecimal> limits = new EnumMap<>(RatePolicyKey.class);
+        limits.put(RatePolicyKey.STALL_PAYLOAD_KG, new BigDecimal("5504"));
+        limits.put(RatePolicyKey.AIR_SHIPMENT_MAX_KG, new BigDecimal("20000"));
+        service.putPolicies(lan, limits, view);
+        verify(policies, times(2)).save(any());
     }
 
     @Test

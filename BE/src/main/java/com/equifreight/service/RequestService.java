@@ -682,6 +682,7 @@ public class RequestService {
         rh.setSex(horse.getSex());
         rh.setSizeClassCode(horse.getSizeClass().getCode());
         rh.setRequiredStall(horse.getRequiredStall());
+        rh.setWeightKg(horse.getWeightKg());
     }
 
     // --- reading ------------------------------------------------------------------------------------------

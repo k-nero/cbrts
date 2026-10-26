@@ -19,6 +19,7 @@ import {
   readinessText,
   readinessView,
   repriceOffer,
+  fitLine,
 } from './quotation';
 
 import type { QuotationDraft, QuotationVersion, StallFit } from '@/interfaces';
@@ -45,6 +46,20 @@ describe('readinessText', () => {
   test('some lines without a rate', () => {
     expect(readinessText({ ready: false, pricedLines: 14, lineCount: 16 })).toBe(
       '14 of 16 lines priced',
+    );
+  });
+});
+
+describe('fitLine', () => {
+  test("the width, the positions and the horses' weight (BR-Q-16)", () => {
+    expect(fitLine({ positions: 2, widthUsedIn: 144, totalWeightKg: 1540 })).toBe(
+      '144 in across 2 positions of 96 in · 1,540 kg of horses.',
+    );
+  });
+
+  test('without a weight (an unknown one, or a quotation issued before weights were kept)', () => {
+    expect(fitLine({ positions: 1, widthUsedIn: 48, totalWeightKg: null })).toBe(
+      '48 in across 1 position of 96 in.',
     );
   });
 });

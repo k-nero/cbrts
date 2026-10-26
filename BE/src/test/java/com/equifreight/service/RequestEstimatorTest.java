@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -93,11 +94,14 @@ class RequestEstimatorTest {
         policy(RatePolicyKey.SERVICE_FEE_PCT, "12");
         policy(RatePolicyKey.ARRIVAL_WINDOW_PCT, "20");
         policy(RatePolicyKey.ESTIMATE_BAND_PCT, "15");
+        policy(RatePolicyKey.STALL_PAYLOAD_KG, "5504");
+        policy(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "20000");
 
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.of(v5));
         when(loader.load(v5)).thenAnswer(i -> new CatalogRows(v5, classes, lines, List.of(), policies, List.of()));
-        when(inputs.inputFor(any(), any())).thenAnswer(i -> input(i.getArgument(0), i.getArgument(1)));
+        when(inputs.inputFor(any(), any(), anyBoolean()))
+                .thenAnswer(i -> input(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.AIR))).thenReturn(resolution(air, Set.of()));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.ROAD))).thenReturn(resolution(road, Set.of()));
     }
@@ -149,8 +153,11 @@ class RequestEstimatorTest {
         return new RouteResolution(corridor, null, run, null, false, false);
     }
 
-    /** Two medium horses; the input follows the request's corridor and service fields as PricingInputs does. */
-    static PricingInput input(TransportRequest r, ServiceClass airClass) {
+    /**
+     * Two medium horses; the input follows the request's corridor, service fields and horse weights, and the caller's
+     * weightsRequired, as PricingInputs does.
+     */
+    static PricingInput input(TransportRequest r, ServiceClass airClass, boolean weightsRequired) {
         Corridor c = r.getCorridor();
         List<PricingHorse> horses = r.getHorses().stream()
                 .map(rh -> new PricingHorse(
@@ -160,7 +167,8 @@ class RequestEstimatorTest {
                         "M",
                         32,
                         false,
-                        rh.getDeclaredValue()))
+                        rh.getDeclaredValue(),
+                        rh.getWeightKg() == null ? null : rh.getWeightKg().intValue()))
                 .toList();
         return new PricingInput(
                 c.getMode(),
@@ -176,7 +184,8 @@ class RequestEstimatorTest {
                 false,
                 0,
                 horses,
-                r.getArrivalMode() == ArrivalMode.WINDOW);
+                r.getArrivalMode() == ArrivalMode.WINDOW,
+                weightsRequired);
     }
 
     TransportRequest request(Corridor corridor) {
@@ -205,6 +214,43 @@ class RequestEstimatorTest {
     }
 
     // --- assumptions ------------------------------------------------------------------------------------
+
+    // --- weight (BR-Q-16) -------------------------------------------------------------------------------
+
+    @Test
+    void aDraftWithoutAWeightStillGetsARange() {
+        TransportRequest draft = request(air);
+        draft.getHorses().getFirst().setWeightKg((short) 520);
+
+        RequestEstimator.View view = estimator.estimate(draft, resolution(air, Set.of()));
+
+        assertThat(view.result().status()).isEqualTo(EstimateStatus.READY);
+        assertThat(view.result().low()).isNotNull();
+    }
+
+    @Test
+    void aCatalogWithoutTheWeightLimitsStillGivesARange() {
+        policies.removeIf(
+                p -> p.getKey() == RatePolicyKey.STALL_PAYLOAD_KG || p.getKey() == RatePolicyKey.AIR_SHIPMENT_MAX_KG);
+
+        RequestEstimator.View view = estimator.estimate(request(air), resolution(air, Set.of()));
+
+        assertThat(view.result().status()).isEqualTo(EstimateStatus.READY);
+    }
+
+    @Test
+    void aDraftOverTheShipmentLimitIsUnavailable() {
+        policies.removeIf(p -> p.getKey() == RatePolicyKey.AIR_SHIPMENT_MAX_KG);
+        policy(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "1000");
+        TransportRequest draft = request(air);
+        draft.getHorses().get(0).setWeightKg((short) 520);
+        draft.getHorses().get(1).setWeightKg((short) 500);
+
+        RequestEstimator.View view = estimator.estimate(draft, resolution(air, Set.of()));
+
+        assertThat(view.result().status()).isEqualTo(EstimateStatus.UNAVAILABLE);
+        assertThat(view.result().message()).isEqualTo("The horses weigh 1,020 kg; one air shipment carries 1,000 kg.");
+    }
 
     @Test
     void unsetFieldsTakeStatedAssumptions() {

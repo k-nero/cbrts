@@ -1,6 +1,7 @@
 package com.equifreight.repository;
 
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.enums.TransportMode;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,6 +15,12 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
 
     /** The seeder's natural key ("RD HCM → BKK"). */
     Optional<Corridor> findByCode(String code);
+
+    boolean existsByCodeIgnoreCase(String code);
+
+    /** Whether the route already runs this way by this mode: a second corridor for it would be a duplicate. */
+    boolean existsByModeAndOriginCityIgnoreCaseAndDestinationCityIgnoreCase(
+            TransportMode mode, String originCity, String destinationCity);
 
     /** The corridors between two cities, in either direction, ignoring case. */
     @Query("select c from Corridor c where (lower(c.originCity) = lower(:a) and lower(c.destinationCity) = lower(:b))"

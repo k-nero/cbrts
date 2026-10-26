@@ -114,6 +114,10 @@ const pctOr = (value: number | undefined, words: (p: string) => string): string 
 const daySpan = (b: FeeBand): string =>
   b.maxDays == null ? `${b.minDays}+ d` : `${b.minDays}–${b.maxDays} d`;
 
+/** "5,504 kg", worded by `words`, or a dash when the policy is unset. */
+const kgOr = (value: number | undefined, words: (kg: string) => string): string =>
+  value == null ? '—' : words(`${value.toLocaleString('en-US')} kg`);
+
 /**
  * The Percentages and policy panel in words. The fee bands are shown read-only: they serve deposits and
  * cancellation terms, which come with a later slice.
@@ -166,6 +170,16 @@ export const policyRows = (
         p.FLIGHT_VET_MIN_HORSES == null || p.HIGH_VALUE_THRESHOLD == null
           ? '—'
           : `${p.FLIGHT_VET_MIN_HORSES}+ horses or > ${money(p.HIGH_VALUE_THRESHOLD)}`,
+    },
+    {
+      key: 'STALL_PAYLOAD_KG',
+      label: 'Stall payload',
+      value: kgOr(p.STALL_PAYLOAD_KG, (x) => `${x} per stall`),
+    },
+    {
+      key: 'AIR_SHIPMENT_MAX_KG',
+      label: 'Air shipment',
+      value: kgOr(p.AIR_SHIPMENT_MAX_KG, (x) => `${x} of horses`),
     },
     {
       key: 'SHORT_NOTICE',

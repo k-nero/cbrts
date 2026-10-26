@@ -96,14 +96,8 @@ public class RouteService {
     /** Every border crossing, by name, for a route plan's border stops (US-F3-17). */
     @Transactional(readOnly = true)
     public List<com.equifreight.model.route.BorderCrossingResponse> borderCrossings() {
-        return crossings.findAll(org.springframework.data.domain.Sort.by("name")).stream()
-                .map(c -> com.equifreight.model.route.BorderCrossingResponse.builder()
-                        .id(c.getId())
-                        .name(c.getName())
-                        .fromCountry(c.getFromCountry().getName())
-                        .toCountry(c.getToCountry().getName())
-                        .roadOnly(c.isRoadOnly())
-                        .build())
+        return crossings.findAllByOrderByNameAsc().stream()
+                .map(RouteMapper::toBorderCrossingResponse)
                 .toList();
     }
 
