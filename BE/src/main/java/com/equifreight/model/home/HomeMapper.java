@@ -44,6 +44,21 @@ public final class HomeMapper {
                 .build();
     }
 
+    public static OwedEntryResponse toRequoteOwed(
+            Quotation expired, String urgency, String title, String subject, String reason, Instant dueAt) {
+        return OwedEntryResponse.builder()
+                .id(expired.getId().toString())
+                .kind("QUOTATION")
+                .requestId(expired.getRequest().getId())
+                .urgency(urgency)
+                .title(title)
+                .subject(subject)
+                .reason(reason)
+                .dueAt(dueAt)
+                .actionLabel("Ask for a re-quote")
+                .build();
+    }
+
     public static OwedEntryResponse toAnswerOwed(TransportRequest r, String urgency, String subject, String reason) {
         return OwedEntryResponse.builder()
                 .id(r.getId().toString())
