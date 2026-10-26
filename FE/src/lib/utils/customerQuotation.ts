@@ -123,11 +123,13 @@ export const expiredSentence = (
   const departure = q.request.departureDate ? ` on ${formatDay(q.request.departureDate)}` : '';
   return `${expired}, and the departure${departure} has come, so it can’t be re-quoted. Start a new request for a later date.`;
 };
+
 /** How long an issued version holds its price, and what the customer can do once it expires (A4). */
 export const holdsReason = (issuedAt: string, validUntil: string, manager: string): string => {
   const days = daysUntil(validUntil, issuedAt);
   return `It holds its price for ${days} ${days === 1 ? 'day' : 'days'} from ${formatDate(issuedAt)}. After ${formatDate(validUntil)} it expires, and you can ask ${manager} for a re-quote.`;
 };
+
 /** "1 Dec 2026 ±3 d": the departure is a calendar day, read as written (no time zone may shift it). */
 export const departsText = (day: string | null, flexDays: number): string =>
   day ? `${formatDay(day)}${flexDays ? ` ±${flexDays} d` : ''}` : '—';
