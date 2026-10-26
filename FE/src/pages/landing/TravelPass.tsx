@@ -2,7 +2,7 @@ import { Col, Flex, Row } from 'antd';
 import { motion } from 'motion/react';
 import type { FC } from 'react';
 
-import { EASE_OUT, fade, IN_VIEW, pin, rise, stagger } from './motion';
+import { EASE_OUT, fade, IN_VIEW, pin, rise, stagger } from '@/lib/motion';
 import { PassEnd } from './PassEnd';
 
 import { Chip, cx, Icon, Perforation } from '@/components/ui';

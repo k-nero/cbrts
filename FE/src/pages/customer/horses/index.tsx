@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Col, Flex, Pagination, Row, Skeleton } from 'antd';
+import { motion } from 'motion/react';
 
 import { archivedChip, horseCardProps } from './components/horseCardProps';
 import FirstRun from './FirstRun';
@@ -10,6 +11,7 @@ import PageHeader from '@/components/PageHeader';
 import { Button, Callout, HorseCard, Tabs } from '@/components/ui';
 import { useMe } from '@/hooks/auth';
 import { useHorseCount, useHorses } from '@/hooks/horse';
+import { settle, stagger } from '@/lib/motion';
 import { ict } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -96,31 +98,47 @@ const MyHorsesPage: FC = () => {
     }
     return (
       <Flex vertical gap={24}>
-        <Row gutter={[24, 24]} align="top">
-          {page.content.map((horse) => (
-            <Col key={horse.id} span={8}>
-              <HorseCard
-                {...horseCardProps(horse, today)}
-                status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
-                actions={
-                  <>
-                    <Button onClick={() => toProfile(horse.id)}>Open profile</Button>
-                    {!horse.archivedAt && (
-                      <Button variant="ghost" leadingIcon="pencil" onClick={() => toEdit(horse.id)}>
-                        Edit
-                      </Button>
-                    )}
-                  </>
-                }
-              />
-            </Col>
-          ))}
-          {!archived && page.last && (
-            <Col span={8}>
-              <AddHorseCard onClick={toAdd} />
-            </Col>
-          )}
-        </Row>
+        {/* The cards arrive one after another; each page of horses plays it again. */}
+        <motion.div
+          key={pageState.number}
+          variants={stagger(0.05)}
+          initial="hidden"
+          animate="shown"
+        >
+          <Row gutter={[24, 24]} align="top">
+            {page.content.map((horse) => (
+              <Col key={horse.id} span={8}>
+                <motion.div variants={settle} className="h-full">
+                  <HorseCard
+                    {...horseCardProps(horse, today)}
+                    status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
+                    actions={
+                      <>
+                        <Button onClick={() => toProfile(horse.id)}>Open profile</Button>
+                        {!horse.archivedAt && (
+                          <Button
+                            variant="ghost"
+                            leadingIcon="pencil"
+                            onClick={() => toEdit(horse.id)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </>
+                    }
+                  />
+                </motion.div>
+              </Col>
+            ))}
+            {!archived && page.last && (
+              <Col span={8}>
+                <motion.div variants={settle} className="h-full">
+                  <AddHorseCard onClick={toAdd} />
+                </motion.div>
+              </Col>
+            )}
+          </Row>
+        </motion.div>
         {page.totalPages > 1 && (
           <Pagination
             align="center"

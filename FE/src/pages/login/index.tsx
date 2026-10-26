@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 import type { AxiosError } from 'axios';
 
 import { type LoginForm, loginSchema } from './schema';
@@ -19,6 +20,7 @@ import { SubmitButton } from '@/components/form/SubmitButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Button, PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
+import { rise, settle, stagger } from '@/lib/motion';
 import type { ApiError } from '@/interfaces';
 import { canSignedInOpen, useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
@@ -74,56 +76,65 @@ const LoginPage = () => {
         </Flex>
       </header>
       <Flex style={{ flex: 1 }}>
-        <Flex vertical gap={32} style={{ width: 720, padding: '96px 120px 64px 160px' }}>
-          <Flex vertical gap={12}>
+        {/* The heading, then the form, rise into place once (lib/motion). */}
+        <motion.div
+          className="flex flex-col gap-8"
+          style={{ width: 720, padding: '96px 120px 64px 160px' }}
+          variants={stagger(0.08)}
+          initial="hidden"
+          animate="shown"
+        >
+          <motion.div variants={rise} className="flex flex-col gap-3">
             <h1 className="m-0 font-display text-[44px] leading-[50px] font-normal text-ink">
               Sign in
             </h1>
             <p className="m-0 text-[15px] text-ink-2">
               One sign-in for racing clubs and EquiFreight staff.
             </p>
-          </Flex>
-          <FormWrapper
-            methods={methods}
-            isSubmitting={login.isPending}
-            onFinish={onSubmit}
-            force
-            style={{ width: 440 }}
-          >
-            {({ FormField }) => (
-              <>
-                <FormField
-                  name="email"
-                  label="Email"
-                  component="text"
-                  componentProps={{ autoComplete: 'email', autoFocus: true }}
-                />
-                <FormField
-                  name="password"
-                  label="Password"
-                  component="password"
-                  componentProps={{ autoComplete: 'current-password' }}
-                />
-                <SubmitButton type="primary" block label="Sign in" />
-                <Flex align="center" gap={4}>
-                  <span className="type-body-s text-ink-2">New to EquiFreight?</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    trailingIcon="arrow-right"
-                    onClick={() => router.push(router.paths.get('register'))}
-                  >
-                    Create a club account
-                  </Button>
-                </Flex>
-                <p className="m-0 border-t border-line pt-5 text-[13px] leading-5 text-ink-3">
-                  Staff sign in here too, with the email your invite was sent to. Your role decides
-                  where you land.
-                </p>
-              </>
-            )}
-          </FormWrapper>
-        </Flex>
+          </motion.div>
+          <motion.div variants={rise}>
+            <FormWrapper
+              methods={methods}
+              isSubmitting={login.isPending}
+              onFinish={onSubmit}
+              force
+              style={{ width: 440 }}
+            >
+              {({ FormField }) => (
+                <>
+                  <FormField
+                    name="email"
+                    label="Email"
+                    component="text"
+                    componentProps={{ autoComplete: 'email', autoFocus: true }}
+                  />
+                  <FormField
+                    name="password"
+                    label="Password"
+                    component="password"
+                    componentProps={{ autoComplete: 'current-password' }}
+                  />
+                  <SubmitButton type="primary" block label="Sign in" />
+                  <Flex align="center" gap={4}>
+                    <span className="type-body-s text-ink-2">New to EquiFreight?</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      trailingIcon="arrow-right"
+                      onClick={() => router.push(router.paths.get('register'))}
+                    >
+                      Create a club account
+                    </Button>
+                  </Flex>
+                  <p className="m-0 border-t border-line pt-5 text-[13px] leading-5 text-ink-3">
+                    Staff sign in here too, with the email your invite was sent to. Your role
+                    decides where you land.
+                  </p>
+                </>
+              )}
+            </FormWrapper>
+          </motion.div>
+        </motion.div>
         <PhotoPanel
           src={signInPhoto}
           alt="A hand rests on a grey horse's rugged neck as it looks out of a trailer window."
@@ -137,22 +148,31 @@ const LoginPage = () => {
           className="flex flex-1 flex-col justify-end"
           style={{ padding: '96px 120px 64px 96px' }}
         >
-          <Flex component="aside" vertical aria-labelledby="keeps-title" className="max-w-[480px]">
-            <h2
-              id="keeps-title"
-              className="m-0 pb-4 font-display text-[22px] leading-7 font-semibold text-ink"
+          {/* What the account keeps arrives line by line, after the form. */}
+          <motion.div variants={stagger(0.06, 0.3)} initial="hidden" animate="shown">
+            <Flex
+              component="aside"
+              vertical
+              aria-labelledby="keeps-title"
+              className="max-w-[480px]"
             >
-              One account for every move
-            </h2>
-            {ACCOUNT_KEEPS.map(([title, icon]) => (
-              <div key={title} className="border-t border-line py-3.5">
-                <Flex gap={14} align="center">
-                  <span className="text-[18px] text-ink-3">{icon}</span>
-                  <span className="text-[14px] font-medium text-ink">{title}</span>
-                </Flex>
-              </div>
-            ))}
-          </Flex>
+              <motion.h2
+                variants={settle}
+                id="keeps-title"
+                className="m-0 pb-4 font-display text-[22px] leading-7 font-semibold text-ink"
+              >
+                One account for every move
+              </motion.h2>
+              {ACCOUNT_KEEPS.map(([title, icon]) => (
+                <motion.div key={title} variants={settle} className="border-t border-line py-3.5">
+                  <Flex gap={14} align="center">
+                    <span className="text-[18px] text-ink-3">{icon}</span>
+                    <span className="text-[14px] font-medium text-ink">{title}</span>
+                  </Flex>
+                </motion.div>
+              ))}
+            </Flex>
+          </motion.div>
         </PhotoPanel>
       </Flex>
       <Footer size="compact" />

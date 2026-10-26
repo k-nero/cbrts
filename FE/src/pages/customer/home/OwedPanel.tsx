@@ -1,8 +1,10 @@
 import { type FC } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { Button, Chip, OwedItem } from '@/components/ui';
 import type { CustomerHome, OwedEntry } from '@/interfaces';
+import { settle, stagger } from '@/lib/motion';
 import { daysUntil, dueLeft, formatDate, ict } from '@/lib/utils';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -54,26 +56,30 @@ export const OwedPanel: FC<OwedProps> = ({ home, onAct, onAllRequests }) => {
           {overdue > 0 && <Chip tone="bad">{overdue} overdue</Chip>}
         </Flex>
       </header>
-      {home.owed.map((o, i) => (
-        <OwedItem
-          key={o.id}
-          urgency={o.urgency}
-          title={o.title}
-          subject={o.subject}
-          reason={o.reason}
-          deadline={deadlineOf(o, home.asOf)}
-          action={
-            <Button
-              size="sm"
-              variant={i === 0 ? 'primary' : 'secondary'}
-              leadingIcon={o.actionIcon ?? undefined}
-              onClick={() => onAct(o)}
-            >
-              {o.actionLabel}
-            </Button>
-          }
-        />
-      ))}
+      {/* The owed items arrive one after another, soonest first. */}
+      <motion.div variants={stagger(0.06, 0.15)} initial="hidden" animate="shown">
+        {home.owed.map((o, i) => (
+          <motion.div key={o.id} variants={settle}>
+            <OwedItem
+              urgency={o.urgency}
+              title={o.title}
+              subject={o.subject}
+              reason={o.reason}
+              deadline={deadlineOf(o, home.asOf)}
+              action={
+                <Button
+                  size="sm"
+                  variant={i === 0 ? 'primary' : 'secondary'}
+                  leadingIcon={o.actionIcon ?? undefined}
+                  onClick={() => onAct(o)}
+                >
+                  {o.actionLabel}
+                </Button>
+              }
+            />
+          </motion.div>
+        ))}
+      </motion.div>
       <footer className="border-t border-line bg-sunken px-3 py-2.5">
         <Button size="sm" variant="ghost" onClick={onAllRequests}>
           See each request in My requests
