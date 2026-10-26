@@ -26,14 +26,12 @@ const JobChecklist: FC<Props> = ({ jobId, onSelectJob, onView, onUpload }) => {
         <Flex align="center" gap={16}>
           <span className="type-label-s shrink-0 text-ink-2">Job</span>
           <Select
-            showSearch
+            showSearch={{ onSearch: setJobSearch, filterOption: false }}
             placeholder="Search by job code or club"
             value={jobId || undefined}
             onChange={(value) => onSelectJob(value ?? null)}
-            onSearch={setJobSearch}
             loading={jobsLoading}
             className="w-full max-w-md"
-            filterOption={false}
             notFoundContent={jobsLoading ? <Spin size="small" /> : 'No open dossier matches'}
             options={[
               ...jobs.map((job) => ({
