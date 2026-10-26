@@ -37,6 +37,7 @@ import RequestReviewPage from '@/pages/staff/requests/review';
 import RatesPage from '@/pages/staff/rates';
 import UsersPage from '@/pages/staff/users';
 import VehiclesPage from '@/pages/staff/vehicles';
+import CorridorsPage from '@/pages/staff/corridors';
 import CustomerNotesPage from '@/pages/staff/customer-notes';
 import RegulationsPage from '@/pages/staff/regulations';
 import { CustomerTripPage, EscortTripPage, StaffTripPage } from '@/pages/trip';
@@ -125,6 +126,7 @@ export const router = createBrowserRouter([
           { path: 'rates', element: <RatesPage /> },
           { path: 'fleet-calendar', element: <FleetCalendarPage /> },
           { path: 'vehicles', element: <VehiclesPage /> },
+          { path: 'routes', element: <CorridorsPage /> },
         ],
       },
       {

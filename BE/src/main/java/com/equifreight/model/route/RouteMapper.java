@@ -2,6 +2,7 @@ package com.equifreight.model.route;
 
 import com.equifreight.entity.BorderCrossing;
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Country;
 import com.equifreight.entity.Place;
 import java.time.LocalDate;
 import java.util.List;
@@ -22,7 +23,7 @@ public final class RouteMapper {
     }
 
     /** A route we run, as the fleet & route coordinator sees it. */
-    public static CorridorResponse toCorridorResponse(Corridor corridor) {
+    public static CorridorResponse toCorridorResponse(Corridor corridor, List<String> crossings) {
         return CorridorResponse.builder()
                 .id(corridor.getId())
                 .code(corridor.getCode())
@@ -31,7 +32,27 @@ public final class RouteMapper {
                 .destinationCity(corridor.getDestinationCity())
                 .distanceKm(corridor.getDistanceKm())
                 .dateFlexDays(corridor.getDateFlexDays())
+                .crossings(crossings)
                 .updatedAt(corridor.getUpdatedAt())
+                .build();
+    }
+
+    /** A border crossing as catalogued, for a route plan's border stops and a new corridor. */
+    public static BorderCrossingResponse toBorderCrossingResponse(BorderCrossing crossing) {
+        return BorderCrossingResponse.builder()
+                .id(crossing.getId())
+                .name(crossing.getName())
+                .fromCountry(crossing.getFromCountry().getName())
+                .toCountry(crossing.getToCountry().getName())
+                .roadOnly(crossing.isRoadOnly())
+                .build();
+    }
+
+    public static CountryOptionResponse toCountryOption(Country country) {
+        return CountryOptionResponse.builder()
+                .id(country.getId())
+                .code(country.getCode())
+                .name(country.getName())
                 .build();
     }
 

@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.PlaceKind;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,13 @@ public interface PlaceRepository extends JpaRepository<Place, UUID>, JpaSpecific
     boolean existsByCityIgnoreCaseAndKindNot(String city, PlaceKind kind);
 
     List<Place> findByKind(PlaceKind kind);
+
+    /** The places in a city, with their country: a new corridor needs one at each end. */
+    @EntityGraph(attributePaths = "country")
+    List<Place> findByCityIgnoreCase(String city);
+
+    /** Names are unique within a city, ignoring case. */
+    boolean existsByNameIgnoreCaseAndCityIgnoreCase(String name, String city);
 
     List<Place> findByCountryCode(String countryCode);
 }

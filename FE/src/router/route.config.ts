@@ -319,6 +319,13 @@ export const routesConfig = [
         breadcrumb: 'Vehicles',
         name: 'vehicles',
       },
+      {
+        path: '/routes',
+        roles: [FRC],
+        type: 'authenticated',
+        breadcrumb: 'Routes',
+        name: 'corridors',
+      },
     ],
   },
   {

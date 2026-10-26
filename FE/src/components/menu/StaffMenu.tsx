@@ -10,6 +10,7 @@ import {
   CarOutlined,
   EditOutlined,
   FileTextOutlined,
+  GlobalOutlined,
   HistoryOutlined,
   NodeIndexOutlined,
   SafetyCertificateOutlined,
@@ -79,6 +80,10 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
         ['vehicles', 'Vehicles', <CarOutlined key="i" />],
         ['customer-notes', 'Customer notes', <EditOutlined key="i" />],
       ],
+    },
+    {
+      label: 'Catalogs',
+      items: [['corridors', 'Routes', <GlobalOutlined key="i" />]],
     },
   ],
   [RoleNameEnum.ESCORT]: [{ items: [['escort', 'Trip log', <HistoryOutlined key="i" />]] }],
