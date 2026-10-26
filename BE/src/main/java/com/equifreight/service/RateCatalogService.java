@@ -83,7 +83,9 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_PCT, "Arrival window surcharge"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_MIN_HOURS, "The arrival window minimum"),
             Map.entry(RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, "Late penalty per hour"),
-            Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "Late penalty cap"));
+            Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "Late penalty cap"),
+            Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "The stall payload"),
+            Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"));
 
     private final RateCatalogVersionRepository versions;
     private final RateSetLoader loader;
@@ -530,6 +532,14 @@ public class RateCatalogService {
             case HIGH_VALUE_THRESHOLD -> {
                 if (value.signum() < 0) {
                     throw new BusinessException(key.name(), "The high value threshold can't be negative.");
+                }
+            }
+            case STALL_PAYLOAD_KG, AIR_SHIPMENT_MAX_KG -> {
+                if (value.compareTo(BigDecimal.ONE) < 0
+                        || value.compareTo(BigDecimal.valueOf(99_999)) > 0
+                        || value.stripTrailingZeros().scale() > 0) {
+                    throw new BusinessException(
+                            key.name(), label + " must be a whole number of kilograms from 1 to 99,999.");
                 }
             }
             case ARRIVAL_WINDOW_MIN_HOURS -> {

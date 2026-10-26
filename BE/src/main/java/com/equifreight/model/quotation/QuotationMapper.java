@@ -152,7 +152,8 @@ public final class QuotationMapper {
                                         snapshot.fit().positions(),
                                         snapshot.fit().widthUsedIn(),
                                         null,
-                                        List.of()))
+                                        List.of(),
+                                        snapshot.fit().totalWeightKg()))
                 .groups(toGroups(lines, facts.mode()))
                 .totals(QuoteTotalsResponse.builder()
                         .pricedLines(pricedSum)
@@ -256,7 +257,12 @@ public final class QuotationMapper {
     private static StallFitResponse toFit(StallFit fit) {
         return fit == null
                 ? null
-                : new StallFitResponse(fit.positions(), fit.widthUsedIn(), fit.refusal(), fit.achievableClasses());
+                : new StallFitResponse(
+                        fit.positions(),
+                        fit.widthUsedIn(),
+                        fit.refusal(),
+                        fit.achievableClasses(),
+                        fit.totalWeightKg());
     }
 
     private static List<QuoteGroupResponse> toGroups(List<QuotationLine> lines, TransportMode mode) {

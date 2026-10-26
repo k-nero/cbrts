@@ -301,11 +301,23 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void theFinalInvoiceRetotalsWithoutRequiringWeights() {
+        service.start(yen, request.getId());
+
+        pricing.totalsWith(stored.orElseThrow(), request, new java.util.HashMap<>());
+
+        // BR-Q-16: weight never prices a line, so an accepted quote's totals don't wait on weights or limits.
+        verify(inputs).inputFor(eq(request), any(), eq(false));
+    }
+
+    @Test
     void aReadyQuoteSaysSoAndNamesItsBases() {
         QuotationDraftResponse response = service.start(yen, request.getId()).quotation();
 
         assertThat(response.readiness().ready()).isTrue();
         assertThat(response.fit().positions()).isEqualTo(1);
+        // BR-Q-16: the two fixture horses at 500 kg each.
+        assertThat(response.fit().totalWeightKg()).isEqualTo(1000);
         assertThat(response.totals().rows())
                 .extracting(r -> r.key())
                 .containsExactly("FUEL", "INSURANCE", "CONTINGENCY", "SERVICE_FEE");

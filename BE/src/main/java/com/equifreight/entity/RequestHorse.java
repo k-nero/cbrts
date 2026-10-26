@@ -39,6 +39,9 @@ public class RequestHorse extends BaseEntity {
     @Column(nullable = false, length = 4)
     private String sizeClassCode;
 
+    /** The horse's weight when the request was sent (BR-Q-16); null on requests sent before it was kept. */
+    private Short weightKg;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StallType requiredStall;

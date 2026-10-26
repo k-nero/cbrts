@@ -222,6 +222,8 @@ erDiagram
 | `LATE_PENALTY_PCT_PER_HOUR` | 10 | Of the job total, per started hour after the window closes. |
 | `LATE_PENALTY_CAP_PCT` | 30 | |
 | `ESTIMATE_BAND_PCT` | 15 | The customer estimate's minimum half-width; the band is never narrower than the share of ESTIMATED lines (BR-Q-11). |
+| `STALL_PAYLOAD_KG` | 5504 | Kilograms one air stall carries: the heaviest horses that could share a stall (economy 3, business 2, first 1) must not exceed it (BR-Q-16). Whole kilograms, 1 to 99,999. Weight never prices a line. |
+| `AIR_SHIPMENT_MAX_KG` | 20000 | The most kilograms of horses one air shipment carries (BR-Q-16); the seeded figure is a demo value. Whole kilograms, 1 to 99,999. |
 
 **`rate_fee_bands`**: `version_id`, `kind` (`CANCELLATION`, `SHORT_NOTICE`), `min_days`, `max_days null`, `value numeric(6,3)`.
 - Cancellation (value is the fee %): more than 30 days → 10, 15–30 → 25, 7–14 → 50, under 7 → 100.
@@ -307,7 +309,8 @@ Checks (submission): `(code is null) = (submitted_at is null)`, and `status in (
 The 3 hours in the check mirrors `ARRIVAL_WINDOW_MIN_HOURS`. If the catalog value changes, the check moves to the application.
 
 **`request_horses`**: primary key `(request_id, horse_id)`.
-- Snapshot columns so later edits to the horse don't change a request: `declared_value`, `sex`, `size_class_code`, `required_stall`. Written on every draft save and refreshed at submission.
+- Snapshot columns so later edits to the horse don't change a request: `declared_value`, `sex`, `size_class_code`, `required_stall`, `weight_kg`. Written on every draft save and refreshed at submission.
+- `weight_kg smallint null`: the horse's weight for the air stall-load and shipment checks (BR-Q-16). V26 back-filled it from the horse profiles for every request except approved ones, whose horses are locked; a null weight refuses a quotation but not the customer's estimate.
 - `with_foal boolean not null default false`: a mare travelling with a foal at foot, on this trip. Check `not with_foal or sex = 'MARE'`.
 - Once the request is `APPROVED`, the horse list is locked (BR-F1-06; application rule plus a trigger that refuses inserts and deletes).
 
