@@ -114,14 +114,14 @@ const pctOr = (value: number | undefined, words: (p: string) => string): string 
 const daySpan = (b: FeeBand): string =>
   b.maxDays == null ? `${b.minDays}+ d` : `${b.minDays}–${b.maxDays} d`;
 
-/**
- * The Percentages and policy panel in words. The fee bands are shown read-only: they serve deposits and
- * cancellation terms, which come with a later slice.
- */
 /** "5,504 kg", worded by `words`, or a dash when the policy is unset. */
 const kgOr = (value: number | undefined, words: (kg: string) => string): string =>
   value == null ? '—' : words(`${value.toLocaleString('en-US')} kg`);
 
+/**
+ * The Percentages and policy panel in words. The fee bands are shown read-only: they serve deposits and
+ * cancellation terms, which come with a later slice.
+ */
 export const policyRows = (
   policies: Partial<Record<RatePolicyKey, number>>,
   feeBands: FeeBand[],
