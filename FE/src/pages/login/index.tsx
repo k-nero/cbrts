@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom';
+import { type Location, useLocation } from 'react-router-dom';
 import {
   CheckOutlined,
   ClockCircleOutlined,
@@ -20,7 +20,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { Button, PhotoPanel } from '@/components/ui';
 import { useLogin } from '@/hooks/auth';
 import type { ApiError } from '@/interfaces';
-import { useCustomRouter } from '@/router/route.hook';
+import { canSignedInOpen, useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 import React from 'react';
 
@@ -48,8 +48,15 @@ const LoginPage = () => {
   const onSubmit = methods.handleSubmit(async (values) => {
     try {
       await login.mutateAsync(values);
-      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-      router.replace(from ?? primaryRoleHome(useAuthStore.getState().roles), { force: true });
+      // Back to the page the guard sent us from, but only if this account may open it: the last
+      // account on this browser may have been someone else's.
+      const from = (location.state as { from?: Partial<Location> } | null)?.from;
+      const { roles } = useAuthStore.getState();
+      const target =
+        from?.pathname !== undefined && canSignedInOpen(from.pathname, roles)
+          ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`
+          : primaryRoleHome(roles);
+      router.replace(target, { force: true });
     } catch (error) {
       // Never say whether the email has an account (DESIGN.md, Access): the server says the same
       // for both, and only names a removed account once its password matched.
