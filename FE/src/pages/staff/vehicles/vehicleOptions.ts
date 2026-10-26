@@ -1,9 +1,13 @@
 import type { Tone } from '@/components/ui';
 import {
+  type Corridor,
+  type CountryOption,
   type CreateVehicleInput,
   type StallSide,
   type StallType,
   StallTypeEnum,
+  TransportModeEnum,
+  type Vehicle,
   type VehicleBooking,
   type VehicleKind,
   VehicleKindEnum,
@@ -66,3 +70,28 @@ export const defaultStalls = (count: number): CreateVehicleInput['stalls'] =>
           : StallTypeEnum.STANDARD;
     return { positionNo, stallType, rowNo, side, nearRamp: rowNo === Math.ceil(count / 2) };
   });
+
+/** Countries for the home country and permit selects, by name. */
+export const countryOptions = (countries: CountryOption[] | undefined) =>
+  [...(countries ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((c) => ({ label: `${c.name} (${c.code})`, value: c.id }));
+
+/**
+ * Road corridors for the operating corridors select (US-F3-19), each with the countries it passes
+ * through, since the vehicle needs a permit for every one. Air corridors carry no vehicle.
+ */
+export const corridorOptions = (corridors: Corridor[] | undefined) =>
+  (corridors ?? [])
+    .filter((c) => c.mode === TransportModeEnum.ROAD)
+    .map((c) => ({
+      label: c.countries?.length ? `${c.code} · ${c.countries.join(', ')}` : c.code,
+      value: c.id,
+    }));
+
+/** "VN · KH, TH": where the vehicle is based, then the countries it holds permits for. */
+export const countriesText = (v: Vehicle) => {
+  const home = v.homeCountry?.code ?? '—';
+  const permits = (v.permittedCountries ?? []).map((c) => c.code).join(', ');
+  return permits ? `${home} · ${permits}` : home;
+};

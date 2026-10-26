@@ -480,15 +480,19 @@ public class DataSeeder implements ApplicationRunner {
             borderCrossingRepository.save(bc);
         }
 
-        createCorridorIfAbsent("AIR PNH -> HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1510);
-        createCorridorIfAbsent("AIR SGN -> HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500);
-        createCorridorIfAbsent("RD HCM -> PNH", TransportMode.ROAD, "Ho Chi Minh City", "Phnom Penh", 240);
-        createCorridorIfAbsent("RD HCM -> BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", 890);
-        createCorridorIfAbsent("RD BKK -> KUL", TransportMode.ROAD, "Bangkok", "Kuala Lumpur", 1480);
-        createCorridorIfAbsent("RD HAN -> VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 850);
+        Country hk = countryRepository.findByCode("HK").orElse(null);
+        createCorridorIfAbsent("AIR PNH -> HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1510, kh, hk);
+        createCorridorIfAbsent("AIR SGN -> HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, vn, hk);
+        createCorridorIfAbsent("RD HCM -> PNH", TransportMode.ROAD, "Ho Chi Minh City", "Phnom Penh", 240, vn, kh);
+        createCorridorIfAbsent("RD HCM -> BKK", TransportMode.ROAD, "Ho Chi Minh City", "Bangkok", 890, vn, th);
+        createCorridorIfAbsent("RD BKK -> KUL", TransportMode.ROAD, "Bangkok", "Kuala Lumpur", 1480, th, my);
+        createCorridorIfAbsent("RD HAN -> VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 850, vn, la);
     }
 
-    private void createCorridorIfAbsent(String code, TransportMode mode, String origin, String dest, int distKm) {
+    /** {@code from} and {@code to} are the countries of its two ends (US-F3-19); skipped when one isn't seeded. */
+    private void createCorridorIfAbsent(
+            String code, TransportMode mode, String origin, String dest, int distKm, Country from, Country to) {
+        if (from == null || to == null) return;
         if (corridorRepository.findByCode(code).isEmpty()) {
             Corridor c = new Corridor();
             c.setCode(code);
@@ -496,6 +500,8 @@ public class DataSeeder implements ApplicationRunner {
             c.setOriginCity(origin);
             c.setDestinationCity(dest);
             c.setDistanceKm(distKm);
+            c.setOriginCountry(from);
+            c.setDestinationCountry(to);
             corridorRepository.save(c);
         }
     }
@@ -512,13 +518,22 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
+    /**
+     * The demo fleet (US-F3-19): TX-447 is based in Vietnam with permits for Cambodia and Thailand; TK-102 in Vietnam
+     * with permits for every neighbour; TX-210 is in maintenance; HK-031 is based in Hong Kong and runs only the road
+     * leg after a flight, so the Vietnamese trucks' pickers show it refused. Each runs every road corridor its permits
+     * cover.
+     */
     private void seedVehicles() {
+        // Every vehicle is based somewhere, so the fleet needs the countries first (seedCountries).
+        if (countryRepository.findByCode("VN").isEmpty()) return;
         if (vehicleRepository.findByCode("TX-447").isEmpty()) {
             Vehicle v = new Vehicle();
             v.setCode("TX-447");
             v.setKind(VehicleKind.TRAILER);
             v.setPayloadKg(3200);
             v.setStatus(VehicleStatus.ACTIVE);
+            basedIn(v, "VN", "KH", "TH");
             Vehicle saved = vehicleRepository.save(v);
 
             createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
@@ -535,6 +550,7 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRUCK);
             v.setPayloadKg(4500);
             v.setStatus(VehicleStatus.ACTIVE);
+            basedIn(v, "VN", "KH", "TH", "LA", "MY");
             Vehicle saved = vehicleRepository.save(v);
 
             createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
@@ -549,7 +565,42 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRAILER);
             v.setPayloadKg(3200);
             v.setStatus(VehicleStatus.MAINTENANCE);
+            basedIn(v, "VN", "KH");
             vehicleRepository.save(v);
+        }
+
+        if (vehicleRepository.findByCode("HK-031").isEmpty()
+                && countryRepository.findByCode("HK").isPresent()) {
+            Vehicle v = new Vehicle();
+            v.setCode("HK-031");
+            v.setKind(VehicleKind.TRAILER);
+            v.setPayloadKg(3200);
+            v.setStatus(VehicleStatus.ACTIVE);
+            basedIn(v, "HK");
+            Vehicle saved = vehicleRepository.save(v);
+
+            createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
+            createStall(saved, (short) 2, StallType.BOX, (short) 1, StallSide.RIGHT, false);
+            createStall(saved, (short) 3, StallType.STANDARD, (short) 2, StallSide.LEFT, true);
+            createStall(saved, (short) 4, StallType.STANDARD, (short) 2, StallSide.RIGHT, true);
+        }
+    }
+
+    /**
+     * Bases {@code v} in {@code home} with permits for {@code permits}, and has it run every road corridor those
+     * cover.
+     */
+    private void basedIn(Vehicle v, String home, String... permits) {
+        v.setHomeCountry(countryRepository.findByCode(home).orElseThrow());
+        for (String code : permits) {
+            countryRepository
+                    .findByCode(code)
+                    .ifPresent(c -> v.getPermittedCountries().add(c));
+        }
+        for (Corridor corridor : corridorRepository.findAll()) {
+            if (corridor.isRoad() && v.refusalToRun(corridor).isEmpty()) {
+                v.getOperatingCorridors().add(corridor);
+            }
         }
     }
 

@@ -19,6 +19,7 @@ import com.equifreight.repository.RegulationVersionRepository;
 import com.equifreight.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +41,16 @@ public class CatalogSeeder {
 
     private record DemoCrossing(String name, String from, String to) {}
 
+    /** {@code fromCountry} and {@code toCountry} are the two ends' country codes (US-F3-19). */
     private record DemoCorridor(
-            String code, TransportMode mode, String from, String to, int km, List<String> crossings) {}
+            String code,
+            TransportMode mode,
+            String from,
+            String to,
+            int km,
+            List<String> crossings,
+            String fromCountry,
+            String toCountry) {}
 
     private record DemoRegulation(String country, int versionNo, int leadTimeDays) {}
 
@@ -73,37 +82,63 @@ public class CatalogSeeder {
                     "Ho Chi Minh City",
                     "Phnom Penh",
                     230,
-                    List.of("Mộc Bài – Bavet")),
+                    List.of("Mộc Bài – Bavet"),
+                    "VN",
+                    "KH"),
             new DemoCorridor(
                     "RD HCM → BKK",
                     TransportMode.ROAD,
                     "Ho Chi Minh City",
                     "Bangkok",
                     960,
-                    List.of("Mộc Bài – Bavet", "Poipet – Aranyaprathet")),
+                    List.of("Mộc Bài – Bavet", "Poipet – Aranyaprathet"),
+                    "VN",
+                    "TH"),
             new DemoCorridor(
                     "RD PNH → BKK",
                     TransportMode.ROAD,
                     "Phnom Penh",
                     "Bangkok",
                     660,
-                    List.of("Poipet – Aranyaprathet")),
+                    List.of("Poipet – Aranyaprathet"),
+                    "KH",
+                    "TH"),
             new DemoCorridor(
-                    "RD BKK → VTE", TransportMode.ROAD, "Bangkok", "Vientiane", 640, List.of("Nong Khai – Vientiane")),
+                    "RD BKK → VTE",
+                    TransportMode.ROAD,
+                    "Bangkok",
+                    "Vientiane",
+                    640,
+                    List.of("Nong Khai – Vientiane"),
+                    "TH",
+                    "LA"),
             new DemoCorridor(
                     "RD BKK → KUL",
                     TransportMode.ROAD,
                     "Bangkok",
                     "Kuala Lumpur",
                     1450,
-                    List.of("Sadao – Bukit Kayu Hitam")),
+                    List.of("Sadao – Bukit Kayu Hitam"),
+                    "TH",
+                    "MY"),
             new DemoCorridor(
-                    "RD HAN → VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 780, List.of("Cầu Treo – Nam Phao")),
-            new DemoCorridor("RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", 1700, List.of()),
-            new DemoCorridor("AIR PNH → HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1550, List.of()),
-            new DemoCorridor("AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of()),
+                    "RD HAN → VTE",
+                    TransportMode.ROAD,
+                    "Hanoi",
+                    "Vientiane",
+                    780,
+                    List.of("Cầu Treo – Nam Phao"),
+                    "VN",
+                    "LA"),
+            new DemoCorridor(
+                    "RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", 1700, List.of(), "VN", "VN"),
+            new DemoCorridor(
+                    "AIR PNH → HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1550, List.of(), "KH", "HK"),
+            new DemoCorridor(
+                    "AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of(), "VN", "HK"),
             // The road trip after the flight, from Hong Kong airport to the stables (US-F3-16).
-            new DemoCorridor("RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of()));
+            new DemoCorridor(
+                    "RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of(), "HK", "HK"));
 
     /** The frames' version numbers; Laos needs 30 days (Request review · Override). */
     private static final List<DemoRegulation> REGULATIONS = List.of(
@@ -193,13 +228,15 @@ public class CatalogSeeder {
         }
     }
 
-    private static Corridor corridor(DemoCorridor demo, Map<String, BorderCrossing> crossingsByName) {
+    private Corridor corridor(DemoCorridor demo, Map<String, BorderCrossing> crossingsByName) {
         Corridor corridor = new Corridor();
         corridor.setCode(demo.code());
         corridor.setMode(demo.mode());
         corridor.setOriginCity(demo.from());
         corridor.setDestinationCity(demo.to());
         corridor.setDistanceKm(demo.km());
+        corridor.setOriginCountry(country(demo.fromCountry()));
+        corridor.setDestinationCountry(country(demo.toCountry()));
         link(corridor, demo, crossingsByName);
         return corridor;
     }
@@ -239,6 +276,43 @@ public class CatalogSeeder {
         version.setArrivalBufferDays(ARRIVAL_BUFFER_DAYS);
         versions.save(version);
         log.info("Seeded regulation version {} v{}", demo.country(), demo.versionNo());
+    }
+
+    /**
+     * The seeded corridors whose countries disagree with their crossings (US-F3-19), one sentence each; empty when
+     * the catalog is consistent. A corridor starts where its first crossing leaves and ends where its last one enters,
+     * each crossing starts where the previous one ended, and a road corridor without crossings stays in one country.
+     */
+    static List<String> inconsistentCorridors() {
+        Map<String, DemoCrossing> byName = new HashMap<>();
+        for (DemoCrossing c : CROSSINGS) byName.put(c.name(), c);
+        List<String> problems = new ArrayList<>();
+        for (DemoCorridor corridor : CORRIDORS) {
+            List<DemoCrossing> route =
+                    corridor.crossings().stream().map(byName::get).toList();
+            if (route.contains(null)) {
+                problems.add(corridor.code() + " names a crossing that isn't seeded.");
+                continue;
+            }
+            if (route.isEmpty()) {
+                if (corridor.mode() == TransportMode.ROAD
+                        && !corridor.fromCountry().equals(corridor.toCountry())) {
+                    problems.add(corridor.code() + " crosses a border by road without a crossing.");
+                }
+                continue;
+            }
+            String at = corridor.fromCountry();
+            for (DemoCrossing crossing : route) {
+                if (!crossing.from().equals(at)) {
+                    problems.add(corridor.code() + " reaches " + crossing.name() + " from " + at + ".");
+                }
+                at = crossing.to();
+            }
+            if (!at.equals(corridor.toCountry())) {
+                problems.add(corridor.code() + " ends in " + at + ", not " + corridor.toCountry() + ".");
+            }
+        }
+        return problems;
     }
 
     private Country country(String code) {

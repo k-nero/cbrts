@@ -26,6 +26,7 @@ import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.VehicleRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +50,13 @@ class CorridorCreateTest {
 
     @BeforeEach
     void setUp() {
-        service = new CorridorService(corridors, mock(CorridorCrossingRepository.class), places, crossings, audit);
+        service = new CorridorService(
+                corridors,
+                mock(CorridorCrossingRepository.class),
+                places,
+                crossings,
+                audit,
+                mock(VehicleRepository.class));
         when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(place("Phú Thọ", vn)));
         when(places.findByCityIgnoreCase("Phnom Penh")).thenReturn(List.of(place("Phnom Penh stables", kh)));
         when(places.findByCityIgnoreCase("Bangkok")).thenReturn(List.of(place("Chao Phraya stables", th)));
@@ -117,6 +124,15 @@ class CorridorCreateTest {
                         any(),
                         any(),
                         any());
+    }
+
+    @Test
+    @DisplayName("a new route stores the countries of its two ends and passes through each crossing's (US-F3-19)")
+    void storesTheRoutesCountries() {
+        CorridorResponse created =
+                service.create(khoi, road("Ho Chi Minh City", "Bangkok", List.of(mocBai.getId(), poipet.getId())));
+
+        assertThat(created.countries()).containsExactly("VN", "KH", "TH");
     }
 
     @Test

@@ -35,7 +35,7 @@ An example: four horses from Vientiane to Sha Tin, two trailers each side.
 | TRP-2026-042 | AIR BKK → HKG | Flight CX 2071 | BKK → HKG | `HANDED_ON` at release |
 | TRP-2026-043 | RD HKG → Sha Tin | 2 trailers (convoy) | HKG quarantine → Sha Tin stables | `DELIVERED`, then handover |
 
-Each trip can still be shared with other jobs on its own corridor, and each is planned, signed off, departed and logged on its own.
+Each trip can still be shared with other jobs on its own corridor, and each is planned, signed off, departed and logged on its own. Each road trip takes only a vehicle that works its corridor and is in the country it starts in (US-F3-19), so the road leg after a flight needs a vehicle based at the arrival end, or one whose last trip ended there; the air trip carries no vehicle and isn't checked.
 
 ### Changes
 

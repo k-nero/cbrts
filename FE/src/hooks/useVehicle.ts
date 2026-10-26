@@ -24,10 +24,14 @@ export const useVehicles = (params?: { page?: number; size?: number; sort?: stri
 export const useVehicleList = () =>
   useCrudResource<Vehicle, CreateVehicleInput>('vehicles', vehiclesApi);
 
-export const useActiveVehicles = () => {
+/**
+ * Active vehicles. With a job, for its trip (`tripId`, or its current one): each carries `available` and
+ * `unavailableReason`, those that may join it first (US-F3-19).
+ */
+export const useActiveVehicles = (trip?: { jobId: string; tripId?: string | null }) => {
   return useQuery({
-    queryKey: ['vehicles', 'active'],
-    queryFn: () => vehicleApi.listActive(),
+    queryKey: ['vehicles', 'active', trip?.jobId ?? null, trip?.tripId ?? null],
+    queryFn: () => vehicleApi.listActive(trip),
   });
 };
 
