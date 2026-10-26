@@ -534,7 +534,7 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRAILER);
             v.setPayloadKg(3200);
             v.setStatus(VehicleStatus.ACTIVE);
-            basedIn(v, "VN", "KH", "TH");
+            basedIn(v, "Ho Chi Minh City", "VN", "KH", "TH");
             Vehicle saved = vehicleRepository.save(v);
 
             createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
@@ -551,7 +551,7 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRUCK);
             v.setPayloadKg(4500);
             v.setStatus(VehicleStatus.ACTIVE);
-            basedIn(v, "VN", "KH", "TH", "LA", "MY");
+            basedIn(v, "Ho Chi Minh City", "VN", "KH", "TH", "LA", "MY");
             Vehicle saved = vehicleRepository.save(v);
 
             createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
@@ -566,7 +566,7 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRAILER);
             v.setPayloadKg(3200);
             v.setStatus(VehicleStatus.MAINTENANCE);
-            basedIn(v, "VN", "KH");
+            basedIn(v, "Ho Chi Minh City", "VN", "KH");
             vehicleRepository.save(v);
         }
 
@@ -577,7 +577,7 @@ public class DataSeeder implements ApplicationRunner {
             v.setKind(VehicleKind.TRAILER);
             v.setPayloadKg(3200);
             v.setStatus(VehicleStatus.ACTIVE);
-            basedIn(v, "HK");
+            basedIn(v, "Hong Kong", "HK");
             Vehicle saved = vehicleRepository.save(v);
 
             createStall(saved, (short) 1, StallType.STANDARD, (short) 1, StallSide.LEFT, false);
@@ -588,10 +588,11 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Bases {@code v} in {@code home} with permits for {@code permits}, and has it run every road corridor those
+     * Bases {@code v} in {@code city}, {@code home}, with permits for {@code permits}, and has it run every road corridor those
      * cover.
      */
-    private void basedIn(Vehicle v, String home, String... permits) {
+    private void basedIn(Vehicle v, String city, String home, String... permits) {
+        v.setHomeCity(city);
         v.setHomeCountry(countryRepository.findByCode(home).orElseThrow());
         for (String code : permits) {
             countryRepository

@@ -35,4 +35,13 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
 
     /** Every corridor, by code: the report's corridor filter. */
     List<Corridor> findAllByOrderByCodeAsc();
+
+    /**
+     * Every road corridor with its crossings and countries (US-F7-03): the network an empty drive between two cities
+     * can use, worked out in memory.
+     */
+    @Query("SELECT DISTINCT c FROM Corridor c LEFT JOIN FETCH c.crossings cc LEFT JOIN FETCH cc.borderCrossing b "
+            + "LEFT JOIN FETCH b.toCountry LEFT JOIN FETCH c.originCountry LEFT JOIN FETCH c.destinationCountry "
+            + "WHERE c.mode = com.equifreight.entity.enums.TransportMode.ROAD")
+    List<Corridor> findRoadNetwork();
 }

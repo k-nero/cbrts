@@ -1,6 +1,6 @@
 # Plan: vehicle permits and operating corridors, in planning (and later in incidents)
 
-Status: US-F7-01 (#249, formerly US-F3-19) is built and merged; US-F7-02 (#252) changes the location rule below (see "Availability over time"). Incident availability waits for a later story. Part of EPIC-F7 (#251).
+Status: US-F7-01 (#249, formerly US-F3-19) is built and merged; US-F7-02 (#252) and US-F7-03 (#255) change the location rule below (see "Availability over time"). Incident availability waits for a later story. Part of EPIC-F7 (#251).
 
 ## Scope
 
@@ -162,6 +162,8 @@ US-F7-01's location rule ("the vehicle is in the trip's start country") becomes 
 - **A trip's length before its route is planned** is its corridor's driving days.
 - **Check at review.** The Request review page shows whether a vehicle can start on the requested date (FREE), within the flexible days (WITHIN_FLEX), only later (NONE, with the earliest date in the next 60 days) or not at all because nobody works the corridor (NO_VEHICLE). Quoting, approving and rejecting are never blocked.
 - **Hold from acceptance.** Accepting a quotation holds the first vehicle that can run the request: a `RESERVED` booking with `request_id`, from the departure day for the corridor's driving days. Approval rechecks it, rejecting or cancelling releases it, and confirming the trip's load plan replaces it with the trip's own bookings. A hold counts as busy for everyone else and as where the vehicle will be after it.
+
+**By city (US-F7-03, #255).** Location is a city, not a country: a trip or hold leaves its vehicle in its corridor's destination city, a road trip starts in its corridor's origin city, and a vehicle with no trip is in its home city (`vehicles.home_city`). The empty drive between two cities is the quickest chain of road corridors in the catalog (fewest driving days), each usable in either direction, through countries the vehicle may enter; it needn't be a corridor the vehicle works. A vehicle with no trip sets off from its home city from now. A truck ending in Hanoi therefore can't start in Ho Chi Minh City the next morning, though both are in Vietnam: it needs the turnaround plus RD HCM → HAN's driving days, driven backwards.
 
 Example: a vehicle runs VN → TH from 1 to 5 Oct. With 24 hours' turnaround it is ready in Bangkok on 6 Oct; with 3 driving days back it can start in Vietnam on 9 Oct, so an 8 Oct trip from Vietnam can't take it.
 

@@ -40,10 +40,14 @@ public class Vehicle extends BaseEntity {
     @OrderBy("positionNo")
     private List<VehicleStall> stalls = new ArrayList<>();
 
-    /** Where the vehicle is based, and where it is when it has run no trip yet (US-F7-01). */
+    /** The country of its home city (US-F7-01): its permits are for the other countries. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_country_id", nullable = false)
     private Country homeCountry;
+
+    /** The city the vehicle is based in, and where it is when it has run no trip yet (US-F7-03). */
+    @Column(nullable = false, length = 80)
+    private String homeCity;
 
     /** The foreign countries it holds a permit for; the home country is never listed. */
     @ManyToMany

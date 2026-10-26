@@ -31,6 +31,7 @@ public final class FleetMapper {
                         .map(RouteMapper::toCountryOption)
                         .sorted(Comparator.comparing(CountryOptionResponse::code))
                         .toList())
+                .homeCity(vehicle.getHomeCity())
                 .availableOn(vehicle.getAvailableOn())
                 .operatingCorridors(vehicle.getOperatingCorridors().stream()
                         .map(c -> new VehicleCorridorResponse(c.getId(), c.getCode()))

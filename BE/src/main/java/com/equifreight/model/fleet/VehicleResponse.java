@@ -22,6 +22,8 @@ public record VehicleResponse(
         int stallCount,
         List<VehicleStallResponse> stalls,
         CountryOptionResponse homeCountry,
+        /** The city it is based in (US-F7-03). */
+        String homeCity,
         List<CountryOptionResponse> permittedCountries,
         List<VehicleCorridorResponse> operatingCorridors,
         /** The date the coordinator expects it back (US-F7-02); null when not set. */
