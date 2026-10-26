@@ -42,7 +42,7 @@ const Footer: FC<{ size?: 'full' | 'compact' }> = ({ size = 'full' }) => {
   }
   return (
     <footer style={{ borderTop: `1px solid ${COLOR_BORDER}` }}>
-      <Flex justify="space-between" align="start" style={{ padding: 40 }}>
+      <div className="flex flex-wrap items-start justify-between gap-8 p-5 md:p-10">
         <Flex vertical gap={10}>
           <Brand />
           <span className="text-[13px] text-ink-3">Cross-Border Racehorse Transport System</span>
@@ -60,7 +60,7 @@ const Footer: FC<{ size?: 'full' | 'compact' }> = ({ size = 'full' }) => {
             <Link>Privacy</Link>
           </Flex>
         </Flex>
-        <Flex vertical gap={6} style={{ width: 360 }}>
+        <Flex vertical gap={6} className="w-full max-w-[360px] md:w-[360px]">
           <span className="text-[14px] font-medium text-ink">
             Horse on the road? Call the operations desk
           </span>
@@ -80,15 +80,14 @@ const Footer: FC<{ size?: 'full' | 'compact' }> = ({ size = 'full' }) => {
           </a>
           <span className="text-[13px] text-ink-3">Staffed 24 hours, every day</span>
         </Flex>
-      </Flex>
-      <Flex
-        justify="space-between"
-        align="center"
-        style={{ padding: '16px 40px', borderTop: `1px solid ${COLOR_BORDER}` }}
+      </div>
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 md:px-10"
+        style={{ borderTop: `1px solid ${COLOR_BORDER}` }}
       >
         <span className="text-[13px] text-ink-3">© 2026 EquiFreight</span>
         <DemoNote />
-      </Flex>
+      </div>
     </footer>
   );
 };

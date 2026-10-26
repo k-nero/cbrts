@@ -120,7 +120,7 @@ const LandingPage: FC = () => {
 
   return (
     <Flex vertical className="min-h-screen bg-canvas">
-      <header className="h-16 shrink-0 border-b border-line px-10">
+      <header className="h-16 shrink-0 border-b border-line px-5 md:px-10">
         <Flex align="center" justify="space-between" className="h-full">
           <Brand />
           <Flex component="nav" aria-label="Account" align="center" gap={8}>
@@ -151,17 +151,20 @@ const LandingPage: FC = () => {
             [0.75, 0.2],
             [1, 0.1],
           ]}
-          className="h-[720px]"
+          className="md:h-[720px]"
         >
-          <div className="mx-auto h-full max-w-[1200px]">
+          <div className="mx-auto h-full max-w-[1280px] px-5 py-20 md:px-10 md:py-0">
             <Flex align="center" className="h-full">
               <motion.div
                 variants={stagger(0.12, 0.15)}
                 initial="hidden"
                 animate="shown"
-                className="flex w-[620px] flex-col gap-6"
+                className="flex w-full max-w-[620px] flex-col gap-6"
               >
-                <motion.h1 variants={rise} className="type-display-xl m-0 text-ink">
+                <motion.h1
+                  variants={rise}
+                  className="type-display-m sm:type-display-l md:type-display-xl m-0 text-ink"
+                >
                   Precision <em className="italic">transport</em>
                   <br />
                   for every horse
@@ -171,7 +174,7 @@ const LandingPage: FC = () => {
                   Kong. Every document is checked against your travel dates, and no horse leaves
                   until clearance is complete.
                 </motion.p>
-                <motion.div variants={rise} className="flex gap-3">
+                <motion.div variants={rise} className="flex flex-wrap gap-3">
                   <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
                     Request transport
                   </Button>
@@ -182,9 +185,9 @@ const LandingPage: FC = () => {
           </div>
         </PhotoPanel>
 
-        <div className="mx-auto w-full max-w-[1200px] pb-24">
+        <div className="mx-auto w-full max-w-[1280px] px-5 pb-24 md:px-10">
           <section aria-labelledby="pass-title" className="pt-20">
-            <Flex align="center" gap={64}>
+            <div className="flex flex-col items-start gap-12 lg:flex-row lg:items-center lg:gap-16">
               <motion.div
                 variants={stagger(0.1)}
                 initial="hidden"
@@ -192,7 +195,11 @@ const LandingPage: FC = () => {
                 viewport={IN_VIEW}
                 className="flex min-w-0 flex-1 flex-col gap-4"
               >
-                <motion.h2 variants={rise} id="pass-title" className="type-display-l m-0 text-ink">
+                <motion.h2
+                  variants={rise}
+                  id="pass-title"
+                  className="type-display-m md:type-display-l m-0 text-ink"
+                >
                   Every move, on one pass
                 </motion.h2>
                 <motion.p variants={rise} className="type-body-m m-0 max-w-[520px] text-ink-2">
@@ -219,7 +226,7 @@ const LandingPage: FC = () => {
                 </div>
               </motion.div>
               <TravelPass />
-            </Flex>
+            </div>
           </section>
 
           <Section
@@ -228,8 +235,8 @@ const LandingPage: FC = () => {
             summary="Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them."
           >
             {/* A fixed-order table: no sort, no filters, and no price figures (an estimate is always a range). */}
-            <div className="overflow-hidden rounded-lg border border-line bg-card">
-              <table className="w-full border-collapse text-left">
+            <div className="overflow-x-auto rounded-lg border border-line bg-card">
+              <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead className="bg-sunken">
                   <tr>
                     <th className="type-mono-label px-4 py-2.5 font-normal text-ink-3">Service</th>
@@ -264,10 +271,12 @@ const LandingPage: FC = () => {
             title="Where we move horses"
             summary="Six countries by road, and Hong Kong by air. Every border crossing has its own document rules, and each one is checked against your travel dates."
           >
-            <Flex align="start" gap={24}>
-              <RouteMap />
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+              <div className="max-w-full overflow-x-auto rounded-lg xl:shrink-0">
+                <RouteMap />
+              </div>
               <Corridors />
-            </Flex>
+            </div>
           </Section>
 
           <Section
@@ -275,7 +284,10 @@ const LandingPage: FC = () => {
             title="Seven stages in four phases"
             summary="Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule."
           >
-            <motion.ol variants={stagger(0.1)} className="m-0 grid list-none grid-cols-4 gap-6 p-0">
+            <motion.ol
+              variants={stagger(0.1)}
+              className="m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-4"
+            >
               {PHASES.map((p) => (
                 <motion.li key={p.title} variants={rise} className="border-t border-line pt-6">
                   <Flex vertical gap={12} className="h-full">
@@ -299,7 +311,7 @@ const LandingPage: FC = () => {
             <motion.div variants={stagger(0.1)}>
               <Row gutter={[24, 24]}>
                 {FEATURES.map((f) => (
-                  <Col key={f.title} span={8}>
+                  <Col key={f.title} xs={24} lg={8}>
                     <motion.article
                       variants={rise}
                       className="h-full rounded-lg border border-line bg-card p-7"
@@ -322,9 +334,9 @@ const LandingPage: FC = () => {
               initial="hidden"
               whileInView="shown"
               viewport={IN_VIEW}
-              className="rounded-lg border border-line bg-card px-12 py-10"
+              className="rounded-lg border border-line bg-card px-6 py-8 md:px-12 md:py-10"
             >
-              <Flex align="center" justify="space-between" gap={48}>
+              <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-12">
                 <Flex vertical gap={10}>
                   <h2 className="type-display-m m-0 text-ink">
                     Send us the horses, the route and the date
@@ -336,7 +348,7 @@ const LandingPage: FC = () => {
                 <Button variant="primary" trailingIcon="arrow-right" onClick={toRequest}>
                   Request transport
                 </Button>
-              </Flex>
+              </div>
             </motion.div>
           </section>
         </div>

@@ -29,15 +29,6 @@ export default defineConfig({
   ],
   html: {
     template: './index.html',
-    tags: [
-      {
-        tag: 'script',
-        attrs: {
-          src: 'https://cdn.jsdelivr.net/npm/react-scan/dist/auto.global.js',
-        },
-        append: false,
-      },
-    ],
   },
   resolve: {
     alias: {
@@ -60,6 +51,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
     proxy: {
       '/api': 'http://localhost:8080',
     },
@@ -71,6 +66,20 @@ export default defineConfig({
     printFileSize: true,
     removeConsole: false,
     preconnect: ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+  },
+  tools: {
+    rspack: {
+      module: {
+        rules: [
+          {
+            // react-scan 0.5.7's ES build takes `version` from react-grab's package.json as a named
+            // import, which strict .mjs parsing refuses. Parse its files loosely so dev can load it.
+            test: /[\\/]node_modules[\\/]react-scan[\\/]dist[\\/].*\.mjs$/,
+            type: 'javascript/auto',
+          },
+        ],
+      },
+    },
   },
   output: {
     target: 'web',
