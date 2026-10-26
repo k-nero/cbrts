@@ -16,7 +16,7 @@ public interface TripVehicleRepository extends JpaRepository<TripVehicle, UUID> 
 
     /**
      * The trips the vehicle is on that haven't ended by {@code now}: its booking for the trip ends later, or the trip
-     * isn't booked yet (US-F3-19). Earliest departure first; a trip with no planned departure comes last.
+     * isn't booked yet (US-F7-01). Earliest departure first; a trip with no planned departure comes last.
      */
     @Query("SELECT tv.trip FROM TripVehicle tv JOIN tv.trip t WHERE tv.vehicle.id = :vehicleId "
             + "AND NOT EXISTS (SELECT b FROM VehicleBooking b WHERE b.trip = t AND b.vehicle = tv.vehicle "

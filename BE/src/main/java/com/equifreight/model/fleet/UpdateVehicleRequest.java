@@ -6,7 +6,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 /**
- * A change to a vehicle. A null field leaves it as it is; a list replaces the whole set (US-F3-19).
+ * A change to a vehicle. A null field leaves it as it is; a list replaces the whole set (US-F7-01).
  */
 @Builder
 public record UpdateVehicleRequest(

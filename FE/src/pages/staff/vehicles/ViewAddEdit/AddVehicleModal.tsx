@@ -28,7 +28,7 @@ type Props = {
 };
 
 /**
- * Add vehicle (US-F3-02, US-F3-19): the vehicle, its starting stall layout, where it is based, the
+ * Add vehicle (US-F3-02, US-F7-01): the vehicle, its starting stall layout, where it is based, the
  * countries it holds permits for and the road corridors it works.
  */
 const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {

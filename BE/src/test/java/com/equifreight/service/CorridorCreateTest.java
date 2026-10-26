@@ -127,7 +127,7 @@ class CorridorCreateTest {
     }
 
     @Test
-    @DisplayName("a new route stores the countries of its two ends and passes through each crossing's (US-F3-19)")
+    @DisplayName("a new route stores the countries of its two ends and passes through each crossing's (US-F7-01)")
     void storesTheRoutesCountries() {
         CorridorResponse created =
                 service.create(khoi, road("Ho Chi Minh City", "Bangkok", List.of(mocBai.getId(), poipet.getId())));

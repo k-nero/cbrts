@@ -35,7 +35,7 @@ public class VehicleController {
 
     /**
      * Active vehicles for dropdowns. With {@code jobId}, for that job's trip ({@code tripId}, or its current one):
-     * each says whether it may join the trip and why not, those that may first (US-F3-19).
+     * each says whether it may join the trip and why not, those that may first (US-F7-01).
      */
     @GetMapping("/active")
     public List<VehicleResponse> listActive(
@@ -59,7 +59,7 @@ public class VehicleController {
     }
 
     /**
-     * US-F3-02, US-F3-19: Update vehicle payload, status, home country, permits or operating corridors.
+     * US-F3-02, US-F7-01: Update vehicle payload, status, home country, permits or operating corridors.
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")

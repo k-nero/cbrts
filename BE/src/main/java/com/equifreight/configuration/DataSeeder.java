@@ -489,7 +489,7 @@ public class DataSeeder implements ApplicationRunner {
         createCorridorIfAbsent("RD HAN -> VTE", TransportMode.ROAD, "Hanoi", "Vientiane", 850, vn, la);
     }
 
-    /** {@code from} and {@code to} are the countries of its two ends (US-F3-19); skipped when one isn't seeded. */
+    /** {@code from} and {@code to} are the countries of its two ends (US-F7-01); skipped when one isn't seeded. */
     private void createCorridorIfAbsent(
             String code, TransportMode mode, String origin, String dest, int distKm, Country from, Country to) {
         if (from == null || to == null) return;
@@ -519,7 +519,7 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * The demo fleet (US-F3-19): TX-447 is based in Vietnam with permits for Cambodia and Thailand; TK-102 in Vietnam
+     * The demo fleet (US-F7-01): TX-447 is based in Vietnam with permits for Cambodia and Thailand; TK-102 in Vietnam
      * with permits for every neighbour; TX-210 is in maintenance; HK-031 is based in Hong Kong and runs only the road
      * leg after a flight, so the Vietnamese trucks' pickers show it refused. Each runs every road corridor its permits
      * cover.

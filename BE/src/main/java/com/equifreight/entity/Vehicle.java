@@ -39,7 +39,7 @@ public class Vehicle extends BaseEntity {
     @OrderBy("positionNo")
     private List<VehicleStall> stalls = new ArrayList<>();
 
-    /** Where the vehicle is based, and where it is when it has run no trip yet (US-F3-19). */
+    /** Where the vehicle is based, and where it is when it has run no trip yet (US-F7-01). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_country_id", nullable = false)
     private Country homeCountry;

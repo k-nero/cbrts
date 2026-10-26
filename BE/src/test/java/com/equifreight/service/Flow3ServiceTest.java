@@ -215,7 +215,7 @@ class Flow3ServiceTest {
         chosen.setVehicle(chosenVehicle);
         lenient().when(jobTrips.vehicleOf(trip)).thenReturn(Optional.of(chosen));
         lenient().when(jobTrips.vehiclesOf(trip)).thenReturn(List.of(chosen));
-        // US-F3-19's checks have their own tests (VehicleAvailabilityTest); here every vehicle may run the trip.
+        // US-F7-01's checks have their own tests (VehicleAvailabilityTest); here every vehicle may run the trip.
         lenient()
                 .when(availability.firstAvailable(any(), any()))
                 .thenAnswer(i -> i.<List<Vehicle>>getArgument(0).getFirst());

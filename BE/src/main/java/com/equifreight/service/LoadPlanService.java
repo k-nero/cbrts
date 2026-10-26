@@ -127,7 +127,7 @@ public class LoadPlanService {
     }
 
     /**
-     * Starts the trip's load on {@code vehicleId}, or on the first vehicle that may run the trip (US-F3-19). When the
+     * Starts the trip's load on {@code vehicleId}, or on the first vehicle that may run the trip (US-F7-01). When the
      * trip has a vehicle already, this changes the first trailer's vehicle instead.
      */
     @Transactional
@@ -684,7 +684,7 @@ public class LoadPlanService {
                 throw new BusinessException("Vehicle " + plan.getVehicle().getCode() + " is currently in "
                         + plan.getVehicle().getStatus() + " and cannot be confirmed for load plan");
             }
-            // Its corridors, its location and its other bookings may have changed since it was chosen (US-F3-19).
+            // Its corridors, its location and its other bookings may have changed since it was chosen (US-F7-01).
             availability.require(plan.getVehicle(), trip);
         }
 

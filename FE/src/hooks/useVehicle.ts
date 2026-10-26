@@ -26,7 +26,7 @@ export const useVehicleList = () =>
 
 /**
  * Active vehicles. With a job, for its trip (`tripId`, or its current one): each carries `available` and
- * `unavailableReason`, those that may join it first (US-F3-19).
+ * `unavailableReason`, those that may join it first (US-F7-01).
  */
 export const useActiveVehicles = (trip?: { jobId: string; tripId?: string | null }) => {
   return useQuery({

@@ -8,7 +8,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 /**
- * A vehicle. {@code available} and {@code unavailableReason} are set only when it is listed for a trip (US-F3-19):
+ * A vehicle. {@code available} and {@code unavailableReason} are set only when it is listed for a trip (US-F7-01):
  * whether it may join that trip, and why not.
  */
 @Builder(toBuilder = true)
