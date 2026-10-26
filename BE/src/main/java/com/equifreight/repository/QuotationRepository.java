@@ -31,6 +31,9 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
     /** The non-draft versions of a page of requests, for the requests list. */
     List<Quotation> findByRequestIdInAndStatusNot(Collection<UUID> requestIds, QuotationStatus status);
 
+    /** The versions in this status among these requests: on Home, the re-quotes being drafted (A4). */
+    List<Quotation> findByRequestIdInAndStatus(Collection<UUID> requestIds, QuotationStatus status);
+
     /** Quotations in a status whose validity ends before the given instant: those to expire. */
     List<Quotation> findByStatusAndValidUntilBefore(QuotationStatus status, Instant before);
 
