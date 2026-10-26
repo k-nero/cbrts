@@ -4,6 +4,7 @@ import type { CustomerQuotation, CustomerQuoteGroup } from '@/interfaces';
 
 import {
   quotedPassChip,
+  quotedPassSub,
   cancellationToday,
   cancelledText,
   noticeBandLabel,
@@ -15,6 +16,8 @@ import {
   moneyRows,
   owedKind,
   quotationCallout,
+  expiredSentence,
+  holdsReason,
   shareText,
 } from './customerQuotation';
 
@@ -183,7 +186,7 @@ describe('quotationCallout', () => {
     expect(quotationCallout({ ...ref, status: 'EXPIRED' })).toEqual({
       tone: 'info',
       title: 'Your quotation Q-2026-0189 v2 expired on 27 Oct 2026.',
-      body: 'A logistics manager can re-price it from the rate catalog in force now.',
+      body: 'Open it to ask for a re-quote, priced from the rate catalog in force now.',
     });
   });
   test('an accepted one says so', () => {
@@ -194,6 +197,33 @@ describe('quotationCallout', () => {
   test('a declined one says so, not that it is ready', () => {
     expect(quotationCallout({ ...ref, status: 'DECLINED' }).title).toBe(
       'You declined quotation Q-2026-0189 v2.',
+    );
+  });
+  test('a declined one is final: nobody re-prices it', () => {
+    expect(quotationCallout({ ...ref, status: 'DECLINED' }).body).toBe(
+      'Declining closed the request. To move these horses after all, start a new request.',
+    );
+  });
+});
+
+describe('expiredSentence', () => {
+  const q = { validUntil: '2026-10-27T16:59:59.999Z', request: { departureDate: '2026-11-20' } };
+  test('while the departure is ahead, the customer asks for the re-quote', () => {
+    expect(expiredSentence(q, 'requote', 'Vũ Hải Yến')).toBe(
+      'This quotation expired on 27 Oct 2026. Ask Vũ Hải Yến for a re-quote: a new version priced from the rate catalog in force now.',
+    );
+  });
+  test('once the departure has come, it says a re-quote is no longer possible', () => {
+    expect(expiredSentence(q, 'expired', 'Vũ Hải Yến')).toBe(
+      'This quotation expired on 27 Oct 2026, and the departure on 20 Nov 2026 has come, so it can’t be re-quoted. Start a new request for a later date.',
+    );
+  });
+});
+
+describe('holdsReason', () => {
+  test('after expiry the customer asks for a re-quote; the manager doesn’t re-price on their own', () => {
+    expect(holdsReason('2026-10-20T03:00:00Z', '2026-10-27T16:59:59.999Z', 'Vũ Hải Yến')).toBe(
+      'It holds its price for 7 days from 20 Oct 2026. After 27 Oct 2026 it expires, and you can ask Vũ Hải Yến for a re-quote.',
     );
   });
 });
@@ -251,5 +281,20 @@ describe('quotedPassChip', () => {
       tone: 'neutral',
       label: 'Cancelled',
     });
+  });
+});
+
+describe('quotedPassSub', () => {
+  test('an expired version no longer holds its price, and nothing claims it is re-priced', () => {
+    expect(
+      quotedPassSub({
+        status: 'EXPIRED',
+        requestStatus: 'EXPIRED',
+        validUntil: '2026-10-27T16:59:59.999Z',
+        acceptedAt: null,
+        declinedAt: null,
+        cancelledAt: null,
+      }),
+    ).toBe('Expired 27 Oct 2026. It no longer holds its price.');
   });
 });

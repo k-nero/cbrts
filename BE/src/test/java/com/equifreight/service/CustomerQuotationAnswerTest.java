@@ -147,8 +147,7 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     void anExpiredQuotationCantBeAcceptedEvenBeforeTheJobExpiresIt() {
         assertThatThrownBy(() -> at(AFTER_EXPIRY).accept(bookings, request.getId()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("Version 1 expired on 27 Oct 2026, so it can't be answered. Ask the logistics manager to"
-                        + " re-price it.")
+                .hasMessage("Version 1 expired on 27 Oct 2026, so it can't be answered. Ask for a re-quote instead.")
                 .extracting("code")
                 .isEqualTo("QUOTATION_EXPIRED");
         assertNothingWritten();

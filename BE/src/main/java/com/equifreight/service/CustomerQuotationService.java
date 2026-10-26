@@ -321,7 +321,7 @@ public class CustomerQuotationService {
         return new ConflictException(
                 "QUOTATION_EXPIRED",
                 "Version " + q.getVersionNo() + " expired on " + day(q.getValidUntil())
-                        + ", so it can't be answered. Ask the logistics manager to re-price it.");
+                        + ", so it can't be answered. Ask for a re-quote instead.");
     }
 
     /** The manager who prepared it, or every active logistics manager when nobody is named. */

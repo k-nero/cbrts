@@ -13,9 +13,10 @@ import type { CustomerQuotation } from '@/interfaces';
 import {
   cancellationToday,
   cancelledText,
-  daysUntil,
   deadlineText,
+  expiredSentence,
   formatDate,
+  holdsReason,
   ict,
   money,
   owedKind,
@@ -86,11 +87,12 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
       </Panel>
     );
   }
-  const expiredSentence = `This quotation expired on ${quotation.validUntil ? formatDate(quotation.validUntil) : '—'}. ${manager} can re-price it from the rate catalog in force now.`;
   if (kind === 'expired') {
     return (
       <Panel title="Nothing to answer" extra={<Chip dot={false}>Expired</Chip>}>
-        <p className="type-body-m m-0 text-ink-2">{expiredSentence}</p>
+        <p className="type-body-m m-0 text-ink-2">
+          {expiredSentence(quotation, 'expired', manager)}
+        </p>
       </Panel>
     );
   }
@@ -99,7 +101,9 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
     return (
       <Panel title="Nothing to answer" extra={<Chip dot={false}>Expired</Chip>}>
         <Flex vertical gap={12} align="start">
-          <p className="type-body-m m-0 text-ink-2">{expiredSentence}</p>
+          <p className="type-body-m m-0 text-ink-2">
+            {expiredSentence(quotation, 'requote', manager)}
+          </p>
           <Button variant="secondary" onClick={() => setOpen('requote')}>
             Ask for a re-quote
           </Button>
@@ -119,7 +123,6 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
   }
   const issued = quotation.issuedAt;
   const until = quotation.validUntil;
-  const days = issued && until ? daysUntil(until, issued) : null;
   const deadline = until
     ? deadlineText(until, new Date().toISOString())
     : { line1: '—', line2: '' };
@@ -145,11 +148,7 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
           subject={`${quotation.code} · version ${quotation.versionNo} · ${
             quotation.totals.total == null ? '—' : money(quotation.totals.total, quotation.currency)
           }`}
-          reason={
-            days != null && issued && until
-              ? `It holds its price for ${days} days from ${formatDate(issued)}. After ${formatDate(until)} it expires and ${manager} re-prices it from the rate catalog in force then.`
-              : undefined
-          }
+          reason={issued && until ? holdsReason(issued, until, manager) : undefined}
           deadline={{ left: deadline.line1, date: deadline.line2 }}
           action={
             <>

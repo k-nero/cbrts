@@ -118,7 +118,7 @@ class QuotationExpiryJobTest {
                         Audience.club(request.getClub().getId()),
                         Subject.quotation(q),
                         "Quotation Q-2026-0189 has expired",
-                        "Vũ Thị Yến can re-price it from the rate catalog in force now.");
+                        "Ask Vũ Thị Yến for a re-quote to have it priced again from the rate catalog in force now.");
         verify(notifications, never())
                 .notify(eq(NotificationKind.QUOTATION_EXPIRING), any(), any(), anyString(), any());
     }
