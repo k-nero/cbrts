@@ -55,7 +55,7 @@ export const ChecksPanel: FC<{ checks: ReviewCheck[]; inReview: boolean }> = ({
         ))}
       </ul>
       <p className="type-body-s m-0 border-t border-line px-6 py-3.5 text-ink-3">
-        Blackout, capacity and horse availability are checked with later steps.
+        Blackout and horse availability are checked with later steps; the fleet is checked below.
       </p>
     </Panel>
   );

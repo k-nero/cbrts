@@ -32,6 +32,7 @@ import com.equifreight.repository.VehicleBookingRepository;
 import com.equifreight.repository.VehicleRepository;
 import com.equifreight.repository.VehicleStallRepository;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -108,15 +109,19 @@ public class VehicleService {
     @Transactional(readOnly = true)
     public List<VehicleResponse> listForTrip(UUID jobId, UUID tripId) {
         Trip trip = jobTrips.tripOf(jobId, tripId);
+        Set<UUID> held = availability.heldVehicleIds(trip);
         return vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
                 .map(v -> {
                     String reason = availability.refusalFor(v, trip).orElse(null);
                     return FleetMapper.toResponse(v).toBuilder()
                             .available(reason == null)
                             .unavailableReason(reason)
+                            .held(held.contains(v.getId()))
                             .build();
                 })
-                .sorted(Comparator.comparing((VehicleResponse v) -> !v.available())
+                // The vehicle held for the trip's request first (US-F7-02), then those that may join it.
+                .sorted(Comparator.comparing((VehicleResponse v) -> !(v.held() && v.available()))
+                        .thenComparing(v -> !v.available())
                         .thenComparing(VehicleResponse::code))
                 .toList();
     }
@@ -277,6 +282,37 @@ public class VehicleService {
         return FleetMapper.toResponse(saved);
     }
 
+    /**
+     * Sets or clears the date the vehicle is expected back (US-F7-02), for what the calendar doesn't know. It counts
+     * only while it is later than the date worked out from the bookings; a past date simply stops counting.
+     */
+    @Transactional
+    public VehicleResponse setAvailableOn(User actor, UUID id, LocalDate availableOn) {
+        Vehicle vehicle = vehicleRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+        LocalDate before = vehicle.getAvailableOn();
+        if (Objects.equals(before, availableOn)) return FleetMapper.toResponse(vehicle);
+        vehicle.setAvailableOn(availableOn);
+        Vehicle saved = vehicleRepository.save(vehicle);
+        audit.recordDecision(
+                actor,
+                "VEHICLE_AVAILABLE_ON_CHANGED",
+                summary(saved.getCode() + " expected back: " + dateWords(before) + " → " + dateWords(availableOn)
+                        + "."),
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getCode(),
+                null,
+                null,
+                null);
+        return FleetMapper.toResponse(saved);
+    }
+
+    private static String dateWords(LocalDate date) {
+        return date == null ? "not set" : BusinessTime.DAY.format(date);
+    }
+
     private static final String ENTITY_TYPE = "VEHICLE";
     private static final int SUMMARY_MAX = 500;
 
@@ -372,6 +408,10 @@ public class VehicleService {
             throw new ConflictException("INVALID_PERIOD", "Booking start time must be before end time");
         }
 
+        if (request.kind() == BookingKind.RESERVED) {
+            throw new BusinessException(
+                    "A vehicle is held for a request when the customer accepts its quotation, not booked by hand");
+        }
         if (request.kind() == BookingKind.JOB && request.jobId() == null) {
             throw new BusinessException("A JOB booking requires a valid jobId");
         }

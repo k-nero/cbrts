@@ -10,12 +10,13 @@ type Props = {
   crud: UseCrudResourceResult<Vehicle, CreateVehicleInput>;
   onBook: (vehicle: Vehicle) => void;
   onEditPermits: (vehicle: Vehicle) => void;
+  onSetAvailableOn: (vehicle: Vehicle) => void;
 };
 
 /** The fleet, paged and sorted by the server (code, A to Z, until a header is clicked). */
-const VehicleList: FC<Props> = ({ crud, onBook, onEditPermits }) => {
+const VehicleList: FC<Props> = ({ crud, onBook, onEditPermits, onSetAvailableOn }) => {
   const { listQuery, pageState, setPageState } = crud;
-  const columns = useGeneratedVehicleColumn({ onBook, onEditPermits });
+  const columns = useGeneratedVehicleColumn({ onBook, onEditPermits, onSetAvailableOn });
   return (
     <Table<Vehicle>
       id="vehicles"

@@ -500,6 +500,7 @@ public class DataSeeder implements ApplicationRunner {
             c.setOriginCity(origin);
             c.setDestinationCity(dest);
             c.setDistanceKm(distKm);
+            c.setDrivingDays(Corridor.drivingDaysFor(distKm));
             c.setOriginCountry(from);
             c.setDestinationCountry(to);
             corridorRepository.save(c);

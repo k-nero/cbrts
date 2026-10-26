@@ -52,6 +52,7 @@ public class CustomerQuotationService {
     private final InvoiceService invoices;
     private final QuotationIssueService issues;
     private final Clock clock;
+    private final RequestFleetService fleet;
 
     public CustomerQuotationService(
             TransportRequestRepository requests,
@@ -63,7 +64,8 @@ public class CustomerQuotationService {
             NotificationService notifications,
             InvoiceService invoices,
             QuotationIssueService issues,
-            Clock clock) {
+            Clock clock,
+            RequestFleetService fleet) {
         this.requests = requests;
         this.quotations = quotations;
         this.feeBands = feeBands;
@@ -74,6 +76,7 @@ public class CustomerQuotationService {
         this.invoices = invoices;
         this.issues = issues;
         this.clock = clock;
+        this.fleet = fleet;
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +117,8 @@ public class CustomerQuotationService {
         Quotation saved = quotations.saveAndFlush(q);
         // The deposit invoice comes with the acceptance (US-F6-03): the quotation's deposit % of its total.
         invoices.issueDeposit(saved, customer);
+        // A vehicle is held for the trip's days (US-F7-02); with none free the request moves on unheld.
+        fleet.hold(request);
 
         String label = label(q);
         audit.recordDecision(

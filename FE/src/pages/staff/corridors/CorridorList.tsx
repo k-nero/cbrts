@@ -6,12 +6,15 @@ import Table from '@/components/table';
 import type { useCorridorList } from '@/hooks/routeCatalog';
 import type { Corridor } from '@/interfaces';
 
-type Props = { crud: ReturnType<typeof useCorridorList> };
+type Props = {
+  crud: ReturnType<typeof useCorridorList>;
+  onEditDrivingDays: (c: Corridor) => void;
+};
 
 /** The routes we run, paged and sorted by the server (code, A to Z, until a header is clicked). */
-const CorridorList: FC<Props> = ({ crud }) => {
+const CorridorList: FC<Props> = ({ crud, onEditDrivingDays }) => {
   const { listQuery, pageState, setPageState } = crud;
-  const columns = useGeneratedCorridorColumn();
+  const columns = useGeneratedCorridorColumn({ onEditDrivingDays });
   return (
     <Table<Corridor>
       id="corridors"

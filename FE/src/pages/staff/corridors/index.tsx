@@ -6,9 +6,11 @@ import AddCorridorModal from './AddCorridorModal';
 import AddCrossingModal from './AddCrossingModal';
 import AddPlaceModal from './AddPlaceModal';
 import CorridorList from './CorridorList';
+import DrivingDaysModal from './DrivingDaysModal';
 
 import PageHeader from '@/components/PageHeader';
 import { useCorridorList } from '@/hooks/routeCatalog';
+import type { Corridor } from '@/interfaces';
 
 /**
  * Routes (fleet & route coordinator): the corridors we run, with their border crossings. A new
@@ -20,6 +22,7 @@ const CorridorsPage = () => {
   const [adding, setAdding] = useState(false);
   const [addingPlace, setAddingPlace] = useState(false);
   const [addingCrossing, setAddingCrossing] = useState(false);
+  const [editing, setEditing] = useState<Corridor | null>(null);
   const total = crud.listQuery.data?.totalElements;
 
   return (
@@ -46,7 +49,7 @@ const CorridorsPage = () => {
       </Flex>
 
       {/* Loading is the table's own spinner; a failed load goes to the error boundary. */}
-      <CorridorList crud={crud} />
+      <CorridorList crud={crud} onEditDrivingDays={setEditing} />
 
       <AddCorridorModal
         open={adding}
@@ -57,6 +60,7 @@ const CorridorsPage = () => {
       />
       <AddPlaceModal open={addingPlace} onClose={() => setAddingPlace(false)} />
       <AddCrossingModal open={addingCrossing} onClose={() => setAddingCrossing(false)} />
+      <DrivingDaysModal corridor={editing} onClose={() => setEditing(null)} />
     </Flex>
   );
 };

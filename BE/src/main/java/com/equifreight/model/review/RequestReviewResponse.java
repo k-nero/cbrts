@@ -26,4 +26,6 @@ public class RequestReviewResponse {
     private QuotationRefResponse quotation;
     /** The job the request became, with its team, once it is APPROVED (US-F1-07); null before. */
     private JobRefResponse job;
+    /** Whether the fleet can run the request, and the vehicle held for it (US-F7-02); null once it is closed. */
+    private FleetCheckResponse fleet;
 }

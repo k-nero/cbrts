@@ -146,8 +146,15 @@ export default function FleetCalendarPage() {
                     minute: '2-digit',
                   });
 
+                  // A RESERVED booking is a vehicle held for an accepted request (US-F7-02).
                   const kindTone =
-                    b.kind === 'JOB' ? 'ok' : b.kind === 'MAINTENANCE' ? 'warn' : 'neutral';
+                    b.kind === 'JOB'
+                      ? 'ok'
+                      : b.kind === 'MAINTENANCE'
+                        ? 'warn'
+                        : b.kind === 'RESERVED'
+                          ? 'info'
+                          : 'neutral';
 
                   return (
                     <div key={b.id} className="py-4">
@@ -163,7 +170,7 @@ export default function FleetCalendarPage() {
                           <Flex vertical>
                             <Flex gap={8} align="center">
                               <span className="type-h4 text-ink">{b.vehicleCode}</span>
-                              <Chip tone={kindTone}>{b.kind}</Chip>
+                              <Chip tone={kindTone}>{b.kind === 'RESERVED' ? 'Held' : b.kind}</Chip>
                             </Flex>
                             {b.jobCode ? (
                               <span className="type-body-s text-ink-2">
@@ -174,6 +181,12 @@ export default function FleetCalendarPage() {
                                   </>
                                 )}
                                 Job <span className="font-mono font-medium">{b.jobCode}</span>
+                              </span>
+                            ) : b.requestCode ? (
+                              <span className="type-body-s text-ink-2">
+                                Held for request{' '}
+                                <span className="font-mono font-medium">{b.requestCode}</span> until
+                                its trip&apos;s load plan is confirmed
                               </span>
                             ) : (
                               <span className="type-body-s text-ink-3">Internal fleet booking</span>

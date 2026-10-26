@@ -218,7 +218,8 @@ class ConvoyTest {
                 routePlanService,
                 mock(BiosecurityService.class),
                 audit,
-                availability);
+                availability,
+                mock(RequestFleetService.class));
         crewService = new CrewAssignmentService(
                 crew, jobs, users, jobTrips, loadPlans, placements, audit, flightService, routePlans);
         jobService = new TransportJobService(

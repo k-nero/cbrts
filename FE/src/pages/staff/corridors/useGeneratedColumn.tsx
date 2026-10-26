@@ -3,14 +3,18 @@ import { Flex, type TableColumnsType } from 'antd';
 
 import { flexWords, MODE_LABEL } from './routeOptions';
 
-import { Chip } from '@/components/ui';
+import { Button, Chip } from '@/components/ui';
 import { type Corridor, TransportModeEnum } from '@/interfaces';
 
 /**
  * Routes columns: the route, mode, border crossings, distance, flexible dates, and how many vehicles
  * run it (US-F7-01): a road route nobody runs can't be planned.
  */
-export const useGeneratedCorridorColumn = () =>
+export const useGeneratedCorridorColumn = ({
+  onEditDrivingDays,
+}: {
+  onEditDrivingDays: (c: Corridor) => void;
+}) =>
   useMemo<TableColumnsType<Corridor>>(
     () => [
       {
@@ -66,6 +70,22 @@ export const useGeneratedCorridorColumn = () =>
         render: (_, c) => <span className="type-body-s text-ink">{flexWords(c.dateFlexDays)}</span>,
       },
       {
+        title: 'Driving days',
+        key: 'drivingDays',
+        width: 170,
+        render: (_, c) =>
+          c.mode !== TransportModeEnum.ROAD ? (
+            <span className="type-body-s text-ink-3">Flown</span>
+          ) : (
+            <Flex align="center" gap={8}>
+              <span className="type-data text-ink">{c.drivingDays}</span>
+              <Button variant="ghost" size="sm" onClick={() => onEditDrivingDays(c)}>
+                Change
+              </Button>
+            </Flex>
+          ),
+      },
+      {
         title: 'Vehicles',
         key: 'vehicleCount',
         width: 150,
@@ -82,5 +102,5 @@ export const useGeneratedCorridorColumn = () =>
         },
       },
     ],
-    [],
+    [onEditDrivingDays],
   );

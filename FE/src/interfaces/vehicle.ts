@@ -48,9 +48,13 @@ export interface Vehicle extends BaseEntity {
   permittedCountries: CountryOption[];
   /** The road corridors it works; a road trip takes it only on one of these. */
   operatingCorridors: { id: string; code: string }[];
+  /** The date the coordinator expects it back, 'YYYY-MM-DD' (US-F7-02); null when not set. */
+  availableOn?: string | null;
   /** Listed for a trip only: whether it may join that trip, and why not. */
   available?: boolean | null;
   unavailableReason?: string | null;
+  /** Listed for a trip only: held for one of the trip's requests since its acceptance (US-F7-02). */
+  held?: boolean | null;
 }
 
 export interface VehicleBooking extends BaseEntity {
@@ -63,7 +67,9 @@ export interface VehicleBooking extends BaseEntity {
   jobId?: string | null;
   /** The codes of the trip's jobs, comma-separated. */
   jobCode?: string | null;
-  kind: 'JOB' | 'MAINTENANCE' | 'HOLD';
+  /** The request a RESERVED booking holds the vehicle for (US-F7-02). */
+  requestCode?: string | null;
+  kind: 'JOB' | 'MAINTENANCE' | 'HOLD' | 'RESERVED';
   startsAt: string;
   endsAt: string;
 }

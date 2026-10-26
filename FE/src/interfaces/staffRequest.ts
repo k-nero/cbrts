@@ -59,6 +59,25 @@ export interface RequestReview {
   quotation: QuotationRef | null;
   /** The job the request became, with its team, once approved (US-F1-07). */
   job: JobRef | null;
+  /** Whether the fleet can run the request, and the vehicle held for it (US-F7-02); null once closed. */
+  fleet: FleetCheck | null;
+}
+
+/**
+ * Whether the fleet can run a request, "by the fleet calendar" (US-F7-02). `held` is null before the
+ * customer accepts, then says whether a vehicle is held for the trip's days.
+ */
+export interface FleetCheck {
+  outcome: 'FREE' | 'WITHIN_FLEX' | 'NONE' | 'NO_VEHICLE' | 'FLOWN';
+  message: string;
+  vehicleCode: string | null;
+  /** The requested departure date, 'YYYY-MM-DD'. */
+  date: string;
+  /** The first date a vehicle can start, when none can on the date. */
+  earliest: string | null;
+  held: boolean | null;
+  heldVehicle: string | null;
+  heldFrom: string | null;
 }
 
 /** The job an approved request became; the names are null on jobs approved before teams were kept. */

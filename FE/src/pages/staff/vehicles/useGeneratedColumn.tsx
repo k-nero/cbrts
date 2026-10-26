@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { App, Flex, type TableColumnsType } from 'antd';
+import dayjs from 'dayjs';
 
 import { countriesText, KIND_LABEL, STALL_TYPES, STATUS_CHIP } from './vehicleOptions';
 
@@ -7,6 +8,7 @@ import { Button, Chip, Icon } from '@/components/ui';
 import { useUpdateVehicle } from '@/hooks/useVehicle';
 import { type Vehicle, VehicleStatusEnum } from '@/interfaces';
 import { apiErrorMessage } from '@/lib';
+import { formatDate } from '@/lib/utils';
 
 /**
  * Vehicles columns: the vehicle, its stalls by type, payload, where it is based and its permits, the
@@ -15,9 +17,11 @@ import { apiErrorMessage } from '@/lib';
 export const useGeneratedVehicleColumn = ({
   onBook,
   onEditPermits,
+  onSetAvailableOn,
 }: {
   onBook: (v: Vehicle) => void;
   onEditPermits: (v: Vehicle) => void;
+  onSetAvailableOn: (v: Vehicle) => void;
 }) => {
   const { message } = App.useApp();
   const update = useUpdateVehicle();
@@ -111,6 +115,17 @@ export const useGeneratedVehicleColumn = ({
         },
       },
       {
+        title: 'Expected back',
+        key: 'availableOn',
+        width: 150,
+        render: (_, v) =>
+          v.availableOn && !dayjs(v.availableOn).isBefore(dayjs(), 'day') ? (
+            <span className="type-data text-ink">{formatDate(v.availableOn)}</span>
+          ) : (
+            <span className="type-body-s text-ink-3">—</span>
+          ),
+      },
+      {
         title: 'Status',
         key: 'status',
         dataIndex: 'status',
@@ -123,7 +138,7 @@ export const useGeneratedVehicleColumn = ({
       },
       {
         key: 'actions',
-        width: 360,
+        width: 480,
         render: (_, v) =>
           v.status === VehicleStatusEnum.RETIRED ? null : (
             <Flex gap={8}>
@@ -132,6 +147,9 @@ export const useGeneratedVehicleColumn = ({
               </Button>
               <Button variant="ghost" size="sm" onClick={() => onEditPermits(v)}>
                 Countries and corridors
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onSetAvailableOn(v)}>
+                Expected back
               </Button>
               <Button
                 variant="ghost"
@@ -145,5 +163,5 @@ export const useGeneratedVehicleColumn = ({
           ),
       },
     ];
-  }, [message, onBook, onEditPermits, update]);
+  }, [message, onBook, onEditPermits, onSetAvailableOn, update]);
 };

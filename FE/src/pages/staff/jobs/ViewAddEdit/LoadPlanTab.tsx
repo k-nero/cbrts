@@ -74,7 +74,7 @@ const vehicleOption = (v: Vehicle) => {
         title: v.unavailableReason ?? undefined,
         label: `${label} · Not available: ${v.unavailableReason ?? 'it can’t run this trip'}`,
       }
-    : { value: v.id, label };
+    : { value: v.id, label: v.held ? `${label} · Held for this request` : label };
 };
 
 export function LoadPlanTab({ job }: Props) {

@@ -95,6 +95,8 @@ export interface Corridor {
   distanceKm: number | null;
   /** How far a request's flexible dates can move on this route; 0 means fixed dates only. */
   dateFlexDays: number;
+  /** Days to drive it one way: a trip's length before its route is planned, and an empty drive back (US-F7-02). */
+  drivingDays: number;
   /** The border crossings it takes, in order from the origin. */
   crossings: string[];
   /** The countries it passes through, in order: ['VN', 'KH', 'TH'] (US-F7-01). */

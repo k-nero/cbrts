@@ -36,6 +36,7 @@ public class LoadPlanService {
     private final BiosecurityService biosecurity;
     private final AuditService auditService;
     private final VehicleAvailability availability;
+    private final RequestFleetService fleet;
 
     public LoadPlanService(
             LoadPlanRepository loadPlanRepository,
@@ -49,7 +50,8 @@ public class LoadPlanService {
             RoutePlanService routePlanService,
             BiosecurityService biosecurity,
             AuditService auditService,
-            VehicleAvailability availability) {
+            VehicleAvailability availability,
+            RequestFleetService fleet) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.transportJobRepository = transportJobRepository;
@@ -62,6 +64,7 @@ public class LoadPlanService {
         this.biosecurity = biosecurity;
         this.auditService = auditService;
         this.availability = availability;
+        this.fleet = fleet;
     }
 
     /**
@@ -721,6 +724,9 @@ public class LoadPlanService {
                             + "for the planned departure and arrival");
         }
 
+        // The holds placed at acceptance give way to the trip's own bookings, on the held vehicle or another
+        // (US-F7-02).
+        fleet.releaseForTrip(trip);
         for (LoadPlan plan : plans) {
             book(trip, plan.getVehicle(), startsAt, endsAt);
         }

@@ -96,7 +96,8 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 notifications,
                 invoices,
                 issue,
-                Clock.fixed(now, BusinessTime.ZONE));
+                Clock.fixed(now, BusinessTime.ZONE),
+                mock(RequestFleetService.class));
     }
 
     CustomerQuotationService customer() {

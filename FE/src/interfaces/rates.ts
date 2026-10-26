@@ -37,6 +37,8 @@ export const RatePolicyKeyEnum = {
   ESTIMATE_BAND_PCT: 'ESTIMATE_BAND_PCT',
   STALL_PAYLOAD_KG: 'STALL_PAYLOAD_KG',
   AIR_SHIPMENT_MAX_KG: 'AIR_SHIPMENT_MAX_KG',
+  /** Hours after a trip before its vehicle drives again (US-F7-02). */
+  TURNAROUND_HOURS: 'TURNAROUND_HOURS',
 } as const;
 export type RatePolicyKey = (typeof RatePolicyKeyEnum)[keyof typeof RatePolicyKeyEnum];
 

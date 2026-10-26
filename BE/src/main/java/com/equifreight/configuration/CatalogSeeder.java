@@ -235,6 +235,7 @@ public class CatalogSeeder {
         corridor.setOriginCity(demo.from());
         corridor.setDestinationCity(demo.to());
         corridor.setDistanceKm(demo.km());
+        corridor.setDrivingDays(Corridor.drivingDaysFor(demo.km()));
         corridor.setOriginCountry(country(demo.fromCountry()));
         corridor.setDestinationCountry(country(demo.toCountry()));
         link(corridor, demo, crossingsByName);

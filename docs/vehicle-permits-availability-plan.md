@@ -1,6 +1,6 @@
 # Plan: vehicle permits and operating corridors, in planning (and later in incidents)
 
-Status: model settled on 26 Oct 2026 (see Decisions). PR 1 covers permits, operating corridors and trip planning; incident availability waits for a later PR. Nothing is built yet.
+Status: US-F7-01 (#249, formerly US-F3-19) is built and merged; US-F7-02 (#252) changes the location rule below (see "Availability over time"). Incident availability waits for a later story. Part of EPIC-F7 (#251).
 
 ## Scope
 
@@ -151,6 +151,19 @@ Rough size: **5–7 developer-days** with tests.
 - `docs/database/database-design.md`: the new columns and tables, and the consistency rule.
 - `docs/multi-trip-jobs-design.md`: each road trip of a chain is checked on its own corridor and start country.
 - `PRODUCT.md` (Region): a corridor names its countries; vehicles carry permits and operating corridors.
+
+## Availability over time (US-F7-02, #252)
+
+US-F7-01's location rule ("the vehicle is in the trip's start country") becomes "it can be there in time":
+
+- **Turnaround.** After a trip or a hold ends, the vehicle is ready where it ended once the rate catalog's `TURNAROUND_HOURS` (default 24) has passed: cleaning, disinfection, crew rest.
+- **Driving days.** Each road corridor has `driving_days` (1 to 30, defaulted from the distance at 500 km a day). A vehicle ready in one country can be in another after the driving days of a corridor it works between them. With no such corridor it isn't available there. The empty drive is worked out, not booked, so a return load can still take its place. A vehicle with no trip yet starts at home.
+- **Expected back.** `vehicles.available_on` is the coordinator's date for what the calendar doesn't know; it wins only while it is later.
+- **A trip's length before its route is planned** is its corridor's driving days.
+- **Check at review.** The Request review page shows whether a vehicle can start on the requested date (FREE), within the flexible days (WITHIN_FLEX), only later (NONE, with the earliest date in the next 60 days) or not at all because nobody works the corridor (NO_VEHICLE). Quoting, approving and rejecting are never blocked.
+- **Hold from acceptance.** Accepting a quotation holds the first vehicle that can run the request: a `RESERVED` booking with `request_id`, from the departure day for the corridor's driving days. Approval rechecks it, rejecting or cancelling releases it, and confirming the trip's load plan replaces it with the trip's own bookings. A hold counts as busy for everyone else and as where the vehicle will be after it.
+
+Example: a vehicle runs VN → TH from 1 to 5 Oct. With 24 hours' turnaround it is ready in Bangkok on 6 Oct; with 3 driving days back it can start in Vietnam on 9 Oct, so an 8 Oct trip from Vietnam can't take it.
 
 ## Later: incident availability (PR 2)
 

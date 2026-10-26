@@ -17,6 +17,8 @@ public record CorridorResponse(
         Integer distanceKm,
         /* How far a request's flexible dates can move on this route; 0 means fixed dates only. */
         int dateFlexDays,
+        /* Days to drive it one way: a trip's length before its route is planned, and an empty drive back (US-F7-02). */
+        int drivingDays,
         /* The border crossings the route takes, in order from the origin. */
         List<String> crossings,
         /* The countries it passes through, in order: "VN", "KH", "TH" (US-F7-01). */
