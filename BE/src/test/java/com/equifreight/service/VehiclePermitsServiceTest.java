@@ -46,7 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** US-F3-19: a vehicle's home country, permits and operating corridors, as the fleet coordinator sets them. */
+/** US-F7-01: a vehicle's home country, permits and operating corridors, as the fleet coordinator sets them. */
 class VehiclePermitsServiceTest {
 
     private final Country vn = country("VN", "Vietnam");

@@ -29,7 +29,7 @@ public interface VehicleBookingRepository extends JpaRepository<VehicleBooking, 
 
     /**
      * The vehicle's trip bookings that end by {@code at}, latest first, with the trip's corridor and the country it
-     * ends in: the first is where the vehicle is at {@code at} (US-F3-19). {@code tripId}'s own booking is left out.
+     * ends in: the first is where the vehicle is at {@code at} (US-F7-01). {@code tripId}'s own booking is left out.
      */
     @Query("SELECT b FROM VehicleBooking b JOIN FETCH b.trip t JOIN FETCH t.corridor c JOIN FETCH c.destinationCountry "
             + "WHERE b.vehicle.id = :vehicleId AND b.kind = com.equifreight.entity.enums.BookingKind.JOB "

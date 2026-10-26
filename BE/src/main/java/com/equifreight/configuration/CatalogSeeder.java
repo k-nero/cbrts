@@ -41,7 +41,7 @@ public class CatalogSeeder {
 
     private record DemoCrossing(String name, String from, String to) {}
 
-    /** {@code fromCountry} and {@code toCountry} are the two ends' country codes (US-F3-19). */
+    /** {@code fromCountry} and {@code toCountry} are the two ends' country codes (US-F7-01). */
     private record DemoCorridor(
             String code,
             TransportMode mode,
@@ -279,7 +279,7 @@ public class CatalogSeeder {
     }
 
     /**
-     * The seeded corridors whose countries disagree with their crossings (US-F3-19), one sentence each; empty when
+     * The seeded corridors whose countries disagree with their crossings (US-F7-01), one sentence each; empty when
      * the catalog is consistent. A corridor starts where its first crossing leaves and ends where its last one enters,
      * each crossing starts where the previous one ended, and a road corridor without crossings stays in one country.
      */

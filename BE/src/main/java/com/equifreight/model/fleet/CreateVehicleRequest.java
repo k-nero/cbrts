@@ -11,7 +11,7 @@ import lombok.Builder;
 
 /**
  * A new vehicle with its stalls, where it is based, the countries it holds permits for and the road corridors it works
- * (US-F3-19). A missing list is empty, a missing payload 0 (refused by {@code @Positive}).
+ * (US-F7-01). A missing list is empty, a missing payload 0 (refused by {@code @Positive}).
  */
 @Builder
 public record CreateVehicleRequest(

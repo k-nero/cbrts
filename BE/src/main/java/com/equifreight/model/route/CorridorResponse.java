@@ -19,7 +19,7 @@ public record CorridorResponse(
         int dateFlexDays,
         /* The border crossings the route takes, in order from the origin. */
         List<String> crossings,
-        /* The countries it passes through, in order: "VN", "KH", "TH" (US-F3-19). */
+        /* The countries it passes through, in order: "VN", "KH", "TH" (US-F7-01). */
         List<String> countries,
         /* How many vehicles run it; a road route nobody runs can't be planned. Null where it isn't counted. */
         Long vehicleCount,

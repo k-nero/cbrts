@@ -364,7 +364,7 @@ class ConvoyTest {
     }
 
     @Test
-    @DisplayName("A trailer that may not run the trip is refused with the reason, and nothing is added (US-F3-19)")
+    @DisplayName("A trailer that may not run the trip is refused with the reason, and nothing is added (US-F7-01)")
     void unavailableTrailerRefused() {
         Vehicle third = vehicle("TX-512");
         when(vehicles.findById(third.getId())).thenReturn(Optional.of(third));

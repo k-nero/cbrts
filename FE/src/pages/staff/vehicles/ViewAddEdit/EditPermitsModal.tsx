@@ -22,7 +22,7 @@ type Props = {
 };
 
 /**
- * Countries and corridors (US-F3-19): where a vehicle is based, the countries it holds permits for
+ * Countries and corridors (US-F7-01): where a vehicle is based, the countries it holds permits for
  * and the road corridors it works. The server refuses taking away a permit one of its corridors
  * needs, or a corridor or home country a trip it is still on depends on, naming what needs it.
  */

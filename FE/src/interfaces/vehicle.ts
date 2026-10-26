@@ -42,7 +42,7 @@ export interface Vehicle extends BaseEntity {
   status: VehicleStatus;
   stallCount: number;
   stalls: VehicleStall[];
-  /** Where it is based, and where it is when it has run no trip yet (US-F3-19). */
+  /** Where it is based, and where it is when it has run no trip yet (US-F7-01). */
   homeCountry: CountryOption;
   /** The foreign countries it holds a permit for. */
   permittedCountries: CountryOption[];

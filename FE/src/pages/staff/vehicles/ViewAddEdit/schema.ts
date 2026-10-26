@@ -6,7 +6,7 @@ const option = (message: string) =>
 
 const options = z.array(z.object({ label: z.string(), value: z.string() })).nullable();
 
-/** Where a vehicle is based, the countries it holds permits for and the corridors it works (US-F3-19). */
+/** Where a vehicle is based, the countries it holds permits for and the corridors it works (US-F7-01). */
 const permitFields = {
   homeCountry: option('Pick the country the vehicle is based in.'),
   permittedCountries: options,

@@ -8,7 +8,7 @@ import { type Corridor, TransportModeEnum } from '@/interfaces';
 
 /**
  * Routes columns: the route, mode, border crossings, distance, flexible dates, and how many vehicles
- * run it (US-F3-19): a road route nobody runs can't be planned.
+ * run it (US-F7-01): a road route nobody runs can't be planned.
  */
 export const useGeneratedCorridorColumn = () =>
   useMemo<TableColumnsType<Corridor>>(

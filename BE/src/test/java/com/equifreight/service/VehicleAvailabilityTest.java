@@ -30,7 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * US-F3-19: a vehicle runs a corridor only with a permit for each of its countries, and joins a road trip only on one
+ * US-F7-01: a vehicle runs a corridor only with a permit for each of its countries, and joins a road trip only on one
  * of its operating corridors, from where the trip starts, when no other booking overlaps.
  */
 class VehicleAvailabilityTest {

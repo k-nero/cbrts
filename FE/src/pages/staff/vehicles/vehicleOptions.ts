@@ -78,7 +78,7 @@ export const countryOptions = (countries: CountryOption[] | undefined) =>
     .map((c) => ({ label: `${c.name} (${c.code})`, value: c.id }));
 
 /**
- * Road corridors for the operating corridors select (US-F3-19), each with the countries it passes
+ * Road corridors for the operating corridors select (US-F7-01), each with the countries it passes
  * through, since the vehicle needs a permit for every one. Air corridors carry no vehicle.
  */
 export const corridorOptions = (corridors: Corridor[] | undefined) =>

@@ -22,7 +22,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID>, JpaSpec
 
     /**
      * How many vehicles that aren't retired run each of {@code corridorIds}, as [corridor id, count] rows; a corridor
-     * nobody runs has no row (US-F3-19).
+     * nobody runs has no row (US-F7-01).
      */
     @Query("SELECT c.id, COUNT(v) FROM Vehicle v JOIN v.operatingCorridors c WHERE c.id IN :corridorIds "
             + "AND v.status <> com.equifreight.entity.enums.VehicleStatus.RETIRED GROUP BY c.id")

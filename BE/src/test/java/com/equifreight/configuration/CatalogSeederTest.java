@@ -79,7 +79,7 @@ class CatalogSeederTest {
     }
 
     @Test
-    @DisplayName("every seeded corridor's countries agree with its border crossings (US-F3-19)")
+    @DisplayName("every seeded corridor's countries agree with its border crossings (US-F7-01)")
     void corridorCountriesAgreeWithCrossings() {
         assertThat(CatalogSeeder.inconsistentCorridors()).isEmpty();
     }

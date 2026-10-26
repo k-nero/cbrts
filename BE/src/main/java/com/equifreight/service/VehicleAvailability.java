@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Whether a vehicle may join a road trip (US-F3-19, docs/vehicle-permits-availability-plan.md). In this order: it is
+ * Whether a vehicle may join a road trip (US-F7-01, docs/vehicle-permits-availability-plan.md). In this order: it is
  * active, the trip's corridor is one of its operating corridors, it is in the country the trip starts in when the
  * trip starts, and no other booking overlaps the trip. An air trip carries no vehicle, so only the status is checked
  * there. Every point where a vehicle joins a trip asks here, so each refuses with the same sentence.

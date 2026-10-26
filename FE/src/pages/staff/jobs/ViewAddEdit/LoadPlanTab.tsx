@@ -63,7 +63,7 @@ const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
 
 /**
  * A vehicle in a trailer picker: its code, kind and stalls; one that may not join the trip is
- * disabled, with the reason in place of a choice (US-F3-19).
+ * disabled, with the reason in place of a choice (US-F7-01).
  */
 const vehicleOption = (v: Vehicle) => {
   const label = `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`;
@@ -84,7 +84,7 @@ export function LoadPlanTab({ job }: Props) {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [trailerToAdd, setTrailerToAdd] = useState<string>();
 
-  // The vehicles for this trip, each saying whether it may join it and why not (US-F3-19).
+  // The vehicles for this trip, each saying whether it may join it and why not (US-F7-01).
   const tripId = useJobTrip();
   const { data: activeVehicles, isLoading: loadingVehicles } = useActiveVehicles({
     jobId: job.id,

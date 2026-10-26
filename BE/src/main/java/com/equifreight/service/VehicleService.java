@@ -102,7 +102,7 @@ public class VehicleService {
     }
 
     /**
-     * The active vehicles for one of a job's trips, each marked with whether it may join it and why not (US-F3-19):
+     * The active vehicles for one of a job's trips, each marked with whether it may join it and why not (US-F7-01):
      * those that may come first, the rest after, each group by code.
      */
     @Transactional(readOnly = true)
@@ -136,7 +136,7 @@ public class VehicleService {
 
     /**
      * Adds a vehicle with its stalls, its home country, the countries it holds permits for and its operating
-     * corridors; a corridor needs a permit for every country on it (US-F3-19).
+     * corridors; a corridor needs a permit for every country on it (US-F7-01).
      */
     @Transactional
     public VehicleResponse create(User actor, CreateVehicleRequest request) {
@@ -193,7 +193,7 @@ public class VehicleService {
     }
 
     /**
-     * Changes a vehicle. Its countries and corridors change only as a whole (US-F3-19): a corridor needs a permit for
+     * Changes a vehicle. Its countries and corridors change only as a whole (US-F7-01): a corridor needs a permit for
      * every country on it, a permit stays while one of its corridors needs it, and a corridor or the home country
      * stays while the vehicle is on a trip that hasn't ended which depends on it. Each such change is audited.
      */
@@ -396,7 +396,7 @@ public class VehicleService {
                     .findById(request.jobId())
                     .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.jobId()));
             trip = jobTrips.tripOf(job.getId());
-            // The vehicle has to be able to run the job's trip: its corridor, from where the trip starts (US-F3-19).
+            // The vehicle has to be able to run the job's trip: its corridor, from where the trip starts (US-F7-01).
             availability.require(vehicle, trip);
         }
 
