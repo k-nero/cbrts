@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -105,6 +106,7 @@ public class CustomerHomeService {
         Map<UUID, Long> horseCounts = new HashMap<>();
         Map<UUID, Quotation> latestIssued = new HashMap<>();
         Map<UUID, TransportJob> jobOf = new HashMap<>();
+        Set<UUID> requoting = new HashSet<>();
         if (!ids.isEmpty()) {
             requests.countHorses(ids).forEach(c -> horseCounts.put(c.getRequestId(), c.getHorses()));
             quotations
@@ -112,9 +114,16 @@ public class CustomerHomeService {
                     .forEach(q -> latestIssued.merge(
                             q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
             jobs.findByRequestIdIn(ids).forEach(j -> jobOf.put(j.getRequest().getId(), j));
+            // A draft version after an issued one is a re-quote being priced (A4).
+            quotations.findByRequestIdInAndStatus(ids, QuotationStatus.DRAFT).forEach(q -> {
+                Quotation issued = latestIssued.get(q.getRequest().getId());
+                if (issued != null && q.getVersionNo() > issued.getVersionNo())
+                    requoting.add(q.getRequest().getId());
+            });
         }
         List<TransportRequest> live = all.stream()
-                .filter(r -> inProgress(r, latestIssued.get(r.getId()), jobOf.get(r.getId())))
+                .filter(r -> inProgress(
+                        r, latestIssued.get(r.getId()), jobOf.get(r.getId()), requoting.contains(r.getId()), today))
                 .toList();
 
         // One query for every document of the club's jobs that haven't left: the owed ones and each horse's count.
@@ -130,6 +139,8 @@ public class CustomerHomeService {
             Quotation q = latestIssued.get(r.getId());
             if (r.getStatus() == RequestStatus.QUOTED && q != null && q.getStatus() == QuotationStatus.ISSUED) {
                 owed.add(quotationOwed(r, q, today));
+            } else if (r.getStatus() == RequestStatus.EXPIRED && q != null && !requoting.contains(r.getId())) {
+                owed.add(requoteOwed(r, q, today));
             } else if (r.getStatus() == RequestStatus.INFO_REQUIRED) {
                 owed.add(HomeMapper.toAnswerOwed(
                         r,
@@ -150,6 +161,7 @@ public class CustomerHomeService {
                         horseCounts.getOrDefault(r.getId(), 0L),
                         latestIssued.get(r.getId()),
                         jobOf.get(r.getId()),
+                        requoting.contains(r.getId()),
                         owedByJob,
                         today))
                 .sorted(Comparator.comparingInt((MoveEntryResponse m) -> needsYou(m.holds()))
@@ -177,13 +189,21 @@ public class CustomerHomeService {
     /* ---------- what is in progress ---------- */
 
     /**
-     * Still a move: not a request the club declined (it ends EXPIRED), and not a job that has closed. An expired
-     * quotation the club didn't decline is being re-priced, so it stays.
+     * Still a move: not a job that has closed, and not an expired request that has ended. An expired request ends when
+     * the club declined its quotation, or when its departure has come with no re-quote being priced: a re-quote is
+     * possible only up to the day before departure (A4).
      */
-    static boolean inProgress(TransportRequest r, Quotation latest, TransportJob job) {
-        if (r.getStatus() == RequestStatus.EXPIRED
-                && (latest == null || latest.getStatus() == QuotationStatus.DECLINED)) return false;
+    static boolean inProgress(
+            TransportRequest r, Quotation latest, TransportJob job, boolean requoting, LocalDate today) {
+        if (r.getStatus() == RequestStatus.EXPIRED) {
+            if (latest == null || latest.getStatus() == QuotationStatus.DECLINED) return false;
+            if (!requoting && departureCome(r, today)) return false;
+        }
         return job == null || (job.getClosedAt() == null && job.getStage() != JobStage.CLOSED);
+    }
+
+    private static boolean departureCome(TransportRequest r, LocalDate today) {
+        return r.getDepartureDate() != null && !r.getDepartureDate().isAfter(today);
     }
 
     /** The customer owes the next step: an upload, a replacement, or a new document (as the checklist page says). */
@@ -244,13 +264,35 @@ public class CustomerHomeService {
         String reason = until == null
                 ? "Accept it to book the move, or decline it."
                 : "It holds its price until " + until.format(BusinessTime.SHORT_DAY)
-                        + "; after that it is re-priced from the rate catalog in force.";
+                        + ". After that it expires, and you can ask for a re-quote.";
         return HomeMapper.toQuotationOwed(
                 q,
                 urgency(until, today),
                 "Accept or decline quotation " + q.getCode() + " v" + q.getVersionNo(),
                 r.getCode() + " · " + q.getCode() + price,
                 reason);
+    }
+
+    /**
+     * An expired quotation is priced again only when the club asks for a re-quote (A4), up to the day before
+     * departure.
+     */
+    private OwedEntryResponse requoteOwed(TransportRequest r, Quotation expired, LocalDate today) {
+        LocalDate lastDay =
+                r.getDepartureDate() == null ? null : r.getDepartureDate().minusDays(1);
+        LocalDate expiredOn = expired.getValidUntil() == null
+                ? null
+                : LocalDate.ofInstant(expired.getValidUntil(), BusinessTime.ZONE);
+        return HomeMapper.toRequoteOwed(
+                expired,
+                urgency(lastDay, today),
+                "Ask for a re-quote of quotation " + expired.getCode() + " v" + expired.getVersionNo(),
+                r.getCode() + " · " + expired.getCode() + " · " + route(r),
+                (expiredOn == null ? "It expired" : "It expired on " + expiredOn.format(BusinessTime.SHORT_DAY))
+                        + ". A re-quote prices it again from the rate catalog in force now.",
+                lastDay == null
+                        ? null
+                        : lastDay.atTime(DUE_BY).atZone(BusinessTime.ZONE).toInstant());
     }
 
     /** Overdue past the date, soon within a week, else upcoming; an undated item is upcoming. */
@@ -268,6 +310,7 @@ public class CustomerHomeService {
             long horseCount,
             Quotation q,
             TransportJob job,
+            boolean requoting,
             Map<UUID, List<ChecklistItem>> owedByJob,
             LocalDate today) {
         List<String> parts = new ArrayList<>();
@@ -289,7 +332,7 @@ public class CustomerHomeService {
                 route(r),
                 String.join(" · ", parts),
                 stage(r, job),
-                holds(r, job, owed, today),
+                holds(r, job, requoting, owed, today),
                 departsAt,
                 arrivesAt);
     }
@@ -312,7 +355,8 @@ public class CustomerHomeService {
     }
 
     /** What holds the move, in words and a tone: Bad or Warn when it waits on the club, Neutral when it doesn't. */
-    static TonedTextResponse holds(TransportRequest r, TransportJob job, List<ChecklistItem> owed, LocalDate today) {
+    static TonedTextResponse holds(
+            TransportRequest r, TransportJob job, boolean requoting, List<ChecklistItem> owed, LocalDate today) {
         if (job != null) {
             if (job.getTripStatus() == TripStatus.HELD) return new TonedTextResponse("On the road · held", "warn");
             if (job.getTripStatus() == TripStatus.DEPARTED) return new TonedTextResponse("On the road", "info");
@@ -331,7 +375,10 @@ public class CustomerHomeService {
             case INFO_REQUIRED -> new TonedTextResponse("Needs your answer", "warn");
             case QUOTED -> new TonedTextResponse("Quotation waiting for you", "warn");
             case CUSTOMER_ACCEPTED -> new TonedTextResponse("With the logistics manager for approval", "neutral");
-            case EXPIRED -> new TonedTextResponse("Quotation expired · being re-priced", "neutral");
+            case EXPIRED ->
+                requoting
+                        ? new TonedTextResponse("Re-quote being priced · nothing needed", "neutral")
+                        : new TonedTextResponse("Quotation expired · ask for a re-quote", "warn");
             default -> new TonedTextResponse("In review · nothing needed", "neutral");
         };
     }

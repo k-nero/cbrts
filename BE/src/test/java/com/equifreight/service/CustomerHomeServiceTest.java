@@ -191,6 +191,68 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("an expired quotation is owed as a re-quote until the day before departure (A4)")
+    void expiredQuotationAsksForRequote() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.EXPIRED);
+        Quotation q = quotation(r, QuotationStatus.EXPIRED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).singleElement().satisfies(o -> {
+            assertThat(o.kind()).isEqualTo("QUOTATION");
+            assertThat(o.title()).isEqualTo("Ask for a re-quote of quotation Q-2026-0188 v2");
+            assertThat(o.actionLabel()).isEqualTo("Ask for a re-quote");
+            assertThat(o.dueAt()).isEqualTo(Instant.parse("2026-11-19T10:00:00Z"));
+        });
+        assertThat(home.moves()).singleElement().satisfies(m -> {
+            assertThat(m.holds().text()).isEqualTo("Quotation expired · ask for a re-quote");
+            assertThat(m.holds().tone()).isEqualTo("warn");
+        });
+    }
+
+    @Test
+    @DisplayName("an expired request whose departure has come has ended: no move, nothing owed (A4)")
+    void expiredAfterDepartureHasEnded() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.EXPIRED);
+        r.setDepartureDate(TODAY);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(quotation(r, QuotationStatus.EXPIRED)));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves()).isEmpty();
+        assertThat(home.owed()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("once the club asked for a re-quote, the manager prices it and nothing is owed (A4)")
+    void requoteBeingPricedOwesNothing() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.EXPIRED);
+        Quotation draft = quotation(r, QuotationStatus.DRAFT);
+        draft.setVersionNo((short) 3);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(quotation(r, QuotationStatus.EXPIRED)));
+        when(quotations.findByRequestIdInAndStatus(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(draft));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).isEmpty();
+        assertThat(home.moves()).singleElement().satisfies(m -> {
+            assertThat(m.holds().text()).isEqualTo("Re-quote being priced · nothing needed");
+            assertThat(m.holds().tone()).isEqualTo("neutral");
+        });
+    }
+
+    @Test
     @DisplayName("an overdue document locks the departure in Bad and is named on its horse")
     void overdueDocumentLocksDeparture() {
         TransportRequest r = request("REQ-2026-0162", RequestStatus.APPROVED);
