@@ -44,7 +44,7 @@ export interface WizardValues {
   destination: PlaceOption | null;
   /** YYYY-MM-DD. */
   departureDate: string | null;
-  /** "My dates can move by ±3 days". */
+  /** "My dates can move by ±N days", N the route's own (#115). */
   flexible: boolean;
   arrivalMode: ArrivalMode;
   /** YYYY-MM-DD, the window's day. */
@@ -104,7 +104,7 @@ export const fromRequest = (r: TransportRequest): WizardValues => ({
   origin: toOption(r.origin),
   destination: toOption(r.destination),
   departureDate: r.departureDate,
-  flexible: r.dateFlexDays === 3,
+  flexible: r.dateFlexDays > 0,
   arrivalMode: r.arrivalMode ?? 'ANY_TIME',
   arriveOn: r.windowStart ? ict(r.windowStart).format('YYYY-MM-DD') : null,
   windowFrom: asTime(r.windowStart),
@@ -143,7 +143,7 @@ export const toDraftInput = (v: WizardValues): RequestDraftInput => {
     destinationPlaceId: destination.placeId,
     destinationText: destination.text,
     departureDate: v.departureDate,
-    dateFlexDays: !window && v.flexible ? 3 : 0,
+    dateFlexDays: !window && v.flexible ? FLEX_ASKED : 0,
     arrivalMode: v.arrivalMode,
     windowStart: window ? instant(v.arriveOn, v.windowFrom) : null,
     windowEnd: window ? instant(v.arriveOn, v.windowUntil) : null,
@@ -156,6 +156,40 @@ export const toDraftInput = (v: WizardValues): RequestDraftInput => {
   };
 };
 
+/**
+ * What a tick on flexible dates asks for before the route is known; the server stores the route's own flex
+ * instead (#115).
+ */
+const FLEX_ASKED = 3;
+/** How far the dates can move on the route, or what the tick asks for before a route is known. */
+const flexDaysOf = (route: Route | null): number => route?.dateFlexDays ?? FLEX_ASKED;
+/** "±5 days": how far the dates can move on the route; null on a route that runs fixed dates only. */
+export const flexWords = (route: Route | null): string | null => {
+  const days = flexDaysOf(route);
+  return days === 0 ? null : `±${days} ${days === 1 ? 'day' : 'days'}`;
+};
+/** The flexible-dates tick, "My dates can move by ±5 days"; null on a route that runs fixed dates only. */
+export const flexLabel = (route: Route | null): string | null => {
+  const words = flexWords(route);
+  return words && `My dates can move by ${words}`;
+};
+/** YYYY-MM-DD plus `days`, as a calendar day (no time zone may shift it). */
+const addDays = (day: string, days: number): string => {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+};
+/**
+ * The departure field's hint: the earliest day the lead time allows, counted as the server counts it, so with
+ * flexible dates the route's flex is added (BR-F1-01, #115).
+ */
+export const departureHint = (route: Route | null, flexible: boolean): string | undefined => {
+  if (!route?.earliestDeparture || route.leadTimeDays === null) return undefined;
+  const flex = flexible ? route.dateFlexDays : 0;
+  const notice = `${route.leadTimeDays} days’ notice`;
+  return flex > 0
+    ? `Earliest departure ${formatDay(addDays(route.earliestDeparture, flex))} · ${notice}, plus ${flex} for dates that can move`
+    : `Earliest departure ${formatDay(route.earliestDeparture)} · ${notice}`;
+};
 /** The form fields each step renders; a change to any of them retires that step's saved blockers. */
 export const STEP_FIELDS: Record<FieldStep, (keyof WizardValues)[]> = {
   horses: ['horses'],
@@ -441,7 +475,8 @@ export const passRows = (
 ): PassRow[] => {
   const day = v.departureDate;
   const tooSoon = day !== null && live.some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
-  const flex = v.flexible && v.arrivalMode === 'ANY_TIME' ? ' · ±3 d' : '';
+  const days = flexDaysOf(route);
+  const flex = v.flexible && v.arrivalMode === 'ANY_TIME' && days > 0 ? ` · ±${days} d` : '';
   const departs: PassRow = !day
     ? { label: 'Departs', value: null, step: 2 }
     : tooSoon
@@ -518,7 +553,7 @@ export const reviewRows = (r: TransportRequest): ReviewRow[] => {
       ? `${ict(r.windowStart).format('D MMM YYYY')}, ${ict(r.windowStart).format('HH:mm')}–${ict(r.windowEnd).format('HH:mm')}`
       : 'Any time on the day';
   const horses = r.horses.map((h) => (h.withFoal ? `${h.name} (with foal)` : h.name)).join(', ');
-  const flex = r.dateFlexDays === 3 ? ' · ±3 days' : '';
+  const flex = r.dateFlexDays > 0 ? ` · ±${r.dateFlexDays} days` : '';
   const vet = r.vetEscort ? ' · veterinary escort' : '';
   return [
     { label: 'Horses', value: horses || dash, step: 'horses' },

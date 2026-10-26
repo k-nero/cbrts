@@ -33,9 +33,9 @@ export const queueRoute = (row: QueueRow): { title: string; by: string } => ({
   by: row.mode === 'AIR' ? 'by air' : 'by road',
 });
 
-/** "30 Oct ±3 d", or "30 Oct" for fixed dates. */
+/** "30 Oct ±3 d" with the request's own flex (#115), or "30 Oct" for fixed dates. */
 export const departsWords = (date: string, flexDays: number): string =>
-  `${shortDay(date)}${flexDays === 3 ? ' ±3 d' : ''}`;
+  `${shortDay(date)}${flexDays > 0 ? ` ±${flexDays} d` : ''}`;
 
 /** "3 of 4". */
 export const queueWords = (q: QueuePosition): string => `${q.position} of ${q.total}`;
@@ -64,7 +64,7 @@ export const reviewSummary = (r: TransportRequest & { club: string }): string =>
   const parts = serviceParts(r.mode ?? 'ROAD', r.trailer, r.airClass);
   const service = `${parts.mode.toLowerCase()}${parts.detail ? `, ${parts.detail}` : ''}`;
   const departs = r.departureDate
-    ? ` · departs ${formatDay(r.departureDate)}${r.dateFlexDays === 3 ? ' ±3 d' : ''}`
+    ? ` · departs ${formatDay(r.departureDate)}${r.dateFlexDays > 0 ? ` ±${r.dateFlexDays} d` : ''}`
     : '';
   return `${r.club} · ${n} horse${n === 1 ? '' : 's'} · ${service}${departs}`;
 };

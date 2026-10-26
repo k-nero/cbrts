@@ -15,6 +15,9 @@ import { useOriginRoutes } from '@/hooks/request';
 import type { Route } from '@/interfaces';
 import {
   alsoByLine,
+  departureHint,
+  flexLabel,
+  flexWords,
   formatDay,
   optionMeta,
   type PlaceOption,
@@ -119,6 +122,8 @@ const RouteStep: FC<StepProps> = ({
   const windowRuns = roadRuns(routes);
   const tooSoon = live.some((b) => b.code === 'LEAD_TIME_TOO_SHORT');
   const earliest = saved?.leadTime?.earliestDeparture ?? null;
+  const flexTick = flexLabel(route);
+  const flexMove = flexWords(route);
 
   const takeRoute = async (r: Route) => {
     const places = await loadPlaces(r.toCity);
@@ -210,10 +215,7 @@ const RouteStep: FC<StepProps> = ({
                 component="datepicker"
                 componentProps={{
                   format: 'D MMM YYYY',
-                  instruction:
-                    route?.earliestDeparture && route.leadTimeDays !== null
-                      ? `Earliest departure ${formatDay(route.earliestDeparture)} · ${route.leadTimeDays} days’ notice`
-                      : undefined,
+                  instruction: departureHint(route, flexible),
                 }}
               />
             </Col>
@@ -241,7 +243,9 @@ const RouteStep: FC<StepProps> = ({
                   selected={arrivalMode === 'ANY_TIME'}
                   onChange={() => set('arrivalMode', 'ANY_TIME')}
                   title="Any time on the day"
-                  description="We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days."
+                  description={`We plan the fastest safe route and tell you the expected time.${
+                    flexMove ? ` Your dates can move by ${flexMove}.` : ''
+                  }`}
                   meta={optionMeta(
                     estimate?.options.arrivalWindow.find((o) => o.value === 'false'),
                   )}
@@ -309,11 +313,14 @@ const RouteStep: FC<StepProps> = ({
                 </Callout>
               </>
             ) : (
-              <Checkbox
-                label="My dates can move by ±3 days"
-                checked={flexible}
-                onChange={(e) => set('flexible', e.target.checked)}
-              />
+              // A route that runs on fixed dates only has no tick (#115).
+              flexTick && (
+                <Checkbox
+                  label={flexTick}
+                  checked={flexible}
+                  onChange={(e) => set('flexible', e.target.checked)}
+                />
+              )
             )}
           </Group>
         </>
