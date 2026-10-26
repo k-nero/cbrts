@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -70,6 +71,8 @@ class ConvoyTest {
 
     @Mock
     private AuditService audit;
+
+    private final VehicleAvailability availability = mock(VehicleAvailability.class);
 
     private LoadPlanService service;
     private CrewAssignmentService crewService;
@@ -214,7 +217,8 @@ class ConvoyTest {
                 jobTrips,
                 routePlanService,
                 mock(BiosecurityService.class),
-                audit);
+                audit,
+                availability);
         crewService = new CrewAssignmentService(
                 crew, jobs, users, jobTrips, loadPlans, placements, audit, flightService, routePlans);
         jobService = new TransportJobService(
@@ -357,6 +361,21 @@ class ConvoyTest {
                         any(),
                         any(),
                         eq("TX-512"));
+    }
+
+    @Test
+    @DisplayName("A trailer that may not run the trip is refused with the reason, and nothing is added (US-F3-19)")
+    void unavailableTrailerRefused() {
+        Vehicle third = vehicle("TX-512");
+        when(vehicles.findById(third.getId())).thenReturn(Optional.of(third));
+        doThrow(new BusinessException("VEHICLE_UNAVAILABLE", "TX-512 doesn't run RD HCM → PNH."))
+                .when(availability)
+                .require(third, trip);
+
+        assertThatThrownBy(() -> service.addVehicle(job.getId(), third.getId(), user("Khoi", "FLEET_COORDINATOR")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("TX-512 doesn't run RD HCM → PNH.");
+        verify(jobTrips, never()).addVehicle(any(), any());
     }
 
     @Test

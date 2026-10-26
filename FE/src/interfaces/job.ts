@@ -97,6 +97,10 @@ export interface Corridor {
   dateFlexDays: number;
   /** The border crossings it takes, in order from the origin. */
   crossings: string[];
+  /** The countries it passes through, in order: ['VN', 'KH', 'TH'] (US-F3-19). */
+  countries: string[];
+  /** How many vehicles run it, on Routes; a road route nobody runs can't be planned. */
+  vehicleCount?: number | null;
 }
 
 export interface JobHorse {

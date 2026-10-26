@@ -2,11 +2,16 @@ package com.equifreight.model.fleet;
 
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
+import com.equifreight.model.route.CountryOptionResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
-@Builder
+/**
+ * A vehicle. {@code available} and {@code unavailableReason} are set only when it is listed for a trip (US-F3-19):
+ * whether it may join that trip, and why not.
+ */
+@Builder(toBuilder = true)
 public record VehicleResponse(
         UUID id,
         String code,
@@ -14,4 +19,9 @@ public record VehicleResponse(
         int payloadKg,
         VehicleStatus status,
         int stallCount,
-        List<VehicleStallResponse> stalls) {}
+        List<VehicleStallResponse> stalls,
+        CountryOptionResponse homeCountry,
+        List<CountryOptionResponse> permittedCountries,
+        List<VehicleCorridorResponse> operatingCorridors,
+        Boolean available,
+        String unavailableReason) {}

@@ -1,7 +1,11 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
+import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Country;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
+import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
@@ -20,14 +24,26 @@ import com.equifreight.model.fleet.UpdateVehicleRequest;
 import com.equifreight.model.fleet.VehicleBookingRequest;
 import com.equifreight.model.fleet.VehicleBookingResponse;
 import com.equifreight.model.fleet.VehicleResponse;
+import com.equifreight.repository.CorridorRepository;
+import com.equifreight.repository.CountryRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.TripVehicleRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import com.equifreight.repository.VehicleRepository;
 import com.equifreight.repository.VehicleStallRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,18 +60,33 @@ public class VehicleService {
     private final VehicleBookingRepository vehicleBookingRepository;
     private final TransportJobRepository transportJobRepository;
     private final JobTripService jobTrips;
+    private final CountryRepository countries;
+    private final CorridorRepository corridors;
+    private final TripVehicleRepository tripVehicles;
+    private final VehicleAvailability availability;
+    private final AuditService audit;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
             VehicleStallRepository vehicleStallRepository,
             VehicleBookingRepository vehicleBookingRepository,
             TransportJobRepository transportJobRepository,
-            JobTripService jobTrips) {
+            JobTripService jobTrips,
+            CountryRepository countries,
+            CorridorRepository corridors,
+            TripVehicleRepository tripVehicles,
+            VehicleAvailability availability,
+            AuditService audit) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
         this.transportJobRepository = transportJobRepository;
         this.jobTrips = jobTrips;
+        this.countries = countries;
+        this.corridors = corridors;
+        this.tripVehicles = tripVehicles;
+        this.availability = availability;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +101,26 @@ public class VehicleService {
                 .toList();
     }
 
+    /**
+     * The active vehicles for one of a job's trips, each marked with whether it may join it and why not (US-F3-19):
+     * those that may come first, the rest after, each group by code.
+     */
+    @Transactional(readOnly = true)
+    public List<VehicleResponse> listForTrip(UUID jobId, UUID tripId) {
+        Trip trip = jobTrips.tripOf(jobId, tripId);
+        return vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
+                .map(v -> {
+                    String reason = availability.refusalFor(v, trip).orElse(null);
+                    return FleetMapper.toResponse(v).toBuilder()
+                            .available(reason == null)
+                            .unavailableReason(reason)
+                            .build();
+                })
+                .sorted(Comparator.comparing((VehicleResponse v) -> !v.available())
+                        .thenComparing(VehicleResponse::code))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public VehicleResponse get(UUID id) {
         Vehicle vehicle = vehicleRepository
@@ -80,6 +131,15 @@ public class VehicleService {
 
     @Transactional
     public VehicleResponse create(CreateVehicleRequest request) {
+        return create(null, request);
+    }
+
+    /**
+     * Adds a vehicle with its stalls, its home country, the countries it holds permits for and its operating
+     * corridors; a corridor needs a permit for every country on it (US-F3-19).
+     */
+    @Transactional
+    public VehicleResponse create(User actor, CreateVehicleRequest request) {
         if (vehicleRepository.existsByCode(request.code())) {
             throw new ConflictException("DUPLICATE_CODE", "Vehicle with code " + request.code() + " already exists");
         }
@@ -89,6 +149,12 @@ public class VehicleService {
         vehicle.setKind(request.kind());
         vehicle.setPayloadKg(request.payloadKg());
         vehicle.setStatus(VehicleStatus.ACTIVE);
+        if (request.homeCountryId() == null) {
+            throw new BusinessException("VEHICLE_HOME_COUNTRY", "Pick the country the vehicle is based in.");
+        }
+        vehicle.setHomeCountry(country(request.homeCountryId()));
+        vehicle.setPermittedCountries(permits(vehicle.getHomeCountry(), request.permittedCountryIds()));
+        vehicle.setOperatingCorridors(operatingCorridors(vehicle, request.operatingCorridorIds()));
 
         List<VehicleStall> stalls = new ArrayList<>();
         if (request.stalls() != null && !request.stalls().isEmpty()) {
@@ -106,12 +172,33 @@ public class VehicleService {
         vehicle.setStalls(stalls);
 
         Vehicle saved = vehicleRepository.save(vehicle);
+        audit.recordDecision(
+                actor,
+                "VEHICLE_CREATED",
+                summary("Added vehicle " + saved.getCode() + ": " + countriesText(saved) + "; runs "
+                        + corridorsText(saved.getOperatingCorridors()) + "."),
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getCode(),
+                null,
+                null,
+                null);
         log.info("Created vehicle {} with {} stalls", saved.getCode(), stalls.size());
         return FleetMapper.toResponse(saved);
     }
 
     @Transactional
     public VehicleResponse update(UUID id, UpdateVehicleRequest request) {
+        return update(null, id, request);
+    }
+
+    /**
+     * Changes a vehicle. Its countries and corridors change only as a whole (US-F3-19): a corridor needs a permit for
+     * every country on it, a permit stays while one of its corridors needs it, and a corridor or the home country
+     * stays while the vehicle is on a trip that hasn't ended which depends on it. Each such change is audited.
+     */
+    @Transactional
+    public VehicleResponse update(User actor, UUID id, UpdateVehicleRequest request) {
         Vehicle vehicle = vehicleRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
@@ -123,7 +210,151 @@ public class VehicleService {
             vehicle.setStatus(request.status());
         }
 
-        return FleetMapper.toResponse(vehicleRepository.save(vehicle));
+        String before = countriesText(vehicle) + "; runs " + corridorsText(vehicle.getOperatingCorridors());
+        boolean placeChanged = false;
+        Country home = vehicle.getHomeCountry();
+        if (request.homeCountryId() != null && !request.homeCountryId().equals(idOf(home))) {
+            Country newHome = country(request.homeCountryId());
+            refuseWhileOnOpenTrip(
+                    vehicle, tripVehicles.findOpenTrips(vehicle.getId(), Instant.now()), "its home country");
+            home = newHome;
+            placeChanged = true;
+        }
+        Set<Country> permits = request.permittedCountryIds() == null && !placeChanged
+                ? vehicle.getPermittedCountries()
+                : permits(
+                        home,
+                        request.permittedCountryIds() == null
+                                ? vehicle.getPermittedCountries().stream()
+                                        .map(Country::getId)
+                                        .toList()
+                                : request.permittedCountryIds());
+        Set<Corridor> runs = request.operatingCorridorIds() == null
+                ? new HashSet<>(vehicle.getOperatingCorridors())
+                : corridorsById(request.operatingCorridorIds());
+
+        // A corridor taken off the vehicle can't be one of the trips it is still on.
+        Set<UUID> dropped = vehicle.getOperatingCorridors().stream()
+                .map(Corridor::getId)
+                .filter(c -> runs.stream().noneMatch(r -> r.getId().equals(c)))
+                .collect(Collectors.toSet());
+        if (!dropped.isEmpty()) {
+            refuseWhileOnOpenTrip(
+                    vehicle, tripVehicles.findOpenTripsOn(vehicle.getId(), dropped, Instant.now()), "that corridor");
+        }
+
+        vehicle.setHomeCountry(home);
+        vehicle.setPermittedCountries(permits);
+        // Every corridor it keeps or gains needs a permit for each of its countries; a permit taken away from a
+        // corridor it keeps is refused here, naming the corridor.
+        Set<UUID> kept =
+                vehicle.getOperatingCorridors().stream().map(Corridor::getId).collect(Collectors.toSet());
+        for (Corridor corridor : runs) {
+            vehicle.refusalToRun(corridor).ifPresent(reason -> {
+                throw new BusinessException(
+                        "VEHICLE_PERMIT",
+                        kept.contains(corridor.getId())
+                                ? reason + " Take the corridor off the vehicle first."
+                                : reason);
+            });
+        }
+        vehicle.setOperatingCorridors(runs);
+
+        Vehicle saved = vehicleRepository.save(vehicle);
+        String after = countriesText(saved) + "; runs " + corridorsText(saved.getOperatingCorridors());
+        if (!after.equals(before)) {
+            audit.recordDecision(
+                    actor,
+                    "VEHICLE_PERMITS_CHANGED",
+                    summary(saved.getCode() + ": " + before + " → " + after + "."),
+                    ENTITY_TYPE,
+                    saved.getId(),
+                    saved.getCode(),
+                    null,
+                    null,
+                    null);
+        }
+        return FleetMapper.toResponse(saved);
+    }
+
+    private static final String ENTITY_TYPE = "VEHICLE";
+    private static final int SUMMARY_MAX = 500;
+
+    private static String summary(String text) {
+        return text.length() <= SUMMARY_MAX ? text : text.substring(0, SUMMARY_MAX - 1) + "…";
+    }
+
+    private static UUID idOf(Country country) {
+        return country == null ? null : country.getId();
+    }
+
+    private Country country(UUID id) {
+        return countries.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Country", id));
+    }
+
+    /** The permitted countries; the home country is never listed, and an unknown one is refused. */
+    private Set<Country> permits(Country home, Collection<UUID> ids) {
+        Set<UUID> wanted = new LinkedHashSet<>(ids);
+        wanted.remove(idOf(home));
+        Map<UUID, Country> byId =
+                countries.findAllById(wanted).stream().collect(Collectors.toMap(Country::getId, Function.identity()));
+        for (UUID id : wanted) {
+            if (!byId.containsKey(id)) throw ResourceNotFoundException.of("Country", id);
+        }
+        return new HashSet<>(byId.values());
+    }
+
+    private Set<Corridor> corridorsById(Collection<UUID> ids) {
+        Set<UUID> wanted = new LinkedHashSet<>(ids);
+        Map<UUID, Corridor> byId =
+                corridors.findAllById(wanted).stream().collect(Collectors.toMap(Corridor::getId, Function.identity()));
+        for (UUID id : wanted) {
+            if (!byId.containsKey(id)) throw ResourceNotFoundException.of("Corridor", id);
+        }
+        return new HashSet<>(byId.values());
+    }
+
+    /** The corridors a new vehicle runs: road corridors only, each with a permit for every one of its countries. */
+    private Set<Corridor> operatingCorridors(Vehicle vehicle, Collection<UUID> ids) {
+        Set<Corridor> runs = corridorsById(ids);
+        for (Corridor corridor : runs) {
+            vehicle.refusalToRun(corridor).ifPresent(reason -> {
+                throw new BusinessException("VEHICLE_PERMIT", reason);
+            });
+        }
+        return runs;
+    }
+
+    private static void refuseWhileOnOpenTrip(Vehicle vehicle, List<Trip> open, String what) {
+        if (open.isEmpty()) return;
+        Trip trip = open.getFirst();
+        String leaving = trip.getPlannedDepartureAt() == null
+                ? ""
+                : ", leaving "
+                        + BusinessTime.SHORT_DAY.withZone(BusinessTime.ZONE).format(trip.getPlannedDepartureAt());
+        throw new BusinessException(
+                "VEHICLE_IN_USE",
+                vehicle.getCode() + " is on " + trip.getCode() + " ("
+                        + trip.getCorridor().getCode() + ")" + leaving + "; take it off that trip before changing "
+                        + what + ".");
+    }
+
+    /** "VN · KH, TH": the home country, then the permits. */
+    private static String countriesText(Vehicle vehicle) {
+        String home = vehicle.getHomeCountry() == null
+                ? "?"
+                : vehicle.getHomeCountry().getCode();
+        String permits = vehicle.getPermittedCountries().stream()
+                .map(Country::getCode)
+                .filter(Objects::nonNull)
+                .sorted()
+                .collect(Collectors.joining(", "));
+        return permits.isEmpty() ? home : home + " · " + permits;
+    }
+
+    private static String corridorsText(Collection<Corridor> runs) {
+        if (runs.isEmpty()) return "no corridor";
+        return runs.stream().map(Corridor::getCode).sorted().collect(Collectors.joining(", "));
     }
 
     @Transactional
@@ -165,6 +396,8 @@ public class VehicleService {
                     .findById(request.jobId())
                     .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + request.jobId()));
             trip = jobTrips.tripOf(job.getId());
+            // The vehicle has to be able to run the job's trip: its corridor, from where the trip starts (US-F3-19).
+            availability.require(vehicle, trip);
         }
 
         VehicleBooking booking = new VehicleBooking();

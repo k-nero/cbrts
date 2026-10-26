@@ -16,7 +16,13 @@ export const vehicleApi = {
   list: (params?: { page?: number; size?: number; sort?: string }) =>
     client.get<PagedResponse<Vehicle>>('/staff/vehicles', { params }).then((r) => r.data),
 
-  listActive: () => client.get<Vehicle[]>('/staff/vehicles/active').then((r) => r.data),
+  /** Active vehicles; for a job's trip, each says whether it may join it, those that may first (US-F3-19). */
+  listActive: (trip?: { jobId: string; tripId?: string | null }) =>
+    client
+      .get<Vehicle[]>('/staff/vehicles/active', {
+        params: trip ? { jobId: trip.jobId, tripId: trip.tripId ?? undefined } : undefined,
+      })
+      .then((r) => r.data),
 
   get: (id: string) => client.get<Vehicle>(`/staff/vehicles/${id}`).then((r) => r.data),
 

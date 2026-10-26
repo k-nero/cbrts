@@ -24,6 +24,11 @@ public final class RouteMapper {
 
     /** A route we run, as the fleet & route coordinator sees it. */
     public static CorridorResponse toCorridorResponse(Corridor corridor, List<String> crossings) {
+        return toCorridorResponse(corridor, crossings, null);
+    }
+
+    /** As above, with how many vehicles run it. */
+    public static CorridorResponse toCorridorResponse(Corridor corridor, List<String> crossings, Long vehicleCount) {
         return CorridorResponse.builder()
                 .id(corridor.getId())
                 .code(corridor.getCode())
@@ -33,6 +38,13 @@ public final class RouteMapper {
                 .distanceKm(corridor.getDistanceKm())
                 .dateFlexDays(corridor.getDateFlexDays())
                 .crossings(crossings)
+                .countries(
+                        corridor.getOriginCountry() == null
+                                ? List.of()
+                                : corridor.countries().stream()
+                                        .map(Country::getCode)
+                                        .toList())
+                .vehicleCount(vehicleCount)
                 .updatedAt(corridor.getUpdatedAt())
                 .build();
     }

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -75,6 +76,12 @@ class CatalogSeederTest {
             return c;
         });
         when(versions.save(any(RegulationVersion.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("every seeded corridor's countries agree with its border crossings (US-F3-19)")
+    void corridorCountriesAgreeWithCrossings() {
+        assertThat(CatalogSeeder.inconsistentCorridors()).isEmpty();
     }
 
     @Test

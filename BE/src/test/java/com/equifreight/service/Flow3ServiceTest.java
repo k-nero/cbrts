@@ -103,6 +103,7 @@ class Flow3ServiceTest {
     private final Trip trip = trip();
 
     private VehicleService vehicleService;
+    private final VehicleAvailability availability = mock(VehicleAvailability.class);
     private LoadPlanService loadPlanService;
     private RoutePlanService routePlanService;
     private CrewAssignmentService crewAssignmentService;
@@ -214,8 +215,21 @@ class Flow3ServiceTest {
         chosen.setVehicle(chosenVehicle);
         lenient().when(jobTrips.vehicleOf(trip)).thenReturn(Optional.of(chosen));
         lenient().when(jobTrips.vehiclesOf(trip)).thenReturn(List.of(chosen));
+        // US-F3-19's checks have their own tests (VehicleAvailabilityTest); here every vehicle may run the trip.
+        lenient()
+                .when(availability.firstAvailable(any(), any()))
+                .thenAnswer(i -> i.<List<Vehicle>>getArgument(0).getFirst());
         vehicleService = new VehicleService(
-                vehicleRepository, vehicleStallRepository, vehicleBookingRepository, transportJobRepository, jobTrips);
+                vehicleRepository,
+                vehicleStallRepository,
+                vehicleBookingRepository,
+                transportJobRepository,
+                jobTrips,
+                mock(CountryRepository.class),
+                mock(CorridorRepository.class),
+                mock(TripVehicleRepository.class),
+                availability,
+                auditService);
         routePlanService = new RoutePlanService(
                 routePlanRepository,
                 routeStopRepository,
@@ -240,7 +254,8 @@ class Flow3ServiceTest {
                 jobTrips,
                 routePlanService,
                 mock(BiosecurityService.class),
-                auditService);
+                auditService,
+                availability);
         crewAssignmentService = new CrewAssignmentService(
                 crewAssignmentRepository,
                 transportJobRepository,

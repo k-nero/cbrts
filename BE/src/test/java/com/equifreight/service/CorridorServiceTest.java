@@ -19,6 +19,7 @@ import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.VehicleRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,8 @@ class CorridorServiceTest {
                 mock(CorridorCrossingRepository.class),
                 mock(PlaceRepository.class),
                 mock(BorderCrossingRepository.class),
-                audit);
+                audit,
+                mock(VehicleRepository.class));
         hcmPnh = new Corridor();
         hcmPnh.setId(ID);
         hcmPnh.setCode("RD HCM → PNH");

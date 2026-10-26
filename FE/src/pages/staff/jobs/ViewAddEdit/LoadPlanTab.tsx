@@ -28,12 +28,13 @@ import {
   useConfirmLoadPlan,
   useCreateLoadPlan,
   useJobDetail,
+  useJobTrip,
   useMoveHorse,
   useRemoveTrailer,
   useSignOffTripPlan,
 } from '@/hooks/useJob';
 import { useActiveVehicles } from '@/hooks/useVehicle';
-import type { JobDetail, JobHorse, LoadPlanStall } from '@/interfaces';
+import type { JobDetail, JobHorse, LoadPlanStall, Vehicle } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
 
 interface Props {
@@ -60,6 +61,22 @@ const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
   };
 };
 
+/**
+ * A vehicle in a trailer picker: its code, kind and stalls; one that may not join the trip is
+ * disabled, with the reason in place of a choice (US-F3-19).
+ */
+const vehicleOption = (v: Vehicle) => {
+  const label = `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`;
+  return v.available === false
+    ? {
+        value: v.id,
+        disabled: true,
+        title: v.unavailableReason ?? undefined,
+        label: `${label} · Not available: ${v.unavailableReason ?? 'it can’t run this trip'}`,
+      }
+    : { value: v.id, label };
+};
+
 export function LoadPlanTab({ job }: Props) {
   const loadPlan = job.loadPlan;
   const [selected, setSelected] = useState<Picked | null>(null);
@@ -67,7 +84,12 @@ export function LoadPlanTab({ job }: Props) {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [trailerToAdd, setTrailerToAdd] = useState<string>();
 
-  const { data: activeVehicles, isLoading: loadingVehicles } = useActiveVehicles();
+  // The vehicles for this trip, each saying whether it may join it and why not (US-F3-19).
+  const tripId = useJobTrip();
+  const { data: activeVehicles, isLoading: loadingVehicles } = useActiveVehicles({
+    jobId: job.id,
+    tripId,
+  });
   const createLoadPlanMutation = useCreateLoadPlan(job.id);
   const moveMutation = useMoveHorse(job.id);
   const autoArrangeMutation = useAutoArrange(job.id);
@@ -137,7 +159,7 @@ export function LoadPlanTab({ job }: Props) {
   }
 
   if (!loadPlan) {
-    const defaultVehicle = activeVehicles?.[0];
+    const defaultVehicle = activeVehicles?.find((v) => v.available !== false);
     const vehicleToUse = selectedVehicleId || defaultVehicle?.id;
 
     return (
@@ -177,18 +199,28 @@ export function LoadPlanTab({ job }: Props) {
                         placeholder="Choose a vehicle"
                         value={vehicleToUse || undefined}
                         onChange={setSelectedVehicleId}
-                        options={activeVehicles?.map((v) => ({
-                          value: v.id,
-                          label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
-                        }))}
+                        notFoundContent="No active vehicle"
+                        options={activeVehicles?.map(vehicleOption)}
                       />
+                      {activeVehicles &&
+                        activeVehicles.length > 0 &&
+                        !activeVehicles.some((v) => v.available !== false) && (
+                          <span className="type-body-s text-bad">
+                            No vehicle can run this trip yet. Assign one to its corridor on the
+                            Vehicles page, or free one up.
+                          </span>
+                        )}
                     </Flex>
 
                     <Button
                       variant="primary"
                       size="md"
                       disabled={!vehicleToUse || createLoadPlanMutation.isPending}
-                      onClick={() => createLoadPlanMutation.mutate(vehicleToUse)}
+                      onClick={() =>
+                        createLoadPlanMutation.mutate(vehicleToUse, {
+                          onError: reportRefusal('The load plan couldn’t be created. Try again.'),
+                        })
+                      }
                     >
                       {createLoadPlanMutation.isPending
                         ? 'Creating load plan…'
@@ -428,10 +460,7 @@ export function LoadPlanTab({ job }: Props) {
                         value={trailerToAdd}
                         onChange={setTrailerToAdd}
                         disabled={spareVehicles.length === 0}
-                        options={spareVehicles.map((v) => ({
-                          value: v.id,
-                          label: `${v.code} · ${v.kind} (${v.stalls?.length || v.stallCount || 0} stalls)`,
-                        }))}
+                        options={spareVehicles.map(vehicleOption)}
                       />
                       <Button
                         variant="secondary"

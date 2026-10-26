@@ -5,6 +5,9 @@ import com.equifreight.entity.Trip;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
+import com.equifreight.model.route.CountryOptionResponse;
+import com.equifreight.model.route.RouteMapper;
+import java.util.Comparator;
 import java.util.List;
 
 public final class FleetMapper {
@@ -22,6 +25,16 @@ public final class FleetMapper {
                 .status(vehicle.getStatus())
                 .stallCount(stalls.size())
                 .stalls(stalls)
+                .homeCountry(
+                        vehicle.getHomeCountry() == null ? null : RouteMapper.toCountryOption(vehicle.getHomeCountry()))
+                .permittedCountries(vehicle.getPermittedCountries().stream()
+                        .map(RouteMapper::toCountryOption)
+                        .sorted(Comparator.comparing(CountryOptionResponse::code))
+                        .toList())
+                .operatingCorridors(vehicle.getOperatingCorridors().stream()
+                        .map(c -> new VehicleCorridorResponse(c.getId(), c.getCode()))
+                        .sorted(Comparator.comparing(VehicleCorridorResponse::code))
+                        .toList())
                 .build();
     }
 

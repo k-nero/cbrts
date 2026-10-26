@@ -1,8 +1,14 @@
-import { type FC, useEffect } from 'react';
+import { type FC, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
-import { defaultStalls, KIND_OPTIONS, STALL_COUNT_OPTIONS } from '../vehicleOptions';
+import {
+  corridorOptions,
+  countryOptions,
+  defaultStalls,
+  KIND_OPTIONS,
+  STALL_COUNT_OPTIONS,
+} from '../vehicleOptions';
 import { type VehicleForm, vehicleSchema } from './schema';
 
 import { CancelButton } from '@/components/form/CancelButton';
@@ -10,6 +16,8 @@ import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import BaseModal from '@/components/modal/BaseModal';
 import type { UseCrudResourceResult } from '@/hooks/crud';
+import { useCountries } from '@/hooks/routeCatalog';
+import { useCorridors } from '@/hooks/useJob';
 import type { CreateVehicleInput, Vehicle, VehicleKind } from '@/interfaces';
 import { apiErrorMessage } from '@/lib';
 
@@ -19,10 +27,17 @@ type Props = {
   onClose: () => void;
 };
 
-/** Add vehicle (US-F3-02): the vehicle and its starting stall layout. */
+/**
+ * Add vehicle (US-F3-02, US-F3-19): the vehicle, its starting stall layout, where it is based, the
+ * countries it holds permits for and the road corridors it works.
+ */
 const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
   const { message } = App.useApp();
   const methods = useFormCustom<VehicleForm>({ resolver: zodResolver(vehicleSchema) });
+  const countries = useCountries();
+  const corridors = useCorridors(open);
+  const countryChoices = useMemo(() => countryOptions(countries.data), [countries.data]);
+  const corridorChoices = useMemo(() => corridorOptions(corridors.data), [corridors.data]);
 
   useEffect(() => {
     if (!open) return;
@@ -31,6 +46,9 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
       kind: KIND_OPTIONS[0],
       payloadKg: 3200,
       stallCount: STALL_COUNT_OPTIONS[1],
+      homeCountry: null,
+      permittedCountries: [],
+      operatingCorridors: [],
     });
   }, [methods, open]);
 
@@ -41,6 +59,9 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
         kind: v.kind?.value as VehicleKind,
         payloadKg: v.payloadKg,
         stalls: defaultStalls(Number(v.stallCount?.value)),
+        homeCountryId: v.homeCountry?.value ?? '',
+        permittedCountryIds: (v.permittedCountries ?? []).map((c) => c.value),
+        operatingCorridorIds: (v.operatingCorridors ?? []).map((c) => c.value),
       });
       void message.success(`${created.code} added to the fleet.`);
       onClose();
@@ -92,6 +113,41 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
               label="Payload (kg)"
               component="number"
               componentProps={{ isRequired: true, min: 500, max: 40000, step: 100 }}
+            />
+            <FormField
+              name="homeCountry"
+              label="Based in"
+              component="select"
+              componentProps={{
+                isRequired: true,
+                options: countryChoices,
+                isLoading: countries.isPending,
+                placeholder: 'Pick a country',
+              }}
+            />
+            <FormField
+              name="permittedCountries"
+              label="Permits for"
+              component="select"
+              componentProps={{
+                isMulti: true,
+                options: countryChoices,
+                isLoading: countries.isPending,
+                placeholder: 'No other country',
+                instruction: 'The foreign countries it may drive in.',
+              }}
+            />
+            <FormField
+              name="operatingCorridors"
+              label="Corridors it works"
+              component="select"
+              componentProps={{
+                isRequired: true,
+                isMulti: true,
+                options: corridorChoices,
+                isLoading: corridors.isPending,
+                instruction: 'It needs a permit for every country a corridor passes through.',
+              }}
             />
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />

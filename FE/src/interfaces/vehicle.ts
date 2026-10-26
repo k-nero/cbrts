@@ -1,4 +1,5 @@
 import type { BaseEntity } from './api';
+import type { CountryOption } from './route';
 
 export const VehicleKindEnum = {
   TRAILER: 'TRAILER',
@@ -41,6 +42,15 @@ export interface Vehicle extends BaseEntity {
   status: VehicleStatus;
   stallCount: number;
   stalls: VehicleStall[];
+  /** Where it is based, and where it is when it has run no trip yet (US-F3-19). */
+  homeCountry: CountryOption;
+  /** The foreign countries it holds a permit for. */
+  permittedCountries: CountryOption[];
+  /** The road corridors it works; a road trip takes it only on one of these. */
+  operatingCorridors: { id: string; code: string }[];
+  /** Listed for a trip only: whether it may join that trip, and why not. */
+  available?: boolean | null;
+  unavailableReason?: string | null;
 }
 
 export interface VehicleBooking extends BaseEntity {
@@ -69,11 +79,18 @@ export interface CreateVehicleInput {
     side: StallSide;
     nearRamp: boolean;
   }[];
+  homeCountryId: string;
+  permittedCountryIds: string[];
+  operatingCorridorIds: string[];
 }
 
+/** A missing field stays as it is; a list replaces the whole set. */
 export interface UpdateVehicleInput {
   payloadKg?: number;
   status?: VehicleStatus;
+  homeCountryId?: string;
+  permittedCountryIds?: string[];
+  operatingCorridorIds?: string[];
 }
 
 export interface VehicleBookingInput {

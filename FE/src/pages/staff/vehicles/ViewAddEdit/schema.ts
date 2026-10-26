@@ -4,15 +4,58 @@ import { z } from 'zod';
 const option = (message: string) =>
   z.object({ label: z.string(), value: z.string() }, message).nullable();
 
-/** Add vehicle: the code, kind and payload, and how many stalls it starts with. */
+const options = z.array(z.object({ label: z.string(), value: z.string() })).nullable();
+
+/** Where a vehicle is based, the countries it holds permits for and the corridors it works (US-F3-19). */
+const permitFields = {
+  homeCountry: option('Pick the country the vehicle is based in.'),
+  permittedCountries: options,
+  operatingCorridors: options,
+};
+
+const checkPermits = (
+  v: {
+    homeCountry: { value: string } | null;
+    permittedCountries: { value: string }[] | null;
+    operatingCorridors: unknown[] | null;
+  },
+  ctx: z.RefinementCtx,
+) => {
+  if (v.homeCountry === null)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['homeCountry'],
+      message: 'Pick the country the vehicle is based in.',
+    });
+  if (v.homeCountry && v.permittedCountries?.some((c) => c.value === v.homeCountry?.value))
+    ctx.addIssue({
+      code: 'custom',
+      path: ['permittedCountries'],
+      message: 'The home country needs no permit; take it out of this list.',
+    });
+  if (!v.operatingCorridors?.length)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['operatingCorridors'],
+      message: 'Pick at least one corridor the vehicle works.',
+    });
+};
+
+/** Edit countries and corridors: the vehicle's home country, permits and operating corridors. */
+export const permitsSchema = z.object(permitFields).superRefine(checkPermits);
+export type PermitsForm = z.infer<typeof permitsSchema>;
+
+/** Add vehicle: the code, kind and payload, how many stalls it starts with, and its countries. */
 export const vehicleSchema = z
   .object({
     code: z.string().trim().min(1, 'Enter the vehicle code, e.g. TX-550.').max(20),
     kind: option('Pick trailer or truck.'),
     payloadKg: z.number('Enter the payload in kg.').int().min(500, 'At least 500 kg.').max(40000),
     stallCount: option('Pick how many stalls.'),
+    ...permitFields,
   })
   .superRefine((v, ctx) => {
+    checkPermits(v, ctx);
     if (v.kind === null)
       ctx.addIssue({ code: 'custom', path: ['kind'], message: 'Pick trailer or truck.' });
     if (v.stallCount === null)

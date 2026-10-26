@@ -1,15 +1,24 @@
 import { useMemo } from 'react';
 import { App, Flex, type TableColumnsType } from 'antd';
 
-import { KIND_LABEL, STALL_TYPES, STATUS_CHIP } from './vehicleOptions';
+import { countriesText, KIND_LABEL, STALL_TYPES, STATUS_CHIP } from './vehicleOptions';
 
 import { Button, Chip, Icon } from '@/components/ui';
 import { useUpdateVehicle } from '@/hooks/useVehicle';
 import { type Vehicle, VehicleStatusEnum } from '@/interfaces';
 import { apiErrorMessage } from '@/lib';
 
-/** Vehicles columns: the vehicle, its stalls by type, payload, status, then the row actions. */
-export const useGeneratedVehicleColumn = ({ onBook }: { onBook: (v: Vehicle) => void }) => {
+/**
+ * Vehicles columns: the vehicle, its stalls by type, payload, where it is based and its permits, the
+ * corridors it works, status, then the row actions.
+ */
+export const useGeneratedVehicleColumn = ({
+  onBook,
+  onEditPermits,
+}: {
+  onBook: (v: Vehicle) => void;
+  onEditPermits: (v: Vehicle) => void;
+}) => {
   const { message } = App.useApp();
   const update = useUpdateVehicle();
 
@@ -81,6 +90,27 @@ export const useGeneratedVehicleColumn = ({ onBook }: { onBook: (v: Vehicle) => 
         ),
       },
       {
+        title: 'Countries',
+        key: 'countries',
+        width: 170,
+        render: (_, v) => <span className="type-data text-ink">{countriesText(v)}</span>,
+      },
+      {
+        title: 'Corridors',
+        key: 'corridors',
+        width: 240,
+        render: (_, v) => {
+          const codes = (v.operatingCorridors ?? []).map((c) => c.code);
+          if (codes.length === 0) return <span className="type-body-s text-ink-3">None</span>;
+          const shown = codes.slice(0, 2).join(', ');
+          return (
+            <span className="type-body-s text-ink-2" title={codes.join(', ')}>
+              {codes.length > 2 ? `${shown} and ${codes.length - 2} more` : shown}
+            </span>
+          );
+        },
+      },
+      {
         title: 'Status',
         key: 'status',
         dataIndex: 'status',
@@ -93,12 +123,15 @@ export const useGeneratedVehicleColumn = ({ onBook }: { onBook: (v: Vehicle) => 
       },
       {
         key: 'actions',
-        width: 240,
+        width: 360,
         render: (_, v) =>
           v.status === VehicleStatusEnum.RETIRED ? null : (
             <Flex gap={8}>
               <Button variant="secondary" size="sm" onClick={() => onBook(v)}>
                 Book slot
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onEditPermits(v)}>
+                Countries and corridors
               </Button>
               <Button
                 variant="ghost"
@@ -112,5 +145,5 @@ export const useGeneratedVehicleColumn = ({ onBook }: { onBook: (v: Vehicle) => 
           ),
       },
     ];
-  }, [message, onBook, update]);
+  }, [message, onBook, onEditPermits, update]);
 };

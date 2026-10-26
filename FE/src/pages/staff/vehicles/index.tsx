@@ -4,6 +4,7 @@ import { Button, Col, Flex, Row } from 'antd';
 
 import AddVehicleModal from './ViewAddEdit/AddVehicleModal';
 import BookVehicleModal from './ViewAddEdit/BookVehicleModal';
+import EditPermitsModal from './ViewAddEdit/EditPermitsModal';
 import VehicleList from './VehicleList';
 
 import PageHeader from '@/components/PageHeader';
@@ -23,11 +24,13 @@ const VehiclesPage = () => {
   const active = useActiveVehicles();
   const [adding, setAdding] = useState(false);
   const [booking, setBooking] = useState<Vehicle | null>(null);
+  const [editing, setEditing] = useState<Vehicle | null>(null);
   const { listQuery, pageState, setPageState } = crud;
   const total = listQuery.data?.totalElements;
   const activeCount = active.data?.length;
   const sort = pageState.sort;
   const onBook = useCallback((v: Vehicle) => setBooking(v), []);
+  const onEditPermits = useCallback((v: Vehicle) => setEditing(v), []);
 
   return (
     <Flex vertical gap={28}>
@@ -95,10 +98,11 @@ const VehiclesPage = () => {
       </Flex>
 
       {/* Loading is the table's own spinner; a failed load goes to the error boundary. */}
-      <VehicleList crud={crud} onBook={onBook} />
+      <VehicleList crud={crud} onBook={onBook} onEditPermits={onEditPermits} />
 
       <AddVehicleModal open={adding} crud={crud} onClose={() => setAdding(false)} />
       <BookVehicleModal vehicle={booking} onClose={() => setBooking(null)} />
+      <EditPermitsModal vehicle={editing} onClose={() => setEditing(null)} />
     </Flex>
   );
 };

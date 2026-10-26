@@ -9,12 +9,13 @@ import type { CreateVehicleInput, Vehicle } from '@/interfaces';
 type Props = {
   crud: UseCrudResourceResult<Vehicle, CreateVehicleInput>;
   onBook: (vehicle: Vehicle) => void;
+  onEditPermits: (vehicle: Vehicle) => void;
 };
 
 /** The fleet, paged and sorted by the server (code, A to Z, until a header is clicked). */
-const VehicleList: FC<Props> = ({ crud, onBook }) => {
+const VehicleList: FC<Props> = ({ crud, onBook, onEditPermits }) => {
   const { listQuery, pageState, setPageState } = crud;
-  const columns = useGeneratedVehicleColumn({ onBook });
+  const columns = useGeneratedVehicleColumn({ onBook, onEditPermits });
   return (
     <Table<Vehicle>
       id="vehicles"

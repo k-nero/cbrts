@@ -18,6 +18,8 @@ import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
+import com.equifreight.repository.VehicleRepository;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,25 +51,34 @@ public class CorridorService {
     private final PlaceRepository places;
     private final BorderCrossingRepository crossings;
     private final AuditService audit;
+    private final VehicleRepository vehicles;
 
     public CorridorService(
             CorridorRepository corridors,
             CorridorCrossingRepository corridorCrossings,
             PlaceRepository places,
             BorderCrossingRepository crossings,
-            AuditService audit) {
+            AuditService audit,
+            VehicleRepository vehicles) {
         this.corridors = corridors;
         this.corridorCrossings = corridorCrossings;
         this.places = places;
         this.crossings = crossings;
         this.audit = audit;
+        this.vehicles = vehicles;
     }
 
     @Transactional(readOnly = true)
     public Page<CorridorResponse> list(Pageable pageable) {
         Page<Corridor> page = corridors.findAll(pageable);
         Map<UUID, List<String>> names = crossingNames(page.map(Corridor::getId).getContent());
-        return page.map(c -> RouteMapper.toCorridorResponse(c, names.getOrDefault(c.getId(), List.of())));
+        Map<UUID, Long> running = new HashMap<>();
+        for (Object[] row :
+                vehicles.countRunningByCorridor(page.map(Corridor::getId).getContent())) {
+            running.put((UUID) row[0], (Long) row[1]);
+        }
+        return page.map(c -> RouteMapper.toCorridorResponse(
+                c, names.getOrDefault(c.getId(), List.of()), c.isRoad() ? running.getOrDefault(c.getId(), 0L) : null));
     }
 
     /**
@@ -113,6 +124,8 @@ public class CorridorService {
         corridor.setDestinationCity(destination);
         corridor.setDistanceKm(request.distanceKm());
         corridor.setDateFlexDays(request.dateFlexDays().shortValue());
+        corridor.setOriginCountry(from);
+        corridor.setDestinationCountry(to);
         for (int i = 0; i < route.size(); i++) {
             CorridorCrossing cc = new CorridorCrossing();
             cc.setCorridor(corridor);

@@ -35,6 +35,7 @@ public class LoadPlanService {
     private final RoutePlanService routePlanService;
     private final BiosecurityService biosecurity;
     private final AuditService auditService;
+    private final VehicleAvailability availability;
 
     public LoadPlanService(
             LoadPlanRepository loadPlanRepository,
@@ -47,7 +48,8 @@ public class LoadPlanService {
             JobTripService jobTrips,
             RoutePlanService routePlanService,
             BiosecurityService biosecurity,
-            AuditService auditService) {
+            AuditService auditService,
+            VehicleAvailability availability) {
         this.loadPlanRepository = loadPlanRepository;
         this.loadPlanStallRepository = loadPlanStallRepository;
         this.transportJobRepository = transportJobRepository;
@@ -59,6 +61,7 @@ public class LoadPlanService {
         this.routePlanService = routePlanService;
         this.biosecurity = biosecurity;
         this.auditService = auditService;
+        this.availability = availability;
     }
 
     /**
@@ -124,8 +127,8 @@ public class LoadPlanService {
     }
 
     /**
-     * Starts the trip's load on {@code vehicleId}, or on the first active vehicle. When the trip has a vehicle
-     * already, this changes the first trailer's vehicle instead.
+     * Starts the trip's load on {@code vehicleId}, or on the first vehicle that may run the trip (US-F3-19). When the
+     * trip has a vehicle already, this changes the first trailer's vehicle instead.
      */
     @Transactional
     public TripLoadResponse createLoadPlan(UUID jobId, UUID vehicleId) {
@@ -137,12 +140,15 @@ public class LoadPlanService {
     public TripLoadResponse createLoadPlan(UUID jobId, UUID tripId, UUID vehicleId) {
         TransportJob job = job(jobId);
         Trip trip = jobTrips.tripOf(jobId, tripId);
-        Vehicle vehicle = vehicleId != null
-                ? vehicle(vehicleId)
-                : vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE).stream()
-                        .findFirst()
-                        .orElseThrow(() -> new BusinessException("No active vehicles available to create load plan"));
-        activeVehicle(vehicle, "used for load plan");
+        Vehicle vehicle;
+        if (vehicleId != null) {
+            vehicle = activeVehicle(vehicle(vehicleId), "used for load plan");
+            availability.require(vehicle, trip);
+        } else {
+            List<Vehicle> active = vehicleRepository.findAllByStatus(VehicleStatus.ACTIVE);
+            if (active.isEmpty()) throw new BusinessException("No active vehicles available to create load plan");
+            vehicle = availability.firstAvailable(active, trip);
+        }
 
         Optional<TripVehicle> first = jobTrips.vehicleOf(trip);
         if (first.isPresent()) {
@@ -171,6 +177,7 @@ public class LoadPlanService {
         TransportJob job = job(jobId);
         Trip trip = jobTrips.tripOf(jobId, tripId);
         Vehicle vehicle = activeVehicle(vehicle(vehicleId), "used for load plan");
+        availability.require(vehicle, trip);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
         LoadPlan plan = tripVehicleId == null ? plans.getFirst() : planOf(plans, tripVehicleId);
         if (!plan.getVehicle().getId().equals(vehicle.getId())) {
@@ -209,6 +216,7 @@ public class LoadPlanService {
         requireNotDeparted(job, tripId, "add a trailer");
         Trip trip = jobTrips.tripOf(jobId, tripId);
         Vehicle vehicle = activeVehicle(vehicle(vehicleId), "added to the trip");
+        availability.require(vehicle, trip);
         List<LoadPlan> plans = lockedPlans(trip, jobId);
 
         LoadPlan plan = new LoadPlan();
@@ -676,6 +684,8 @@ public class LoadPlanService {
                 throw new BusinessException("Vehicle " + plan.getVehicle().getCode() + " is currently in "
                         + plan.getVehicle().getStatus() + " and cannot be confirmed for load plan");
             }
+            // Its corridors, its location and its other bookings may have changed since it was chosen (US-F3-19).
+            availability.require(plan.getVehicle(), trip);
         }
 
         TripLoadResponse state = buildResponse(trip, plans, job);

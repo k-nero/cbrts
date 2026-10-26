@@ -4,9 +4,12 @@ import { Flex, type TableColumnsType } from 'antd';
 import { flexWords, MODE_LABEL } from './routeOptions';
 
 import { Chip } from '@/components/ui';
-import type { Corridor } from '@/interfaces';
+import { type Corridor, TransportModeEnum } from '@/interfaces';
 
-/** Routes columns: the route, mode, border crossings, distance and flexible dates. */
+/**
+ * Routes columns: the route, mode, border crossings, distance, flexible dates, and how many vehicles
+ * run it (US-F3-19): a road route nobody runs can't be planned.
+ */
 export const useGeneratedCorridorColumn = () =>
   useMemo<TableColumnsType<Corridor>>(
     () => [
@@ -61,6 +64,22 @@ export const useGeneratedCorridorColumn = () =>
         width: 140,
         sorter: true,
         render: (_, c) => <span className="type-body-s text-ink">{flexWords(c.dateFlexDays)}</span>,
+      },
+      {
+        title: 'Vehicles',
+        key: 'vehicleCount',
+        width: 150,
+        render: (_, c) => {
+          if (c.mode !== TransportModeEnum.ROAD) {
+            return <span className="type-body-s text-ink-3">Flown</span>;
+          }
+          const count = c.vehicleCount ?? 0;
+          return count === 0 ? (
+            <Chip tone="warn">No vehicle yet</Chip>
+          ) : (
+            <span className="type-data text-ink">{count}</span>
+          );
+        },
       },
     ],
     [],
