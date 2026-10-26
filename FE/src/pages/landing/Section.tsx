@@ -21,7 +21,7 @@ export const Section: FC<{ id: string; title: string; summary?: string; children
   >
     <Flex vertical gap={32}>
       <motion.header variants={rise} className="flex flex-col gap-2.5">
-        <h2 id={id} className="type-display-l m-0 text-ink">
+        <h2 id={id} className="type-display-m md:type-display-l m-0 text-ink">
           {title}
         </h2>
         {summary && <p className="type-body-m m-0 max-w-[680px] text-ink-2">{summary}</p>}

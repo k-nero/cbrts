@@ -56,13 +56,13 @@ const truck = {
 export const TravelPass: FC = () => (
   <motion.aside
     aria-label="Example travel pass: Ho Chi Minh City to Phnom Penh"
-    className="flex w-[520px] shrink-0 overflow-hidden rounded-xl bg-card shadow-overlay"
+    className="flex w-full max-w-[520px] shrink-0 flex-col overflow-hidden sm:flex-row rounded-xl bg-card shadow-overlay"
     variants={rise}
     initial="hidden"
     whileInView="shown"
     viewport={IN_VIEW}
   >
-    <div className="min-w-0 flex-1 py-6 pr-6 pl-7">
+    <div className="min-w-0 flex-1 px-5 py-6 sm:pr-6 sm:pl-7">
       <Flex vertical gap={18}>
         <Flex align="center" justify="space-between">
           <span className="type-label-s text-ink-3">Travel pass</span>
@@ -114,8 +114,9 @@ export const TravelPass: FC = () => (
         </Flex>
       </Flex>
     </div>
-    <Perforation />
-    <div className="w-[140px] shrink-0 bg-sunken px-[18px] py-6">
+    <Perforation className="hidden sm:block" />
+    <Perforation direction="horizontal" className="sm:hidden" />
+    <div className="shrink-0 bg-sunken px-[18px] py-6 sm:w-[140px]">
       <Flex vertical justify="space-between" gap={12} className="h-full">
         <Flex vertical gap={8}>
           <motion.span
