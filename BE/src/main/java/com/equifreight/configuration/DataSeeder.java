@@ -565,11 +565,16 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private void seedDemoJobs() {
+        // The demo job is seeded once per database: an existing CBRT counter means it was seeded before,
+        // so a demo job someone deleted on purpose stays deleted across restarts.
+        boolean seededBefore = codeCounterRepository
+                .findByPrefixAndYear(CodePrefix.CBRT, (short) 2026)
+                .isPresent();
         advanceCodeCounter(CodePrefix.REQ, (short) 2026, 193);
         advanceCodeCounter(CodePrefix.Q, (short) 2026, 188);
         advanceCodeCounter(CodePrefix.CBRT, (short) 2026, 41);
 
-        if (transportJobRepository.findByCode("CBRT-2026-041").isPresent()) {
+        if (seededBefore || transportJobRepository.findByCode("CBRT-2026-041").isPresent()) {
             return;
         }
 

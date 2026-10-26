@@ -142,7 +142,7 @@ public class Snapshots {
                 rows,
                 fit == null || fit.refusal() != null
                         ? null
-                        : new QuotationSnapshot.Fit(fit.positions(), fit.widthUsedIn()),
+                        : new QuotationSnapshot.Fit(fit.positions(), fit.widthUsedIn(), fit.totalWeightKg()),
                 stallNote(in, rates, quote),
                 facts);
     }

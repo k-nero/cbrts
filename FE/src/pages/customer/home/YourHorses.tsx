@@ -7,7 +7,11 @@ import type { CustomerHome } from '@/interfaces';
 /* ---------- your horses ---------- */
 
 /** Coat swatch, name and breed line, documents cleared, and the one thing a horse waits on. */
-export const YourHorses: FC<{ home: CustomerHome; onAll: () => void }> = ({ home, onAll }) => (
+export const YourHorses: FC<{ home: CustomerHome; onAll: () => void; onAdd: () => void }> = ({
+  home,
+  onAll,
+  onAdd,
+}) => (
   <Panel
     title={
       <Flex vertical gap={2}>
@@ -17,6 +21,16 @@ export const YourHorses: FC<{ home: CustomerHome; onAll: () => void }> = ({ home
     }
     className="self-start"
   >
+    {home.horses.length === 0 && (
+      <Flex vertical align="start" gap={12} className="border-t border-line py-4">
+        <p className="type-body-s m-0 text-ink-2">
+          Add each horse once; every request then picks from them.
+        </p>
+        <Button size="sm" variant="secondary" leadingIcon="plus" onClick={onAdd}>
+          Add a horse
+        </Button>
+      </Flex>
+    )}
     <ul className="m-0 -mt-1 list-none p-0">
       {home.horses.map((h) => (
         <li key={h.id} className="border-t border-line py-3">

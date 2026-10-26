@@ -3,6 +3,7 @@ package com.equifreight.service.pricing;
 import static com.equifreight.service.pricing.PricingFixtures.air;
 import static com.equifreight.service.pricing.PricingFixtures.classRow;
 import static com.equifreight.service.pricing.PricingFixtures.d;
+import static com.equifreight.service.pricing.PricingFixtures.estimateOf;
 import static com.equifreight.service.pricing.PricingFixtures.foal;
 import static com.equifreight.service.pricing.PricingFixtures.horse;
 import static com.equifreight.service.pricing.PricingFixtures.kmLine;
@@ -13,6 +14,7 @@ import static com.equifreight.service.pricing.PricingFixtures.pnhHkgRates;
 import static com.equifreight.service.pricing.PricingFixtures.rates;
 import static com.equifreight.service.pricing.PricingFixtures.road;
 import static com.equifreight.service.pricing.PricingFixtures.sexLine;
+import static com.equifreight.service.pricing.PricingFixtures.withPolicy;
 import static com.equifreight.service.pricing.PricingFixtures.withWindow;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -84,7 +86,8 @@ class QuotePricerTest {
                 true,
                 in.quarantineDays(),
                 in.horses(),
-                in.arrivalWindow());
+                in.arrivalWindow(),
+                true);
     }
 
     private static PricingInput withDays(PricingInput in, Integer days) {
@@ -102,7 +105,8 @@ class QuotePricerTest {
                 in.vetEscort(),
                 days,
                 in.horses(),
-                in.arrivalWindow());
+                in.arrivalWindow(),
+                true);
     }
 
     private static PricingInput withInsurance(PricingInput in, InsuranceOption insurance) {
@@ -120,7 +124,8 @@ class QuotePricerTest {
                 in.vetEscort(),
                 in.quarantineDays(),
                 in.horses(),
-                in.arrivalWindow());
+                in.arrivalWindow(),
+                true);
     }
 
     @Test
@@ -179,7 +184,7 @@ class QuotePricerTest {
         assertThat(waiting.estimateNote()).isEqualTo("Billed by the hour if the flight or border queue runs late.");
         assertThat(waiting.basisText()).isEqualTo("per hour · 2 h estimated");
 
-        assertThat(quote.fit()).isEqualTo(new StallFit(1, 96, null, List.of()));
+        assertThat(quote.fit()).isEqualTo(new StallFit(1, 96, null, List.of(), 1000));
     }
 
     @Test
@@ -298,7 +303,7 @@ class QuotePricerTest {
 
         PricedQuote quote = QuotePricer.price(three, pnhHkgRates());
 
-        assertThat(quote.fit()).isEqualTo(new StallFit(2, 144, null, List.of()));
+        assertThat(quote.fit()).isEqualTo(new StallFit(2, 144, null, List.of(), 1500));
         assertThat(find(quote, "Air stall position").amount()).isEqualByComparingTo("33600.00");
         assertThat(find(quote, "Air stall position").basisText())
                 .isEqualTo("business gives each horse 48 in · 3 × 48 in = 144 in = 2 positions");
@@ -315,6 +320,155 @@ class QuotePricerTest {
         assertThat(quote.fit().refusal()).isEqualTo("Lotus Crown is size XL (96 in); business gives 48 in.");
         assertThat(quote.fit().achievableClasses()).containsExactly(ServiceClass.FIRST);
         assertThat(quote.totals().total()).isNull();
+    }
+
+    // --- weight (BR-Q-16) -----------------------------------------------------------------------------------
+
+    @Test
+    void theFitCarriesTheTotalWeight() {
+        PricingInput one = air(ServiceClass.BUSINESS, List.of(horse("Nightfall", HorseSex.MARE, "M", 32, "1000")));
+
+        PricedQuote quote = QuotePricer.price(one, pnhHkgRates());
+
+        assertThat(quote.fit()).isEqualTo(new StallFit(1, 48, null, List.of(), 500));
+        assertThat(find(quote, "Air stall position")).isNotNull();
+    }
+
+    @Test
+    void aHorseWithoutAWeightIsRefused() {
+        PricingInput unweighed =
+                air(ServiceClass.BUSINESS, List.of(horse("Storm", HorseSex.GELDING, "M", 32, "1000", null)));
+
+        PricedQuote quote = QuotePricer.price(unweighed, pnhHkgRates());
+
+        assertThat(quote.fit().refusal())
+                .isEqualTo("Storm's weight isn't on the request, so the stall load can't be checked.");
+        assertThat(quote.fit().achievableClasses()).isEmpty();
+        assertThat(find(quote, "Air stall position")).isNull();
+        assertThat(quote.totals().total()).isNull();
+    }
+
+    @Test
+    void theEstimateDoesNotRefuseAMissingWeight() {
+        PricingInput unweighed = estimateOf(
+                air(ServiceClass.BUSINESS, List.of(horse("Storm", HorseSex.GELDING, "M", 32, "1000", null))));
+
+        StallFit fit = QuotePricer.fit(unweighed, pnhHkgRates());
+
+        assertThat(fit.refusal()).isNull();
+        assertThat(fit.totalWeightKg()).isNull();
+    }
+
+    @Test
+    void aStallTooHeavyInEconomyFitsBusiness() {
+        PricingInput heavy = air(
+                ServiceClass.ECONOMY,
+                List.of(
+                        horse("One", HorseSex.MARE, "M", 32, "1000", 520),
+                        horse("Two", HorseSex.MARE, "M", 32, "1000", 510),
+                        horse("Three", HorseSex.MARE, "M", 32, "1000", 500)));
+
+        StallFit fit = QuotePricer.fit(heavy, withPolicy(pnhHkgRates(), RatePolicyKey.STALL_PAYLOAD_KG, "1500"));
+
+        assertThat(fit.refusal())
+                .isEqualTo("The 3 heaviest horses that could share a stall weigh 1,530 kg; a stall carries 1,500 kg.");
+        assertThat(fit.achievableClasses()).containsExactly(ServiceClass.BUSINESS, ServiceClass.FIRST);
+    }
+
+    @Test
+    void oneHorseOverTheStallPayload() {
+        PricingInput lotus = air(ServiceClass.FIRST, List.of(horse("Lotus Crown", HorseSex.GELDING, "XL", 96, "1000")));
+
+        StallFit fit = QuotePricer.fit(lotus, withPolicy(pnhHkgRates(), RatePolicyKey.STALL_PAYLOAD_KG, "400"));
+
+        assertThat(fit.refusal()).isEqualTo("Lotus Crown weighs 500 kg; a stall carries 400 kg.");
+        assertThat(fit.achievableClasses()).isEmpty();
+    }
+
+    @Test
+    void aShipmentOverTheLimitFitsNoClass() {
+        PricingInput two = air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("One", HorseSex.MARE, "M", 32, "1000", 520),
+                        horse("Two", HorseSex.MARE, "M", 32, "1000", 500)));
+
+        StallFit fit = QuotePricer.fit(two, withPolicy(pnhHkgRates(), RatePolicyKey.AIR_SHIPMENT_MAX_KG, "1000"));
+
+        assertThat(fit.refusal()).isEqualTo("The horses weigh 1,020 kg; one air shipment carries 1,000 kg.");
+        assertThat(fit.achievableClasses()).isEmpty();
+    }
+
+    @Test
+    void knownWeightsOverTheLimitRefuseTheEstimate() {
+        PricingInput draft = estimateOf(air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("One", HorseSex.MARE, "M", 32, "1000", 520),
+                        horse("Two", HorseSex.MARE, "M", 32, "1000", 500),
+                        horse("Three", HorseSex.MARE, "M", 32, "1000", null))));
+
+        StallFit fit = QuotePricer.fit(draft, withPolicy(pnhHkgRates(), RatePolicyKey.AIR_SHIPMENT_MAX_KG, "1000"));
+
+        assertThat(fit.refusal()).isEqualTo("The horses weigh 1,020 kg; one air shipment carries 1,000 kg.");
+    }
+
+    @Test
+    void aWidthRefusalWinsOverWeight() {
+        PricingInput wide =
+                air(ServiceClass.BUSINESS, List.of(horse("Lotus Crown", HorseSex.GELDING, "XL", 96, "1000")));
+
+        StallFit fit = QuotePricer.fit(wide, withPolicy(pnhHkgRates(), RatePolicyKey.AIR_SHIPMENT_MAX_KG, "100"));
+
+        assertThat(fit.refusal()).isEqualTo("Lotus Crown is size XL (96 in); business gives 48 in.");
+    }
+
+    @Test
+    void withoutThePoliciesWeightIsNotChecked() {
+        PricingInput heavy = air(
+                ServiceClass.ECONOMY,
+                List.of(
+                        horse("One", HorseSex.MARE, "M", 32, "1000", 1500),
+                        horse("Two", HorseSex.MARE, "M", 32, "1000", 1500)));
+        RateSet bare = withPolicy(
+                withPolicy(pnhHkgRates(), RatePolicyKey.STALL_PAYLOAD_KG, null),
+                RatePolicyKey.AIR_SHIPMENT_MAX_KG,
+                null);
+
+        StallFit fit = QuotePricer.fit(heavy, bare);
+
+        assertThat(fit.refusal()).isNull();
+        assertThat(fit.totalWeightKg()).isEqualTo(3000);
+    }
+
+    @Test
+    void anAcceptedQuoteRetotalsWithoutWeightsOrLimits() {
+        // An air quote accepted before weights were kept: pinned to a version without the limits, a horse unweighed.
+        PricingInput accepted = estimateOf(air(
+                ServiceClass.BUSINESS,
+                List.of(
+                        horse("Storm", HorseSex.GELDING, "M", 32, "1000", null),
+                        horse("Nightfall", HorseSex.MARE, "M", 32, "1000"))));
+        RateSet pinned = withPolicy(
+                withPolicy(pnhHkgRates(), RatePolicyKey.STALL_PAYLOAD_KG, null),
+                RatePolicyKey.AIR_SHIPMENT_MAX_KG,
+                null);
+        PricedQuote quote = QuotePricer.price(accepted, pinned);
+
+        PricedTotals totals = QuotePricer.retotal(accepted, pinned, quote.lines());
+
+        assertThat(totals.fuel()).isNotNull();
+        assertThat(totals.contingency()).isNotNull();
+        assertThat(totals.serviceFee()).isNotNull();
+        assertThat(totals.total()).isNotNull();
+    }
+
+    @Test
+    void roadIsNotWeighed() {
+        PricingInput unweighed =
+                road(TrailerType.PRIVATE, 850, 1, List.of(horse("Storm", HorseSex.GELDING, "M", 32, "1000", null)));
+
+        assertThat(QuotePricer.fit(unweighed, pnhHkgRates())).isNull();
     }
 
     @Test
@@ -399,7 +553,8 @@ class QuotePricerTest {
                 true,
                 30,
                 seven,
-                false);
+                false,
+                true);
 
         PricedQuote refused = QuotePricer.price(in, rates(List.of(), pnhHkgLines()));
         PricingInput first = new PricingInput(
@@ -416,7 +571,8 @@ class QuotePricerTest {
                 true,
                 30,
                 seven,
-                false);
+                false,
+                true);
         PricedQuote priced = QuotePricer.price(first, pnhHkgRates());
 
         for (PricedQuote quote : List.of(refused, priced)) {
@@ -464,7 +620,8 @@ class QuotePricerTest {
                 false,
                 14,
                 pnhHkgBusiness().horses(),
-                false);
+                false,
+                true);
 
         PricedQuote quote = QuotePricer.price(in, rates(List.of(), pnhHkgLines()));
 

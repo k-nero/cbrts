@@ -1,4 +1,7 @@
+import { motion } from 'motion/react';
 import type { FC } from 'react';
+
+import { draw, fade, IN_VIEW, pin } from './motion';
 
 import { cx, Icon } from '@/components/ui';
 
@@ -60,6 +63,12 @@ const at = (code: string): [number, number] => {
   return c ? [mx(c.lon), my(c.lat)] : [0, 0];
 };
 
+/* When each layer arrives: roads draw one after another, then the air legs, gates and cities. */
+const ROAD_GAP = 0.18;
+const AIR_AT = 0.5 + ROADS.length * ROAD_GAP;
+const GATES_AT = 0.7;
+const CITIES_AT = 0.3;
+
 const range = (step: number, end: number) =>
   Array.from({ length: Math.ceil(end / step) - 1 }, (_, i) => (i + 1) * step);
 
@@ -77,7 +86,10 @@ export const RouteMap: FC = () => {
   });
 
   return (
-    <figure
+    <motion.figure
+      initial="hidden"
+      whileInView="shown"
+      viewport={IN_VIEW}
       aria-label="Map: road corridors between Vietnam, Cambodia, Thailand, Laos and Malaysia, and air to Hong Kong"
       className="relative m-0 shrink-0 overflow-hidden rounded-lg bg-sunken"
       style={{ width: W, height: H }}
@@ -99,13 +111,14 @@ export const RouteMap: FC = () => {
           ))}
         </g>
         <g className="stroke-ink-3" strokeWidth={2} strokeDasharray="6 6" strokeLinecap="round">
+          {/* Dashed, so the air legs fade in: drawing them would replace the dashes. */}
           {air.map((d) => (
-            <path key={d} d={d} />
+            <motion.path key={d} d={d} variants={fade} custom={AIR_AT} />
           ))}
         </g>
         <g className="stroke-ink" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-          {roads.map((d) => (
-            <path key={d} d={d} />
+          {roads.map((d, i) => (
+            <motion.path key={d} d={d} variants={draw} custom={i * ROAD_GAP} />
           ))}
         </g>
       </svg>
@@ -113,8 +126,9 @@ export const RouteMap: FC = () => {
       {AREAS.map(([label, lon, lat]) => {
         const sea = label !== label.toUpperCase();
         return (
-          <span
+          <motion.span
             key={label}
+            variants={fade}
             aria-hidden
             className={cx(
               'absolute -translate-1/2 whitespace-nowrap text-ink-3',
@@ -127,38 +141,46 @@ export const RouteMap: FC = () => {
             }}
           >
             {label}
-          </span>
+          </motion.span>
         );
       })}
 
-      {ROADS.map(([, , crossing, lon, lat, [dx, dy]]) => (
+      {ROADS.map(([, , crossing, lon, lat, [dx, dy]], i) => (
         <span key={crossing} aria-hidden>
-          <span
+          <motion.span
+            variants={pin}
+            custom={GATES_AT + i * ROAD_GAP}
             className="absolute grid size-5 place-items-center rounded-full border-[1.5px] border-ink bg-card text-ink"
             style={{ left: mx(lon) - 10, top: my(lat) - 10 }}
           >
             <Icon name="flag" size={11} />
-          </span>
-          <span
+          </motion.span>
+          <motion.span
+            variants={fade}
+            custom={GATES_AT + i * ROAD_GAP + 0.15}
             className="type-caption absolute whitespace-nowrap text-ink-2"
             style={{ left: mx(lon) + dx, top: my(lat) + dy }}
           >
             {crossing}
-          </span>
+          </motion.span>
         </span>
       ))}
 
-      {CITIES.map((c) => {
+      {CITIES.map((c, i) => {
         const x = mx(c.lon);
         const y = my(c.lat);
         const right = c.side === 'r';
         return (
           <span key={c.code} aria-hidden>
-            <span
+            <motion.span
+              variants={pin}
+              custom={CITIES_AT + i * 0.06}
               className="absolute box-border size-3.5 rounded-full border-[3px] border-ink bg-card"
               style={{ left: x - 7, top: y - 7 }}
             />
-            <span
+            <motion.span
+              variants={fade}
+              custom={CITIES_AT + i * 0.06 + 0.1}
               className={cx(
                 'absolute flex flex-col whitespace-nowrap',
                 right ? 'items-start' : '-translate-x-full items-end text-right',
@@ -170,10 +192,10 @@ export const RouteMap: FC = () => {
             >
               <span className="type-label-s text-ink">{c.name}</span>
               <span className="type-caption text-ink-3">{c.code}</span>
-            </span>
+            </motion.span>
           </span>
         );
       })}
-    </figure>
+    </motion.figure>
   );
 };

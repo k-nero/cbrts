@@ -42,5 +42,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID>, JpaSpecific
      */
     List<Horse> findByClubId(UUID clubId);
 
+    /** The club's active horses, by name: the Home's horse list. */
+    List<Horse> findByClubIdAndArchivedAtIsNullOrderByName(UUID clubId);
+
     Optional<Horse> findByName(String name);
 }

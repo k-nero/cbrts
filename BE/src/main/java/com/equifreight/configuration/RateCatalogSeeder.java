@@ -64,7 +64,10 @@ public class RateCatalogSeeder {
             Map.entry(RatePolicyKey.ESTIMATE_BAND_PCT, "15"),
             Map.entry(RatePolicyKey.ARRIVAL_WINDOW_MIN_HOURS, "3"),
             Map.entry(RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, "10"),
-            Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "30"));
+            Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "30"),
+            // The VRR HMC main-deck stall (quotation builder section, §3); the shipment limit is a demo figure.
+            Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "5504"),
+            Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "20000"));
 
     private final RateCatalogVersionRepository versions;
     private final RateLineRepository lines;

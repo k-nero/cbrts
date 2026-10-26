@@ -134,7 +134,13 @@ export const bandsSchema = z.object({
 });
 export type BandsForm = z.infer<typeof bandsSchema>;
 
-export const POLICY_FIELDS: { key: RatePolicyKey; label: string; max?: number; step: number }[] = [
+export const POLICY_FIELDS: {
+  key: RatePolicyKey;
+  label: string;
+  min?: number;
+  max?: number;
+  step: number;
+}[] = [
   { key: 'FUEL_PCT', label: 'Fuel surcharge, % of air lines', max: 100, step: 0.5 },
   { key: 'INSURANCE_PCT', label: 'Insurance, % of declared value', max: 100, step: 0.1 },
   { key: 'CONTINGENCY_PCT', label: 'Contingency, %', max: 100, step: 0.5 },
@@ -144,14 +150,24 @@ export const POLICY_FIELDS: { key: RatePolicyKey; label: string; max?: number; s
   { key: 'ESTIMATE_BAND_PCT', label: 'Estimate band, %', max: 100, step: 1 },
   { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet from, horses', step: 1 },
   { key: 'HIGH_VALUE_THRESHOLD', label: 'High value threshold, USD', step: 1000 },
+  // BR-Q-16: the air weight limits, whole kilograms.
+  { key: 'STALL_PAYLOAD_KG', label: 'Stall payload, kg', min: 1, max: 99999, step: 1 },
+  { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment limit, kg', min: 1, max: 99999, step: 1 },
 ];
 
 export const policySchema = z.object(
   Object.fromEntries(
-    POLICY_FIELDS.map((f) => [
-      f.key,
-      z.number({ error: 'Enter a value.' }).min(0, "It can't be negative."),
-    ]),
+    POLICY_FIELDS.map((f) => {
+      const atLeast = f.min
+        ? z.number({ error: 'Enter a value.' }).min(f.min, `Enter at least ${f.min}.`)
+        : z.number({ error: 'Enter a value.' }).min(0, "It can't be negative.");
+      return [
+        f.key,
+        f.max == null
+          ? atLeast
+          : atLeast.max(f.max, `Enter at most ${f.max.toLocaleString('en-US')}.`),
+      ];
+    }),
   ) as Record<RatePolicyKey, z.ZodNumber>,
 );
 export type PolicyForm = z.infer<typeof policySchema>;

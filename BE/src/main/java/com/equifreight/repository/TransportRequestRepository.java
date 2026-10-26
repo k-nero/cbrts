@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -40,6 +41,10 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
     Optional<TransportRequest> findByIdForUpdate(@Param("id") UUID id);
 
     Page<TransportRequest> findByClubId(UUID clubId, Pageable pageable);
+
+    /** The club's requests outside these statuses, with both ends fetched for the Home's route lines. */
+    @EntityGraph(attributePaths = {"originPlace", "destinationPlace"})
+    List<TransportRequest> findByClubIdAndStatusNotIn(UUID clubId, Collection<RequestStatus> statuses);
 
     Page<TransportRequest> findByClubIdAndStatus(UUID clubId, RequestStatus status, Pageable pageable);
 

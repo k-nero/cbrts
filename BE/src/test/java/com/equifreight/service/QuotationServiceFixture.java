@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -120,9 +121,16 @@ abstract class QuotationServiceFixture {
         v3 = version(3);
         horses = new ArrayList<>(List.of(
                 new PricingHorse(
-                        UUID.randomUUID(), "Nightfall", HorseSex.MARE, "M", 32, false, new BigDecimal("175000")),
+                        UUID.randomUUID(), "Nightfall", HorseSex.MARE, "M", 32, false, new BigDecimal("175000"), 500),
                 new PricingHorse(
-                        UUID.randomUUID(), "Shadowfax", HorseSex.GELDING, "M", 32, false, new BigDecimal("150000"))));
+                        UUID.randomUUID(),
+                        "Shadowfax",
+                        HorseSex.GELDING,
+                        "M",
+                        32,
+                        false,
+                        new BigDecimal("150000"),
+                        500)));
 
         when(requests.findByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
         when(requests.findById(request.getId())).thenReturn(Optional.of(request));
@@ -130,7 +138,7 @@ abstract class QuotationServiceFixture {
                 .thenReturn(Optional.of(v2));
         when(loader.load(v2.getId())).thenReturn(rows(v2, true));
         when(loader.load(v3.getId())).thenReturn(rows(v3, true));
-        when(inputs.inputFor(eq(request), any())).thenAnswer(i -> input(i.getArgument(1)));
+        when(inputs.inputFor(eq(request), any(), anyBoolean())).thenAnswer(i -> input(i.getArgument(1)));
         when(codes.next(CodePrefix.Q, 2026)).thenReturn("Q-2026-0189");
         when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
                 .thenAnswer(i -> stored);
@@ -179,7 +187,8 @@ abstract class QuotationServiceFixture {
                 false,
                 0,
                 List.copyOf(horses),
-                request.getArrivalMode() == com.equifreight.entity.enums.ArrivalMode.WINDOW);
+                request.getArrivalMode() == com.equifreight.entity.enums.ArrivalMode.WINDOW,
+                true);
     }
 
     /** Business and first stall rows (business optional), a groom line, the four percentages. */
@@ -205,7 +214,9 @@ abstract class QuotationServiceFixture {
                 RatePolicyKey.CONTINGENCY_PCT,
                 RatePolicyKey.SERVICE_FEE_PCT,
                 RatePolicyKey.QUOTE_VALIDITY_DAYS,
-                RatePolicyKey.DEPOSIT_PCT)) {
+                RatePolicyKey.DEPOSIT_PCT,
+                RatePolicyKey.STALL_PAYLOAD_KG,
+                RatePolicyKey.AIR_SHIPMENT_MAX_KG)) {
             RatePolicy p = new RatePolicy();
             p.setVersion(v);
             p.setKey(key);
@@ -213,6 +224,8 @@ abstract class QuotationServiceFixture {
                     switch (key) {
                         case QUOTE_VALIDITY_DAYS -> new BigDecimal("7");
                         case DEPOSIT_PCT -> new BigDecimal("30");
+                        case STALL_PAYLOAD_KG -> new BigDecimal("5504");
+                        case AIR_SHIPMENT_MAX_KG -> new BigDecimal("20000");
                         default -> BigDecimal.TEN;
                     });
             policies.add(p);

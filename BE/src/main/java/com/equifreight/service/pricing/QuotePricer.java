@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -88,7 +89,12 @@ public final class QuotePricer {
         return totals(in, rates, lines, complete);
     }
 
-    /** How the horses fit the priced air class; null for road, or when the class has no row in the catalog. */
+    /**
+     * How the horses fit the priced air class; null for road, or when the class has no row in the catalog. The width
+     * checks come first; then the weight (BR-Q-16): a horse with no weight when weights are required, the heaviest
+     * horses that could share a stall against the stall payload, and the total against the air shipment limit. A
+     * missing policy skips its check (it is listed as a missing rate). Weight never prices a line.
+     */
     public static StallFit fit(PricingInput in, RateSet rates) {
         if (in.mode() != TransportMode.AIR) {
             return null;
@@ -98,6 +104,7 @@ public final class QuotePricer {
             return null;
         }
         int width = classRow.widthPerHorseIn();
+        Integer weight = totalWeight(in.horses());
         for (PricingHorse horse : in.horses()) {
             String refusal = refusal(horse, in.airClass(), width);
             if (refusal != null) {
@@ -107,12 +114,91 @@ public final class QuotePricer {
                         .map(ClassRow::serviceClass)
                         .sorted()
                         .toList();
-                return new StallFit(0, 0, refusal, achievable);
+                return new StallFit(0, 0, refusal, achievable, weight);
             }
+        }
+        if (in.weightsRequired()) {
+            for (PricingHorse horse : in.horses()) {
+                if (horse.weightKg() == null) {
+                    return new StallFit(
+                            0,
+                            0,
+                            horse.name() + "'s weight isn't on the request, so the stall load can't be checked.",
+                            List.of(),
+                            weight);
+                }
+            }
+        }
+        BigDecimal payload = rates.policies().get(RatePolicyKey.STALL_PAYLOAD_KG);
+        if (payload != null) {
+            String load = stallLoad(in.horses(), width, payload);
+            if (load != null) {
+                List<ServiceClass> achievable = rates.classes().stream()
+                        .filter(c -> in.horses().stream()
+                                        .allMatch(h -> refusal(h, c.serviceClass(), c.widthPerHorseIn()) == null)
+                                && stallLoad(in.horses(), c.widthPerHorseIn(), payload) == null)
+                        .map(ClassRow::serviceClass)
+                        .sorted()
+                        .toList();
+                return new StallFit(0, 0, load, achievable, weight);
+            }
+        }
+        BigDecimal limit = rates.policies().get(RatePolicyKey.AIR_SHIPMENT_MAX_KG);
+        int known = in.horses().stream()
+                .map(PricingHorse::weightKg)
+                .filter(w -> w != null)
+                .mapToInt(Integer::intValue)
+                .sum();
+        if (limit != null && BigDecimal.valueOf(known).compareTo(limit) > 0) {
+            return new StallFit(
+                    0,
+                    0,
+                    "The horses weigh " + kg(known) + " kg; one air shipment carries " + kg(limit.intValue()) + " kg.",
+                    List.of(),
+                    weight);
         }
         int total = width * in.horses().size();
         int positions = (total + POSITION_WIDTH_IN - 1) / POSITION_WIDTH_IN;
-        return new StallFit(positions, total, null, List.of());
+        return new StallFit(positions, total, null, List.of(), weight);
+    }
+
+    /** The horses' total weight, or null while any weight is unknown. */
+    private static Integer totalWeight(List<PricingHorse> horses) {
+        int total = 0;
+        for (PricingHorse horse : horses) {
+            if (horse.weightKg() == null) {
+                return null;
+            }
+            total += horse.weightKg();
+        }
+        return total;
+    }
+
+    /**
+     * Whether the heaviest horses that could share one stall in a class of this width exceed the payload: a 96 in stall
+     * takes 96 ÷ width horses, so they are what any load plan might put together. Unknown weights count as 0 kg. Null
+     * when they fit.
+     */
+    private static String stallLoad(List<PricingHorse> horses, int classWidth, BigDecimal payload) {
+        int perStall = Math.min(POSITION_WIDTH_IN / classWidth, horses.size());
+        List<PricingHorse> heaviest = horses.stream()
+                .filter(h -> h.weightKg() != null)
+                .sorted(Comparator.comparing(PricingHorse::weightKg).reversed())
+                .limit(perStall)
+                .toList();
+        int sum = heaviest.stream().mapToInt(PricingHorse::weightKg).sum();
+        if (heaviest.isEmpty() || BigDecimal.valueOf(sum).compareTo(payload) <= 0) {
+            return null;
+        }
+        String carries = "; a stall carries " + kg(payload.intValue()) + " kg.";
+        return heaviest.size() == 1
+                ? heaviest.getFirst().name() + " weighs " + kg(sum) + " kg" + carries
+                : "The " + heaviest.size() + " heaviest horses that could share a stall weigh " + kg(sum) + " kg"
+                        + carries;
+    }
+
+    private static String kg(int kilograms) {
+        return String.format(Locale.US, "%,d", kilograms);
     }
 
     private static String refusal(PricingHorse horse, ServiceClass serviceClass, int classWidth) {

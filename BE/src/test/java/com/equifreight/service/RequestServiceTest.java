@@ -1010,6 +1010,19 @@ class RequestServiceTest {
         }
 
         @Test
+        void submitCopiesTheHorsesWeight() {
+            nightfall.setWeightKg((short) 512);
+
+            service.submit(user, draft.getId());
+            nightfall.setWeightKg((short) 530);
+
+            assertThat(draft.getHorses())
+                    .filteredOn(rh -> rh.getHorse() == nightfall)
+                    .singleElement()
+                    .satisfies(rh -> assertThat(rh.getWeightKg()).isEqualTo((short) 512));
+        }
+
+        @Test
         void submitWritesRevisionOne() {
             service.submit(user, draft.getId());
 

@@ -131,7 +131,7 @@ public class RequestEstimator {
         }
         RateSet rates = rows.forCorridor(r.getCorridor().getId());
         ServiceClass airClass = r.getMode() == TransportMode.AIR ? r.getAirClass() : null;
-        PricedQuote quote = QuotePricer.price(inputs.inputFor(r, airClass), rates);
+        PricedQuote quote = QuotePricer.price(inputs.inputFor(r, airClass, false), rates);
         return new Priced(EstimateBand.of(quote, rates), quote);
     }
 

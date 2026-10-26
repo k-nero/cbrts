@@ -15,7 +15,10 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.route.CorridorResponse;
+import com.equifreight.repository.BorderCrossingRepository;
+import com.equifreight.repository.CorridorCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
+import com.equifreight.repository.PlaceRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +39,12 @@ class CorridorServiceTest {
     void setUp() {
         corridors = mock(CorridorRepository.class);
         audit = mock(AuditService.class);
-        service = new CorridorService(corridors, audit);
+        service = new CorridorService(
+                corridors,
+                mock(CorridorCrossingRepository.class),
+                mock(PlaceRepository.class),
+                mock(BorderCrossingRepository.class),
+                audit);
         hcmPnh = new Corridor();
         hcmPnh.setId(ID);
         hcmPnh.setCode("RD HCM → PNH");

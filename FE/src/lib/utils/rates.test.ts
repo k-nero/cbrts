@@ -165,6 +165,8 @@ describe('policyRows', () => {
         ARRIVAL_WINDOW_MIN_HOURS: 3,
         LATE_PENALTY_PCT_PER_HOUR: 10,
         LATE_PENALTY_CAP_PCT: 30,
+        STALL_PAYLOAD_KG: 5504,
+        AIR_SHIPMENT_MAX_KG: 20000,
       },
       [
         { kind: 'CANCELLATION', minDays: 0, maxDays: 6, value: 100 },
@@ -181,6 +183,8 @@ describe('policyRows', () => {
       { key: 'QUOTE_VALIDITY_DAYS', label: 'Quote validity', value: '7 days' },
       { key: 'ESTIMATE_BAND_PCT', label: 'Estimate band', value: '± 15% minimum' },
       { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
+      { key: 'STALL_PAYLOAD_KG', label: 'Stall payload', value: '5,504 kg per stall' },
+      { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment', value: '20,000 kg of horses' },
       { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
       { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
       {
@@ -199,6 +203,8 @@ describe('policyRows', () => {
   test('a missing value is a dash', () => {
     expect(policyRows({}, [])[0]).toEqual({ key: 'FUEL_PCT', label: 'Fuel surcharge', value: '—' });
     expect(policyRows({}, []).find((r) => r.key === 'ESTIMATE_BAND_PCT')?.value).toBe('—');
+    expect(policyRows({}, []).find((r) => r.key === 'STALL_PAYLOAD_KG')?.value).toBe('—');
+    expect(policyRows({}, []).find((r) => r.key === 'AIR_SHIPMENT_MAX_KG')?.value).toBe('—');
   });
 });
 

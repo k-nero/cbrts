@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 
-import { bandsSchema, classSchema, LINE_FIELDS, type LineForm, lineSchema } from './schema';
+import {
+  bandsSchema,
+  classSchema,
+  LINE_FIELDS,
+  type LineForm,
+  lineSchema,
+  POLICY_FIELDS,
+  policySchema,
+} from './schema';
 
 const o = (value: string) => ({ value, label: value });
 
@@ -24,6 +32,19 @@ const issues = (result: {
   success: boolean;
   error?: { issues: { path: PropertyKey[]; message: string }[] };
 }) => (result.success ? [] : result.error!.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
+
+describe('policySchema', () => {
+  const valid = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, 1]));
+  const stall = (value: number) =>
+    policySchema.safeParse({ ...valid, STALL_PAYLOAD_KG: value, AIR_SHIPMENT_MAX_KG: 20000 })
+      .success;
+
+  test('the weight limits are whole kilograms from 1 to 99,999 (BR-Q-16)', () => {
+    expect(stall(5504)).toBe(true);
+    expect(stall(0)).toBe(false);
+    expect(stall(100000)).toBe(false);
+  });
+});
 
 describe('lineSchema', () => {
   test('a valid sex line passes', () => {
