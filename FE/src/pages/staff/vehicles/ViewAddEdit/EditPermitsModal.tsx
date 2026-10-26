@@ -2,14 +2,14 @@ import { type FC, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
-import { corridorOptions, countryOptions } from '../vehicleOptions';
+import { cityOptions, corridorOptions, countryOptions } from '../vehicleOptions';
 import { type PermitsForm, permitsSchema } from './schema';
 
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import BaseModal from '@/components/modal/BaseModal';
-import { useCountries } from '@/hooks/routeCatalog';
+import { useCatalogPlaces, useCountries } from '@/hooks/routeCatalog';
 import { useCorridors } from '@/hooks/useJob';
 import { useUpdateVehicle } from '@/hooks/useVehicle';
 import type { Vehicle } from '@/interfaces';
@@ -31,6 +31,8 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
   const open = vehicle !== null;
   const update = useUpdateVehicle();
   const countries = useCountries();
+  const places = useCatalogPlaces();
+  const cityChoices = useMemo(() => cityOptions(places.data), [places.data]);
   const corridors = useCorridors(open);
   const countryChoices = useMemo(() => countryOptions(countries.data), [countries.data]);
   const corridorChoices = useMemo(() => corridorOptions(corridors.data), [corridors.data]);
@@ -43,7 +45,7 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
       value: c.id,
     });
     methods.reset({
-      homeCountry: vehicle.homeCountry ? asOption(vehicle.homeCountry) : null,
+      homeCity: vehicle.homeCity ? { label: vehicle.homeCity, value: vehicle.homeCity } : null,
       permittedCountries: (vehicle.permittedCountries ?? []).map(asOption),
       operatingCorridors: (vehicle.operatingCorridors ?? []).map(asOption),
     });
@@ -55,7 +57,7 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
       const saved = await update.mutateAsync({
         id: vehicle.id,
         body: {
-          homeCountryId: v.homeCountry?.value,
+          homeCity: v.homeCity?.value,
           permittedCountryIds: (v.permittedCountries ?? []).map((c) => c.value),
           operatingCorridorIds: (v.operatingCorridors ?? []).map((c) => c.value),
         },
@@ -86,14 +88,14 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
         {({ FormField }) => (
           <>
             <FormField
-              name="homeCountry"
+              name="homeCity"
               label="Based in"
               component="select"
               componentProps={{
                 isRequired: true,
-                options: countryChoices,
-                isLoading: countries.isPending,
-                instruction: 'Where it is when it has run no trip yet.',
+                options: cityChoices,
+                isLoading: places.isPending,
+                instruction: 'Where it is when it has run no trip yet; its home country follows.',
               }}
             />
             <FormField

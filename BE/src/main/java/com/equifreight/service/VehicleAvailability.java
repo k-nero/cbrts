@@ -2,7 +2,6 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
-import com.equifreight.entity.Country;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -13,20 +12,25 @@ import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.RatePolicyRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -60,16 +64,22 @@ public class VehicleAvailability {
     private final VehicleBookingRepository bookings;
     private final RateCatalogVersionRepository versions;
     private final RatePolicyRepository policies;
+    private final CorridorRepository corridors;
+    private final Clock clock;
 
     public VehicleAvailability(
             JobTripService jobTrips,
             VehicleBookingRepository bookings,
             RateCatalogVersionRepository versions,
-            RatePolicyRepository policies) {
+            RatePolicyRepository policies,
+            CorridorRepository corridors,
+            Clock clock) {
         this.jobTrips = jobTrips;
         this.bookings = bookings;
         this.versions = versions;
         this.policies = policies;
+        this.corridors = corridors;
+        this.clock = clock;
     }
 
     /**
@@ -152,6 +162,17 @@ public class VehicleAvailability {
         return new Own(trip.getId() == null ? Set.of() : Set.of(trip.getId()), requestIds);
     }
 
+    /**
+     * What every check needs besides the vehicle's bookings: the turnaround, the road network an empty drive can use,
+     * and now (a vehicle with no trip yet can set off from its home city from now on).
+     */
+    record Context(Duration turnaround, RoadNetwork roads, Instant now) {}
+
+    @Transactional(readOnly = true)
+    Context context() {
+        return new Context(turnaround(), new RoadNetwork(corridors.findRoadNetwork()), clock.instant());
+    }
+
     /** Why {@code vehicle} can't join {@code trip}, or empty when it can. */
     @Transactional(readOnly = true)
     public Optional<String> refusalFor(Vehicle vehicle, Trip trip) {
@@ -162,7 +183,7 @@ public class VehicleAvailability {
                 span.startsAt(),
                 span.endsAt(),
                 ownOf(trip),
-                turnaround(),
+                context(),
                 bookings.findForAvailability(vehicle.getId()));
     }
 
@@ -179,7 +200,7 @@ public class VehicleAvailability {
                 start,
                 afterDriving(start, request.getCorridor()),
                 ownOf(request),
-                turnaround(),
+                context(),
                 bookings.findForAvailability(vehicle.getId()));
     }
 
@@ -191,12 +212,12 @@ public class VehicleAvailability {
     public Optional<LocalDate> earliestStart(
             Vehicle vehicle, TransportRequest request, LocalDate from, LocalDate last) {
         Own own = ownOf(request);
-        Duration turnaround = turnaround();
+        Context context = context();
         List<VehicleBooking> held = bookings.findForAvailability(vehicle.getId());
         for (LocalDate day = from; !day.isAfter(last); day = day.plusDays(1)) {
             Instant start = startOf(day);
             Instant end = afterDriving(start, request.getCorridor());
-            if (refusal(vehicle, request.getCorridor(), start, end, own, turnaround, held)
+            if (refusal(vehicle, request.getCorridor(), start, end, own, context, held)
                     .isEmpty()) {
                 return Optional.of(day);
             }
@@ -218,7 +239,7 @@ public class VehicleAvailability {
             Instant start,
             Instant end,
             Own own,
-            Duration turnaround,
+            Context context,
             List<VehicleBooking> held) {
         if (vehicle.getStatus() != VehicleStatus.ACTIVE) {
             return Optional.of(
@@ -238,7 +259,7 @@ public class VehicleAvailability {
         }
 
         Optional<String> location =
-                locationRefusal(vehicle, corridor.getOriginCountry(), start, starts, own, turnaround, held);
+                locationRefusal(vehicle, corridor.getOriginCity(), start, starts, own, context, held);
         if (location.isPresent()) return location;
 
         if (end != null && start.isBefore(end)) {
@@ -255,61 +276,48 @@ public class VehicleAvailability {
     }
 
     /**
-     * Whether the vehicle can be in {@code startCountry} by {@code start}: ready where its last trip or hold left it
-     * once the turnaround is over, and, when that is another country, after driving a corridor it works from there.
+     * Whether the vehicle can be in {@code startCity} by {@code start} (US-F7-03): ready in the city its last trip or
+     * hold left it once the turnaround is over (in its home city from now, with no trip yet), then, when that is
+     * another city, after the quickest permitted empty drive there.
      */
     private static Optional<String> locationRefusal(
             Vehicle vehicle,
-            Country startCountry,
+            String startCity,
             Instant start,
             String starts,
             Own own,
-            Duration turnaround,
+            Context context,
             List<VehicleBooking> held) {
         Optional<VehicleBooking> last = held.stream()
                 .filter(b -> !own.contains(b))
-                .filter(b -> endCountry(b) != null && !b.getEndsAt().isAfter(start))
+                .filter(b -> corridorOf(b) != null && !b.getEndsAt().isAfter(start))
                 .max(Comparator.comparing(VehicleBooking::getEndsAt));
-        Country where = last.map(VehicleAvailability::endCountry).orElse(vehicle.getHomeCountry());
-        if (where == null || startCountry == null) return Optional.empty();
-        Instant ready = last.map(b -> b.getEndsAt().plus(turnaround)).orElse(null);
+        String where = last.map(b -> corridorOf(b).getDestinationCity()).orElse(vehicle.getHomeCity());
+        if (where == null || startCity == null) return Optional.empty();
+        Instant ready = last.map(b -> b.getEndsAt().plus(context.turnaround())).orElse(null);
 
-        if (sameCountry(where, startCountry)) {
+        if (RoadNetwork.sameCity(where, startCity)) {
             if (ready != null && ready.isAfter(start)) {
-                return Optional.of(vehicle.getCode() + " is ready in " + where.getName() + " on " + DAY.format(ready)
+                return Optional.of(vehicle.getCode() + " is ready in " + where + " on " + DAY.format(ready)
                         + " after its last trip; " + starts);
             }
             return Optional.empty();
         }
-        Optional<Corridor> way = vehicle.getOperatingCorridors().stream()
-                .filter(Corridor::isRoad)
-                .filter(c -> sameCountry(c.getOriginCountry(), where)
-                        && sameCountry(c.getDestinationCountry(), startCountry))
-                .min(Comparator.comparingInt(Corridor::getDrivingDays));
-        if (way.isEmpty()) {
+        Optional<Integer> days = context.roads().drivingDays(where, startCity, vehicle);
+        if (days.isEmpty()) {
             return Optional.of(vehicle.getCode()
-                    + last.map(b -> " will be in " + where.getName() + " from " + DAY.format(b.getEndsAt()))
-                            .orElse(" is based in " + where.getName())
-                    + " and runs no corridor to " + startCountry.getName() + ".");
+                    + last.map(b -> " will be in " + where + " from " + DAY.format(b.getEndsAt()))
+                            .orElse(" is based in " + where)
+                    + " and has no permitted road to " + startCity + ".");
         }
-        if (ready != null) {
-            Instant there = afterDriving(ready, way.get());
-            if (there.isAfter(start)) {
-                return Optional.of(vehicle.getCode() + " can be in " + startCountry.getName() + " on "
-                        + DAY.format(there) + " (driving back from " + endCity(last.get()) + "); " + starts);
-            }
+        Instant from = ready != null ? ready : context.now();
+        Instant there = from.plus(days.get(), ChronoUnit.DAYS);
+        if (there.isAfter(start)) {
+            return Optional.of(vehicle.getCode() + " can be in " + startCity + " on " + DAY.format(there)
+                    + " (driving from " + where + ", " + days.get() + (days.get() == 1 ? " day" : " days") + "); "
+                    + starts);
         }
         return Optional.empty();
-    }
-
-    /** Where a trip or a hold leaves the vehicle; null for a maintenance or inspection booking, which doesn't move it. */
-    private static Country endCountry(VehicleBooking b) {
-        Corridor c = corridorOf(b);
-        return c == null ? null : c.getDestinationCountry();
-    }
-
-    private static String endCity(VehicleBooking b) {
-        return corridorOf(b).getDestinationCity();
     }
 
     private static Corridor corridorOf(VehicleBooking b) {
@@ -320,8 +328,53 @@ public class VehicleAvailability {
         return null;
     }
 
-    private static boolean sameCountry(Country a, Country b) {
-        return a == b || (a != null && b != null && a.getId() != null && Objects.equals(a.getId(), b.getId()));
+    /**
+     * The road corridors an empty drive can use (US-F7-03): each in either direction, for its driving days, and only
+     * through countries the vehicle holds a permit for (or is based in). The quickest chain is found by Dijkstra over
+     * the cities; the catalog has a few dozen corridors, so this runs in memory.
+     */
+    static final class RoadNetwork {
+        private final List<Corridor> roads;
+
+        RoadNetwork(List<Corridor> roads) {
+            this.roads = roads.stream().filter(Corridor::isRoad).toList();
+        }
+
+        static boolean sameCity(String a, String b) {
+            return key(a).equals(key(b));
+        }
+
+        private static String key(String city) {
+            return city == null ? "" : city.trim().toLowerCase(Locale.ROOT);
+        }
+
+        /** The fewest driving days from {@code from} to {@code to} for {@code vehicle}, or empty with no road. */
+        Optional<Integer> drivingDays(String from, String to, Vehicle vehicle) {
+            Map<String, Integer> best = new HashMap<>();
+            PriorityQueue<Map.Entry<String, Integer>> queue = new PriorityQueue<>(Map.Entry.comparingByValue());
+            best.put(key(from), 0);
+            queue.add(Map.entry(key(from), 0));
+            List<Corridor> usable = roads.stream()
+                    .filter(c -> vehicle.refusalToRun(c).isEmpty())
+                    .toList();
+            while (!queue.isEmpty()) {
+                Map.Entry<String, Integer> at = queue.poll();
+                if (at.getValue() > best.getOrDefault(at.getKey(), Integer.MAX_VALUE)) continue;
+                if (at.getKey().equals(key(to))) return Optional.of(at.getValue());
+                for (Corridor c : usable) {
+                    String next = null;
+                    if (key(c.getOriginCity()).equals(at.getKey())) next = key(c.getDestinationCity());
+                    else if (key(c.getDestinationCity()).equals(at.getKey())) next = key(c.getOriginCity());
+                    if (next == null) continue;
+                    int days = at.getValue() + Math.max(1, c.getDrivingDays());
+                    if (days < best.getOrDefault(next, Integer.MAX_VALUE)) {
+                        best.put(next, days);
+                        queue.add(Map.entry(next, days));
+                    }
+                }
+            }
+            return Optional.empty();
+        }
     }
 
     /** Refuses {@code vehicle} for {@code trip} with the reason, as every planning entry point does. */
@@ -356,9 +409,7 @@ public class VehicleAvailability {
         }
         Span span = spanOf(trip);
         String on = span.startsAt() == null ? "" : " on " + DAY.format(span.startsAt());
-        String in = corridor.getOriginCountry() == null
-                ? ""
-                : " and in " + corridor.getOriginCountry().getName();
+        String in = corridor.getOriginCity() == null ? "" : " and in " + corridor.getOriginCity();
         throw new BusinessException(
                 "VEHICLE_UNAVAILABLE", "No vehicle that runs " + corridor.getCode() + " is free" + in + on + ".");
     }

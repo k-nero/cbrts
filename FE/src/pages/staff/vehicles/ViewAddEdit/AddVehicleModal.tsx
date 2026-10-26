@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
 import {
+  cityOptions,
   corridorOptions,
   countryOptions,
   defaultStalls,
@@ -16,7 +17,7 @@ import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import BaseModal from '@/components/modal/BaseModal';
 import type { UseCrudResourceResult } from '@/hooks/crud';
-import { useCountries } from '@/hooks/routeCatalog';
+import { useCatalogPlaces, useCountries } from '@/hooks/routeCatalog';
 import { useCorridors } from '@/hooks/useJob';
 import type { CreateVehicleInput, Vehicle, VehicleKind } from '@/interfaces';
 import { apiErrorMessage } from '@/lib';
@@ -35,6 +36,8 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
   const { message } = App.useApp();
   const methods = useFormCustom<VehicleForm>({ resolver: zodResolver(vehicleSchema) });
   const countries = useCountries();
+  const places = useCatalogPlaces();
+  const cityChoices = useMemo(() => cityOptions(places.data), [places.data]);
   const corridors = useCorridors(open);
   const countryChoices = useMemo(() => countryOptions(countries.data), [countries.data]);
   const corridorChoices = useMemo(() => corridorOptions(corridors.data), [corridors.data]);
@@ -46,7 +49,7 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
       kind: KIND_OPTIONS[0],
       payloadKg: 3200,
       stallCount: STALL_COUNT_OPTIONS[1],
-      homeCountry: null,
+      homeCity: null,
       permittedCountries: [],
       operatingCorridors: [],
     });
@@ -59,7 +62,7 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
         kind: v.kind?.value as VehicleKind,
         payloadKg: v.payloadKg,
         stalls: defaultStalls(Number(v.stallCount?.value)),
-        homeCountryId: v.homeCountry?.value ?? '',
+        homeCity: v.homeCity?.value ?? '',
         permittedCountryIds: (v.permittedCountries ?? []).map((c) => c.value),
         operatingCorridorIds: (v.operatingCorridors ?? []).map((c) => c.value),
       });
@@ -115,14 +118,14 @@ const AddVehicleModal: FC<Props> = ({ open, crud, onClose }) => {
               componentProps={{ isRequired: true, min: 500, max: 40000, step: 100 }}
             />
             <FormField
-              name="homeCountry"
+              name="homeCity"
               label="Based in"
               component="select"
               componentProps={{
                 isRequired: true,
-                options: countryChoices,
-                isLoading: countries.isPending,
-                placeholder: 'Pick a country',
+                options: cityChoices,
+                isLoading: places.isPending,
+                placeholder: 'Pick a city',
               }}
             />
             <FormField

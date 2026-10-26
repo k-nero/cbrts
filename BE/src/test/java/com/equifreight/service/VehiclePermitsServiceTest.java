@@ -15,9 +15,11 @@ import static org.mockito.Mockito.when;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
@@ -29,6 +31,7 @@ import com.equifreight.model.fleet.VehicleResponse;
 import com.equifreight.model.route.CountryOptionResponse;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.CountryRepository;
+import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TripVehicleRepository;
 import com.equifreight.repository.VehicleBookingRepository;
@@ -62,6 +65,7 @@ class VehiclePermitsServiceTest {
     private final JobTripService jobTrips = mock(JobTripService.class);
     private final VehicleAvailability availability = mock(VehicleAvailability.class);
     private final AuditService audit = mock(AuditService.class);
+    private final PlaceRepository places = mock(PlaceRepository.class);
     private final User khoi = new User();
     private VehicleService service;
 
@@ -77,7 +81,8 @@ class VehiclePermitsServiceTest {
                 corridors,
                 tripVehicles,
                 availability,
-                audit);
+                audit,
+                places);
         Map<UUID, Country> countryById = byId(List.of(vn, kh, th), Country::getId);
         Map<UUID, Corridor> corridorById = byId(List.of(hcmPnh, hcmHan), Corridor::getId);
         when(countries.findById(any())).thenAnswer(i -> Optional.ofNullable(countryById.get(i.<UUID>getArgument(0))));
@@ -92,6 +97,8 @@ class VehiclePermitsServiceTest {
                         .filter(java.util.Objects::nonNull)
                         .toList());
         when(vehicles.save(any(Vehicle.class))).thenAnswer(i -> i.getArgument(0));
+        when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(place(vn)));
+        when(places.findByCityIgnoreCase("Bangkok")).thenReturn(List.of(place(th)));
         when(tripVehicles.findOpenTrips(any(), any())).thenReturn(List.of());
         when(tripVehicles.findOpenTripsOn(any(), anyCollection(), any())).thenReturn(List.of());
     }
@@ -105,7 +112,7 @@ class VehiclePermitsServiceTest {
                         .code("TX-500")
                         .kind(VehicleKind.TRAILER)
                         .payloadKg(3200)
-                        .homeCountryId(vn.getId())
+                        .homeCity("Ho Chi Minh City")
                         .permittedCountryIds(List.of(vn.getId(), kh.getId()))
                         .operatingCorridorIds(List.of(hcmPnh.getId()))
                         .build());
@@ -121,7 +128,7 @@ class VehiclePermitsServiceTest {
                 .recordDecision(
                         eq(khoi),
                         eq("VEHICLE_CREATED"),
-                        eq("Added vehicle TX-500: VN · KH; runs RD HCM → PNH."),
+                        eq("Added vehicle TX-500: Ho Chi Minh City (VN) · KH; runs RD HCM → PNH."),
                         eq("VEHICLE"),
                         any(),
                         eq("TX-500"),
@@ -131,7 +138,7 @@ class VehiclePermitsServiceTest {
     }
 
     @Test
-    @DisplayName("a new vehicle needs a home country")
+    @DisplayName("a new vehicle needs a home city")
     void createNeedsHome() {
         assertThatThrownBy(() -> service.create(
                         khoi,
@@ -141,7 +148,7 @@ class VehiclePermitsServiceTest {
                                 .payloadKg(3200)
                                 .build()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("Pick the country the vehicle is based in.");
+                .hasMessage("Pick the city the vehicle is based in.");
     }
 
     @Test
@@ -153,7 +160,7 @@ class VehiclePermitsServiceTest {
                                 .code("TX-500")
                                 .kind(VehicleKind.TRAILER)
                                 .payloadKg(3200)
-                                .homeCountryId(vn.getId())
+                                .homeCity("Ho Chi Minh City")
                                 .operatingCorridorIds(List.of(hcmPnh.getId()))
                                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -223,7 +230,9 @@ class VehiclePermitsServiceTest {
                 .recordDecision(
                         eq(khoi),
                         eq("VEHICLE_PERMITS_CHANGED"),
-                        eq("TX-447: VN · KH, TH; runs RD HCM → HAN, RD HCM → PNH → VN · KH; runs RD HCM → PNH."),
+                        eq(
+                                "TX-447: Ho Chi Minh City (VN) · KH, TH; runs RD HCM → HAN, RD HCM → PNH → Ho Chi Minh City (VN)"
+                                        + " · KH; runs RD HCM → PNH."),
                         eq("VEHICLE"),
                         any(),
                         eq("TX-447"),
@@ -249,7 +258,7 @@ class VehiclePermitsServiceTest {
     }
 
     @Test
-    @DisplayName("the home country can't change while the vehicle is on a trip that hasn't ended")
+    @DisplayName("the home city can't change while the vehicle is on a trip that hasn't ended")
     void homeInUse() {
         Vehicle tx447 = vehicle("TX-447", vn, List.of(kh), List.of());
         when(vehicles.findById(tx447.getId())).thenReturn(Optional.of(tx447));
@@ -261,10 +270,10 @@ class VehiclePermitsServiceTest {
         assertThatThrownBy(() -> service.update(
                         khoi,
                         tx447.getId(),
-                        UpdateVehicleRequest.builder().homeCountryId(th.getId()).build()))
+                        UpdateVehicleRequest.builder().homeCity("Bangkok").build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("TX-447 is on TRP-2026-014 (RD HCM → PNH); take it off that trip before changing its"
-                        + " home country.");
+                        + " home city.");
     }
 
     @Test
@@ -296,6 +305,7 @@ class VehiclePermitsServiceTest {
         v.setKind(VehicleKind.TRAILER);
         v.setStatus(VehicleStatus.ACTIVE);
         v.setHomeCountry(home);
+        v.setHomeCity("Ho Chi Minh City");
         v.getPermittedCountries().addAll(permits);
         v.getOperatingCorridors().addAll(runs);
         return v;
@@ -309,6 +319,13 @@ class VehiclePermitsServiceTest {
         c.setOriginCountry(from);
         c.setDestinationCountry(to);
         return c;
+    }
+
+    private static Place place(Country country) {
+        Place p = new Place();
+        p.setKind(PlaceKind.STABLE);
+        p.setCountry(country);
+        return p;
     }
 
     private static Country country(String code, String name) {

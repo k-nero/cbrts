@@ -10,7 +10,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 /**
- * A new vehicle with its stalls, where it is based, the countries it holds permits for and the road corridors it works
+ * A new vehicle with its stalls, the city it is based in, the countries it holds permits for and the road corridors it works
  * (US-F7-01). A missing list is empty, a missing payload 0 (refused by {@code @Positive}).
  */
 @Builder
@@ -19,7 +19,8 @@ public record CreateVehicleRequest(
         @NotNull VehicleKind kind,
         @Positive Integer payloadKg,
         @Valid List<CreateVehicleStallRequest> stalls,
-        UUID homeCountryId,
+        /* The city it is based in (US-F7-03); its home country follows from the city's places. */
+        String homeCity,
         List<UUID> permittedCountryIds,
         List<UUID> operatingCorridorIds) {
     public CreateVehicleRequest {

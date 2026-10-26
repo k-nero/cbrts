@@ -44,6 +44,8 @@ export interface Vehicle extends BaseEntity {
   stalls: VehicleStall[];
   /** Where it is based, and where it is when it has run no trip yet (US-F7-01). */
   homeCountry: CountryOption;
+  /** The city it is based in, and where it is with no trip yet (US-F7-03). */
+  homeCity: string;
   /** The foreign countries it holds a permit for. */
   permittedCountries: CountryOption[];
   /** The road corridors it works; a road trip takes it only on one of these. */
@@ -85,7 +87,8 @@ export interface CreateVehicleInput {
     side: StallSide;
     nearRamp: boolean;
   }[];
-  homeCountryId: string;
+  /** The city it is based in (US-F7-03); its home country follows from the city's places. */
+  homeCity: string;
   permittedCountryIds: string[];
   operatingCorridorIds: string[];
 }
@@ -94,7 +97,7 @@ export interface CreateVehicleInput {
 export interface UpdateVehicleInput {
   payloadKg?: number;
   status?: VehicleStatus;
-  homeCountryId?: string;
+  homeCity?: string;
   permittedCountryIds?: string[];
   operatingCorridorIds?: string[];
 }

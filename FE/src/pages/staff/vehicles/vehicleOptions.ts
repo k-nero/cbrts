@@ -3,6 +3,7 @@ import {
   type Corridor,
   type CountryOption,
   type CreateVehicleInput,
+  type Place,
   type StallSide,
   type StallType,
   StallTypeEnum,
@@ -71,7 +72,21 @@ export const defaultStalls = (count: number): CreateVehicleInput['stalls'] =>
     return { positionNo, stallType, rowNo, side, nearRamp: rowNo === Math.ceil(count / 2) };
   });
 
-/** Countries for the home country and permit selects, by name. */
+/**
+ * The cities a vehicle can be based in (US-F7-03): each city with a place a request can start or end
+ * at, labelled with its country.
+ */
+export const cityOptions = (places: Place[] | undefined) => {
+  const seen = new Map<string, { label: string; value: string }>();
+  for (const p of places ?? []) {
+    if (!p.city || p.kind === 'WELFARE_STOP') continue;
+    const key = p.city.toLowerCase();
+    if (!seen.has(key)) seen.set(key, { label: `${p.city}, ${p.countryName}`, value: p.city });
+  }
+  return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+};
+
+/** Countries for the permit select, by name. */
 export const countryOptions = (countries: CountryOption[] | undefined) =>
   [...(countries ?? [])]
     .sort((a, b) => a.name.localeCompare(b.name))

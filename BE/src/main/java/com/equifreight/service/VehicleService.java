@@ -3,6 +3,7 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
 import com.equifreight.entity.User;
@@ -10,6 +11,7 @@ import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.VehicleStall;
 import com.equifreight.entity.enums.BookingKind;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.StallSide;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.VehicleKind;
@@ -26,6 +28,7 @@ import com.equifreight.model.fleet.VehicleBookingResponse;
 import com.equifreight.model.fleet.VehicleResponse;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.CountryRepository;
+import com.equifreight.repository.PlaceRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TripVehicleRepository;
 import com.equifreight.repository.VehicleBookingRepository;
@@ -66,6 +69,7 @@ public class VehicleService {
     private final TripVehicleRepository tripVehicles;
     private final VehicleAvailability availability;
     private final AuditService audit;
+    private final PlaceRepository places;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
@@ -77,7 +81,8 @@ public class VehicleService {
             CorridorRepository corridors,
             TripVehicleRepository tripVehicles,
             VehicleAvailability availability,
-            AuditService audit) {
+            AuditService audit,
+            PlaceRepository places) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
@@ -88,6 +93,7 @@ public class VehicleService {
         this.tripVehicles = tripVehicles;
         this.availability = availability;
         this.audit = audit;
+        this.places = places;
     }
 
     @Transactional(readOnly = true)
@@ -154,10 +160,11 @@ public class VehicleService {
         vehicle.setKind(request.kind());
         vehicle.setPayloadKg(request.payloadKg());
         vehicle.setStatus(VehicleStatus.ACTIVE);
-        if (request.homeCountryId() == null) {
-            throw new BusinessException("VEHICLE_HOME_COUNTRY", "Pick the country the vehicle is based in.");
+        if (request.homeCity() == null || request.homeCity().isBlank()) {
+            throw new BusinessException("VEHICLE_HOME_CITY", "Pick the city the vehicle is based in.");
         }
-        vehicle.setHomeCountry(country(request.homeCountryId()));
+        vehicle.setHomeCity(request.homeCity().trim());
+        vehicle.setHomeCountry(countryOfCity(vehicle.getHomeCity()));
         vehicle.setPermittedCountries(permits(vehicle.getHomeCountry(), request.permittedCountryIds()));
         vehicle.setOperatingCorridors(operatingCorridors(vehicle, request.operatingCorridorIds()));
 
@@ -218,12 +225,15 @@ public class VehicleService {
         String before = countriesText(vehicle) + "; runs " + corridorsText(vehicle.getOperatingCorridors());
         boolean placeChanged = false;
         Country home = vehicle.getHomeCountry();
-        if (request.homeCountryId() != null && !request.homeCountryId().equals(idOf(home))) {
-            Country newHome = country(request.homeCountryId());
-            refuseWhileOnOpenTrip(
-                    vehicle, tripVehicles.findOpenTrips(vehicle.getId(), Instant.now()), "its home country");
+        String homeCity = vehicle.getHomeCity();
+        if (request.homeCity() != null
+                && !request.homeCity().isBlank()
+                && !request.homeCity().trim().equalsIgnoreCase(homeCity)) {
+            Country newHome = countryOfCity(request.homeCity().trim());
+            refuseWhileOnOpenTrip(vehicle, tripVehicles.findOpenTrips(vehicle.getId(), Instant.now()), "its home city");
+            homeCity = request.homeCity().trim();
+            placeChanged = !Objects.equals(idOf(newHome), idOf(home));
             home = newHome;
-            placeChanged = true;
         }
         Set<Country> permits = request.permittedCountryIds() == null && !placeChanged
                 ? vehicle.getPermittedCountries()
@@ -249,6 +259,7 @@ public class VehicleService {
         }
 
         vehicle.setHomeCountry(home);
+        vehicle.setHomeCity(homeCity);
         vehicle.setPermittedCountries(permits);
         // Every corridor it keeps or gains needs a permit for each of its countries; a permit taken away from a
         // corridor it keeps is refused here, naming the corridor.
@@ -324,8 +335,17 @@ public class VehicleService {
         return country == null ? null : country.getId();
     }
 
-    private Country country(UUID id) {
-        return countries.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Country", id));
+    /**
+     * The country of a city's places (US-F7-03): a vehicle is based in a city a request can start or end at, as a
+     * route's ends are.
+     */
+    private Country countryOfCity(String city) {
+        return places.findByCityIgnoreCase(city).stream()
+                .filter(p -> p.getKind() != PlaceKind.WELFARE_STOP)
+                .map(Place::getCountry)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        "VEHICLE_HOME_CITY", "No place in " + city + " yet. Add one on the Routes page first."));
     }
 
     /** The permitted countries; the home country is never listed, and an unknown one is refused. */
@@ -375,11 +395,12 @@ public class VehicleService {
                         + what + ".");
     }
 
-    /** "VN · KH, TH": the home country, then the permits. */
+    /** "Hanoi (VN) · KH, TH": the home city and country, then the permits. */
     private static String countriesText(Vehicle vehicle) {
-        String home = vehicle.getHomeCountry() == null
-                ? "?"
-                : vehicle.getHomeCountry().getCode();
+        String home = (vehicle.getHomeCity() == null ? "" : vehicle.getHomeCity() + " ") + "("
+                + (vehicle.getHomeCountry() == null
+                        ? "?"
+                        : vehicle.getHomeCountry().getCode()) + ")";
         String permits = vehicle.getPermittedCountries().stream()
                 .map(Country::getCode)
                 .filter(Objects::nonNull)

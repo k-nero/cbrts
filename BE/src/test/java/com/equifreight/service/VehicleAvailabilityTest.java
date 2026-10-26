@@ -24,10 +24,12 @@ import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.RatePolicyRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,6 +64,7 @@ class VehicleAvailabilityTest {
     private final Corridor sgnHkg = air("AIR SGN → HKG", vn, hk);
 
     private final JobTripService jobTrips = mock(JobTripService.class);
+    private final CorridorRepository corridors = mock(CorridorRepository.class);
     private final VehicleBookingRepository bookings = mock(VehicleBookingRepository.class);
     private final RateCatalogVersionRepository versions = mock(RateCatalogVersionRepository.class);
     private final RatePolicyRepository policies = mock(RatePolicyRepository.class);
@@ -69,14 +72,20 @@ class VehicleAvailabilityTest {
 
     @BeforeEach
     void setUp() {
-        availability = new VehicleAvailability(jobTrips, bookings, versions, policies);
+        // Now is 1 Oct 2026 in Ho Chi Minh City: a vehicle with no trip yet sets off from its home city from then.
+        Clock clock = Clock.fixed(
+                LocalDateTime.of(2026, 10, 1, 0, 0).atZone(BusinessTime.ZONE).toInstant(), BusinessTime.ZONE);
+        availability = new VehicleAvailability(jobTrips, bookings, versions, policies, corridors, clock);
         when(bookings.findForAvailability(any())).thenReturn(List.of());
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.empty());
-        hcmBkk.setDestinationCity("Bangkok");
-        bkkHcm.setDestinationCity("Ho Chi Minh City");
-        bkkHcm.setDrivingDays((short) 3);
-        hcmBkk.setDrivingDays((short) 2);
+        cities(hcmBkk, "Ho Chi Minh City", "Bangkok", 3);
+        cities(bkkHcm, "Bangkok", "Ho Chi Minh City", 3);
+        cities(bkkKul, "Bangkok", "Kuala Lumpur", 3);
+        cities(hcmHan, "Ho Chi Minh City", "Hanoi", 4);
+        cities(hkgShaTin, "Hong Kong", "Sha Tin", 1);
+        cities(sgnHkg, "Ho Chi Minh City", "Hong Kong", 3);
+        when(corridors.findRoadNetwork()).thenReturn(List.of(hcmBkk, bkkHcm, bkkKul, hcmHan, hkgShaTin));
     }
 
     // --- Corridor countries and permits
@@ -149,12 +158,13 @@ class VehicleAvailabilityTest {
     }
 
     @Test
-    @DisplayName("a trip that starts abroad is refused for a vehicle at home that works no corridor there")
+    @DisplayName("a trip that starts in a city with no permitted road from home is refused")
     void notWhereTheTripStarts() {
-        Vehicle tx447 = runs(vehicle("TX-447", vn, kh, th), bkkHcm);
+        // Ho Chi Minh City to Bangkok passes Cambodia, which it has no permit for.
+        Vehicle tx447 = runs(vehicle("TX-447", vn, th, my), bkkKul);
 
-        assertThat(availability.refusalFor(tx447, trip(bkkHcm, at(14))))
-                .contains("TX-447 is based in Vietnam and runs no corridor to Thailand.");
+        assertThat(availability.refusalFor(tx447, trip(bkkKul, at(14))))
+                .contains("TX-447 is based in Ho Chi Minh City and has no permitted road to Bangkok.");
     }
 
     @Test
@@ -241,11 +251,11 @@ class VehicleAvailabilityTest {
     @Test
     @DisplayName("when vehicles run the corridor but none can be there and free, the refusal says so")
     void noneThereAndFree() {
-        Vehicle tx447 = runs(vehicle("TX-447", vn, kh, th), bkkHcm);
+        Vehicle tx447 = runs(vehicle("TX-447", vn, th, my), bkkKul);
 
-        assertThatThrownBy(() -> availability.firstAvailable(List.of(tx447), trip(bkkHcm, at(14))))
+        assertThatThrownBy(() -> availability.firstAvailable(List.of(tx447), trip(bkkKul, at(14))))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("No vehicle that runs RD BKK → HCM is free and in Thailand on 14 Oct.");
+                .hasMessage("No vehicle that runs RD BKK → KUL is free and in Bangkok on 14 Oct.");
     }
 
     // --- Over time (US-F7-02)
@@ -259,7 +269,8 @@ class VehicleAvailabilityTest {
 
         // Ready in Bangkok on 6 Oct after 24 hours, back in Vietnam 3 driving days later: 9 Oct.
         assertThat(availability.refusalFor(tx447, trip(hcmHan, at(8))))
-                .contains("TX-447 can be in Vietnam on 9 Oct (driving back from Bangkok); this trip starts 8 Oct.");
+                .contains("TX-447 can be in Ho Chi Minh City on 9 Oct (driving from Bangkok, 3 days); this trip starts"
+                        + " 8 Oct.");
         assertThat(availability.refusalFor(tx447, trip(hcmHan, at(9)))).isEmpty();
     }
 
@@ -280,7 +291,7 @@ class VehicleAvailabilityTest {
         when(bookings.findForAvailability(tx447.getId())).thenReturn(List.of(booking(tx447, earlier, at(10), at(12))));
 
         assertThat(availability.refusalFor(tx447, trip(bkkHcm, at(13))))
-                .contains("TX-447 is ready in Thailand on 14 Oct after its last trip; this trip starts 13 Oct.");
+                .contains("TX-447 is ready in Bangkok on 14 Oct after its last trip; this trip starts 13 Oct.");
     }
 
     @Test
@@ -295,14 +306,42 @@ class VehicleAvailabilityTest {
     }
 
     @Test
-    @DisplayName("a truck ending abroad with no corridor back isn't available at home")
+    @DisplayName("a truck with no permitted road back isn't available at home")
     void noCorridorBack() {
-        Vehicle tx447 = runs(vehicle("TX-447", vn, kh, th), hcmBkk, hcmHan);
-        Trip earlier = trip(hcmBkk, at(1));
+        // Back from Kuala Lumpur to Ho Chi Minh City passes Cambodia, which it has no permit for.
+        Vehicle tx447 = runs(vehicle("TX-447", vn, th, my), bkkKul, hcmHan);
+        Trip earlier = trip(bkkKul, at(1));
         when(bookings.findForAvailability(tx447.getId())).thenReturn(List.of(booking(tx447, earlier, at(1), at(5))));
 
         assertThat(availability.refusalFor(tx447, trip(hcmHan, at(20))))
-                .contains("TX-447 will be in Thailand from 5 Oct and runs no corridor to Vietnam.");
+                .contains("TX-447 will be in Kuala Lumpur from 5 Oct and has no permitted road to Ho Chi Minh City.");
+    }
+
+    @Test
+    @DisplayName("Hanoi to Ho Chi Minh City counts the drive, though both are in Vietnam, using RD HCM → HAN backwards")
+    void sameCountryOtherCity() {
+        Vehicle tx447 = runs(vehicle("TX-447", vn), hcmHan);
+        Trip earlier = trip(hcmHan, at(1));
+        when(bookings.findForAvailability(tx447.getId())).thenReturn(List.of(booking(tx447, earlier, at(1), at(5))));
+
+        // Ready in Hanoi on 6 Oct, 4 driving days back: 10 Oct.
+        assertThat(availability.refusalFor(tx447, trip(hcmHan, at(8))))
+                .contains("TX-447 can be in Ho Chi Minh City on 10 Oct (driving from Hanoi, 4 days); this trip starts"
+                        + " 8 Oct.");
+        assertThat(availability.refusalFor(tx447, trip(hcmHan, at(10)))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the drive chains corridors: Kuala Lumpur to Ho Chi Minh City through Bangkok, 6 days")
+    void chainedDrive() {
+        Vehicle tk102 = runs(vehicle("TK-102", vn, kh, th, my), bkkKul, hcmHan);
+        Trip earlier = trip(bkkKul, at(1));
+        when(bookings.findForAvailability(tk102.getId())).thenReturn(List.of(booking(tk102, earlier, at(1), at(5))));
+
+        assertThat(availability.refusalFor(tk102, trip(hcmHan, at(11))))
+                .contains("TK-102 can be in Ho Chi Minh City on 12 Oct (driving from Kuala Lumpur, 6 days); this trip"
+                        + " starts 11 Oct.");
+        assertThat(availability.refusalFor(tk102, trip(hcmHan, at(12)))).isEmpty();
     }
 
     @Test
@@ -316,7 +355,7 @@ class VehicleAvailabilityTest {
         assertThat(availability.refusalFor(tx447, mine, LocalDate.of(2026, 10, 10)))
                 .isEmpty();
         assertThat(availability.refusalFor(tx447, other, LocalDate.of(2026, 10, 10)))
-                .hasValueSatisfying(r -> assertThat(r).startsWith("TX-447 is booked until 12 Oct"));
+                .hasValueSatisfying(r -> assertThat(r).startsWith("TX-447 is booked until 13 Oct"));
     }
 
     @Test
@@ -387,8 +426,15 @@ class VehicleAvailabilityTest {
         return b;
     }
 
+    private static void cities(Corridor c, String from, String to, int days) {
+        c.setOriginCity(from);
+        c.setDestinationCity(to);
+        c.setDrivingDays((short) days);
+    }
+
     private static Vehicle vehicle(String code, Country home, Country... permits) {
         Vehicle v = new Vehicle();
+        v.setHomeCity("HK".equals(home.getCode()) ? "Hong Kong" : "Ho Chi Minh City");
         v.setId(UUID.randomUUID());
         v.setCode(code);
         v.setStatus(VehicleStatus.ACTIVE);

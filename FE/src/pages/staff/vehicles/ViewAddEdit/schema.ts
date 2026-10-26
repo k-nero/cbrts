@@ -8,30 +8,24 @@ const options = z.array(z.object({ label: z.string(), value: z.string() })).null
 
 /** Where a vehicle is based, the countries it holds permits for and the corridors it works (US-F7-01). */
 const permitFields = {
-  homeCountry: option('Pick the country the vehicle is based in.'),
+  homeCity: option('Pick the city the vehicle is based in.'),
   permittedCountries: options,
   operatingCorridors: options,
 };
 
 const checkPermits = (
   v: {
-    homeCountry: { value: string } | null;
+    homeCity: { value: string } | null;
     permittedCountries: { value: string }[] | null;
     operatingCorridors: unknown[] | null;
   },
   ctx: z.RefinementCtx,
 ) => {
-  if (v.homeCountry === null)
+  if (v.homeCity === null)
     ctx.addIssue({
       code: 'custom',
-      path: ['homeCountry'],
-      message: 'Pick the country the vehicle is based in.',
-    });
-  if (v.homeCountry && v.permittedCountries?.some((c) => c.value === v.homeCountry?.value))
-    ctx.addIssue({
-      code: 'custom',
-      path: ['permittedCountries'],
-      message: 'The home country needs no permit; take it out of this list.',
+      path: ['homeCity'],
+      message: 'Pick the city the vehicle is based in.',
     });
   if (!v.operatingCorridors?.length)
     ctx.addIssue({

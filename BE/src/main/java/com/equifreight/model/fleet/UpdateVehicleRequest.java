@@ -12,6 +12,7 @@ import lombok.Builder;
 public record UpdateVehicleRequest(
         Integer payloadKg,
         VehicleStatus status,
-        UUID homeCountryId,
+        /* The city it is based in (US-F7-03); its home country follows. */
+        String homeCity,
         List<UUID> permittedCountryIds,
         List<UUID> operatingCorridorIds) {}

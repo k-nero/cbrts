@@ -94,6 +94,12 @@ export const useGeneratedVehicleColumn = ({
         ),
       },
       {
+        title: 'Based in',
+        key: 'homeCity',
+        width: 170,
+        render: (_, v) => <span className="type-body-s text-ink">{v.homeCity ?? '—'}</span>,
+      },
+      {
         title: 'Countries',
         key: 'countries',
         width: 170,
