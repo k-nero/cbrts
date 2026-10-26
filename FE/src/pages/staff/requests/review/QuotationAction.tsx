@@ -1,6 +1,6 @@
 import { type FC, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { message } from 'antd';
+import { App } from 'antd';
 
 import { Button } from '@/components/ui';
 import { queryKeys } from '@/constant/query';
@@ -21,6 +21,7 @@ export const QuotationAction: FC<{ review: RequestReview; primary?: boolean }> =
   const router = useCustomRouter();
   const start = useStartQuotation();
   const qc = useQueryClient();
+  const { message } = App.useApp();
   const starting = useRef(false);
   const id = review.request.id;
   const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));

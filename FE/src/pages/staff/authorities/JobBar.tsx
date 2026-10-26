@@ -23,13 +23,11 @@ const JobBar: FC<Props> = ({ jobs, loading, jobId, onSelect, onSearch }) => {
       <Flex gap={12} align="center">
         <span className="type-label-s text-ink-2">Transport job:</span>
         <Select
-          showSearch
+          showSearch={{ onSearch, filterOption: false }}
           placeholder="Search by job code or club"
           value={jobId ?? undefined}
           onChange={(value) => onSelect(value ?? null)}
-          onSearch={onSearch}
           loading={loading}
-          filterOption={false}
           options={jobs.map((job) => ({
             label: [job.code, job.clubName, routeOf(job)].filter(Boolean).join(' · '),
             value: job.id,

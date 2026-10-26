@@ -2,7 +2,7 @@ import { type FC, useRef, useState } from 'react';
 import { useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { Flex, message } from 'antd';
+import { App, Flex } from 'antd';
 import type { AxiosError } from 'axios';
 
 import { afterReturn } from './afterReturn';
@@ -39,6 +39,7 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
   const router = useCustomRouter();
   const send = useReturnRequest();
   const qc = useQueryClient();
+  const { message } = App.useApp();
   const methods = useFormCustom<NoteForm>({
     resolver: zodResolver(noteSchema),
     mode: 'onChange',
