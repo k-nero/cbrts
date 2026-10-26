@@ -4,7 +4,7 @@ import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginTailwindcss } from '@rsbuild/plugin-tailwindcss';
 import { pluginTypeCheck } from '@rsbuild/plugin-type-check';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     pluginReact({
       enableProfiler: true,
@@ -37,7 +37,9 @@ export default defineConfig({
   },
   source: {
     entry: {
-      index: './src/main.tsx',
+      // In dev, react-scan runs as the first entry module so it hooks into React before react-dom
+      // loads. A build never includes it.
+      index: command === 'dev' ? ['./src/scan.ts', './src/main.tsx'] : './src/main.tsx',
     },
   },
   dev: {
@@ -87,4 +89,4 @@ export default defineConfig({
       root: 'dist',
     },
   },
-});
+}));
