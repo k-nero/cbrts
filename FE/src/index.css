@@ -357,3 +357,16 @@ button:focus-visible,
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+
+/*
+ * Theme switch (components/ThemeToggle.tsx): the new theme is revealed by a clip-path circle from
+ * the toggle, so the browser's default crossfade is turned off and the new snapshot sits on top.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}

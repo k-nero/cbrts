@@ -13,6 +13,39 @@ export type RouteName = NameInto<typeof routesConfig>;
 
 type AdditionOption = { force?: boolean };
 
+type MatchedConfig = Pick<RouteConfigItem, 'roles' | 'type' | 'name' | 'breadcrumb'>;
+
+/** The config of every route along `pathname`, outermost first. */
+export function configsForPath(pathname: string): MatchedConfig[] {
+  const segments = pathname
+    .split('/')
+    .filter(Boolean)
+    .map((s) => `/${s}`);
+  let level: readonly RouteConfigItem[] = routesConfig;
+  const result: MatchedConfig[] = [];
+  for (const segment of segments) {
+    const found = level.find((c) => DYNAMIC_PATH_REGEX.test(c.path) || c.path === segment);
+    if (!found) break;
+    result.push({
+      roles: found.roles,
+      type: found.type,
+      name: found.name,
+      breadcrumb: found.breadcrumb,
+    });
+    level = found.children ?? [];
+  }
+  return result;
+}
+
+/** Whether a signed-in user with `roles` may open `pathname`, by the same rules as the guard. */
+export function canSignedInOpen(pathname: string, roles: readonly string[]): boolean {
+  return configsForPath(pathname).every(
+    (config) =>
+      config.type !== 'unauthenticated' &&
+      (config.roles.includes('*') || config.roles.some((r) => roles.includes(r))),
+  );
+}
+
 /** Navigation that asks before leaving a form with unsaved changes (FormWrapper registers them). */
 export const useRouterNavigation = () => {
   const navigate = useNavigate();
@@ -79,26 +112,7 @@ export const useCustomRouter = () => {
   );
 
   /** The config of every route along the current path, outermost first. */
-  const configsMatchPath = useMemo(() => {
-    const segments = pathname
-      .split('/')
-      .filter(Boolean)
-      .map((s) => `/${s}`);
-    let level: readonly RouteConfigItem[] = routesConfig;
-    const result: Pick<RouteConfigItem, 'roles' | 'type' | 'name' | 'breadcrumb'>[] = [];
-    for (const segment of segments) {
-      const found = level.find((c) => DYNAMIC_PATH_REGEX.test(c.path) || c.path === segment);
-      if (!found) break;
-      result.push({
-        roles: found.roles,
-        type: found.type,
-        name: found.name,
-        breadcrumb: found.breadcrumb,
-      });
-      level = found.children ?? [];
-    }
-    return result;
-  }, [pathname]);
+  const configsMatchPath = useMemo(() => configsForPath(pathname), [pathname]);
 
   return { ...navigation, configsMatchPath, routesConfig, paths, checkCurrentPathMatch };
 };
