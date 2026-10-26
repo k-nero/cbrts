@@ -10,6 +10,7 @@ import { ApprovePanel } from './ApprovePanel';
 import { JobPanel } from './JobPanel';
 import { NoteField } from './NoteField';
 import { QuotationAction } from './QuotationAction';
+import { fleetShort } from './fleetCheck';
 import { RejectBox } from './RejectBox';
 import { type NoteForm, noteSchema } from './schema';
 
@@ -172,6 +173,11 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
         <div className="pt-4 border-t border-line">
           <Flex vertical gap={8}>
             <span className="type-label-s text-ink-2">Other outcomes</span>
+            {fleetShort(review.fleet) && (
+              <span className="type-body-s text-warn">
+                No vehicle can run this by the fleet calendar. You can still quote it.
+              </span>
+            )}
             <QuotationAction review={review} />
             <RejectBox review={review} />
           </Flex>

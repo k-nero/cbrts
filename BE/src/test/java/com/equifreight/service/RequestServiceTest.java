@@ -144,7 +144,8 @@ class RequestServiceTest {
                 quotations,
                 feeBands,
                 notifications,
-                progress);
+                progress,
+                mock(RequestFleetService.class));
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -1218,7 +1219,8 @@ class RequestServiceTest {
                     quotations,
                     feeBands,
                     notifications,
-                    progress);
+                    progress,
+                    mock(RequestFleetService.class));
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 

@@ -153,6 +153,8 @@ export const POLICY_FIELDS: {
   // BR-Q-16: the air weight limits, whole kilograms.
   { key: 'STALL_PAYLOAD_KG', label: 'Stall payload, kg', min: 1, max: 99999, step: 1 },
   { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment limit, kg', min: 1, max: 99999, step: 1 },
+  // US-F7-02: cleaning, disinfection and crew rest after a trip, whole hours.
+  { key: 'TURNAROUND_HOURS', label: 'Turnaround after a trip, hours', max: 240, step: 1 },
 ];
 
 export const policySchema = z.object(

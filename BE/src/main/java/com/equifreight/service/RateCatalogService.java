@@ -85,7 +85,8 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.LATE_PENALTY_PCT_PER_HOUR, "Late penalty per hour"),
             Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "Late penalty cap"),
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "The stall payload"),
-            Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"));
+            Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"),
+            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"));
 
     private final RateCatalogVersionRepository versions;
     private final RateSetLoader loader;
@@ -540,6 +541,14 @@ public class RateCatalogService {
                         || value.stripTrailingZeros().scale() > 0) {
                     throw new BusinessException(
                             key.name(), label + " must be a whole number of kilograms from 1 to 99,999.");
+                }
+            }
+            case TURNAROUND_HOURS -> {
+                if (value.signum() < 0
+                        || value.compareTo(BigDecimal.valueOf(240)) > 0
+                        || value.stripTrailingZeros().scale() > 0) {
+                    throw new BusinessException(
+                            key.name(), "The turnaround must be a whole number of hours from 0 to 240.");
                 }
             }
             case ARRIVAL_WINDOW_MIN_HOURS -> {

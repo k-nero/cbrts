@@ -116,7 +116,8 @@ class CustomerQuotationRequoteTest extends QuotationServiceFixture {
                 notifications,
                 invoices,
                 issue,
-                Clock.fixed(now, BusinessTime.ZONE));
+                Clock.fixed(now, BusinessTime.ZONE),
+                mock(RequestFleetService.class));
     }
 
     CustomerQuotationResponse ask(RequoteRequest body) {

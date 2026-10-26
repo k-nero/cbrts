@@ -77,3 +77,11 @@ export const bookingSchema = z
       ctx.addIssue({ code: 'custom', path: ['endsAt'], message: 'End after it starts.' });
   });
 export type BookingForm = z.infer<typeof bookingSchema>;
+
+/** Expected back: the date the coordinator expects the vehicle to be available again (US-F7-02). */
+export const availableOnSchema = z.object({
+  availableOn: z
+    .string('Pick the date it is expected back.')
+    .min(1, 'Pick the date it is expected back.'),
+});
+export type AvailableOnForm = z.infer<typeof availableOnSchema>;

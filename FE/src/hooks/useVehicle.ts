@@ -65,6 +65,16 @@ export const useUpdateVehicle = () => {
   });
 };
 
+/** Sets or clears the date a vehicle is expected back (US-F7-02). */
+export const useSetAvailableOn = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, availableOn }: { id: string; availableOn: string | null }) =>
+      vehicleApi.setAvailableOn(id, availableOn),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
+  });
+};
+
 export const useBookVehicle = () => {
   const queryClient = useQueryClient();
   return useMutation({

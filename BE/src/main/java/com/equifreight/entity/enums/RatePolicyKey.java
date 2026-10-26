@@ -21,5 +21,7 @@ public enum RatePolicyKey {
     /** The kilograms one air stall carries; the heaviest horses that could share a stall must not exceed it (BR-Q-16). */
     STALL_PAYLOAD_KG,
     /** The most kilograms of horses one air shipment may carry (BR-Q-16). */
-    AIR_SHIPMENT_MAX_KG
+    AIR_SHIPMENT_MAX_KG,
+    /** Hours after a trip ends before its vehicle can drive again: cleaning, disinfection, crew rest (US-F7-02). */
+    TURNAROUND_HOURS
 }

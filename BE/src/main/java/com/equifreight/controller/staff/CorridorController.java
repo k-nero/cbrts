@@ -4,6 +4,7 @@ import com.equifreight.entity.User;
 import com.equifreight.model.route.CorridorResponse;
 import com.equifreight.model.route.CreateCorridorRequest;
 import com.equifreight.model.route.DateFlexRequest;
+import com.equifreight.model.route.DrivingDaysRequest;
 import com.equifreight.service.CorridorService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -59,5 +60,13 @@ public class CorridorController {
     public CorridorResponse setDateFlex(
             @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody DateFlexRequest request) {
         return corridorService.setDateFlexDays(user, id, request.dateFlexDays());
+    }
+
+    /** US-F7-02: how many days the route takes to drive one way. */
+    @PutMapping("/{id}/driving-days")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public CorridorResponse setDrivingDays(
+            @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody DrivingDaysRequest request) {
+        return corridorService.setDrivingDays(user, id, request.drivingDays());
     }
 }

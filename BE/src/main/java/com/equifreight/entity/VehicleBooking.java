@@ -26,6 +26,11 @@ public class VehicleBooking extends BaseEntity {
     @JoinColumn(name = "trip_id")
     private Trip trip;
 
+    /** Set exactly when kind is RESERVED: the accepted request this vehicle is held for (US-F7-02). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "request_id")
+    private TransportRequest request;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private BookingKind kind;

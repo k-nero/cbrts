@@ -22,6 +22,8 @@ public record CreateCorridorRequest(
         @Positive Integer distanceKm,
         /* 0 to 7; 3 when left out. */
         Integer dateFlexDays,
+        /* 1 to 30; from the distance at 500 km a day when left out (US-F7-02). */
+        Integer drivingDays,
         List<UUID> crossingIds) {
 
     public CreateCorridorRequest {

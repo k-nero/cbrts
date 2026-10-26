@@ -117,6 +117,7 @@ public class RequestService {
     private final RateFeeBandRepository feeBands;
     private final NotificationService notifications;
     private final RequestProgressService progress;
+    private final RequestFleetService fleet;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -134,7 +135,8 @@ public class RequestService {
             QuotationRepository quotations,
             RateFeeBandRepository feeBands,
             NotificationService notifications,
-            RequestProgressService progress) {
+            RequestProgressService progress,
+            RequestFleetService fleet) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -151,6 +153,7 @@ public class RequestService {
         this.feeBands = feeBands;
         this.notifications = notifications;
         this.progress = progress;
+        this.fleet = fleet;
     }
 
     @Transactional(readOnly = true)
@@ -411,6 +414,7 @@ public class RequestService {
         request.setCancelledAt(clock.instant());
         request.setCancellationFeePct(feePct);
         TransportRequest saved = requests.saveAndFlush(request);
+        fleet.release(saved, "the club cancelled the request.");
 
         String fee = issued.isEmpty()
                 ? "no fee, as no quotation was issued"

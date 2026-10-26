@@ -88,7 +88,8 @@ class RequestApprovalServiceTest {
                 review,
                 audit,
                 notifications,
-                Clock.fixed(NOW, BusinessTime.ZONE));
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                mock(RequestFleetService.class));
 
         yen = user("Hải Yến", "Vũ");
         lan = user("Thị Lan", "Nguyễn");

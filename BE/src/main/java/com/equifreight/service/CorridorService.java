@@ -124,6 +124,11 @@ public class CorridorService {
         corridor.setDestinationCity(destination);
         corridor.setDistanceKm(request.distanceKm());
         corridor.setDateFlexDays(request.dateFlexDays().shortValue());
+        if (request.drivingDays() != null) checkDrivingDays(request.drivingDays());
+        corridor.setDrivingDays(
+                request.drivingDays() == null
+                        ? Corridor.drivingDaysFor(request.distanceKm())
+                        : request.drivingDays().shortValue());
         corridor.setOriginCountry(from);
         corridor.setDestinationCountry(to);
         for (int i = 0; i < route.size(); i++) {
@@ -172,6 +177,41 @@ public class CorridorService {
                 "{\"dateFlexDays\":" + before + "}",
                 "{\"dateFlexDays\":" + days + "}");
         return RouteMapper.toCorridorResponse(saved, names);
+    }
+
+    /** Sets the route's driving days (US-F7-02) and writes the decision to the audit log; the same value changes nothing. */
+    @Transactional
+    public CorridorResponse setDrivingDays(User actor, UUID id, int days) {
+        Corridor corridor = corridors.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Corridor", id));
+        checkDrivingDays(days);
+        List<String> names = crossingNames(List.of(id)).getOrDefault(id, List.of());
+        int before = corridor.getDrivingDays();
+        if (before == days) {
+            return RouteMapper.toCorridorResponse(corridor, names);
+        }
+        corridor.setDrivingDays((short) days);
+        Corridor saved = corridors.save(corridor);
+        audit.recordDecision(
+                actor,
+                "CORRIDOR_DRIVING_DAYS_CHANGED",
+                "Driving days on " + corridor.getCode() + ": " + dayWords(before) + " → " + dayWords(days) + ".",
+                ENTITY_TYPE,
+                saved.getId(),
+                corridor.getCode().length() <= AUDIT_CODE_MAX ? corridor.getCode() : null,
+                null,
+                "{\"drivingDays\":" + before + "}",
+                "{\"drivingDays\":" + days + "}");
+        return RouteMapper.toCorridorResponse(saved, names);
+    }
+
+    private static void checkDrivingDays(int days) {
+        if (days < 1 || days > 30) {
+            throw new BusinessException("DRIVING_DAYS", "Driving days run from 1 to 30.");
+        }
+    }
+
+    private static String dayWords(int days) {
+        return days + (days == 1 ? " day" : " days");
     }
 
     private static void checkFlex(int days) {

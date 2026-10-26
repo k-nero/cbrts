@@ -32,6 +32,10 @@ export const vehicleApi = {
   update: (id: string, body: UpdateVehicleInput) =>
     client.put<Vehicle>(`/staff/vehicles/${id}`, body).then((r) => r.data),
 
+  /** The date the vehicle is expected back, or null to clear it (US-F7-02). */
+  setAvailableOn: (id: string, availableOn: string | null) =>
+    client.put<Vehicle>(`/staff/vehicles/${id}/available-on`, { availableOn }).then((r) => r.data),
+
   book: (body: VehicleBookingInput) =>
     client.post<VehicleBooking>('/staff/vehicles/bookings', body).then((r) => r.data),
 

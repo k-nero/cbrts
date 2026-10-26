@@ -39,6 +39,13 @@ public class Corridor extends BaseEntity {
     @Column(nullable = false)
     private short dateFlexDays = 3;
 
+    /**
+     * Days to drive the route one way, 1 to 30 (US-F7-02): a trip's length before its route is planned, and how long
+     * an empty drive back takes. Filled from the distance at 500 km a day; the fleet & route coordinator corrects it.
+     */
+    @Column(nullable = false)
+    private short drivingDays = 1;
+
     /** The country the route starts in: the first crossing's, or its origin city's places'. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_country_id", nullable = false)
@@ -52,6 +59,12 @@ public class Corridor extends BaseEntity {
     @OneToMany(mappedBy = "corridor", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("seq")
     private List<CorridorCrossing> crossings = new ArrayList<>();
+
+    /** Driving days for {@code distanceKm} at 500 km a day, 1 to 30: a new route's default (US-F7-02). */
+    public static short drivingDaysFor(Integer distanceKm) {
+        if (distanceKm == null || distanceKm <= 0) return 1;
+        return (short) Math.min(30, Math.max(1, (distanceKm + 499) / 500));
+    }
 
     public boolean isRoad() {
         return mode == TransportMode.ROAD;

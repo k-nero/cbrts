@@ -70,6 +70,14 @@ public class VehicleController {
         return vehicleService.update(user, id, request);
     }
 
+    /** US-F7-02: the date the vehicle is expected back, or null to clear it. */
+    @PutMapping("/{id}/available-on")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public VehicleResponse setAvailableOn(
+            @AuthenticationPrincipal User user, @PathVariable UUID id, @RequestBody AvailableOnRequest request) {
+        return vehicleService.setAvailableOn(user, id, request.availableOn());
+    }
+
     /**
      * US-F3-04: Book vehicle without double booking.
      */

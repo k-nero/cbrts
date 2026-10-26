@@ -6,5 +6,7 @@ package com.equifreight.entity.enums;
 public enum BookingKind {
     JOB,
     MAINTENANCE,
-    HOLD
+    HOLD,
+    /** A vehicle held for an accepted request until its trip's load plan is confirmed (US-F7-02). */
+    RESERVED
 }

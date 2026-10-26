@@ -25,4 +25,9 @@ export const routeCatalogApi = {
   createBorderCrossing: (body: CreateBorderCrossingInput) =>
     client.post<BorderCrossing>('/staff/border-crossings', body).then((r) => r.data),
   countries: () => client.get<CountryOption[]>('/staff/countries').then((r) => r.data),
+  /** How many days the route takes to drive one way, 1 to 30 (US-F7-02). */
+  setDrivingDays: (id: string, drivingDays: number) =>
+    client
+      .put<Corridor>(`/staff/corridors/${id}/driving-days`, { drivingDays })
+      .then((r) => r.data),
 };

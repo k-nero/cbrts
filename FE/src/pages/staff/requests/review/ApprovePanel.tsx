@@ -3,9 +3,10 @@ import { Flex, Skeleton } from 'antd';
 
 import { ApproveForm } from './ApproveForm';
 import { QuotationAction } from './QuotationAction';
+import { fleetShort } from './fleetCheck';
 import { RejectBox } from './RejectBox';
 
-import { Chip, Panel } from '@/components/ui';
+import { Callout, Chip, Panel } from '@/components/ui';
 import { useApprovalOptions } from '@/hooks/staffRequest';
 import type { RequestReview } from '@/interfaces';
 
@@ -23,6 +24,13 @@ export const ApprovePanel: FC<{ review: RequestReview }> = ({ review }) => {
         <p className="type-body-s m-0 text-ink-2">
           {`${request.club} accepted ${quotation ? `quotation ${quotation.code} v${quotation.versionNo}` : 'the quotation'}. Approving creates the job, locks the price and the horse list, and opens the document checklist.`}
         </p>
+        {(fleetShort(review.fleet) || review.fleet?.held === false) && (
+          <Callout tone="warn" title="No vehicle held">
+            {fleetShort(review.fleet)
+              ? `${review.fleet?.message} You can still approve; the coordinator plans the vehicle.`
+              : 'No vehicle was free when the customer accepted. Approving tries again; you can approve either way.'}
+          </Callout>
+        )}
         <div className="p-4 rounded-md border border-line-strong bg-raised">
           <Flex vertical gap={12}>
             <span className="type-label-m text-ink">Approve into a job</span>

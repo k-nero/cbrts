@@ -52,6 +52,15 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class RequestReviewService {
 
+    /** The statuses the fleet check is shown for (US-F7-02): from submission until the request is approved. */
+    private static final java.util.Set<RequestStatus> FLEET_CHECKED = java.util.EnumSet.of(
+            RequestStatus.SUBMITTED,
+            RequestStatus.UNDER_REVIEW,
+            RequestStatus.INFO_REQUIRED,
+            RequestStatus.QUOTED,
+            RequestStatus.CUSTOMER_ACCEPTED,
+            RequestStatus.APPROVED);
+
     /** request_revisions.note is varchar(500); transport_requests.info_required_note holds 1000. */
     static final int NOTE_MAX = 500;
 
@@ -84,6 +93,7 @@ public class RequestReviewService {
     private final TransportJobRepository jobs;
     private final JsonMapper json;
     private final Clock clock;
+    private final RequestFleetService fleet;
 
     public RequestReviewService(
             TransportRequestRepository requests,
@@ -95,7 +105,8 @@ public class RequestReviewService {
             QuotationRepository quotations,
             TransportJobRepository jobs,
             JsonMapper json,
-            Clock clock) {
+            Clock clock,
+            RequestFleetService fleet) {
         this.requests = requests;
         this.revisions = revisions;
         this.auditLogs = auditLogs;
@@ -106,6 +117,7 @@ public class RequestReviewService {
         this.jobs = jobs;
         this.json = json;
         this.clock = clock;
+        this.fleet = fleet;
     }
 
     /** "accepted by the customer": a status in words, for refusals. */
@@ -203,6 +215,7 @@ public class RequestReviewService {
                         .findFirstByRequestIdOrderByVersionNoDesc(request.getId())
                         .map(QuotationMapper::toRef)
                         .orElse(null))
+                .fleet(FLEET_CHECKED.contains(request.getStatus()) ? fleet.check(request) : null)
                 .job(
                         request.getStatus() == RequestStatus.APPROVED
                                 ? jobs.findByRequestId(request.getId())

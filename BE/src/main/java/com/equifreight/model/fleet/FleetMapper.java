@@ -31,6 +31,7 @@ public final class FleetMapper {
                         .map(RouteMapper::toCountryOption)
                         .sorted(Comparator.comparing(CountryOptionResponse::code))
                         .toList())
+                .availableOn(vehicle.getAvailableOn())
                 .operatingCorridors(vehicle.getOperatingCorridors().stream()
                         .map(c -> new VehicleCorridorResponse(c.getId(), c.getCode()))
                         .sorted(Comparator.comparing(VehicleCorridorResponse::code))
@@ -68,6 +69,7 @@ public final class FleetMapper {
                                 : String.join(
                                         ", ",
                                         jobs.stream().map(TransportJob::getCode).toList()))
+                .requestCode(booking.getRequest() != null ? booking.getRequest().getCode() : null)
                 .kind(booking.getKind() != null ? booking.getKind().name() : "JOB")
                 .startsAt(booking.getStartsAt())
                 .endsAt(booking.getEndsAt())

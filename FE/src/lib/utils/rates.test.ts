@@ -167,6 +167,7 @@ describe('policyRows', () => {
         LATE_PENALTY_CAP_PCT: 30,
         STALL_PAYLOAD_KG: 5504,
         AIR_SHIPMENT_MAX_KG: 20000,
+        TURNAROUND_HOURS: 24,
       },
       [
         { kind: 'CANCELLATION', minDays: 0, maxDays: 6, value: 100 },
@@ -185,6 +186,7 @@ describe('policyRows', () => {
       { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
       { key: 'STALL_PAYLOAD_KG', label: 'Stall payload', value: '5,504 kg per stall' },
       { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment', value: '20,000 kg of horses' },
+      { key: 'TURNAROUND_HOURS', label: 'Turnaround', value: '24 h after each trip' },
       { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
       { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
       {
@@ -205,6 +207,7 @@ describe('policyRows', () => {
     expect(policyRows({}, []).find((r) => r.key === 'ESTIMATE_BAND_PCT')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'STALL_PAYLOAD_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'AIR_SHIPMENT_MAX_KG')?.value).toBe('—');
+    expect(policyRows({}, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value).toBe('—');
   });
 });
 

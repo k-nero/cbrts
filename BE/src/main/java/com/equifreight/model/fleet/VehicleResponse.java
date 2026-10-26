@@ -3,6 +3,7 @@ package com.equifreight.model.fleet;
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.model.route.CountryOptionResponse;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
@@ -23,5 +24,9 @@ public record VehicleResponse(
         CountryOptionResponse homeCountry,
         List<CountryOptionResponse> permittedCountries,
         List<VehicleCorridorResponse> operatingCorridors,
+        /** The date the coordinator expects it back (US-F7-02); null when not set. */
+        LocalDate availableOn,
         Boolean available,
-        String unavailableReason) {}
+        String unavailableReason,
+        /** Listed for a trip only: it is held for one of the trip's requests (US-F7-02). */
+        Boolean held) {}

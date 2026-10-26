@@ -59,6 +59,7 @@ public class RequestApprovalService {
     private final AuditService audit;
     private final NotificationService notifications;
     private final Clock clock;
+    private final RequestFleetService fleet;
 
     public RequestApprovalService(
             TransportRequestRepository requests,
@@ -70,7 +71,8 @@ public class RequestApprovalService {
             RequestReviewService review,
             AuditService audit,
             NotificationService notifications,
-            Clock clock) {
+            Clock clock,
+            RequestFleetService fleet) {
         this.requests = requests;
         this.quotations = quotations;
         this.jobs = jobs;
@@ -81,6 +83,7 @@ public class RequestApprovalService {
         this.audit = audit;
         this.notifications = notifications;
         this.clock = clock;
+        this.fleet = fleet;
     }
 
     /** Who can be put on the job: every active specialist and coordinator, fewest open jobs first. */
@@ -126,6 +129,8 @@ public class RequestApprovalService {
                 teamMember(body.transportSpecialistId(), RoleName.TRANSPORT_SPECIALIST, "transport specialist");
         User coordinator = teamMember(body.coordinatorId(), RoleName.FLEET_COORDINATOR, "fleet & route coordinator");
         clearance.requireChecklistSource(request);
+        // The hold placed at acceptance is checked again, or placed now (US-F7-02); none free never blocks approval.
+        fleet.recheck(request);
 
         Instant now = clock.instant();
         request.setStatus(RequestStatus.APPROVED);
@@ -196,6 +201,7 @@ public class RequestApprovalService {
         request.setStatus(RequestStatus.REJECTED);
         request.setRejectReason(reason);
         requests.saveAndFlush(request);
+        fleet.release(request, "the request was rejected.");
 
         audit.recordDecision(
                 manager,

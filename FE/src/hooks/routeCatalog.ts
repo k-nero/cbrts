@@ -41,6 +41,16 @@ export const useCreatePlace = () => {
   });
 };
 
+/** Sets a route's driving days (US-F7-02); refreshes Routes and every corridor list. */
+export const useSetDrivingDays = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, drivingDays }: { id: string; drivingDays: number }) =>
+      routeCatalogApi.setDrivingDays(id, drivingDays),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['corridors'] }),
+  });
+};
+
 export const useCreateBorderCrossing = () => {
   const qc = useQueryClient();
   return useMutation({

@@ -56,3 +56,13 @@ export const crossingSchema = z
       pick(ctx, 'toCountry', 'A crossing joins two different countries.');
   });
 export type CrossingForm = z.infer<typeof crossingSchema>;
+
+/** Driving days: how many days the route takes to drive one way (US-F7-02). */
+export const drivingDaysSchema = z.object({
+  drivingDays: z
+    .number('Enter 1 to 30 days.')
+    .int('Whole days only.')
+    .min(1, 'At least 1 day.')
+    .max(30, 'At most 30 days.'),
+});
+export type DrivingDaysForm = z.infer<typeof drivingDaysSchema>;

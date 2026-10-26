@@ -2,6 +2,7 @@ import { type FC, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
+import { fleetRejectReason } from './fleetCheck';
 import { type RejectForm, rejectSchema } from './schema';
 
 import { CancelButton } from '@/components/form/CancelButton';
@@ -41,7 +42,15 @@ export const RejectBox: FC<{ review: RequestReview }> = ({ review }) => {
 
   if (!open) {
     return (
-      <Button variant="ghost" block onClick={() => setOpen(true)}>
+      <Button
+        variant="ghost"
+        block
+        onClick={() => {
+          // With no vehicle to run it, the reason starts from the fleet check (US-F7-02).
+          methods.reset({ reason: fleetRejectReason(review) });
+          setOpen(true);
+        }}
+      >
         Reject with a reason
       </Button>
     );

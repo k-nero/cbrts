@@ -182,6 +182,11 @@ export const policyRows = (
       value: kgOr(p.AIR_SHIPMENT_MAX_KG, (x) => `${x} of horses`),
     },
     {
+      key: 'TURNAROUND_HOURS',
+      label: 'Turnaround',
+      value: p.TURNAROUND_HOURS == null ? '—' : `${p.TURNAROUND_HOURS} h after each trip`,
+    },
+    {
       key: 'SHORT_NOTICE',
       label: 'Short notice',
       value: bands('SHORT_NOTICE', (b) => `× ${b.value}`),

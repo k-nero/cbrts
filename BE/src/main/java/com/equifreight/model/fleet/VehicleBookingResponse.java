@@ -17,6 +17,8 @@ public record VehicleBookingResponse(
         UUID jobId,
         /** The codes of the trip's jobs, comma-separated. */
         String jobCode,
+        /** The request a RESERVED booking holds the vehicle for (US-F7-02). */
+        String requestCode,
         String kind,
         Instant startsAt,
         Instant endsAt) {}

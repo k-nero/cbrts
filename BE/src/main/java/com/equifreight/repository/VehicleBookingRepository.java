@@ -2,6 +2,7 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.VehicleBooking;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,14 +29,19 @@ public interface VehicleBookingRepository extends JpaRepository<VehicleBooking, 
             @Param("excludeId") UUID excludeId);
 
     /**
-     * The vehicle's trip bookings that end by {@code at}, latest first, with the trip's corridor and the country it
-     * ends in: the first is where the vehicle is at {@code at} (US-F7-01). {@code tripId}'s own booking is left out.
+     * Every booking of the vehicle, earliest first, with the corridor a trip or a hold ends on and its countries: where
+     * the vehicle is and when it is free, worked out in memory (US-F7-02).
      */
-    @Query("SELECT b FROM VehicleBooking b JOIN FETCH b.trip t JOIN FETCH t.corridor c JOIN FETCH c.destinationCountry "
-            + "WHERE b.vehicle.id = :vehicleId AND b.kind = com.equifreight.entity.enums.BookingKind.JOB "
-            + "AND b.endsAt <= :at AND (:tripId IS NULL OR t.id <> :tripId) ORDER BY b.endsAt DESC")
-    List<VehicleBooking> findTripBookingsEndingBy(
-            @Param("vehicleId") UUID vehicleId, @Param("at") Instant at, @Param("tripId") UUID tripId);
+    @Query("SELECT b FROM VehicleBooking b LEFT JOIN FETCH b.trip t LEFT JOIN FETCH t.corridor tc "
+            + "LEFT JOIN FETCH tc.destinationCountry LEFT JOIN FETCH b.request r LEFT JOIN FETCH r.corridor rc "
+            + "LEFT JOIN FETCH rc.destinationCountry WHERE b.vehicle.id = :vehicleId ORDER BY b.startsAt")
+    List<VehicleBooking> findForAvailability(@Param("vehicleId") UUID vehicleId);
+
+    /** The holds for these requests (US-F7-02). */
+    List<VehicleBooking> findByRequest_IdIn(Collection<UUID> requestIds);
+
+    /** The hold for this request, if any (US-F7-02). */
+    Optional<VehicleBooking> findFirstByRequest_Id(UUID requestId);
 
     @Query("SELECT b FROM VehicleBooking b WHERE b.startsAt < :rangeEnd AND b.endsAt > :rangeStart")
     List<VehicleBooking> findInDateRange(@Param("rangeStart") Instant rangeStart, @Param("rangeEnd") Instant rangeEnd);

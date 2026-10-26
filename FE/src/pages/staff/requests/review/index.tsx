@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import { ChecksPanel } from './ChecksPanel';
 import { DecisionPanel } from './DecisionPanel';
+import { FleetPanel } from './FleetPanel';
 import { SentPanel } from './SentPanel';
 
 import { HistoryPanel } from '@/components/request/HistoryPanel';
@@ -88,6 +89,7 @@ const RequestReviewPage: FC = () => {
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <Flex vertical gap={24} className="min-w-0">
           <ChecksPanel checks={review.checks} inReview={inReview(request.status)} />
+          {review.fleet && <FleetPanel fleet={review.fleet} />}
           <SentPanel key={request.id} revisions={review.revisions} />
           <HistoryPanel history={review.history} />
         </Flex>

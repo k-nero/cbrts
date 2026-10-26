@@ -3,6 +3,7 @@ package com.equifreight.entity;
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +60,12 @@ public class Vehicle extends BaseEntity {
             joinColumns = @JoinColumn(name = "vehicle_id"),
             inverseJoinColumns = @JoinColumn(name = "corridor_id"))
     private Set<Corridor> operatingCorridors = new HashSet<>();
+
+    /**
+     * The date the coordinator expects it back, for what the calendar doesn't know (US-F7-02). It counts only while it
+     * is later than the date worked out from the bookings.
+     */
+    private LocalDate availableOn;
 
     /** Its home country or one it holds a permit for. */
     public boolean mayEnter(Country country) {

@@ -86,7 +86,8 @@ class RequestReviewServiceTest {
                 quotations,
                 jobs,
                 JsonMapper.builder().build(),
-                Clock.fixed(NOW, BusinessTime.ZONE));
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                mock(RequestFleetService.class));
 
         manager = new User();
         manager.setId(UUID.randomUUID());
