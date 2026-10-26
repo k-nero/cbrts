@@ -9,6 +9,7 @@ import ErrorBoundaryHandling from './ErrorBoundaryHandling';
 import Footer from './Footer';
 import Header from './Header';
 import NotificationBell from './notification/NotificationBell';
+import PageMotion from './PageMotion';
 import ThemeToggle from './ThemeToggle';
 import { SideUser } from './SideUser';
 
@@ -46,7 +47,9 @@ const AuthenticateLayout: FC<Props> = ({
       <Layout style={{ minHeight: '100vh', background: COLOR_BG_CANVAS }}>
         <Header />
         <ErrorBoundaryHandling key={pathname}>
-          <Content style={{ padding: '32px 120px 96px' }}>{children}</Content>
+          <Content style={{ padding: '32px 120px 96px' }}>
+            <PageMotion>{children}</PageMotion>
+          </Content>
         </ErrorBoundaryHandling>
         <Footer />
       </Layout>

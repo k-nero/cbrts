@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isAxiosError } from 'axios';
 import { Col, Flex, Row } from 'antd';
+import { motion } from 'motion/react';
 
 import { FormGroup } from './FormGroup';
 import { PASSWORD_MIN, type RegisterForm, registerSchema } from './schema';
@@ -13,6 +14,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { Button } from '@/components/ui';
 import { useRegister } from '@/hooks/auth';
 import { apiErrorMessage } from '@/lib';
+import { rise, settle, stagger } from '@/lib/motion';
 import { useCustomRouter } from '@/router/route.hook';
 import { primaryRoleHome, useAuthStore } from '@/stores/authStore';
 
@@ -91,8 +93,15 @@ const RegisterPage = () => {
         </Flex>
       </header>
       <Flex style={{ flex: 1 }}>
-        <Flex vertical gap={32} style={{ width: 720, padding: '96px 120px 64px 160px' }}>
-          <Flex vertical gap={12}>
+        {/* The heading, then the form, rise into place once (lib/motion). */}
+        <motion.div
+          className="flex flex-col gap-8"
+          style={{ width: 720, padding: '96px 120px 64px 160px' }}
+          variants={stagger(0.08)}
+          initial="hidden"
+          animate="shown"
+        >
+          <motion.div variants={rise} className="flex flex-col gap-3">
             <h1 className="m-0 font-display text-[44px] leading-[50px] font-normal text-ink">
               Create a club account
             </h1>
@@ -100,114 +109,118 @@ const RegisterPage = () => {
               For racing clubs and horse owners. Staff accounts come by invite from your logistics
               manager.
             </p>
-          </Flex>
-          <FormWrapper
-            methods={methods}
-            isSubmitting={register.isPending}
-            onFinish={onSubmit}
-            force
-            style={{ width: 440 }}
-          >
-            {({ FormField }) => (
-              <>
-                <FormGroup title="Your club">
+          </motion.div>
+          <motion.div variants={rise}>
+            <FormWrapper
+              methods={methods}
+              isSubmitting={register.isPending}
+              onFinish={onSubmit}
+              force
+              style={{ width: 440 }}
+            >
+              {({ FormField }) => (
+                <>
+                  <FormGroup title="Your club">
+                    <FormField
+                      name="clubName"
+                      label="Club or owner name"
+                      component="text"
+                      componentProps={{ autoComplete: 'organization', autoFocus: true }}
+                    />
+                    <FormField
+                      name="country"
+                      label="Country"
+                      component="select"
+                      componentProps={{ options: COUNTRIES, placeholder: 'Pick a country' }}
+                    />
+                  </FormGroup>
+                  <FormGroup title="You">
+                    <Row gutter={[16, 16]}>
+                      <Col span={12}>
+                        <FormField
+                          name="lastName"
+                          label="Family name"
+                          component="text"
+                          componentProps={{ autoComplete: 'family-name' }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <FormField
+                          name="firstName"
+                          label="Given name"
+                          component="text"
+                          componentProps={{ autoComplete: 'given-name' }}
+                        />
+                      </Col>
+                    </Row>
+                    <FormField
+                      name="email"
+                      label="Email"
+                      component="text"
+                      componentProps={{
+                        autoComplete: 'email',
+                        instruction: 'You sign in with it, and bookings are sent to it.',
+                      }}
+                    />
+                    <FormField
+                      name="phone"
+                      label="Phone (optional)"
+                      component="text"
+                      componentProps={{ autoComplete: 'tel' }}
+                    />
+                  </FormGroup>
+                  <FormGroup title="Password">
+                    <FormField
+                      name="password"
+                      label="Password"
+                      component="password"
+                      componentProps={{
+                        autoComplete: 'new-password',
+                        instruction: `At least ${PASSWORD_MIN} characters.`,
+                      }}
+                    />
+                  </FormGroup>
                   <FormField
-                    name="clubName"
-                    label="Club or owner name"
-                    component="text"
-                    componentProps={{ autoComplete: 'organization', autoFocus: true }}
-                  />
-                  <FormField
-                    name="country"
-                    label="Country"
-                    component="select"
-                    componentProps={{ options: COUNTRIES, placeholder: 'Pick a country' }}
-                  />
-                </FormGroup>
-                <FormGroup title="You">
-                  <Row gutter={[16, 16]}>
-                    <Col span={12}>
-                      <FormField
-                        name="lastName"
-                        label="Family name"
-                        component="text"
-                        componentProps={{ autoComplete: 'family-name' }}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <FormField
-                        name="firstName"
-                        label="Given name"
-                        component="text"
-                        componentProps={{ autoComplete: 'given-name' }}
-                      />
-                    </Col>
-                  </Row>
-                  <FormField
-                    name="email"
-                    label="Email"
-                    component="text"
+                    name="terms"
+                    component="checkbox"
                     componentProps={{
-                      autoComplete: 'email',
-                      instruction: 'You sign in with it, and bookings are sent to it.',
+                      showLabel: false,
+                      children: 'I agree to the terms of service',
                     }}
                   />
-                  <FormField
-                    name="phone"
-                    label="Phone (optional)"
-                    component="text"
-                    componentProps={{ autoComplete: 'tel' }}
-                  />
-                </FormGroup>
-                <FormGroup title="Password">
-                  <FormField
-                    name="password"
-                    label="Password"
-                    component="password"
-                    componentProps={{
-                      autoComplete: 'new-password',
-                      instruction: `At least ${PASSWORD_MIN} characters.`,
-                    }}
-                  />
-                </FormGroup>
-                <FormField
-                  name="terms"
-                  component="checkbox"
-                  componentProps={{
-                    showLabel: false,
-                    children: 'I agree to the terms of service',
-                  }}
-                />
-                <SubmitButton type="primary" block label="Create account" />
-                <div className="border-t border-line pt-5">
-                  <Flex align="center" gap={4}>
-                    <span className="type-body-s text-ink-2">Already have an account?</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => router.push(router.paths.get('login'))}
-                    >
-                      Sign in
-                    </Button>
-                  </Flex>
-                </div>
-              </>
-            )}
-          </FormWrapper>
-        </Flex>
-        <Flex
-          component="aside"
-          vertical
+                  <SubmitButton type="primary" block label="Create account" />
+                  <div className="border-t border-line pt-5">
+                    <Flex align="center" gap={4}>
+                      <span className="type-body-s text-ink-2">Already have an account?</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(router.paths.get('login'))}
+                      >
+                        Sign in
+                      </Button>
+                    </Flex>
+                  </div>
+                </>
+              )}
+            </FormWrapper>
+          </motion.div>
+        </motion.div>
+        {/* The next steps arrive one after another, after the form. */}
+        <motion.aside
           aria-labelledby="next-title"
-          className="flex-1 border-l border-line bg-sunken"
+          className="flex flex-1 flex-col border-l border-line bg-sunken"
           style={{ padding: '96px 120px 64px 96px' }}
+          variants={stagger(0.08, 0.3)}
+          initial="hidden"
+          animate="shown"
         >
-          <h2 id="next-title" className="type-h3 m-0 pb-4 text-ink">
+          <motion.h2 variants={settle} id="next-title" className="type-h3 m-0 pb-4 text-ink">
             What happens next
-          </h2>
+          </motion.h2>
           <Flex component="ol" vertical className="m-0 max-w-[480px] list-none p-0">
             {NEXT_STEPS.map(([title, body], i) => (
-              <li key={title} className="border-t border-line py-3.5">
+              <motion.li key={title} variants={settle} className="border-t border-line py-3.5">
                 <Flex gap={14}>
                   <Flex
                     aria-hidden
@@ -228,10 +241,10 @@ const RegisterPage = () => {
                     <span className="type-body-s text-ink-2">{body}</span>
                   </Flex>
                 </Flex>
-              </li>
+              </motion.li>
             ))}
           </Flex>
-        </Flex>
+        </motion.aside>
       </Flex>
       <Footer size="compact" />
     </Flex>

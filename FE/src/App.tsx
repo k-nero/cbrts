@@ -1,4 +1,5 @@
 import { RouterProvider } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 
 import ConfigWrapper from '@/HOC/ConfigWrapper';
 import { router } from '@/router';
@@ -6,7 +7,10 @@ import { router } from '@/router';
 export default function App() {
   return (
     <ConfigWrapper>
-      <RouterProvider router={router} />
+      {/* Every animation honours the visitor's reduced-motion setting: fades stay, travel goes. */}
+      <MotionConfig reducedMotion="user">
+        <RouterProvider router={router} />
+      </MotionConfig>
     </ConfigWrapper>
   );
 }

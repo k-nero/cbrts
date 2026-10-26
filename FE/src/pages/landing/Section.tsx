@@ -2,7 +2,7 @@ import { Flex } from 'antd';
 import { motion } from 'motion/react';
 import type { FC, ReactNode } from 'react';
 
-import { IN_VIEW, rise, stagger } from './motion';
+import { IN_VIEW, rise, stagger } from '@/lib/motion';
 
 /* The header rises first, then the body; children may stagger their own items on the same cue. */
 export const Section: FC<{ id: string; title: string; summary?: string; children: ReactNode }> = ({

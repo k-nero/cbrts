@@ -1,8 +1,10 @@
 import { type FC } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { Button, cx, Icon, Perforation, StageMark, type Tone, TONE_FG } from '@/components/ui';
 import type { CustomerHome, MoveEntry } from '@/interfaces';
+import { settle, stagger } from '@/lib/motion';
 import { formatDate, formatDayTime, spanUntil } from '@/lib/utils';
 
 /* "What holds it" is quiet Mist when nothing is needed; every other tone speaks in its colour. */
@@ -45,11 +47,16 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
         <p className="type-body-m m-0 text-ink-2">No moves in progress.</p>
       </div>
     )}
-    <Flex component="ul" vertical gap={12} className="list-none">
+    <motion.ul
+      className="m-0 flex list-none flex-col gap-3 p-0"
+      variants={stagger(0.06, 0.15)}
+      initial="hidden"
+      animate="shown"
+    >
       {home.moves.map((m) => {
         const d = departs(m, home.asOf);
         return (
-          <li key={m.requestCode}>
+          <motion.li key={m.requestCode} variants={settle}>
             <button
               type="button"
               onClick={() => onOpen(m)}
@@ -99,9 +106,9 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
                 </span>
               </Flex>
             </button>
-          </li>
+          </motion.li>
         );
       })}
-    </Flex>
+    </motion.ul>
   </Flex>
 );

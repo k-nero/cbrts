@@ -1,9 +1,10 @@
 import type { Transition, Variants } from 'motion/react';
 
 /*
- * The landing's motion: quiet and once. Things rise into place as they enter the view and then
- * hold still; nothing loops and nothing moves on its own after that. MotionConfig on the page
- * honours the visitor's reduced-motion setting, which keeps the fades and drops the travel.
+ * The app's motion: quiet and once. Things rise into place as a page opens or as they enter the
+ * view, then hold still; nothing loops and nothing moves on its own after that. MotionConfig at the
+ * app root (App.tsx) honours the visitor's reduced-motion setting, which keeps the fades and drops
+ * the travel. The landing page, the access pages and the customer portal share these presets.
  */
 
 export const EASE_OUT: Transition['ease'] = [0.22, 1, 0.36, 1];
@@ -60,4 +61,13 @@ export const pin: Variants = {
 export const fade: Variants = {
   hidden: { opacity: 0 },
   shown: (delay?: number) => ({ opacity: 1, transition: { duration: 0.5, ...at(delay) } }),
+};
+
+/**
+ * A page or a list row settling into place: a shorter, quicker rise than `rise`, so moving between
+ * pages and scanning a list never feels slow. A list hands each row its turn with `stagger`.
+ */
+export const settle: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  shown: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE_OUT } },
 };

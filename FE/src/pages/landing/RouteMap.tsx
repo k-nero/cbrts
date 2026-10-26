@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import type { FC } from 'react';
 
-import { draw, fade, IN_VIEW, pin } from './motion';
+import { draw, fade, IN_VIEW, pin } from '@/lib/motion';
 
 import { cx, Icon } from '@/components/ui';
 

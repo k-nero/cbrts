@@ -1,8 +1,10 @@
 import { type FC } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { Button, COAT_SWATCH, cx, Panel, TONE_FG } from '@/components/ui';
 import type { CustomerHome } from '@/interfaces';
+import { settle, stagger } from '@/lib/motion';
 
 /* ---------- your horses ---------- */
 
@@ -31,9 +33,14 @@ export const YourHorses: FC<{ home: CustomerHome; onAll: () => void; onAdd: () =
         </Button>
       </Flex>
     )}
-    <ul className="m-0 -mt-1 list-none p-0">
+    <motion.ul
+      className="m-0 -mt-1 list-none p-0"
+      variants={stagger(0.05, 0.2)}
+      initial="hidden"
+      animate="shown"
+    >
       {home.horses.map((h) => (
-        <li key={h.id} className="border-t border-line py-3">
+        <motion.li key={h.id} variants={settle} className="border-t border-line py-3">
           <Flex align="center" gap={12}>
             <span
               aria-hidden
@@ -53,9 +60,9 @@ export const YourHorses: FC<{ home: CustomerHome; onAll: () => void; onAdd: () =
               )}
             </Flex>
           </Flex>
-        </li>
+        </motion.li>
       ))}
-    </ul>
+    </motion.ul>
     <div className="pt-1">
       <Button size="sm" variant="ghost" trailingIcon="arrow-right" onClick={onAll}>
         My horses
