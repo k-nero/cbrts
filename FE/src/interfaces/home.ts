@@ -1,4 +1,5 @@
 import type { Coat, IconName, Stage, Tone, Urgency } from '@/components/ui';
+import type { RequestStatus } from './request';
 
 /*
  * The customer's Home (DESIGN.md, Home signed in): what the club owes across every request,
@@ -8,17 +9,26 @@ import type { Coat, IconName, Stage, Tone, Urgency } from '@/components/ui';
 
 export interface OwedEntry {
   id: string;
+  /** Where the action opens: the document, the quotation, or the request to answer. */
+  kind: 'DOCUMENT' | 'QUOTATION' | 'ANSWER';
+  requestId: string;
+  /** The checklist item, for a document. */
+  itemId: string | null;
   urgency: Urgency;
   title: string;
   /** "CBRT-2026-041 · Silver Bell · Proof of ownership". */
   subject: string;
   /** The rule, or who asked and why. */
   reason: string;
-  dueAt: string;
-  action: { label: string; icon?: IconName };
+  /** Null while the job has no planned departure to count from. */
+  dueAt: string | null;
+  actionLabel: string;
+  actionIcon: IconName | null;
 }
 
 export interface MoveEntry {
+  requestId: string;
+  status: RequestStatus;
   /** The customer's reference; it never changes. */
   requestCode: string;
   /** "Ho Chi Minh City → Phnom Penh". */
@@ -28,9 +38,10 @@ export interface MoveEntry {
   stage: Stage;
   /** What holds it, in words and a tone: "Departure locked · you owe 4". */
   holds: { text: string; tone: Tone };
-  departsAt: string;
+  /** Null for a draft without a departure date. */
+  departsAt: string | null;
   /** Set while the move is on the road: the departs column shows the arrival instead. */
-  arrivesAt?: string;
+  arrivesAt: string | null;
 }
 
 export interface HomeHorse {
@@ -42,7 +53,7 @@ export interface HomeHorse {
   /** "4 of 5 cleared", or on the road "Stall 1 · standard". */
   documents: string;
   /** The one thing the horse is waiting on, toned: "Bill of sale overdue". */
-  note?: { text: string; tone: Tone };
+  note: { text: string; tone: Tone } | null;
 }
 
 /** When nothing is owed, the next event leads instead (DESIGN.md, Home states). */
@@ -51,7 +62,8 @@ export interface NextEvent {
   body: string;
   /** "Departs" or "Expected": the verb before the time left. */
   verb: string;
-  at: string;
+  /** Null when no move has a date yet. */
+  at: string | null;
   /** Show the date or only the time on the second line. */
   dateStyle: 'date' | 'dayTime' | 'time';
 }
@@ -75,17 +87,19 @@ export interface CustomerHome {
   clubName: string;
   requestCount: number;
   horseCount: number;
-  nextDeparture?: {
+  nextDeparture: {
     route: string;
-    departsAt: string;
+    departsAt: string | null;
     state: 'locked' | 'cleared' | 'on-road';
-    arrivesAt?: string;
-  };
+    arrivesAt: string | null;
+  } | null;
   /** Soonest first; the first item's action is the page's one gold button. */
   owed: OwedEntry[];
   /** Requests the owed items span. */
   owedRequestCount: number;
-  nextEvent?: NextEvent;
+  /** Set only when nothing is owed and a move is in progress. */
+  nextEvent: NextEvent | null;
+  /** The move on the road as recorded checkpoints; not sent yet. */
   trip?: TripNow;
   /** Ordered by what needs the club first, then by departure. */
   moves: MoveEntry[];

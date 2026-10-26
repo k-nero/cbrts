@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Flex, Skeleton } from 'antd';
 
+import { FirstMove } from './FirstMove';
 import { NothingOwed } from './NothingOwed';
 import { OnTheRoad } from './OnTheRoad';
 import { OwedPanel } from './OwedPanel';
@@ -10,7 +11,7 @@ import { YourMoves } from './YourMoves';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout } from '@/components/ui';
 import { useCustomerHome } from '@/hooks/home';
-import type { CustomerHome, MoveEntry } from '@/interfaces';
+import type { CustomerHome, MoveEntry, OwedEntry } from '@/interfaces';
 import { formatTime, ict } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -18,7 +19,7 @@ import { useCustomRouter } from '@/router/route.hook';
 const summaryOf = (h: CustomerHome) => {
   const counts = `${h.requestCount} ${h.requestCount === 1 ? 'request' : 'requests'} in progress and ${h.horseCount} ${h.horseCount === 1 ? 'horse' : 'horses'}.`;
   const d = h.nextDeparture;
-  if (!d) return counts;
+  if (!d?.departsAt) return counts;
   if (d.state === 'on-road')
     return `${counts} On the road now: ${d.route}, arriving about ${formatTime(d.arrivesAt ?? d.departsAt)}.`;
   const when = ict(d.departsAt).format('D MMM');
@@ -41,10 +42,30 @@ const CustomerHomePage: FC = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     router.push(router.paths.get('my-horses'));
   };
-  const handleOpenMove = (m: MoveEntry) => {
+  const go = (path: string) => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    router.push(`${router.paths.get('my-requests')}?code=${encodeURIComponent(m.requestCode)}`);
+    router.push(path);
   };
+  // A draft opens in the wizard, a quotation waiting for an answer on the quotation, the rest on its status page.
+  const handleOpenMove = (m: MoveEntry) =>
+    go(
+      router.paths.get(
+        m.status === 'DRAFT'
+          ? 'request-edit'
+          : m.status === 'QUOTED'
+            ? 'request-quotation'
+            : 'request-submitted',
+        { pathParams: [m.requestId] },
+      ),
+    );
+  const handleAct = (o: OwedEntry) =>
+    go(
+      o.kind === 'DOCUMENT' && o.itemId
+        ? router.paths.get('request-document', { pathParams: [o.requestId, o.itemId] })
+        : router.paths.get(o.kind === 'QUOTATION' ? 'request-quotation' : 'request-submitted', {
+            pathParams: [o.requestId],
+          }),
+    );
 
   if (isPending) {
     return (
@@ -79,14 +100,20 @@ const CustomerHomePage: FC = () => {
     <Flex vertical gap={28}>
       <PageHeader reserveBack title={home.clubName} summary={summaryOf(home)} />
       {home.owed.length > 0 ? (
-        <OwedPanel home={home} onOpen={toRequests} onAllRequests={toRequests} />
+        <OwedPanel home={home} onAct={handleAct} onAllRequests={toRequests} />
+      ) : home.nextEvent ? (
+        <NothingOwed event={home.nextEvent} asOf={home.asOf} />
       ) : (
-        home.nextEvent && <NothingOwed event={home.nextEvent} asOf={home.asOf} />
+        <FirstMove
+          hasHorses={home.horses.length > 0}
+          onRequest={() => go(router.paths.get('request-new'))}
+          onAddHorse={() => go(router.paths.get('horse-new'))}
+        />
       )}
       {home.trip && <OnTheRoad trip={home.trip} />}
       <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
         <YourMoves home={home} onOpen={handleOpenMove} onAll={toRequests} />
-        <YourHorses home={home} onAll={toHorses} />
+        <YourHorses home={home} onAll={toHorses} onAdd={() => go(router.paths.get('horse-new'))} />
       </div>
     </Flex>
   );
