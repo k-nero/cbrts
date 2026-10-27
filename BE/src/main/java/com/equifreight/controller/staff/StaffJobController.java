@@ -360,6 +360,15 @@ public class StaffJobController {
     }
 
     /**
+     * US-F3-06: Crew assignment - available escorts for drivers and grooms, for the roles that assign them.
+     */
+    @GetMapping("/crew/candidates")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<CrewCandidateResponse> crewCandidates() {
+        return crewAssignmentService.getCandidates();
+    }
+
+    /**
      * US-F3-06: Crew assignment - assign crew enforcing groom ratio.
      */
     @PostMapping("/{jobId}/crew")
