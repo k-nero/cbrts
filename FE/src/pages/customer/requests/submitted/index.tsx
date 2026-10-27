@@ -7,6 +7,8 @@ import DocumentsCallout from './DocumentsCallout';
 import { WhereItStands } from './WhereItStands';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
+import { RequestTracking } from '../tracking/RequestTracking';
+import { isTracking } from '../tracking/tracking';
 
 import { InvoicesPanel } from '@/components/invoice/InvoicesPanel';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
@@ -15,6 +17,7 @@ import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, OwedItem, Panel } from '@/components/ui';
 import { useRequestInvoices } from '@/hooks/invoice';
 import { useRequest, useWizardHorses } from '@/hooks/request';
+import { useTrip } from '@/hooks/trip';
 import {
   cancelledText,
   estimateStub,
@@ -38,10 +41,23 @@ const RequestSubmittedPage: FC = () => {
   const { data: invoices } = useRequestInvoices(id);
   const request = query.data;
   const [cancelling, setCancelling] = useState(false);
+  // Once the horses leave, the request is tracked here (Tracking · In transit, Delivered).
+  const tripQuery = useTrip('customer', request?.jobCode ?? '');
+  const trip = tripQuery.data;
 
   if (!request) return <RequestLoadState query={query} />;
   if (request.status === 'DRAFT')
     return <Navigate to={router.paths.get('request-edit', { pathParams: [request.id] })} replace />;
+
+  if (trip && isTracking(trip))
+    return (
+      <RequestTracking
+        request={request}
+        trip={trip}
+        horses={horses.data ?? []}
+        onBack={() => router.push(router.paths.get('my-requests'))}
+      />
+    );
 
   const latest = latestRevision(request);
   // Before a quotation is issued there is no price to take a fee from; once one is, the quotation page

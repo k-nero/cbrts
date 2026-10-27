@@ -93,7 +93,8 @@ public interface TransportJobRepository
             select new com.equifreight.model.trip.TripSummaryResponse(
                 j.code, j.tripStatus, o.name, d.name,
                 (select max(r.occurredAt) from TripRecord r
-                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
+                 where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)),
+                rq.id)
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where rq.club.id = :clubId
               and exists (select 1 from TripHorse th where th.job = j)

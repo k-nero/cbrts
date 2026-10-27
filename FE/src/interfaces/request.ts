@@ -178,6 +178,8 @@ export interface TransportRequest {
   history?: HistoryEntry[];
   /** What happens next, on the customer's read; null when nothing more happens. */
   nextStep?: NextStep | null;
+  /** The approved request's job code (BR-F1-05), on the customer's read; its trip is tracked here. */
+  jobCode?: string | null;
   /** Null until submitted. */
   code: string | null;
   status: RequestStatus;

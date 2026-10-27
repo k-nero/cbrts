@@ -135,6 +135,8 @@ export interface TripSummary {
   jobCodes: string[];
   /** Where the trip stands, on the office board only (US-F4-04); null elsewhere. */
   progress: TripProgress | null;
+  /** The request the job came from, on the customer's list only: its page tracks the trip. */
+  requestId?: string | null;
 }
 /** The leg a trip is on and its last checkpoint, from recorded checkpoints only (BE TripSummaryResponse.Progress). */
 export interface TripProgress {
