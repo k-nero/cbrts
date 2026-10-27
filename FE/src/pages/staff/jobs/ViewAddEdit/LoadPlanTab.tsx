@@ -25,6 +25,7 @@ import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from
 import {
   useAddTrailer,
   useAutoArrange,
+  useCanPlanTrips,
   useConfirmLoadPlan,
   useCreateLoadPlan,
   useJobDetail,
@@ -34,8 +35,9 @@ import {
   useSignOffTripPlan,
 } from '@/hooks/useJob';
 import { useActiveVehicles } from '@/hooks/useVehicle';
-import type { JobDetail, JobHorse, LoadPlanStall, Vehicle } from '@/interfaces';
+import { type JobDetail, type JobHorse, type LoadPlanStall, RoleNameEnum, type Vehicle } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Props {
   job: JobDetail;
@@ -79,6 +81,8 @@ const vehicleOption = (v: Vehicle) => {
 
 export function LoadPlanTab({ job }: Props) {
   const loadPlan = job.loadPlan;
+  const canPlan = useCanPlanTrips();
+  const isLogisticsManager = useAuthStore((s) => s.roles).includes(RoleNameEnum.LOGISTICS_MANAGER);
   const [selected, setSelected] = useState<Picked | null>(null);
   const [dragging, setDragging] = useState<Picked | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
@@ -138,20 +142,22 @@ export function LoadPlanTab({ job }: Props) {
                     .join(', ')
                 : 'none assigned yet'}
             </span>
-            <div>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={signOffMutation.isPending}
-                onClick={() =>
-                  signOffMutation.mutate(undefined, {
-                    onError: reportRefusal('The trip plan couldn’t be signed off. Try again.'),
-                  })
-                }
-              >
-                {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-              </Button>
-            </div>
+            {isLogisticsManager && (
+              <div>
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={signOffMutation.isPending}
+                  onClick={() =>
+                    signOffMutation.mutate(undefined, {
+                      onError: reportRefusal('The trip plan couldn’t be signed off. Try again.'),
+                    })
+                  }
+                >
+                  {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
+                </Button>
+              </div>
+            )}
           </Flex>
         </Panel>
       </Flex>
@@ -180,53 +186,56 @@ export function LoadPlanTab({ job }: Props) {
                 <Flex vertical gap={6}>
                   <h3 className="type-h3 text-ink">No load plan created yet</h3>
                   <p className="type-body-s text-ink-3">
-                    Select an active vehicle to start load planning and stall arrangement for this
-                    job.
+                    {canPlan
+                      ? 'Select an active vehicle to start load planning and stall arrangement for this job.'
+                      : 'A fleet & route coordinator will select a vehicle and arrange stalls for this job.'}
                   </p>
                 </Flex>
 
-                {loadingVehicles ? (
-                  <Skeleton active title={false} paragraph={{ rows: 2 }} />
-                ) : (
-                  <Flex vertical gap={16} className="w-full">
-                    <Flex vertical gap={6} className="text-left">
-                      <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
-                        Assigned vehicle
-                      </label>
-                      <Select
-                        id="load-plan-vehicle"
-                        className="w-full"
-                        placeholder="Choose a vehicle"
-                        value={vehicleToUse || undefined}
-                        onChange={setSelectedVehicleId}
-                        notFoundContent="No active vehicle"
-                        options={activeVehicles?.map(vehicleOption)}
-                      />
-                      {activeVehicles &&
-                        activeVehicles.length > 0 &&
-                        !activeVehicles.some((v) => v.available !== false) && (
-                          <span className="type-body-s text-bad">
-                            No vehicle can run this trip yet. Assign one to its corridor on the
-                            Vehicles page, or free one up.
-                          </span>
-                        )}
-                    </Flex>
+                {canPlan && (
+                  loadingVehicles ? (
+                    <Skeleton active title={false} paragraph={{ rows: 2 }} />
+                  ) : (
+                    <Flex vertical gap={16} className="w-full">
+                      <Flex vertical gap={6} className="text-left">
+                        <label htmlFor="load-plan-vehicle" className="type-label-s text-ink">
+                          Assigned vehicle
+                        </label>
+                        <Select
+                          id="load-plan-vehicle"
+                          className="w-full"
+                          placeholder="Choose a vehicle"
+                          value={vehicleToUse || undefined}
+                          onChange={setSelectedVehicleId}
+                          notFoundContent="No active vehicle"
+                          options={activeVehicles?.map(vehicleOption)}
+                        />
+                        {activeVehicles &&
+                          activeVehicles.length > 0 &&
+                          !activeVehicles.some((v) => v.available !== false) && (
+                            <span className="type-body-s text-bad">
+                              No vehicle can run this trip yet. Assign one to its corridor on the
+                              Vehicles page, or free one up.
+                            </span>
+                          )}
+                      </Flex>
 
-                    <Button
-                      variant="primary"
-                      size="md"
-                      disabled={!vehicleToUse || createLoadPlanMutation.isPending}
-                      onClick={() =>
-                        createLoadPlanMutation.mutate(vehicleToUse, {
-                          onError: reportRefusal('The load plan couldn’t be created. Try again.'),
-                        })
-                      }
-                    >
-                      {createLoadPlanMutation.isPending
-                        ? 'Creating load plan…'
-                        : 'Create load plan'}
-                    </Button>
-                  </Flex>
+                      <Button
+                        variant="primary"
+                        size="md"
+                        disabled={!vehicleToUse || createLoadPlanMutation.isPending}
+                        onClick={() =>
+                          createLoadPlanMutation.mutate(vehicleToUse, {
+                            onError: reportRefusal('The load plan couldn’t be created. Try again.'),
+                          })
+                        }
+                      >
+                        {createLoadPlanMutation.isPending
+                          ? 'Creating load plan…'
+                          : 'Create load plan'}
+                      </Button>
+                    </Flex>
+                  )
                 )}
               </Flex>
             </div>
@@ -245,9 +254,9 @@ export function LoadPlanTab({ job }: Props) {
   const warningsToAccept = warnings.filter((w) => !w.accepted);
   const totalStalls = stalls.length;
   const occupiedStalls = stalls.filter((s) => s.horse !== null && s.horse !== undefined).length;
-  const editable = !isConfirmed && !busy;
+  const editable = !isConfirmed && !busy && canPlan;
   // Trailers are added or taken out before departure only; after it, only through an incident.
-  const canChangeTrailers = job.tripStatus === 'NOT_STARTED';
+  const canChangeTrailers = job.tripStatus === 'NOT_STARTED' && canPlan;
   const onTrip = new Set(trailers.map((t) => t.vehicleId));
   const spareVehicles = (activeVehicles ?? []).filter((v) => !onTrip.has(v.id));
   const trailerOf = (stallId: string) =>
@@ -652,7 +661,7 @@ export function LoadPlanTab({ job }: Props) {
                     </span>
 
                     <Flex gap={12} align="center">
-                      {!isConfirmed && (
+                      {canPlan && !isConfirmed && (
                         <>
                           <Button
                             variant="secondary"
@@ -691,7 +700,7 @@ export function LoadPlanTab({ job }: Props) {
                           </Button>
                         </>
                       )}
-                      {isConfirmed && (
+                      {isConfirmed && isLogisticsManager && (
                         <Button
                           variant="primary"
                           size="md"
