@@ -1,6 +1,8 @@
 import { type FC, useEffect, useMemo, useState } from 'react';
 import { App, Col, Flex, Row, Select } from 'antd';
 
+import { groomsRequired, horsesForCrew } from './crew';
+
 import BaseModal from '@/components/modal/BaseModal';
 import { Button, Callout } from '@/components/ui';
 import { useAssignCrew, useCrewCandidates } from '@/hooks/useJob';
@@ -34,14 +36,9 @@ export const AssignCrewModal: FC<Props> = ({ job, tripVehicleId, open, onClose }
 
   const targetVehicleId = trailer?.tripVehicleId;
 
-  // Horses assigned to this trailer (via its stalls)
-  const horseCount = useMemo(() => {
-    if (!trailer) return job.horses.length;
-    const occupied = trailer.stalls.filter((s) => Boolean(s.horse));
-    return occupied.length > 0 ? occupied.length : job.horses.length;
-  }, [trailer, job.horses.length]);
-
-  const requiredGrooms = Math.max(1, Math.ceil(horseCount / 3));
+  const placed = trailer?.stalls.filter((s) => Boolean(s.horse)).length ?? 0;
+  const horseCount = horsesForCrew(placed, trailers.length > 1, job.horses.length);
+  const requiredGrooms = groomsRequired(horseCount);
 
   // Current assigned crew on this trailer
   const existingCrew = useMemo(() => {
