@@ -103,6 +103,37 @@ class JobTripServiceTest {
     }
 
     @Test
+    @DisplayName("A request by way of hubs is approved onto a chain: the leg to the hub, the flight, the leg from it")
+    void aRequestByWayOfHubsIsApprovedOntoAChain() {
+        Corridor toHub = new Corridor();
+        Corridor flight = new Corridor();
+        Corridor fromHub = new Corridor();
+        TransportRequest request = new TransportRequest();
+        request.setCorridor(flight);
+        request.setFirstLegCorridor(toHub);
+        request.setLastLegCorridor(fromHub);
+        RequestHorse rh = new RequestHorse();
+        rh.setHorse(horse("Shadowfax"));
+        request.getHorses().add(rh);
+        TransportJob job = new TransportJob();
+        job.setRequest(request);
+        when(codes.next(CodePrefix.TRP, 2026)).thenReturn("TRP-2026-001", "TRP-2026-002", "TRP-2026-003");
+        JobTripService spy = org.mockito.Mockito.spy(service);
+        org.mockito.Mockito.doReturn(null).when(spy).planNext(any(), any(), any());
+
+        Trip first = spy.createForJob(job, new User(), Instant.parse("2026-10-27T03:00:00Z"));
+
+        assertThat(first.getCorridor()).isSameAs(toHub);
+        ArgumentCaptor<Trip> from = ArgumentCaptor.forClass(Trip.class);
+        ArgumentCaptor<Trip> to = ArgumentCaptor.forClass(Trip.class);
+        verify(spy, org.mockito.Mockito.times(2)).planNext(eq(job), from.capture(), to.capture());
+        assertThat(from.getAllValues().get(0)).isSameAs(first);
+        assertThat(to.getAllValues().get(0).getCorridor()).isSameAs(flight);
+        assertThat(from.getAllValues().get(1)).isSameAs(to.getAllValues().get(0));
+        assertThat(to.getAllValues().get(1).getCorridor()).isSameAs(fromHub);
+    }
+
+    @Test
     @DisplayName("Choosing another vehicle replaces the trip's vehicle in place, so its crew stays")
     void anotherVehicleReplacesTheTripsVehicle() {
         Trip trip = new Trip();

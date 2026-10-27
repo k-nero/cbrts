@@ -44,4 +44,12 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
             + "LEFT JOIN FETCH b.toCountry LEFT JOIN FETCH c.originCountry LEFT JOIN FETCH c.destinationCountry "
             + "WHERE c.mode = com.equifreight.entity.enums.TransportMode.ROAD")
     List<Corridor> findRoadNetwork();
+
+    /**
+     * Every corridor of both modes with its crossings and countries (US-F1-09): the routes by way of a hub between two
+     * cities no corridor joins, worked out in memory.
+     */
+    @Query("SELECT DISTINCT c FROM Corridor c LEFT JOIN FETCH c.crossings cc LEFT JOIN FETCH cc.borderCrossing b "
+            + "LEFT JOIN FETCH b.toCountry LEFT JOIN FETCH c.originCountry LEFT JOIN FETCH c.destinationCountry")
+    List<Corridor> findNetwork();
 }

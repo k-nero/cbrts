@@ -307,7 +307,7 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
         pricing.totalsWith(stored.orElseThrow(), request, new java.util.HashMap<>());
 
         // BR-Q-16: weight never prices a line, so an accepted quote's totals don't wait on weights or limits.
-        verify(inputs).inputFor(eq(request), any(), eq(false));
+        verify(inputs).inputFor(eq(request), any(), eq(false), any());
     }
 
     @Test

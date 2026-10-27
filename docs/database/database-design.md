@@ -285,7 +285,8 @@ erDiagram
 | `vet_escort` | boolean default false | Added automatically from 8 horses or when a declared value is over the threshold (application rule). |
 | `origin_place_id`, `destination_place_id` | → `places` | Null while a draft names a city we don't run. |
 | `origin_text`, `destination_text` | varchar(160) | What the customer typed when it matches no place ("Singapore"). Kept so the logistics manager sees the ask. Never set together with the place of the same end (check). |
-| `corridor_id` | → `corridors` | Resolved from the places. Null means the route is not one we run. |
+| `corridor_id` | → `corridors` | Resolved from the places. Null means the route is not one we run. On a move between a city no corridor joins and a hub, it is the corridor from hub to hub (US-F1-09). |
+| `first_leg_corridor_id`, `last_leg_corridor_id` | → `corridors` null | V31, US-F1-09: the domestic road legs before and after `corridor_id`, from the origin's city to the hub it leaves from and from the hub it arrives in to the destination's city (Da Nang → Ho Chi Minh City, then the flight to Hong Kong). A hub is not a table: it is a city a corridor starts or ends in. Set only when no corridor joins the two cities and `corridor_id` crosses a border; two domestic corridors are never chained. The legs are priced into the same quotation (group A before, G after) from their own corridors' per-km road rates, and at approval each becomes a trip of the job's chain. |
 | `departure_date` | date | Required once submitted. |
 | `date_flex_days` | smallint default 0, check 0–7 | 0 is fixed dates. With flexible dates, the route's `corridors.date_flex_days`, followed while a draft and copied when the request is submitted (#115). |
 | `arrival_mode` | varchar(10) default 'ANY_TIME' | `ANY_TIME`, `WINDOW`. |

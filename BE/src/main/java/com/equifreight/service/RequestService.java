@@ -294,6 +294,8 @@ public class RequestService {
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
+        request.setFirstLegCorridor(resolution.firstLeg());
+        request.setLastLegCorridor(resolution.lastLeg());
         // The range shown at this submission is kept to compare the quotation against; never a quotation itself.
         EstimateResult estimate = estimator.rangeFor(request);
         boolean ranged = estimate.status() == EstimateStatus.READY;
@@ -668,6 +670,8 @@ public class RequestService {
         request.setVetEscort(draft.vetEscort());
         RouteResolution resolution = resolve(request);
         request.setCorridor(resolution.corridor());
+        request.setFirstLegCorridor(resolution.firstLeg());
+        request.setLastLegCorridor(resolution.lastLeg());
         request.setDateFlexDays((short) LeadTimePolicy.flexDaysFor(draft.dateFlexDays(), routeFlexDays(resolution)));
         return resolution;
     }
@@ -705,7 +709,12 @@ public class RequestService {
         if (!editable(request.getStatus())) {
             RouteResponse route = request.getCorridor() == null || request.getOriginPlace() == null
                     ? null
-                    : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
+                    : routes.describe(
+                            request.getCorridor(),
+                            request.getFirstLegCorridor(),
+                            request.getLastLegCorridor(),
+                            request.getOriginPlace(),
+                            request.getDestinationPlace());
             return RequestMapper.toResponse(request, route, null, List.of(), revisionsOf(request));
         }
         LocalDate today = LocalDate.now(clock);

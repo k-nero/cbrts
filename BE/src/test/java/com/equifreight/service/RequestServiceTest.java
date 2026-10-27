@@ -559,7 +559,7 @@ class RequestServiceTest {
         submitted.setOriginPlace(phuTho);
         submitted.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(submitted.getId(), CLUB_ID)).thenReturn(Optional.of(submitted));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
 
         RequestResponse response = service.get(user, submitted.getId());
 
@@ -612,7 +612,7 @@ class RequestServiceTest {
         quoted.setOriginPlace(phuTho);
         quoted.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(quoted.getId(), CLUB_ID)).thenReturn(Optional.of(quoted));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(quoted.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(issuedQuotation(quoted, 2)));
 
@@ -632,7 +632,7 @@ class RequestServiceTest {
         inReview.setOriginPlace(phuTho);
         inReview.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(inReview.getId(), CLUB_ID)).thenReturn(Optional.of(inReview));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
 
         assertThat(service.get(user, inReview.getId()).quotation()).isNull();
     }

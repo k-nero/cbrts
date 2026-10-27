@@ -15,7 +15,7 @@ import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui';
 import { useStaffRequestInvoices } from '@/hooks/invoice';
 import { useRequestReview } from '@/hooks/staffRequest';
-import { inReview, queueWords, reviewSubject, reviewSummary } from '@/lib/utils';
+import { inReview, queueWords, reviewSubject, reviewSummary, routeEnds } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -48,8 +48,8 @@ const RequestReviewPage: FC = () => {
   const { request, queue } = review;
   // The header describes what the customer sent, never a returned request's unsent edits.
   const subject = reviewSubject(review);
-  const from = subject.route?.fromCity ?? subject.origin?.city ?? '—';
-  const to = subject.route?.toCity ?? subject.destination?.city ?? '—';
+  const from = (subject.route && routeEnds(subject.route).from) ?? subject.origin?.city ?? '—';
+  const to = (subject.route && routeEnds(subject.route).to) ?? subject.destination?.city ?? '—';
 
   return (
     <Flex vertical gap={28}>

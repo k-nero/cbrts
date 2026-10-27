@@ -51,6 +51,10 @@ public final class QuotePricer {
         for (RateRow row : rates.lines()) {
             expand(in, rates, row, lines);
         }
+        for (RoadLeg leg : in.legs()) {
+            RateRow freight = RequiredRates.legFreight(leg, in.legTrailer());
+            if (freight != null && leg.distanceKm() != null) lines.add(legLine(in, leg, freight));
+        }
         List<MissingRate> missing = RequiredRates.forRequest(in, rates);
         for (int i = 0; i < missing.size(); i++) {
             MissingRate gap = missing.get(i);
@@ -291,6 +295,36 @@ public final class QuotePricer {
                 // Stall positions are priced from the service class table, never from a line.
             }
         }
+    }
+
+    /**
+     * A domestic leg to or from a hub (US-F1-09): its corridor's per-km road rate over its own distance, in the leg's
+     * group (A before the border, G after), so the volume break and the arrival window count it as ground.
+     */
+    private static PricedLine legLine(PricingInput in, RoadLeg leg, RateRow row) {
+        BigDecimal km = BigDecimal.valueOf(leg.distanceKm());
+        BigDecimal amount = cents(row.rate().multiply(km));
+        String basis = "per km · " + leg.distanceKm() + " km · " + leg.code();
+        if (row.minCharge() != null && row.minCharge().compareTo(amount) > 0) {
+            amount = cents(row.minCharge());
+            basis += " · minimum charge applies";
+        }
+        return new PricedLine(
+                leg.group(),
+                "LEG_" + leg.group() + "_" + row.code(),
+                PricingText.fitDescription("Road freight " + leg.fromCity() + " → " + leg.toCity() + ", "
+                        + PricingText.trailerWord(in.legTrailer())),
+                row.basis(),
+                basis,
+                km,
+                row.rate(),
+                amount,
+                LineSource.CATALOG,
+                row.id(),
+                null,
+                null,
+                certainty(row),
+                row.estimateNote());
     }
 
     private static PricedLine perKm(PricingInput in, RateRow row) {
