@@ -28,7 +28,7 @@ public record RequestDraftRequest(
         UUID destinationPlaceId,
         @Size(max = 160) String destinationText,
         LocalDate departureDate,
-        /** 0 or 3 ("My dates can move by ±3 days"); null means 0. */
+        /** 0 for fixed dates, above 0 for flexible ones (the route sets how far, #115); null means 0. */
         Integer dateFlexDays,
         /** Null means ANY_TIME. A window needs road, a private trailer and fixed dates. */
         ArrivalMode arrivalMode,

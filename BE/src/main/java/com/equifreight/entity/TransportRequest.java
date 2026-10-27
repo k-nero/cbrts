@@ -107,7 +107,7 @@ public class TransportRequest extends BaseEntity {
     private LocalDate departureDate;
 
     /**
-     * 0 or 3 ("My dates can move by ±3 days").
+     * 0 for fixed dates; otherwise the route's flexible days, 1 to 7, copied at submission (#115).
      */
     @Column(nullable = false)
     private short dateFlexDays;

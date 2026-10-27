@@ -178,6 +178,35 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void changingTheClassIsAudited() {
+        service.start(yen, request.getId());
+
+        service.changeClass(yen, request.getId(), ServiceClass.FIRST);
+
+        verify(audit)
+                .recordDecision(
+                        yen,
+                        "QUOTATION_CLASS_CHANGED",
+                        "Quotation Q-2026-0189 v1 priced in first class instead of business",
+                        "TRANSPORT_REQUEST",
+                        request.getId(),
+                        request.getCode(),
+                        null,
+                        null,
+                        null);
+    }
+
+    @Test
+    void choosingTheSameClassAuditsNothing() {
+        service.start(yen, request.getId());
+
+        service.changeClass(yen, request.getId(), ServiceClass.BUSINESS);
+
+        verify(audit, never())
+                .recordDecision(any(), eq("QUOTATION_CLASS_CHANGED"), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void changeClassOnARoadRequestIsRefused() {
         request.setMode(TransportMode.ROAD);
         request.setAirClass(null);
