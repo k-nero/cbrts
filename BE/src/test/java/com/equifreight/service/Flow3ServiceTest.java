@@ -16,6 +16,7 @@ import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.fleet.VehicleBookingRequest;
 import com.equifreight.model.fleet.VehicleBookingResponse;
 import com.equifreight.model.job.AssignCrewRequest;
+import com.equifreight.model.job.JobDetailResponse;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
@@ -996,6 +997,28 @@ class Flow3ServiceTest {
                         eq(Subject.job(job)),
                         contains("Trip plan signed off"),
                         any());
+    }
+
+    @Test
+    @DisplayName("The job page says when the trip shown was signed off, and by whom (US-F3-08)")
+    void jobDetail_showsTheTripSignOff() {
+        TransportJob job = readyJob();
+        User manager = user("yen.vu@equifreight.vn", RoleName.LOGISTICS_MANAGER);
+        stubPlansAndCrew(job, List.of());
+        TripJob part = new TripJob();
+        part.setTrip(trip);
+        part.setJob(job);
+        when(jobTrips.findPartOf(trip, job)).thenReturn(Optional.of(part));
+
+        assertNull(transportJobService.getJobDetail(job.getId()).tripSignedOffAt());
+
+        Instant at = Instant.parse("2026-11-16T09:00:00Z");
+        part.setSignedOffAt(at);
+        part.setSignedOffBy(manager);
+        JobDetailResponse detail = transportJobService.getJobDetail(job.getId());
+
+        assertEquals(at, detail.tripSignedOffAt());
+        assertEquals(manager.displayName(), detail.tripSignedOffBy());
     }
 
     @Test
