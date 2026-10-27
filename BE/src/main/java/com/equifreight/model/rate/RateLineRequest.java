@@ -40,12 +40,15 @@ public record RateLineRequest(
         BigDecimal defaultQuantity,
 
         RateCertainty certainty,
-        @Size(max = 300) String estimateNote) {
+        @Size(max = 300) String estimateNote,
+        /** Not charged at an end a domestic road leg covers (US-F3-21); group A or G only. False when left out. */
+        Boolean coveredByRoadLeg) {
 
     /** rate_lines keeps money and quantities as numeric(…, 2). */
     public static final String TWO_DECIMALS = "Use at most 2 decimals.";
 
     public RateLineRequest {
         certainty = certainty == null ? RateCertainty.FIXED : certainty;
+        coveredByRoadLeg = coveredByRoadLeg != null && coveredByRoadLeg;
     }
 }

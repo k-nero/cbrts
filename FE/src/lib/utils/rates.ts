@@ -17,11 +17,19 @@ import type { AxiosError } from 'axios';
 /** "18%", "1.5%". */
 export const pctText = (value: number): string => `${Number(value.toFixed(3))}%`;
 
-/** The basis of a catalog line in words, as the Rates table shows it. */
+/**
+ * The basis of a catalog line in words, as the Rates table shows it. A flat transfer a road leg replaces says so
+ * (US-F3-21).
+ */
 export const basisWords = (
   line: RateLine,
   policies: Partial<Record<RatePolicyKey, number>>,
 ): string => {
+  const words = basisOnly(line, policies);
+  return line.coveredByRoadLeg ? `${words} · not where a road leg covers this end` : words;
+};
+
+const basisOnly = (line: RateLine, policies: Partial<Record<RatePolicyKey, number>>): string => {
   const sex = line.appliesToSex ? ` · ${line.appliesToSex.toLowerCase()}` : '';
   switch (line.basis) {
     case 'PER_HORSE':

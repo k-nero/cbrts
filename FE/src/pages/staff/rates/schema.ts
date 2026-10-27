@@ -46,6 +46,7 @@ export const lineSchema = z
       .nullable(),
     certainty: option,
     estimateNote: z.string().max(300, 'At most 300 characters.'),
+    coveredByRoadLeg: z.boolean(),
   })
   .superRefine((v, ctx) => {
     const basis = v.basis.value as RateBasis;
@@ -85,6 +86,13 @@ export const lineSchema = z
         path: ['estimateNote'],
         message: 'Say why an estimated line may vary.',
       });
+    // US-F3-21: a flat transfer to or from the cargo terminal sits at an end of the move.
+    if (v.coveredByRoadLeg && !['A', 'G'].includes(v.group.value))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['coveredByRoadLeg'],
+        message: 'Only a group A or G line is at an end of the move a road leg can cover.',
+      });
   });
 export type LineForm = z.infer<typeof lineSchema>;
 
@@ -97,6 +105,7 @@ export const LINE_FIELDS: Record<string, string> = {
   MIN_CHARGE: 'minCharge',
   DEFAULT_QUANTITY: 'defaultQuantity',
   ESTIMATE_NOTE: 'estimateNote',
+  COVERED_BY_ROAD_LEG: 'coveredByRoadLeg',
 };
 
 // --- air stall classes ----------------------------------------------------------------------------------

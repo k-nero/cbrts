@@ -141,6 +141,10 @@ class RateCatalogSeederTest {
         assertThat(codesOn(all, pnhHkg))
                 .containsExactlyInAnyOrder(
                         "TRANSFER_ORIGIN", "TRANSFER_DEST", "HANDLING", "GROOM", "FLIGHT_VET", "IMPORT_PERMIT");
+        // Only the flat transfers at the ends give way to a road leg (US-F3-21).
+        assertThat(all.stream().filter(RateLine::isCoveredByRoadLeg).map(RateLine::getCode))
+                .containsOnly("TRANSFER_ORIGIN", "TRANSFER_DEST")
+                .isNotEmpty();
         assertThat(codesOn(all, hcmBkk))
                 .containsExactlyInAnyOrder("ROAD_SHARED", "ROAD_PRIVATE", "CROSSING", "VET_ESCORT");
         assertThat(codesOn(all, hanVte)).containsExactlyInAnyOrder("ROAD_SHARED", "VET_ESCORT");

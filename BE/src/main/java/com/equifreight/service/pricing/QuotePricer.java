@@ -49,7 +49,7 @@ public final class QuotePricer {
             lines.add(stallLine(in, classRow, fit));
         }
         for (RateRow row : rates.lines()) {
-            expand(in, rates, row, lines);
+            if (!coveredByLeg(in, row)) expand(in, rates, row, lines);
         }
         for (RoadLeg leg : in.legs()) {
             RateRow freight = RequiredRates.legFreight(leg, in.legTrailer());
@@ -252,6 +252,16 @@ public final class QuotePricer {
                 null,
                 LineCertainty.FIXED,
                 null);
+    }
+
+    /**
+     * Whether a domestic road leg covers the end of the move {@code row} is charged at (US-F3-21): a flat transfer to
+     * or from the cargo terminal isn't charged where the leg already brings the horses, so the move is charged once. A
+     * leg with no road rate still covers its end; it is listed as a missing rate instead.
+     */
+    private static boolean coveredByLeg(PricingInput in, RateRow row) {
+        return row.coveredByRoadLeg()
+                && in.legs().stream().anyMatch(leg -> leg.group().equals(row.group()));
     }
 
     private static void expand(PricingInput in, RateSet rates, RateRow row, List<PricedLine> lines) {

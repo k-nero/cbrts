@@ -84,7 +84,8 @@ public record CatalogRows(
                 l.getDefaultQuantity(),
                 l.getCertainty(),
                 l.getEstimateNote(),
-                everyCorridor);
+                everyCorridor,
+                l.isCoveredByRoadLeg());
     }
 
     private static BreakRow band(RateVolumeBreak b) {

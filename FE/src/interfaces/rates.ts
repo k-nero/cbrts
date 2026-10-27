@@ -105,6 +105,8 @@ export interface RateLine {
   certainty: RateCertainty;
   estimateNote: string | null;
   everyCorridor: boolean;
+  /** Not charged at an end a domestic road leg covers (US-F3-21). */
+  coveredByRoadLeg: boolean;
 }
 
 export interface VolumeBreak {
@@ -156,6 +158,7 @@ export interface RateLineInput {
   defaultQuantity: number | null;
   certainty: RateCertainty;
   estimateNote: string | null;
+  coveredByRoadLeg: boolean;
 }
 
 export interface ServiceClassInput {

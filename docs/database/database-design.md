@@ -202,6 +202,7 @@ erDiagram
 | `rate` | numeric(14,2) not null | |
 | `min_charge` | numeric(14,2) | "minimum charge applies". |
 | `certainty` | varchar(10) | `FIXED`, `ESTIMATED` (waiting time). |
+| `covered_by_road_leg` | boolean not null, default false | Not charged at an end of the move a domestic road leg to or from a hub covers (US-F1-09, US-F3-21), so the stables-to-terminal move is charged once: a group `A` line at the origin, `G` at the destination. Check: only on group `A` or `G` lines. Set on the air corridors' `TRANSFER_ORIGIN` and `TRANSFER_DEST`. V34 set it on published versions too, lifting `rate_lines_guard` for that one update: the one exception to immutable versions, made because it corrects how the lines are read rather than a rate. Issued quotations keep their lines. |
 
 **`rate_volume_breaks`**: `version_id`, `corridor_id null`, `min_horses`, `max_horses null`, `discount_pct numeric(5,2)`. Check `min_horses <= coalesce(max_horses, min_horses)`. The application rejects overlapping bands.
 

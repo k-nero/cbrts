@@ -179,26 +179,32 @@ public class RateCatalogSeeder {
 
     private static List<RateLine> airLines(RateCatalogVersion v, Corridor c) {
         return List.of(
-                line(
+                coveredByRoadLeg(line(
                         v,
                         c,
                         "TRANSFER_ORIGIN",
                         "A",
                         "Road transfer to the cargo terminal",
                         RateBasis.PER_SHIPMENT,
-                        "250"),
+                        "250")),
                 line(v, c, "HANDLING", "C", "Airline handling and stall build-up", RateBasis.PER_SHIPMENT, "950"),
                 line(v, c, "GROOM", "D", "Flying groom", RateBasis.PER_THREE_HORSES, "1450"),
                 line(v, c, "FLIGHT_VET", "D", "Flight veterinarian", RateBasis.FLIGHT_VET, "2200"),
                 line(v, c, "IMPORT_PERMIT", "E", "Import permit handling", RateBasis.PER_SHIPMENT, "380"),
-                line(
+                coveredByRoadLeg(line(
                         v,
                         c,
                         "TRANSFER_DEST",
                         "G",
                         "Road transfer from the cargo terminal",
                         RateBasis.PER_SHIPMENT,
-                        "300"));
+                        "300")));
+    }
+
+    /** A flat transfer at an end of the move, not charged where a domestic road leg covers it (US-F3-21). */
+    private static RateLine coveredByRoadLeg(RateLine l) {
+        l.setCoveredByRoadLeg(true);
+        return l;
     }
 
     /**

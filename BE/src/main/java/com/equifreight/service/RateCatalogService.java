@@ -430,6 +430,10 @@ public class RateCatalogService {
                 && (r.estimateNote() == null || r.estimateNote().isBlank())) {
             throw new BusinessException("ESTIMATE_NOTE", "Say why an estimated line may vary.");
         }
+        if (r.coveredByRoadLeg() && !"A".equals(r.group()) && !"G".equals(r.group())) {
+            throw new BusinessException(
+                    "COVERED_BY_ROAD_LEG", "Only a group A or G line is at an end of the move a road leg can cover.");
+        }
     }
 
     private void refuseDuplicate(RateCatalogVersion draft, RateLineRequest r, UUID exceptLineId) {
@@ -462,6 +466,7 @@ public class RateCatalogService {
                 r.estimateNote() == null || r.estimateNote().isBlank()
                         ? null
                         : r.estimateNote().strip());
+        line.setCoveredByRoadLeg(r.coveredByRoadLeg());
     }
 
     private static void checkBands(List<VolumeBreakRequest> bands) {
@@ -602,6 +607,7 @@ public class RateCatalogService {
                     copy.setDefaultQuantity(l.getDefaultQuantity());
                     copy.setCertainty(l.getCertainty());
                     copy.setEstimateNote(l.getEstimateNote());
+                    copy.setCoveredByRoadLeg(l.isCoveredByRoadLeg());
                     return copy;
                 })
                 .toList());

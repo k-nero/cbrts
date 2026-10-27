@@ -38,6 +38,7 @@ const LINE_SHOWN = [
   'defaultQuantity',
   'certainty',
   'estimateNote',
+  'coveredByRoadLeg',
 ];
 
 /** Add or change a catalog line in the draft, for this corridor or for every corridor. */
@@ -69,12 +70,18 @@ export const LineModal: FC<{
       defaultQuantity: editing?.defaultQuantity ?? null,
       certainty: pick(CERTAINTIES, editing?.certainty ?? 'FIXED') ?? CERTAINTIES[0],
       estimateNote: editing?.estimateNote ?? '',
+      coveredByRoadLeg: editing?.coveredByRoadLeg ?? false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, methods, open]);
 
   const everyCorridor = useWatch({ control: methods.control, name: 'everyCorridor' }) ?? false;
   const scopeWarning = lineScopeWarning(editing, everyCorridor, view.corridor.code);
+  // A road leg covers an end of the move: group A at the origin, G at the destination (US-F3-21). A ticked box
+  // stays clickable on another group, so it can be cleared.
+  const group = useWatch({ control: methods.control, name: 'group' });
+  const covered = useWatch({ control: methods.control, name: 'coveredByRoadLeg' }) ?? false;
+  const atAnEnd = group?.value === 'A' || group?.value === 'G';
 
   const onSubmit = methods.handleSubmit(async (v) => {
     // Unticking a shared line adds this corridor's own line, which replaces the shared one here only;
@@ -97,6 +104,7 @@ export const LineModal: FC<{
           defaultQuantity: v.defaultQuantity,
           certainty: v.certainty.value as 'FIXED' | 'ESTIMATED',
           estimateNote: v.estimateNote.trim() || null,
+          coveredByRoadLeg: v.coveredByRoadLeg,
         },
       });
       message.success(
@@ -206,6 +214,16 @@ export const LineModal: FC<{
               label="Why it may vary (estimated lines)"
               component="textarea"
               componentProps={{ rows: 2, maxLength: 300 }}
+            />
+            <FormField
+              name="coveredByRoadLeg"
+              component="checkbox"
+              componentProps={{
+                children: atAnEnd
+                  ? 'Not charged when a road leg covers this end'
+                  : 'Not charged when a road leg covers this end (groups A and G only)',
+                disabled: !atAnEnd && !covered,
+              }}
             />
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />

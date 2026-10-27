@@ -23,4 +23,5 @@ public record RateLineResponse(
         BigDecimal defaultQuantity,
         RateCertainty certainty,
         String estimateNote,
-        boolean everyCorridor) {}
+        boolean everyCorridor,
+        boolean coveredByRoadLeg) {}
