@@ -19,6 +19,14 @@ export const useInvoiceList = (view: InvoiceView) => {
 export const useReadyForInvoice = () =>
   useQuery({ queryKey: ['invoices', 'ready'], queryFn: invoiceApi.ready });
 
+/** Request review's Invoices panel; under `invoices`, so issuing or a payment refreshes it. */
+export const useStaffRequestInvoices = (requestId: string | undefined) =>
+  useQuery({
+    queryKey: ['invoices', 'request', requestId],
+    queryFn: () => invoiceApi.ofRequestForStaff(requestId as string),
+    enabled: Boolean(requestId),
+  });
+
 export const useInvoice = (id: string) =>
   useQuery({ queryKey: ['invoice', id], queryFn: () => invoiceApi.get(id), enabled: Boolean(id) });
 

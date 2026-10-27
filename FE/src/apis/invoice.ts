@@ -30,6 +30,10 @@ export const invoiceApi = {
   recordPayment: (id: string, input: RecordPaymentInput) =>
     client.post<Invoice>(`/staff/invoices/${id}/payments`, input).then((r) => r.data),
 
+  /** A request's invoices on Request review: the deposit, then its job's, drafts included. */
+  ofRequestForStaff: (requestId: string) =>
+    client.get<InvoiceSummary[]>(`/staff/requests/${requestId}/invoices`).then((r) => r.data),
+
   /** The customer's side: a request's invoices, and one invoice. */
   ofRequest: (requestId: string) =>
     client.get<InvoiceSummary[]>(`/customer/requests/${requestId}/invoices`).then((r) => r.data),
