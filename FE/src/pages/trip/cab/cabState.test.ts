@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { cabPosition, outcomes, recordStop, stopCell } from './cabState';
+import { cabPosition, departureBlocked, outcomes, recordStop, stopCell } from './cabState';
 
 import type { TripRecord, TripStop, TripView } from '@/interfaces';
 
@@ -105,6 +105,36 @@ describe('outcomes', () => {
     const t = { ...trip('NOT_STARTED', [stop('a', 'PICKUP')]), clearanceReady: false };
     const depart = outcomes(t, cabPosition(t)).find((o) => o.kind === 'DEPARTED');
     expect(depart?.blocked).toBeTruthy();
+  });
+
+  it('blocks the departure until the trip before hands the horses on', () => {
+    const part = (tripCode: string, status: string, current = false) => ({
+      tripId: tripCode,
+      tripCode,
+      status,
+      current,
+      handsOn: false,
+      startCity: null,
+      endCity: null,
+    });
+    const t = {
+      ...trip('NOT_STARTED', [stop('a', 'TRANSFER'), stop('b', 'DELIVERY')]),
+      parts: [part('TRP-2026-002', 'NOT_STARTED'), part('TRP-2026-003', 'NOT_STARTED', true)],
+    } as unknown as TripView;
+    const depart = outcomes(t, cabPosition(t)).find((o) => o.kind === 'DEPARTED');
+    expect(depart?.blocked).toBe('Waits for TRP-2026-002 to hand the horses on');
+    const after = {
+      ...t,
+      parts: [part('TRP-2026-002', 'DELIVERED'), part('TRP-2026-003', 'NOT_STARTED', true)],
+    } as unknown as TripView;
+    expect(departureBlocked(after)).toBeUndefined();
+  });
+
+  it('offers the flight, not the trailer, on a leg that starts at the airport', () => {
+    const t = trip('NOT_STARTED', [stop('a', 'AIRPORT_OUT'), stop('b', 'AIRPORT_IN')]);
+    const kinds = outcomes(t, cabPosition(t)).map((o) => o.kind);
+    expect(kinds).toContain('FLIGHT_DEPARTED');
+    expect(kinds).not.toContain('DEPARTED');
   });
 
   it('records an arrival at the next stop between stops', () => {

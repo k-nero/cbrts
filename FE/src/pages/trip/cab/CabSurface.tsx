@@ -4,9 +4,10 @@ import { CabBar } from './CabBar';
 import { CabStrip } from './CabStrip';
 import { CheckpointTask } from './CheckpointTask';
 import { ConditionTask } from './ConditionTask';
+import { HandedOnTask } from './HandedOnTask';
 import { HandoverTask } from './HandoverTask';
 import { HeldTask } from './HeldTask';
-import { cabPosition } from './cabState';
+import { cabPosition, departureBlocked, neighbourParts } from './cabState';
 
 import { HandoverRecord } from '../HandoverRecord';
 import { ReportEmergency } from '../ReportEmergency';
@@ -27,16 +28,21 @@ type Props = {
 const cabState = (trip: TripView): { tone: Tone; word: string } => {
   const held = trip.records.filter((r) => r.kind === TripRecordKindEnum.HELD).at(-1);
   switch (trip.tripStatus) {
-    case TripStatusEnum.NOT_STARTED:
-      return trip.clearanceReady
-        ? { tone: 'ok', word: 'Clear to depart' }
-        : { tone: 'warn', word: 'Waiting for clearance' };
+    case TripStatusEnum.NOT_STARTED: {
+      const previous = neighbourParts(trip).previous;
+      if (previous && previous.status !== TripStatusEnum.DELIVERED)
+        return { tone: 'warn', word: `Waiting for ${previous.tripCode ?? 'the trip before'}` };
+      return departureBlocked(trip)
+        ? { tone: 'warn', word: 'Waiting for clearance' }
+        : { tone: 'ok', word: 'Clear to depart' };
+    }
     case TripStatusEnum.HELD:
       return {
         tone: 'bad',
         word: held?.checkpointName ? `Held at ${held.checkpointName}` : 'Held',
       };
     case TripStatusEnum.DELIVERED:
+      if (neighbourParts(trip).handsOn) return { tone: 'ok', word: 'Handed on' };
       if (trip.handover?.handedOverAt) return { tone: 'ok', word: 'Handed over' };
       return trip.handover?.deliveredAt
         ? { tone: 'ok', word: `Arrived ${formatTime(trip.handover.deliveredAt)}` }
@@ -66,12 +72,14 @@ export const CabSurface: FC<Props> = ({ trip, trips, selected, onSelect }) => {
 
   const delivered = trip.tripStatus === TripStatusEnum.DELIVERED;
   const handedOver = Boolean(trip.handover?.handedOverAt);
+  // A leg that ends at a transfer hands the horses on; the receiver's handover is on the last trip.
+  const handedOn = delivered && neighbourParts(trip).handsOn;
   const part = trip.parts.find((p) => p.current);
   const route =
     part?.startCity && part.endCity
       ? `${part.startCity} → ${part.endCity}`
       : `${trip.stops[0]?.name ?? trip.origin ?? 'Origin'} → ${trip.stops.at(-1)?.name ?? trip.destination ?? 'Destination'}`;
-  const emergency = !handedOver && <ReportEmergency trip={trip} />;
+  const emergency = !handedOver && !handedOn && <ReportEmergency trip={trip} />;
 
   return (
     <>
@@ -80,11 +88,13 @@ export const CabSurface: FC<Props> = ({ trip, trips, selected, onSelect }) => {
         selected={selected}
         onSelect={onSelect}
         route={route}
-        stage={delivered ? 'Handover' : 'Trip'}
+        stage={delivered && !handedOn ? 'Handover' : 'Trip'}
         state={cabState(trip)}
       />
       {trip.stops.length > 0 && <CabStrip trip={trip} position={position} />}
-      {handedOver ? (
+      {handedOn ? (
+        <HandedOnTask trip={trip} />
+      ) : handedOver ? (
         <HandoverRecord trip={trip} />
       ) : delivered ? (
         <HandoverTask trip={trip} tripCode={tripCode} extra={emergency} />
