@@ -7,13 +7,16 @@ import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.RequoteRequest;
+import com.equifreight.model.request.MoveProgressResponse;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestResponse;
 import com.equifreight.model.request.RequestSummaryResponse;
 import com.equifreight.service.CustomerQuotationService;
+import com.equifreight.service.MoveProgressService;
 import com.equifreight.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,10 +41,13 @@ public class RequestController {
 
     private final RequestService requestService;
     private final CustomerQuotationService quotations;
+    private final MoveProgressService moves;
 
-    public RequestController(RequestService requestService, CustomerQuotationService quotations) {
+    public RequestController(
+            RequestService requestService, CustomerQuotationService quotations, MoveProgressService moves) {
         this.quotations = quotations;
         this.requestService = requestService;
+        this.moves = moves;
     }
 
     // Sortable: createdAt, departureDate, submittedAt.
@@ -50,7 +56,12 @@ public class RequestController {
             @AuthenticationPrincipal User user,
             @RequestParam(value = "status", required = false) RequestStatus status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return requestService.list(user, status, pageable);
+        Page<RequestSummaryResponse> page = requestService.list(user, status, pageable);
+        // An approved request stays Approved; the list says where its move is.
+        Map<UUID, MoveProgressResponse> move =
+                moves.of(page.map(RequestSummaryResponse::id).getContent());
+        return page.map(r ->
+                move.containsKey(r.id()) ? r.toBuilder().move(move.get(r.id())).build() : r);
     }
 
     @GetMapping("/requests/{id}")

@@ -1,6 +1,7 @@
 import { type FC, useState } from 'react';
 
 import { tripHistory } from './tracking';
+import { TripPhotos } from './TripPhotos';
 
 import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { Button } from '@/components/ui';
@@ -16,7 +17,10 @@ export const TripHistory: FC<{ trip: TripView; request: TransportRequest }> = ({
   if (history.length === 0) return null;
   return (
     <HistoryPanel
-      history={all ? history : history.slice(0, 3)}
+      history={(all ? history : history.slice(0, 3)).map((e) => ({
+        ...e,
+        media: <TripPhotos photos={e.photos} />,
+      }))}
       footer={
         history.length > 3 && (
           <Button size="sm" variant="ghost" onClick={() => setAll(!all)}>

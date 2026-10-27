@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { ArrivalCondition } from './ArrivalCondition';
 import { ConditionLog } from './ConditionLog';
@@ -13,6 +14,7 @@ import { OnTheRoad } from '../../home/OnTheRoad';
 
 import { Button } from '@/components/ui';
 import type { Horse, TransportRequest, TripView } from '@/interfaces';
+import { settle, stagger } from '@/lib/motion';
 
 type Props = {
   request: TransportRequest;
@@ -24,54 +26,71 @@ type Props = {
 /**
  * The request once its horses are on the road (DESIGN.md, the tracking page model; Figma "Tracking · In
  * transit" and "Tracking · Delivered"). A journey of several trips reads as one route: the transfers where one
- * trip hands the horses to the next are stops on it.
+ * trip hands the horses to the next are stops on it. The blocks settle in from the pass down, once, as the page opens.
  */
 export const RequestTracking: FC<Props> = ({ request, trip, horses, onBack }) => {
   const now = new Date().toISOString();
   const lastAt = trip.records.at(-1)?.occurredAt ?? now;
   const done = delivered(trip);
   return (
-    <Flex vertical gap={24}>
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={stagger(0.07)}
+      initial="hidden"
+      animate="shown"
+    >
       {/* The pass is the header (DESIGN.md, The pass header): only the back link sits above it. */}
-      <div>
+      <motion.div variants={settle}>
         <Button variant="ghost" size="sm" leadingIcon="arrow-left" onClick={onBack}>
           My requests
         </Button>
-      </div>
+      </motion.div>
       <h1 className="sr-only">
         {request.code} · {done ? 'Delivered' : 'In transit'}
       </h1>
-      <TrackingPass request={request} trip={trip} horses={horses} now={now} />
-      <TrackingLead trip={trip} now={now} />
+      <motion.div variants={settle}>
+        <TrackingPass request={request} trip={trip} horses={horses} now={now} />
+      </motion.div>
+      <motion.div variants={settle}>
+        <TrackingLead trip={trip} now={now} />
+      </motion.div>
       {done ? (
-        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_456px]">
+        <motion.div
+          variants={settle}
+          className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_456px]"
+        >
           <Flex vertical gap={24}>
             <ArrivalCondition trip={trip} />
             <TripStages rows={stageRows(trip, now)} />
           </Flex>
           <RouteRecord trip={trip} />
-        </div>
+        </motion.div>
       ) : (
         <>
-          <OnTheRoad
-            trip={{
-              updatedAt: lastAt,
-              gate: trip.clearanceReady ? 'clear' : 'locked',
-              stops: routeStops(trip).map((s) => ({
-                name: String(s.name),
-                kind: String(s.kind),
-                state: s.state,
-                time: String(s.time),
-              })),
-            }}
-          />
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_456px]">
+          <motion.div variants={settle}>
+            <OnTheRoad
+              trip={{
+                updatedAt: lastAt,
+                gate: trip.clearanceReady ? 'clear' : 'locked',
+                stops: routeStops(trip).map((s) => ({
+                  name: String(s.name),
+                  kind: String(s.kind),
+                  state: s.state,
+                  time: String(s.time),
+                })),
+              }}
+            />
+          </motion.div>
+          <motion.div
+            variants={settle}
+            className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_456px]"
+          >
             <TripStages rows={stageRows(trip, now)} />
             <ConditionLog trip={trip} />
-          </div>
+          </motion.div>
         </>
       )}
       <TripHistory trip={trip} request={request} />
-    </Flex>
+    </motion.div>
   );
 };

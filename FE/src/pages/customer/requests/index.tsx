@@ -62,8 +62,11 @@ const MyRequestsPage: FC = () => {
         title: 'Status',
         key: 'status',
         width: 150,
+        // After approval the request stays Approved; its move says where it is.
         render: (_, r) => {
-          const chip = requestStatusChip(r.status);
+          const chip = r.move
+            ? { tone: r.move.tone, label: r.move.label }
+            : requestStatusChip(r.status);
           return <Chip tone={chip.tone}>{chip.label}</Chip>;
         },
       },
@@ -94,6 +97,28 @@ const MyRequestsPage: FC = () => {
                 onClick={() => router.push(router.paths.get('request', { pathParams: [r.id] }))}
               >
                 Answer
+              </Button>
+            </Flex>
+          ) : r.move ? (
+            <Flex component="span" justify="end">
+              <Button
+                size="sm"
+                variant={r.move.tone === 'warn' ? 'primary' : 'secondary'}
+                onClick={() =>
+                  router.push(
+                    router.paths.get(r.move?.tracking ? 'request' : 'request-documents', {
+                      pathParams: [r.id],
+                    }),
+                  )
+                }
+              >
+                {!r.move.tracking
+                  ? 'Open documents'
+                  : r.move.label === 'Completed'
+                    ? 'Open the record'
+                    : r.move.tone === 'warn'
+                      ? 'Open the move'
+                      : 'Track the move'}
               </Button>
             </Flex>
           ) : r.quotation ? (

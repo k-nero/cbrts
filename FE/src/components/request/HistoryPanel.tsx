@@ -1,15 +1,22 @@
 import { Flex } from 'antd';
 import type { FC, ReactNode } from 'react';
+import { motion } from 'motion/react';
 
 import { Panel } from '@/components/ui';
 import type { HistoryEntry } from '@/interfaces';
+import { IN_VIEW, settle } from '@/lib/motion';
 import { formatDayTime } from '@/lib/utils';
 
 /**
  * A request's history from the audit trail, newest first (BR-F1-08): every decision on the staff
  * review, every status change on the customer's request (US-F1-08); an incident's timeline oldest first.
+ * Each row settles in the first time it is in view, a beat after the one above; rows shown later (a longer
+ * list) settle the same way, which a staggering parent would leave hidden.
  */
-export const HistoryPanel: FC<{ history: HistoryEntry[]; title?: string; footer?: ReactNode }> = ({
+/** An entry may carry what came with it, such as the photos on a trip record. */
+type Entry = HistoryEntry & { media?: ReactNode };
+
+export const HistoryPanel: FC<{ history: Entry[]; title?: string; footer?: ReactNode }> = ({
   history,
   title = 'History',
   footer,
@@ -17,16 +24,22 @@ export const HistoryPanel: FC<{ history: HistoryEntry[]; title?: string; footer?
   <Panel title={title} flush footer={footer}>
     <ol className="m-0 list-none p-0">
       {history.map((h, i) => (
-        <li
+        <motion.li
           key={`${h.occurredAt}-${i}`}
+          variants={settle}
+          custom={Math.min(i, 8) * 0.04}
+          initial="hidden"
+          whileInView="shown"
+          viewport={IN_VIEW}
           className={`grid grid-cols-[120px_minmax(0,1fr)] gap-4 px-6 py-3 ${i > 0 ? 'border-t border-line' : ''}`}
         >
           <span className="type-caption pt-0.5 text-ink-3">{formatDayTime(h.occurredAt)}</span>
           <Flex component="span" vertical gap={2}>
             <span className="type-body-s text-ink">{h.summary}</span>
             <span className="type-body-s text-ink-3">{h.actorLabel}</span>
+            {h.media}
           </Flex>
-        </li>
+        </motion.li>
       ))}
     </ol>
   </Panel>

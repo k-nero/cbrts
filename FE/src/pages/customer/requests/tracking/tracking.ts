@@ -1,3 +1,5 @@
+import type { HorsePhoto } from './TripPhotos';
+
 import type { RouteStripStop, Stage } from '@/components/ui';
 import type { HistoryEntry, TransportRequest, TripRecord, TripStop, TripView } from '@/interfaces';
 import { ON_THE_WAY, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
@@ -246,6 +248,7 @@ export const conditionLog = (trip: TripView) =>
       id: r.id,
       at: r.occurredAt,
       by: r.recordedBy,
+      photos: recordPhotos(r),
       text:
         r.text ??
         r.conditions
@@ -274,9 +277,16 @@ const EVENT: Partial<Record<string, (r: TripRecord) => string>> = {
  * The move's history, newest first: the trip's checkpoints, then the request's own steps. A delivery at a
  * transfer hands the horses on to the next trip of the journey.
  */
-export const tripHistory = (trip: TripView, request: TransportRequest): HistoryEntry[] => {
+/** A history row, with the photos the escort took on its record. */
+export type TripEvent = HistoryEntry & { photos: HorsePhoto[] };
+
+/** The photos on a record, each with the horse it shows. */
+export const recordPhotos = (r: TripRecord): HorsePhoto[] =>
+  r.conditions.flatMap((c) => c.photos.map((p) => ({ ...p, horseName: c.horseName })));
+
+export const tripHistory = (trip: TripView, request: TransportRequest): TripEvent[] => {
   const stopKind = new Map(trip.stops.map((s) => [s.id, s.kind]));
-  const records: HistoryEntry[] = trip.records
+  const records: TripEvent[] = trip.records
     .filter((r) => r.kind !== TripRecordKindEnum.NOTE)
     .map((r) => ({
       occurredAt: r.occurredAt,
@@ -285,6 +295,7 @@ export const tripHistory = (trip: TripView, request: TransportRequest): HistoryE
           ? `Handed on to the next trip at ${r.checkpointName ?? 'the transfer'}.`
           : (EVENT[r.kind]?.(r) ?? 'Update recorded.'),
       actorLabel: r.recordedBy ?? 'The escort',
+      photos: recordPhotos(r),
     }));
   const h = trip.handover;
   if (h?.confirmedAt && h.customerOutcome)
@@ -297,8 +308,9 @@ export const tripHistory = (trip: TripView, request: TransportRequest): HistoryE
             ? 'Handover taken as accepted: no answer by the due time.'
             : 'Handover accepted.',
       actorLabel: h.acceptedByDefault ? 'System' : (h.confirmedByName ?? 'You'),
+      photos: [],
     });
-  return [...records, ...(request.history ?? [])].sort((a, b) =>
+  return [...records, ...(request.history ?? []).map((e) => ({ ...e, photos: [] }))].sort((a, b) =>
     b.occurredAt.localeCompare(a.occurredAt),
   );
 };

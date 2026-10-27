@@ -236,6 +236,15 @@ export interface RequestSummary {
   submittedAt: string | null;
   /** The latest issued quotation; null until one is issued. */
   quotation: QuotationIssuedRef | null;
+  /** Where an approved request's move stands, read from its job: the request itself stays Approved. */
+  move?: MoveProgress | null;
+}
+
+/** An approved request's move in a word and a tone, and whether its page tracks the trip yet. */
+export interface MoveProgress {
+  label: string;
+  tone: 'ok' | 'info' | 'warn' | 'neutral';
+  tracking: boolean;
 }
 
 /** The body of POST and PUT /customer/requests, sent whole: a field left out is cleared. */

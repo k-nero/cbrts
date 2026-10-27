@@ -18,4 +18,6 @@ public record RequestSummaryResponse(
         long horseCount,
         Instant createdAt,
         Instant submittedAt,
-        QuotationIssuedRefResponse quotation) {}
+        QuotationIssuedRefResponse quotation,
+        /** Where an approved request's move stands; null before approval. */
+        MoveProgressResponse move) {}

@@ -109,7 +109,37 @@ describe('tracking', () => {
         at: '2026-10-18T01:40:00Z',
         by: 'Hoa',
         text: 'All settled.',
+        photos: [],
       },
+    ]);
+  });
+
+  it('carries the photos on a record into the history, with the horse each shows', () => {
+    const photo = {
+      id: 'p1',
+      fileName: 'king.jpg',
+      contentType: 'image/jpeg',
+      contentUrl: '/f/p1',
+    };
+    const t = trip({
+      records: [
+        record('CONDITION_CHECK', '2026-10-18T01:40:00Z', {
+          conditions: [
+            {
+              horseId: 'h',
+              horseName: 'Copper King',
+              condition: 'SOUND',
+              drinking: true,
+              eating: true,
+              note: null,
+              photos: [photo],
+            },
+          ],
+        }),
+      ],
+    });
+    expect(tripHistory(t, { history: [] } as unknown as TransportRequest)[0].photos).toEqual([
+      { ...photo, horseName: 'Copper King' },
     ]);
   });
 
