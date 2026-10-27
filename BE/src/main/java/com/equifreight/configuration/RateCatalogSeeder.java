@@ -201,12 +201,16 @@ public class RateCatalogSeeder {
                         "300"));
     }
 
-    /** HAN → VTE gets the shared road rate only and no crossing fee: the two gaps of the Blocked frame. */
+    /**
+     * Every road corridor prices a vet escort on request. HAN → VTE gets no private-trailer rate and no crossing fee:
+     * the two gaps of the Blocked frame.
+     */
     private static List<RateLine> roadLines(RateCatalogVersion v, Corridor c) {
         boolean hanoiVientiane =
                 "Hanoi".equalsIgnoreCase(c.getOriginCity()) && "Vientiane".equalsIgnoreCase(c.getDestinationCity());
         List<RateLine> list = new ArrayList<>();
         list.add(road(v, c, "ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40"));
+        list.add(line(v, c, "VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
         if (hanoiVientiane) {
             return list;
         }

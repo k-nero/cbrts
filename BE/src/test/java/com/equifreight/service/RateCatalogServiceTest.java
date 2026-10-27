@@ -193,7 +193,9 @@ class RateCatalogServiceTest {
                 isolation(v, HorseSex.STALLION),
                 isolation(v, HorseSex.MARE),
                 isolation(v, HorseSex.GELDING),
-                line(v, pnhHkg, "HANDLING", "C", RateBasis.PER_SHIPMENT)));
+                line(v, pnhHkg, "HANDLING", "C", RateBasis.PER_SHIPMENT),
+                line(v, pnhHkg, "FLIGHT_VET", "D", RateBasis.FLIGHT_VET),
+                line(v, hanVte, "VET_ESCORT", "D", RateBasis.VET_ESCORT)));
         RateLine shared = line(v, hanVte, "ROAD_SHARED", "C", RateBasis.PER_KM);
         shared.setAppliesToTrailer(com.equifreight.entity.enums.TrailerType.SHARED);
         rateLines.add(shared);

@@ -1,6 +1,7 @@
 package com.equifreight.service.pricing;
 
 import static com.equifreight.service.pricing.PricingFixtures.air;
+import static com.equifreight.service.pricing.PricingFixtures.askingForAVet;
 import static com.equifreight.service.pricing.PricingFixtures.classRow;
 import static com.equifreight.service.pricing.PricingFixtures.d;
 import static com.equifreight.service.pricing.PricingFixtures.estimateOf;
@@ -229,6 +230,35 @@ class QuotePricerTest {
                 sexLine("ISO_GELDING", "B", "Pre-export isolation", HorseSex.GELDING, "70")));
         lines.addAll(List.of(extra));
         return rates(List.of(), lines);
+    }
+
+    @Test
+    void aRoadVetEscortIsPricedOnlyWhenTheCustomerAsks() {
+        RateSet rates = roadRates(
+                kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"),
+                line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        PricingInput move =
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+
+        assertThat(find(QuotePricer.price(move, rates), "Veterinary escort")).isNull();
+
+        PricedLine vet = find(QuotePricer.price(askingForAVet(move), rates), "Veterinary escort");
+        assertThat(vet.group()).isEqualTo("D");
+        assertThat(vet.quantity()).isEqualByComparingTo("1");
+        assertThat(vet.amount()).isEqualByComparingTo("650.00");
+        assertThat(vet.basisText()).isEqualTo("vet escort requested");
+    }
+
+    @Test
+    void anAirMovesVetIsTheFlightVetNotTheRoadEscort() {
+        List<RateRow> lines = new ArrayList<>(pnhHkgLines());
+        lines.add(line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        RateSet rates = rates(pnhHkgRates().classes(), lines);
+
+        PricedQuote quote = QuotePricer.price(askingForAVet(pnhHkgBusiness()), rates);
+
+        assertThat(find(quote, "Veterinary escort")).isNull();
+        assertThat(find(quote, "Flight veterinarian")).isNotNull();
     }
 
     @Test

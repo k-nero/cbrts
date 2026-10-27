@@ -291,6 +291,12 @@ public final class QuotePricer {
                     lines.add(priced(row, trigger, 1, null));
                 }
             }
+            case VET_ESCORT -> {
+                // An air move's vet is the flight vet, so this line is for road only.
+                if (in.mode() == TransportMode.ROAD && in.vetEscort()) {
+                    lines.add(priced(row, "vet escort requested", 1, null));
+                }
+            }
             case PER_POSITION -> {
                 // Stall positions are priced from the service class table, never from a line.
             }

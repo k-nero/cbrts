@@ -433,6 +433,10 @@ class RateCatalogServiceWriteTest {
                 "BASIS",
                 "Air corridors price the flight by stall position; a road transfer to the terminal is per shipment.");
         assertRefused(
+                () -> service.addLine(lan, lineRequest(air, "VET", RateBasis.VET_ESCORT), null),
+                "BASIS",
+                "An air move's vet is the flight vet line; a vet escort on request is for road corridors.");
+        assertRefused(
                 () -> service.addLine(
                         lan,
                         with(lineRequest(road, "X", RateBasis.PER_HORSE), b -> b.appliesToTrailer(TrailerType.SHARED)),
