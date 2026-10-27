@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { App, Flex } from 'antd';
-import { ContinueTripModal } from './ContinueTripModal';
+
 import { FlightPanel } from './FlightPanel';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
@@ -9,29 +8,18 @@ import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
-import {
-  useCanPlanTrips,
-  useConfirmRoutePlan,
-  useRemoveChainedTrip,
-  useRoutePlans,
-} from '@/hooks/useJob';
-import type { JobDetail, RouteStop, RouteStopKind } from '@/interfaces';
+import { useCanPlanTrips, useConfirmRoutePlan, useRoutePlans } from '@/hooks/useJob';
+import type { JobDetail } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
 interface Props {
   job: JobDetail;
 }
 
-/** Where a journey continues on another trip: the places horses wait between carriers (US-F3-16). */
-const SPLITS: RouteStopKind[] = ['AIRPORT_OUT', 'AIRPORT_IN', 'QUARANTINE'];
-
 export function RouteTab({ job }: Props) {
   const routePlan = job.routePlan;
   const { data: allVersions } = useRoutePlans(job.id);
-  const { message, modal } = App.useApp();
-  const [, setSearchParams] = useSearchParams();
-  const [splitAt, setSplitAt] = useState<RouteStop | null>(null);
-  const removeTrip = useRemoveChainedTrip(job.id);
+  const { message } = App.useApp();
   const confirmRoute = useConfirmRoutePlan(job.id);
   const [editing, setEditing] = useState(false);
 
@@ -40,45 +28,19 @@ export function RouteTab({ job }: Props) {
   const part = index < 0 ? null : job.parts[index];
   const before = index > 0 && job.parts[index - 1].handsOn ? job.parts[index - 1] : null;
   const departed = (part?.status ?? job.tripStatus) !== 'NOT_STARTED';
-  // Splitting the journey, taking a trip out, sharing and editing the route are the trip planners' (US-F3-16,
-  // US-F3-11, US-F3-17).
+  // Sharing and editing the route are the trip planners' (US-F3-11, US-F3-17); the journey's trips are added and
+  // taken off on the Trip tab's rail (US-F3-21).
   const planning = useCanPlanTrips() && !departed;
 
-  const takeOut = () =>
-    modal.confirm({
-      title: 'Take this trip out of the journey?',
-      content: `${job.code} travels on ${before?.corridorCode ?? 'the trip before'} again to the end of this trip's stops. This trip's plan for ${job.code} is dropped; a trip nobody else rides releases its trailers and crew.`,
-      okText: 'Take it out',
-      onOk: () =>
-        removeTrip.mutateAsync(part!.tripId).then(
-          () => {
-            message.success(`${job.code} travels on the trip before again.`);
-            setSearchParams({ tab: 'route', trip: before!.tripId }, { replace: true });
-          },
-          (error) => message.error(apiErrorMessage(error, 'The trip was not taken out.')),
-        ),
-    });
-
-  // A later trip of the journey says where it continues from, and can be taken out before it leaves.
+  // A later trip of the journey says where it collects the horses (US-F3-16, US-F3-21).
   const chainPanel =
     before && part ? (
       <Callout
         tone="info"
-        title={`Continues the journey after ${before.corridorCode ?? 'the trip before'}`}
+        title={`Collects the horses from ${before.tripCode} in ${part.startCity ?? 'the city it starts from'}`}
       >
-        <Flex vertical gap={12}>
-          <span>
-            The horses join this trip when the trip before hands them on at its transfer stop; it
-            can’t depart before then.
-          </span>
-          {planning && (
-            <div>
-              <Button variant="secondary" size="sm" onClick={takeOut}>
-                Take this trip out of the journey
-              </Button>
-            </div>
-          )}
-        </Flex>
+        The horses join this trip when {before.tripCode} hands them on at its transfer stop; it
+        can’t depart before then.
       </Callout>
     ) : null;
 
@@ -204,7 +166,6 @@ export function RouteTab({ job }: Props) {
       {draftPanel}
       {editor}
       {sharePanel}
-      <ContinueTripModal job={job} stop={splitAt} onClose={() => setSplitAt(null)} />
 
       {/* Summary Strip (matching Figma scrRoute) */}
       <div className="p-6 rounded-xl border border-line bg-card shadow-xs">
@@ -282,8 +243,6 @@ export function RouteTab({ job }: Props) {
                 : stop.placeName || 'Stop';
             const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
 
-            // Before departure, the journey can continue on another trip from an airport or quarantine stop.
-            const canSplit = planning && SPLITS.includes(stop.kind);
             return (
               <TimelineStop
                 key={stop.id}
@@ -291,18 +250,6 @@ export function RouteTab({ job }: Props) {
                 stop={stopName}
                 time={timeStr}
                 details={stop.details || undefined}
-                status={
-                  canSplit ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      trailingIcon="arrow-right"
-                      onClick={() => setSplitAt(stop)}
-                    >
-                      Continue on another trip
-                    </Button>
-                  ) : undefined
-                }
               />
             );
           })}

@@ -5,6 +5,7 @@ import type {
   CrewMember,
   FlightAllocation,
   FlightAllocationInput,
+  FlightInput,
   JobDetail,
   JobListParams,
   JobSummary,
@@ -14,6 +15,7 @@ import type {
   ShareSuggestion,
   ShareTripResult,
   JoinableTrip,
+  JourneyCorridor,
   TripJob,
   TripPart,
   JobClosing,
@@ -144,18 +146,25 @@ export const jobApi = {
       .delete<TripJob>(`/staff/jobs/${jobId}/trip/jobs/${otherJobId}`, { params: { trip } })
       .then((r) => r.data),
 
-  /**
-   * US-F3-16: continues the job's journey on a new trip of `corridorId`, from the airport or
-   * quarantine stop `stopSeq` of the route of `trip` (its current trip when left out).
-   */
-  continueOnTrip: (jobId: string, stopSeq: number, corridorId: string, trip?: string) =>
+  /** US-F3-21: the corridors the next trip can run, read from the city the journey has reached. */
+  journeyCorridors: (jobId: string) =>
+    client.get<JourneyCorridor[]>(`/staff/jobs/${jobId}/journey/corridors`).then((r) => r.data),
+
+  /** US-F3-21: adds a trip on `corridorId` to the end of the job's journey. */
+  addTrip: (jobId: string, corridorId: string) =>
     client
-      .post<TripPart[]>(`/staff/jobs/${jobId}/trip/chain`, { tripId: trip, stopSeq, corridorId })
+      .post<TripPart[]>(`/staff/jobs/${jobId}/journey/trips`, { corridorId })
       .then((r) => r.data),
 
-  /** US-F3-16: takes a later trip out of the job's journey; it travels on the trip before again. */
-  removeChainedTrip: (jobId: string, trip: string) =>
-    client.delete<TripPart[]>(`/staff/jobs/${jobId}/trip/chain/${trip}`).then((r) => r.data),
+  /** US-F3-21: takes the journey's last trip off before it departs. */
+  removeTrip: (jobId: string, tripId: string) =>
+    client.delete<TripPart[]>(`/staff/jobs/${jobId}/journey/trips/${tripId}`).then((r) => r.data),
+
+  /** US-F3-21: sets the flight of a flight trip; its times become the airport stops' times. */
+  setFlight: (jobId: string, tripId: string, flight: FlightInput) =>
+    client
+      .put<JobDetail>(`/staff/jobs/${jobId}/journey/trips/${tripId}/flight`, flight)
+      .then((r) => r.data),
 
   getCrew: (jobId: string, trip?: string) =>
     client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`, { params: { trip } }).then((r) => r.data),

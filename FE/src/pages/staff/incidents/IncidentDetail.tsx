@@ -115,7 +115,7 @@ export default function IncidentDetailPage() {
               <Flex vertical gap={12}>
                 <Fact label="Job">
                   <Link
-                    to={`/staff/jobs/${incident.jobId}?tab=route`}
+                    to={`/staff/jobs/${incident.jobId}?tab=trip&view=route`}
                     className="text-ink! underline"
                   >
                     {incident.jobCode}
