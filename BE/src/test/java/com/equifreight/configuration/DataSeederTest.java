@@ -9,8 +9,6 @@ import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.Role;
 import com.equifreight.entity.User;
 import com.equifreight.repository.*;
-import com.equifreight.service.JobTripService;
-import com.equifreight.service.storage.FileStorage;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -47,41 +45,18 @@ class DataSeederTest {
                 mock(PasswordEncoder.class),
                 "changeme123!",
                 mock(CountryRepository.class),
-                mock(PlaceRepository.class),
-                mock(BorderCrossingRepository.class),
                 mock(CorridorRepository.class),
                 clubs,
                 sizeClasses,
                 horses,
                 mock(VehicleRepository.class),
                 mock(VehicleStallRepository.class),
-                mock(RateCatalogVersionRepository.class),
-                mock(TransportRequestRepository.class),
-                mock(QuotationRepository.class),
-                mock(TransportJobRepository.class),
-                mock(LoadPlanRepository.class),
-                mock(LoadPlanStallRepository.class),
-                mock(RoutePlanRepository.class),
-                mock(RouteStopRepository.class),
-                mock(RouteLegRepository.class),
-                mock(CrewAssignmentRepository.class),
-                mock(CodeCounterRepository.class),
                 mock(RegulationCatalogRepository.class),
                 mock(RegulationVersionRepository.class),
                 mock(RegulationRuleRepository.class),
                 mock(DocumentTypeRepository.class),
-                mock(JobRegulationPinRepository.class),
                 mock(AuthorityRepository.class),
-                mock(AuthoritySubmissionRepository.class),
-                mock(QuarantinePeriodRepository.class),
-                mock(NoteRepository.class),
-                mock(NoteReplyRepository.class),
-                mock(ChecklistItemRepository.class),
-                mock(DocumentVersionRepository.class),
-                mock(StoredFileRepository.class),
-                mock(FileStorage.class),
-                mock(CatalogSeeder.class),
-                mock(JobTripService.class));
+                mock(CatalogSeeder.class));
 
         Club club = new Club();
         club.setId(CLUB_ID);

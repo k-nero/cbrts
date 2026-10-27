@@ -28,16 +28,17 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 
 /**
- * The demo route catalog (spec §7): pickup and delivery places, border crossings, the corridors we run and one
- * published regulation version per country, carrying the lead times (BR-F1-01) but no document rules; Flow 2
- * adds those as the next version. Every value is a demo placeholder. Idempotent by natural key: a row that
- * exists is left alone. Called by {@link DataSeeder} after the accounts exist.
+ * The route catalog the demo runs on (spec §7): pickup and delivery places, border crossings, the corridors we run and
+ * one published regulation version per country, carrying the lead times (BR-F1-01) but no document rules; Flow 2 adds
+ * those as the next version. The venues, terminals, crossings and distances are real; the stables and isolation barns
+ * named inside a venue, and every day count and figure, are demo values. Idempotent by natural key: a row that exists
+ * is left alone. Called by {@link DataSeeder} after the accounts exist.
  */
 @Component
 @Log4j2
 public class CatalogSeeder {
 
-    private record DemoPlace(String name, PlaceKind kind, String city, String country) {}
+    private record DemoPlace(String name, PlaceKind kind, String city, String country, String address) {}
 
     private record DemoCrossing(String name, String from, String to) {}
 
@@ -52,25 +53,79 @@ public class CatalogSeeder {
             String fromCountry,
             String toCountry) {}
 
-    private record DemoRegulation(String country, int versionNo, int leadTimeDays) {}
+    /** {@code quarantineMinDays}: the shortest quarantine the country takes a horse in from (BR-F2-06). */
+    private record DemoRegulation(String country, int versionNo, int leadTimeDays, int quarantineMinDays) {}
 
     private static final List<DemoPlace> PLACES = List.of(
-            new DemoPlace("Phú Thọ training centre", PlaceKind.TRAINING_CENTRE, "Ho Chi Minh City", "VN"),
-            new DemoPlace("Sóc Sơn quarantine station", PlaceKind.QUARANTINE, "Hanoi", "VN"),
-            // A city no cross-border corridor leaves from: its moves abroad go by way of Ho Chi Minh City (US-F1-09).
-            new DemoPlace("Hòa Xuân racing stables", PlaceKind.STABLE, "Da Nang", "VN"),
-            new DemoPlace("Phnom Penh Equestrian Centre", PlaceKind.STABLE, "Phnom Penh", "KH"),
-            new DemoPlace("Chao Phraya Racing Stables", PlaceKind.STABLE, "Bangkok", "TH"),
-            new DemoPlace("Vientiane racing stables", PlaceKind.STABLE, "Vientiane", "LA"),
-            new DemoPlace("Kuala Lumpur equestrian centre", PlaceKind.STABLE, "Kuala Lumpur", "MY"),
+            // Đại Nam's racecourse in Thủ Dầu Một, part of Ho Chi Minh City since Bình Dương merged into it (2025).
+            new DemoPlace(
+                    "Đại Nam Racecourse",
+                    PlaceKind.TRAINING_CENTRE,
+                    "Ho Chi Minh City",
+                    "VN",
+                    "Đại Nam Wonderland, Đại lộ Bình Dương, Thủ Dầu Một"),
+            // Pre-export isolation is held at premises the exporting country's official vet approves, usually the
+            // horses' own yard: RAHO6 approves this barn for each shipment.
+            new DemoPlace(
+                    "Đại Nam Racecourse isolation barn",
+                    PlaceKind.QUARANTINE,
+                    "Ho Chi Minh City",
+                    "VN",
+                    "Đại Nam Wonderland, Đại lộ Bình Dương, Thủ Dầu Một"),
+            new DemoPlace(
+                    "Genius Resort Equestrian Centre",
+                    PlaceKind.STABLE,
+                    "Phnom Penh",
+                    "KH",
+                    "Northbridge Street, Sen Sok, Phnom Penh"),
+            new DemoPlace(
+                    "Svay Rieng welfare stop",
+                    PlaceKind.WELFARE_STOP,
+                    "Svay Rieng",
+                    "KH",
+                    "National Road 1, Svay Rieng"),
+            new DemoPlace(
+                    "Royal Bangkok Sports Club",
+                    PlaceKind.STABLE,
+                    "Bangkok",
+                    "TH",
+                    "1 Henri Dunant Road, Pathum Wan, Bangkok"),
+            new DemoPlace(
+                    "Selangor Turf Club", PlaceKind.STABLE, "Kuala Lumpur", "MY", "Jalan Sungai Besi, Kuala Lumpur"),
             // In Sha Tin, not Hong Kong: a flight lands at HKG, so the move to the stables is the road leg
             // "RD HKG → Sha Tin" (US-F1-09), not the flight's own end.
-            new DemoPlace("Sha Tin stables", PlaceKind.STABLE, "Sha Tin", "HK"),
-            // Where a journey of several trips changes carrier (US-F3-16): road to the airport, the flight, road again.
-            new DemoPlace("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.AIRPORT, "Ho Chi Minh City", "VN"),
-            new DemoPlace("Techo International Airport cargo terminal (PNH)", PlaceKind.AIRPORT, "Phnom Penh", "KH"),
             new DemoPlace(
-                    "Hong Kong International Airport cargo terminal (HKG)", PlaceKind.AIRPORT, "Hong Kong", "HK"));
+                    "Sha Tin Racecourse stables (HKJC)",
+                    PlaceKind.STABLE,
+                    "Sha Tin",
+                    "HK",
+                    "Sha Tin Racecourse, Sha Tin, New Territories"),
+            // AFCD: imported horses serve their post-arrival quarantine at the Jockey Club's facilities, the only ones.
+            new DemoPlace(
+                    "HKJC import quarantine stables",
+                    PlaceKind.QUARANTINE,
+                    "Sha Tin",
+                    "HK",
+                    "Sha Tin Racecourse, Sha Tin, New Territories"),
+            // Where a journey of several trips changes carrier (US-F3-16): road to the airport, the flight, road again.
+            new DemoPlace(
+                    "TCS cargo terminal, Tân Sơn Nhất (SGN)",
+                    PlaceKind.AIRPORT,
+                    "Ho Chi Minh City",
+                    "VN",
+                    "46-48 Hậu Giang, Tân Sơn Nhất Airport"),
+            new DemoPlace(
+                    "Techo International Airport cargo terminal (PNH)",
+                    PlaceKind.AIRPORT,
+                    "Phnom Penh",
+                    "KH",
+                    "Techo International Airport, Kandal"),
+            new DemoPlace(
+                    "Cathay Cargo Terminal (HKG)",
+                    PlaceKind.AIRPORT,
+                    "Hong Kong",
+                    "HK",
+                    "Hong Kong International Airport, Chek Lap Kok"));
 
     private static final List<DemoCrossing> CROSSINGS = List.of(
             new DemoCrossing("Mộc Bài – Bavet", "VN", "KH"),
@@ -147,17 +202,19 @@ public class CatalogSeeder {
             new DemoCorridor(
                     "RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of(), "HK", "HK"));
 
-    /** The frames' version numbers; Laos needs 30 days (Request review · Override). */
+    /**
+     * The frames' version numbers; Laos needs 30 days (Request review · Override). Hong Kong holds an imported horse
+     * at least 14 days; the others take a 7-day minimum. Every day count is a demo value.
+     */
     private static final List<DemoRegulation> REGULATIONS = List.of(
-            new DemoRegulation("VN", 5, 21),
-            new DemoRegulation("KH", 7, 21),
-            new DemoRegulation("TH", 4, 21),
-            new DemoRegulation("LA", 3, 30),
-            new DemoRegulation("MY", 1, 21),
-            new DemoRegulation("HK", 1, 21));
+            new DemoRegulation("VN", 5, 21, 7),
+            new DemoRegulation("KH", 7, 21, 7),
+            new DemoRegulation("TH", 4, 21, 7),
+            new DemoRegulation("LA", 3, 30, 7),
+            new DemoRegulation("MY", 1, 21, 7),
+            new DemoRegulation("HK", 1, 21, 14));
 
     private static final short DOMESTIC_LEAD_TIME_DAYS = 3;
-    private static final short QUARANTINE_MIN_DAYS = 7;
     private static final short ARRIVAL_BUFFER_DAYS = 2;
     private static final String PUBLISHER = "lan.nguyen@equifreight.vn";
     private static final Instant PUBLISHED_AT =
@@ -196,6 +253,7 @@ public class CatalogSeeder {
                 place.setKind(demo.kind());
                 place.setCity(demo.city());
                 place.setCountry(country(demo.country()));
+                place.setAddress(demo.address());
                 places.save(place);
                 log.info("Seeded place {}", demo.name());
             }
@@ -207,6 +265,7 @@ public class CatalogSeeder {
                 crossing.setName(demo.name());
                 crossing.setFromCountry(country(demo.from()));
                 crossing.setToCountry(country(demo.to()));
+                crossing.setRoadOnly(true);
                 log.info("Seeded border crossing {}", demo.name());
                 return crossings.save(crossing);
             }));
@@ -280,7 +339,7 @@ public class CatalogSeeder {
         version.setPublishedBy(users.getByEmail(PUBLISHER));
         version.setLeadTimeDays((short) demo.leadTimeDays());
         version.setDomesticLeadTimeDays(DOMESTIC_LEAD_TIME_DAYS);
-        version.setQuarantineMinDays(QUARANTINE_MIN_DAYS);
+        version.setQuarantineMinDays((short) demo.quarantineMinDays());
         version.setArrivalBufferDays(ARRIVAL_BUFFER_DAYS);
         versions.save(version);
         log.info("Seeded regulation version {} v{}", demo.country(), demo.versionNo());
