@@ -1,6 +1,6 @@
 # One job, several trips: road, air, road
 
-Status: built (US-F3-16, #206), 25 Oct 2026. See [As built](#as-built) for where the build differs from the plan below. Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
+Status: built (US-F3-16, #206), 25 Oct 2026; reworked by US-F3-21 (#269), 27 Oct 2026: the coordinator builds the journey one trip at a time (see [Coordinator-built journeys](#coordinator-built-journeys-us-f3-21)). See [As built](#as-built) for where the build differs from the plan below. Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
 
 ## Why
 
@@ -87,9 +87,23 @@ Removing a trip from the chain is the reverse, before either trip departs.
 - **Crew are booked per trip.** A crew member is busy for each trip's own planned span (its route's first planned time to its last, plus that stop's stay), not for the job's whole journey: a groom can ride the trailer to the airport and fly with the horses on the next trip.
 - **The customer's timeline.** Without `?trip=`, the customer's tracking view of a journey merges every trip's own view in chain order: one numbered list of stops (a later trip's pickup at the transfer place is left out), every record in the order it happened, every trip's flights, and the job's own status and times. Opening one trip shows only that trip, with a way back to the whole journey. A delivery recorded at a `TRANSFER` reads "Handed on to the next trip", and a trip that handed on shows "Handed on".
 
+## Coordinator-built journeys (US-F3-21)
+
+US-F3-21 replaces the way a chain is made. The rest of this document still holds: a journey is a chain of trips, each with its own corridor, carrier, dates, crew and bookings, handed on at `TRANSFER` stops.
+
+- **Approval makes no trip.** The job's Trip tab opens with an empty journey, and the fleet coordinator adds its first trip. The chain the quoted route used to give a request by way of hubs (US-F1-09) is gone; the quoted route is only a guide, with a Warn line where the journey leaves it, since the price was worked out on it.
+- **Add trip** (`POST /staff/jobs/{id}/journey/trips`) puts a trip on any catalog corridor touching the city the journey has reached (the origin's city first, then where the last trip ends), read from that city. The direction is stored on the trip (`trips.reversed`, V35), not worked out from the chain, because a shared trip runs one way for every job on it; joining checks it.
+- **Where the horses change trips.** A trip that ends short of the destination city ends with a `TRANSFER` at that city's cargo terminal or airport (else a quarantine station, else the request's own place there, else any place there); the next trip starts with a `PICKUP` at the same place. The trip that reaches the destination city ends with the `DELIVERY`. Route confirmation expects a `TRANSFER` at the end of a trip short of the destination city even before the next trip exists.
+- **A flight** is added with its route confirmed at once, cargo terminal to cargo terminal by air, with no times. Setting its flight (`PUT /staff/jobs/{id}/journey/trips/{tripId}/flight`) confirms a new version with the airport-out stops at the departure time and the airport-in stops at the arrival, so the checks against the trips before and after run then. It has no load plan and no route editor.
+- **Take off** (`DELETE /staff/jobs/{id}/journey/trips/{tripId}`) removes only the last trip, before it departs; the only trip leaves the job with none. A trip nobody else rides is deleted with its route, load plans, bookings and crew (database cascades); a shared one reopens without the job.
+- **Splitting a route at a stop** ("continue on another trip") is removed.
+- **Sign-off** is refused while the journey ends short of the destination city, and on a flight without its flight and times.
+- **A job with no trip** shows a locked gate ("No trip planned yet"), its documents are checked against the request's departure date, it isn't listed on the trip boards, and its planning endpoints answer `NO_TRIP`, "Add its first trip on the Trip tab".
+- **The job page** has three tabs, Trip, Clearance and Authorities (DESIGN.md, Job page); the journey rail lives in the Trip tab.
+
 ## Not in scope
 
-- Automatic chains at approval, other than the domestic legs of a route by way of hubs (US-F1-09).
+- Automatic chains at approval (US-F3-21 removed even the hub route's chain).
 - Pricing per trip; the quote stays door to door.
 - A trip with two flights for one air leg (already out of scope in shared flights).
 

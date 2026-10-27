@@ -219,7 +219,7 @@ async function eScreensOwnerB() { return screensCall([scrRequest1, scrRequest2, 
 
 var ROWS = [
   ['Owner portal', ['Landing · Signed out', 'Home', 'My horses', 'Request · 1 Horses', 'Request · 2 Route & dates (error)', 'Request · 4 Review']],
-  ['Operations', ['Quotation', 'Fleet & route coordinator · Load plan', 'Transport specialist · Clearance checklist', 'Fleet & route coordinator · Route plan']],
+  ['Operations', ['Quotation', 'Fleet & route coordinator · Load plan', 'Transport specialist · Clearance checklist', 'Fleet & route coordinator · Route plan', 'Fleet & route coordinator · Trip · Flight']],
   ['Dark mode & mobile', ['Landing · Signed out · Dark', 'Home · Dark', 'Transport specialist · Clearance checklist · Dark', 'Quotation · Dark', 'My horses · Mobile', 'My horses · Mobile · Dark']]
 ];
 async function eArrange() {
@@ -293,7 +293,7 @@ async function staffScreensCall(builders) {
 }
 async function eQuoteScreen() { return staffScreensCall([scrQuote]); }
 async function eStaffScreensA() { return staffScreensCall([scrJobs, scrJobsSorted, scrClearance]); }
-async function eStaffScreensB() { return staffScreensCall([scrLoadPlan, scrRoute]); }
+async function eStaffScreensB() { return staffScreensCall([scrLoadPlan, scrRoute, scrFlightTrip]); }
 
 /* ---------- MCP: the canvas, one row per surface, every row from x 0 with 120 gutters ---------- */
 /* one staff row per role, so who is signed in is clear from the canvas alone */
@@ -305,7 +305,7 @@ var CANVAS = [
   ['Owner · Request tracking', ['Row label · Owner · Request tracking'], ['Tracking · My requests', 'Tracking · In review', 'Tracking · Info required', 'Quotation', 'Tracking · Documents needed', 'Tracking · All documents', 'Tracking · Ask a question', 'Tracking · Document upload · Refused', 'Tracking · Document upload', 'Tracking · In transit', 'Tracking · Re-routed', 'Tracking · Delivered', 'Tracking · Closed', 'Tracking · Invoice', 'Tracking · Report a problem']],
   [STAFF_ROWS[0], ['Row label · ' + STAFF_ROWS[0], 'Row label · Staff workspace · Dark', 'Row label · Staff workspace'], ['Logistics manager · Overview', 'Logistics manager · Jobs', 'Logistics manager · Jobs · Sorted', 'Logistics manager · Request review', 'Logistics manager · Request review · Override', 'Logistics manager · Quotation builder', 'Logistics manager · Quotation builder · Blocked', 'Logistics manager · Incident · Held', 'Logistics manager · Incident · Customer report', 'Logistics manager · Invoices', 'Logistics manager · Invoices · Record payment', 'Logistics manager · Users & roles', 'Logistics manager · Users & roles · Error', 'Logistics manager · Users & roles · Pending invites', 'Logistics manager · Audit log', 'Logistics manager · Audit log · Entry', 'Logistics manager · Audit log · No results']],
   [STAFF_ROWS[1], ['Row label · ' + STAFF_ROWS[1]], ['Transport specialist · Clearance checklist', 'Transport specialist · Authorities', 'Transport specialist · Authorities · Overdue', 'Transport specialist · Document review', 'Transport specialist · Document review · Not sent', 'Transport specialist · Document review · Reject', 'Transport specialist · Customer notes', 'Transport specialist · Regulation catalog', 'Transport specialist · Rate catalog', 'Transport specialist · Audit log · Not allowed']],
-  [STAFF_ROWS[2], ['Row label · ' + STAFF_ROWS[2]], ['Fleet & route coordinator · Load plan', 'Fleet & route coordinator · Route plan', 'Fleet & route coordinator · Trip']],
+  [STAFF_ROWS[2], ['Row label · ' + STAFF_ROWS[2]], ['Fleet & route coordinator · Load plan', 'Fleet & route coordinator · Route plan', 'Fleet & route coordinator · Trip · Flight', 'Fleet & route coordinator · Trip']],
   ['Escort cab surface', ['Row label · Escort cab surface', 'Row label · Escort cab surface · Light', 'Row label · Operations · Dark', 'Row label · Operations'], ['Escort · Checkpoint', 'Escort · Welfare stop', 'Escort · Delivery', 'Escort · Held']],
   ['Dark mode · Mobile not maintained', ['Row label · Dark mode · Mobile not maintained', 'Row label · Light mode · Mobile not maintained', 'Row label · Dark mode & mobile', 'Row label · Light mode & mobile'], ['Landing · Signed out · Dark', 'Home · Dark', 'Home · Nothing owed · Dark', 'Home · On the road · Dark', 'Quotation · Dark', 'Transport specialist · Clearance checklist · Dark', 'My horses · Mobile', 'My horses · Mobile · Dark']]
 ];
