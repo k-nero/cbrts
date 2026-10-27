@@ -472,6 +472,11 @@ class RouteServiceTest {
         assertThat(route.toTerminal().distanceKm()).isEqualTo(40);
         assertThat(route.fromTerminal().fromPlace()).isEqualTo("Hong Kong International Airport");
         assertThat(route.fromTerminal().toPlace()).isEqualTo("Sha Tin stables");
+        // Every stop by name: the customer's places and the flight's terminals.
+        assertThat(route.fromPlace()).isEqualTo("Phú Thọ training centre");
+        assertThat(route.departureTerminal()).isEqualTo("TCS cargo terminal");
+        assertThat(route.arrivalTerminal()).isEqualTo("Hong Kong International Airport");
+        assertThat(route.toPlace()).isEqualTo("Sha Tin stables");
 
         // Picked up at the terminal itself, there is no run to it.
         RouteResponse fromTerminal =

@@ -474,6 +474,20 @@ describe('route words', () => {
       ['Hong Kong', 'Hub · ~1,500 km'],
       ['Sha Tin', '~40 km'],
     ]);
+    // With the places and terminals named, every stop reads by name.
+    const named = {
+      ...fromStable,
+      fromPlace: 'Đại Nam Racecourse',
+      toPlace: 'Sha Tin Racecourse stables (HKJC)',
+      departureTerminal: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      arrivalTerminal: 'Cathay Cargo Terminal (HKG)',
+    };
+    expect(routeStops(named).map((s) => [s.name, s.kind])).toEqual([
+      ['Đại Nam Racecourse', 'Pickup'],
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
+      ['Cathay Cargo Terminal (HKG)', 'Hub · ~1,500 km'],
+      ['Sha Tin Racecourse stables (HKJC)', '~40 km'],
+    ]);
     expect(routeSentence(fromStable)).toBe(
       'About 1,580 km by air, by road to the cargo terminal first and by road from Hong Kong after, worked out from your route.',
     );
@@ -491,10 +505,17 @@ describe('route words', () => {
         distanceKm: 35,
       },
     };
-    expect(routeStops(toStable).map((s) => [s.name, s.kind])).toEqual([
-      ['Ho Chi Minh City', 'Pickup'],
+    const named = {
+      ...toStable,
+      fromPlace: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      toPlace: 'Hong Kong stables',
+      departureTerminal: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      arrivalTerminal: 'Cathay Cargo Terminal (HKG)',
+    };
+    expect(routeStops(named).map((s) => [s.name, s.kind])).toEqual([
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Pickup'],
       ['Cathay Cargo Terminal (HKG)', 'Terminal · ~1,500 km'],
-      ['Sha Tin stables', '~35 km'],
+      ['Hong Kong stables', '~35 km'],
     ]);
   });
 

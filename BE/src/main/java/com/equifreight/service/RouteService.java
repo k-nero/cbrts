@@ -326,7 +326,12 @@ public class RouteService {
                                     .findFirst());
             if (version.isEmpty()) {
                 return new Described(
-                        RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, names, null, null),
+                        withPlaces(
+                                RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, names, null, null),
+                                corridor,
+                                origin,
+                                destination,
+                                fromCity),
                         countries.get(code));
             }
             published.put(code, version.get());
@@ -334,7 +339,7 @@ public class RouteService {
         int required = LeadTimePolicy.requiredDays(codes, published);
         LocalDate today = LocalDate.now(clock);
         return new Described(
-                withTerminalRuns(
+                withPlaces(
                         RouteMapper.toRouteResponse(
                                 corridor,
                                 reversed,
@@ -351,15 +356,19 @@ public class RouteService {
     }
 
     /**
-     * A flight's route with the local road runs either side of it (US-F3-22): from the stable to the cargo terminal
-     * when the horses are picked up in the city it leaves from, and from the terminal to the stable when they go to the
-     * city it lands in; the journey drafted for the job runs them as trips of their own.
+     * The route with its stops by name: the customer's two places and, for a flight, the airport terminal at each end.
+     * A flight also gets the local road runs either side of it (US-F3-22): from the stable to the cargo terminal when
+     * the horses are picked up in the city it leaves from, and from the terminal to the stable when they go to the city
+     * it lands in; the journey drafted for the job runs them as trips of their own.
      */
-    private RouteResponse withTerminalRuns(
+    private RouteResponse withPlaces(
             RouteResponse route, Corridor corridor, Place origin, Place destination, String fromCity) {
-        if (corridor.isRoad()) return route;
+        RouteResponse.RouteResponseBuilder named =
+                route.toBuilder().fromPlace(origin.getName()).toPlace(destination.getName());
+        if (corridor.isRoad()) return named.build();
         String toCity = otherEnd(corridor, fromCity);
-        return route.toBuilder()
+        return named.departureTerminal(terminalIn(fromCity).map(Place::getName).orElse(null))
+                .arrivalTerminal(terminalIn(toCity).map(Place::getName).orElse(null))
                 .toTerminal(
                         fromCity.equalsIgnoreCase(origin.getCity())
                                 ? terminalRun(origin, true).orElse(null)
@@ -374,10 +383,7 @@ public class RouteService {
     /** The local run between {@code stable} and its city's cargo terminal, in the direction {@code out} says. */
     private Optional<RouteTerminalRunResponse> terminalRun(Place stable, boolean out) {
         if (stable.isTerminal()) return Optional.empty();
-        Optional<Place> terminal = places.findByCityIgnoreCase(stable.getCity()).stream()
-                .filter(Place::isTerminal)
-                .min(Comparator.comparing((Place p) -> p.getKind() == PlaceKind.CARGO_TERMINAL ? 0 : 1)
-                        .thenComparing(Place::getName));
+        Optional<Place> terminal = terminalIn(stable.getCity());
         if (terminal.isEmpty()) return Optional.empty();
         return corridors
                 .findLocalRun(stable.getCity())
@@ -389,6 +395,14 @@ public class RouteService {
                         .toPlace(out ? terminal.get().getName() : stable.getName())
                         .distanceKm(run.getDistanceKm())
                         .build());
+    }
+
+    /** Where flights meet the trailers in {@code city}: its cargo terminal, else its airport. */
+    private Optional<Place> terminalIn(String city) {
+        return places.findByCityIgnoreCase(city).stream()
+                .filter(Place::isTerminal)
+                .min(Comparator.comparing((Place p) -> p.getKind() == PlaceKind.CARGO_TERMINAL ? 0 : 1)
+                        .thenComparing(Place::getName));
     }
 
     private static boolean isReversed(Corridor corridor, String fromCity) {

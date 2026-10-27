@@ -387,79 +387,43 @@ export const routeEnds = (r: Route): { from: string; to: string } => ({
 });
 
 /**
- * The route strip: pickup, the hub a road leg brings the horses to (US-F1-09), or the cargo
- * terminal a local run brings them to before a flight (US-F3-22), each border, the hub or terminal
- * they arrive in, then the destination.
+ * The route strip, each stop by place name where the route knows it (else its city): the pickup,
+ * the hub a road leg brings the horses to (US-F1-09) or the cargo terminal a local run brings them
+ * to before a flight (US-F3-22), each border, the hub or terminal they arrive in, then the
+ * delivery place.
  */
 export const routeStops = (
   r: Route,
-): { name: string; kind: string; time: string; state: 'upcoming' }[] => [
-  ...(r.firstLeg
-    ? [
-        { name: r.firstLeg.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const },
-        {
-          name: r.fromCity,
-          kind: `Hub · ~${km(r.firstLeg.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
-      ]
-    : r.toTerminal
-      ? [
-          { name: r.toTerminal.fromPlace, kind: 'Pickup', time: '', state: 'upcoming' as const },
-          {
-            name: r.toTerminal.toPlace,
-            kind: `Terminal · ~${km(r.toTerminal.distanceKm)} km`,
-            time: '',
-            state: 'upcoming' as const,
-          },
-        ]
-      : [{ name: r.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const }]),
-  ...r.crossings.map((c, i) => ({
-    name: c.name,
-    kind: `Border ${i + 1}`,
+): { name: string; kind: string; time: string; state: 'upcoming' }[] => {
+  const stop = (name: string, kind: string) => ({
+    name,
+    kind,
     time: '',
     state: 'upcoming' as const,
-  })),
-  ...(r.lastLeg
+  });
+  const leaving = r.departureTerminal ?? r.toTerminal?.toPlace ?? r.fromCity;
+  const arriving = r.arrivalTerminal ?? r.fromTerminal?.fromPlace ?? r.toCity;
+  const pickup = r.fromPlace ?? r.toTerminal?.fromPlace ?? r.firstLeg?.fromCity ?? r.fromCity;
+  const start = r.firstLeg
+    ? [stop(pickup, 'Pickup'), stop(leaving, `Hub · ~${km(r.firstLeg.distanceKm)} km`)]
+    : r.toTerminal
+      ? [stop(pickup, 'Pickup'), stop(leaving, `Terminal · ~${km(r.toTerminal.distanceKm)} km`)]
+      : [stop(pickup, 'Pickup')];
+  const borders = r.crossings.map((c, i) => stop(c.name, `Border ${i + 1}`));
+  const delivery = r.toPlace ?? r.fromTerminal?.toPlace ?? r.lastLeg?.toCity ?? r.toCity;
+  const end = r.lastLeg
     ? [
-        {
-          name: r.toCity,
-          kind: `Hub · ~${km(r.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
-        {
-          name: r.lastLeg.toCity,
-          kind: `~${km(r.lastLeg.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
+        stop(arriving, `Hub · ~${km(r.distanceKm)} km`),
+        stop(delivery, `~${km(r.lastLeg.distanceKm)} km`),
       ]
     : r.fromTerminal
       ? [
-          {
-            name: r.fromTerminal.fromPlace,
-            kind: `Terminal · ~${km(r.distanceKm)} km`,
-            time: '',
-            state: 'upcoming' as const,
-          },
-          {
-            name: r.fromTerminal.toPlace,
-            kind: `~${km(r.fromTerminal.distanceKm)} km`,
-            time: '',
-            state: 'upcoming' as const,
-          },
+          stop(arriving, `Terminal · ~${km(r.distanceKm)} km`),
+          stop(delivery, `~${km(r.fromTerminal.distanceKm)} km`),
         ]
-      : [
-          {
-            name: r.toCity,
-            kind: `~${km(r.distanceKm)} km`,
-            time: '',
-            state: 'upcoming' as const,
-          },
-        ]),
-];
+      : [stop(delivery, `~${km(r.distanceKm)} km`)];
+  return [...start, ...borders, ...end];
+};
 
 const shortCrossing = (name: string): string => name.split(' – ')[0];
 

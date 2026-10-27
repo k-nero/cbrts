@@ -111,6 +111,12 @@ export interface Route {
   toTerminal?: TerminalRun | null;
   /** After a flight that lands in the stable's city, the local run from the cargo terminal; null when none. */
   fromTerminal?: TerminalRun | null;
+  /** The customer's pickup and delivery places by name; null without a destination. */
+  fromPlace?: string | null;
+  toPlace?: string | null;
+  /** A flight's airport terminal at each end, by name; null by road or when none is in the catalog. */
+  departureTerminal?: string | null;
+  arrivalTerminal?: string | null;
 }
 
 export interface LeadTime {
