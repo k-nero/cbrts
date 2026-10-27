@@ -2,6 +2,7 @@ package com.equifreight.controller.staff;
 
 import com.equifreight.entity.User;
 import com.equifreight.model.clearance.*;
+import com.equifreight.service.CatalogUpdateService;
 import com.equifreight.service.ClearanceService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -25,9 +26,11 @@ import org.springframework.web.bind.annotation.*;
 public class ClearanceController {
 
     private final ClearanceService clearanceService;
+    private final CatalogUpdateService catalogUpdateService;
 
-    public ClearanceController(ClearanceService clearanceService) {
+    public ClearanceController(ClearanceService clearanceService, CatalogUpdateService catalogUpdateService) {
         this.clearanceService = clearanceService;
+        this.catalogUpdateService = catalogUpdateService;
     }
 
     /*
@@ -49,6 +52,21 @@ public class ClearanceController {
     public ResponseEntity<List<ChecklistItemResponse>> generateChecklist(
             @PathVariable UUID jobId, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(clearanceService.generateChecklist(jobId, user));
+    }
+
+    /** Newer published versions of the job's pinned catalogs, with what moving onto each would change. */
+    @GetMapping("/jobs/{jobId}/catalog-updates")
+    public List<CatalogUpdateResponse> getCatalogUpdates(@PathVariable UUID jobId) {
+        return catalogUpdateService.updatesFor(jobId);
+    }
+
+    /** Moves the job onto a newer published version of one of its catalogs; returns the checklist after the move. */
+    @PostMapping("/jobs/{jobId}/catalog-updates")
+    public List<ChecklistItemResponse> moveToCatalogVersion(
+            @PathVariable UUID jobId,
+            @Valid @RequestBody CatalogMoveRequest request,
+            @AuthenticationPrincipal User user) {
+        return catalogUpdateService.moveToVersion(jobId, request, user);
     }
 
     @GetMapping("/jobs/{jobId}/status")

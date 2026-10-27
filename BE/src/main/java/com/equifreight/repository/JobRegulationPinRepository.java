@@ -10,13 +10,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface JobRegulationPinRepository extends JpaRepository<JobRegulationPin, UUID> {
 
-    long countByRegulationVersionId(UUID regulationVersionId);
+    long countByRegulationVersionIdAndSupersededAtIsNull(UUID regulationVersionId);
 
     /**
      * How many jobs are pinned to each regulation version, for the catalog list (versions with none are absent).
      */
     @Query("select p.regulationVersion.id as versionId, count(p) as pinned from JobRegulationPin p"
-            + " group by p.regulationVersion.id")
+            + " where p.supersededAt is null group by p.regulationVersion.id")
     List<VersionPinCount> countPinsByVersion();
 
     interface VersionPinCount {
@@ -27,5 +27,6 @@ public interface JobRegulationPinRepository extends JpaRepository<JobRegulationP
 
     List<JobRegulationPin> findByRegulationVersionId(UUID regulationVersionId);
 
-    List<JobRegulationPin> findByJobId(UUID jobId);
+    /** The pins in force: one per role. */
+    List<JobRegulationPin> findByJobIdAndSupersededAtIsNull(UUID jobId);
 }

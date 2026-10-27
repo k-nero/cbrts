@@ -35,6 +35,7 @@ public interface ChecklistItemRepository
             JOIN ci.regulationRule rr
             WHERE ci.job.id = :jobId
               AND rr.mandatory = true
+              AND ci.droppedAt IS NULL
               AND ci.status <> com.equifreight.entity.enums.ChecklistStatus.CLEARED
             """)
     boolean areAllMandatoryItemsCleared(@Param("jobId") UUID jobId);
@@ -57,6 +58,7 @@ public interface ChecklistItemRepository
             WHERE ci.holder = com.equifreight.entity.enums.ChecklistHolder.CUSTOMER
               AND ci.status <> com.equifreight.entity.enums.ChecklistStatus.CLEARED
               AND ci.dueDate IN :days
+              AND ci.droppedAt IS NULL
               AND j.departedAt IS NULL
             ORDER BY j.code, ci.dueDate
             """)
@@ -73,6 +75,7 @@ public interface ChecklistItemRepository
             LEFT JOIN FETCH ci.horse
             LEFT JOIN FETCH ci.currentVersion
             WHERE j.request.club.id = :clubId
+              AND ci.droppedAt IS NULL
               AND j.departedAt IS NULL
               AND j.closedAt IS NULL
             ORDER BY ci.dueDate NULLS LAST

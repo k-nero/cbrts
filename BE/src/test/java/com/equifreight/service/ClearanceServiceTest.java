@@ -336,7 +336,8 @@ class ClearanceServiceTest {
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
-        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+        when(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(job.getId()))
+                .thenReturn(List.of(pin));
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
@@ -580,7 +581,8 @@ class ClearanceServiceTest {
         JobRegulationPin pin = new JobRegulationPin();
         pin.setRole(RegulationRole.DESTINATION);
         pin.setRegulationVersion(version);
-        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+        when(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(job.getId()))
+                .thenReturn(List.of(pin));
         when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(regulationRuleRepository.findByVersionIdIn(Set.of(version.getId())))
                 .thenReturn(List.of(passport));
