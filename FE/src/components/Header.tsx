@@ -18,7 +18,6 @@ const NAV: [RouteName, string, boolean][] = [
   ['customer-home', 'Home', true],
   ['my-horses', 'My horses', false],
   ['my-requests', 'My requests', false],
-  ['tracking', 'Trip tracking', false],
 ];
 
 const AVATAR =

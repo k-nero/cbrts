@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 
 import { conditionLog } from './tracking';
+import { TripPhotos } from './TripPhotos';
 
 import { cx, Panel } from '@/components/ui';
 import type { TripView } from '@/interfaces';
@@ -27,6 +28,7 @@ export const ConditionLog: FC<{ trip: TripView; limit?: number }> = ({ trip, lim
                 {e.by && <span className="type-body-s text-ink-3">{e.by}</span>}
               </span>
               <span className="type-body-s text-ink-2">{e.text}</span>
+              <TripPhotos photos={e.photos} />
             </li>
           ))}
         </ol>

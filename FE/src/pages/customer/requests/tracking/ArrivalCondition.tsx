@@ -1,5 +1,7 @@
 import type { FC } from 'react';
 
+import { TripPhotos } from './TripPhotos';
+
 import { Chip, cx, Panel } from '@/components/ui';
 import type { TripView } from '@/interfaces';
 import { formatTime } from '@/lib/utils';
@@ -27,7 +29,10 @@ export const ArrivalCondition: FC<{ trip: TripView }> = ({ trip }) => {
             )}
           >
             <span className="type-h4 text-ink">{c.horseName}</span>
-            <span className="type-body-s text-ink-2">{c.note ?? WORD[c.condition]}</span>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="type-body-s text-ink-2">{c.note ?? WORD[c.condition]}</span>
+              <TripPhotos photos={c.photos.map((p) => ({ ...p, horseName: c.horseName }))} />
+            </span>
             <Chip tone={TONE[c.condition]}>{WORD[c.condition]}</Chip>
           </li>
         ))}
