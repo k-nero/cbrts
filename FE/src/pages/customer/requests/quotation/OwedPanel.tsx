@@ -20,6 +20,7 @@ import {
   ict,
   money,
   owedKind,
+  rejectedText,
 } from '@/lib/utils';
 
 /**
@@ -63,6 +64,14 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
         <p className="type-body-m m-0 text-ink-2">
           {cancelledText(quotation.cancelledAt, quotation.cancellationFeePct, true)}
         </p>
+      </Panel>
+    );
+  }
+  // Rejected before approval (BR-F1-04): the version may still read as issued or accepted.
+  if (quotation.requestStatus === 'REJECTED') {
+    return (
+      <Panel title="Nothing to answer" extra={<Chip tone="bad">Rejected</Chip>}>
+        <p className="type-body-m m-0 text-ink-2">{rejectedText(manager)}</p>
       </Panel>
     );
   }

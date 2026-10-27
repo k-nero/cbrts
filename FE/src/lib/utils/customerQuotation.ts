@@ -202,11 +202,16 @@ export const cancelledText = (
     : `${on} No fee, as no quotation was issued.`;
 };
 
+/** The owed panel on a request the logistics manager rejected: nothing is left to answer (BR-F1-04). */
+export const rejectedText = (manager: string): string =>
+  `${manager} turned this request down, so the quotation can’t be answered. The reason is on the request page.`;
+
 /** The quoted pass's chip: the version and where the club's answer stands. */
 export const quotedPassChip = (
   q: Pick<CustomerQuotation, 'status' | 'requestStatus' | 'versionNo'>,
-): { tone: 'info' | 'ok' | 'neutral'; label: string } => {
+): { tone: 'info' | 'ok' | 'neutral' | 'bad'; label: string } => {
   if (q.requestStatus === 'CANCELLED') return { tone: 'neutral', label: 'Cancelled' };
+  if (q.requestStatus === 'REJECTED') return { tone: 'bad', label: 'Rejected' };
   if (q.requestStatus === 'APPROVED') return { tone: 'ok', label: `Approved · v${q.versionNo}` };
   if (q.status === 'ACCEPTED') return { tone: 'ok', label: `Accepted · v${q.versionNo}` };
   if (q.status === 'DECLINED') return { tone: 'neutral', label: `Declined · v${q.versionNo}` };
@@ -223,6 +228,7 @@ export const quotedPassSub = (
 ): string => {
   const on = (iso: string | null) => (iso ? ` ${formatDate(iso)}` : '');
   if (q.requestStatus === 'CANCELLED') return `Request cancelled${on(q.cancelledAt)}.`;
+  if (q.requestStatus === 'REJECTED') return 'Request rejected. The reason is on the request page.';
   if (q.requestStatus === 'APPROVED')
     return 'Approved. The price and the horse list are locked; your document checklist is open.';
   if (q.status === 'ACCEPTED')

@@ -95,6 +95,11 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               <p className="type-label-s m-0 text-ink-2">Rejected with:</p>
               <p className="type-body-s m-0 whitespace-pre-line text-ink">{request.rejectReason}</p>
             </Flex>
+          ) : request.status === 'QUOTED' ? (
+            <p className="type-body-s m-0 text-ink-2">
+              The quotation is with the customer. Until they accept it, you can still reject the
+              request.
+            </p>
           ) : (
             <p className="type-body-s m-0 text-ink-2">
               This request isn&apos;t waiting for review.

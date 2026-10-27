@@ -277,4 +277,11 @@ describe('restingPanel', () => {
     });
     expect(restingPanel(review('REJECTED'))).toEqual({ title: 'Not in review', requote: null });
   });
+
+  test('a quoted request waits for the customer to answer', () => {
+    expect(restingPanel(review('QUOTED'))).toEqual({
+      title: 'Waiting for the customer',
+      requote: null,
+    });
+  });
 });

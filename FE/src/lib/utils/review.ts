@@ -171,7 +171,10 @@ export const restingPanel = (
       requote: `Issue version ${quotation.versionNo} of the quotation.`,
     };
   return {
-    title: request.status === 'INFO_REQUIRED' ? 'Waiting for the customer' : 'Not in review',
+    title:
+      request.status === 'INFO_REQUIRED' || request.status === 'QUOTED'
+        ? 'Waiting for the customer'
+        : 'Not in review',
     requote: null,
   };
 };
