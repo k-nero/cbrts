@@ -72,6 +72,19 @@ export interface HubLeg {
 }
 
 /**
+ * A local road run within one city, between the stable and the airport's cargo terminal, before or after a flight
+ * (US-F3-22): "Đại Nam Racecourse → TCS cargo terminal, Tân Sơn Nhất (SGN)".
+ */
+export interface TerminalRun {
+  corridorId: string;
+  code: string;
+  city: string;
+  fromPlace: string;
+  toPlace: string;
+  distanceKm: number | null;
+}
+
+/**
  * A corridor we run, read in the direction of travel (GET /customer/routes). Without a destination
  * (the alternatives on a route we don't run) the countries, crossBorder and lead time are null.
  */
@@ -94,6 +107,10 @@ export interface Route {
   firstLeg?: HubLeg | null;
   /** The road leg from the hub this corridor arrives in to the destination's city; null when none. */
   lastLeg?: HubLeg | null;
+  /** Before a flight from a stable, the local run to the cargo terminal; null when none. */
+  toTerminal?: TerminalRun | null;
+  /** After a flight that lands in the stable's city, the local run from the cargo terminal; null when none. */
+  fromTerminal?: TerminalRun | null;
 }
 
 export interface LeadTime {

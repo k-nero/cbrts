@@ -449,6 +449,55 @@ describe('route words', () => {
     expect(routeEnds(sgnHkg)).toEqual({ from: 'Ho Chi Minh City', to: 'Hong Kong' });
   });
 
+  test('a flight from a stable (US-F3-22): the local run to the cargo terminal, then the flight', () => {
+    const fromStable = {
+      ...sgnHkg,
+      toTerminal: {
+        corridorId: 'c-hcm',
+        code: 'RD HCM local',
+        city: 'Ho Chi Minh City',
+        fromPlace: 'Đại Nam Racecourse',
+        toPlace: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+        distanceKm: 40,
+      },
+      lastLeg: {
+        corridorId: 'c-hkg',
+        code: 'RD HKG → Sha Tin',
+        fromCity: 'Hong Kong',
+        toCity: 'Sha Tin',
+        distanceKm: 40,
+      },
+    };
+    expect(routeStops(fromStable).map((s) => [s.name, s.kind])).toEqual([
+      ['Đại Nam Racecourse', 'Pickup'],
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
+      ['Hong Kong', 'Hub · ~1,500 km'],
+      ['Sha Tin', '~40 km'],
+    ]);
+    expect(routeSentence(fromStable)).toBe(
+      'About 1,580 km by air, by road to the cargo terminal first and by road from Hong Kong after, worked out from your route.',
+    );
+  });
+
+  test('a flight to a stable in the city it lands in: the local run from the cargo terminal', () => {
+    const toStable = {
+      ...sgnHkg,
+      fromTerminal: {
+        corridorId: 'c-hkg',
+        code: 'RD HKG local',
+        city: 'Hong Kong',
+        fromPlace: 'Cathay Cargo Terminal (HKG)',
+        toPlace: 'Sha Tin stables',
+        distanceKm: 35,
+      },
+    };
+    expect(routeStops(toStable).map((s) => [s.name, s.kind])).toEqual([
+      ['Ho Chi Minh City', 'Pickup'],
+      ['Cathay Cargo Terminal (HKG)', 'Terminal · ~1,500 km'],
+      ['Sha Tin stables', '~35 km'],
+    ]);
+  });
+
   test('borders summary', () => {
     expect(bordersSummary(hcmBkk)).toBe('2 · Mộc Bài, Poipet');
     expect(bordersSummary(hcmHan)).toBe('None · domestic');

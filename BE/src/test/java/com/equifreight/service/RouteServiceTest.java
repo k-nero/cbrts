@@ -446,6 +446,41 @@ class RouteServiceTest {
     }
 
     @Test
+    @DisplayName("A flight from a stable to a stable names the local runs to and from the cargo terminals (US-F3-22)")
+    void aFlightNamesItsLocalRuns() {
+        publish("HK", 21);
+        publish("VN", 21);
+        Corridor hcmLocal =
+                between("RD HCM local", TransportMode.ROAD, "Ho Chi Minh City", "Ho Chi Minh City", "VN", "VN", 40);
+        Corridor hkgLocal = between("RD HKG local", TransportMode.ROAD, "Hong Kong", "Hong Kong", "HK", "HK", 35);
+        Place tcs = place("TCS cargo terminal", "Ho Chi Minh City", "VN");
+        tcs.setKind(PlaceKind.CARGO_TERMINAL);
+        Place hkgAirport = place("Hong Kong International Airport", "Hong Kong", "HK");
+        hkgAirport.setKind(PlaceKind.AIRPORT);
+        when(corridors.findBetweenCities("Ho Chi Minh City", "Hong Kong")).thenReturn(List.of(sgnHkg));
+        when(corridors.findNetwork()).thenReturn(List.of(sgnHkg, hcmLocal, hkgLocal));
+        when(corridors.findLocalRun("Ho Chi Minh City")).thenReturn(Optional.of(hcmLocal));
+        when(corridors.findLocalRun("Hong Kong")).thenReturn(Optional.of(hkgLocal));
+        when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(phuTho, tcs));
+        when(places.findByCityIgnoreCase("Hong Kong")).thenReturn(List.of(shaTin, hkgAirport));
+
+        RouteResponse route =
+                service.resolve(phuTho, null, shaTin, null, TransportMode.AIR).route();
+
+        assertThat(route.toTerminal().fromPlace()).isEqualTo("Phú Thọ training centre");
+        assertThat(route.toTerminal().toPlace()).isEqualTo("TCS cargo terminal");
+        assertThat(route.toTerminal().distanceKm()).isEqualTo(40);
+        assertThat(route.fromTerminal().fromPlace()).isEqualTo("Hong Kong International Airport");
+        assertThat(route.fromTerminal().toPlace()).isEqualTo("Sha Tin stables");
+
+        // Picked up at the terminal itself, there is no run to it.
+        RouteResponse fromTerminal =
+                service.resolve(tcs, null, shaTin, null, TransportMode.AIR).route();
+        assertThat(fromTerminal.toTerminal()).isNull();
+        assertThat(fromTerminal.fromTerminal()).isNotNull();
+    }
+
+    @Test
     @DisplayName("Hong Kong → Da Nang reads the same corridors the other way: the flight, then the road from the hub")
     void theLegFromTheHubIsReadTheOtherWay() {
         publish("HK", 21);

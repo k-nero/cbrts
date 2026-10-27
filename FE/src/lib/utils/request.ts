@@ -353,10 +353,17 @@ export const routeSentence = (r: Route): string => {
       : r.crossings.length > 0
         ? `by road with ${plural(r.crossings.length, 'border crossing')}`
         : `by road within ${COUNTRY_NAME[country] ?? (country || 'one country')}`;
-  const total = (r.distanceKm ?? 0) + (r.firstLeg?.distanceKm ?? 0) + (r.lastLeg?.distanceKm ?? 0);
+  const total =
+    (r.distanceKm ?? 0) +
+    (r.firstLeg?.distanceKm ?? 0) +
+    (r.lastLeg?.distanceKm ?? 0) +
+    (r.toTerminal?.distanceKm ?? 0) +
+    (r.fromTerminal?.distanceKm ?? 0);
   const legs = [
     r.firstLeg && `by road to ${r.firstLeg.toCity} first`,
+    r.toTerminal && 'by road to the cargo terminal first',
     r.lastLeg && `by road from ${r.lastLeg.fromCity} after`,
+    r.fromTerminal && 'by road from the cargo terminal after',
   ].filter(Boolean);
   const hubs = legs.length ? `, ${legs.join(' and ')}` : '';
   return `About ${km(r.distanceKm === null ? null : total)} km ${how}${hubs}, worked out from your route.`;
@@ -380,7 +387,8 @@ export const routeEnds = (r: Route): { from: string; to: string } => ({
 });
 
 /**
- * The route strip: pickup, the hub a road leg brings the horses to (US-F1-09), each border, the hub
+ * The route strip: pickup, the hub a road leg brings the horses to (US-F1-09), or the cargo
+ * terminal a local run brings them to before a flight (US-F3-22), each border, the hub or terminal
  * they arrive in, then the destination.
  */
 export const routeStops = (
@@ -396,7 +404,17 @@ export const routeStops = (
           state: 'upcoming' as const,
         },
       ]
-    : [{ name: r.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const }]),
+    : r.toTerminal
+      ? [
+          { name: r.toTerminal.fromPlace, kind: 'Pickup', time: '', state: 'upcoming' as const },
+          {
+            name: r.toTerminal.toPlace,
+            kind: `Terminal · ~${km(r.toTerminal.distanceKm)} km`,
+            time: '',
+            state: 'upcoming' as const,
+          },
+        ]
+      : [{ name: r.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const }]),
   ...r.crossings.map((c, i) => ({
     name: c.name,
     kind: `Border ${i + 1}`,
@@ -418,7 +436,29 @@ export const routeStops = (
           state: 'upcoming' as const,
         },
       ]
-    : [{ name: r.toCity, kind: `~${km(r.distanceKm)} km`, time: '', state: 'upcoming' as const }]),
+    : r.fromTerminal
+      ? [
+          {
+            name: r.fromTerminal.fromPlace,
+            kind: `Terminal · ~${km(r.distanceKm)} km`,
+            time: '',
+            state: 'upcoming' as const,
+          },
+          {
+            name: r.fromTerminal.toPlace,
+            kind: `~${km(r.fromTerminal.distanceKm)} km`,
+            time: '',
+            state: 'upcoming' as const,
+          },
+        ]
+      : [
+          {
+            name: r.toCity,
+            kind: `~${km(r.distanceKm)} km`,
+            time: '',
+            state: 'upcoming' as const,
+          },
+        ]),
 ];
 
 const shortCrossing = (name: string): string => name.split(' – ')[0];
