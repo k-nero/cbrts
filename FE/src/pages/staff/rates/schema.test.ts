@@ -35,10 +35,20 @@ const issues = (result: {
 }) => (result.success ? [] : result.error!.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
 
 describe('policySchema', () => {
-  const valid = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, 1]));
+  const valid = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, f.fallback ?? 1]));
   const stall = (value: number) =>
     policySchema.safeParse({ ...valid, STALL_PAYLOAD_KG: value, AIR_SHIPMENT_MAX_KG: 20000 })
       .success;
+
+  test('the planning settings are whole numbers within their bounds (US-F3-22)', () => {
+    const plan = (over: Record<string, number>) =>
+      policySchema.safeParse({ ...valid, ...over }).success;
+    expect(plan({ PLAN_START_HOUR: 23, PLAN_SPEED_KMH: 10 })).toBe(true);
+    expect(plan({ PLAN_START_HOUR: 24 })).toBe(false);
+    expect(plan({ PLAN_SPEED_KMH: 5 })).toBe(false);
+    expect(plan({ PLAN_WELFARE_EVERY_HOURS: 0 })).toBe(false);
+    expect(plan({ PLAN_BORDER_STOP_MIN: 1441 })).toBe(false);
+  });
 
   test('the weight limits are whole kilograms from 1 to 99,999 (BR-Q-16)', () => {
     expect(stall(5504)).toBe(true);

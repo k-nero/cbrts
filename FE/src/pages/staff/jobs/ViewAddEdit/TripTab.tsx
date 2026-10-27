@@ -9,7 +9,7 @@ import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 
 import { Button, Callout, Icon } from '@/components/ui';
-import { useCanPlanTrips, useRemoveTrip } from '@/hooks/useJob';
+import { useCanPlanTrips, useDraftJourney, useRemoveTrip } from '@/hooks/useJob';
 import type { JobDetail, TripPart } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
@@ -26,6 +26,7 @@ export function TripTab({ job }: { job: JobDetail }) {
   const [adding, setAdding] = useState(false);
   const planner = useCanPlanTrips();
   const remove = useRemoveTrip(job.id);
+  const drafting = useDraftJourney(job.id);
 
   const part = job.parts.find((p) => p.current) ?? null;
   const show = (trip: string, view?: TripView) =>
@@ -86,13 +87,43 @@ export function TripTab({ job }: { job: JobDetail }) {
           <h3 className="type-h3 m-0 text-ink">No trips yet</h3>
           <p className="type-body-m m-0 max-w-md text-ink-2">
             {planner
-              ? `Build ${job.code}’s journey one trip at a time, from ${job.journeyEndCity ?? job.originCity} to ${job.destinationCity}. Each trip has its own load plan and route; a flight has its flight.`
+              ? `Draft ${job.code}’s journey from its quoted route, from ${job.originCity} to ${job.destinationCity}, then review each trip and confirm its route. Or build it one trip at a time.`
               : `The fleet coordinator builds ${job.code}’s journey, from ${job.originCity} to ${job.destinationCity}.`}
           </p>
           {planner && (
-            <Button variant="primary" size="md" leadingIcon="plus" onClick={() => setAdding(true)}>
-              Add the first trip from {job.journeyEndCity ?? job.originCity}
-            </Button>
+            <Flex gap={8} wrap justify="center">
+              <Button
+                variant="primary"
+                size="md"
+                leadingIcon="route"
+                disabled={drafting.isPending}
+                onClick={() =>
+                  drafting.mutate(undefined, {
+                    onSuccess: (parts) => {
+                      message.success(
+                        `${parts.length} ${parts.length === 1 ? 'trip' : 'trips'} drafted. Review each route and confirm it.`,
+                      );
+                      const firstTrip = parts[0];
+                      if (firstTrip) show(firstTrip.tripId, 'route');
+                    },
+                    onError: (error) =>
+                      message.error(
+                        apiErrorMessage(error, 'The journey wasn’t drafted. Try again.'),
+                      ),
+                  })
+                }
+              >
+                {drafting.isPending ? 'Drafting…' : 'Draft the journey from the quote'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                leadingIcon="plus"
+                onClick={() => setAdding(true)}
+              >
+                Add the first trip by hand
+              </Button>
+            </Flex>
           )}
         </Flex>
         {addModal}

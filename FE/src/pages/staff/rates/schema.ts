@@ -149,6 +149,8 @@ export const POLICY_FIELDS: {
   min?: number;
   max?: number;
   step: number;
+  /** What the server uses when a version doesn't set it (US-F3-22): the form starts from it. */
+  fallback?: number;
 }[] = [
   { key: 'FUEL_PCT', label: 'Fuel surcharge, % of air lines', max: 100, step: 0.5 },
   { key: 'INSURANCE_PCT', label: 'Insurance, % of declared value', max: 100, step: 0.1 },
@@ -164,6 +166,40 @@ export const POLICY_FIELDS: {
   { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment limit, kg', min: 1, max: 99999, step: 1 },
   // US-F7-02: cleaning, disinfection and crew rest after a trip, whole hours.
   { key: 'TURNAROUND_HOURS', label: 'Turnaround after a trip, hours', max: 240, step: 1 },
+  // US-F3-22: how a journey drafted from its quote is timed, whole numbers.
+  { key: 'PLAN_START_HOUR', label: 'Drafted trips start at, hour', max: 23, step: 1, fallback: 6 },
+  {
+    key: 'PLAN_SPEED_KMH',
+    label: 'Average road speed, km/h',
+    min: 10,
+    max: 120,
+    step: 5,
+    fallback: 60,
+  },
+  {
+    key: 'PLAN_WELFARE_EVERY_HOURS',
+    label: 'Welfare stop every, hours',
+    min: 1,
+    max: 24,
+    step: 1,
+    fallback: 4,
+  },
+  { key: 'PLAN_WELFARE_STOP_MIN', label: 'Welfare stop, minutes', max: 600, step: 5, fallback: 45 },
+  { key: 'PLAN_BORDER_STOP_MIN', label: 'Border stop, minutes', max: 1440, step: 15, fallback: 90 },
+  {
+    key: 'PLAN_AIRPORT_BEFORE_HOURS',
+    label: 'At the cargo terminal before a flight, hours',
+    max: 72,
+    step: 1,
+    fallback: 4,
+  },
+  {
+    key: 'PLAN_AIRPORT_AFTER_HOURS',
+    label: 'Release after landing, hours',
+    max: 240,
+    step: 1,
+    fallback: 3,
+  },
 ];
 
 export const policySchema = z.object(

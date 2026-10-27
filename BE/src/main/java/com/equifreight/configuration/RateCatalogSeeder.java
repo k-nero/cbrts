@@ -69,7 +69,15 @@ public class RateCatalogSeeder {
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "5504"),
             Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "20000"),
             // Cleaning, disinfection and crew rest after a trip before its vehicle drives again (US-F7-02).
-            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "24"));
+            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "24"),
+            // How a journey drafted from its quote is timed (US-F3-22).
+            Map.entry(RatePolicyKey.PLAN_START_HOUR, "6"),
+            Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "60"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, "4"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "45"),
+            Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "90"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "4"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_AFTER_HOURS, "3"));
 
     private final RateCatalogVersionRepository versions;
     private final RateLineRepository lines;

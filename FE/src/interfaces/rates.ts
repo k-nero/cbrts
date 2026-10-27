@@ -41,6 +41,14 @@ export const RatePolicyKeyEnum = {
   AIR_SHIPMENT_MAX_KG: 'AIR_SHIPMENT_MAX_KG',
   /** Hours after a trip before its vehicle drives again (US-F7-02). */
   TURNAROUND_HOURS: 'TURNAROUND_HOURS',
+  /** How a journey drafted from its quote is timed (US-F3-22). */
+  PLAN_START_HOUR: 'PLAN_START_HOUR',
+  PLAN_SPEED_KMH: 'PLAN_SPEED_KMH',
+  PLAN_WELFARE_EVERY_HOURS: 'PLAN_WELFARE_EVERY_HOURS',
+  PLAN_WELFARE_STOP_MIN: 'PLAN_WELFARE_STOP_MIN',
+  PLAN_BORDER_STOP_MIN: 'PLAN_BORDER_STOP_MIN',
+  PLAN_AIRPORT_BEFORE_HOURS: 'PLAN_AIRPORT_BEFORE_HOURS',
+  PLAN_AIRPORT_AFTER_HOURS: 'PLAN_AIRPORT_AFTER_HOURS',
 } as const;
 export type RatePolicyKey = (typeof RatePolicyKeyEnum)[keyof typeof RatePolicyKeyEnum];
 
