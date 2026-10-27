@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
@@ -20,6 +21,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.JobStage;
+import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.repository.TripHorseRepository;
@@ -310,5 +312,128 @@ class JobTripServiceTest {
         service.clearSignOff(t);
         assertThat(p.getSignedOffAt()).isNull();
         assertThat(job.getSignedOffAt()).isNull();
+    }
+    // ---------- the clearance gate at the border (US-F2-13) ----------
+
+    private static final Country VN = country("VN");
+    private static final Country HK = country("HK");
+
+    private static Country country(String code) {
+        Country c = new Country();
+        c.setId(UUID.randomUUID());
+        c.setCode(code);
+        return c;
+    }
+
+    private static Trip tripOn(String code, TransportMode mode, Country from, Country to, Instant departs) {
+        Corridor corridor = new Corridor();
+        corridor.setId(UUID.randomUUID());
+        corridor.setCode(code);
+        corridor.setMode(mode);
+        corridor.setOriginCountry(from);
+        corridor.setDestinationCountry(to);
+        Trip t = trip("TRP " + code);
+        t.setCorridor(corridor);
+        t.setPlannedDepartureAt(departs);
+        return t;
+    }
+
+    /** Parts in creation order, each handing on to the next: a journey along {@code legs}. */
+    private List<TripJob> journey(TransportJob job, Trip... legs) {
+        List<TripJob> chain = new java.util.ArrayList<>();
+        for (Trip leg : legs) {
+            TripJob p = part(leg, job, TripStatus.NOT_STARTED, null);
+            p.setId(UUID.randomUUID());
+            if (!chain.isEmpty()) chain.getLast().setNext(p);
+            chain.add(p);
+        }
+        when(parts.findByJob_IdOrderByCreatedAt(job.getId())).thenReturn(chain);
+        return chain;
+    }
+
+    private static TransportJob job(Instant departs) {
+        TransportJob job = new TransportJob();
+        job.setId(UUID.randomUUID());
+        job.setStage(JobStage.CLEARANCE);
+        job.setPlannedDepartureAt(departs);
+        return job;
+    }
+
+    private static final Instant PICKUP_DA_NANG = Instant.parse("2026-11-10T23:00:00Z");
+    private static final Instant FLIGHT_SGN = Instant.parse("2026-11-13T02:00:00Z");
+
+    @Test
+    @DisplayName(
+            "Da Nang → Sha Tin: the gate sits on the flight, and the leg to Ho Chi Minh City comes before the border")
+    void theGateSitsOnTheBorderTrip() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toHub = tripOn("RD DAD → HCM", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG);
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        Trip toStables = tripOn("RD HKG → Sha Tin", TransportMode.ROAD, HK, HK, null);
+        journey(job, toHub, flight, toStables);
+
+        assertThat(service.borderTripOf(job)).contains(flight);
+        assertThat(service.beforeBorder(toHub, job)).isTrue();
+        assertThat(service.beforeBorder(flight, job)).isFalse();
+        assertThat(service.beforeBorder(toStables, job)).isFalse();
+        assertThat(service.documentsDepartureOf(job)).isEqualTo(FLIGHT_SGN);
+    }
+
+    @Test
+    @DisplayName("Until the border trip's route is confirmed, documents count from the job's own departure")
+    void documentsCountFromTheJobUntilTheBorderTripIsPlanned() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        journey(
+                job,
+                tripOn("RD DAD → HCM", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG),
+                tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, null));
+
+        assertThat(service.documentsDepartureOf(job)).isEqualTo(PICKUP_DA_NANG);
+    }
+
+    @Test
+    @DisplayName("A domestic move keeps the gate on its one trip, and its documents count from its departure")
+    void aDomesticMoveIsUnchanged() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip only = tripOn("RD HCM → HAN", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG);
+        journey(job, only);
+
+        assertThat(service.borderTripOf(job)).contains(only);
+        assertThat(service.beforeBorder(only, job)).isFalse();
+        assertThat(service.documentsDepartureOf(job)).isEqualTo(PICKUP_DA_NANG);
+    }
+
+    @Test
+    @DisplayName("A move that crosses the border on its first trip keeps the gate there")
+    void aCrossBorderFirstTripKeepsTheGate() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip road = tripOn("RD HCM → BKK", TransportMode.ROAD, VN, country("TH"), PICKUP_DA_NANG);
+        journey(job, road, tripOn("RD BKK → BKK", TransportMode.ROAD, country("TH"), country("TH"), FLIGHT_SGN));
+
+        assertThat(service.borderTripOf(job)).contains(road);
+        assertThat(service.documentsDepartureOf(job)).isEqualTo(PICKUP_DA_NANG);
+    }
+
+    @Test
+    @DisplayName(
+            "On the leg to the hub the horses are on the road, but the job hasn't departed: its documents stay open")
+    void theLegToTheHubDoesntDepartTheJob() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toHub = tripOn("RD DAD → HCM", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG);
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        List<TripJob> chain = journey(job, toHub, flight);
+        chain.getFirst().setStatus(TripStatus.DEPARTED);
+        chain.getFirst().setDepartedAt(PICKUP_DA_NANG);
+        Horse shadowfax = horse("Shadowfax");
+        when(tripHorses.findByJob_IdOrderByCreatedAt(job.getId()))
+                .thenReturn(List.of(
+                        row(toHub, job, shadowfax, TripHorseStatus.ON_TRIP),
+                        row(flight, job, shadowfax, TripHorseStatus.PLANNED)));
+
+        service.summarize(job);
+
+        assertThat(job.getTripStatus()).isEqualTo(TripStatus.DEPARTED);
+        assertThat(job.getDepartedAt()).isNull();
+        assertThat(job.getStage()).isEqualTo(JobStage.CLEARANCE);
     }
 }

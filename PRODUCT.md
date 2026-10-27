@@ -34,7 +34,7 @@ Success means:
 ## Positioning
 
 - **Documents are checked against the job's travel dates, not today.** Each document type carries a machine-evaluable validity rule (window before departure, valid until, booster window, or presence only). Each rule returns GREEN, AMBER or RED and re-runs whenever the dates, the catalog or the horse list change.
-- **Clearance is a hard gate.** Departure cannot be recorded until the dossier reaches CLEARANCE_READY.
+- **Clearance is a hard gate.** Departure cannot be recorded until the dossier reaches CLEARANCE_READY. The gate sits where the move leaves the country: on a journey that starts with a domestic leg into the city it crosses the border from (Da Nang → Ho Chi Minh City, then the flight to Hong Kong), that leg departs first and the trip that crosses the border carries the gate, and the documents are checked against that trip's departure. A domestic move keeps the gate on its one trip.
 - **Quotations are built from a versioned rate catalog in a fixed calculation order.**
   - Space is priced by stall width, not headcount.
   - Grooms are one per three horses, rounded up.

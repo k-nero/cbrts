@@ -70,6 +70,11 @@ public class Corridor extends BaseEntity {
         return mode == TransportMode.ROAD;
     }
 
+    /** Whether the route leaves the country it starts in: "RD HCM → BKK" and "AIR SGN → HKG" do, "RD DAD → HCM" doesn't. */
+    public boolean crossesBorder() {
+        return countries().size() > 1;
+    }
+
     /**
      * The countries the route passes through, in order: where it starts, then the country each crossing enters, then
      * where it ends if no crossing entered it. "RD HCM → BKK" is VN, KH, TH; "RD HCM → HAN" is VN.

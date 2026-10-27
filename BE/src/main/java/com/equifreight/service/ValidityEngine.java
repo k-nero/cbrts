@@ -8,6 +8,7 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.enums.RegulationRuleKind;
 import com.equifreight.entity.enums.Validity;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,14 @@ public class ValidityEngine {
     }
 
     public Result evaluate(ChecklistItem item, DocumentVersion version, TransportJob job) {
+        return evaluate(item, version, job, job == null ? null : job.getPlannedDepartureAt());
+    }
+
+    /**
+     * As {@link #evaluate(ChecklistItem, DocumentVersion, TransportJob)}, against {@code departureAt}: the departure
+     * across the border when the journey starts with a domestic leg (US-F2-13).
+     */
+    public Result evaluate(ChecklistItem item, DocumentVersion version, TransportJob job, Instant departureAt) {
         if (version == null) {
             return new Result(Validity.RED, "No document uploaded yet.");
         }
@@ -42,8 +51,8 @@ public class ValidityEngine {
             return new Result(Validity.GREEN, "Document uploaded and ready for inspection.");
         }
 
-        LocalDate departureDate = job != null && job.getPlannedDepartureAt() != null
-                ? job.getPlannedDepartureAt().atZone(AppConstants.BUSINESS_ZONE).toLocalDate()
+        LocalDate departureDate = departureAt != null
+                ? departureAt.atZone(AppConstants.BUSINESS_ZONE).toLocalDate()
                 : null;
 
         LocalDate arrivalDate = job != null && job.getPlannedArrivalAt() != null

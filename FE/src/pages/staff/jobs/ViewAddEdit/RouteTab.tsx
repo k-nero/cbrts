@@ -327,7 +327,8 @@ export function RouteTab({ job }: Props) {
           ) : (
             <>
               <Callout tone="ok" title="Clear to depart">
-                Dossier status is CLEARANCE_READY. The driver may record departure.
+                {job.clearanceGateSummary ||
+                  'The dossier is cleared. The driver may record departure.'}
               </Callout>
               <div>
                 <Button variant="primary" size="md" leadingIcon="arrow-right">

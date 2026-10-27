@@ -172,7 +172,7 @@ public class ClearanceService {
         candidate.setIssuedOn(dates.issuedOn());
         candidate.setSampledOn(dates.sampledOn());
         candidate.setValidUntil(dates.validUntil());
-        ValidityEngine.Result result = validityEngine.evaluate(item, candidate, item.getJob());
+        ValidityEngine.Result result = validity(item, candidate, item.getJob());
         return new DocumentCheckResponse(
                 result.validity(), result.note(), result.rule(), result.found(), result.required(), result.renewBy());
     }
@@ -264,7 +264,7 @@ public class ClearanceService {
 
         // Validate, then write (US-F2-03, US-F2-09, AGENTS.md):
         // Evaluate validity on the unsaved version first; refuse RED with clear error before persisting.
-        ValidityEngine.Result valResult = validityEngine.evaluate(item, candidate, item.getJob());
+        ValidityEngine.Result valResult = validity(item, candidate, item.getJob());
         if (valResult.validity() == Validity.RED) {
             throw new ConflictException("DOCUMENT_VALIDITY_RED", "Refused: " + valResult.note());
         }
@@ -339,8 +339,7 @@ public class ClearanceService {
             }
         }
 
-        ValidityEngine.Result valResult =
-                (item != null && job != null) ? validityEngine.evaluate(item, version, job) : null;
+        ValidityEngine.Result valResult = (item != null && job != null) ? validity(item, version, job) : null;
         String autoCheckText = valResult != null ? valResult.note() : "Document present and complete.";
         String autoCheckTone = valResult != null
                 ? (valResult.validity() == Validity.GREEN
@@ -407,7 +406,7 @@ public class ClearanceService {
                         "A reason must be provided when rejecting a document version (BR-F2-07)");
             }
         } else if (request.review() == DocumentReview.APPROVED) {
-            ValidityEngine.Result valResult = validityEngine.evaluate(item, version, item.getJob());
+            ValidityEngine.Result valResult = validity(item, version, item.getJob());
             if (valResult.validity() == Validity.RED) {
                 throw new BusinessException(
                         "DOCUMENT_VALIDITY_RED", "A document evaluated as RED cannot be approved: " + valResult.note());
@@ -559,12 +558,18 @@ public class ClearanceService {
         return red;
     }
 
+    /** One document against the job's schedule, from the departure across the border (US-F2-13). */
+    private ValidityEngine.Result validity(ChecklistItem item, DocumentVersion version, TransportJob job) {
+        return validityEngine.evaluate(item, version, job, job == null ? null : jobTrips.documentsDepartureOf(job));
+    }
+
     /** Evaluates every uploaded item against the job's schedule; returns the items now red, in words. */
     private List<String> reevaluate(TransportJob job) {
         List<String> red = new ArrayList<>();
+        Instant departure = jobTrips.documentsDepartureOf(job);
         for (ChecklistItem item : checklistItemRepository.findByJobId(job.getId())) {
             if (item.getCurrentVersion() != null) {
-                ValidityEngine.Result result = validityEngine.evaluate(item, item.getCurrentVersion(), job);
+                ValidityEngine.Result result = validityEngine.evaluate(item, item.getCurrentVersion(), job, departure);
                 boolean turnedRed = result.validity() == Validity.RED && item.getValidity() != Validity.RED;
                 item.setValidity(result.validity());
                 item.setValidityNote(result.note());

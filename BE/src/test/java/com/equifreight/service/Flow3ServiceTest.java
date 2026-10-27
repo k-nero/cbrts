@@ -785,6 +785,27 @@ class Flow3ServiceTest {
         assertThrows(BusinessException.class, () -> transportJobService.signOffTripPlan(jobId, manager));
     }
 
+    @Test
+    @DisplayName("A domestic leg before the border is signed off before the dossier clears (US-F2-13)")
+    void signOff_domesticLegBeforeTheBorderSkipsTheGate() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = new TransportJob();
+        job.setId(jobId);
+        job.setCode("CBRT-2026-041");
+        Trip toHub = new Trip();
+        toHub.setId(UUID.randomUUID());
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobTrips.tripOf(jobId, null)).thenReturn(toHub);
+        when(jobTrips.beforeBorder(toHub, job)).thenReturn(true);
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> transportJobService.signOffTripPlan(jobId, new User()));
+
+        // Past the gate: what stops it now is the route plan, not the dossier.
+        assertTrue(ex.getMessage().contains("Route plan is not confirmed"), ex.getMessage());
+        verify(clearanceService, never()).getClearanceStatus(jobId);
+    }
+
     private static RouteStop stop(RouteStopKind kind, String at) {
         RouteStop st = new RouteStop();
         st.setKind(kind);
