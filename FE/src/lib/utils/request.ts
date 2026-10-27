@@ -401,11 +401,13 @@ export const routeStops = (
     time: '',
     state: 'upcoming' as const,
   });
+  // A flight's two ends are airport terminals, whatever road trip meets them; a road route's are hubs.
+  const hub = r.mode === 'AIR' ? 'Terminal' : 'Hub';
   const leaving = r.departureTerminal ?? r.toTerminal?.toPlace ?? r.fromCity;
   const arriving = r.arrivalTerminal ?? r.fromTerminal?.fromPlace ?? r.toCity;
   const pickup = r.fromPlace ?? r.toTerminal?.fromPlace ?? r.firstLeg?.fromCity ?? r.fromCity;
   const start = r.firstLeg
-    ? [stop(pickup, 'Pickup'), stop(leaving, `Hub · ~${km(r.firstLeg.distanceKm)} km`)]
+    ? [stop(pickup, 'Pickup'), stop(leaving, `${hub} · ~${km(r.firstLeg.distanceKm)} km`)]
     : r.toTerminal
       ? [stop(pickup, 'Pickup'), stop(leaving, `Terminal · ~${km(r.toTerminal.distanceKm)} km`)]
       : [stop(pickup, 'Pickup')];
@@ -413,7 +415,7 @@ export const routeStops = (
   const delivery = r.toPlace ?? r.fromTerminal?.toPlace ?? r.lastLeg?.toCity ?? r.toCity;
   const end = r.lastLeg
     ? [
-        stop(arriving, `Hub · ~${km(r.distanceKm)} km`),
+        stop(arriving, `${hub} · ~${km(r.distanceKm)} km`),
         stop(delivery, `~${km(r.lastLeg.distanceKm)} km`),
       ]
     : r.fromTerminal

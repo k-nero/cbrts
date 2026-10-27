@@ -442,9 +442,11 @@ describe('route words', () => {
     );
     expect(routeStops(viaHub).map((s) => [s.name, s.kind])).toEqual([
       ['Da Nang', 'Pickup'],
-      ['Ho Chi Minh City', 'Hub · ~960 km'],
+      ['Ho Chi Minh City', 'Terminal · ~960 km'],
       ['Hong Kong', '~1,500 km'],
     ]);
+    // By road, the city the leg brings the horses to stays a hub.
+    expect(routeStops({ ...hcmPnh, firstLeg: viaHub.firstLeg })[1].kind).toBe('Hub · ~960 km');
     expect(routeEnds(viaHub)).toEqual({ from: 'Da Nang', to: 'Hong Kong' });
     expect(routeEnds(sgnHkg)).toEqual({ from: 'Ho Chi Minh City', to: 'Hong Kong' });
   });
@@ -471,7 +473,7 @@ describe('route words', () => {
     expect(routeStops(fromStable).map((s) => [s.name, s.kind])).toEqual([
       ['Đại Nam Racecourse', 'Pickup'],
       ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
-      ['Hong Kong', 'Hub · ~1,500 km'],
+      ['Hong Kong', 'Terminal · ~1,500 km'],
       ['Sha Tin', '~40 km'],
     ]);
     // With the places and terminals named, every stop reads by name.
@@ -485,7 +487,7 @@ describe('route words', () => {
     expect(routeStops(named).map((s) => [s.name, s.kind])).toEqual([
       ['Đại Nam Racecourse', 'Pickup'],
       ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
-      ['Cathay Cargo Terminal (HKG)', 'Hub · ~1,500 km'],
+      ['Cathay Cargo Terminal (HKG)', 'Terminal · ~1,500 km'],
       ['Sha Tin Racecourse stables (HKJC)', '~40 km'],
     ]);
     expect(routeSentence(fromStable)).toBe(
