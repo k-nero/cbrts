@@ -186,6 +186,8 @@ public final class ClearanceMapper {
                 .evaluatedAt(item.getEvaluatedAt())
                 .holder(item.getHolder())
                 .dueDate(item.getDueDate())
+                .droppedAt(item.getDroppedAt())
+                .addedByUpdate(item.isAddedByUpdate())
                 .currentVersion(toVersionResponse(item.getCurrentVersion()))
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt());
@@ -201,7 +203,8 @@ public final class ClearanceMapper {
         if (item.getRegulationRule() != null) {
             builder.regulationRuleId(item.getRegulationRule().getId())
                     .ruleKind(item.getRegulationRule().getRuleKind())
-                    .mandatory(item.getRegulationRule().isMandatory())
+                    .mandatory(item.getDroppedAt() == null
+                            && item.getRegulationRule().isMandatory())
                     .minDays(item.getRegulationRule().getMinDays())
                     .maxDays(item.getRegulationRule().getMaxDays())
                     .ruleDescription(item.getRegulationRule().getDescription())

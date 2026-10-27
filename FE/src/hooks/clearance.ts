@@ -4,6 +4,8 @@ import { fileApi } from '@/apis/file';
 import { queryKeys } from '@/constant/query';
 import type {
   AuthorityKind,
+  CatalogMoveRequest,
+  CatalogUpdate,
   ChecklistItem,
   ClearanceStatus,
   CreateAuthoritySubmissionRequest,
@@ -242,6 +244,29 @@ export const useGenerateChecklist = () => {
     onSuccess: (_, jobId) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+    },
+  });
+};
+
+/** Newer published versions of the job's pinned catalogs; the job stays on its pins until moved. */
+export const useCatalogUpdates = (jobId: string) =>
+  useQuery({
+    queryKey: queryKeys.clearance.catalogUpdates(jobId),
+    queryFn: async (): Promise<CatalogUpdate[]> =>
+      (await clearanceApi.getCatalogUpdates(jobId)).data,
+    enabled: Boolean(jobId),
+  });
+
+/** Moves the job onto a newer catalog version: its checklist, gate and pending updates all change. */
+export const useMoveToCatalogVersion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, data }: { jobId: string; data: CatalogMoveRequest }) =>
+      clearanceApi.moveToCatalogVersion(jobId, data).then((r) => r.data),
+    onSuccess: (_, { jobId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.checklist(jobId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.catalogUpdates(jobId) });
     },
   });
 };

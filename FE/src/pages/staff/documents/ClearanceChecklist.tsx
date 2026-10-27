@@ -1,9 +1,16 @@
-import { type FC } from 'react';
+import { type FC, useState } from 'react';
 import { App, Empty, Flex, Spin } from 'antd';
 import { Button, Callout, Chip, DocumentRow } from '@/components/ui';
-import { useClearanceStatus, useGenerateChecklist, useJobChecklist } from '@/hooks/clearance';
-import { type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
+import {
+  useCatalogUpdates,
+  useClearanceStatus,
+  useGenerateChecklist,
+  useJobChecklist,
+} from '@/hooks/clearance';
+import { type CatalogUpdate, type ChecklistItem, ChecklistStatusEnum } from '@/interfaces';
 import { apiErrorMessage, rowStatus } from '@/lib/utils';
+import { CatalogMoveModal } from './CatalogMoveModal';
+import { CatalogUpdateCallout } from './CatalogUpdateCallout';
 import ClearanceSummary from './ClearanceSummary';
 
 type Props = {
@@ -22,6 +29,8 @@ const ClearanceChecklist: FC<Props> = ({ jobId, onView, onUpload, withGate = tru
     isError: checklistFailed,
   } = useJobChecklist(jobId);
   const { data: status } = useClearanceStatus(jobId);
+  const { data: updates = [] } = useCatalogUpdates(jobId);
+  const [moving, setMoving] = useState<CatalogUpdate | null>(null);
   const generate = useGenerateChecklist();
   const { message } = App.useApp();
 
@@ -43,6 +52,10 @@ const ClearanceChecklist: FC<Props> = ({ jobId, onView, onUpload, withGate = tru
   return (
     <Flex vertical gap={24}>
       {status && <ClearanceSummary jobId={jobId} status={status} withGate={withGate} />}
+
+      {updates.map((u) => (
+        <CatalogUpdateCallout key={u.versionId} update={u} onMove={setMoving} />
+      ))}
 
       <Flex vertical gap={8}>
         <Flex align="center" justify="space-between">
@@ -85,20 +98,32 @@ const ClearanceChecklist: FC<Props> = ({ jobId, onView, onUpload, withGate = tru
             {checklist.map((item) => (
               <DocumentRow
                 key={item.id}
-                status={rowStatus(item)}
-                statusLabel={item.status === ChecklistStatusEnum.REJECTED ? 'Rejected' : undefined}
+                status={item.droppedAt ? 'required' : rowStatus(item)}
+                statusLabel={
+                  item.droppedAt
+                    ? 'No longer required'
+                    : item.status === ChecklistStatusEnum.REJECTED
+                      ? 'Rejected'
+                      : undefined
+                }
+                className={item.droppedAt ? 'opacity-60' : undefined}
                 document={
                   <Flex align="center" gap={8}>
                     <span>{item.documentTypeName || item.documentTypeCode}</span>
                     {item.mandatory && <Chip tone="neutral">Mandatory</Chip>}
+                    {item.addedByUpdate && <Chip tone="info">Added by catalog update</Chip>}
                     {item.horseName && (
                       <span className="font-display text-ink-3">{item.horseName}</span>
                     )}
                   </Flex>
                 }
-                rule={[item.ruleDescription || 'Standard validity validation', item.ruleCatalog]
-                  .filter(Boolean)
-                  .join(' · ')}
+                rule={
+                  item.droppedAt
+                    ? `Dropped from the catalog when the job moved off ${item.ruleCatalog ?? 'its version'}`
+                    : [item.ruleDescription || 'Standard validity validation', item.ruleCatalog]
+                        .filter(Boolean)
+                        .join(' · ')
+                }
                 result={
                   item.validityNote ||
                   (item.status === ChecklistStatusEnum.AWAITING_UPLOAD
@@ -132,6 +157,8 @@ const ClearanceChecklist: FC<Props> = ({ jobId, onView, onUpload, withGate = tru
           </div>
         )}
       </Flex>
+
+      <CatalogMoveModal jobId={jobId} update={moving} onClose={() => setMoving(null)} />
     </Flex>
   );
 };

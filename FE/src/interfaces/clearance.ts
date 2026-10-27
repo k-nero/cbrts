@@ -140,6 +140,10 @@ export interface ChecklistItem {
   ruleDescription?: string;
   /** The catalog the rule comes from: "Hong Kong v2", the origin's or the destination's pinned version. */
   ruleCatalog?: string | null;
+  /** The job moved onto a catalog version that no longer lists this document; it no longer counts. */
+  droppedAt?: string | null;
+  /** The item came from a catalog version the job moved onto after its checklist was made. */
+  addedByUpdate?: boolean;
   horseId?: string;
   horseName?: string;
   horseMicrochip?: string;
@@ -381,4 +385,24 @@ export interface ClearanceJobSummary {
   clubName?: string;
   originCity?: string;
   destinationCity?: string;
+}
+
+/** A newer published version of a catalog the job is pinned to, and what moving onto it changes. */
+export interface CatalogUpdate {
+  role: 'ORIGIN' | 'DESTINATION';
+  country: string;
+  pinnedVersionId: string;
+  pinnedVersionNo: number;
+  versionId: string;
+  versionNo: number;
+  publishedAt?: string | null;
+  added: string[];
+  /** "EIA (Coggins): within 60 d, mandatory → within 45 d, mandatory". */
+  changed: string[];
+  removed: string[];
+}
+
+export interface CatalogMoveRequest {
+  versionId: string;
+  reason: string;
 }

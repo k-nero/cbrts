@@ -73,6 +73,7 @@ export const queryKeys = {
     versions: (checklistItemId: string) =>
       ['clearance', 'checklist', checklistItemId, 'versions'] as const,
     status: (jobId: string) => ['clearance', 'jobs', jobId, 'status'] as const,
+    catalogUpdates: (jobId: string) => ['clearance', 'jobs', jobId, 'catalog-updates'] as const,
     authorities: () => ['clearance', 'authorities'] as const,
     submissions: (jobId: string) => ['clearance', 'jobs', jobId, 'submissions'] as const,
     quarantines: (jobId: string) => ['clearance', 'jobs', jobId, 'quarantines'] as const,
