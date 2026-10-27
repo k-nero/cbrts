@@ -1182,7 +1182,8 @@ function scrLoadPlan() {
   addAll(body, [left, fillW(center)]);
   var tiles = H({ name: 'Tiles', gap: 16 });
   addAll(tiles, [fillW(stat('Neutral', '3/6', 'Positions filled')), fillW(stat('Bad', '1', 'Conflict')), fillW(stat('Warn', '1', 'Horse to place'))]);
-  return jobScreen('Fleet & route coordinator · Load plan', 'Load plan', STAFF.khoi, [tiles, body]);
+  var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
+  return jobScreen('Fleet & route coordinator · Load plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Load plan'), [tiles, body])]);
 }
 
 /* ---------------------------------------------------------------------
@@ -1227,7 +1228,8 @@ var STAFF = { yen: ['Vũ Hải Yến', 'Logistics manager', 'VY'], lan: ['Nguy�
 var JOB = { code: 'CBRT-2026-041', title: 'Ho Chi Minh City → Phnom Penh', meta: '4 horses · trailer TX-447 · departs 18 Oct 2026, 06:00' };
 /* the customer bought an arrival window for this job; the route is planned backwards from its close */
 var JOB_WINDOW = { from: '11:00', until: '14:00', text: '18 Oct, 11:00–14:00' };
-var JOB_TABS = [['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist'], ['Load plan', 'Khôi, fleet & route coordinator'], ['Route', 'Khôi, fleet & route coordinator'], ['Trip', 'Minh, driver']];
+/* US-F3-21: the Trip tab plans the trip chosen on its journey rail; Clearance and Authorities cover the whole job */
+var JOB_TABS = [['Trip', 'Khôi, fleet & route coordinator'], ['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist']];
 /* one header for every tab of a job: route title, code, stage, the clearance gate, then tabs with the tab's owner */
 function jobHead(tab, gateBody, stage, gateState) {
   var gate = inst(C.gate, { State: gateState || 'Locked' });
@@ -1245,11 +1247,91 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(own, [Tx('Owner', 'Body/S', 'text/tertiary'), Tx(owner, 'Label/S', 'text/primary')]);
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
+  var job = jobHead.job || JOB;
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
-  return adminScreen(name, 'Jobs', ['Jobs', JOB.code, tab], user, [jobHead(tab, o.gate, o.stage, o.gateState)].concat(blocks), o.today);
+  jobHead.job = o.job || null;
+  var head = jobHead(tab, o.gate, o.stage, o.gateState);
+  jobHead.job = null;
+  return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(blocks), o.today);
+}
+/* the job's trips in journey order (US-F3-16, US-F3-21): the chosen one is the Nav item's active pill */
+var ONE_TRIP = [{ mode: 'Road', icon: 'truck', status: 'not started', route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014 · 18 Oct, 06:00' }];
+var CHAIN_JOB = { code: 'CBRT-2026-042', title: 'Da Nang → Sha Tin', meta: '2 horses · road, flight, road · departs 16 Oct 2026, 06:00' };
+var CHAIN = [
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00' },
+  { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40' },
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned' }];
+function journeyRail(parts, active, addFrom) {
+  var r = VV({ name: 'Journey rail', gap: 8, w: 240 });
+  add(r, Tx('Journey · ' + parts.length + (parts.length === 1 ? ' trip' : ' trips'), 'Mono/Caption', 'text/tertiary'));
+  parts.forEach(function (p, i) {
+    var on = i === active;
+    var row = VV({ name: 'Trip · ' + p.code.split(' ')[0], gap: 4, pad: [10, 12, 10, 12], radius: 8, fill: on ? 'surface/muted' : null });
+    var top = H({ name: 'Head', gap: 8, cross: 'CENTER' });
+    var status = Tx(p.status, 'Mono/Caption', 'text/tertiary');
+    var gap = H({ name: 'Gap' });
+    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), status]);
+    addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
+    add(r, fillW(row));
+  });
+  if (parts.length > 1) add(r, btn('Ghost', 'SM', 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
+  if (addFrom) add(r, btn('Secondary', 'SM', 'Add trip from ' + addFrom, { lead: 'plus' }));
+  return r;
+}
+/* the chosen trip's head: its cities and code, and for a road trip the Load plan | Route switch */
+function tripHead(part, view) {
+  var h = H({ name: 'Trip head', gap: 16, main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var t = VV({ name: 'Trip', gap: 2 });
+  addAll(t, [Tx(part.route, 'Heading/H4'), Tx(part.code.split(' ')[0] + ' · ' + part.corridor, 'Mono/Data', 'text/tertiary')]);
+  add(h, t);
+  if (view) {
+    var seg = H({ name: 'Load plan | Route', gap: 2, pad: 2, radius: 8, fill: 'bg/sunken', stroke: 'border/default' });
+    ['Load plan', 'Route'].forEach(function (v) {
+      var on = v === view;
+      var o = H({ name: 'Option · ' + v, pad: [6, 14, 6, 14], radius: 6, fill: on ? 'surface/card' : null, stroke: on ? 'border/default' : null });
+      add(o, Tx(v, 'Label/S', on ? 'text/primary' : 'text/tertiary'));
+      add(seg, o);
+    });
+    add(h, seg);
+  }
+  return h;
+}
+/* the Trip tab's body: the rail, then the chosen trip */
+function tripBody(parts, active, addFrom, head, blocks) {
+  var c = VV({ name: 'Chosen trip', gap: 24 });
+  add(c, fillW(head));
+  blocks.forEach(function (b) { add(c, fillW(b)); });
+  var row = H({ name: 'Trip tab', gap: 24 });
+  addAll(row, [journeyRail(parts, active, addFrom), fillW(c)]);
+  return row;
+}
+/* a flight of the journey (US-F3-21): its schedule, set from the airline's flight, then each job's consignment */
+function scrFlightTrip() {
+  var part = { route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003', corridor: 'AIR SGN → HKG' };
+  var sched = panel('Schedule', { gap: 12 });
+  var sh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(sh, [Tx('Schedule · Cathay Cargo CX 2071', 'Heading/H4'), btn('Secondary', 'SM', 'Change flight')]);
+  addAll(sched, [fillW(sh), Tx('Ho Chi Minh City → Hong Kong · departs 17 Oct 2026, 23:40 · lands 18 Oct 2026, 03:20', 'Body/M', 'text/secondary')]);
+  var cons = panel('Consignments', { gap: 12 });
+  var chh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(chh, [Tx('Flight CX 2071 · Cathay Cargo', 'Heading/H4'), chip('Neutral', '2 of 6 stall positions')]);
+  var row = H({ name: 'Consignment', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var who = VV({ name: 'Job', gap: 2 });
+  addAll(who, [Tx('CBRT-2026-042 · this job', 'Label/M'), Tx('AWB 160-2207 3145 · 2 positions · Business', 'Body/S', 'text/secondary')]);
+  addAll(row, [who, btn('Secondary', 'SM', 'Edit consignment')]);
+  addAll(cons, [fillW(chh), fillW(row)]);
+  var crew = panel('This trip flies', { gap: 12 });
+  addAll(crew, [Tx('This trip flies', 'Heading/H4'),
+    Tx('The flight is this trip’s carrier, so it has no trailer to load. Flight crew: Lê Thị Hoa (flying groom), Dr Phạm An (flight vet).', 'Body/S', 'text/secondary', { fill: true }),
+    btn('Primary', 'MD', 'Sign off trip plan')]);
+  var body = tripBody(CHAIN, 1, null, tripHead(part, null), [sched, cons, crew]);
+  return jobScreen('Fleet & route coordinator · Trip · Flight', 'Trip', STAFF.khoi, [body], {
+    job: CHAIN_JOB,
+    gate: 'Clearance gates TRP-2026-003 (the flight Ho Chi Minh City → Hong Kong) and every trip after it. TRP-2026-002 (Da Nang → Ho Chi Minh City) can leave before.'
+  });
 }
 /* Lan's checklist is the customer's All documents list, in the same words, with the holder named for staff */
 function scrClearance() {
@@ -1278,7 +1360,8 @@ function scrRoute() {
   var refuse = VV({ name: 'Depart', gap: 16 });
   add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
   add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
-  return jobScreen('Fleet & route coordinator · Route plan', 'Route', STAFF.khoi, [strip, tl, refuse]);
+  var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
+  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])]);
 }
 
 /* ---------------------------------------------------------------------

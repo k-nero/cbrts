@@ -83,7 +83,7 @@ var TYPE = [
   ['Mono/Data L', 'mono', 'Medium', 28, 32, -1],
   ['Mono/Data', 'mono', 'Regular', 14, 20, 0],
   ['Mono/Caption', 'mono', 'Regular', 12, 16, 0],
-  ['Mono/Eyebrow', 'mono', 'Regular', 11, 14, 14, true],
+  ['Mono/Eyebrow', 'mono', 'Regular', 12, 16, 14, true],
   ['Mono/Chip', 'mono', 'Medium', 12, 14, 8, true]
 ];
 
@@ -109,12 +109,21 @@ var EFX = {};      // effect style name -> id
 var ICON = {};     // icon name -> ComponentNode
 var C = {};        // components / component sets
 var COLL = {};     // variable collections + mode ids
+/* Light is the presented theme (DESIGN.md, Theme): every frame sets it explicitly, because the collection's
+   default mode is still Dark. Dark stays supported; a frame's dark copy is named with ALT_SUFFIX. */
+var ALT_SUFFIX = ' · Dark';
+function primaryTheme(n) { if (COLL.light) n.setExplicitVariableModeForCollection(COLL.color, COLL.light); return n; }
+function altCopy(src) { var c = src.clone(); c.name = src.name + ALT_SUFFIX; c.setExplicitVariableModeForCollection(COLL.color, COLL.dark); return c; }
 var FONT = {};     // role/style -> FontName
 var PENDING = [];  // async style applications
 var SZ = {};       // node.id -> deferred sizing ({ w, h, abs })
 var STATS = { components: 0, variants: 0 };
 
 function flush() { var p = PENDING.splice(0); return Promise.all(p); }
+/* queue a text style; a node removed before the style lands (e.g. a table dropped for an error state) is not an error */
+function styleLater(t, id) {
+  PENDING.push(t.setTextStyleIdAsync(id).catch(function (e) { if (!t.removed) throw e; }));
+}
 
 /* ---------------------------------------------------------------------
    Colour + paint helpers
@@ -269,7 +278,7 @@ function Tx(str, style, color, o) {
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   if (s.upper) t.textCase = 'UPPER';
   t.characters = String(str);
-  if (!o.noStyle) PENDING.push(t.setTextStyleIdAsync(s.id));
+  if (!o.noStyle) styleLater(t, s.id);
   t.fills = [P(color || 'text/primary')];
   if (o.align) t.textAlignHorizontal = o.align;
   if (o.w) { t.textAutoResize = 'HEIGHT'; t.resize(o.w, t.height); } else t.textAutoResize = 'WIDTH_AND_HEIGHT';
@@ -287,7 +296,7 @@ function restyle(t, style, color) {
   t.lineHeight = { unit: 'PIXELS', value: s.lh };
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   t.textCase = s.upper ? 'UPPER' : 'ORIGINAL';
-  PENDING.push(t.setTextStyleIdAsync(s.id));
+  styleLater(t, s.id);
   if (color) t.fills = [P(color)];
   return t;
 }
@@ -961,7 +970,7 @@ var STALL = {
   Climate: { tok: 'stall/climate', icon: 'snowflake' }
 };
 function buildStall(parent) {
-  var b = docBlock(parent, 'Stall tile', 'One trailer or air-stall position. Type is shown by colour and label; Conflict names the broken rule in words. Target is the drop state while a horse is selected. Properties: Stall, Horse, Meta, Issue.');
+  var b = docBlock(parent, 'Stall tile', 'One trailer or air-stall position. Type is shown by colour and label; Conflict names the broken rule in words. Target is the drop state: under a dragged horse it says what the drop does (place, swap, or send the occupant back to the list); while a horse is selected every empty stall shows it. Properties: Stall, Horse, Meta, Issue.');
   var comps = [];
   Object.keys(STALL).forEach(function (type) {
     ['Empty', 'Occupied', 'Conflict', 'Target'].forEach(function (st) {
@@ -1010,7 +1019,7 @@ function stallI(type, state, n, o) {
 
 /* ---------- Load item ---------- */
 function buildLoadItem(parent) {
-  var b = docBlock(parent, 'Load item', 'A horse waiting to be placed on the load plan. Drag it, or select it and choose a stall (keyboard path).');
+  var b = docBlock(parent, 'Load item', 'A horse waiting to be placed on the load plan. Drag it, or select it and choose a stall (keyboard path). While dragging, a compact Selected copy rides just past the cursor so the stall below stays readable.');
   var comps = ['Default', 'Selected'].map(function (st) {
     var sel = st === 'Selected';
     var c = VV({ component: true, name: 'State=' + st, gap: 8, pad: [14, 16, 14, 16], w: 300, radius: 8, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'accent/default' : 'border/default', sw: sel ? 1.5 : 1 });
@@ -1299,7 +1308,7 @@ var COLOR_GROUPS = [
 function colorPanel(mode) {
   var dark = mode === 'Dark';
   var p = VV({ name: 'Colour · ' + mode, gap: 28, pad: 40, w: 1080, radius: 16, fill: 'bg/canvas', stroke: 'border/default' });
-  if (!dark) p.setExplicitVariableModeForCollection(COLL.color, COLL.light);
+  p.setExplicitVariableModeForCollection(COLL.color, dark ? COLL.dark : COLL.light);
   add(p, Tx(mode + ' mode', 'Heading/H3'));
   var hex = {};
   COLORS.forEach(function (c) { hex[c[0]] = dark ? c[1] : c[2]; });
@@ -1336,7 +1345,7 @@ var PRINCIPLES = [
   ['Estimates are ranges.', 'Customer-facing prices before a quotation is issued are always a low–high range with a non-binding notice.']
 ];
 function buildFoundations(page) {
-  var board = VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' });
+  var board = primaryTheme(VV({ name: 'Foundations', gap: 56, pad: 80, w: 2360, fill: 'bg/canvas' }));
   page.appendChild(board);
   var intro = VV({ name: 'Intro', gap: 12 });
   addAll(intro, [Tx('Foundations', 'Display/L'), Tx('Tokens live in two variable collections: EquiFreight / Color (Dark and Light modes) and EquiFreight / Dimension (space and radius). Components bind to these, so switching a frame’s mode re-themes everything inside it.', 'Body/L', 'text/secondary', { w: 900 })]);
@@ -1505,7 +1514,7 @@ function section(title, sub, content) {
   return s;
 }
 function stepper(states) {
-  var labels = ['Horses', 'Service', 'Route & dates', 'Review'];
+  var labels = ['Horses', 'Route & dates', 'Service', 'Review'];
   var r = H({ name: 'Stepper', gap: 16, cross: 'CENTER', pad: [8, 0, 8, 0] });
   for (var i = 0; i < 4; i++) {
     add(r, stepI(states[i], i + 1, labels[i]));
@@ -1519,7 +1528,7 @@ function stepper(states) {
    --------------------------------------------------------------------- */
 var HORSES = [
   { name: 'Shadowfax', coat: 'Grey', sub: 'Andalusian · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.2 hh', weight: '510 kg', size: 'M · 32', chip: '250 259 600 123 456', value: '$85,000', notes: 'Annual vaccinations up to date. No known allergies. Loads best in a quiet yard.', ready: '4 of 5 cleared', pct: 80 },
-  { name: 'Nightfall', coat: 'Black', sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
+  { name: 'Nightfall', coat: 'Black', photo: true, sub: 'Thoroughbred · Mare', tags: [['Warn', 'Nervous'], ['Info', 'Climate stall']], age: '4 y', height: '16.0 hh', weight: '478 kg', size: 'M · 32', chip: '250 259 600 223 311', value: '$240,000', notes: 'Sensitive to loud noise. Needs a slow, gentle load and a climate-controlled stall.', ready: '3 of 5 cleared', pct: 60 },
   { name: 'Copper King', coat: 'Chestnut', sub: 'Quarter Horse · Stallion', tags: [['Bad', 'Aggressive'], ['Neutral', 'Box stall']], age: '9 y', height: '15.3 hh', weight: '583 kg', size: 'L · 48', chip: '985 141 000 876 502', value: '$120,000', notes: 'Box stall only. Never next to a mare. Experienced handlers only.', ready: '4 of 5 cleared', pct: 80 },
   { name: 'Silver Bell', coat: 'Grey', sub: 'Lipizzan · Mare', tags: [['Ok', 'Calm']], age: '6 y', height: '15.1 hh', weight: '445 kg', size: 'M · 32', chip: '203 098 100 554 120', value: '$60,000', notes: 'Travels well. Hay net at shoulder height.', ready: '2 of 5 cleared', pct: 40 }
 ];
@@ -1547,10 +1556,12 @@ function publicHeader() {
   return h;
 }
 /* the public landing page, signed out: what EquiFreight does, the services and how a move runs.
-   A signed-in club never lands here; its Home is the work (scrHome). */
+   A signed-in club never lands here; its Home is the work (scrHome). No customer, horse or job
+   appears on it (PRODUCT.md, Absences): the hero shows the rules at work on an example date instead. */
 async function scrLanding() {
-  var hero = H({ name: 'Hero', gap: 64, pad: [88, 0, 24, 0], cross: 'CENTER' });
-  var left = VV({ name: 'Hero copy', gap: 24 });
+  /* the hero is a photograph, so it is drawn in Dark mode whatever the theme; the copy sits on the scrim, the horse on the right */
+  var hero = photoPanel({ key: 'Hero', dir: 'H', h: 720, pad: [0, PADX, 0, PADX], gap: 64, cross: 'CENTER', scrim: [[0, NAVY + 'F5'], [0.45, NAVY + 'B3'], [0.75, NAVY + '33'], [1, NAVY + '1A']] });
+  var left = VV({ name: 'Hero copy', gap: 24, w: 620 });
   var h1 = Tx('Precision transport\nfor every horse', 'Display/XL', 'text/primary', { name: 'Headline', fill: true });
   await flush();
   var i = h1.characters.indexOf('transport');
@@ -1560,16 +1571,14 @@ async function scrLanding() {
   addAll(left, [h1,
     Tx('Road and air moves across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Every document is checked against your travel dates, and no horse leaves until clearance is complete.', 'Body/L', 'text/secondary', { w: 560 }),
     ctas]);
-  addAll(hero, [fillW(left), heroCard()]);
+  add(hero, left); // the right half is the photograph: the horse being loaded
 
-  /* the six services as a price list, not a grid of icon cards: what it is, where it runs, what it starts at */
-  var services = tbl('Services', [['Service', null], ['Scope', 240, null, 'Body/S', 'text/secondary'], ['Indicative from', 140, 'RIGHT', 'Mono/Data']], [
-    ['Regional road', 'Scheduled and private trailer runs between training centres, studs and racecourses in one country.', 'Domestic · up to 500 km', '$800'],
-    ['Cross-border road', 'Door to door, with every border document prepared, checked against your dates and filed for you.', 'VN · KH · TH · LA · MY', '$2,400'],
-    ['Air freight', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box. A flying groom travels with every three horses.', 'Economy · Business · First', '$9,500'],
-    ['Veterinary escort', 'A veterinarian travels with the horse and logs its condition at every stop.', 'Injury, rehab, post-surgery', '$650 / day'],
-    ['Race-day logistics', 'Timed to post time, with stabling at the venue and a groom who knows the horse.', 'Arrive settled, on time', '$1,600'],
-    ['Mare & foal', 'Mare and foal travel together in a full-width box for the whole journey.', 'Full box · 96 in', '$2,800']
+  /* the services the request flow offers, as a table, not a grid of icon cards: what it is, where it runs,
+     and what moves its price. No figures: an estimate is always a range, worked out for the request. */
+  var services = tbl('Services', [['Service', null], ['Scope', 220, null, 'Body/S', 'text/secondary'], ['What drives the price', 320, null, 'Body/S', 'text/secondary']], [
+    ['Road, within one country', 'Shared or private trailer runs between training centres, studs and racecourses.', 'One country · 3 days’ notice', 'Distance, a shared or private trailer, each horse’s stall'],
+    ['Road, across borders', 'Door to door, with every border document prepared and filed for you.', 'Vietnam, Cambodia, Thailand, Laos, Malaysia · 21 days’ notice', 'Border crossings, distance, grooms, a shared or private trailer'],
+    ['Air', 'Stall positions planned by width: 32 in, 48 in or a full 96 in box, with a flying groom on board.', 'Economy, Business and First stalls', 'Stall width, pre-export isolation, flying grooms']
   ].map(function (r) {
     var name = VV({ name: r[0], gap: 4 });
     addAll(name, [Tx(r[0], 'Heading/H4'), Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
@@ -1577,35 +1586,47 @@ async function scrLanding() {
   }));
 
   var how = H({ name: 'Steps', gap: 24 });
-  /* the tracker's seven stages, grouped into four phases */
+  /* the tracker's seven stages, grouped into four phases; each stage has one owner, named in stage order */
   [
-    ['1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review.', 'Logistics Manager', '21 days’ notice across a border, 3 within one country. A quotation holds its price for 7 days.'],
-    ['3–4', 'Approval and Documents', 'You accept, the job is approved and your checklist opens. Every upload is checked against your travel dates.', 'Logistics Manager · Transport Specialist', 'A document valid today but expired on departure day is flagged now, with the date a new one must carry.'],
-    ['5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist · Fleet & Route Coordinator', 'One groom for every three horses, rounded up, so four horses travel with two.'],
-    ['7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort', 'Nothing is overwritten: every document version and record is kept.']
+    ['Stages 1–2', 'Request and Quotation', 'Tell us the horses, route and dates. You see an indicative range straight away; the itemised quotation follows review.', 'Logistics Manager', '21 days’ notice across a border, 3 within one country. Quotations hold for a week.'],
+    ['Stages 3–4', 'Approval and Documents', 'You accept, the job is approved and your document checklist opens.', 'Logistics Manager, then Transport Specialist', 'A refused document always says why, and what a new one must show.'],
+    ['Stages 5–6', 'Clearance and Trip', 'Departure unlocks only when every document clears. On the road, the escort records each checkpoint and how the horses are.', 'Transport Specialist, then Fleet & Route Coordinator', 'One groom for every three horses, rounded up, so four horses travel with two.'],
+    ['Stage 7', 'Handover', 'You confirm the horses arrived sound, or report a problem, and the job closes.', 'You, with the escort', 'Nothing is overwritten: every document version and record is kept.']
   ].forEach(function (s, idx) {
     var c = VV({ name: 'Step ' + (idx + 1), gap: 12, pad: [24, 0, 0, 0] });
     borderSide(c, 'border/default', 'top');
     var rule = H({ name: 'Rule', gap: 8, pad: [12, 0, 0, 0] });
     borderSide(rule, 'border/default', 'top');
-    addAll(rule, [Ic('check', 16, 'status/ok/fg'), Tx(s[4], 'Label/S', 'text/primary', { fill: true })]);
-    addAll(c, [Tx(s.shift(), 'Mono/Data L', 'text/tertiary'), Tx(s[0], 'Heading/H3'), Tx(s[1], 'Body/S', 'text/secondary', { fill: true }), Tx(s[2], 'Body/S', 'text/tertiary', { fill: true }), fillW(rule)]);
-    add(how, fillW(c));
+    addAll(rule, [Ic('check', 16, 'status/ok/fg'), Tx(s[4], 'Body/S', 'text/secondary', { fill: true })]);
+    addAll(c, [Tx(s[0], 'Label/S', 'text/tertiary', { name: 'Stages' }), Tx(s[1], 'Heading/H3'), Tx(s[2], 'Body/S', 'text/secondary', { fill: true }), Tx('Owner: ' + s[3], 'Body/S', 'text/tertiary', { name: 'Owner', fill: true }), fillW(rule)]);
+    add(how, sz(fillW(c), 'h', 'FILL'));
   });
 
   var feats = H({ name: 'Features', gap: 24 });
   addAll(feats, [
-    featureCard(windowVisual(), 'Documents checked against your travel dates', 'A Coggins test that is valid today but 77 days old on departure day is flagged now, with the date a new test must carry.'),
-    featureCard(widthVisual(), 'Stalls planned by width and temperament', 'A 96 in air stall takes three standard horses, two at 48 in, or one in a full box. Stallions get box stalls and never stand beside a mare.'),
+    featureCard(windowVisual(), 'Caught before departure day', 'A Coggins test that is valid today but 77 days old on departure day is flagged now, with the date a new test must carry.'),
+    featureCard(widthVisual(), 'Stalls planned by width', 'A 96 in air stall takes three standard horses, two at 48 in, or one in a full box. Stallions get box stalls and never stand beside a mare.'),
     featureCard(quoteVisual(), 'Quotes that say what can move', 'Every line shows its basis. Lines that can change on the final invoice, such as waiting time, are marked before you accept.')
   ]);
 
-  return screen('Landing · Signed out', null, [
-    hero,
-    section('Six ways to move a racehorse', 'Each service is priced from the same rate catalog. What you see here is a starting point; your quotation is itemised line by line.', services),
-    section('Seven stages, one owner each', 'Road and air across Vietnam, Cambodia, Thailand, Laos, Malaysia and Hong Kong. Your request page tracks the same seven stages; the next never starts until the one before it is done, and each holds to a rule.', how),
-    section('Built around the paperwork and the horse', null, feats)
+  /* the page ends on the way in, with the one promise a visitor needs before they ask */
+  var close = H({ name: 'Close', gap: 48, pad: [40, 48, 40, 48], radius: 12, fill: 'surface/card', stroke: 'border/default', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var cc = VV({ name: 'Copy', gap: 10 });
+  addAll(cc, [Tx('Send us the horses, the route and the date', 'Display/M', 'text/primary', { name: 'Title' }), Tx('Nothing is booked until you accept the itemised quotation.', 'Body/M', 'text/secondary', { name: 'Summary' })]);
+  addAll(close, [cc, btn('Primary', 'MD', 'Request transport', { trail: 'arrow-right' })]);
+
+  var land = screen('Landing · Signed out', null, [
+    passSection(),
+    section('Three ways to move a racehorse', 'Each is priced from the same rate catalog and itemised line by line. A veterinary escort and transit insurance can be added to any of them.', services),
+    section('Where we move horses', 'Six countries by road, and Hong Kong by air. Every border crossing has its own document rules, and each one is checked against your travel dates.', routeMapRow()),
+    section('Seven stages in four phases', 'Your request page tracks the same seven stages, each with a named owner. The next never starts until the one before it is done, and each holds to a rule.', how),
+    section('Built around the paperwork and the horse', null, feats),
+    VV({ name: 'Closing', pad: [80, 0, 0, 0] }, [fillW(close)])
   ], { gap: 0, header: publicHeader() });
+  /* full bleed: the hero sits between the header and the 1200 content column */
+  land.insertChild(1, hero);
+  hero.layoutSizingHorizontal = 'FILL';
+  return land;
 }
 
 /* ---------- Home, signed in ----------
@@ -1624,25 +1645,30 @@ var HOME_HORSES = [
   ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', '2 of 5 cleared', 'Bill of sale overdue']
 ];
 /* one request on the signed-in Home: route and codes, the stage and what holds it, the departure */
-function moveRow(m, i) {
-  var row = H({ name: m[1], gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
-  if (i) borderSide(row, 'border/default', 'top');
-  var id = VV({ name: 'Move', gap: 4 });
+/* a move on Home is a small pass: the route and where it stands, a tear line, and a stub with the date */
+function moveRow(m) {
+  var card = H({ name: m[1], radius: 12, fill: 'surface/card', stroke: 'border/default', clip: true });
+  var main = H({ name: 'Move', gap: 24, pad: [16, 20, 16, 20], cross: 'CENTER' });
+  var id = VV({ name: 'Route', gap: 4 });
   var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER' });
   addAll(meta, [Tx(m[1], 'Mono/Caption', 'text/secondary'), Tx(m[2], 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(id, [Tx(m[0], 'Heading/H4'), fillW(meta)]);
-  var st = VV({ name: 'Where it is', gap: 4, w: 220 });
+  var st = VV({ name: 'Where it is', gap: 4, w: 200 });
   addAll(st, [stageMark(m[3]), Tx(m[4], 'Label/S', m[5], { fill: true })]);
-  var due = VV({ name: 'Departs', gap: 2, w: 110, cross: 'MAX' });
-  addAll(due, [Tx(m[6], 'Label/S', 'text/primary', { align: 'RIGHT' }), Tx(m[7], 'Mono/Caption', 'text/tertiary', { align: 'RIGHT' })]);
-  addAll(row, [fillW(id), st, due, rowOpen()]);
-  return row;
+  addAll(main, [fillW(id), st]);
+  var perf = VV({ name: 'Perforation', gap: 6, pad: [6, 0, 6, 0], w: 4, cross: 'CENTER', clip: true });
+  for (var k = 0; k < 9; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = H({ name: 'Stub', gap: 12, pad: [14, 16, 14, 20], w: 190, fill: 'bg/sunken', cross: 'CENTER' });
+  var due = VV({ name: 'Departs', gap: 2 });
+  addAll(due, [Tx(m[6], 'Label/M', 'text/primary'), Tx(m[7], 'Mono/Caption', 'text/tertiary')]);
+  addAll(stub, [fillW(due), rowOpen()]);
+  addAll(card, [fillW(main), perf, stub]);
+  perf.layoutSizingVertical = 'FILL'; stub.layoutSizingVertical = 'FILL';
+  return card;
 }
-/* the signed-in Home in any state: a lead block (what is owed, or that nothing is), then the moves beside the horses */
-/* calm: nothing is owed, so the moves are ordered by departure alone and the caption says so */
 function homeScreen(name, summary, lead, moves, horses, horseNote, asOf, calm) {
-  var list = panel('Moves', { gap: 0, pad: 0, clip: true });
-  moves.forEach(function (m, i) { add(list, fillW(moveRow(m, i))); });
+  var list = VV({ name: 'Moves', gap: 12 });
+  moves.forEach(function (m) { add(list, fillW(moveRow(m))); });
   var movesBlock = titled('Your moves', moves.length + (calm ? ' in progress, soonest departure first.' : ' in progress, the one that needs you most first.') + ' Each opens its request.', list, btn('Ghost', 'SM', 'My requests', { trail: 'arrow-right' }));
   var hp = panel('Your horses', { gap: 0, pad: [20, 24, 8, 24] });
   add(hp, VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] }, [Tx('Your horses', 'Heading/H4'), Tx(horseNote, 'Body/S', 'text/tertiary')]));
@@ -1701,65 +1727,182 @@ function scrHomeRoad() {
     ['Silver Bell', 'coat/grey', 'Grey · Lipizzan mare', 'Stall 6 · standard', 'Sound at 08:40', 'status/ok/fg']
   ], 'All four on CBRT-2026-041, with Hoa’s last condition log.', '18 Oct 2026, 08:41', true);
 }
-function heroCard() {
-  var card = panel('Live job card', { w: 480, gap: 20, pad: 28 });
-  R(card, 16);
-  effect(card, 'Elevation/1 Card');
-  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
-  var id = VV({ name: 'Job', gap: 2 });
-  addAll(id, [Tx('Transport job', 'Body/S', 'text/tertiary'), Tx('CBRT-2026-041', 'Mono/Data', 'text/primary')]);
-  addAll(top, [id, chip('Bad', 'Locked')]);
-  add(card, fillW(top));
-
-  var route = H({ name: 'Route', gap: 8 });
-  [['Ho Chi Minh City', '06:00'], ['Mộc Bài – Bavet', '08:30'], ['Phnom Penh', '12:30']].forEach(function (s, idx) {
-    var stop = VV({ name: s[0], gap: 6 });
-    addAll(stop, [dot(10, 'text/tertiary'), Tx(s[0], 'Label/S', 'text/primary'), Tx(s[1], 'Mono/Caption', 'text/tertiary')]);
-    add(route, stop);
-    if (idx < 2) add(route, fillW(VV({ name: 'Leg', pad: [4, 0, 0, 0] }, [fillW(rect(40, 1, 'border/strong', 'Line'))])));
-  });
-  add(card, fillW(route));
-  add(card, Tx('Departs 18 Oct 2026 · 4 horses · Road, private trailer', 'Body/S', 'text/secondary'));
-  add(card, divider());
-  add(card, Tx('Documents, checked against travel dates', 'Body/S', 'text/tertiary'));
-  /* each state has its own glyph as well as its tone, so the rows read without colour (Said-Twice); an open ring is not issued yet */
-  var glyphs = { c: ['check', 'status/ok/fg'], r: ['clock', 'status/info/fg'], a: ['alert', 'status/warn/fg'], x: ['x', 'status/bad/fg'] };
-  var ring = function (size) { var e = dot(size, null, 'Not issued yet'); e.strokes = [P('border/strong')]; e.strokeWeight = 1.5; return e; };
-  [['Shadowfax', 'ccc-c', '4/5'], ['Nightfall', 'cca-c', '3/5'], ['Copper King', 'ccc-c', '4/5'], ['Silver Bell', 'cxc-x', '2/5'], ['Shipment', 'rac', '1/3']].forEach(function (h) {
-    var row = H({ name: h[0], gap: 12, cross: 'CENTER' });
-    var dots = H({ name: 'Dots', gap: 6, cross: 'CENTER' });
-    h[1].split('').forEach(function (ch) {
-      if (ch === '-') add(dots, ring(12));
-      else { var g = Ic(glyphs[ch][0], 14, glyphs[ch][1]); g.name = glyphs[ch][0]; add(dots, g); }
-    });
-    addAll(row, [Tx(h[0], 'Label/M', 'text/primary', { fill: true }), dots, Tx(h[2], 'Mono/Caption', 'text/secondary')]);
-    add(card, fillW(row));
-  });
-  var legend = H({ name: 'Legend', gap: 14, wrap: true, rowGap: 6 });
-  [['c', 'Cleared'], ['r', 'In review'], ['a', 'Expires in transit'], ['x', 'Fails rule'], ['-', 'Not issued yet']].forEach(function (l) {
-    var it = H({ name: l[1], gap: 6, cross: 'CENTER' });
-    var d = l[0] === '-' ? ring(10) : Ic(glyphs[l[0]][0], 12, glyphs[l[0]][1]);
-    addAll(it, [d, Tx(l[1], 'Mono/Caption', 'text/tertiary')]);
-    add(legend, it);
-  });
-  add(card, fillW(legend));
-  var foot = H({ name: 'Gate', gap: 10, pad: [12, 14, 12, 14], radius: 8, cross: 'CENTER', fill: 'status/bad/bg', stroke: 'status/bad/border' });
-  addAll(foot, [Ic('lock', 16, 'status/bad/fg'), Tx('Departure locked · 9 items outstanding', 'Label/S', 'text/primary', { fill: true }), Tx('Open clearance', 'Label/S', 'text/primary')]);
-  add(card, fillW(foot));
-  return card;
+var RULES_EXAMPLE = [['passport', 'Valid through 20 Oct'], ['vacc', '21 Apr–11 Oct'], ['eia', 'On or after 19 Aug'], ['health', '8–18 Oct'], ['own', 'Any date']];
+/* ---------- Photography ----------
+   A photo is a material, like the brass nameplate: it reads the same in both themes, so a photo panel is drawn
+   in Dark mode with a navy scrim under its text. The generator draws the panel with a flat placeholder fill
+   named "Photo · <key>"; the picture is uploaded into that fill from docs/design-assets/ (drafts for now,
+   to be replaced by licensed photographs). */
+var NAVY = '#0B1524';
+function photoPanel(o) {
+  var f = F({ name: 'Photo · ' + o.key, dir: o.dir || 'V', w: o.w, h: o.h, gap: o.gap || 0, pad: o.pad, main: o.main, cross: o.cross, fill: 'bg/sunken', clip: true });
+  if (COLL.dark) f.setExplicitVariableModeForCollection(COLL.color, COLL.dark);
+  var scrim = figma.createRectangle(); scrim.name = 'Scrim';
+  scrim.fills = [gradient(o.scrim, o.vertical)];
+  f.appendChild(scrim);
+  scrim.layoutPositioning = 'ABSOLUTE'; scrim.x = 0; scrim.y = 0; scrim.resize(Math.max(f.width, 1), Math.max(f.height, 1));
+  scrim.constraints = { horizontal: 'STRETCH', vertical: 'STRETCH' };
+  return f;
 }
+/* ---------- The travel pass ----------
+   An example of what a club holds when a move is ready: the route, the facts that matter, the date each
+   document must carry, and a stub that says the gate is open. Labelled Example; it names no horse or club. */
+function travelPass() {
+  var pass = primaryTheme(H({ name: 'Travel pass · Example', w: 520, radius: 16, fill: 'surface/card', clip: true }));
+  effect(pass, 'Elevation/2 Overlay');
+  var main = VV({ name: 'Pass', gap: 18, pad: [24, 24, 24, 28] });
+  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(top, [Tx('Travel pass', 'Label/S', 'text/tertiary'), chip('Neutral', 'Example', { noDot: true })]);
+  var end = function (code, city, align) { var v = VV({ name: city, gap: 2, cross: align }); addAll(v, [Tx(code, 'Mono/Data L', 'text/primary', { name: 'Code' }), Tx(city, 'Body/S', 'text/secondary', { name: 'City' })]); return v; };
+  var leg = H({ name: 'Leg', gap: 8, cross: 'CENTER', pad: [0, 0, 18, 0] });
+  addAll(leg, [fillW(rect(20, 1, 'border/strong', 'Line')), Ic('truck', 18, 'text/secondary'), fillW(rect(20, 1, 'border/strong', 'Line'))]);
+  var route = H({ name: 'Route', gap: 14, cross: 'CENTER' });
+  addAll(route, [end('HCM', 'Ho Chi Minh City', 'MIN'), fillW(leg), end('PNH', 'Phnom Penh', 'MAX')]);
+  var facts = VV({ name: 'Facts', gap: 12 });
+  [[['Departs', '18 Oct · 06:00', true], ['Border', 'Mộc Bài – Bavet']], [['Horses', '4 · private trailer'], ['Arrival window', '11:00–14:00', true]]].forEach(function (pair, i) {
+    var r = H({ name: 'Row ' + (i + 1), gap: 16 });
+    pair.forEach(function (f) { var c = VV({ name: f[0], gap: 2 }); addAll(c, [Tx(f[0], 'Body/S', 'text/tertiary'), Tx(f[1], f[2] ? 'Mono/Data' : 'Label/M', 'text/primary')]); add(r, fillW(c)); });
+    add(facts, fillW(r));
+  });
+  var docs = VV({ name: 'Documents', gap: 8 });
+  add(docs, Tx('Each document must carry', 'Body/S', 'text/tertiary'));
+  RULES_EXAMPLE.forEach(function (d) {
+    var r = H({ name: DOCNAME[d[0]], gap: 12, cross: 'CENTER' });
+    addAll(r, [Tx(DOCNAME[d[0]], 'Label/S', 'text/primary', { fill: true }), Tx(d[1], 'Mono/Caption', 'text/secondary', { align: 'RIGHT' })]);
+    add(docs, fillW(r));
+  });
+  addAll(main, [fillW(top), fillW(route), fillW(facts), divider(), fillW(docs)]);
+  /* the tear line between pass and stub */
+  var perf = VV({ name: 'Perforation', gap: 8, pad: [10, 0, 10, 0], w: 4, cross: 'CENTER', clip: true });
+  for (var k = 0; k < 36; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = VV({ name: 'Stub', gap: 12, pad: [24, 18, 24, 18], w: 140, fill: 'bg/sunken', main: 'SPACE_BETWEEN' });
+  var gate = VV({ name: 'Gate', gap: 8 });
+  var ic = H({ name: 'Icon wrap', w: 32, h: 32, radius: 999, fill: 'status/ok/bg', main: 'CENTER', cross: 'CENTER' });
+  add(ic, Ic('unlock', 16, 'status/ok/fg'));
+  addAll(gate, [ic, Tx('Clear to depart', 'Label/M', 'text/primary', { w: 104 }), Tx('23 of 23 documents cleared', 'Body/S', 'text/secondary', { w: 104 })]);
+  var bars = H({ name: 'Code bars', gap: 2, h: 36 });
+  [2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 2].forEach(function (w) { add(bars, rect(w, 36, 'text/primary', 'Bar')); });
+  addAll(stub, [gate, VV({ name: 'Code', gap: 6 }, [bars, Tx('Example only', 'Mono/Caption', 'text/tertiary')])]);
+  addAll(pass, [fillW(main), perf, stub]);
+  perf.layoutSizingVertical = 'FILL'; stub.layoutSizingVertical = 'FILL';
+  return pass;
+}
+/* the pass, introduced: what a club holds once a move is approved */
+function passSection() {
+  var row = H({ name: 'Pass row', gap: 64, cross: 'CENTER' });
+  var t = VV({ name: 'Copy', gap: 16 });
+  addAll(t, [Tx('Every move, on one pass', 'Display/L'), Tx('Once a request is approved, the move gets its own pass: the route, the departure, your arrival window, and the date each document must carry for the crossings on your route.', 'Body/M', 'text/secondary', { w: 520 })]);
+  var pts = VV({ name: 'Points', gap: 10, pad: [8, 0, 0, 0] });
+  ['Dates worked out for your route and departure', 'Every upload checked against those dates, not today', 'Departure unlocks the moment every document clears'].forEach(function (x) {
+    var r = H({ name: x, gap: 10, cross: 'CENTER' });
+    addAll(r, [Ic('check', 16, 'status/ok/fg'), Tx(x, 'Body/M', 'text/primary')]);
+    add(pts, r);
+  });
+  add(t, pts);
+  addAll(row, [fillW(t), travelPass()]);
+  return VV({ name: 'Your move', pad: [80, 0, 0, 0] }, [fillW(row)]);
+}
+/* ---------- Where we move horses: a schematic map ----------
+   Drawn like a transit map, not a survey map: positions follow longitude and latitude, but the empty sea
+   east of 107°E is squeezed so the six countries get the room. Roads are solid, air is dashed, and each
+   border crossing is a gate on its road. */
+var MAP = { w: 760, h: 560 };
+function mx(lon) { return lon <= 107 ? 40 + (lon - 99.5) * 62 : 505 + (lon - 107) * 28; }
+function my(lat) { return 30 + (23 - lat) * 24.4; }
+/* label side: r right, l left, la left and above (where a road leaves to the right or below) */
+var MAP_CITIES = [['HCM', 'Ho Chi Minh City', 106.7, 10.8, 'r'], ['PNH', 'Phnom Penh', 104.9, 11.6, 'l'], ['BKK', 'Bangkok', 100.5, 13.8, 'la'], ['VTE', 'Vientiane', 102.6, 17.97, 'l'], ['HAN', 'Hanoi', 105.8, 21.0, 'r'], ['KUL', 'Kuala Lumpur', 101.7, 3.1, 'r'], ['HKG', 'Hong Kong', 114.2, 22.3, 'la']];
+/* [from, to, crossing, gate lon/lat, label offset] */
+var MAP_ROADS = [
+  ['HCM', 'PNH', 'Mộc Bài – Bavet', 105.8, 11.2, [-96, 16]],
+  ['PNH', 'BKK', 'Poipet – Aranyaprathet', 102.55, 13.65, [-74, -28]],
+  ['BKK', 'VTE', 'Nong Khai – Vientiane', 102.18, 17.14, [16, -2]],
+  ['BKK', 'KUL', 'Sadao – Bukit Kayu Hitam', 100.45, 6.55, [16, -8]],
+  ['HAN', 'VTE', 'Cầu Treo – Nam Phao', 105.1, 18.4, [16, -6]]
+];
+var MAP_AIR = [['HCM', 112, 12], ['PNH', 110, 16]];
+var MAP_LABELS = [['VIETNAM', 106.3, 14.6], ['CAMBODIA', 104.5, 13.2], ['THAILAND', 101.3, 19.3], ['LAOS', 104, 19.8], ['MALAYSIA', 102.8, 4.8], ['Gulf of Thailand', 101.8, 9.5], ['South China Sea', 111.5, 9]];
+function cityXY(code) { var c = MAP_CITIES.filter(function (x) { return x[0] === code; })[0]; return [mx(c[2]), my(c[3])]; }
+function mapSvg(paths, dashed) {
+  return '<svg width="' + MAP.w + '" height="' + MAP.h + '" viewBox="0 0 ' + MAP.w + ' ' + MAP.h + '" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    paths.map(function (d) { return '<path d="' + d + '" stroke="#000" stroke-width="2"' + (dashed ? ' stroke-dasharray="6 6"' : '') + '/>'; }).join('') + '</svg>';
+}
+function mapLayer(name, paths, token, weight, dash) {
+  var f = figma.createNodeFromSvg(mapSvg(paths, !!dash));
+  f.name = name; f.fills = [];
+  f.findAll(function (n) { return n.type === 'VECTOR'; }).forEach(function (v) {
+    v.strokes = [P(token)]; v.strokeWeight = weight; v.strokeCap = 'ROUND'; v.strokeJoin = 'ROUND';
+    if (dash) v.dashPattern = dash;
+  });
+  return f;
+}
+function routeMap() {
+  var m = F({ name: 'Map', w: MAP.w, h: MAP.h, fill: 'bg/sunken', radius: 12, clip: true });
+  var put = function (n, x, y) { m.appendChild(n); n.x = Math.round(x); n.y = Math.round(y); return n; };
+  for (var gx = 76; gx < MAP.w; gx += 76) { var v = rect(1, MAP.h, 'border/default', 'Grid'); v.opacity = 0.6; put(v, gx, 0); }
+  for (var gy = 70; gy < MAP.h; gy += 70) { var hz = rect(MAP.w, 1, 'border/default', 'Grid'); hz.opacity = 0.6; put(hz, 0, gy); }
+  MAP_LABELS.forEach(function (l) {
+    var sea = l[0] !== l[0].toUpperCase();
+    var t = Tx(l[0], sea ? 'Body/S' : 'Mono/Eyebrow', 'text/tertiary', { name: 'Area · ' + l[0], noStyle: sea });
+    if (sea) t.fontName = FONT['display/Italic'];
+    put(t, mx(l[1]) - t.width / 2, my(l[2]) - t.height / 2);
+  });
+  var roads = MAP_ROADS.map(function (r) { var a = cityXY(r[0]), b = cityXY(r[1]); return 'M' + a[0] + ' ' + a[1] + ' L' + mx(r[3]) + ' ' + my(r[4]) + ' L' + b[0] + ' ' + b[1]; });
+  var hk = cityXY('HKG');
+  var air = MAP_AIR.map(function (r) { var a = cityXY(r[0]); return 'M' + a[0] + ' ' + a[1] + ' Q' + mx(r[1]) + ' ' + my(r[2]) + ' ' + hk[0] + ' ' + hk[1]; });
+  put(mapLayer('Air', air, 'text/tertiary', 2, [6, 6]), 0, 0);
+  put(mapLayer('Roads', roads, 'text/primary', 3), 0, 0);
+  MAP_ROADS.forEach(function (r) {
+    var g = H({ name: 'Gate · ' + r[2], w: 20, h: 20, radius: 999, fill: 'surface/card', stroke: 'text/primary', sw: 1.5, main: 'CENTER', cross: 'CENTER' });
+    add(g, Ic('flag', 11, 'text/primary'));
+    put(g, mx(r[3]) - 10, my(r[4]) - 10);
+    put(Tx(r[2], 'Mono/Caption', 'text/secondary', { name: 'Crossing · ' + r[2] }), mx(r[3]) + r[5][0], my(r[4]) + r[5][1]);
+  });
+  MAP_CITIES.forEach(function (c) {
+    var x = mx(c[2]), y = my(c[3]);
+    var d = dot(14, 'surface/card', 'City · ' + c[1]); d.strokes = [P('text/primary')]; d.strokeWeight = 3; d.strokeAlign = 'INSIDE';
+    put(d, x - 7, y - 7);
+    var lb = VV({ name: 'Label · ' + c[1], gap: 0, cross: c[4] === 'r' ? 'MIN' : 'MAX' });
+    addAll(lb, [Tx(c[1], 'Label/S', 'text/primary'), Tx(c[0], 'Mono/Caption', 'text/tertiary')]);
+    m.appendChild(lb);
+    lb.x = Math.round(c[4] === 'r' ? x + 12 : c[4] === 'l' ? x - 12 - lb.width : x + 8 - lb.width); lb.y = Math.round(c[4] === 'la' ? y - 44 : y - 10);
+  });
+  return m;
+}
+function routeMapRow() {
+  var row = H({ name: 'Map row', gap: 24 });
+  var side = panel('Corridors', { gap: 0, pad: [20, 24, 12, 24] });
+  add(side, VV({ name: 'Title', gap: 4, pad: [0, 0, 14, 0] }, [Tx('Corridors we run', 'Heading/H4'), Tx('Each road corridor crosses at one border post. Air goes through Hong Kong.', 'Body/S', 'text/tertiary', { w: 360 })]));
+  [['Ho Chi Minh City → Phnom Penh', 'Road · Mộc Bài – Bavet'], ['Phnom Penh → Bangkok', 'Road · Poipet – Aranyaprathet'], ['Bangkok → Vientiane', 'Road · Nong Khai – Vientiane'], ['Bangkok → Kuala Lumpur', 'Road · Sadao – Bukit Kayu Hitam'], ['Hanoi → Vientiane', 'Road · Cầu Treo – Nam Phao'], ['Ho Chi Minh City, Phnom Penh → Hong Kong', 'Air · Economy, Business, First stalls']].forEach(function (c) {
+    var r = H({ name: c[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var air = c[1].indexOf('Air') === 0;
+    var key = H({ name: 'Key', w: 28, h: 12, cross: 'CENTER' });
+    var ln = rect(28, air ? 2 : 3, air ? 'text/tertiary' : 'text/primary', 'Line'); if (air) ln.dashPattern = [6, 6];
+    add(key, fillW(ln));
+    var t = VV({ name: 'Text', gap: 2 });
+    addAll(t, [Tx(c[0], 'Label/S', 'text/primary', { fill: true }), Tx(c[1], 'Body/S', 'text/tertiary', { fill: true })]);
+    addAll(r, [key, fillW(t)]);
+    add(side, fillW(r));
+  });
+  addAll(row, [routeMap(), fillW(side)]);
+  return row;
+}
+/* feature cards stretch to the tallest, and every visual is one height, so the titles line up */
+var FEATURE_VISUAL_H = 132;
 function featureCard(visual, title, body) {
   var c = panel(title, { gap: 16, pad: 28 });
+  visual.resize(visual.width, FEATURE_VISUAL_H); visual.layoutSizingVertical = 'FIXED';
   addAll(c, [fillW(visual), Tx(title, 'Heading/H3', 'text/primary', { fill: true }), Tx(body, 'Body/S', 'text/secondary', { fill: true })]);
-  return fillW(c);
+  return sz(fillW(c), 'h', 'FILL');
 }
+/* the track fills its panel; its marks are pinned by constraints, so they land inside it at any width */
 function windowVisual() {
   var f = VV({ name: 'Window visual', gap: 8, pad: 16, radius: 8, fill: 'bg/sunken' });
   var track = F({ name: 'Track', w: 300, h: 28 });
-  var line = rect(300, 2, 'border/strong', 'Axis'); line.y = 13; track.appendChild(line);
-  var win = rect(150, 10, 'status/ok/bg', 'Valid window', 999); win.x = 150; win.y = 9; win.strokes = [P('status/ok/border')]; win.strokeWeight = 1; track.appendChild(win);
-  var issued = dot(12, 'status/warn/fg', 'Test date'); issued.x = 92; issued.y = 8; track.appendChild(issued);
-  var dep = rect(2, 28, 'text/primary', 'Departure'); dep.x = 298; track.appendChild(dep);
+  var line = rect(300, 2, 'border/strong', 'Axis'); line.y = 13; track.appendChild(line); line.constraints = { horizontal: 'STRETCH', vertical: 'MIN' };
+  var win = rect(148, 10, 'status/ok/bg', 'Valid window', 999); track.appendChild(win); win.x = 150; win.y = 9; win.strokes = [P('status/ok/border')]; win.strokeWeight = 1; win.constraints = { horizontal: 'SCALE', vertical: 'MIN' };
+  var issued = dot(12, 'status/warn/fg', 'Test date'); issued.x = 92; issued.y = 8; track.appendChild(issued); issued.constraints = { horizontal: 'CENTER', vertical: 'MIN' };
+  var dep = rect(2, 28, 'text/primary', 'Departure'); dep.x = 298; track.appendChild(dep); dep.constraints = { horizontal: 'MAX', vertical: 'MIN' };
   add(f, fillW(track));
   var lbl = H({ name: 'Labels', gap: 8, wrap: true, rowGap: 4 });
   addAll(lbl, [Tx('Test 2 Aug', 'Mono/Caption', 'status/warn/fg'), Tx('60-day window', 'Mono/Caption', 'status/ok/fg'), Tx('Departs 18 Oct', 'Mono/Caption', 'text/primary')]);
@@ -1767,14 +1910,15 @@ function windowVisual() {
   add(f, chip('Warn', 'Expires in transit'));
   return f;
 }
+/* each row: the class name, a bar that fills what is left, then the positions it holds */
 function widthVisual() {
-  var f = VV({ name: 'Width visual', gap: 10, pad: 16, radius: 8, fill: 'bg/sunken' });
+  var f = VV({ name: 'Width visual', gap: 10, pad: 16, radius: 8, fill: 'bg/sunken', main: 'CENTER' });
   [['Economy', 3, '3 × 32 in'], ['Business', 2, '2 × 48 in'], ['First', 1, '1 × 96 in']].forEach(function (r) {
     var row = H({ name: r[0], gap: 10, cross: 'CENTER' });
-    var bar = H({ name: 'Stall', gap: 3, w: 180, h: 18 });
+    var bar = H({ name: 'Stall', gap: 3, h: 18 });
     for (var i = 0; i < r[1]; i++) add(bar, fillW(rect(10, 18, i === 0 ? 'stall/standard' : 'stall/box', 'Position', 4)));
-    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/secondary', { w: 70 }), bar, Tx(r[2], 'Mono/Caption', 'text/tertiary')]);
-    add(f, row);
+    addAll(row, [Tx(r[0], 'Body/S', 'text/secondary', { w: 64 }), fillW(bar), Tx(r[2], 'Mono/Caption', 'text/tertiary')]);
+    add(f, fillW(row));
   });
   return f;
 }
@@ -1820,74 +1964,212 @@ function scrHorsesMobile() {
 }
 
 /* ---------------------------------------------------------------------
-   Screens: Request transport (steps 1, 3, 4)
+   Screens: Request transport (steps 1, 2, 4; step 3 Service is in 14-service.js)
+   The route comes before the service: distance, border crossings and whether
+   any air service exists all depend on it, and they decide the service choices.
    --------------------------------------------------------------------- */
-function estimateCard(range, horses, grooms, crossings, dist) {
-  var e = inst(C.estimate);
-  setP(e, { Range: range, Horses: horses, Grooms: grooms, 'Border crossings': crossings, Distance: dist });
-  e.name = 'Estimate';
-  return e;
+/* ---------- the draft pass ----------
+   The wizard's side column is the request drawn as the pass it becomes once approved (the landing
+   introduces the pass). It fills in as the steps are done: a value no step has set yet says which step
+   sets it, and the stub carries the indicative range, never a price.
+   o: { route: bool, from, to: [code, city], mode: 'air', chip: [tone, label], rows: [[label, value, mono, tone] | [label, null, step]], stubLabel, range, rangeSub }
+   The quotation page reuses it with the quoted total in the stub. */
+var DRAFT_ROUTE = { from: ['HCM', 'Ho Chi Minh City'], to: ['BKK', 'Bangkok'] };
+function draftPass(o) {
+  var pass = VV({ name: 'Draft pass', w: SIDE.narrow, radius: 16, fill: 'surface/card', stroke: 'border/default', clip: true });
+  effect(pass, 'Elevation/1 Card');
+  var main = VV({ name: 'Pass', gap: 18, pad: [20, 24, 18, 24] });
+  var top = H({ name: 'Top', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var ch = o.chip || ['Neutral', 'Draft'];
+  addAll(top, [Tx('Your move', 'Label/S', 'text/tertiary'), chip(ch[0], ch[1], { noDot: ch[0] === 'Neutral' })]);
+  var set = !!o.route;
+  var end = function (c, align) {
+    var v = VV({ name: set ? c[1] : 'Not set', gap: 2, cross: align });
+    addAll(v, [Tx(set ? c[0] : '···', 'Mono/Data L', set ? 'text/primary' : 'text/tertiary', { name: 'Code' }), Tx(set ? c[1] : (align === 'MIN' ? 'From' : 'To'), 'Body/S', set ? 'text/secondary' : 'text/tertiary', { name: 'City' })]);
+    return v;
+  };
+  var leg = H({ name: 'Leg', gap: 8, cross: 'CENTER', pad: [0, 0, 18, 0] });
+  addAll(leg, [fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line')), Ic(o.mode === 'air' ? 'plane' : 'truck', 18, set ? 'text/secondary' : 'text/tertiary'), fillW(rect(20, 1, set ? 'border/strong' : 'border/default', 'Line'))]);
+  var route = H({ name: 'Route', gap: 14, cross: 'CENTER' });
+  addAll(route, [end(o.from || DRAFT_ROUTE.from, 'MIN'), fillW(leg), end(o.to || DRAFT_ROUTE.to, 'MAX')]);
+  var facts = VV({ name: 'Facts', gap: 0 });
+  [['Horses', coatRow(COAT041.slice(0, 2), '2 horses')]].concat(o.rows).forEach(function (f) {
+    var r = H({ name: f[0], gap: 16, pad: [10, 0, 10, 0], main: 'SPACE_BETWEEN', cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var val = f[1] == null ? Tx('Set on step ' + f[2], 'Body/S', 'text/tertiary', { name: 'Not set' })
+      : typeof f[1] === 'string' ? Tx(f[1], f[2] ? 'Mono/Data' : 'Label/S', f[3] || 'text/primary', { name: 'Value', align: 'RIGHT' }) : f[1];
+    addAll(r, [Tx(f[0], 'Body/S', 'text/tertiary'), val]);
+    add(facts, fillW(r));
+  });
+  addAll(main, [fillW(top), fillW(route), fillW(facts)]);
+  /* the tear line between the pass and its stub */
+  var perf = H({ name: 'Perforation', gap: 8, pad: [0, 12, 0, 12], h: 12, main: 'CENTER', cross: 'CENTER', clip: true });
+  for (var k = 0; k < 34; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = VV({ name: 'Stub', gap: 6, pad: [16, 24, 22, 24], fill: 'bg/sunken' });
+  addAll(stub, [Tx(o.stubLabel || 'Indicative range', 'Body/S', 'text/secondary'), Tx(o.range || '—', 'Display/M', o.range ? 'text/primary' : 'text/tertiary', { name: 'Range' }), Tx(o.rangeSub, 'Body/S', 'text/tertiary', { name: 'Sub', fill: true })]);
+  addAll(pass, [fillW(main), fillW(perf), fillW(stub)]);
+  return pass;
 }
+var DRAFT_SUB = 'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.';
+var DRAFT_BORDERS = ['Borders', '2 · Mộc Bài, Poipet'];
 function requestLayout(title, stepStates, left, right) {
   var body = H({ name: 'Body', gap: 24 });
   right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
   addAll(body, [fillW(left), right]);
   return screen(title, 'My requests', [
-    pageHead('Request transport', 'Draft saved 25 Sep 2026. Your estimate updates as you go; the binding price comes as an itemised quotation.'),
+    pageHead('Request transport', 'Draft saved 25 Sep 2026. Your move fills in on the right as you go; the binding price comes as an itemised quotation.'),
     stepper(stepStates),
     body
   ]);
 }
+/* a horse to pick: her coat (or her photo) as a swatch, her name, what decides her stall, and a note
+   when choosing her changes the plan for another horse */
+function horsePick(h, sel, note) {
+  var c = VV({ name: 'Horse · ' + h.name, gap: 14, pad: 20, radius: 12, fill: sel ? 'surface/raised' : 'surface/card', stroke: sel ? 'text/secondary' : 'border/default', sw: sel ? 1.5 : 1 });
+  var top = H({ name: 'Top', gap: 14, cross: 'CENTER' });
+  var sw = F({ name: h.photo ? 'Photo · ' + h.name : 'Coat', w: 48, h: 48, radius: 999, fill: 'coat/' + h.coat.toLowerCase() });
+  var id = VV({ name: 'Name', gap: 2 });
+  addAll(id, [Tx(h.name, 'Heading/H4'), Tx(h.sub + ' · ' + h.age, 'Body/S', 'text/tertiary')]);
+  var cb = inst(C.checkbox, { Checked: sel ? 'True' : 'False' }); setP(cb, { 'Show label': false }); cb.name = 'Indicator';
+  addAll(top, [sw, fillW(id), cb]);
+  var meta = H({ name: 'Meta', gap: 8, cross: 'CENTER', wrap: true, rowGap: 8 });
+  add(meta, Tx(h.size + ' in · ' + h.weight, 'Mono/Caption', 'text/secondary'));
+  h.tags.forEach(function (t) { add(meta, chip(t[0], t[1], { noDot: t[0] === 'Neutral' })); });
+  addAll(c, [fillW(top), fillW(meta)]);
+  if (note) add(c, Tx(note, 'Body/S', 'status/warn/fg', { fill: true }));
+  return c;
+}
 function scrRequest1() {
   var left = VV({ name: 'Step 1', gap: 24 });
   addAll(left, [Tx('Which horses are travelling?', 'Heading/H3'), Tx('All horses in one request share the same route and dates. Size class and temperament decide stall allocation.', 'Body/M', 'text/secondary', { fill: true })]);
-  var grid = H({ name: 'Horse options', gap: 16, wrap: true, rowGap: 16 });
-  [['Selected', 'Shadowfax', 'Andalusian · Gelding · 510 kg', 'Size M · 32 in · Calm'],
-   ['Selected', 'Nightfall', 'Thoroughbred · Mare · 478 kg', 'Size M · 32 in · Nervous · Climate stall'],
-   ['Default', 'Copper King', 'Quarter Horse · Stallion · 583 kg', 'Size L · 48 in · Box stall only'],
-   ['Default', 'Silver Bell', 'Lipizzan · Mare · 445 kg', 'Size M · 32 in · Calm']].forEach(function (o) {
-    var c = inst(C.option, { State: o[0] });
-    setP(c, { Title: o[1], Description: o[2], Meta: o[3], 'Show icon': false });
-    var mt = c.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Meta'; });
-    if (mt) restyle(mt, 'Label/S', 'text/secondary');
-    c.resize(380, c.height); // two per row in the 776 left column: (776 − 16) / 2
-    c.name = 'Option · ' + o[1];
-    add(grid, c);
+  var grid = VV({ name: 'Horse options', gap: 16 });
+  [[[HORSES[0], true], [HORSES[1], true]], [[HORSES[2], false, 'Never next to a mare: with Nightfall on board, the load plan keeps them apart.'], [HORSES[3], false]]].forEach(function (pair, i) {
+    var row = H({ name: 'Row ' + (i + 1), gap: 16 });
+    pair.forEach(function (p) { var c = horsePick(p[0], p[1], p[2]); add(row, fillW(c)); c.layoutSizingVertical = 'FILL'; });
+    add(grid, fillW(row));
   });
   add(left, fillW(grid));
-  add(left, callout('Info', 'Nightfall needs a climate-controlled stall', 'We have added a climate stall to this request. You can see it on the next step.'));
+  add(left, callout('Info', 'Nightfall needs a climate-controlled stall', 'We have added one to this request. You will see it on the Service step.'));
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   addAll(foot, [Tx('2 horses selected', 'Label/M', 'text/secondary'), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 1 Horses', ['Current', 'Upcoming', 'Upcoming', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 1 Horses', ['Current', 'Upcoming', 'Upcoming', 'Upcoming'], left, draftPass({ route: false,
+    rows: [['Departs', null, 2], ['Arrival', null, 2], ['Borders', null, 2], ['Service', null, 3]],
+    range: null, rangeSub: 'Appears once your route is set: distance and border crossings drive most of the price.' }));
 }
-function scrRequest3() {
-  var left = VV({ name: 'Step 3', gap: 24 });
+/* the route as the customer sets it: the road from pickup to destination, each border crossing a gate */
+var MAP_REQ = {
+  bounds: [100.2, 107.0, 10.4, 14.3],
+  /* each border is a short tick through its gate, so it never runs through a label */
+  borders: [[[106.18, 11.3], [106.12, 11.08], [106.05, 10.95]], [[102.48, 13.95], [102.56, 13.66], [102.66, 13.35]]],
+  areas: [['VIETNAM', 106.5, 13.6], ['CAMBODIA', 104.6, 13.5], ['THAILAND', 101.6, 11.8]],
+  road: [[106.66, 10.86], [106.12, 11.08], [104.92, 11.56], [103.5, 13.0], [102.56, 13.66], [100.5, 13.75]]
+};
+function routeReqMap(w, h) {
+  return jobMap({ w: w, h: h, end: 100.5, bounds: MAP_REQ.bounds, borders: MAP_REQ.borders, areas: MAP_REQ.areas, paths: [{ pts: MAP_REQ.road, kind: 'todo' }],
+    stops: [[106.66, 10.86, 'Ho Chi Minh City', 'Pickup', 'stop', 'todo', 'a'], [106.12, 11.08, 'Mộc Bài – Bavet', 'Border 1', 'gate', 'todo', 'b'], [104.92, 11.56, 'Phnom Penh', 'Via', 'stop', 'todo', 'a'],
+      [102.56, 13.66, 'Poipet – Aranyaprathet', 'Border 2', 'gate', 'todo', 'a'], [100.5, 13.75, 'Bangkok', '~960 km', 'stop', 'todo', 'b']] });
+}
+/* Arrival on step 2: by default we plan the fastest safe route and give an expected time; a road
+   customer can instead buy an arrival window. A window is never an exact hour (at least 3 hours), it
+   needs a private trailer so the departure is theirs, and if we arrive after it closes we pay the
+   contract penalty from the rate catalog. The clock stops while an authority holds the trailer or a
+   horse's welfare stops it, so the deadline never cuts a welfare stop or a border check. */
+var WINDOW = { minHours: 3, premium: '+ $3,100 – $4,200', penalty: '10% of the job total for each started hour after the window closes, up to 30%' };
+function arrivalOptions(win) {
+  return svcSection('Arrival', 'Road moves only. By air, the airline’s schedule sets the arrival time.', svcOptions([
+    [win ? 'Default' : 'Selected', 'Any time on the day', 'We plan the fastest safe route and tell you the expected time. Your dates can move by ±3 days.', 'In the estimate', 'clock'],
+    [win ? 'Selected' : 'Default', 'Within a window', 'You choose a window of at least ' + WINDOW.minHours + ' hours. We use a private trailer so the departure is yours.', WINDOW.premium, 'calendar']], true));
+}
+function routeDates(name, win) {
+  var left = VV({ name: 'Step 2', gap: 24 });
   addAll(left, [Tx('Route and dates', 'Heading/H3'), Tx('We work out the border crossings from the route. Cross-border moves need time for documents to clear.', 'Body/M', 'text/secondary', { fill: true })]);
   var r1 = H({ name: 'Places', gap: 16 });
   addAll(r1, [input('Select', 'Default', 'From', 'Ho Chi Minh City, Vietnam', null, { fill: true }), input('Select', 'Default', 'To', 'Bangkok, Thailand', null, { fill: true })]);
   add(left, fillW(r1));
-  var cr = VV({ name: 'Crossings', gap: 10 });
-  var chips = H({ name: 'Chips', gap: 8 });
-  addAll(chips, [chip('Neutral', 'Mộc Bài – Bavet'), chip('Neutral', 'Poipet – Aranyaprathet')]);
-  addAll(cr, [Tx('Border crossings on this route', 'Label/S', 'text/secondary'), chips]);
-  add(left, cr);
+  var mp = VV({ name: 'Your route', gap: 10 });
+  addAll(mp, [fillW(routeReqMap(776, 280)), Tx('About 960 km by road with 2 border crossings, worked out from your route. The fleet coordinator plans the exact road and stops after approval.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(left, fillW(mp));
   var r2 = H({ name: 'Dates', gap: 16 });
-  addAll(r2, [input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }), input('Text', 'Default', 'Special instructions', 'Quiet loading. Arrive by 07:00 for vet check.', null, { fill: true })]);
+  addAll(r2, [win ? input('Date', 'Default', 'Departure date', '30 Oct 2026', null, { fill: true }) : input('Date', 'Error', 'Departure date', '5 Oct 2026', 'Cross-border moves need 21 days for document clearance. The earliest departure is 17 Oct 2026.', { fill: true }),
+    input('Text', 'Default', 'Special instructions', 'Quiet loading. Vet check on arrival.', null, { fill: true })]);
   add(left, fillW(r2));
-  var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
-  add(left, cb);
+  add(left, fillW(arrivalOptions(win)));
+  if (win) {
+    var w = H({ name: 'Window', gap: 16 });
+    addAll(w, [input('Date', 'Default', 'Arrive on', '31 Oct 2026', null, { fill: true }), input('Select', 'Default', 'From', '08:00', null, { fill: true }), input('Select', 'Default', 'Until', '12:00', 'A 4-hour window.', { fill: true })]);
+    add(left, fillW(w));
+    add(left, callout('Info', 'If we arrive after 12:00, we pay', 'The penalty is ' + WINDOW.penalty + ', credited on the final invoice. The clock stops while a border authority holds the trailer or a vet stops it for a horse’s welfare. Your quotation states the exact terms.'));
+  } else {
+    var cb = inst(C.checkbox, { Checked: 'True' }); setP(cb, { Label: 'My dates can move by ±3 days' });
+    add(left, cb);
+  }
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   var rightBtns = H({ name: 'Forward', gap: 12 });
-  addAll(rightBtns, [btn('Secondary', 'MD', 'Use 17 Oct 2026', { lead: 'calendar' }), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: 'Disabled' })]);
+  if (!win) add(rightBtns, btn('Secondary', 'MD', 'Use 17 Oct 2026', { lead: 'calendar' }));
+  add(rightBtns, btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: win ? 'Default' : 'Disabled' }));
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), rightBtns]);
   add(left, fillW(foot));
-  return requestLayout('Request · 3 Route & dates (error)', ['Done', 'Done', 'Current', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout(name, ['Done', 'Current', 'Upcoming', 'Upcoming'], left, draftPass({ route: true,
+    rows: win ? [['Departs', '30 Oct 2026', true], ['Arrival', '31 Oct · 08:00–12:00', true], DRAFT_BORDERS, ['Service', null, 3]]
+      : [['Departs', '5 Oct · too soon', true, 'status/bad/fg'], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', null, 3]],
+    range: win ? '$14,400 – $20,300' : '$11,300 – $16,100',
+    rangeSub: win ? 'Includes the private trailer your window needs. Not a quote.' : 'Assumes road with a shared load until you choose a service on step 3. Not a quote.' }));
 }
+function scrRequest2() { return routeDates('Request · 2 Route & dates (error)', false); }
+function scrRequest2Window() { return routeDates('Request · 2 Route & dates · Arrival window', true); }
+/* A route we don't run. The customer can name any city, but only a corridor in the catalog can be
+   estimated or quoted, so the step says so in words, shows where our road ends, offers the nearest
+   route we run, and lets the customer ask instead of guessing. Dates wait until the route is one we run.
+   The map is schematic (a straight line, not geography): a transit map of where coverage stops. */
+function routeNotRunMap(w, h) {
+  return jobMap({ w: w, h: h, end: 9, bounds: [0, 10, 0, 1], borders: [[[3.6, 0.78], [3.6, 0.22]], [[7.9, 0.78], [7.9, 0.22]]],
+    areas: [['THAILAND', 1.9, 0.86], ['MALAYSIA', 5.6, 0.86], ['SINGAPORE', 9, 0.86]],
+    paths: [{ pts: [[1, 0.5], [6.6, 0.5]], kind: 'todo' }, { pts: [[6.6, 0.5], [9, 0.5]], kind: 'old' }],
+    stops: [[1, 0.5, 'Bangkok', 'From', 'stop', 'todo', 'b'], [3.6, 0.5, 'Sadao – Bukit Kayu Hitam', 'Border', 'gate', 'todo', 'b'],
+      [6.6, 0.5, 'Kuala Lumpur', 'Our road ends here', 'stop', 'todo', 'b'], [9, 0.5, 'Singapore', 'Not run yet', 'stop', 'old', 'b']] });
+}
+function scrRequest2NotRun() {
+  var left = VV({ name: 'Step 2', gap: 24 });
+  addAll(left, [Tx('Route and dates', 'Heading/H3'), Tx('We work out the border crossings from the route. Cross-border moves need time for documents to clear.', 'Body/M', 'text/secondary', { fill: true })]);
+  var r1 = H({ name: 'Places', gap: 16 });
+  addAll(r1, [input('Select', 'Default', 'From', 'Bangkok, Thailand', null, { fill: true }), input('Select', 'Default', 'To', 'Singapore', 'Outside the region we run.', { fill: true })]);
+  add(left, fillW(r1));
+  add(left, callout('Warn', 'We don’t run Bangkok → Singapore yet', 'We move horses by road within Vietnam, Cambodia, Thailand, Laos and Malaysia, and by air through Hong Kong. Singapore isn’t in our catalog, so there is no estimate or quotation for it.'));
+  var mp = VV({ name: 'Where our road ends', gap: 10 });
+  addAll(mp, [fillW(routeNotRunMap(776, 220)), mapLegend(['todo', 'old'], { todo: 'A road we run', old: 'Not run yet' })]);
+  add(left, fillW(mp));
+  var near = panel('Nearest route we run', { gap: 14 });
+  var nh = H({ name: 'Head', gap: 16, cross: 'CENTER' });
+  var nt = VV({ name: 'Text', gap: 4 });
+  addAll(nt, [Tx('The nearest route we run', 'Heading/H4'), Tx('Bangkok → Kuala Lumpur by road · ~1,450 km · 1 border crossing', 'Body/S', 'text/secondary', { fill: true })]);
+  addAll(nh, [fillW(nt), btn('Secondary', 'MD', 'Use this route', { trail: 'arrow-right' })]);
+  addAll(near, [fillW(nh), Tx('We hand the horses over in Kuala Lumpur; the last leg to Singapore would be yours to arrange.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(left, fillW(near));
+  var ask = panel('Ask us', { gap: 14 });
+  var ah = VV({ name: 'Head', gap: 4 });
+  addAll(ah, [Tx('Ask us about this route', 'Heading/H4'), Tx('Yến, logistics manager, replies within 1 business day and tells you whether we can add it. Your draft stays saved; nothing is priced until it is a route we run.', 'Body/S', 'text/secondary', { fill: true })]);
+  var send = H({ name: 'Send', gap: 12, main: 'MAX' });
+  add(send, btn('Secondary', 'MD', 'Send to Yến'));
+  addAll(ask, [fillW(ah), input('Text', 'Default', 'What you need', 'Two mares, Bangkok to Kranji racecourse, mid-November.', null, { fill: true }), fillW(send)]);
+  add(left, fillW(ask));
+  var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var fwd = H({ name: 'Forward', gap: 16, cross: 'CENTER' });
+  addAll(fwd, [Tx('Choose a route we run to continue', 'Body/S', 'text/tertiary'), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right', state: 'Disabled' })]);
+  addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), fwd]);
+  add(left, fillW(foot));
+  return requestLayout('Request · 2 Route & dates · Not run', ['Done', 'Current', 'Upcoming', 'Upcoming'], left, draftPass({ route: true, from: ['BKK', 'Bangkok'], to: ['SIN', 'Singapore'],
+    rows: [['Departs', null, 2], ['Arrival', null, 2], ['Borders', 'Not run yet', false, 'status/warn/fg'], ['Service', null, 3]],
+    range: null, rangeSub: 'No range: we don’t run Bangkok → Singapore yet.' }));
+}
+/* the review reads in the order the steps were done */
+var REVIEW_ORDER = ['Horses', 'Pickup', 'Route', 'Departure', 'Arrival', 'Instructions', 'Service', 'Insurance'];
 function scrRequest4() {
   var left = VV({ name: 'Step 4', gap: 24 });
   add(left, Tx('Review and submit', 'Heading/H3'));
-  add(left, fillW(requestSummary(REQ_0193, { edit: true })));
+  var rows = REQ_0193.concat([['Arrival', 'Any time on the day']]).map(function (r) { return r[0] === 'Instructions' ? ['Instructions', 'Quiet loading. Vet check on arrival.'] : r[0] === 'Insurance' ? ['Insurance', 'Your own policy · upload it with your documents once the job is approved'] : r; });
+  rows.sort(function (a, b) { return REVIEW_ORDER.indexOf(a[0]) - REVIEW_ORDER.indexOf(b[0]); });
+  add(left, fillW(requestSummary(rows, { edit: true })));
   add(left, callout('Ok', 'Lead time is fine', 'Cross-border moves need 21 days’ notice. Your departure is 34 days away.'));
   var next = panel('What happens next', { gap: 14 });
   add(next, Tx('What happens next', 'Heading/H4'));
@@ -1902,7 +2184,9 @@ function scrRequest4() {
   var foot = H({ name: 'Footer', main: 'SPACE_BETWEEN', cross: 'CENTER' });
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), btn('Primary', 'MD', 'Submit request', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 4 Review', ['Done', 'Done', 'Done', 'Current'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 4 Review', ['Done', 'Done', 'Done', 'Current'], left, draftPass({ route: true,
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    range: '$11,300 – $16,100', rangeSub: 'Not a quote. Once you approve the quotation, this becomes your travel pass.' }));
 }
 
 /* ---------------------------------------------------------------------
@@ -2015,6 +2299,35 @@ function quoteTotalsPanel(T) {
   add(tot, Tx('Applied in a fixed order: the volume break on air and ground lines, fuel on the discounted air lines, insurance on declared value, then contingency, then the service fee. USD at the 23 Sep rate; rate catalog v12 is pinned to this quotation.', 'Body/S', 'text/tertiary', { fill: true }));
   return tot;
 }
+/* Where the money goes: one bar per ledger group, largest first, and the fees and cover added after the
+   subtotal as one row, so the customer sees the shape of the price before the lines. One series, so one hue
+   and no legend; the letter badges match the ledger; values and shares in mono. */
+var BREAK_TRACK = 220;
+function sharePct(v, total) { var x = v / total * 100; return x < 1 ? '<1%' : Math.round(x) + '%'; }
+function quoteBreakdown(T, q) {
+  var p = panel('Where the money goes', { gap: 12 });
+  var rows = (q || QUOTE).map(function (g) { return [g[0], g[1], T.groups[g[0]]]; });
+  rows.push(['+', 'Fees, fuel and cover', T.total - T.subtotal, 'Fuel, insurance, contingency and the service fee, less the volume break']);
+  rows.sort(function (a, b) { return b[2] - a[2]; });
+  var top = rows[0];
+  var h = VV({ name: 'Head', gap: 2 });
+  addAll(h, [Tx('Where the ' + money(T.total) + ' goes', 'Heading/H4'), Tx(top[1] + ' is ' + Math.round(top[2] / T.total * 100) + '% of the total. Each group is itemised in the lines below.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(p, fillW(h));
+  rows.forEach(function (r) {
+    var row = H({ name: r[1], gap: 12, cross: 'CENTER' });
+    var badge = H({ name: 'Letter', w: 26, h: 26, radius: 6, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
+    add(badge, Tx(r[0], 'Mono/Chip', 'text/secondary'));
+    var nm = VV({ name: 'Name', gap: 0 });
+    add(nm, Tx(r[1], 'Label/S', 'text/primary', { fill: true }));
+    if (r[3]) add(nm, Tx(r[3], 'Body/S', 'text/tertiary', { fill: true }));
+    var track = F({ name: 'Track', w: BREAK_TRACK, h: 8, radius: 4, fill: 'surface/muted' });
+    var bar = rect(Math.max(4, Math.round(r[2] / T.total * BREAK_TRACK)), 8, 'text/secondary', 'Bar', 4);
+    track.appendChild(bar);
+    addAll(row, [badge, fillW(nm), track, Tx(money(r[2]), 'Mono/Data', 'text/primary', { w: 96, align: 'RIGHT' }), Tx(sharePct(r[2], T.total), 'Mono/Caption', 'text/tertiary', { w: 40, align: 'RIGHT' })]);
+    add(p, fillW(row));
+  });
+  return p;
+}
 function scrQuote() {
   var T = quoteTotals();
   var left = VV({ name: 'Lines', gap: 24 });
@@ -2022,13 +2335,13 @@ function scrQuote() {
   var sizing = VV({ name: 'Group note · sizing', gap: 4, pad: [10, 20, 14, 20], fill: 'bg/sunken' });
   borderSide(sizing, 'border/default', 'top');
   addAll(sizing, [Tx('How the stall was sized', 'Label/S', 'text/secondary'), Tx('Nightfall and Shadowfax fly business class at 48 in each: 96 in, so 1 position. Flying grooms: 2 ÷ 3, rounded up, is 1. No flight vet: one joins from 8 horses, or when a horse is declared above $250,000.', 'Body/S', 'text/tertiary', { fill: true })]);
-  addAll(left, [fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
+  addAll(left, [fillW(quoteBreakdown(T)), fillW(quoteTable(QUOTE, T, null, { C: sizing })), fillW(quoteTotalsPanel(T))]);
 
   var est = panel('Against your estimate', { gap: 12 });
   var inside = T.total >= QUOTE_ESTIMATE[0] && T.total <= QUOTE_ESTIMATE[1];
   var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', wrap: true, rowGap: 8 });
   addAll(head, [Tx('Against your estimate', 'Heading/H4'), chip(inside ? 'Ok' : 'Warn', inside ? 'Inside your range' : 'Outside your range')]);
-  addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('This quotation', money(T.total)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
+  addAll(est, [fillW(head), dlRow('Your estimate at submission', money(QUOTE_ESTIMATE[0], 0) + ' – ' + money(QUOTE_ESTIMATE[1], 0)), dlRow('Deposit on acceptance', '30% · ' + money(T.deposit)),
     Tx('The largest line is the business-class air stall, $16,800, or ' + Math.round(16800 / T.total * 100) + '% of the total. Waiting time (H) is the only line that can change on the final invoice.', 'Body/S', 'text/tertiary', { fill: true })]);
 
   var next = panel('After you accept', { gap: 14 });
@@ -2061,12 +2374,16 @@ function scrQuote() {
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data', 'text/tertiary'), Tx('Superseded. Departure moved from 12 Nov to 20 Nov.', 'Body/S', 'text/tertiary', { fill: true })]);
   addAll(terms, [divider(), Tx('Versions', 'Label/S', 'text/secondary'), fillW(v2), fillW(v1)]);
-  var right = column([est, next, who, terms]);
+  /* the request as the pass it becomes, now quoted: the wizard's draft pass with the total in the stub */
+  var pass = draftPass({ route: true, mode: 'air', from: ['PNH', 'Phnom Penh'], to: ['HKG', 'Hong Kong'], chip: ['Info', 'Quoted · v2'],
+    rows: [['Departs', '20 Nov 2026', true], ['Mode', 'Air · business class'], ['Arrival', 'Airline schedule'], ['Service', 'Flying groom · insured with us']],
+    stubLabel: 'Quoted total', range: money(T.total), rangeSub: 'Valid until 30 Sep 2026. Once you accept and Yến approves, this becomes your travel pass.' });
+  var right = column([pass, est, next, who, terms]);
 
   var lead = owedPanel('1 item', 'Yến, logistics manager, issued version 2 on 23 Sep. Accepting locks the price and the horse list; declining closes the request.',
     [owedItem('Soon', 'Accept or decline this quotation', 'Q-2026-0188 · version 2 · ' + money(T.total), 'It holds its price for 7 days from 23 Sep. After 30 Sep it expires and Yến re-prices it from the rate catalog in force then.', 'Due in 4 days', '30 Sep 2026', 'Accept quotation', 'check', { second: 'Decline' })],
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
-  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'quotation Q-2026-0188 v2 · Nightfall and Shadowfax · air, business class · departs 20 Nov 2026'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
+  return trackScreen('Quotation', trackHead('Phnom Penh → Hong Kong (Sha Tin)', ['REQ-2026-0179', 'Q-2026-0188 · version 2'], [stageMark('Quotation'), chip('Neutral', 'Rates v12 pinned', { noDot: true })], true), [lead, split(left, right, 400)], '26 Sep 2026, 11:20');
 }
 
 /* ---------------------------------------------------------------------
@@ -2135,7 +2452,8 @@ function scrLoadPlan() {
   addAll(body, [left, fillW(center)]);
   var tiles = H({ name: 'Tiles', gap: 16 });
   addAll(tiles, [fillW(stat('Neutral', '3/6', 'Positions filled')), fillW(stat('Bad', '1', 'Conflict')), fillW(stat('Warn', '1', 'Horse to place'))]);
-  return jobScreen('Fleet & route coordinator · Load plan', 'Load plan', STAFF.khoi, [tiles, body]);
+  var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
+  return jobScreen('Fleet & route coordinator · Load plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Load plan'), [tiles, body])]);
 }
 
 /* ---------------------------------------------------------------------
@@ -2178,7 +2496,10 @@ var CHECKLIST = [
 /* 23 items: 14 cleared, 4 with the customer, 4 health certificates and 1 permit with authorities */
 var STAFF = { yen: ['Vũ Hải Yến', 'Logistics manager', 'VY'], lan: ['Nguyễn Thị Lan', 'Transport specialist', 'NL'], khoi: ['Đỗ Minh Khôi', 'Fleet & route coordinator', 'DK'], minh: ['Trần Văn Minh', 'Driver', 'TM'], hoa: ['Lê Thị Hoa', 'Groom', 'LH'] };
 var JOB = { code: 'CBRT-2026-041', title: 'Ho Chi Minh City → Phnom Penh', meta: '4 horses · trailer TX-447 · departs 18 Oct 2026, 06:00' };
-var JOB_TABS = [['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist'], ['Load plan', 'Khôi, fleet & route coordinator'], ['Route', 'Khôi, fleet & route coordinator'], ['Trip', 'Minh, driver']];
+/* the customer bought an arrival window for this job; the route is planned backwards from its close */
+var JOB_WINDOW = { from: '11:00', until: '14:00', text: '18 Oct, 11:00–14:00' };
+/* US-F3-21: the Trip tab plans the trip chosen on its journey rail; Clearance and Authorities cover the whole job */
+var JOB_TABS = [['Trip', 'Khôi, fleet & route coordinator'], ['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist']];
 /* one header for every tab of a job: route title, code, stage, the clearance gate, then tabs with the tab's owner */
 function jobHead(tab, gateBody, stage, gateState) {
   var gate = inst(C.gate, { State: gateState || 'Locked' });
@@ -2196,11 +2517,91 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(own, [Tx('Owner', 'Body/S', 'text/tertiary'), Tx(owner, 'Label/S', 'text/primary')]);
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: JOB.title, code: JOB.code, summary: JOB.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
+  var job = jobHead.job || JOB;
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
-  return adminScreen(name, 'Jobs', ['Jobs', JOB.code, tab], user, [jobHead(tab, o.gate, o.stage, o.gateState)].concat(blocks), o.today);
+  jobHead.job = o.job || null;
+  var head = jobHead(tab, o.gate, o.stage, o.gateState);
+  jobHead.job = null;
+  return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(blocks), o.today);
+}
+/* the job's trips in journey order (US-F3-16, US-F3-21): the chosen one is the Nav item's active pill */
+var ONE_TRIP = [{ mode: 'Road', icon: 'truck', status: 'not started', route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014 · 18 Oct, 06:00' }];
+var CHAIN_JOB = { code: 'CBRT-2026-042', title: 'Da Nang → Sha Tin', meta: '2 horses · road, flight, road · departs 16 Oct 2026, 06:00' };
+var CHAIN = [
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00' },
+  { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40' },
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned' }];
+function journeyRail(parts, active, addFrom) {
+  var r = VV({ name: 'Journey rail', gap: 8, w: 240 });
+  add(r, Tx('Journey · ' + parts.length + (parts.length === 1 ? ' trip' : ' trips'), 'Mono/Caption', 'text/tertiary'));
+  parts.forEach(function (p, i) {
+    var on = i === active;
+    var row = VV({ name: 'Trip · ' + p.code.split(' ')[0], gap: 4, pad: [10, 12, 10, 12], radius: 8, fill: on ? 'surface/muted' : null });
+    var top = H({ name: 'Head', gap: 8, cross: 'CENTER' });
+    var status = Tx(p.status, 'Mono/Caption', 'text/tertiary');
+    var gap = H({ name: 'Gap' });
+    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), status]);
+    addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
+    add(r, fillW(row));
+  });
+  if (parts.length > 1) add(r, btn('Ghost', 'SM', 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
+  if (addFrom) add(r, btn('Secondary', 'SM', 'Add trip from ' + addFrom, { lead: 'plus' }));
+  return r;
+}
+/* the chosen trip's head: its cities and code, and for a road trip the Load plan | Route switch */
+function tripHead(part, view) {
+  var h = H({ name: 'Trip head', gap: 16, main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var t = VV({ name: 'Trip', gap: 2 });
+  addAll(t, [Tx(part.route, 'Heading/H4'), Tx(part.code.split(' ')[0] + ' · ' + part.corridor, 'Mono/Data', 'text/tertiary')]);
+  add(h, t);
+  if (view) {
+    var seg = H({ name: 'Load plan | Route', gap: 2, pad: 2, radius: 8, fill: 'bg/sunken', stroke: 'border/default' });
+    ['Load plan', 'Route'].forEach(function (v) {
+      var on = v === view;
+      var o = H({ name: 'Option · ' + v, pad: [6, 14, 6, 14], radius: 6, fill: on ? 'surface/card' : null, stroke: on ? 'border/default' : null });
+      add(o, Tx(v, 'Label/S', on ? 'text/primary' : 'text/tertiary'));
+      add(seg, o);
+    });
+    add(h, seg);
+  }
+  return h;
+}
+/* the Trip tab's body: the rail, then the chosen trip */
+function tripBody(parts, active, addFrom, head, blocks) {
+  var c = VV({ name: 'Chosen trip', gap: 24 });
+  add(c, fillW(head));
+  blocks.forEach(function (b) { add(c, fillW(b)); });
+  var row = H({ name: 'Trip tab', gap: 24 });
+  addAll(row, [journeyRail(parts, active, addFrom), fillW(c)]);
+  return row;
+}
+/* a flight of the journey (US-F3-21): its schedule, set from the airline's flight, then each job's consignment */
+function scrFlightTrip() {
+  var part = { route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003', corridor: 'AIR SGN → HKG' };
+  var sched = panel('Schedule', { gap: 12 });
+  var sh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(sh, [Tx('Schedule · Cathay Cargo CX 2071', 'Heading/H4'), btn('Secondary', 'SM', 'Change flight')]);
+  addAll(sched, [fillW(sh), Tx('Ho Chi Minh City → Hong Kong · departs 17 Oct 2026, 23:40 · lands 18 Oct 2026, 03:20', 'Body/M', 'text/secondary')]);
+  var cons = panel('Consignments', { gap: 12 });
+  var chh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(chh, [Tx('Flight CX 2071 · Cathay Cargo', 'Heading/H4'), chip('Neutral', '2 of 6 stall positions')]);
+  var row = H({ name: 'Consignment', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var who = VV({ name: 'Job', gap: 2 });
+  addAll(who, [Tx('CBRT-2026-042 · this job', 'Label/M'), Tx('AWB 160-2207 3145 · 2 positions · Business', 'Body/S', 'text/secondary')]);
+  addAll(row, [who, btn('Secondary', 'SM', 'Edit consignment')]);
+  addAll(cons, [fillW(chh), fillW(row)]);
+  var crew = panel('This trip flies', { gap: 12 });
+  addAll(crew, [Tx('This trip flies', 'Heading/H4'),
+    Tx('The flight is this trip’s carrier, so it has no trailer to load. Flight crew: Lê Thị Hoa (flying groom), Dr Phạm An (flight vet).', 'Body/S', 'text/secondary', { fill: true }),
+    btn('Primary', 'MD', 'Sign off trip plan')]);
+  var body = tripBody(CHAIN, 1, null, tripHead(part, null), [sched, cons, crew]);
+  return jobScreen('Fleet & route coordinator · Trip · Flight', 'Trip', STAFF.khoi, [body], {
+    job: CHAIN_JOB,
+    gate: 'Clearance gates TRP-2026-003 (the flight Ho Chi Minh City → Hong Kong) and every trip after it. TRP-2026-002 (Da Nang → Ho Chi Minh City) can leave before.'
+  });
 }
 /* Lan's checklist is the customer's All documents list, in the same words, with the holder named for staff */
 function scrClearance() {
@@ -2211,7 +2612,7 @@ function scrClearance() {
 }
 function scrRoute() {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1']].forEach(function (s) {
+  [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
     var c = VV({ name: s[0], gap: 4 });
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
@@ -2220,7 +2621,7 @@ function scrRoute() {
   [['Pickup', 'Phú Thọ training centre, HCMC', '06:00', 'Loading and condition check, logged with photos.'],
    ['Border', 'Mộc Bài – Bavet border', '08:30', 'Vietnam export clearance and Cambodia entry. Recorded per leg as Cleared or Held.'],
    ['Welfare', 'Svay Rieng welfare stop', '09:30', '45-minute rest, water and hay, welfare check by the escort.'],
-   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log.']].forEach(function (s) {
+   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s) {
     var st = inst(C.stop, { Kind: s[0] });
     setP(st, { Stop: s[1], Time: s[2], Details: s[3] });
     st.name = 'Stop · ' + s[1];
@@ -2229,14 +2630,15 @@ function scrRoute() {
   var refuse = VV({ name: 'Depart', gap: 16 });
   add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
   add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
-  return jobScreen('Fleet & route coordinator · Route plan', 'Route', STAFF.khoi, [strip, tl, refuse]);
+  var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
+  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])]);
 }
 
 /* ---------------------------------------------------------------------
    Components page toast demo + Cover
    --------------------------------------------------------------------- */
 function buildCover(page) {
-  var f = VV({ name: 'Cover', gap: 32, pad: 96, w: 1600, h: 1000, fill: 'bg/canvas', main: 'SPACE_BETWEEN' });
+  var f = primaryTheme(VV({ name: 'Cover', gap: 32, pad: 96, w: 1600, h: 1000, fill: 'bg/canvas', main: 'SPACE_BETWEEN' }));
   page.appendChild(f);
   var top = VV({ name: 'Top', gap: 24 });
   var mk = H({ name: 'Mark', w: 72, h: 72, radius: 12, fill: 'accent/default', main: 'CENTER', cross: 'CENTER' });
@@ -2270,6 +2672,7 @@ var ADMIN_ICONS = {
   'book': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V21h16"/>',
   'tag': '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   'search': '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  'receipt': '<path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5-2 1.5-2.5-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   'ledger': '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
   'sort': '<path d="m8 9 4-4 4 4"/><path d="m8 15 4 4 4-4"/>',
   'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
@@ -2282,12 +2685,12 @@ var CHART_COLORS = [
 ];
 /* The staff sidebar lists the work each role owns (PRODUCT.md: one accountable owner per step),
    not the system's tables. Every item exists once in the component; each role shows its own. */
-var NAV_MAIN = [['Overview', 'chart'], ['Requests', 'history'], ['Jobs', 'route'], ['Incidents', 'alert'], ['Documents', 'file'], ['Authorities', 'shield'], ['Customer notes', 'pencil'], ['Fleet calendar', 'calendar'], ['Vehicles', 'truck']];
+var NAV_MAIN = [['Overview', 'chart'], ['Requests', 'history'], ['Jobs', 'route'], ['Incidents', 'alert'], ['Invoices', 'receipt'], ['Documents', 'file'], ['Authorities', 'shield'], ['Customer notes', 'pencil'], ['Fleet calendar', 'calendar'], ['Vehicles', 'truck']];
 /* sections below the main list: a label only when the section holds more than one item */
 var NAV_MORE = [['Catalogs', [['Regulations', 'book'], ['Rates', 'tag']]], ['Admin', [['Users & roles', 'users'], ['Audit log', 'ledger']]]];
 /* what a badge counts: always items where this person owns the next step; 0 hides the badge, over 99 reads 99+ */
 var BADGE_MEANS = {
-  'Requests': 'requests waiting for your review', 'Jobs': 'jobs where you own the next step', 'Incidents': 'open incidents',
+  'Requests': 'requests waiting for your review', 'Jobs': 'jobs where you own the next step', 'Incidents': 'open incidents', 'Invoices': 'invoices overdue or part paid',
   'Documents': 'documents waiting for your check', 'Authorities': 'filings or follow-ups due from you', 'Customer notes': 'notes due today',
   'Fleet calendar': 'capacity checks asked of you', 'Regulations': 'changes waiting to publish', 'Rates': 'missing rates'
 };
@@ -2295,7 +2698,7 @@ var BADGE_MEANS = {
    2 due today, Draft v8 · 3 changes, 2 missing), and the recent codes. The escort (driver, grooms)
    has no sidebar: they work on the cab surface. */
 var ROLE_NAV = {
-  'Logistics manager': { items: ['Overview', 'Requests', 'Jobs', 'Incidents', 'Users & roles', 'Audit log'], badges: { 'Requests': '4', 'Jobs': '1', 'Incidents': '1' },
+  'Logistics manager': { items: ['Overview', 'Requests', 'Jobs', 'Incidents', 'Invoices', 'Users & roles', 'Audit log'], badges: { 'Requests': '4', 'Jobs': '1', 'Incidents': '1', 'Invoices': '2' },
     recent: [['REQ-2026-0193', 'HCM → BKK'], ['CBRT-2026-040', 'PNH → HCM'], ['CBRT-2026-041', 'HCM → PNH']] },
   'Transport specialist': { items: ['Jobs', 'Documents', 'Authorities', 'Customer notes', 'Regulations', 'Rates'], badges: { 'Jobs': '1', 'Documents': '1', 'Authorities': '1', 'Customer notes': '2', 'Regulations': '3', 'Rates': '2' },
     recent: [['CBRT-2026-041', 'HCM → PNH'], ['CBRT-2026-038', 'BKK → PNH'], ['CBRT-2026-044', 'VTE → BKK']] },
@@ -2360,7 +2763,7 @@ function userMenu() {
   return m;
 }
 function buildAdminComponents(board) {
-  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
+  var b = docBlock(board, 'Staff shell', 'One workspace for every staff role. The sidebar lists the work the signed-in role owns, not the system’s tables: the logistics manager sees Overview, Requests, Jobs, Incidents, Invoices, Users & roles and the Audit log; the transport specialist Jobs, Documents, Authorities, Customer notes and the catalogs; the fleet & route coordinator Jobs, Fleet calendar and Vehicles. The escort has no sidebar (cab surface). A badge only ever counts items where this person owns the next step, links to that filtered list, hides at 0 and reads 99+ above 99; its accessible name says what it counts ("4 requests waiting for your review"). One name per place: the nav label is the first breadcrumb segment and the page title. The sidebar is sticky at viewport height with the user menu pinned at its foot.');
   var items = ['Default', 'Hover', 'Active', 'Focus'].map(sideItem);
   C.sideNav = combine(items, b, 'Side nav item', 'States: Default, Hover, Active (gold ink: the one place gold marks the current page), Focus (gold border and ring). Set aria-current on the Active item.');
   wireText(C.sideNav, ['Label', 'Badge']);
@@ -2818,7 +3221,7 @@ function scrRates() {
     ['Air', [['AIR', 'PNH → HKG', 'v12', { sel: true, chip: ['Warn', 'Draft'] }], ['AIR', 'SGN → HKG', 'v12']]],
     ['Road', [['RD', 'HCM → PNH', 'v12'], ['RD', 'HCM → BKK', 'v12'], ['RD', 'BKK → KUL', 'v11'], ['RD', 'HAN → VTE', '', { chip: ['Bad', '2 missing'] }]]]
   ]);
-  var classes = tbl('Service classes', [['Class', null], ['Width per horse', 140, null, 'Mono/Data'], ['Horses per position', 160, 'RIGHT', 'Mono/Data'], ['Position rate', 130, 'RIGHT', 'Mono/Data'], ['Per horse', 130, 'RIGHT', 'Mono/Data']], [
+  var classes = tbl('Service classes', [['Class', null], ['Width per horse', 140, null, 'Mono/Data'], ['Horses per position', 180, 'RIGHT', 'Mono/Data'], ['Position rate', 130, 'RIGHT', 'Mono/Data'], ['Per horse', 130, 'RIGHT', 'Mono/Data']], [
     { cells: ['Economy', '32 in', '3', '$16,800', '$5,600'] },
     { cells: ['Business', '48 in', '2', '$16,800', '$8,400'] },
     { cells: ['First', '96 in', '1', '$16,800', '$16,800'] }
@@ -2828,11 +3231,12 @@ function scrRates() {
   ]);
   var policy = panel('Percentages and policy', { gap: 10 });
   add(policy, Tx('Percentages and policy', 'Heading/H4'));
-  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
+  [['Fuel surcharge', '18% · air lines only'], ['Insurance', '1.5% of declared value'], ['Contingency', '5% of cost base'], ['Service fee', '12% after contingency'], ['Short notice', '< 14 d × 1.25 · 14–21 d × 1.10'], ['Deposit', '30%'], ['Quote validity', '7 days'], ['Cancellation', '10 · 25 · 50 · 100%'], ['Arrival window', 'Road · +20% of ground lines'], ['Late arrival', '10% per started hour · max 30%']].forEach(function (r) { add(policy, dlRow(r[0], r[1])); });
   var pair = H({ name: 'Breaks and policy', gap: 24 });
   addAll(pair, [fillW(titled('Volume breaks', 'Applied to air and ground lines.', breaks)), fillW(policy)]);
   var cert = function (c) { return chip(c === 'Fixed' ? 'Neutral' : 'Warn', c, { noDot: true }); };
   var lines = tbl('Catalog lines', [['Line', null], ['Basis', 200, null, 'Mono/Caption', 'text/secondary'], ['Rate', 110, 'RIGHT', 'Mono/Data'], ['', 110, 'RIGHT']], [
+    { cells: ['Road transfer to the cargo terminal', 'per shipment · not where a road leg covers this end', '$250', cert('Fixed')] },
     { cells: ['Pre-export isolation · stallion', 'per day', '$140', cert('Fixed')] },
     { cells: ['Pre-export isolation · mare', 'per day', '$85', cert('Fixed')] },
     { cells: ['Pre-export isolation · gelding', 'per day', '$70', cert('Fixed')] },
@@ -2840,6 +3244,7 @@ function scrRates() {
     { cells: ['Flight veterinarian', '8+ horses or > $250,000', '$2,200', cert('Fixed')] },
     { cells: ['Export health certificate', 'per horse', '$180', cert('Fixed')] },
     { cells: ['Customs and border documentation', 'per crossing', '$420', cert('Fixed')] },
+    { cells: ['Road transfer from the cargo terminal', 'per shipment · not where a road leg covers this end', '$300', cert('Fixed')] },
     { cells: ['Waiting time at terminal', 'per hour', '$95', cert('Estimated')] }
   ]);
   var mainCol = VV({ name: 'Catalog', gap: 24 });
@@ -2954,7 +3359,7 @@ function actionTiles(list) {
   return r;
 }
 function scrDashboard() {
-  var queue = tbl('Review queue', [['Request', 118, null, 'Mono/Caption'], ['Customer', 170], ['Route', null, null, 'Body/S', 'text/secondary'], ['Horses', 50, 'RIGHT', 'Mono/Data'], ['Departs', 64, null, 'Mono/Caption', 'text/secondary'], ['Age', 40, 'RIGHT', 'Mono/Caption'], ['', 24, 'RIGHT']], [
+  var queue = tbl('Review queue', [['Request', 118, null, 'Mono/Caption'], ['Customer', 170], ['Route', null, null, 'Body/S', 'text/secondary'], ['Horses', 60, 'RIGHT', 'Mono/Data'], ['Departs', 64, null, 'Mono/Caption', 'text/secondary'], ['Age', 40, 'RIGHT', 'Mono/Caption'], ['', 24, 'RIGHT']], [
     { cells: ['REQ-2026-0187', 'Mekong Equestrian', 'PNH → HKG', '3', '12 Nov', '1 d', rowOpen()] },
     { cells: ['REQ-2026-0190', stack('Hanoi Riding Club', 'Lead-time override', 'status/warn/fg'), 'HAN → VTE', '1', '20 Oct', '20 h', rowOpen()] },
     { cells: ['REQ-2026-0191', 'Bangkok Polo Club', 'BKK → KUL', '4', '5 Nov', '9 h', rowOpen()] },
@@ -3136,7 +3541,7 @@ async function adminScreensCall(builders) {
   var page = await rehydrate(PAGE_NAMES[3]);
   var made = [];
   for (var i = 0; i < builders.length; i++) {
-    var s = builders[i]();
+    var s = primaryTheme(builders[i]());
     await flush();
     page.children.filter(function (n) { return n.name === s.name && n !== s; }).forEach(function (n) { n.remove(); });
     var label = adminRowLabel(page), y = label.y + 120, x = 0;
@@ -3189,8 +3594,10 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Users & roles · Error': ['yen', 'Users & roles', ['Users & roles']],
   'Logistics manager · Users & roles · Pending invites': ['yen', 'Users & roles', ['Users & roles', 'Pending invites']],
   'Transport specialist · Clearance checklist': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Clearance']],
-  'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Load plan']],
-  'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Route']],
+  'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
+  'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
+  'Fleet & route coordinator · Trip · Flight': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
+  'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Reject': ['lan', 'Documents', ['Documents', 'Silver Bell · Proof of ownership'], [['Clearance checklist', 'Documents']]],
@@ -3202,7 +3609,9 @@ var SIDEBAR_FRAMES = {
   'Transport specialist · Authorities · Overdue': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Authorities']],
   'Logistics manager · Incident · Held': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-040'], [['Jobs', 'Incidents']]],
   'Logistics manager · Incident · Customer report': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-036'], [['Jobs', 'Incidents']]],
-  'Transport specialist · Customer notes': ['lan', 'Customer notes', ['Customer notes']]
+  'Transport specialist · Customer notes': ['lan', 'Customer notes', ['Customer notes']],
+  'Logistics manager · Invoices': ['yen', 'Invoices', ['Invoices']],
+  'Logistics manager · Invoices · Record payment': ['yen', 'Invoices', ['Invoices', 'INV-2026-0041']]
 };
 async function eSidebar() {
   var page = await rehydrate(PAGE_NAMES[2]);
@@ -3221,7 +3630,7 @@ async function eSidebar() {
     if (f.type !== 'FRAME') return;
     var old1 = f.children.filter(function (n) { return n.name === 'Staff sidebar'; })[0];
     if (!old1) return;
-    var cfg = SIDEBAR_FRAMES[f.name.replace(/ · Light$/, '')];
+    var cfg = SIDEBAR_FRAMES[f.name.replace(/ · (Light|Dark)$/, '')];
     if (!cfg) { missing.push(f.name); return; }
     /* a fresh instance, not a swap: a swap keeps overrides on same-named layers that point at the old nav-item variants */
     var side = C.adminSide.createInstance();
@@ -3351,7 +3760,9 @@ function owedItem(u, title, subject, reason, due, date, action, icon, o) {
   var it = inst(C.owed, { Urgency: u });
   setP(it, { Title: title, Subject: subject, Reason: reason, Due: due, Date: date });
   var a = nested(it, 'Action');
-  if (a) {
+  /* no action: the item is answered in place, right below it */
+  if (a && action == null) a.visible = false;
+  else if (a) {
     var m = { Label: action };
     if (icon) m['Leading icon'] = ICON[icon]; else m['Show leading icon'] = false;
     setP(a, m);
@@ -3544,17 +3955,40 @@ function stopsWith(states, times) { return HCMC_PNH.map(function (s, i) { return
 
 /* ---------- My requests ---------- */
 /* the requests table, the same with no rows (first run) or three; a row opens with its chevron */
-var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 70, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
+var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 96, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
 function rowOpen() { var i = Ic('arrow-right', 16, 'text/tertiary'); i.name = 'Open'; return i; }
+/* a move's stage at a glance under its name: seven segments, the stages done solid, the current one in the
+   secondary ink, the rest faint. Position, not status, so it never takes a status colour */
+function stageTrack(s) {
+  var v = VV({ name: 'Stage · ' + s, gap: 6 });
+  var segs = H({ name: 'Track', gap: 3 });
+  var at = STAGES.indexOf(s);
+  for (var i = 0; i < 7; i++) add(segs, rect(14, 4, i < at ? 'text/primary' : i === at ? 'text/secondary' : 'border/default', 'Segment', 2));
+  addAll(v, [stageMark(s), segs]);
+  return v;
+}
 function scrMyRequests() {
-  var owe = function (n, tone) { return n ? chip(tone, 'You owe ' + n) : Tx('Nothing needed', 'Body/S', 'text/tertiary'); };
-  var route = function (a, b) { var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]); return v; };
+  /* what is owed, with the date the first of it is due */
+  var owe = function (n, tone, due) {
+    if (!n) return Tx('Nothing needed', 'Body/S', 'text/tertiary');
+    var v = VV({ name: 'Owed', gap: 4, cross: 'MAX' });
+    addAll(v, [chip(tone, 'You owe ' + n), Tx(due, 'Mono/Caption', 'text/tertiary')]);
+    return v;
+  };
+  /* the route with its mode, as on the pass */
+  var route = function (a, b, mode) {
+    var r = H({ name: 'Route', gap: 10, cross: 'MIN' });
+    var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]);
+    addAll(r, [VV({ name: 'Mode', pad: [1, 0, 0, 0] }, [Ic(mode, 16, 'text/tertiary')]), v]);
+    return r;
+  };
+  var horses = function (names) { return coatRow(COAT041.filter(function (c) { return names.indexOf(c[0]) >= 0; }), String(names.length)); };
   /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
   var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer'), '4', '18 Oct 2026', stageMark('Documents'), owe(4, 'Bad'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class'), '2', '20 Nov 2026', stageMark('Quotation'), owe(1, 'Warn'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load'), '2', '30 Oct 2026', stageMark('Request'), owe(0), rowOpen()] }
+    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer', 'truck'), horses(['Shadowfax', 'Nightfall', 'Copper King', 'Silver Bell']), '18 Oct 2026', stageTrack('Documents'), owe(4, 'Bad', 'First due 4 Oct'), rowOpen()], hl: true },
+    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class', 'plane'), horses(['Shadowfax', 'Nightfall']), '20 Nov 2026', stageTrack('Quotation'), owe(1, 'Warn', 'Due 30 Sep'), rowOpen()] },
+    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load', 'truck'), horses(['Shadowfax', 'Nightfall']), '30 Oct 2026', stageTrack('Request'), owe(0), rowOpen()] }
   ]);
   tableFoot(t, 3, 3, 'requests');
   var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
@@ -3575,11 +4009,17 @@ function scrTrackReview() {
     ['Upcoming', 'Departs 30 Oct 2026, flexible by 3 days.', '', ''],
     ['Upcoming', 'Departure 30 Oct; you confirm handover on arrival.', 'In 34 days', '30 Oct']
   ]);
-  var est = panel('Estimate', { gap: 10 });
-  addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('An indicative range, not a quote. The quotation will be itemised line by line.', 'Body/S', 'text/tertiary', { fill: true }), divider(),
-    fillW(requestSummary(REQ_0193, { title: 'What you sent', bare: true, only: ['Horses', 'Service', 'Route', 'Departure'] }))]);
+  /* the wizard's pass, now submitted: draft → submitted → quoted → travel pass */
+  var pass = draftPass({ route: true, chip: ['Neutral', 'Submitted'],
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    stubLabel: 'Your estimate at submission', range: '$11,300 – $16,100', rangeSub: 'Not a quote. Yến prices it line by line; the quotation arrives here.' });
+  /* only what the pass doesn't show, and the one way to change it while it is in review */
+  var sent = requestSummary([['Pickup', 'Phú Thọ training centre, Ho Chi Minh City'], ['Route', 'Via Mộc Bài – Bavet and Poipet – Aranyaprathet'], ['Instructions', 'Quiet loading. Vet check on arrival.'], ['Insurance', 'Your own policy']], { title: 'What you sent' });
+  add(sent, fillW(VV({ name: 'Change', gap: 6, pad: [12, 0, 12, 0] }, [Tx('Need to change something? Yến can still update it before she quotes.', 'Body/S', 'text/tertiary', { fill: true }), btn('Secondary', 'SM', 'Ask Yến to change it')])));
+  var route = panel('Your route', { gap: 12 });
+  addAll(route, [Tx('Your route', 'Heading/H4'), routeReqMap(728, 240), Tx('About 960 km by road with 2 border crossings. Khôi, fleet & route coordinator, plans the exact road and stops after approval.', 'Body/S', 'text/tertiary', { fill: true })]);
   var hist = historyPanel([['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, est), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · In review', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', 'Submitted 26 Sep 2026'], [stageMark('Request')], true), [lead, split(column([stagesP, route]), column([pass, sent]), SIDE.narrow), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: documents needed ---------- */
@@ -3603,6 +4043,7 @@ function scrTrackDocs() {
   ]);
   var people = peoplePanel([['Lan', 'transport specialist', 'Checks your documents and files the border dossiers.'], ['Yến', 'logistics manager', 'Approved the job; handles changes to dates or price.'], ['Minh', 'driver', 'Drives trailer TX-447 on 18 Oct with two grooms.']]);
   var route = routePanel('Route', 'Planned. Positions will come from checkpoints recorded by the escort.', stopsWith(['Upcoming', 'Upcoming', 'Upcoming', 'Upcoming']), 'Locked', [['Vehicle', 'Trailer TX-447', true], ['Driver', 'Minh'], ['Grooms', '2, one per 3 horses'], ['Distance', '240 km · 6.5 h', true]]);
+  route.insertChild(1, map041('plan', 408, 280));
   var hist = historyPanel([
     ['24 Sep · 16:02', 'Proof of ownership for Silver Bell rejected: the bill of sale is unsigned.', 'Lan, transport specialist'],
     ['21 Sep · 10:15', 'EIA test for Shadowfax uploaded and approved.', 'You, then Lan'],
@@ -3610,7 +4051,7 @@ function scrTrackDocs() {
     ['12 Sep · 11:30', 'Job approved as CBRT-2026-041; document checklist created (23 items).', 'Yến, logistics manager'],
     ['10 Sep · 18:44', 'Quotation v2 accepted; 30% deposit confirmed.', 'You']
   ], 'Show all 14 events');
-  return trackScreen('Tracking · Documents needed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · road, private trailer · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], true), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · Documents needed', pass041(['Departs in', '22 days', '18 Oct 2026 · 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')]), [lead, split(column([stagesP, people]), route, SIDE.wide), hist], '26 Sep 2026, 11:20');
 }
 
 /* ---------- Detail: in transit ---------- */
@@ -3619,7 +4060,7 @@ function onTheRoad() {
   var route = panel('Route', { gap: 20 });
   var rh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
   addAll(rh, [VV({ name: 'Title', gap: 2 }, [Tx('On the road', 'Heading/H3'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary')]), Tx('Updated 08:41', 'Mono/Caption', 'text/tertiary')]);
-  addAll(route, [fillW(rh), fillW(routeStrip(stopsWith(['Done', 'Current', 'Upcoming', 'Upcoming'], ['06:05 · departed', '08:34 · cleared', 'exp. 09:30', 'exp. 12:30']), 'Clear'))]);
+  addAll(route, [fillW(rh), map041('transit', 1152, 380), mapLegend(['done', 'todo'])]);
   return route;
 }
 function scrTrackTransit() {
@@ -3638,18 +4079,19 @@ function scrTrackTransit() {
   var stagesP = stagePanel([
     ['Done', 'Submitted with 4 horses.', '', '2 Sep'], ['Done', 'Quotation v2 accepted.', '', '10 Sep'], ['Done', 'Approved. Job CBRT-2026-041.', '', '12 Sep'],
     ['Done', '23 of 23 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
-    ['Current', 'On the road with Minh, driver, and two grooms since 06:05.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
+    ['Current', 'On the road with Minh, driver, and two grooms since 06:05. Planned to arrive inside your ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ' window.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
   var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
-  return trackScreen('Tracking · In transit', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departed 18 Oct 2026, 06:05'], [stageMark('Trip')], true), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
+  return trackScreen('Tracking · In transit', pass041(['Arrives in about', '4 h', '12:30 · in your window'], [stageMark('Trip')]), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
 /* ---------- Detail: delivered ---------- */
 function scrTrackDelivered() {
   var items = [owedItem('Soon', 'Confirm handover and condition', 'Shipment · 4 horses delivered 12:41', 'Hoa, groom, logged all four horses sound on arrival. Confirm receipt, or report a problem. If you don’t reply by 20 Oct, the handover is taken as accepted on Hoa’s record.', 'Due in 2 days', '20 Oct 2026', 'Confirm handover', 'check', { second: 'Report a problem' })];
-  var lead = owedPanel('1 item', 'Your horses arrived at Phnom Penh Equestrian Centre at 12:41, eleven minutes after the planned time.', items,
+  var lead = owedPanel('1 item', 'Your horses arrived at Phnom Penh Equestrian Centre at 12:41, inside your 11:00–14:00 window.', items,
     { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
   var route = routePanel('Route', 'Completed. Every checkpoint was recorded by the escort.', stopsWith(['Done', 'Done', 'Done', 'Done'], ['06:05', '08:34', '09:36', '12:41']), 'Clear', [['On time', 'Yes, 11 min after plan'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold']]);
+  route.insertChild(1, map041('done', 408, 280));
   var arr = panel('Arrival record', { gap: 12 });
   add(arr, Tx('Arrival condition', 'Heading/H4'));
   [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.'], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
@@ -3665,7 +4107,7 @@ function scrTrackDelivered() {
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
   var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
-  return trackScreen('Tracking · Delivered', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover')], true), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
+  return trackScreen('Tracking · Delivered', pass041(['Delivered', '12:41', '18 Oct · inside your window'], [stageMark('Handover')]), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 
 /* ---------- entries ---------- */
@@ -3686,7 +4128,7 @@ async function trackScreensCall(builders) {
   var page = await rehydrate(PAGE_NAMES[3]);
   var made = [];
   for (var i = 0; i < builders.length; i++) {
-    var s = builders[i]();
+    var s = primaryTheme(builders[i]());
     await flush();
     var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
     var label = trackRowLabel(page), y = label.y + 120;
@@ -3708,7 +4150,8 @@ async function eTrackComponents() {
   await flush();
   return report({ owed: C.owed.id, stageRow: C.stageRow.id, stop: C.stop2.id });
 }
-async function eTrackScreensA() { return trackScreensCall([scrMyRequests, scrTrackReview, scrTrackDocs]); }
+async function eTrackScreensA() { return trackScreensCall([scrMyRequests, scrTrackReview]); }
+async function eTrackScreensA2() { return trackScreensCall([scrTrackDocs]); }
 async function eTrackScreensB() { return trackScreensCall([scrTrackTransit, scrTrackDelivered]); }
 /* =====================================================================
    Request review (Flow 1, feasibility). The logistics manager decides
@@ -3831,17 +4274,39 @@ function scrReviewOverride() {
 }
 
 /* ---------- the customer's side: the request came back with a question ---------- */
+/* the answer's effect on the route: the Ho Chi Minh City leg and the Mộc Bài crossing drop away (faint and dashed),
+   and the move starts in Phnom Penh */
+function infoChangeMap(w, h) {
+  var r = MAP_REQ.road;
+  return jobMap({ w: w, h: h, end: 100.5, bounds: MAP_REQ.bounds, borders: MAP_REQ.borders, areas: MAP_REQ.areas,
+    paths: [{ pts: r.slice(0, 3), kind: 'old' }, { pts: r.slice(2), kind: 'todo' }],
+    stops: [[106.66, 10.86, 'Ho Chi Minh City', 'Not needed', 'stop', 'old', 'b'], [106.12, 11.08, 'Mộc Bài – Bavet', 'Not crossed', 'gate', 'old', 'a'], [104.92, 11.56, 'Phnom Penh', 'New pickup', 'stop', 'todo', 'b'],
+      [102.56, 13.66, 'Poipet – Aranyaprathet', 'Border', 'gate', 'todo', 'a'], [100.5, 13.75, 'Bangkok', '~660 km', 'stop', 'todo', 'b']] });
+}
 function scrTrackInfo() {
   /* the question has three answers, so the customer picks one here; each opens the matching edit, prefilled */
   var answer = VV({ name: 'Your answer', gap: 12, pad: [0, 20, 20, 72] });
   var go = H({ name: 'Actions', gap: 16, cross: 'CENTER' });
   addAll(go, [btn('Primary', 'MD', 'Continue with this answer', { trail: 'arrow-right' }), Tx('Opens your request with the pickup set to Phnom Penh Equestrian Centre. Check it, then send it back as version 2.', 'Body/S', 'text/tertiary', { fill: true })]);
+  /* what the chosen answer does, before it is sent: the leg it drops, the crossing it saves, the distance */
+  var change = H({ name: 'What this answer changes', gap: 20, pad: 16, radius: 12, fill: 'bg/sunken', cross: 'MIN' });
+  var diffs = VV({ name: 'Changes', gap: 0 });
+  add(diffs, fillW(VV({ name: 'Head', gap: 2, pad: [0, 0, 8, 0] }, [Tx('What this answer changes', 'Label/M'), Tx('Shown before you send it. Yến re-checks capacity on version 2.', 'Body/S', 'text/tertiary', { fill: true })])));
+  [['Pickup', 'Phú Thọ, Ho Chi Minh City', 'Phnom Penh Equestrian Centre'], ['Border crossings', '2', '1 · Poipet only'], ['Distance', '~960 km', '~660 km'], ['Estimate', '$11,300 – $16,100', 'New range on version 2']].forEach(function (d) {
+    var r = VV({ name: d[0], gap: 2, pad: [8, 0, 8, 0] });
+    borderSide(r, 'border/default', 'top');
+    var v = H({ name: 'Values', gap: 8, cross: 'CENTER', wrap: true, rowGap: 2 });
+    addAll(v, [Tx(d[1], 'Body/S', 'text/tertiary', { strike: true }), Ic('arrow-right', 14, 'text/tertiary'), Tx(d[2], 'Label/S', 'text/primary')]);
+    addAll(r, [Tx(d[0], 'Body/S', 'text/tertiary'), fillW(v)]);
+    add(diffs, fillW(r));
+  });
+  addAll(change, [infoChangeMap(640, 220), fillW(diffs)]);
   addAll(answer, [Tx('Your answer', 'Label/S', 'text/secondary'), fillW(svcOptions([
     ['Selected', 'Collect them in Phnom Penh', 'Both arrive at Phnom Penh Equestrian Centre on 18 Oct.', 'Pickup moves; the estimate updates', null],
     ['Default', 'Move the date', 'Pick a later departure. Yến checks it against their other bookings.', 'Lead time checked again', null],
-    ['Default', 'Choose other horses', 'Swap in horses from your list that are free on 30 Oct.', 'The estimate updates', null]], true)), fillW(go)]);
-  var items = [owedItem('Soon', 'Answer Yến’s question', 'REQ-2026-0193 · version 1', REVIEW_NOTE + ' Reply by 9 Oct to keep the 30 Oct departure; after that the 21-day lead time moves it.', 'Reply in 11 days', '9 Oct 2026', 'Withdraw request', null, { secondary: true }), fillW(answer)];
-  var lead = owedPanel('1 item', 'Yến, logistics manager, reviewed your request this morning and needs one answer before she can quote.', items, { chipTone: 'Warn', chipLabel: 'Waiting for you' }, null);
+    ['Default', 'Choose other horses', 'Swap in horses from your list that are free on 30 Oct.', 'The estimate updates', null]], true)), fillW(change), fillW(go)]);
+  var items = [owedItem('Soon', 'Answer Yến’s question', 'REQ-2026-0193 · version 1', REVIEW_NOTE + ' Reply by 9 Oct to keep the 30 Oct departure; after that the 21-day lead time moves it.', 'Reply in 11 days', '9 Oct 2026', null), fillW(answer)];
+  var lead = owedPanel('1 item', 'Yến, logistics manager, reviewed your request this morning and needs one answer before she can quote.', items, { chipTone: 'Warn', chipLabel: 'Waiting for you' }, 'Withdraw request');
   var stagesP = stagePanel([
     ['Current', 'Returned to you on 28 Sep with one question from Yến. Your answer is above.', '', ''],
     ['Upcoming', 'Itemised and valid for 7 days. You accept and your 30% deposit is acknowledged.', '', ''],
@@ -3855,10 +4320,12 @@ function scrTrackInfo() {
   var v1 = H({ name: 'v1', gap: 10, cross: 'CENTER' });
   addAll(v1, [Tx('v1', 'Mono/Data'), Tx('Submitted 26 Sep 09:14 · returned 28 Sep 09:41', 'Body/S', 'text/secondary', { fill: true }), chip('Info', 'Current', { noDot: true })]);
   addAll(ver, [Tx('Versions', 'Heading/H4'), fillW(v1), Tx('Your changes become v2. You and Yến both keep v1, so nothing you sent is lost.', 'Body/S', 'text/tertiary', { fill: true })]);
-  var est = panel('Estimate', { gap: 10 });
-  addAll(est, [Tx('Your estimate at submission', 'Heading/H4'), Tx('$11,300 – $16,100', 'Display/M'), Tx('Still an indicative range. It updates if you change the horses, route or date.', 'Body/S', 'text/tertiary', { fill: true })]);
+  /* the request's pass, waiting on the answer; version 1's values until version 2 is sent */
+  var est = draftPass({ route: true, chip: ['Warn', 'Needs your answer'],
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    stubLabel: 'Your estimate at submission', range: '$11,300 – $16,100', rangeSub: 'Version 1. It updates when you send version 2.' });
   var hist = historyPanel([['28 Sep · 09:41', 'Returned with a question: where to collect Shadowfax and Nightfall.', 'Yến, logistics manager'], ['26 Sep · 09:14', 'Request submitted with 2 horses and a climate-controlled stall.', 'You'], ['26 Sep · 09:14', 'Lead time checked: 34 days before departure, 21 required.', 'System']], null);
-  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', '2 horses · road, shared load · departs 30 Oct 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([ver, est])), hist], '28 Sep 2026, 10:05');
+  return trackScreen('Tracking · Info required', trackHead('Ho Chi Minh City → Bangkok', ['REQ-2026-0193', 'Version 1 · returned 28 Sep 2026'], [stageMark('Request')], true), [lead, split(stagesP, column([est, ver]), SIDE.narrow), hist], '28 Sep 2026, 10:05');
 }
 
 /* =====================================================================
@@ -4206,7 +4673,7 @@ function docTable(viewer) {
 function scrAllDocs() {
   var sum = docTableSummary('owner'), tabs = docTableTabs('owner'), list = docTable('owner');
   var note = Tx('Export health certificates are issued by the Dept. of Animal Health (VN) 8–14 Oct, inside the 10 days before departure; Lan requests them for you. Open any row to see its versions.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · All documents', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], 'Back to the request'), [sum, tabs, list, note], '26 Sep 2026, 11:20');
+  return trackScreen('Tracking · All documents', pass041(['Departs in', '22 days', '18 Oct 2026 · 06:00'], [stageMark('Documents'), chip('Bad', 'Departure locked')], { back: 'Back to the request' }), [sum, tabs, list, note], '26 Sep 2026, 11:20');
 }
 
 /* ---------- MCP entry ---------- */
@@ -4215,7 +4682,7 @@ async function insertChainCall(builders, afterName) {
   var page = await rehydrate(PAGE_NAMES[3]);
   var made = [];
   for (var i = 0; i < builders.length; i++) {
-    var s = builders[i]();
+    var s = primaryTheme(builders[i]());
     await flush();
     var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
     if (old.length) { s.x = old[0].x; s.y = old[0].y; old.forEach(function (n) { n.remove(); }); }
@@ -4836,7 +5303,88 @@ function scrTripHeld() {
     cabStrip([['Done', 'Phnom Penh', 'Pickup', INC40.loaded, 'Departed'], ['Held', 'Bavet – Mộc Bài', 'Border', INC40.held, 'Held since'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '—', 'Waits on the decision'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '—', 'Waits on the decision']]),
     task, right, cabDock('Waiting for Yến’s decision', 'Nothing to record until she decides; any water or checks you log go on the trip record.', null));
 }
-async function eTripA() { return insertChainCall([scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
+/* ---------- The office side of the same trip: Khôi at 08:41 on 18 Oct ----------
+   The coordinator watches what the cab records against the route he planned. Positions come
+   only from recorded checkpoints, as on the customer's page, so nothing here is a guess.
+   There is no gold: while the trip runs to plan the office has nothing to move forward. */
+var NOW041 = '08:41';
+/* [stop, kind, planned, recorded, what was recorded, chip tone, chip word] */
+var TRIP_PLAN = [
+  ['Phú Thọ training centre', 'Pickup · Ho Chi Minh City', '06:00', '06:05', 'Departed · Minh, driver', 'Ok', 'Departed'],
+  ['Mộc Bài – Bavet', 'Border · Vietnam exit, Cambodia entry', '08:30', '08:34', 'Arrived 07:58, cleared both sides · Minh, driver', 'Ok', 'Cleared'],
+  ['Svay Rieng welfare stop', 'Welfare stop · 45 min rest', '09:30', null, 'Expected in ' + durText(toMin('09:30') - toMin(NOW041)), 'Info', 'Next'],
+  ['Phnom Penh Equestrian Centre', 'Delivery · handover to the receiving groom', '12:30', null, 'Window ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ', ' + durText(toMin(JOB_WINDOW.until) - toMin('12:30')) + ' to spare at plan', 'Neutral', 'Upcoming']
+];
+function againstPlan(planned, recorded) {
+  if (!recorded) return '—';
+  var d = toMin(recorded) - toMin(planned);
+  return d === 0 ? 'On time' : (d > 0 ? '+' : '−') + durText(Math.abs(d));
+}
+function scrTripCoordinator() {
+  var last = TRIP_PLAN.filter(function (r) { return r[3]; }).pop();
+  var log = tripLogUntil(NOW041);
+  var tiles = H({ name: 'Tiles', gap: 16 });
+  addAll(tiles, [
+    fillW(stat('Neutral', againstPlan(last[2], last[3]), 'Against plan at ' + last[0])),
+    fillW(stat('Neutral', JOB_WINDOW.from + '–' + JOB_WINDOW.until, 'Arrival window · plan arrives ' + TRIP_PLAN[3][2])),
+    fillW(stat('Info', TRIP_PLAN[2][2], 'Next checkpoint · Svay Rieng')),
+    fillW(stat('Ok', '4 of 4', 'Horses sound at the last check, ' + log[log.length - 1][0]))
+  ]);
+
+  var stops = tbl('Checkpoints', [['Checkpoint', null], ['Planned', 90, null, 'Mono/Data'], ['Recorded', 280], ['Against plan', 110, 'RIGHT', 'Mono/Data'], ['Status', 110, 'RIGHT']], TRIP_PLAN.map(function (r) {
+    var name = VV({ name: r[0], gap: 2 });
+    addAll(name, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/tertiary', { fill: true })]);
+    var rec = VV({ name: 'Recorded', gap: 2 });
+    if (r[3]) add(rec, Tx(r[3], 'Mono/Data', 'text/primary'));
+    add(rec, Tx(r[4], 'Body/S', r[3] ? 'text/tertiary' : (r[5] === 'Info' ? 'status/info/fg' : 'text/tertiary'), { fill: true }));
+    return { cells: [fillW(name), r[2], fillW(rec), againstPlan(r[2], r[3]), chip(r[5], r[6], r[5] === 'Neutral' ? { noDot: true } : null)], hl: r[6] === 'Next' };
+  }));
+
+  var lp = panel('Escort’s log', { gap: 0, pad: [20, 24, 12, 24] });
+  var lh = VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] });
+  addAll(lh, [Tx('Escort’s log', 'Heading/H4'), Tx(tripLogSummary(NOW041) + '. Every record also reaches the customer’s page.', 'Body/S', 'text/tertiary')]);
+  add(lp, fillW(lh));
+  log.slice().reverse().forEach(function (r) {
+    var row = H({ name: r[0], gap: 20, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(row, 'border/default', 'top');
+    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/tertiary', { w: 56 }), Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary', { w: 120, align: 'RIGHT' })]);
+    add(lp, fillW(row));
+  });
+  var plan = titled('Checkpoints, planned against recorded', 'From the route plan you confirmed on 16 Oct; recorded times come from the cab.', stops, Tx('Updated ' + NOW041, 'Mono/Caption', 'text/tertiary'));
+
+  /* each horse's word from the last condition check, the same Sound / Watch / Concern the groom picks */
+  var board = panel('On board', { gap: 0, pad: [20, 24, 12, 24] });
+  var bh = VV({ name: 'Title', gap: 2, pad: [0, 0, 10, 0] });
+  addAll(bh, [Tx('On board', 'Heading/H4'), Tx('Last condition check ' + log[log.length - 1][0] + ' by ' + log[log.length - 1][2] + '. Next at the welfare stop.', 'Body/S', 'text/tertiary', { fill: true })]);
+  add(board, fillW(bh));
+  var notes = { Nightfall: 'Sweated at loading; calm since the border.' };
+  TRIP_LOAD.forEach(function (h) {
+    var r = H({ name: h[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(r, 'border/default', 'top');
+    var t = VV({ name: 'Text', gap: 2 });
+    add(t, Tx(h[0], 'Label/M'));
+    add(t, Tx(notes[h[0]] ? h[1] + ' · ' + notes[h[0]] : h[1], 'Body/S', 'text/tertiary', { fill: true }));
+    addAll(r, [fillW(t), chip('Ok', 'Sound')]);
+    add(board, fillW(r));
+  });
+  var crew = panel('Crew and vehicle', { gap: 12 });
+  add(crew, Tx('Crew and vehicle', 'Heading/H4'));
+  [['Vehicle', 'Trailer TX-447', true], ['Driver', STAFF.minh[0]], ['Grooms', 'Lê Thị Hoa, Phạm Quốc Tuấn'], ['Records', 'All sent · last ' + log[log.length - 1][0]]].forEach(function (f) { add(crew, factRow(f)); });
+  add(crew, btn('Secondary', 'MD', 'Call the cab', { fill: true }));
+  var stop = panel('If the trip stops', { gap: 10 });
+  addAll(stop, [Tx('If the trip stops', 'Heading/H4'),
+    Tx('A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the customer. Raise one yourself for anything the cab can’t record.', 'Body/S', 'text/secondary', { fill: true }),
+    btn('Secondary', 'MD', 'Raise an incident', { lead: 'alert' })]);
+  /* the table takes the full width; below it, what was recorded and what the customer reads, beside the horses and the crew */
+  var left = column([lp, customerSees('Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop, expected 09:30.')]);
+  var right = column([board, crew, stop]);
+
+  return jobScreen('Fleet & route coordinator · Trip', 'Trip', STAFF.khoi, [tiles, plan, split(left, right, SIDE.narrow)], {
+    stage: 'Trip', gateState: 'Clear', today: 'Sun 18 Oct 2026',
+    gate: 'Cleared 17 Oct, 16:20 by Lan, transport specialist. Departure recorded 06:05 by Minh, driver.'
+  });
+}
+async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
 async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld], 'Escort · Welfare stop'); }
 /* =====================================================================
    Handover and closing. The escort records delivery once: condition on
@@ -4850,14 +5398,14 @@ function closedLead() {
   var ic = H({ name: 'Icon wrap', w: 40, h: 40, radius: 999, fill: 'status/ok/bg', main: 'CENTER', cross: 'CENTER' });
   add(ic, Ic('check', 20, 'status/ok/fg'));
   var t = VV({ name: 'Text', gap: 4 });
-  addAll(t, [Tx('Closed. Nothing more is needed.', 'Heading/H3'), Tx('You confirmed the handover on 19 Oct at 09:14. This page stays as the record of the move.', 'Body/M', 'text/secondary', { fill: true })]);
+  addAll(t, [Tx('Closed. Your final invoice follows today.', 'Heading/H3'), Tx('You confirmed the handover on 19 Oct at 09:14. This page stays as the record of the move; the invoice appears here when Yến issues it.', 'Body/M', 'text/secondary', { fill: true })]);
   addAll(p, [ic, fillW(t), btn('Secondary', 'MD', 'Download the record (PDF)', { lead: 'file' })]);
   return p;
 }
 function scrTrackClosed() {
   var sum = panel('Summary', { gap: 0, pad: 0, clip: true });
   var f = H({ name: 'Facts', gap: 48, pad: [18, 24, 18, 24] });
-  [['Delivered', '18 Oct · 12:41', true], ['Against plan', '11 min late'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold'], ['Incidents', 'None'], ['Documents', '23 kept', true]].forEach(function (x) {
+  [['Delivered', '18 Oct · 12:41', true], ['Arrival window', 'Kept · 11 min after plan'], ['Distance', '240 km', true], ['Border', 'Cleared, no hold'], ['Incidents', 'None'], ['Documents', '23 kept', true]].forEach(function (x) {
     var cell = VV({ name: x[0], gap: 3 });
     addAll(cell, [Tx(x[0], 'Body/S', 'text/tertiary'), Tx(x[1], x[2] ? 'Mono/Data' : 'Label/S', 'text/primary')]);
     add(f, cell);
@@ -4876,8 +5424,9 @@ function scrTrackClosed() {
   addAll(docs, [Tx('23 documents, every version kept', 'Heading/H4'), Tx('Passports, tests, certificates, the import permit and the customs clearance, with each version and who approved it. Nothing is ever overwritten; this is the legal record of the crossing.', 'Body/S', 'text/secondary', { fill: true }), btn('Secondary', 'SM', 'See all 23 documents', { trail: 'arrow-right' })]);
   var stagesP = stagePanel([['Done', 'Submitted 2 Sep.', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', '', '', ''], ['Done', 'Closed after you confirmed the handover.', 'Done', '19 Oct']]);
   var route = routePanel('Route as recorded', 'Every checkpoint was recorded by the escort.', stopsWith(['Done', 'Done', 'Done', 'Done'], ['06:05', '08:34', '09:36', '12:41']), 'Clear', [['Vehicle', 'Trailer TX-447', true], ['Escort', 'Minh, driver · Hoa and Tuấn'], ['Distance', '240 km · 6 h 36 min', true]]);
+  route.insertChild(1, map041('done', 408, 280));
   var hist = historyPanel([['19 Oct · 09:14', 'Handover confirmed; the job is closed.', 'You'], ['18 Oct · 12:48', 'Handed over to Sophea, receiving groom; arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver']], 'Show all 38 events');
-  return trackScreen('Tracking · Closed', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · delivered 18 Oct 2026, 12:41'], [stageMark('Handover'), chip('Ok', 'Closed')], true),
+  return trackScreen('Tracking · Closed', pass041(['Delivered', '12:41', '18 Oct · inside your window'], [stageMark('Handover'), chip('Ok', 'Closed')]),
     [closedLead(), sum, split(column([arr, docs, stagesP]), route, SIDE.wide), hist], '19 Oct 2026, 09:20');
 }
 async function eHandover() { return insertChainCall([scrTrackClosed], 'Tracking · Delivered'); }
@@ -5043,7 +5592,7 @@ function scrTrackReport() {
   addAll(r, [Tx('Yến replies', 'Body/S', 'text/secondary'), dueStack('Within 2 hours', 'of sending')]);
   addAll(next, [Tx('What happens next', 'Heading/H4'), Tx('Yến, logistics manager, reads your report with the escort’s arrival record and replies with a next step.', 'Body/S', 'text/secondary', { fill: true }), fillW(r),
     Tx('Sending pauses the 26 Sep handover deadline until the case is settled.', 'Body/S', 'text/secondary', { fill: true })]);
-  var s = trackScreen('Tracking · Report a problem', trackHead('Bangkok → Ho Chi Minh City', ['REQ-2026-0151', 'job CBRT-2026-036 · 3 horses · delivered 24 Sep 2026, 16:05'], [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], 'Back to the request'),
+  var s = trackScreen('Tracking · Report a problem', passHead({ back: 'Back to the request', codes: ['REQ-2026-0151', 'CBRT-2026-036'], chips: [stageMark('Handover'), chip('Warn', 'Handover not confirmed')], from: ['BKK', 'Bangkok'], to: ['HCM', 'Ho Chi Minh City'], facts: [['Delivered', '24 Sep · 16:05', true], ['Horses', '3 · Golden Lotus and two more'], ['Borders', 'Poipet, then Mộc Bài']], stub: ['Confirm handover by', '26 Sep', 'paused once you send this report'] }),
     [split(form, column([urgent, next]), SIDE.narrow)], '24 Sep 2026, ' + INC36.draft);
   var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
   var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
@@ -5087,7 +5636,7 @@ async function eIncidents() {
   return report({ screens: a.screens.concat(b.screens) });
 }
 /* =====================================================================
-   Request wizard, step 2: Service. How the horses travel, the stalls each
+   Request wizard, step 3: Service. How the horses travel, the stalls each
    horse needs, extras and who insures them. Every option says what it
    does to the estimate (a range delta, "Included", or why it isn't
    available); the estimate card stays a range, never a price.
@@ -5131,15 +5680,15 @@ function effectRow(lead, title, sub, effect, effectTone) {
   addAll(r, [lead, fillW(t), Tx(effect, 'Mono/Caption', effectTone || 'text/secondary', { align: 'RIGHT' })]);
   return r;
 }
-function scrRequest2() {
-  var left = VV({ name: 'Step 2', gap: 28 });
+function scrRequest3() {
+  var left = VV({ name: 'Step 3', gap: 28 });
   var intro = VV({ name: 'Intro', gap: 8 });
   addAll(intro, [Tx('How should they travel?', 'Heading/H3'), Tx('Each choice shows what it does to your estimate. The estimate stays a range; the itemised quotation comes after review.', 'Body/M', 'text/secondary', { fill: true })]);
   add(left, fillW(intro));
   add(left, fillW(svcSection('Mode', null, svcOptions([
     ['Selected', 'Road', 'Door to door by trailer · ~960 km · 2 border crossings.', 'In the estimate', 'truck'],
     ['Disabled', 'Air', 'No equine air service Ho Chi Minh City → Bangkok. The nearest goes via Hong Kong and takes 3 days longer.', 'Unavailable', 'plane']], true))));
-  add(left, fillW(svcSection('Trailer', null, svcOptions([
+  add(left, fillW(svcSection('Trailer', 'An arrival window on step 2 books a private trailer.', svcOptions([
     ['Selected', 'Shared load', 'Shares a trailer with other consignments on set departures.', 'In the estimate', null],
     ['Default', 'Private trailer', 'Your own trailer and your own departure time.', '+ $2,400 – $3,300', null]], true))));
   var stalls = panel('Stalls', { gap: 0, pad: 0, clip: true });
@@ -5164,20 +5713,14 @@ function scrRequest2() {
   foot.paddingTop = 20;
   addAll(foot, [btn('Secondary', 'MD', 'Back', { lead: 'arrow-left' }), Tx('Road · shared load · 1 climate stall · your own insurance', 'Label/S', 'text/secondary', { fill: true, align: 'CENTER' }), btn('Primary', 'MD', 'Continue', { trail: 'arrow-right' })]);
   add(left, fillW(foot));
-  return requestLayout('Request · 2 Service', ['Done', 'Current', 'Upcoming', 'Upcoming'], left, estimateCard('$11,300 – $16,100', '2', '1 per 3 horses → 1', '2', '~960 km'));
+  return requestLayout('Request · 3 Service', ['Done', 'Done', 'Current', 'Upcoming'], left, draftPass({ route: true,
+    rows: [['Departs', '30 Oct 2026 · ±3 d', true], ['Arrival', 'Any time on the day'], DRAFT_BORDERS, ['Service', 'Road · shared load']],
+    range: '$11,300 – $16,100', rangeSub: DRAFT_SUB }));
 }
 async function eService() {
-  var out = await insertChainCall([scrRequest2], 'Request · 1 Horses');
-  var rv = figma.currentPage.children.filter(function (n) { return n.name === 'Request · 4 Review'; })[0];
-  var sum = rv && rv.findOne(function (n) { return n.type === 'FRAME' && n.name === 'Summary'; });
-  var svc = sum && sum.children.filter(function (n) { return n.name === 'Service'; })[0];
-  if (svc && !sum.children.some(function (n) { return n.name === 'Insurance'; })) {
-    var row = svc.clone(); row.name = 'Insurance';
-    sum.insertChild(sum.children.indexOf(svc) + 1, row);
-    var t = row.children.filter(function (n) { return n.type === 'TEXT'; });
-    t[0].characters = 'Insurance'; t[1].characters = 'Your own policy · upload it with your documents once the job is approved';
-    out.reviewEdited = true;
-  }
+  var out = await insertChainCall([scrRequest2Window], 'Request · 2 Route & dates (error)');
+  await insertChainCall([scrRequest2NotRun], 'Request · 2 Route & dates · Arrival window');
+  await insertChainCall([scrRequest3], 'Request · 2 Route & dates · Not run');
   return out;
 }
 /* =====================================================================
@@ -5187,13 +5730,51 @@ async function eService() {
    what an edit would touch before it is saved.
    ===================================================================== */
 var NF = HORSES[1];
-/* the horse's coat band stands in for the title; the nameplate carries her name */
-function horseHead(right) {
-  var band = H({ name: 'Coat', h: 132, pad: [0, 24, 22, 24], radius: 12, cross: 'MAX', fill: 'coat/' + NF.coat.toLowerCase(), clip: true });
+/* the horse's coat band stands in for the title; the nameplate carries her name. With a photo, the band fades
+   from her coat colour on the left into the picture, so the nameplate always sits on her colour. The photo is a
+   flat placeholder named "Photo · <name>" that the picture is uploaded into (docs/design-assets/). After the upload,
+   set the fill to CROP with PHOTO_CROP.band; the same picture goes on her My horses card's Coat band (over the coat
+   colour, under its Shade) with PHOTO_CROP.card, which puts her head right of the nameplate. */
+var PHOTO_CROP = { band: [[0.908, 0, 0], [0, 0.326, 0.195]], card: [[0.632, 0, 0], [0, 0.439, 0.143]], avatar: [[0.218, 0, 0.407], [0, 0.39, 0.156]] }; // avatar: the request wizard's horse pick
+var COAT_HEX = { Grey: '#8E949B', Black: '#202329', Chestnut: '#7B3F1F', Bay: '#5B3522' };
+function horseBand(h, o) {
+  o = o || {};
+  var band = H({ name: 'Coat', w: 1200, h: o.photo ? 240 : 132, pad: [0, 32, 28, 32], radius: 16, cross: 'MAX', fill: 'coat/' + h.coat.toLowerCase(), clip: true });
+  if (o.photo) {
+    var hex = COAT_HEX[h.coat];
+    var ph = figma.createRectangle(); ph.name = 'Photo · ' + h.name; ph.fills = [P('coat/' + h.coat.toLowerCase())];
+    var sc = figma.createRectangle(); sc.name = 'Scrim'; sc.fills = [gradient([[0, hex + 'FF'], [0.22, hex + 'CC'], [0.46, hex + '00']])];
+    [ph, sc].forEach(function (r) { band.appendChild(r); r.layoutPositioning = 'ABSOLUTE'; r.x = 0; r.y = 0; r.resize(1200, 240); r.constraints = { horizontal: 'STRETCH', vertical: 'STRETCH' }; });
+  }
   var plate = inst(C.nameplate);
-  setP(plate, { Name: NF.name, Subtitle: NF.sub });
+  setP(plate, { Name: h.name, Subtitle: h.sub });
   add(band, plate);
-  return pageHeader({ back: 'My horses', banner: band, code: NF.chip, summary: 'Thoroughbred · mare · 4 y · black', metaChips: NF.tags.map(function (t) { return chip(t[0], t[1]); }), right: [right] });
+  return band;
+}
+function horseHead(right) {
+  return pageHeader({ back: 'My horses', banner: horseBand(NF, { photo: true }), code: NF.chip, summary: 'Thoroughbred · mare · 4 y · black', metaChips: NF.tags.map(function (t) { return chip(t[0], t[1]); }), right: [right] });
+}
+/* how ready she is to travel: a ring of documents cleared, and who holds the rest */
+function readinessPanel(done, total, rest) {
+  var p = panel('Ready to travel', { gap: 14 });
+  add(p, Tx('Ready to travel?', 'Heading/H4'));
+  var row = H({ name: 'Row', gap: 20, cross: 'CENTER' });
+  var r = 38, c = 48, a = done / total * 2 * Math.PI;
+  var ex = c + r * Math.sin(a), ey = c - r * Math.cos(a);
+  var svg = '<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="48" cy="48" r="38" stroke="#000" stroke-width="8"/><path d="M48 10 A38 38 0 ' + (a > Math.PI ? 1 : 0) + ' 1 ' + ex.toFixed(2) + ' ' + ey.toFixed(2) + '" stroke="#000" stroke-width="8"/></svg>';
+  var ring = figma.createNodeFromSvg(svg); ring.name = 'Ring'; ring.fills = [];
+  var vs = ring.findAll(function (n) { return n.type === 'VECTOR' || n.type === 'ELLIPSE'; });
+  vs.forEach(function (v, i) { v.strokes = [P(i === 0 ? 'surface/muted' : 'status/ok/fg')]; v.strokeWeight = 8; v.strokeCap = 'ROUND'; });
+  var wrap = F({ name: 'Readiness', w: 96, h: 96 });
+  wrap.appendChild(ring); ring.x = 0; ring.y = 0;
+  var n = Tx(done + '/' + total, 'Mono/Data', 'text/primary', { name: 'Count' });
+  wrap.appendChild(n); n.x = Math.round(48 - n.width / 2); n.y = Math.round(48 - n.height / 2);
+  var t = VV({ name: 'Text', gap: 6 });
+  add(t, Tx('Not yet: ' + (total - done) + ' of ' + total + ' documents to go', 'Label/M', 'text/primary', { fill: true }));
+  rest.forEach(function (x) { add(t, Tx(x, 'Body/S', 'text/secondary', { fill: true })); });
+  addAll(row, [wrap, fillW(t)]);
+  add(p, fillW(row));
+  return p;
 }
 /* facts: [label, value, mono] in a two-column grid */
 function factGrid(facts) {
@@ -5267,7 +5848,7 @@ function scrHorseProfile() {
     ['EIA (Coggins) test · CBRT-2026-041', 'Warn', 'Expires in transit', '77 days old at departure; a new test is due 4 Oct.'],
     ['Export health certificate · CBRT-2026-041', 'Neutral', 'Not issued yet', 'Issued 8–14 Oct by the vet authority.']], true);
   var left = column([owed, needs, keep, trip]);
-  var s = screen('My horses · Nightfall', 'My horses', [horseHead(btn('Secondary', 'MD', 'Edit profile', { lead: 'pencil' })), split(left, column([tripsPanel(), valuePanel()]), SIDE.narrow)], { gap: 28, asOf: '26 Sep 2026, 11:20' });
+  var s = screen('My horses · Nightfall', 'My horses', [horseHead(btn('Secondary', 'MD', 'Edit profile', { lead: 'pencil' })), split(left, column([readinessPanel(3, 5, ['EIA (Coggins) test: yours, due 4 Oct', 'Export health certificate: the vet authority, 8–14 Oct']), tripsPanel(), valuePanel()]), SIDE.narrow)], { gap: 28, asOf: '26 Sep 2026, 11:20' });
   return s;
 }
 
@@ -5360,7 +5941,7 @@ function scrTrackAsk() {
   addAll(route, [Tx('Goes to Lan, transport specialist. Yến can read it too.', 'Body/S', 'text/secondary', { fill: true }), dueStack('Within 1 business day', 'by Mon 28 Sep')]);
   add(form, fillW(route));
   add(form, btn('Primary', 'MD', 'Send to Lan', { trail: 'arrow-right' }));
-  return trackScreen('Tracking · Ask a question', trackHead('Ho Chi Minh City → Phnom Penh', ['REQ-2026-0162', 'job CBRT-2026-041 · 4 horses · departs 18 Oct 2026, 06:00'], [stageMark('Documents')], 'Back to the request'),
+  return trackScreen('Tracking · Ask a question', pass041(['Departs in', '22 days', '18 Oct 2026 · 06:00'], [stageMark('Documents')], { back: 'Back to the request' }),
     [split(form, column([earlierNotes(), whoAnswers()]), SIDE.narrow)], '26 Sep 2026, 11:30');
 }
 
@@ -5427,12 +6008,22 @@ function newCustomer(s) {
   setP(s.children[s.children.length - 1], { 'As of': '26 Sep 2026' });
   return s;
 }
+/* the first horse before it exists: an empty stall nameplate on a dashed band, the card the club is about to make */
+function ghostHorse(w) {
+  var g = VV({ name: 'Your first nameplate', gap: 10, w: w });
+  var band = F({ name: 'Coat', w: w, h: 148, radius: 12, fill: 'surface/muted', stroke: 'border/strong', dash: [4, 4] });
+  var plate = inst(C.nameplate);
+  setP(plate, { Name: 'Your first horse', Subtitle: 'Breed · sex' });
+  band.appendChild(plate); plate.x = 20; plate.y = 148 - 20 - plate.height;
+  addAll(g, [band, Tx('Each horse gets a brass nameplate on its coat colour, and every request starts from it.', 'Body/S', 'text/tertiary', { fill: true })]);
+  return g;
+}
 function scrFirstRequests() {
   var w = panel('Welcome', { gap: 20, pad: 28 });
   var h = VV({ name: 'Head', gap: 6 });
   addAll(h, [Tx('Start with your horses', 'Display/M'), Tx('Every request is built from your horses’ profiles, so we ask for them once and reuse them on every move.', 'Body/M', 'text/secondary', { fill: true })]);
   add(w, fillW(h));
-  [['Add your horses', 'Name, microchip, size and temperament. About 3 minutes each.'], ['Request transport', 'Pick horses, service, route and dates. You see an indicative range straight away.'], ['We review and quote', 'Within 1 business day you get an itemised quotation, valid for 7 days.']].forEach(function (s, i) {
+  [['Add your horses', 'Name, microchip, size and temperament. About 3 minutes each.'], ['Request transport', 'Pick the horses, then the route and dates, then the service. You see an indicative range as soon as the route is set.'], ['We review and quote', 'Within 1 business day you get an itemised quotation, valid for 7 days.']].forEach(function (s, i) {
     var row = H({ name: s[0], gap: 14, cross: 'MIN' });
     var n = H({ name: 'N', w: 28, h: 28, radius: 999, stroke: i === 0 ? 'text/primary' : 'border/strong', main: 'CENTER', cross: 'CENTER' });
     add(n, Tx(String(i + 1), 'Mono/Caption', i === 0 ? 'text/primary' : 'text/tertiary'));
@@ -5444,6 +6035,12 @@ function scrFirstRequests() {
   var acts = H({ name: 'Actions', gap: 12, pad: [4, 0, 0, 0] });
   addAll(acts, [btn('Primary', 'MD', 'Add your first horse', { lead: 'plus' }), btn('Secondary', 'MD', 'See how a request works')]);
   add(w, acts);
+  /* the steps on the left, the nameplate they lead to on the right */
+  var welcome = panel('Welcome', { gap: 0, pad: 0 });
+  var wr = H({ name: 'Row', gap: 32, pad: 28, cross: 'MIN' });
+  w.name = 'Steps'; w.fills = []; w.strokes = []; w.paddingLeft = w.paddingRight = w.paddingTop = w.paddingBottom = 0;
+  addAll(wr, [fillW(w), ghostHorse(272)]);
+  add(welcome, fillW(wr));
   var ready = panel('Have these ready', { gap: 12 });
   add(ready, Tx('Have these ready', 'Heading/H4'));
   [['Each horse’s passport', 'For the microchip number and date of birth.'], ['Height and weight', 'Height sets the stall width; weight sets the load.'], ['A declared value', 'Used for insurance if you insure through us.'], ['Handling needs', 'Nervous loaders, box stall only, a climate stall, a foal at foot.']].forEach(function (r) {
@@ -5457,7 +6054,7 @@ function scrFirstRequests() {
   var eb = VV({ name: 'Empty', gap: 6, pad: [40, 24, 44, 24], cross: 'CENTER' });
   addAll(eb, [Tx('Your requests appear here', 'Heading/H4', 'text/secondary', { align: 'CENTER' }), Tx('Sorted by what needs you first, with the stage each one is at.', 'Body/S', 'text/tertiary', { align: 'CENTER' })]);
   add(empty, fillW(eb));
-  return newCustomer(screen('First run · My requests', 'My requests', [pageHead('My requests', '0 requests · Đà Lạt Highland Stables'), split(w, ready, SIDE.narrow), empty], { gap: 28 }));
+  return newCustomer(screen('First run · My requests', 'My requests', [pageHead('My requests', '0 requests · Đà Lạt Highland Stables'), split(welcome, ready, SIDE.narrow), empty], { gap: 28 }));
 }
 function fieldRow(fields) {
   var r = H({ name: 'Fields', gap: 16, cross: 'MIN' });
@@ -5486,7 +6083,8 @@ function scrAddHorse() {
   addAll(size, [chip('Neutral', 'Size M · 32 in', { noDot: true }), Tx('Worked out from 16.0 hh. It decides the stall width and the air position.', 'Body/S', 'text/secondary', { fill: true })]);
   add(form, fillW(formSection('Size and weight', null, [fieldRow([['Text', 'Default', 'Height', '16.0 hh', null], ['Text', 'Default', 'Weight', '505 kg', null]]), size])));
   var ticks = H({ name: 'Needs', gap: 24, cross: 'CENTER' });
-  addAll(ticks, [tick('Climate-controlled stall', false), tick('Box stall only', false), tick('Mare with foal at foot', false)]);
+  /* "Mare with foal at foot" joins these only when Sex is Mare */
+  addAll(ticks, [tick('Climate-controlled stall', false), tick('Box stall only', false)]);
   var notes = noteField('Handling notes', 'Anything the grooms should know: how he loads, what settles him.', 'Shown to the escort and the fleet coordinator.', true);
   add(form, fillW(formSection('Temperament and needs', null, [svcOptions([
     ['Selected', 'Calm', 'Loads with a standard team.', 'Standard stall', null],
@@ -5497,6 +6095,14 @@ function scrAddHorse() {
   borderSide(foot, 'border/default', 'top');
   addAll(foot, [btn('Ghost', 'MD', 'Cancel'), btn('Primary', 'MD', 'Save horse', { lead: 'check' })]);
   add(form, fillW(foot));
+  /* the horse card as it will appear, built from the form as it is typed */
+  var preview = VV({ name: 'Preview', gap: 12 });
+  var card = horseCard({ name: 'Langbiang Star', coat: 'Bay', sub: 'Thoroughbred · Gelding', tags: [['Ok', 'Calm']], age: '7 y', height: '16.0 hh', weight: '505 kg', size: 'M · 32', chip: '250 259 600 441 087', value: '$95,000', notes: 'No handling notes yet.', ready: 'No trips yet', pct: 0 });
+  setP(card, { 'Readiness label': 'Documents · per trip' });
+  card.findAll(function (n) { return n.name === 'Actions' || n.name === 'Divider'; }).forEach(function (n) { n.visible = false; });
+  var ph = VV({ name: 'Head', gap: 2 });
+  addAll(ph, [Tx('How he’ll appear', 'Heading/H4'), Tx('On My horses and in every request. It updates as you type.', 'Body/S', 'text/tertiary', { fill: true })]);
+  addAll(preview, [fillW(ph), fillW(card)]);
   var why = panel('Why we ask', { gap: 14 });
   add(why, Tx('Why we ask', 'Heading/H4'));
   [['Identity', 'Border posts read the microchip and match it to the passport.'], ['Size and weight', 'Height sets the stall width and the air position; weight sets the trailer’s load.'], ['Temperament', 'Decides the stall type and who stands next to whom.']].forEach(function (r) {
@@ -5507,7 +6113,7 @@ function scrAddHorse() {
   });
   var later = panel('Documents come later', { gap: 6 });
   addAll(later, [Tx('Documents come later', 'Heading/H4'), Tx('We ask for the passport, tests and certificates per trip, checked against your travel dates. Nothing to upload now.', 'Body/S', 'text/secondary', { fill: true })]);
-  return newCustomer(screen('First run · Add a horse', 'My horses', [pageHead('Add a horse', 'Your first horse. You can add more after saving.'), split(form, column([why, later]), SIDE.narrow)], { gap: 28 }));
+  return newCustomer(screen('First run · Add a horse', 'My horses', [pageHead('Add a horse', 'Your first horse. You can add more after saving.'), split(form, column([preview, why, later]), SIDE.narrow)], { gap: 28 }));
 }
 async function eFirstRun() { return insertChainCall([scrFirstRequests, scrAddHorse], 'Request · 4 Review'); }
 /* =====================================================================
@@ -5532,7 +6138,7 @@ function authBar() {
 /* title and a one-paragraph summary, left-aligned over the form */
 function authHead(title, summary) {
   var h = VV({ name: 'Head', gap: 12 });
-  addAll(h, [Tx(title, 'Display/L', 'text/primary', { name: 'Title' }), Tx(summary, 'Body/M', 'text/secondary', { name: 'Summary', w: AUTH_FORM })]);
+  addAll(h, [Tx(title, 'Display/L', 'text/primary', { name: 'Title', w: AUTH_FORM }), Tx(summary, 'Body/M', 'text/secondary', { name: 'Summary', w: AUTH_FORM })]);
   return h;
 }
 function authForm(head, blocks) {
@@ -5559,9 +6165,16 @@ function authScreen(name, form, aside, o) {
     body = H({ name: 'Body' });
     var left = VV({ name: 'Form column', w: 720, pad: [96, 120, 64, 160] });
     add(left, form);
-    var right = VV({ name: 'Aside', gap: 28, pad: [96, 120, 64, 96], fill: 'bg/sunken' });
-    right.strokes = [P('border/default')]; right.strokeAlign = 'INSIDE';
-    right.strokeTopWeight = 0; right.strokeBottomWeight = 0; right.strokeRightWeight = 0; right.strokeLeftWeight = 1;
+    var right;
+    if (o.photo) {
+      /* a photograph, so Dark mode and a scrim from the bottom; the list sits on the dark end */
+      right = photoPanel({ key: o.photo, dir: 'V', gap: 28, pad: [96, 120, 64, 96], main: 'MAX', vertical: true, scrim: [[0, NAVY + '00'], [0.3, NAVY + '26'], [0.55, NAVY + 'B3'], [1, NAVY + 'F5']] });
+      right.name = 'Aside · Photo · ' + o.photo;
+    } else {
+      right = VV({ name: 'Aside', gap: 28, pad: [96, 120, 64, 96], fill: 'bg/sunken' });
+      right.strokes = [P('border/default')]; right.strokeAlign = 'INSIDE';
+      right.strokeTopWeight = 0; right.strokeBottomWeight = 0; right.strokeRightWeight = 0; right.strokeLeftWeight = 1;
+    }
     aside.forEach(function (a) { add(right, a); });
     addAll(body, [left, fillW(right)]);
     right.layoutSizingVertical = 'FILL';
@@ -5589,7 +6202,8 @@ function asideList(title, rows, o) {
       add(row, n);
     } else if (r[2]) add(row, Ic(r[2], 20, 'text/tertiary'));
     var t = VV({ name: 'Text', gap: 2 });
-    addAll(t, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    add(t, Tx(r[0], 'Label/M'));
+    if (!o.compact) add(t, Tx(r[1], 'Body/S', 'text/secondary', { fill: true }));
     add(row, fillW(t));
     add(v, fillW(row));
   });
@@ -5601,7 +6215,8 @@ var ACCOUNT_KEEPS = [
   ['Quotations you can read line by line', 'Every line says how it was worked out. You accept or decline in one place.', 'tag'],
   ['Your horses, entered once', 'Passport details, size and handling needs are reused on every move.', 'check']
 ];
-function signInAside() { return [asideList('One account for every move', ACCOUNT_KEEPS)]; }
+/* on the photograph only the four titles are shown, so the list stays on the dark end of the scrim */
+function signInAside() { return [asideList('One account for every move', ACCOUNT_KEEPS, { compact: true })]; }
 
 /* ---------- Sign in ---------- */
 function signInForm(o) {
@@ -5628,9 +6243,9 @@ function signInForm(o) {
   blocks.push(Tx('Staff sign in here too, with the email your invite was sent to. Your role decides where you land.', 'Body/S', 'text/tertiary', { fill: true }));
   return authForm(authHead('Sign in', 'One sign-in for racing clubs and EquiFreight staff.'), blocks);
 }
-function scrSignIn() { return authScreen('Access · Sign in', signInForm(), signInAside()); }
-function scrSignInError() { return authScreen('Access · Sign in · Wrong password', signInForm({ error: true }), signInAside()); }
-function scrSignInLocked() { return authScreen('Access · Sign in · Locked', signInForm({ locked: true }), signInAside(), { asOf: '26 Sep 2026, 14:20', tall: true }); } // the lock notice and its two actions need more than 900
+function scrSignIn() { return authScreen('Access · Sign in', signInForm(), signInAside(), { photo: 'Sign in' }); }
+function scrSignInError() { return authScreen('Access · Sign in · Wrong password', signInForm({ error: true }), signInAside(), { photo: 'Sign in' }); }
+function scrSignInLocked() { return authScreen('Access · Sign in · Locked', signInForm({ locked: true }), signInAside(), { asOf: '26 Sep 2026, 14:20', tall: true, photo: 'Sign in' }); } // the lock notice and its two actions need more than 900
 
 /* ---------- Create a club account ---------- */
 var NEXT_STEPS = [
@@ -5911,12 +6526,13 @@ async function main() {
   await flush();
 
   await figma.setCurrentPageAsync(screens);
-  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
-  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld()];
+  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest2Window(), scrRequest2NotRun(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
+  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrFlightTrip(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld()];
+  row1.concat(row2).forEach(primaryTheme);
   await flush();
-  var lbl1 = Tx('Owner portal · Dark', 'Display/M');
-  var lbl2 = Tx('Operations · Dark', 'Display/M');
-  var lbl3 = Tx('Light mode & mobile', 'Display/M');
+  var lbl1 = Tx('Owner portal', 'Display/M');
+  var lbl2 = Tx('Operations', 'Display/M');
+  var lbl3 = Tx('Dark mode & mobile', 'Display/M');
   [lbl1, lbl2, lbl3].forEach(function (l) { screens.appendChild(l); });
   lbl1.x = 0; lbl1.y = -120;
   place(row1, 0, 0, 120);
@@ -5925,12 +6541,10 @@ async function main() {
   place(row2, 0, y2, 120);
   var y3 = y2 + Math.max.apply(null, row2.map(function (n) { return n.height; })) + 360;
   lbl3.x = 0; lbl3.y = y3 - 120;
-  var light = [row1[0].clone(), row2[2].clone(), row2[0].clone()];
-  light.forEach(function (n) { n.name = n.name + ' · Light'; n.setExplicitVariableModeForCollection(COLL.color, COLL.light); screens.appendChild(n); });
-  var mob = scrHorsesMobile();
-  var mobL = mob.clone();
-  mobL.name = 'My horses · Mobile · Light';
-  mobL.setExplicitVariableModeForCollection(COLL.color, COLL.light);
+  var light = [altCopy(row1[0]), altCopy(row2[2]), altCopy(row2[0])];
+  light.forEach(function (n) { screens.appendChild(n); });
+  var mob = primaryTheme(scrHorsesMobile());
+  var mobL = altCopy(mob);
   screens.appendChild(mobL);
   place(light.concat([mob, mobL]), 0, y3, 120);
   await flush();

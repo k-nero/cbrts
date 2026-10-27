@@ -762,7 +762,8 @@ public class DataSeeder implements ApplicationRunner {
         // Vehicle TX-447, on the job's own trip
         Vehicle tx447 = vehicleRepository.findByCode("TX-447").orElseThrow();
         List<VehicleStall> stalls = vehicleStallRepository.findByVehicleIdOrderByPositionNo(tx447.getId());
-        Trip trip = jobTrips.createForJob(savedJob, yen, savedJob.getApprovedAt());
+        // The demo job's one trip, as the coordinator adds it (US-F3-21): its request's corridor, from the origin.
+        Trip trip = jobTrips.startJourney(savedJob, savedReq.getCorridor(), false, yen, savedJob.getApprovedAt());
         trip.setPlannedDepartureAt(savedJob.getPlannedDepartureAt());
         TripVehicle tripVehicle = jobTrips.useVehicle(trip, tx447);
 

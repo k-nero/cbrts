@@ -399,6 +399,39 @@ export interface JobDetail extends BaseEntity {
   tripJobs: TripJob[];
   /** The job's trips in journey order, one while it travels on one trip (US-F5-06, US-F3-16). */
   parts: TripPart[];
+  /** The city the journey has reached, where the next trip starts; the origin's with no trip (US-F3-21). */
+  journeyEndCity: string | null;
+  /** True once the last trip ends in the destination city: no trip can be added after it. */
+  journeyComplete: boolean;
+  /** Warn lines: the journey ends short of the destination, or leaves the quoted route. */
+  journeyWarnings: string[];
+  /** Which trips the clearance gate holds back, in words; null with no trip. */
+  clearanceJourneyNote: string | null;
+}
+
+/** A corridor the next trip of a job's journey can run, read from the city it has reached (US-F3-21). */
+export interface JourneyCorridor {
+  corridorId: string;
+  corridorCode: string;
+  mode: TransportMode;
+  /** Run from the corridor's destination city to its origin city. */
+  reversed: boolean;
+  fromCity: string;
+  toCity: string;
+  /** The trip would end in the city the horses are going to. */
+  reachesDestination: boolean;
+  /** On the route the customer was quoted. */
+  quoted: boolean;
+}
+
+/** The airline's flight for a journey's flight trip (US-F3-21); its times become the airport stops'. */
+export interface FlightInput {
+  airline: string;
+  flightNo: string;
+  aircraftType: string | null;
+  stallCapacity: number | null;
+  scheduledDepartureAt: string | null;
+  scheduledArrivalAt: string | null;
 }
 
 /** Whether a job can be closed, what holds it, or how it was closed (US-F6-04). */

@@ -298,7 +298,11 @@ public class RoutePlanService {
                     .filter(st -> ownerOf(st, job).getId().equals(onTrip.getId()))
                     .toList();
             // A job that continues on a later trip of its chain hands its horses on here instead of delivering them.
-            RouteStopKind end = jobTrips.handsOn(trip, onTrip) ? RouteStopKind.TRANSFER : RouteStopKind.DELIVERY;
+            // A trip that ends short of the destination city hands on too: the journey continues on a trip the
+            // coordinator hasn't added yet (US-F3-21).
+            RouteStopKind end = jobTrips.handsOn(trip, onTrip) || !JobTripService.reachesDestination(trip, onTrip)
+                    ? RouteStopKind.TRANSFER
+                    : RouteStopKind.DELIVERY;
             if (own.stream().noneMatch(st -> st.getKind() == RouteStopKind.PICKUP)
                     || own.stream().noneMatch(st -> st.getKind() == end)) {
                 throw new BusinessException("The route must pick up and "
@@ -623,10 +627,6 @@ public class RoutePlanService {
     /** The stops a trip can end with: a job's delivery, or where it hands a job's horses on (US-F3-16). */
     private static final Set<RouteStopKind> ENDS = EnumSet.of(RouteStopKind.DELIVERY, RouteStopKind.TRANSFER);
 
-    /** Where a job's journey can be split across trips (US-F3-16): the places horses wait between two carriers. */
-    private static final Set<RouteStopKind> SPLITS =
-            EnumSet.of(RouteStopKind.AIRPORT_OUT, RouteStopKind.AIRPORT_IN, RouteStopKind.QUARANTINE);
-
     /** The stop kinds that name the job they are for. */
     static boolean namesJob(RouteStopKind kind) {
         return kind == RouteStopKind.PICKUP || kind == RouteStopKind.DELIVERY || kind == RouteStopKind.TRANSFER;
@@ -753,146 +753,31 @@ public class RoutePlanService {
     }
 
     /**
-     * Splits {@code job}'s journey at the stop numbered {@code stopSeq} on {@code from}'s route (US-F3-16): from then
-     * on, the job travels on {@code to}. On {@code from}'s draft the stop becomes the job's TRANSFER, and the job's
-     * stops after it (with the trip's own stops when no other job still needs them) move to a new draft of
-     * {@code to}'s route, which starts with the job's pickup at the same place. The legs and flights between stops that
-     * stay consecutive come along, so a flight from the airport travels with the trip that flies. Returns the stop's
-     * place.
+     * The first route of a trip a coordinator adds to {@code job}'s journey (US-F3-21): the job's pickup at
+     * {@code from}, then its {@code endKind} (DELIVERY where the journey ends, else TRANSFER, where the next trip
+     * collects the horses) at {@code to}, with no times yet. A road trip's route is a draft the coordinator plans on the
+     * Route view. A flight's is confirmed at once, airport to airport by air: its times come from the flight.
      */
     @Transactional
-    public Place splitAt(Trip from, Trip to, TransportJob job, short stopSeq, String reason) {
-        RoutePlan draft = draftOf(from, reason)
-                .orElseThrow(() -> new BusinessException("Plan the route of trip " + from.getCode()
-                        + " first: the journey is split at one of its stops"));
-        List<RouteStop> stops = draft.getStops();
-        int at = -1;
-        for (int i = 0; i < stops.size(); i++) if (stops.get(i).getSeq() == stopSeq) at = i;
-        if (at < 0) throw new BusinessException("Trip " + from.getCode() + "'s route has no stop " + stopSeq);
-        RouteStop split = stops.get(at);
-        if (!SPLITS.contains(split.getKind()) || split.getPlace() == null) {
-            throw new BusinessException("A journey continues on another trip at an airport or a quarantine station, "
-                    + "where the horses wait between carriers");
+    public RoutePlan startRoute(
+            Trip trip, TransportJob job, Place from, RouteStopKind endKind, Place to, User by, String reason) {
+        RoutePlan draft = newDraft(trip, reason);
+        rebuild(
+                draft,
+                List.of(
+                        new StopCopy(null, job, RouteStopKind.PICKUP, from, null),
+                        new StopCopy(null, job, endKind, to, null)));
+        if (trip.getCorridor().isRoad()) return draft;
+        for (RouteLeg leg : draft.getLegs()) {
+            leg.setMode(TransportMode.AIR);
+            leg.setVehicle(null);
+            leg.setDistanceKm(trip.getCorridor().getDistanceKm());
+            routeLegRepository.save(leg);
         }
-        boolean delivered = false;
-        for (int i = at + 1; i < stops.size(); i++) {
-            RouteStop st = stops.get(i);
-            if (st.getJob() != null && st.getJob().getId().equals(job.getId()) && ENDS.contains(st.getKind())) {
-                delivered = true;
-            }
-        }
-        if (!delivered) {
-            throw new BusinessException("The stop is after " + job.getCode() + "'s delivery on trip " + from.getCode()
-                    + ": split the journey before it");
-        }
-        boolean othersAfter = stops.subList(at + 1, stops.size()).stream()
-                .anyMatch(st -> st.getJob() != null && !st.getJob().getId().equals(job.getId()));
-        boolean splitShared = split.getJob() != null || othersAfter;
-
-        List<StopCopy> staying = new ArrayList<>();
-        List<StopCopy> moving = new ArrayList<>();
-        for (int i = 0; i <= at; i++) {
-            RouteStop st = stops.get(i);
-            staying.add(
-                    i == at && !splitShared
-                            ? new StopCopy(st, job, RouteStopKind.TRANSFER, st.getPlace(), st.getPlannedAt())
-                            : copy(st));
-        }
-        if (splitShared) {
-            staying.add(new StopCopy(null, job, RouteStopKind.TRANSFER, split.getPlace(), split.getPlannedAt()));
-        }
-        Instant ready = split.getPlannedAt() == null || split.getPlannedStayMin() == null
-                ? split.getPlannedAt()
-                : split.getPlannedAt().plus(Duration.ofMinutes(split.getPlannedStayMin()));
-        moving.add(new StopCopy(split, job, RouteStopKind.PICKUP, split.getPlace(), ready));
-        for (int i = at + 1; i < stops.size(); i++) {
-            RouteStop st = stops.get(i);
-            boolean own = st.getJob() != null && st.getJob().getId().equals(job.getId());
-            if (own || (st.getJob() == null && !othersAfter)) moving.add(copy(st));
-            else staying.add(copy(st));
-        }
-        Map<String, RouteLeg> legs = legsOf(draft);
-        RoutePlan next = routePlanRepository
-                .findByTrip_IdAndStatus(to.getId(), RoutePlanStatus.DRAFT)
-                .orElseGet(() -> newDraft(to, reason));
-        if (next.getStops().isEmpty()) {
-            rebuild(next, moving, legs);
-        } else {
-            // The job joins a trip already planned: its stops go after the trip's own pickups and deliveries.
-            addJobStops(to, job, moving);
-        }
-        rebuild(draft, staying);
-        return split.getPlace();
-    }
-
-    /**
-     * Joins {@code job}'s journey on {@code next} back onto {@code from} (US-F3-16), the reverse of
-     * {@link #splitAt}: the job's TRANSFER on {@code from}'s draft becomes the airport or quarantine stop it was, and
-     * the job's stops after its pickup on {@code next} (with that trip's own stops when no other job rides it) follow
-     * it, keeping their legs and flights. {@code next}'s draft loses the job's stops.
-     */
-    @Transactional
-    public void joinBack(Trip from, Trip next, TransportJob job, boolean nextHasOthers, String reason) {
-        RoutePlan draft = draftOf(from, reason).orElse(null);
-        RoutePlan later = draftOf(next, reason)
-                .or(() -> routePlanRepository.findFirstByTrip_IdOrderByVersionNoDesc(next.getId()))
-                .orElse(null);
-        if (draft == null) return;
-        List<RouteStop> stops = draft.getStops();
-        int at = -1;
-        for (int i = 0; i < stops.size(); i++) {
-            RouteStop st = stops.get(i);
-            if (st.getKind() == RouteStopKind.TRANSFER && st.getJob().getId().equals(job.getId())) at = i;
-        }
-        Map<String, RouteLeg> legs = legsOf(draft);
-        List<StopCopy> joined = new ArrayList<>();
-        List<RouteStop> after = List.of();
-        RouteLeg firstLeg = null;
-        if (later != null) {
-            List<RouteStop> laterStops = later.getStops();
-            int pickup = -1;
-            for (int i = 0; i < laterStops.size(); i++) {
-                RouteStop st = laterStops.get(i);
-                if (pickup < 0
-                        && st.getKind() == RouteStopKind.PICKUP
-                        && st.getJob().getId().equals(job.getId())) pickup = i;
-            }
-            if (pickup >= 0) {
-                after = laterStops.subList(pickup + 1, laterStops.size()).stream()
-                        .filter(st ->
-                                (st.getJob() != null && st.getJob().getId().equals(job.getId()))
-                                        || (st.getJob() == null && !nextHasOthers))
-                        .toList();
-                Map<String, RouteLeg> laterLegs = legsOf(later);
-                legs.putAll(laterLegs);
-                if (!after.isEmpty()) {
-                    firstLeg = laterLegs.get(laterStops.get(pickup).getId() + ">"
-                            + after.getFirst().getId());
-                }
-            }
-        }
-        RouteStop transfer = at < 0 ? null : stops.get(at);
-        for (int i = 0; i < stops.size(); i++) {
-            RouteStop st = stops.get(i);
-            if (i != at) {
-                joined.add(copy(st));
-                continue;
-            }
-            RouteLeg into = at > 0 ? legs.get(stops.get(at - 1).getId() + ">" + st.getId()) : null;
-            RouteStopKind was = firstLeg != null && firstLeg.getMode() == TransportMode.AIR
-                    ? RouteStopKind.AIRPORT_OUT
-                    : into != null && into.getMode() == TransportMode.AIR
-                            ? RouteStopKind.AIRPORT_IN
-                            : RouteStopKind.QUARANTINE;
-            joined.add(new StopCopy(st, null, was, st.getPlace(), st.getPlannedAt()));
-            for (RouteStop moved : after) joined.add(copy(moved));
-        }
-        if (transfer != null && firstLeg != null) {
-            // The leg out of the transfer is the later trip's leg out of the job's pickup.
-            legs.put(transfer.getId() + ">" + after.getFirst().getId(), firstLeg);
-        }
-        rebuild(draft, joined, legs);
-        if (later != null && later.getStatus() == RoutePlanStatus.DRAFT) removeJobStops(next, job);
+        draft.setStatus(RoutePlanStatus.CONFIRMED);
+        draft.setConfirmedBy(by);
+        draft.setConfirmedAt(Instant.now());
+        return routePlanRepository.save(draft);
     }
 
     private static StopCopy copy(RouteStop st) {

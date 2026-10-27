@@ -904,7 +904,9 @@ public class TripService {
                     Optional.ofNullable(p.getTrip().getCorridor())
                             .map(c -> c.getMode())
                             .orElse(null),
-                    p.getNext() != null));
+                    p.getNext() != null,
+                    p.getTrip().getCorridor() == null ? null : p.getTrip().startCity(),
+                    p.getTrip().getCorridor() == null ? null : p.getTrip().endCity()));
             if (here) {
                 // A part shows its own plan only: one still to be planned has no times yet.
                 current = new TripMapper.Part(p.getStatus(), p.getTrip().getPlannedDepartureAt(), arrival, List.of());

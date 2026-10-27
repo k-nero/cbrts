@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -132,7 +133,8 @@ class TripLeavingServiceTest {
         when(jobTrips.partDeparted(trip, job)).thenReturn(true);
         when(jobTrips.horsesOn(trip))
                 .thenReturn(List.of(rider(job, shadowfax), rider(job, nightfall), rider(other, ivory)));
-        when(jobTrips.newTripFor(eq(job), any(), eq(NOW))).thenReturn(later);
+        when(jobTrips.newTrip(eq(trip.getCorridor()), eq(trip.isReversed()), any(), eq(NOW)))
+                .thenReturn(later);
     }
 
     @Test
@@ -201,7 +203,7 @@ class TripLeavingServiceTest {
         verify(jobTrips).leaveInCare(trip, job, Set.of(nightfall.getId()));
         verify(loadPlans).unload(trip, Set.of(nightfall.getId()));
         verify(jobTrips).summarize(job);
-        verify(jobTrips, never()).newTripFor(any(), any(), any());
+        verify(jobTrips, never()).newTrip(any(), anyBoolean(), any(), any());
     }
 
     @Test

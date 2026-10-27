@@ -99,6 +99,9 @@ class Flow3ServiceTest {
     @Mock
     private JobTripService jobTrips;
 
+    private final com.equifreight.repository.FlightRepository flights =
+            mock(com.equifreight.repository.FlightRepository.class);
+
     /** The trip every job in these tests travels on alone. */
     private final Trip trip = trip();
 
@@ -280,7 +283,9 @@ class Flow3ServiceTest {
                 auditService,
                 notificationService,
                 mock(CodeService.class),
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                flights);
     }
 
     @Test
@@ -991,6 +996,52 @@ class Flow3ServiceTest {
                         eq(Subject.job(job)),
                         contains("Trip plan signed off"),
                         any());
+    }
+
+    @Test
+    @DisplayName("Sign-off is refused while the journey ends short of the destination city (US-F3-21)")
+    void signOff_refusesAJourneyShortOfTheDestination() {
+        TransportJob job = readyJob();
+        Corridor toAirport = new Corridor();
+        toAirport.setCode("RD DAD → HCM");
+        toAirport.setOriginCity("Da Nang");
+        toAirport.setDestinationCity("Ho Chi Minh City");
+        trip.setCorridor(toAirport);
+        Place stables = new Place();
+        stables.setName("Sha Tin stables");
+        stables.setCity("Sha Tin");
+        job.getRequest().setDestinationPlace(stables);
+        stubPlansAndCrew(job, List.of());
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> transportJobService.signOffTripPlan(job.getId(), new User()));
+
+        assertEquals(
+                "Cannot sign off trip plan: CBRT-2026-041's journey ends in Ho Chi Minh City; the horses go to Sha Tin."
+                        + " Add the trip there first.",
+                refused.getMessage());
+        assertNull(job.getSignedOffAt());
+    }
+
+    @Test
+    @DisplayName("A flight is signed off only once its flight and times are set (US-F3-21)")
+    void signOff_refusesAFlightWithoutItsTimes() {
+        TransportJob job = readyJob();
+        stubPlansAndCrew(job, List.of());
+        RouteLeg air = new RouteLeg();
+        air.setId(UUID.randomUUID());
+        air.setMode(TransportMode.AIR);
+        RoutePlan route = new RoutePlan();
+        route.setTrip(trip);
+        route.getLegs().add(air);
+        when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(route));
+        when(flights.findByRouteLegId(air.getId())).thenReturn(Optional.empty());
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> transportJobService.signOffTripPlan(job.getId(), new User()));
+
+        assertEquals("Cannot sign off trip plan: enter the flight and its times first.", refused.getMessage());
     }
 
     @Test

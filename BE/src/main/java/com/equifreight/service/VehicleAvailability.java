@@ -180,6 +180,7 @@ public class VehicleAvailability {
         return refusal(
                 vehicle,
                 trip.getCorridor(),
+                trip.startCity(),
                 span.startsAt(),
                 span.endsAt(),
                 ownOf(trip),
@@ -197,6 +198,7 @@ public class VehicleAvailability {
         return refusal(
                 vehicle,
                 request.getCorridor(),
+                request.getCorridor() == null ? null : request.getCorridor().getOriginCity(),
                 start,
                 afterDriving(start, request.getCorridor()),
                 ownOf(request),
@@ -217,7 +219,17 @@ public class VehicleAvailability {
         for (LocalDate day = from; !day.isAfter(last); day = day.plusDays(1)) {
             Instant start = startOf(day);
             Instant end = afterDriving(start, request.getCorridor());
-            if (refusal(vehicle, request.getCorridor(), start, end, own, context, held)
+            if (refusal(
+                            vehicle,
+                            request.getCorridor(),
+                            request.getCorridor() == null
+                                    ? null
+                                    : request.getCorridor().getOriginCity(),
+                            start,
+                            end,
+                            own,
+                            context,
+                            held)
                     .isEmpty()) {
                 return Optional.of(day);
             }
@@ -236,6 +248,7 @@ public class VehicleAvailability {
     static Optional<String> refusal(
             Vehicle vehicle,
             Corridor corridor,
+            String startCity,
             Instant start,
             Instant end,
             Own own,
@@ -258,8 +271,7 @@ public class VehicleAvailability {
                     + BusinessTime.SHORT_DAY.format(vehicle.getAvailableOn()) + "; " + starts);
         }
 
-        Optional<String> location =
-                locationRefusal(vehicle, corridor.getOriginCity(), start, starts, own, context, held);
+        Optional<String> location = locationRefusal(vehicle, startCity, start, starts, own, context, held);
         if (location.isPresent()) return location;
 
         if (end != null && start.isBefore(end)) {
@@ -290,9 +302,9 @@ public class VehicleAvailability {
             List<VehicleBooking> held) {
         Optional<VehicleBooking> last = held.stream()
                 .filter(b -> !own.contains(b))
-                .filter(b -> corridorOf(b) != null && !b.getEndsAt().isAfter(start))
+                .filter(b -> endCityOf(b) != null && !b.getEndsAt().isAfter(start))
                 .max(Comparator.comparing(VehicleBooking::getEndsAt));
-        String where = last.map(b -> corridorOf(b).getDestinationCity()).orElse(vehicle.getHomeCity());
+        String where = last.map(VehicleAvailability::endCityOf).orElse(vehicle.getHomeCity());
         if (where == null || startCity == null) return Optional.empty();
         Instant ready = last.map(b -> b.getEndsAt().plus(context.turnaround())).orElse(null);
 
@@ -320,11 +332,14 @@ public class VehicleAvailability {
         return Optional.empty();
     }
 
-    private static Corridor corridorOf(VehicleBooking b) {
-        if (b.getKind() == BookingKind.JOB && b.getTrip() != null)
-            return b.getTrip().getCorridor();
-        if (b.getKind() == BookingKind.RESERVED && b.getRequest() != null)
-            return b.getRequest().getCorridor();
+    /** The city a booking leaves its vehicle in: a trip's end, in the trip's direction (US-F3-21), or a hold's. */
+    private static String endCityOf(VehicleBooking b) {
+        if (b.getKind() == BookingKind.JOB && b.getTrip() != null && b.getTrip().getCorridor() != null)
+            return b.getTrip().endCity();
+        if (b.getKind() == BookingKind.RESERVED
+                && b.getRequest() != null
+                && b.getRequest().getCorridor() != null)
+            return b.getRequest().getCorridor().getDestinationCity();
         return null;
     }
 
@@ -409,7 +424,7 @@ public class VehicleAvailability {
         }
         Span span = spanOf(trip);
         String on = span.startsAt() == null ? "" : " on " + DAY.format(span.startsAt());
-        String in = corridor.getOriginCity() == null ? "" : " and in " + corridor.getOriginCity();
+        String in = trip.startCity() == null ? "" : " and in " + trip.startCity();
         throw new BusinessException(
                 "VEHICLE_UNAVAILABLE", "No vehicle that runs " + corridor.getCode() + " is free" + in + on + ".");
     }

@@ -42,4 +42,12 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             order by t.plannedDepartureAt asc nulls last, t.code
             """)
     List<Trip> findJoinable(@Param("corridorId") UUID corridorId, @Param("exceptId") UUID exceptId);
+
+    /**
+     * Deletes a trip nobody rides any more (US-F3-21): its vehicles, horses, parts, route, load plans, bookings and crew
+     * go with it, by the database's cascades.
+     */
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Trip t where t.id = :id")
+    void deleteTrip(@Param("id") UUID id);
 }

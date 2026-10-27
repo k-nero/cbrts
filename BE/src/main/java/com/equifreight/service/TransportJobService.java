@@ -44,6 +44,8 @@ public class TransportJobService {
     private final NotificationService notificationService;
     private final CodeService codeService;
     private final JobTripService jobTrips;
+    private final JourneyService journeys;
+    private final com.equifreight.repository.FlightRepository flightRepository;
 
     public TransportJobService(
             TransportJobRepository transportJobRepository,
@@ -57,7 +59,9 @@ public class TransportJobService {
             AuditService auditService,
             NotificationService notificationService,
             CodeService codeService,
-            JobTripService jobTrips) {
+            JobTripService jobTrips,
+            JourneyService journeys,
+            com.equifreight.repository.FlightRepository flightRepository) {
         this.transportJobRepository = transportJobRepository;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -70,6 +74,8 @@ public class TransportJobService {
         this.notificationService = notificationService;
         this.codeService = codeService;
         this.jobTrips = jobTrips;
+        this.journeys = journeys;
+        this.flightRepository = flightRepository;
     }
 
     @Transactional(readOnly = true)
@@ -158,10 +164,14 @@ public class TransportJobService {
         // A domestic leg before the border leaves before the dossier clears; the gate is on the trip that crosses
         // (US-F2-13).
         boolean domesticLeg = shown.map(t -> jobTrips.beforeBorder(t, job)).orElse(false);
-        boolean isClear = gate.clearanceReady() || domesticLeg;
+        boolean noTrip = jobTrips.journey(job).isEmpty();
+        // With no trip yet nothing can depart, whatever the dossier says (US-F3-21).
+        boolean isClear = !noTrip && (gate.clearanceReady() || domesticLeg);
         String gateState = isClear ? "Clear" : "Locked";
         String gateSummary;
-        if (domesticLeg && !gate.clearanceReady()) {
+        if (noTrip) {
+            gateSummary = "No trip planned yet. The fleet coordinator adds the journey's first trip.";
+        } else if (domesticLeg && !gate.clearanceReady()) {
             gateSummary = jobTrips.borderTripOf(job)
                     .map(border -> "This leg stays in one country and can depart before the dossier clears. The"
                             + " clearance gate is on " + border.getCode() + ", which crosses the border.")
@@ -181,25 +191,53 @@ public class TransportJobService {
                         .toList())
                 .orElse(List.of());
         return JobMapper.toDetailResponse(
-                job,
-                shown.map(Trip::getCode).orElse(null),
-                getBlockingReason(job),
-                getNextStepOwner(job),
-                gateState,
-                gateSummary,
-                horses,
-                loadPlan,
-                routePlan,
-                crew,
-                tripJobs,
-                jobTrips.describeParts(job, tripId));
+                        job,
+                        shown.map(Trip::getCode).orElse(null),
+                        getBlockingReason(job),
+                        getNextStepOwner(job),
+                        gateState,
+                        gateSummary,
+                        horses,
+                        loadPlan,
+                        routePlan,
+                        crew,
+                        tripJobs,
+                        jobTrips.describeParts(job, tripId))
+                .toBuilder()
+                .journeyEndCity(jobTrips.journeyEndCity(job))
+                .journeyComplete(journeys.complete(job))
+                .journeyWarnings(journeys.warnings(job))
+                .clearanceJourneyNote(clearanceJourneyNote(job))
+                .build();
+    }
+
+    /**
+     * Which trips of the job's journey the clearance gate holds back (US-F2-13, US-F3-21): the trip that crosses the
+     * border and every trip after it; a domestic leg before it can leave first. Null while the job has no trip.
+     */
+    private String clearanceJourneyNote(TransportJob job) {
+        List<com.equifreight.entity.TripJob> journey = jobTrips.journey(job);
+        Optional<Trip> border = jobTrips.borderTripOf(job);
+        if (journey.isEmpty() || border.isEmpty()) return null;
+        List<String> before = new java.util.ArrayList<>();
+        for (com.equifreight.entity.TripJob part : journey) {
+            Trip t = part.getTrip();
+            if (t.getId().equals(border.get().getId())) break;
+            before.add(t.getCode() + " (" + t.startCity() + " → " + t.endCity() + ")");
+        }
+        Trip gated = border.get();
+        String what = gated.getCorridor().isRoad() ? "the road trip" : "the flight";
+        String note = "Clearance gates " + gated.getCode() + " (" + what + " " + gated.startCity() + " → "
+                + gated.endCity() + ")" + (journey.size() > before.size() + 1 ? " and every trip after it." : ".");
+        if (!before.isEmpty()) note += " " + String.join(", ", before) + " can leave before.";
+        return note;
     }
 
     /**
      * The job an approved request becomes (US-F1-07, BR-F1-05): its CBRT code from the code counter, the accepted
      * quotation it is held to, the manager who approved it and the team they chose, with the request's arrival window.
-     * It travels on a trip of its own, with all its horses (US-F3-09). The caller has checked the request and the
-     * team; the dates are planned in Flow 3.
+     * It has no trip until the fleet coordinator adds one (US-F3-21). The caller has checked the request and the team;
+     * the dates are planned in Flow 3.
      */
     @Transactional
     public TransportJob createApproved(
@@ -220,9 +258,8 @@ public class TransportJobService {
         job.setCoordinator(coordinator);
         job.setWindowStart(request.getWindowStart());
         job.setWindowEnd(request.getWindowEnd());
-        TransportJob saved = transportJobRepository.saveAndFlush(job);
-        jobTrips.createForJob(saved, manager, approvedAt);
-        return saved;
+        // No trip yet: the coordinator builds the journey one trip at a time on the job's Trip tab (US-F3-21).
+        return transportJobRepository.saveAndFlush(job);
     }
 
     @Transactional
@@ -255,6 +292,19 @@ public class TransportJobService {
                         + (onTrip.getId().equals(jobId) ? "" : " for " + onTrip.getCode())
                         + " (" + gate.outstandingIssues().size() + " items outstanding)"
                         + (onTrip.getId().equals(jobId) ? "" : ". Take it off the trip so the others can leave."));
+            }
+        }
+
+        // The journey must reach the destination city before any trip of it is signed off (US-F3-21).
+        for (TransportJob onTrip : jobsOnTrip) {
+            List<com.equifreight.entity.TripJob> journey = jobTrips.journey(onTrip);
+            Trip last = journey.isEmpty() ? trip : journey.getLast().getTrip();
+            if (!JobTripService.reachesDestination(last, onTrip)) {
+                throw new BusinessException(
+                        "JOURNEY_SHORT",
+                        "Cannot sign off trip plan: " + onTrip.getCode()
+                                + "'s journey ends in " + last.endCity() + "; the horses go to "
+                                + onTrip.getRequest().getDestinationPlace().getCity() + ". Add the trip there first.");
             }
         }
 
@@ -300,6 +350,18 @@ public class TransportJobService {
             if (groomCount < reqGrooms) {
                 throw new BusinessException("Cannot sign off trip plan: " + vehicleCode + " requires " + reqGrooms
                         + " groom(s), found " + groomCount);
+            }
+        }
+        // A flight of the journey is signed off once the airline's flight and its times are set (US-F3-21).
+        for (com.equifreight.entity.RouteLeg leg : routePlanOpt.get().getLegs()) {
+            if (leg.getMode() != com.equifreight.entity.enums.TransportMode.AIR) continue;
+            boolean timed = flightRepository
+                    .findByRouteLegId(leg.getId())
+                    .map(f -> f.getScheduledDepartureAt() != null && f.getScheduledArrivalAt() != null)
+                    .orElse(false);
+            if (!timed) {
+                throw new BusinessException(
+                        "FLIGHT_TIMES", "Cannot sign off trip plan: enter the flight and its times first.");
             }
         }
         // A trip that flies needs its flight crew too, counted for every horse on board (US-F3-15).
