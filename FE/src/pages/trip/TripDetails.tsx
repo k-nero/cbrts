@@ -80,61 +80,68 @@ export function TripDetails({
                   : 'An incident split this job across trips; each part departs, travels and is delivered on its own.'}
             </p>
             {trip.parts.map((part, index) => (
-              <Flex
-                key={part.tripId}
-                wrap
-                align="center"
-                justify="space-between"
-                gap={12}
-                className="rounded-lg border border-line bg-card p-4"
-              >
-                <Flex vertical gap={2}>
-                  <span className="type-label-m text-ink">
-                    {journey
-                      ? [
-                          `${index + 1}`,
-                          part.mode === 'AIR' ? 'Flight' : 'Road',
-                          part.corridorCode,
-                          part.tripCode,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')
-                      : `${part.tripCode ?? `Part ${index + 1}`} · ${part.horses.join(', ') || 'No horse travelling'}`}
-                  </span>
-                  <span className="type-body-s text-ink-3">
-                    {[
-                      part.plannedDepartureAt
-                        ? `Departs ${formatTime(part.plannedDepartureAt)}`
-                        : 'Departure to be planned',
-                      part.plannedArrivalAt ? `Arrives ${formatTime(part.plannedArrivalAt)}` : null,
-                      part.leftInCare.length > 0 ? `In care: ${part.leftInCare.join(', ')}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
+              // The padding sits on a box around the Flex: AntD's Flex styles override Tailwind padding.
+              <div key={part.tripId} className="rounded-lg border border-line bg-card px-4 py-3">
+                <Flex wrap align="center" justify="space-between" gap={12}>
+                  <Flex vertical gap={2}>
+                    <span className="type-label-m text-ink">
+                      {journey
+                        ? [
+                            `${index + 1}`,
+                            part.mode === 'AIR' ? 'Flight' : 'Road',
+                            // The trip's cities in its direction (US-F3-21); the corridor code is staff shorthand.
+                            part.startCity && part.endCity
+                              ? `${part.startCity} → ${part.endCity}`
+                              : part.corridorCode,
+                            part.tripCode,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : `${part.tripCode ?? `Part ${index + 1}`} · ${part.horses.join(', ') || 'No horse travelling'}`}
+                    </span>
+                    <span className="type-body-s text-ink-3">
+                      {[
+                        part.plannedDepartureAt
+                          ? `Departs ${formatTime(part.plannedDepartureAt)}`
+                          : 'Departure to be planned',
+                        part.plannedArrivalAt
+                          ? `Arrives ${formatTime(part.plannedArrivalAt)}`
+                          : null,
+                        part.leftInCare.length > 0
+                          ? `In care: ${part.leftInCare.join(', ')}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </Flex>
+                  <Flex align="center" gap={8}>
+                    <Chip
+                      tone={
+                        part.status === 'DELIVERED'
+                          ? 'ok'
+                          : part.status === 'HELD'
+                            ? 'warn'
+                            : 'info'
+                      }
+                    >
+                      {part.handsOn && part.status === 'DELIVERED'
+                        ? 'Handed on'
+                        : sentence(part.status)}
+                    </Chip>
+                    {part.current ? (
+                      <Chip>Shown</Chip>
+                    ) : (
+                      onShowPart &&
+                      audience !== 'escort' && (
+                        <Button size="sm" onClick={() => onShowPart(part.tripId)}>
+                          {journey ? 'Show this trip' : 'Show this part'}
+                        </Button>
+                      )
+                    )}
+                  </Flex>
                 </Flex>
-                <Flex align="center" gap={8}>
-                  <Chip
-                    tone={
-                      part.status === 'DELIVERED' ? 'ok' : part.status === 'HELD' ? 'warn' : 'info'
-                    }
-                  >
-                    {part.handsOn && part.status === 'DELIVERED'
-                      ? 'Handed on'
-                      : sentence(part.status)}
-                  </Chip>
-                  {part.current ? (
-                    <Chip>Shown</Chip>
-                  ) : (
-                    onShowPart &&
-                    audience !== 'escort' && (
-                      <Button size="sm" onClick={() => onShowPart(part.tripId)}>
-                        {journey ? 'Show this trip' : 'Show this part'}
-                      </Button>
-                    )
-                  )}
-                </Flex>
-              </Flex>
+              </div>
             ))}
             {journey && !wholeJourney && audience === 'customer' && onShowJourney && (
               <Flex>

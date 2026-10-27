@@ -29,7 +29,7 @@ const RequestInvoicePage: FC = () => {
       <PageHeader
         back={{
           label: invoice.requestCode ?? 'Request',
-          onClick: () => router.push(router.paths.get('request-submitted', { pathParams: [id] })),
+          onClick: () => router.push(router.paths.get('request', { pathParams: [id] })),
         }}
         title={`${INVOICE_KIND[invoice.kind]} invoice`}
         summary={

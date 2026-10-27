@@ -89,9 +89,7 @@ const MyRequestsPage: FC = () => {
             <Flex component="span" justify="end">
               <Button
                 size="sm"
-                onClick={() =>
-                  router.push(router.paths.get('request-submitted', { pathParams: [r.id] }))
-                }
+                onClick={() => router.push(router.paths.get('request', { pathParams: [r.id] }))}
               >
                 Answer
               </Button>
