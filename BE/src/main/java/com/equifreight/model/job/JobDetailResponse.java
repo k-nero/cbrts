@@ -49,4 +49,7 @@ public record JobDetailResponse(
         /** What to warn about the journey: it ends short of the destination, or leaves the quoted route (US-F3-21). */
         List<String> journeyWarnings,
         /** Which trips of the journey the clearance gate holds back, in words; null with no trip (US-F3-21). */
-        String clearanceJourneyNote) {}
+        String clearanceJourneyNote,
+        /** When the manager signed off the plan of the trip shown, and who; null until then (US-F3-08). */
+        Instant tripSignedOffAt,
+        String tripSignedOffBy) {}

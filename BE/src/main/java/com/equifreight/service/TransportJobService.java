@@ -186,6 +186,9 @@ public class TransportJobService {
                     gate.outstandingIssues().size());
         }
 
+        // The sign-off is the trip's, recorded on each job's part of it (US-F3-08).
+        Optional<com.equifreight.entity.TripJob> signedOff =
+                shown.flatMap(trip -> jobTrips.findPartOf(trip, job)).filter(part -> part.getSignedOffAt() != null);
         List<TripJobResponse> tripJobs = shown.map(trip -> jobTrips.jobsOn(trip).stream()
                         .map(JobMapper::toTripJobResponse)
                         .toList())
@@ -208,6 +211,13 @@ public class TransportJobService {
                 .journeyComplete(journeys.complete(job))
                 .journeyWarnings(journeys.warnings(job))
                 .clearanceJourneyNote(clearanceJourneyNote(job))
+                .tripSignedOffAt(signedOff
+                        .map(com.equifreight.entity.TripJob::getSignedOffAt)
+                        .orElse(null))
+                .tripSignedOffBy(signedOff
+                        .map(com.equifreight.entity.TripJob::getSignedOffBy)
+                        .map(User::displayName)
+                        .orElse(null))
                 .build();
     }
 

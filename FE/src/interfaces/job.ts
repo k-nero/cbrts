@@ -415,6 +415,9 @@ export interface JobDetail extends BaseEntity {
   journeyWarnings: string[];
   /** Which trips the clearance gate holds back, in words; null with no trip. */
   clearanceJourneyNote: string | null;
+  /** When the manager signed off the plan of the trip shown, and who; null until then (US-F3-08). */
+  tripSignedOffAt?: string | null;
+  tripSignedOffBy?: string | null;
 }
 
 /** A corridor the next trip of a job's journey can run, read from the city it has reached (US-F3-21). */

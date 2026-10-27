@@ -676,6 +676,12 @@ public class JobTripService {
         tripHorses.flush();
     }
 
+    /** The job's part on the trip, if it rides it; unlike {@link #partOf} it makes none. */
+    @Transactional(readOnly = true)
+    public Optional<TripJob> findPartOf(Trip trip, TransportJob job) {
+        return parts.findByTrip_IdAndJob_Id(trip.getId(), job.getId());
+    }
+
     /** The job's part on the trip, made when the job first rides it. */
     @Transactional
     public TripJob partOf(Trip trip, TransportJob job) {

@@ -16,6 +16,7 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
+import { FlightCrew } from './FlightCrew';
 import { SignOffButton } from './SignOffButton';
 import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
@@ -122,7 +123,6 @@ export function LoadPlanTab({ job }: Props) {
   const onlyFlies = legs.length > 0 && legs.every((leg) => leg.mode === 'AIR');
   if (onlyFlies) {
     const flights = legs.flatMap((leg) => (leg.flight ? [leg.flight] : []));
-    const flightCrew = job.crew.filter((c) => c.onFlight);
     return (
       <Flex vertical gap={24}>
         <TripJobsPanel job={job} />
@@ -133,16 +133,9 @@ export function LoadPlanTab({ job }: Props) {
               {flights.map((f) => `${f.airline} ${f.flightNo}`).join(', ') || 'flight not set yet'}.
               Each job’s stall positions and air waybill are its consignment, above.
             </p>
-            <span className="type-body-s text-ink-3">
-              Flight crew:{' '}
-              {flightCrew.length > 0
-                ? flightCrew
-                    .map((c) => `${c.name} (${c.crewRole.toLowerCase().replace('_', ' ')})`)
-                    .join(', ')
-                : 'none assigned yet'}
-            </span>
+            <FlightCrew job={job} />
             <div>
-              <SignOffButton jobId={job.id} />
+              <SignOffButton job={job} />
             </div>
           </Flex>
         </Panel>
@@ -606,17 +599,7 @@ export function LoadPlanTab({ job }: Props) {
                             </Flex>
                           );
                         })}
-                        {job.crew.some((c) => c.onFlight) && (
-                          <span className="type-body-s text-ink-2 truncate">
-                            Flight:{' '}
-                            {job.crew
-                              .filter((c) => c.onFlight)
-                              .map(
-                                (c) => `${c.name} (${c.crewRole.toLowerCase().replace('_', ' ')})`,
-                              )
-                              .join(', ')}
-                          </span>
-                        )}
+                        {legs.some((leg) => leg.mode === 'AIR') && <FlightCrew job={job} />}
                       </Flex>
                     </Col>
 
@@ -689,7 +672,7 @@ export function LoadPlanTab({ job }: Props) {
                           </Button>
                         </>
                       )}
-                      {isConfirmed && <SignOffButton jobId={job.id} />}
+                      {isConfirmed && <SignOffButton job={job} />}
                     </Flex>
                   </Flex>
                 </Flex>

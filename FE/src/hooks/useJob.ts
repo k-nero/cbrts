@@ -219,10 +219,13 @@ export const useAssignCrew = (jobId: string) => {
     mutationFn: ({
       crew,
       tripVehicleId,
+      flight = false,
     }: {
       crew: { userId: string; crewRole: string }[];
       tripVehicleId?: string;
-    }) => jobApi.assignCrew(jobId, crew, tripVehicleId, false, trip),
+      /** The trip's flight crew (flying grooms, the flight vet) instead of a trailer's (US-F3-15). */
+      flight?: boolean;
+    }) => jobApi.assignCrew(jobId, crew, tripVehicleId, flight, trip),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },

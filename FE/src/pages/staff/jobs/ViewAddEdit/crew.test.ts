@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { groomsRequired, horsesForCrew } from './crew';
+import { groomsRequired, horsesForCrew, horsesOnFlight } from './crew';
 
 describe('horsesForCrew', () => {
   test('loneTrailerCountsPlacedHorses', () => {
@@ -23,5 +23,15 @@ describe('groomsRequired', () => {
     expect(groomsRequired(1)).toBe(1);
     expect(groomsRequired(3)).toBe(1);
     expect(groomsRequired(4)).toBe(2);
+  });
+});
+
+describe('horsesOnFlight', () => {
+  test('countsEveryJobOnTheTrip', () => {
+    expect(horsesOnFlight([2, 3], 2)).toBe(5);
+  });
+
+  test('fallsBackToTheJobsOwnHorses', () => {
+    expect(horsesOnFlight([], 4)).toBe(4);
   });
 });
