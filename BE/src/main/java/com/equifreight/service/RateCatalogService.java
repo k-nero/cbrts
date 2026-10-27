@@ -86,7 +86,14 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "Late penalty cap"),
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "The stall payload"),
             Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"),
-            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"));
+            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"),
+            Map.entry(RatePolicyKey.PLAN_START_HOUR, "The start hour"),
+            Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "The average speed"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, "The welfare interval"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "The welfare stop"),
+            Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "The border stop"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "The time before a flight"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_AFTER_HOURS, "The release after landing"));
 
     private final RateCatalogVersionRepository versions;
     private final RateSetLoader loader;
@@ -563,6 +570,23 @@ public class RateCatalogService {
                         || value.stripTrailingZeros().scale() > 0) {
                     throw new BusinessException(
                             key.name(), "The turnaround must be a whole number of hours from 0 to 240.");
+                }
+            }
+            case PLAN_START_HOUR,
+                    PLAN_SPEED_KMH,
+                    PLAN_WELFARE_EVERY_HOURS,
+                    PLAN_WELFARE_STOP_MIN,
+                    PLAN_BORDER_STOP_MIN,
+                    PLAN_AIRPORT_BEFORE_HOURS,
+                    PLAN_AIRPORT_AFTER_HOURS -> {
+                PlanningDefaults.Bounds b = PlanningDefaults.BOUNDS.get(key);
+                if (value.compareTo(BigDecimal.valueOf(b.min())) < 0
+                        || value.compareTo(BigDecimal.valueOf(b.max())) > 0
+                        || value.stripTrailingZeros().scale() > 0) {
+                    throw new BusinessException(
+                            key.name(),
+                            label + " must be a whole number from " + b.min() + " to " + b.max() + " " + b.unit()
+                                    + ".");
                 }
             }
             case ARRIVAL_WINDOW_MIN_HOURS -> {

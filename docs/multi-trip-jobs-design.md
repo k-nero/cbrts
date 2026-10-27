@@ -101,6 +101,21 @@ US-F3-21 replaces the way a chain is made. The rest of this document still holds
 - **A job with no trip** shows a locked gate ("No trip planned yet"), its documents are checked against the request's departure date, it isn't listed on the trip boards, and its planning endpoints answer `NO_TRIP`, "Add its first trip on the Trip tab".
 - **The job page** has three tabs, Trip, Clearance and Authorities (DESIGN.md, Job page); the journey rail lives in the Trip tab.
 
+## Drafted from the quote (US-F3-22)
+
+The coordinator can still build a journey by hand, but the empty Trip tab's main action drafts it from the quoted route (`POST /staff/jobs/{id}/journey/draft`, refused once the job has a trip):
+
+- **Trips:** one per corridor of the quote (the leg to the hub, the corridor, the leg from the hub), each added with Add trip's rules, so the directions and hand-over places are the same as by hand.
+- **Road routes** become drafts. The pickup comes first. Then, country by country in the trip's direction, the catalog's welfare places in that country (one per interval of driving) and the border crossing out of it. The transfer or delivery comes last.
+  - The catalog has no positions, so the country is the only guide to which welfare places lie on the way. A drive that needs more welfare stops than it found says so in the route's draft reason.
+- **Times:**
+  - The first trip starts on the request's departure date at the planned start hour.
+  - The corridor's distance at the planned speed is shared equally between the legs. Each border and welfare stop adds its stay, and a transfer before a flight adds the wait at the cargo terminal.
+  - A trip starts when the trip before has the horses ready.
+  - A flight's hand-over at the arrival airport stays for the release time. A trip after a flight stays untimed until the flight's times are set.
+- **Planning settings** (`PLAN_*` rate policies, V36, versioned with the catalog): start hour 6, 60 km/h, a welfare stop every 4 h for 45 min, 90 min at a border, 4 h at the terminal before a flight, 3 h release after landing. A version that doesn't set one uses that default (`PlanningDefaults`).
+- **Nothing is confirmed.** The coordinator reviews each draft and confirms it, and the checks between trips run then. Changing an earlier trip doesn't move the later ones; confirming refuses a conflict.
+
 ## Not in scope
 
 - Automatic chains at approval (US-F3-21 removed even the hub route's chain).

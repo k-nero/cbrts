@@ -225,6 +225,14 @@ erDiagram
 | `ESTIMATE_BAND_PCT` | 15 | The customer estimate's minimum half-width; the band is never narrower than the share of ESTIMATED lines (BR-Q-11). |
 | `STALL_PAYLOAD_KG` | 5504 | Kilograms one air stall carries: the heaviest horses that could share a stall (economy 3, business 2, first 1) must not exceed it (BR-Q-16). Whole kilograms, 1 to 99,999. Weight never prices a line. |
 | `AIR_SHIPMENT_MAX_KG` | 20000 | The most kilograms of horses one air shipment carries (BR-Q-16); the seeded figure is a demo value. Whole kilograms, 1 to 99,999. |
+| `TURNAROUND_HOURS` | 24 | Hours after a trip before its vehicle drives again (US-F7-02). 24 when unset. |
+| `PLAN_START_HOUR` | 6 | US-F3-22, V36: the hour a journey drafted from its quote starts on the departure date. 0 to 23. Every `PLAN_*` key is a whole number, and a version that doesn't set it uses the default shown here (`PlanningDefaults`). |
+| `PLAN_SPEED_KMH` | 60 | The average road speed a drafted route's driving time is worked out at. 10 to 120. |
+| `PLAN_WELFARE_EVERY_HOURS` | 4 | Hours of driving between two welfare stops on a drafted route. 1 to 24. |
+| `PLAN_WELFARE_STOP_MIN` | 45 | Minutes at a drafted welfare stop. 0 to 600. |
+| `PLAN_BORDER_STOP_MIN` | 90 | Minutes at a drafted border crossing. 0 to 1440. |
+| `PLAN_AIRPORT_BEFORE_HOURS` | 4 | Hours at the cargo terminal before a flight: the stay of the road trip's transfer. 0 to 72. |
+| `PLAN_AIRPORT_AFTER_HOURS` | 3 | Hours after landing before the next road trip collects the horses: the stay of the flight's transfer. 0 to 240. |
 
 **`rate_fee_bands`**: `version_id`, `kind` (`CANCELLATION`, `SHORT_NOTICE`), `min_days`, `max_days null`, `value numeric(6,3)`.
 - Cancellation (value is the fee %): more than 30 days → 10, 15–30 → 25, 7–14 → 50, under 7 → 100.

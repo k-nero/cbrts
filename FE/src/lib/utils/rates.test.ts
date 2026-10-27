@@ -179,6 +179,8 @@ describe('policyRows', () => {
         STALL_PAYLOAD_KG: 5504,
         AIR_SHIPMENT_MAX_KG: 20000,
         TURNAROUND_HOURS: 24,
+        PLAN_START_HOUR: 5,
+        PLAN_SPEED_KMH: 55,
       },
       [
         { kind: 'CANCELLATION', minDays: 0, maxDays: 6, value: 100 },
@@ -198,6 +200,17 @@ describe('policyRows', () => {
       { key: 'STALL_PAYLOAD_KG', label: 'Stall payload', value: '5,504 kg per stall' },
       { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment', value: '20,000 kg of horses' },
       { key: 'TURNAROUND_HOURS', label: 'Turnaround', value: '24 h after each trip' },
+      { key: 'PLAN_START_HOUR', label: 'Drafted trips', value: 'Start 05:00 · 55 km/h' },
+      {
+        key: 'PLAN_WELFARE_EVERY_HOURS',
+        label: 'Drafted stops',
+        value: 'Welfare every 4 h, 45 min · border 90 min',
+      },
+      {
+        key: 'PLAN_AIRPORT_BEFORE_HOURS',
+        label: 'Drafted flights',
+        value: '4 h at the terminal before · 3 h release after landing',
+      },
       { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
       { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
       {
@@ -219,6 +232,10 @@ describe('policyRows', () => {
     expect(policyRows({}, []).find((r) => r.key === 'STALL_PAYLOAD_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'AIR_SHIPMENT_MAX_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value).toBe('—');
+    // The planning settings fall back to their defaults (US-F3-22).
+    expect(policyRows({}, []).find((r) => r.key === 'PLAN_START_HOUR')?.value).toBe(
+      'Start 06:00 · 60 km/h (defaults)',
+    );
   });
 });
 
