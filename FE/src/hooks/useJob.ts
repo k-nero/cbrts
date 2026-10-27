@@ -229,6 +229,12 @@ export const useAssignCrew = (jobId: string) => {
   });
 };
 
+export const useCrewCandidates = () =>
+  useQuery({
+    queryKey: ['staff', 'crew', 'candidates'],
+    queryFn: jobApi.crewCandidates,
+  });
+
 export const useSignOffTripPlan = (jobId: string) => {
   const queryClient = useQueryClient();
   const trip = useJobTrip();

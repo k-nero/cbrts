@@ -21,6 +21,7 @@ import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
 import { TripJobsPanel } from './TripJobsPanel';
+import { AssignCrewModal } from './AssignCrewModal';
 
 import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
@@ -83,6 +84,7 @@ export function LoadPlanTab({ job }: Props) {
   const [dragging, setDragging] = useState<Picked | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [trailerToAdd, setTrailerToAdd] = useState<string>();
+  const [assigningTrailerId, setAssigningTrailerId] = useState<string | null>(null);
 
   // The vehicles for this trip, each saying whether it may join it and why not (US-F7-01).
   const tripId = useJobTrip();
@@ -561,10 +563,28 @@ export function LoadPlanTab({ job }: Props) {
                     {/* Crew */}
                     <Col xs={24} md={8}>
                       <Flex vertical gap={6}>
-                        <span className="type-body-s text-ink-3">Crew</span>
+                        <Flex justify="space-between" align="center">
+                          <span className="type-body-s text-ink-3">Crew</span>
+                          {!isConfirmed && trailers.length > 0 && !convoy && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                setAssigningTrailerId(trailers[0]?.tripVehicleId ?? '')
+                              }
+                            >
+                              {job.crew.length > 0 ? 'Change crew' : 'Assign crew'}
+                            </Button>
+                          )}
+                        </Flex>
                         <span className="type-data text-ink">
                           {job.crew.length > 0
-                            ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
+                            ? (() => {
+                                const groomCount = job.crew.filter(
+                                  (c) => c.crewRole === 'GROOM' || c.crewRole === 'FLYING_GROOM',
+                                ).length;
+                                return `${groomCount} groom${groomCount === 1 ? '' : 's'} · 1 per 3 horses`;
+                              })()
                             : 'Not assigned'}
                         </span>
                         {job.crew.length === 0 ? (
@@ -579,18 +599,34 @@ export function LoadPlanTab({ job }: Props) {
                               const onTrailer = job.crew.filter(
                                 (c) => c.tripVehicleId === t.tripVehicleId,
                               );
+                              const drivers = onTrailer.filter((c) => c.crewRole === 'DRIVER');
+                              const grooms = onTrailer.filter((c) => c.crewRole !== 'DRIVER');
+                              const formatted = [
+                                ...drivers.map((d) => `${d.name} (driver)`),
+                                ...grooms.map((g) => g.name),
+                              ].join(', ');
+
                               return (
-                                <span
+                                <Flex
                                   key={t.tripVehicleId}
-                                  className="type-body-s text-ink-2 truncate"
+                                  justify="space-between"
+                                  align="center"
+                                  gap={8}
                                 >
-                                  {convoy && `${t.vehicleCode}: `}
-                                  {onTrailer.length > 0
-                                    ? onTrailer
-                                        .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
-                                        .join(', ')
-                                    : 'No crew yet'}
-                                </span>
+                                  <span className="type-body-s text-ink-2 truncate">
+                                    {convoy && `${t.vehicleCode}: `}
+                                    {onTrailer.length > 0 ? formatted : 'No crew yet'}
+                                  </span>
+                                  {convoy && !isConfirmed && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setAssigningTrailerId(t.tripVehicleId)}
+                                    >
+                                      {onTrailer.length > 0 ? 'Change' : 'Assign'}
+                                    </Button>
+                                  )}
+                                </Flex>
                               );
                             })}
                             {job.crew.some((c) => c.onFlight) && (
@@ -691,6 +727,14 @@ export function LoadPlanTab({ job }: Props) {
 
       {/* What follows the pointer: a compact card beside the cursor, so the stall under it
           keeps showing its drop hint. */}
+      {assigningTrailerId !== null && (
+        <AssignCrewModal
+          job={job}
+          tripVehicleId={assigningTrailerId}
+          open={assigningTrailerId !== null}
+          onClose={() => setAssigningTrailerId(null)}
+        />
+      )}
       <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
         {dragging && (
           <div className="w-64">

@@ -2,6 +2,7 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
+  CrewCandidate,
   CrewMember,
   FlightAllocation,
   FlightAllocationInput,
@@ -172,6 +173,8 @@ export const jobApi = {
 
   getCrew: (jobId: string, trip?: string) =>
     client.get<CrewMember[]>(`/staff/jobs/${jobId}/crew`, { params: { trip } }).then((r) => r.data),
+  crewCandidates: () =>
+    client.get<CrewCandidate[]>('/staff/jobs/crew/candidates').then((r) => r.data),
 
   /** A trailer's crew, or with `flight` the trip's flight crew (flying grooms, the flight vet). */
   assignCrew: (
