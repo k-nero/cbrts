@@ -70,6 +70,8 @@ const MyRequestsPage: FC = () => {
       {
         key: 'actions',
         width: 230,
+        // The buttons go their own way; the click doesn't open the row as well.
+        onCell: () => ({ onClick: (e) => e.stopPropagation() }),
         render: (_, r) =>
           r.status === 'DRAFT' ? (
             <Flex component="span" justify="end" gap={8}>
@@ -189,6 +191,16 @@ const MyRequestsPage: FC = () => {
             onRefresh={() => void listQuery.refetch()}
             refreshing={listQuery.isFetching && !listQuery.isPending}
             ignoreKeys={['actions']}
+            // A row opens its request: a draft in the editor, any other at its request page.
+            onRow={(r) => ({
+              onClick: () =>
+                router.push(
+                  router.paths.get(r.status === 'DRAFT' ? 'request-edit' : 'request', {
+                    pathParams: [r.id],
+                  }),
+                ),
+              className: 'cursor-pointer',
+            })}
             pagination={{
               current: pageState.number + 1,
               pageSize: pageState.size,
