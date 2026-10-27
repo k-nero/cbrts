@@ -32,6 +32,7 @@ const line = (over: Partial<RateLine>): RateLine => ({
   certainty: 'FIXED',
   estimateNote: null,
   everyCorridor: true,
+  coveredByRoadLeg: false,
   ...over,
 });
 
@@ -50,6 +51,12 @@ describe('basisWords', () => {
 
   test('the flight vet names its thresholds', () => {
     expect(basisWords(line({ basis: 'FLIGHT_VET' }), policies)).toBe('8+ horses or > $250,000.00');
+  });
+
+  test('a transfer a road leg covers says so (US-F3-21)', () => {
+    expect(
+      basisWords(line({ group: 'A', basis: 'PER_SHIPMENT', coveredByRoadLeg: true }), policies),
+    ).toBe('per shipment · not where a road leg covers this end');
   });
 
   test('a road vet escort is priced when the customer asks', () => {

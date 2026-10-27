@@ -25,6 +25,7 @@ const LINE: LineForm = {
   defaultQuantity: null,
   certainty: o('FIXED'),
   estimateNote: '',
+  coveredByRoadLeg: false,
 };
 
 /** The first message zod gives for each path, "path: message". */
@@ -68,6 +69,15 @@ describe('lineSchema', () => {
     expect(issues(lineSchema.safeParse({ ...LINE, basis: o('PER_HORSE') }))).toEqual([]);
   });
 
+  test('only a group A or G line can be left to a road leg', () => {
+    expect(issues(lineSchema.safeParse({ ...LINE, coveredByRoadLeg: true }))).toEqual([
+      'coveredByRoadLeg: Only a group A or G line is at an end of the move a road leg can cover.',
+    ]);
+    expect(
+      issues(lineSchema.safeParse({ ...LINE, group: o('G'), coveredByRoadLeg: true })),
+    ).toEqual([]);
+  });
+
   test('money and hours have at most 2 decimals', () => {
     expect(issues(lineSchema.safeParse({ ...LINE, rate: 3.605 }))).toEqual([
       'rate: Use at most 2 decimals.',
@@ -80,6 +90,7 @@ describe('LINE_FIELDS', () => {
   test('the description and sex refusals land on their fields', () => {
     expect(LINE_FIELDS.DESCRIPTION).toBe('description');
     expect(LINE_FIELDS.APPLIES_TO_SEX).toBe('appliesToSex');
+    expect(LINE_FIELDS.COVERED_BY_ROAD_LEG).toBe('coveredByRoadLeg');
   });
 });
 

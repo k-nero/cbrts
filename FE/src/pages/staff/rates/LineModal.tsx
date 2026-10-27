@@ -38,6 +38,7 @@ const LINE_SHOWN = [
   'defaultQuantity',
   'certainty',
   'estimateNote',
+  'coveredByRoadLeg',
 ];
 
 /** Add or change a catalog line in the draft, for this corridor or for every corridor. */
@@ -69,6 +70,7 @@ export const LineModal: FC<{
       defaultQuantity: editing?.defaultQuantity ?? null,
       certainty: pick(CERTAINTIES, editing?.certainty ?? 'FIXED') ?? CERTAINTIES[0],
       estimateNote: editing?.estimateNote ?? '',
+      coveredByRoadLeg: editing?.coveredByRoadLeg ?? false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, methods, open]);
@@ -97,6 +99,7 @@ export const LineModal: FC<{
           defaultQuantity: v.defaultQuantity,
           certainty: v.certainty.value as 'FIXED' | 'ESTIMATED',
           estimateNote: v.estimateNote.trim() || null,
+          coveredByRoadLeg: v.coveredByRoadLeg,
         },
       });
       message.success(
@@ -206,6 +209,11 @@ export const LineModal: FC<{
               label="Why it may vary (estimated lines)"
               component="textarea"
               componentProps={{ rows: 2, maxLength: 300 }}
+            />
+            <FormField
+              name="coveredByRoadLeg"
+              component="checkbox"
+              componentProps={{ children: 'Not charged when a road leg covers this end' }}
             />
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />
