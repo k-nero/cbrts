@@ -6,6 +6,7 @@ import com.equifreight.model.job.*;
 import com.equifreight.model.trip.TripPartResponse;
 import com.equifreight.service.CrewAssignmentService;
 import com.equifreight.service.FlightService;
+import com.equifreight.service.JourneyDrafter;
 import com.equifreight.service.JourneyService;
 import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
@@ -33,6 +34,7 @@ public class StaffJobController {
     private final TripSharingService tripSharingService;
     private final FlightService flightService;
     private final JourneyService journeyService;
+    private final JourneyDrafter journeyDrafter;
 
     public StaffJobController(
             TransportJobService transportJobService,
@@ -41,7 +43,8 @@ public class StaffJobController {
             CrewAssignmentService crewAssignmentService,
             TripSharingService tripSharingService,
             FlightService flightService,
-            JourneyService journeyService) {
+            JourneyService journeyService,
+            JourneyDrafter journeyDrafter) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
@@ -49,6 +52,7 @@ public class StaffJobController {
         this.tripSharingService = tripSharingService;
         this.flightService = flightService;
         this.journeyService = journeyService;
+        this.journeyDrafter = journeyDrafter;
     }
 
     /**
@@ -264,6 +268,16 @@ public class StaffJobController {
     @GetMapping("/{jobId}/journey/corridors")
     public List<JourneyCorridorResponse> nextCorridors(@PathVariable UUID jobId) {
         return journeyService.nextCorridors(jobId);
+    }
+
+    /**
+     * US-F3-22: Draft the job's journey from its quoted route for the coordinator to review: a trip per corridor, and
+     * each road route drafted and timed. Refused once the job has a trip.
+     */
+    @PostMapping("/{jobId}/journey/draft")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripPartResponse> draftJourney(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
+        return journeyDrafter.draft(jobId, user);
     }
 
     /**

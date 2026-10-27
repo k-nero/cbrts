@@ -350,6 +350,18 @@ export const useJourneyCorridors = (jobId: string, enabled: boolean) =>
     enabled: Boolean(jobId) && enabled,
   });
 
+/** Drafts the job's journey from its quote (US-F3-22); every view of the job refetches. */
+export const useDraftJourney = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => jobApi.draftJourney(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
 /** Adds a trip to the end of the job's journey (US-F3-21); every view of the job refetches. */
 export const useAddTrip = (jobId: string) => {
   const queryClient = useQueryClient();

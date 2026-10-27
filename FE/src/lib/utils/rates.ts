@@ -196,6 +196,25 @@ export const policyRows = (
       label: 'Turnaround',
       value: p.TURNAROUND_HOURS == null ? '—' : `${p.TURNAROUND_HOURS} h after each trip`,
     },
+    // US-F3-22: how a drafted journey is timed; a version without them uses the defaults.
+    {
+      key: 'PLAN_START_HOUR',
+      label: 'Drafted trips',
+      value:
+        p.PLAN_START_HOUR == null && p.PLAN_SPEED_KMH == null
+          ? 'Start 06:00 · 60 km/h (defaults)'
+          : `Start ${String(p.PLAN_START_HOUR ?? 6).padStart(2, '0')}:00 · ${p.PLAN_SPEED_KMH ?? 60} km/h`,
+    },
+    {
+      key: 'PLAN_WELFARE_EVERY_HOURS',
+      label: 'Drafted stops',
+      value: `Welfare every ${p.PLAN_WELFARE_EVERY_HOURS ?? 4} h, ${p.PLAN_WELFARE_STOP_MIN ?? 45} min · border ${p.PLAN_BORDER_STOP_MIN ?? 90} min`,
+    },
+    {
+      key: 'PLAN_AIRPORT_BEFORE_HOURS',
+      label: 'Drafted flights',
+      value: `${p.PLAN_AIRPORT_BEFORE_HOURS ?? 4} h at the terminal before · ${p.PLAN_AIRPORT_AFTER_HOURS ?? 3} h release after landing`,
+    },
     {
       key: 'SHORT_NOTICE',
       label: 'Short notice',
