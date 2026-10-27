@@ -35,9 +35,11 @@ import com.equifreight.entity.enums.PaymentMethod;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.invoice.ActualQuantityRequest;
 import com.equifreight.model.invoice.InvoiceLineResponse;
 import com.equifreight.model.invoice.InvoiceResponse;
+import com.equifreight.model.invoice.InvoiceSummaryResponse;
 import com.equifreight.model.invoice.RecordPaymentRequest;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.IncidentRepository;
@@ -426,5 +428,40 @@ class InvoiceServiceTest {
         assertEquals(d, service.issueDeposit(quotation, null));
         verify(codes, org.mockito.Mockito.times(1)).next(CodePrefix.INV, 2026);
         verify(pricing, never()).totalsWith(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Request review lists the request's invoices, the deposit first and a draft final invoice included")
+    void aRequestsInvoicesForStaff() {
+        Invoice d = deposited();
+        d.setClub(club);
+        Invoice draft = new Invoice();
+        draft.setId(UUID.randomUUID());
+        draft.setCode("INV-2026-0042");
+        draft.setKind(InvoiceKind.FINAL);
+        draft.setQuotation(quotation);
+        draft.setJob(job);
+        draft.setClub(club);
+        UUID requestId = quotation.getRequest().getId();
+        when(requests.existsById(requestId)).thenReturn(true);
+        when(invoices.findByQuotation_Request_IdOrderByCreatedAtAsc(requestId)).thenReturn(List.of(d, draft));
+
+        List<InvoiceSummaryResponse> rows = service.forRequest(requestId);
+
+        assertEquals(
+                List.of("INV-2026-0041", "INV-2026-0042"),
+                rows.stream().map(InvoiceSummaryResponse::code).toList());
+        assertEquals(InvoiceStatus.DRAFT, rows.get(1).status());
+        assertEquals("CBRT-2026-041", rows.get(1).jobCode());
+    }
+
+    @Test
+    @DisplayName("A request that doesn't exist has no invoices to list: not found")
+    void anUnknownRequestsInvoices() {
+        UUID unknown = UUID.randomUUID();
+        when(requests.existsById(unknown)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> service.forRequest(unknown));
+        verify(invoices, never()).findByQuotation_Request_IdOrderByCreatedAtAsc(any());
     }
 }

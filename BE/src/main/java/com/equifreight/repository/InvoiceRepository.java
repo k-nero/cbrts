@@ -35,6 +35,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     @EntityGraph(attributePaths = {"job", "quotation", "quotation.request"})
     List<Invoice> findByQuotation_Request_IdAndStatusNotOrderByCreatedAtAsc(UUID requestId, InvoiceStatus not);
 
+    /** Every invoice of a request on the staff side, drafts and voids included, oldest first: the deposit first. */
+    @EntityGraph(attributePaths = {"club", "job", "quotation", "quotation.request"})
+    List<Invoice> findByQuotation_Request_IdOrderByCreatedAtAsc(UUID requestId);
+
+    /** The club's invoices of some kinds still to be paid (the customer's Home). */
+    @EntityGraph(attributePaths = {"job", "quotation", "quotation.request"})
+    List<Invoice> findByClub_IdAndKindInAndStatusIn(
+            UUID clubId, Collection<InvoiceKind> kinds, Collection<InvoiceStatus> statuses);
+
     /** Whether the job has a final invoice that isn't void. */
     boolean existsByJob_IdAndKindAndStatusNot(UUID jobId, InvoiceKind kind, InvoiceStatus not);
 

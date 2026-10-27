@@ -367,6 +367,19 @@ public class InvoiceService {
         return view(invoice(id));
     }
 
+    /**
+     * A request's invoices on the staff side (Request review): the deposit issued at acceptance and any later invoice
+     * of its job, drafts and voids included.
+     */
+    @Transactional(readOnly = true)
+    public List<InvoiceSummaryResponse> forRequest(UUID requestId) {
+        if (!requests.existsById(requestId)) throw ResourceNotFoundException.of("Request", requestId);
+        LocalDate today = today();
+        return invoices.findByQuotation_Request_IdOrderByCreatedAtAsc(requestId).stream()
+                .map(i -> InvoiceMapper.toSummary(i, today))
+                .toList();
+    }
+
     /** A request's invoices on the customer's side: issued ones only, of their own club. */
     @Transactional(readOnly = true)
     public List<InvoiceSummaryResponse> ofRequest(User customer, UUID requestId) {

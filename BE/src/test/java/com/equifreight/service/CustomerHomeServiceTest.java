@@ -12,6 +12,7 @@ import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentType;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -20,6 +21,8 @@ import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
+import com.equifreight.entity.enums.InvoiceKind;
+import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TrailerType;
@@ -27,6 +30,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.model.home.CustomerHomeResponse;
 import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.HorseRepository;
+import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
@@ -54,6 +58,7 @@ class CustomerHomeServiceTest {
     private final TransportJobRepository jobs = mock(TransportJobRepository.class);
     private final ChecklistItemRepository checklist = mock(ChecklistItemRepository.class);
     private final HorseRepository horses = mock(HorseRepository.class);
+    private final InvoiceRepository invoices = mock(InvoiceRepository.class);
     private final User customer = new User();
     private final Club club = new Club();
     private CustomerHomeService service;
@@ -61,7 +66,7 @@ class CustomerHomeServiceTest {
     @BeforeEach
     void setUp() {
         service = new CustomerHomeService(
-                clubs, requests, quotations, jobs, checklist, horses, Clock.fixed(NOW, BusinessTime.ZONE));
+                clubs, requests, quotations, jobs, checklist, horses, invoices, Clock.fixed(NOW, BusinessTime.ZONE));
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
         when(clubs.requireClub(customer)).thenReturn(club);
@@ -73,6 +78,8 @@ class CustomerHomeServiceTest {
         when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
                 .thenReturn(List.of());
         when(jobs.findByRequestIdIn(any())).thenReturn(List.of());
+        when(invoices.findByClub_IdAndKindInAndStatusIn(eq(club.getId()), anyCollection(), anyCollection()))
+                .thenReturn(List.of());
     }
 
     private TransportRequest request(String code, RequestStatus status) {
@@ -123,6 +130,20 @@ class CustomerHomeServiceTest {
         ci.setHolder(ChecklistHolder.CUSTOMER);
         ci.setDueDate(due);
         return ci;
+    }
+
+    private Invoice invoice(Quotation q, InvoiceKind kind, InvoiceStatus status, String total, String paid) {
+        Invoice i = new Invoice();
+        i.setId(UUID.randomUUID());
+        i.setCode(kind == InvoiceKind.DEPOSIT ? "INV-2026-0041" : "INV-2026-0042");
+        i.setKind(kind);
+        i.setStatus(status);
+        i.setQuotation(q);
+        i.setClub(club);
+        i.setTotal(new BigDecimal(total));
+        i.setAmountPaid(new BigDecimal(paid));
+        i.setDueOn(LocalDate.of(2026, 10, 21));
+        return i;
     }
 
     private static Horse horse(String name) {
@@ -332,5 +353,66 @@ class CustomerHomeServiceTest {
         assertThat(CustomerHomeService.urgency(TODAY.plusDays(7), TODAY)).isEqualTo("soon");
         assertThat(CustomerHomeService.urgency(TODAY.plusDays(8), TODAY)).isEqualTo("upcoming");
         assertThat(CustomerHomeService.urgency(null, TODAY)).isEqualTo("upcoming");
+    }
+
+    @Test
+    @DisplayName("an unpaid deposit invoice is owed, due on its due day, and opens the invoice")
+    void unpaidDepositIsOwed() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.CUSTOMER_ACCEPTED);
+        Quotation q = quotation(r, QuotationStatus.ACCEPTED);
+        Invoice deposit = invoice(q, InvoiceKind.DEPOSIT, InvoiceStatus.ISSUED, "11405.76", "0");
+        when(invoices.findByClub_IdAndKindInAndStatusIn(eq(club.getId()), anyCollection(), anyCollection()))
+                .thenReturn(List.of(deposit));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).singleElement().satisfies(o -> {
+            assertThat(o.kind()).isEqualTo("INVOICE");
+            assertThat(o.invoiceId()).isEqualTo(deposit.getId());
+            assertThat(o.requestId()).isEqualTo(r.getId());
+            assertThat(o.title()).isEqualTo("Pay the deposit invoice");
+            assertThat(o.subject()).isEqualTo("REQ-2026-0179 · INV-2026-0041 · USD 11,405.76");
+            assertThat(o.urgency()).isEqualTo("soon");
+            assertThat(o.dueAt()).isEqualTo(Instant.parse("2026-10-21T10:00:00Z"));
+            assertThat(o.actionLabel()).isEqualTo("Open invoice");
+        });
+        assertThat(home.owedRequestCount()).isEqualTo(1);
+        assertThat(home.nextEvent()).isNull();
+    }
+
+    @Test
+    @DisplayName("a part-paid final invoice is owed for what is left, and says what was received")
+    void partPaidFinalOwesTheRest() {
+        TransportRequest r = request("REQ-2026-0162", RequestStatus.APPROVED);
+        Quotation q = quotation(r, QuotationStatus.ACCEPTED);
+        Invoice fin = invoice(q, InvoiceKind.FINAL, InvoiceStatus.PARTIALLY_PAID, "4789.61", "1000");
+        when(invoices.findByClub_IdAndKindInAndStatusIn(eq(club.getId()), anyCollection(), anyCollection()))
+                .thenReturn(List.of(fin));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).singleElement().satisfies(o -> {
+            assertThat(o.title()).isEqualTo("Pay the final invoice");
+            assertThat(o.subject()).isEqualTo("REQ-2026-0162 · INV-2026-0042 · USD 3,789.61");
+            assertThat(o.reason())
+                    .isEqualTo("USD 1,000.00 of USD 4,789.61 is received. Pay the rest by bank transfer, with"
+                            + " INV-2026-0042 as the reference.");
+        });
+    }
+
+    @Test
+    @DisplayName("only issued or part-paid deposit and final invoices are asked for: not paid ones, drafts or credits")
+    @SuppressWarnings("unchecked")
+    void onlyUnpaidInvoicesAreAskedFor() {
+        service.get(customer);
+
+        org.mockito.ArgumentCaptor<java.util.Collection<InvoiceKind>> kinds =
+                org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+        org.mockito.ArgumentCaptor<java.util.Collection<InvoiceStatus>> statuses =
+                org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+        org.mockito.Mockito.verify(invoices)
+                .findByClub_IdAndKindInAndStatusIn(eq(club.getId()), kinds.capture(), statuses.capture());
+        assertThat(kinds.getValue()).containsExactlyInAnyOrder(InvoiceKind.DEPOSIT, InvoiceKind.FINAL);
+        assertThat(statuses.getValue()).containsExactlyInAnyOrder(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID);
     }
 }

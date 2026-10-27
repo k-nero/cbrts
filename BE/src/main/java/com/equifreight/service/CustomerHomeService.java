@@ -5,6 +5,7 @@ import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentVersion;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
@@ -13,6 +14,8 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.InvoiceKind;
+import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
@@ -28,9 +31,11 @@ import com.equifreight.model.home.OwedEntryResponse;
 import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.HorseRepository;
+import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -64,6 +69,12 @@ public class CustomerHomeService {
     /** Requests that ended before becoming a move: they never appear on Home. */
     private static final Set<RequestStatus> ENDED = EnumSet.of(RequestStatus.REJECTED, RequestStatus.CANCELLED);
 
+    /** An invoice still to be paid, in part or in full. */
+    private static final Set<InvoiceStatus> UNPAID = EnumSet.of(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID);
+
+    /** The invoices a club pays; a credit note is money owed to it. */
+    private static final Set<InvoiceKind> PAYABLE = EnumSet.of(InvoiceKind.DEPOSIT, InvoiceKind.FINAL);
+
     /** An owed item due within this many days is "soon". */
     private static final int SOON_DAYS = 7;
 
@@ -76,6 +87,7 @@ public class CustomerHomeService {
     private final TransportJobRepository jobs;
     private final ChecklistItemRepository checklist;
     private final HorseRepository horses;
+    private final InvoiceRepository invoices;
     private final Clock clock;
 
     public CustomerHomeService(
@@ -85,6 +97,7 @@ public class CustomerHomeService {
             TransportJobRepository jobs,
             ChecklistItemRepository checklist,
             HorseRepository horses,
+            InvoiceRepository invoices,
             Clock clock) {
         this.clubs = clubs;
         this.requests = requests;
@@ -92,6 +105,7 @@ public class CustomerHomeService {
         this.jobs = jobs;
         this.checklist = checklist;
         this.horses = horses;
+        this.invoices = invoices;
         this.clock = clock;
     }
 
@@ -151,6 +165,9 @@ public class CustomerHomeService {
                                 : r.getInfoRequiredNote()));
             }
         }
+        // An unpaid invoice is owed whatever stage its move is at, until it is paid.
+        invoices.findByClub_IdAndKindInAndStatusIn(club.getId(), PAYABLE, UNPAID)
+                .forEach(i -> owed.add(invoiceOwed(i, today)));
         owed.sort(Comparator.comparing(OwedEntryResponse::dueAt, Comparator.nullsLast(Comparator.naturalOrder())));
         int owedRequestCount =
                 (int) owed.stream().map(OwedEntryResponse::requestId).distinct().count();
@@ -258,9 +275,7 @@ public class CustomerHomeService {
 
     private OwedEntryResponse quotationOwed(TransportRequest r, Quotation q, LocalDate today) {
         LocalDate until = q.getValidUntil() == null ? null : LocalDate.ofInstant(q.getValidUntil(), BusinessTime.ZONE);
-        String price = q.getTotal() == null
-                ? ""
-                : " · " + q.getCurrency() + " " + String.format(Locale.ENGLISH, "%,.2f", q.getTotal());
+        String price = q.getTotal() == null ? "" : " · " + money(q.getCurrency(), q.getTotal());
         String reason = until == null
                 ? "Accept it to book the move, or decline it."
                 : "It holds its price until " + until.format(BusinessTime.SHORT_DAY)
@@ -271,6 +286,30 @@ public class CustomerHomeService {
                 "Accept or decline quotation " + q.getCode() + " v" + q.getVersionNo(),
                 r.getCode() + " · " + q.getCode() + price,
                 reason);
+    }
+
+    /**
+     * An issued deposit or final invoice not yet paid in full (DESIGN.md, Invoice): due on its due day, paid by bank
+     * transfer with its code as the reference.
+     */
+    private OwedEntryResponse invoiceOwed(Invoice i, LocalDate today) {
+        TransportRequest r = i.getQuotation().getRequest();
+        String currency = i.getQuotation().getCurrency();
+        String title = i.getKind() == InvoiceKind.DEPOSIT ? "Pay the deposit invoice" : "Pay the final invoice";
+        String reason = i.getStatus() == InvoiceStatus.PARTIALLY_PAID
+                ? money(currency, i.getAmountPaid()) + " of " + money(currency, i.getTotal())
+                        + " is received. Pay the rest by bank transfer, with " + i.getCode() + " as the reference."
+                : "By bank transfer, with " + i.getCode()
+                        + " as the reference. We record transfers by hand within 1 working day.";
+        return HomeMapper.toInvoiceOwed(
+                i,
+                urgency(i.getDueOn(), today),
+                title,
+                r.getCode() + " · " + i.getCode() + " · " + money(currency, i.getAmountDue()),
+                reason,
+                i.getDueOn() == null
+                        ? null
+                        : i.getDueOn().atTime(DUE_BY).atZone(BusinessTime.ZONE).toInstant());
     }
 
     /**
@@ -524,6 +563,11 @@ public class CustomerHomeService {
 
     private static String shortDay(Instant at) {
         return LocalDate.ofInstant(at, BusinessTime.ZONE).format(BusinessTime.SHORT_DAY);
+    }
+
+    /** "USD 38,019.20". */
+    private static String money(String currency, BigDecimal amount) {
+        return currency + " " + String.format(Locale.ENGLISH, "%,.2f", amount);
     }
 
     private static String capitalize(String s) {
