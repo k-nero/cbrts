@@ -160,6 +160,33 @@ export type Outcome = {
 
 const sees = (title: string) => `The customer sees “${title}”`;
 
+/** The trips of the journey either side of this one (US-F3-16), when it is one leg of several. */
+export const neighbourParts = (trip: TripView) => {
+  const i = trip.parts.findIndex((p) => p.current);
+  return {
+    previous: i > 0 ? trip.parts[i - 1] : undefined,
+    next: i >= 0 && i + 1 < trip.parts.length ? trip.parts[i + 1] : undefined,
+    handsOn: i >= 0 && trip.parts[i].handsOn,
+  };
+};
+
+/**
+ * Why the trailer can't leave yet, as the backend checks it: the dossier is cleared, and the trip
+ * before this one has handed the horses on (TripService.requireHandedOn).
+ */
+export const departureBlocked = (trip: TripView): string | undefined => {
+  const { previous } = neighbourParts(trip);
+  if (previous && previous.status !== TripStatusEnum.DELIVERED)
+    return `Waits for ${previous.tripCode ?? 'the trip before'} to hand the horses on`;
+  if (!trip.clearanceReady) return 'Opens once the transport specialist clears the dossier';
+  return undefined;
+};
+
+const DEPARTURES = new Set<TripRecordKind>([
+  TripRecordKindEnum.DEPARTED,
+  TripRecordKindEnum.FLIGHT_DEPARTED,
+]);
+
 const held = (where: string): Outcome => ({
   kind: TripRecordKindEnum.HELD,
   title: 'Held',
@@ -178,18 +205,28 @@ const note: Outcome = {
 
 /** What the cab can record next, where it stands: the likely outcome first. */
 export const outcomes = (trip: TripView, position: CabPosition): Outcome[] => {
+  const blocked = departureBlocked(trip);
+  // The first departure is gated; a later one (a trip already on its way) only by the backend.
+  const gate = trip.tripStatus === TripStatusEnum.NOT_STARTED;
+  return choices(trip, position).map((o) =>
+    gate && blocked && DEPARTURES.has(o.kind) ? { ...o, blocked } : o,
+  );
+};
+
+const choices = (trip: TripView, position: CabPosition): Outcome[] => {
   const { stops } = trip;
   const recorded = (kind: TripRecordKind) => trip.records.some((r) => r.kind === kind);
-  if (trip.tripStatus === TripStatusEnum.NOT_STARTED) {
+  // A flight leg starts at the airport: its departure is the flight's.
+  if (
+    trip.tripStatus === TripStatusEnum.NOT_STARTED &&
+    stops[0]?.kind !== RouteStopKindEnum.AIRPORT_OUT
+  ) {
     const depart: Outcome = {
       kind: TripRecordKindEnum.DEPARTED,
       title: 'Departed',
       description: 'The horses are loaded and the trailer is leaving the pickup.',
       meta: sees('Departed'),
       icon: 'truck',
-      blocked: trip.clearanceReady
-        ? undefined
-        : 'Opens once the transport specialist clears the dossier',
     };
     if (recorded(TripRecordKindEnum.LOADED)) return [depart, note];
     return [
