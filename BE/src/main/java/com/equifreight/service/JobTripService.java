@@ -67,14 +67,33 @@ public class JobTripService {
     }
 
     /**
-     * The approved job's own trip, on the request's corridor, with every horse of the request on it.
+     * The approved job's own trip, on the request's corridor, with every horse of the request on it. A request that
+     * goes by way of hubs (US-F1-09) starts on its domestic leg to the hub instead, and its journey is the chain: that
+     * leg, the corridor that crosses the border, then the leg from the hub, each a trip of its own (US-F3-16).
+     * Returns the journey's first trip.
      */
     @Transactional
     public Trip createForJob(TransportJob job, User createdBy, Instant at) {
+        Corridor firstLeg = job.getRequest().getFirstLegCorridor();
+        Corridor lastLeg = job.getRequest().getLastLegCorridor();
+        Trip first =
+                startTrip(job, firstLeg != null ? firstLeg : job.getRequest().getCorridor(), createdBy, at);
+        Trip previous = first;
+        if (firstLeg != null) {
+            Trip crossing = newTrip(job.getRequest().getCorridor(), createdBy, at);
+            planNext(job, previous, crossing);
+            previous = crossing;
+        }
+        if (lastLeg != null) planNext(job, previous, newTrip(lastLeg, createdBy, at));
+        return first;
+    }
+
+    /** The journey's first trip, on {@code corridor}, with every horse of the request on it. */
+    private Trip startTrip(TransportJob job, Corridor corridor, User createdBy, Instant at) {
         Trip trip = new Trip();
         trip.setCode(
                 codeService.next(CodePrefix.TRP, at.atZone(BusinessTime.ZONE).getYear()));
-        trip.setCorridor(job.getRequest().getCorridor());
+        trip.setCorridor(corridor);
         trip.setCreatedBy(createdBy);
         trip = trips.save(trip);
         for (RequestHorse requestHorse : job.getRequest().getHorses()) {

@@ -83,6 +83,18 @@ public final class RouteMapper {
      * destination place, and
      * {@code leadTimeDays} and {@code earliestDeparture} are null when either is unknown.
      */
+    /** A domestic leg read from {@code fromCity}, the end the horses start at (US-F1-09). */
+    public static RouteLegResponse toLegResponse(Corridor leg, String fromCity) {
+        boolean reversed = !leg.getOriginCity().equalsIgnoreCase(fromCity);
+        return RouteLegResponse.builder()
+                .corridorId(leg.getId())
+                .code(leg.getCode())
+                .fromCity(reversed ? leg.getDestinationCity() : leg.getOriginCity())
+                .toCity(reversed ? leg.getOriginCity() : leg.getDestinationCity())
+                .distanceKm(leg.getDistanceKm())
+                .build();
+    }
+
     public static RouteResponse toRouteResponse(
             Corridor corridor,
             boolean reversed,

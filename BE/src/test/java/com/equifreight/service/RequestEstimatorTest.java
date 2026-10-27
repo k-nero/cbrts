@@ -100,7 +100,7 @@ class RequestEstimatorTest {
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.of(v5));
         when(loader.load(v5)).thenAnswer(i -> new CatalogRows(v5, classes, lines, List.of(), policies, List.of()));
-        when(inputs.inputFor(any(), any(), anyBoolean()))
+        when(inputs.inputFor(any(), any(), anyBoolean(), any()))
                 .thenAnswer(i -> input(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.AIR))).thenReturn(resolution(air, Set.of()));
         when(routes.resolve(any(), any(), any(), any(), eq(TransportMode.ROAD))).thenReturn(resolution(road, Set.of()));

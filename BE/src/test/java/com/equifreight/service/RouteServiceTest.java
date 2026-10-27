@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Spec R-05 (corridor resolution) and R-06 (lead time from the published regulation versions). */
@@ -48,7 +49,9 @@ class RouteServiceTest {
             "LA",
             country("LA", "Laos"),
             "MY",
-            country("MY", "Malaysia"));
+            country("MY", "Malaysia"),
+            "HK",
+            country("HK", "Hong Kong"));
 
     private final Place phuTho = place("Phú Thọ training centre", "Ho Chi Minh City", "VN");
     private final Place socSon = place("Sóc Sơn quarantine station", "Hanoi", "VN");
@@ -340,6 +343,7 @@ class RouteServiceTest {
 
     private static Country country(String code, String name) {
         Country c = new Country();
+        c.setId(UUID.nameUUIDFromBytes(code.getBytes()));
         c.setCode(code);
         c.setName(name);
         return c;
@@ -381,5 +385,87 @@ class RouteServiceTest {
             c.getCrossings().add(cc);
         }
         return c;
+    }
+    // ---------- routes by way of hubs (US-F1-09) ----------
+
+    private final Place hoaXuan = place("Hòa Xuân racing stables", "Da Nang", "VN");
+    private final Place shaTin = place("Sha Tin stables", "Hong Kong", "HK");
+
+    private static Corridor between(
+            String code, TransportMode mode, String from, String to, String a, String b, int km) {
+        Corridor c = corridor(code, mode, from, to);
+        c.setOriginCountry(COUNTRIES.get(a));
+        c.setDestinationCountry(COUNTRIES.get(b));
+        c.setDistanceKm(km);
+        return c;
+    }
+
+    private final Corridor dadHcm =
+            between("RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City", "VN", "VN", 960);
+    private final Corridor hcmHan =
+            between("RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", "VN", "VN", 1700);
+    private final Corridor sgnHkg =
+            between("AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", "VN", "HK", 1500);
+
+    @Test
+    @DisplayName("Da Nang → Hong Kong goes by road to Ho Chi Minh City, then flies: one route naming its first leg")
+    void aCityWithNoCorridorAbroadGoesByWayOfTheHub() {
+        publish("HK", 21);
+        when(corridors.findNetwork()).thenReturn(List.of(dadHcm, hcmHan, sgnHkg));
+
+        RouteResolution resolution = service.resolve(hoaXuan, null, shaTin, null, null);
+
+        assertThat(resolution.corridor()).isSameAs(sgnHkg);
+        assertThat(resolution.firstLeg()).isSameAs(dadHcm);
+        assertThat(resolution.lastLeg()).isNull();
+        assertThat(resolution.modesRun()).containsExactly(TransportMode.AIR);
+        RouteResponse route = resolution.route();
+        assertThat(route.fromCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(route.firstLeg().fromCity()).isEqualTo("Da Nang");
+        assertThat(route.firstLeg().toCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(route.firstLeg().distanceKm()).isEqualTo(960);
+        assertThat(route.crossBorder()).isTrue();
+        assertThat(route.countries()).containsExactly("VN", "HK");
+    }
+
+    @Test
+    @DisplayName("Hong Kong → Da Nang reads the same corridors the other way: the flight, then the road from the hub")
+    void theLegFromTheHubIsReadTheOtherWay() {
+        publish("HK", 21);
+        when(corridors.findNetwork()).thenReturn(List.of(dadHcm, sgnHkg));
+
+        RouteResolution resolution = service.resolve(shaTin, null, hoaXuan, null, TransportMode.AIR);
+
+        assertThat(resolution.corridor()).isSameAs(sgnHkg);
+        assertThat(resolution.firstLeg()).isNull();
+        assertThat(resolution.lastLeg()).isSameAs(dadHcm);
+        assertThat(resolution.route().fromCity()).isEqualTo("Hong Kong");
+        assertThat(resolution.route().lastLeg().fromCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(resolution.route().lastLeg().toCity()).isEqualTo("Da Nang");
+    }
+
+    @Test
+    @DisplayName(
+            "Two domestic corridors are never chained: Da Nang → Hanoi through Ho Chi Minh City is a route we don't run")
+    void domesticCorridorsAreNeverChained() {
+        when(corridors.findNetwork()).thenReturn(List.of(dadHcm, hcmHan, sgnHkg));
+
+        RouteResolution resolution = service.resolve(hoaXuan, null, socSon, null, null);
+
+        assertThat(resolution.corridor()).isNull();
+        assertThat(resolution.modesRun()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A corridor between the two cities wins over a route by way of a hub")
+    void aDirectCorridorWins() {
+        when(corridors.findBetweenCities("Ho Chi Minh City", "Hanoi")).thenReturn(List.of(hcmHan));
+
+        RouteResolution resolution = service.resolve(phuTho, null, socSon, null, null);
+
+        assertThat(resolution.corridor()).isSameAs(hcmHan);
+        assertThat(resolution.firstLeg()).isNull();
+        assertThat(resolution.route().firstLeg()).isNull();
+        assertThat(resolution.modesRun()).containsExactly(TransportMode.ROAD);
     }
 }

@@ -48,6 +48,20 @@ public final class RequiredRates {
                         null, "Corridor distance", in.corridorCode() + " has no distance in the corridor catalog."));
             }
         }
+        for (RoadLeg leg : in.legs()) {
+            if (legFreight(leg, in.legTrailer()) == null) {
+                String kind = in.legTrailer() == TrailerType.SHARED ? "shared-load" : "private-trailer";
+                missing.add(new MissingRate(
+                        leg.group(),
+                        PricingText.fitDescription("Road freight " + leg.fromCity() + " → " + leg.toCity() + ", "
+                                + PricingText.trailerWord(in.legTrailer())),
+                        catalog(rates) + kind + " road rate for " + leg.code() + "."));
+            }
+            if (leg.distanceKm() == null) {
+                missing.add(new MissingRate(
+                        null, "Corridor distance", leg.code() + " has no distance in the corridor catalog."));
+            }
+        }
         if (in.crossingCount() > 0 && !has(rates, RateBasis.PER_CROSSING)) {
             missing.add(crossing(rates, in.corridorCode()));
         }
@@ -150,6 +164,14 @@ public final class RequiredRates {
     static ClassRow classRow(RateSet rates, ServiceClass serviceClass) {
         return rates.classes().stream()
                 .filter(c -> c.serviceClass() == serviceClass)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** The leg's per-km road row for the trailer (US-F1-09), or null when its corridor has none. */
+    static RateRow legFreight(RoadLeg leg, TrailerType trailer) {
+        return leg.freight().stream()
+                .filter(l -> l.appliesToTrailer() == null || l.appliesToTrailer() == trailer)
                 .findFirst()
                 .orElse(null);
     }

@@ -4,7 +4,7 @@ import { HorseSwatches } from './HorseSwatches';
 
 import { DraftPass, type Tone } from '@/components/ui';
 import type { Blocker, Horse, Route } from '@/interfaces';
-import { passRows, type WizardValues } from '@/lib/utils';
+import { passRows, routeEnds, type WizardValues } from '@/lib/utils';
 
 export const DRAFT_SUB =
   'Not a quote. A logistics manager prices the move after review; the quotation is itemised and valid for 7 days.';
@@ -35,8 +35,8 @@ export const RequestPass: FC<Props> = ({
   rangeSub,
   className,
 }) => {
-  const from = route?.fromCity ?? values.origin?.city ?? null;
-  const to = route?.toCity ?? values.destination?.city ?? null;
+  const from = (route && routeEnds(route).from) ?? values.origin?.city ?? null;
+  const to = (route && routeEnds(route).to) ?? values.destination?.city ?? null;
   const ids = values.horses.map((h) => h.horseId);
   return (
     <DraftPass

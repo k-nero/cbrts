@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** The engine's input, built from a stored request (spec §4.1). */
@@ -211,5 +212,45 @@ class PricingInputsTest {
         r.setArrivalMode(com.equifreight.entity.enums.ArrivalMode.WINDOW);
         assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true).arrivalWindow())
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName(
+            "Da Nang → Hong Kong by way of Ho Chi Minh City: the leg to the hub from its own rates, the flight from the hub")
+    void theLegToTheHubIsPricedFromItsOwnCorridor() {
+        Corridor toHub = new Corridor();
+        toHub.setId(UUID.randomUUID());
+        toHub.setCode("RD DAD → HCM");
+        toHub.setOriginCity("Da Nang");
+        toHub.setDestinationCity("Ho Chi Minh City");
+        toHub.setDistanceKm(960);
+        TransportRequest r = request(place("Da Nang", vietnam), place("Hong Kong", hongKong));
+        r.getCorridor().setOriginCity("Ho Chi Minh City");
+        r.setFirstLegCorridor(toHub);
+        com.equifreight.entity.RateLine freight = new com.equifreight.entity.RateLine();
+        freight.setId(UUID.randomUUID());
+        freight.setCorridor(toHub);
+        freight.setCode("ROAD_PRIVATE");
+        freight.setGroupCode("C");
+        freight.setDescription("Road freight, private trailer");
+        freight.setBasis(com.equifreight.entity.enums.RateBasis.PER_KM);
+        freight.setRate(new BigDecimal("3.60"));
+        com.equifreight.entity.RateCatalogVersion version = new com.equifreight.entity.RateCatalogVersion();
+        version.setVersionNo(1);
+        CatalogRows rows = new CatalogRows(version, List.of(), List.of(freight), List.of(), List.of(), List.of());
+
+        PricingInput in = inputs.inputFor(r, ServiceClass.BUSINESS, true, rows);
+
+        assertThat(in.fromCity()).isEqualTo("Ho Chi Minh City");
+        assertThat(in.toCity()).isEqualTo("Hong Kong");
+        assertThat(in.legs()).singleElement().satisfies(leg -> {
+            assertThat(leg.group()).isEqualTo("A");
+            assertThat(leg.fromCity()).isEqualTo("Da Nang");
+            assertThat(leg.toCity()).isEqualTo("Ho Chi Minh City");
+            assertThat(leg.distanceKm()).isEqualTo(960);
+            assertThat(leg.freight()).extracting(RateRow::code).containsExactly("ROAD_PRIVATE");
+        });
+        // Without the catalog rows (a caller that doesn't price), there are no legs.
+        assertThat(inputs.inputFor(r, ServiceClass.BUSINESS, true).legs()).isEmpty();
     }
 }

@@ -11,7 +11,7 @@ import lombok.Builder;
  * route we don't run), countries, crossBorder and the lead time are null; the lead time is also null when a
  * country on the route has no published regulation catalog.
  */
-@Builder
+@Builder(toBuilder = true)
 public record RouteResponse(
         UUID corridorId,
         String code,
@@ -27,4 +27,8 @@ public record RouteResponse(
         List<String> countryNames,
         Boolean crossBorder,
         Integer leadTimeDays,
-        LocalDate earliestDeparture) {}
+        LocalDate earliestDeparture,
+        /** The domestic road leg from the origin's city to the hub this corridor leaves from (US-F1-09); else null. */
+        RouteLegResponse firstLeg,
+        /** The domestic road leg from the hub this corridor arrives in to the destination's city; else null. */
+        RouteLegResponse lastLeg) {}

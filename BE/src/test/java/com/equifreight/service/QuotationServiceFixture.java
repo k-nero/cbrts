@@ -138,7 +138,7 @@ abstract class QuotationServiceFixture {
                 .thenReturn(Optional.of(v2));
         when(loader.load(v2.getId())).thenReturn(rows(v2, true));
         when(loader.load(v3.getId())).thenReturn(rows(v3, true));
-        when(inputs.inputFor(eq(request), any(), anyBoolean())).thenAnswer(i -> input(i.getArgument(1)));
+        when(inputs.inputFor(eq(request), any(), anyBoolean(), any())).thenAnswer(i -> input(i.getArgument(1)));
         when(codes.next(CodePrefix.Q, 2026)).thenReturn("Q-2026-0189");
         when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))
                 .thenAnswer(i -> stored);

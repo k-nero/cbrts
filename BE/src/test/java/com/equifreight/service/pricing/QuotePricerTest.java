@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class QuotePricerTest {
@@ -867,5 +868,63 @@ class QuotePricerTest {
                                 l.estimateNote())
                         : l)
                 .toList();
+    }
+    // ---------- domestic legs to and from hubs (US-F1-09) ----------
+
+    private static PricingInput withLeg(PricingInput in, RoadLeg leg) {
+        return new PricingInput(
+                in.mode(),
+                in.corridorCode(),
+                in.fromCity(),
+                in.toCity(),
+                in.destinationCountryName(),
+                in.distanceKm(),
+                in.crossingCount(),
+                in.airClass(),
+                in.trailer(),
+                in.insurance(),
+                in.vetEscort(),
+                in.quarantineDays(),
+                in.horses(),
+                in.arrivalWindow(),
+                in.weightsRequired(),
+                List.of(leg));
+    }
+
+    private static RoadLeg toTheHub(Integer km, RateRow... freight) {
+        return new RoadLeg("A", "RD DAD → HCM", "Da Nang", "Phnom Penh", km, List.of(freight));
+    }
+
+    @Test
+    @DisplayName("The leg to the hub is a group A line, its corridor's per-km rate over its own distance")
+    void theLegToTheHubIsPricedInGroupA() {
+        RateRow privateRoad =
+                kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400");
+        PricedQuote without = QuotePricer.price(pnhHkgBusiness(), pnhHkgRates());
+
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960, privateRoad)), pnhHkgRates());
+
+        PricedLine leg = find(quote, "Road freight Da Nang → Phnom Penh");
+        assertThat(leg.group()).isEqualTo("A");
+        assertThat(leg.lineKey()).isEqualTo("LEG_A_ROAD_PRIVATE");
+        // A flight has no trailer of its own: the leg goes by private trailer.
+        assertThat(leg.description()).contains("private trailer");
+        assertThat(leg.amount()).isEqualByComparingTo("3456.00");
+        assertThat(leg.basisText()).isEqualTo("per km · 960 km · RD DAD → HCM");
+        assertThat(group(quote, "A")).isEqualByComparingTo(group(without, "A").add(d("3456.00")));
+        assertThat(quote.missing()).isEmpty();
+        assertThat(quote.totals().total()).isGreaterThan(without.totals().total());
+    }
+
+    @Test
+    @DisplayName(
+            "A leg whose corridor has no road rate is a missing rate in its group, so the quotation can't be issued")
+    void aLegWithNoRoadRateIsMissing() {
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960)), pnhHkgRates());
+
+        assertThat(quote.missing()).singleElement().satisfies(m -> {
+            assertThat(m.group()).isEqualTo("A");
+            assertThat(m.why()).contains("private-trailer road rate for RD DAD → HCM");
+        });
     }
 }

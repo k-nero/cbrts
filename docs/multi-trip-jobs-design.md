@@ -12,7 +12,7 @@ A job that flies is really three moves: trailers take the horses from their stab
 | --- | --- |
 | Shape | **A chain of trips per job:** one trip per leg of the journey, e.g. road → air → road. The job stays the commercial and legal unit. |
 | The flight | **Its own trip.** An air trip's flight plays the part a trailer plays on a road trip: the flight number takes the vehicle's place, so no rule is broken by a trip that has no trailer. |
-| Who makes the chain | **The fleet coordinator, while planning.** Approval still puts the job on one trip; the coordinator adds the next trip on the Route tab. Nothing is split automatically. |
+| Who makes the chain | **The fleet coordinator, while planning,** except for a request that goes by way of hubs (US-F1-09): its approval puts the job on the chain its route names, the domestic leg to the hub, the corridor that crosses the border, and the leg from the hub. Otherwise approval puts the job on one trip and the coordinator adds the next trip on the Route tab. |
 | Corridors | **Every trip has a catalog corridor of its own mode.** The air trip uses an air corridor ("AIR BKK → HKG"); each road trip a road corridor ("RD VTE → BKK", "RD HKG → Sha Tin"). Sharing a trip with other jobs keeps working, because sharing is "same corridor". |
 | Price | **Unchanged.** The quotation already covers door to door (ground lines and air). Splitting the journey into trips is planning only, like sharing; invoices stay per job. |
 
@@ -89,7 +89,7 @@ Removing a trip from the chain is the reverse, before either trip departs.
 
 ## Not in scope
 
-- Automatic chains at approval.
+- Automatic chains at approval, other than the domestic legs of a route by way of hubs (US-F1-09).
 - Pricing per trip; the quote stays door to door.
 - A trip with two flights for one air leg (already out of scope in shared flights).
 
