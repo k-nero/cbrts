@@ -4,6 +4,8 @@ package com.equifreight.entity.enums;
  * {@code notifications.kind}: what happened. The caller writes the text; the kind decides the tone the bell shows.
  */
 public enum NotificationKind {
+    /** A club submitted a request, or sent it again after a return; the logistics managers review it (§2.3). */
+    REQUEST_SUBMITTED(NotificationTone.INFO),
     REQUEST_INFO_REQUIRED(NotificationTone.WARN),
     REQUEST_CANCELLED(NotificationTone.NEUTRAL),
     REQUEST_REJECTED(NotificationTone.BAD),
