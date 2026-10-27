@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { corridorApi, jobApi, jobsListApi, routeStopApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
+import { canSignOffTripPlan } from '@/lib/utils/rbac';
 import { useAuthStore } from '@/stores/authStore';
 import {
   type FlightAllocationInput,
@@ -261,6 +262,12 @@ export const useCanPlanTrips = () => {
   return (
     roles.includes(RoleNameEnum.FLEET_COORDINATOR) || roles.includes(RoleNameEnum.LOGISTICS_MANAGER)
   );
+};
+
+/** Whether the signed-in staff member signs off trip plans: the logistics manager only (US-F3-08). */
+export const useCanSignOffTripPlan = () => {
+  const roles = useAuthStore((state) => state.roles) as string[];
+  return canSignOffTripPlan(roles);
 };
 
 /** Puts another job on this job's trip; both jobs' plans reopen. */

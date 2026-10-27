@@ -16,6 +16,7 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
+import { SignOffButton } from './SignOffButton';
 import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
@@ -31,7 +32,6 @@ import {
   useJobTrip,
   useMoveHorse,
   useRemoveTrailer,
-  useSignOffTripPlan,
 } from '@/hooks/useJob';
 import { useActiveVehicles } from '@/hooks/useVehicle';
 import type { JobDetail, JobHorse, LoadPlanStall, Vehicle } from '@/interfaces';
@@ -94,7 +94,6 @@ export function LoadPlanTab({ job }: Props) {
   const moveMutation = useMoveHorse(job.id);
   const autoArrangeMutation = useAutoArrange(job.id);
   const confirmMutation = useConfirmLoadPlan(job.id);
-  const signOffMutation = useSignOffTripPlan(job.id);
   const addTrailerMutation = useAddTrailer(job.id);
   const removeTrailerMutation = useRemoveTrailer(job.id);
 
@@ -139,18 +138,7 @@ export function LoadPlanTab({ job }: Props) {
                 : 'none assigned yet'}
             </span>
             <div>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={signOffMutation.isPending}
-                onClick={() =>
-                  signOffMutation.mutate(undefined, {
-                    onError: reportRefusal('The trip plan couldn’t be signed off. Try again.'),
-                  })
-                }
-              >
-                {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-              </Button>
+              <SignOffButton jobId={job.id} />
             </div>
           </Flex>
         </Panel>
@@ -691,22 +679,7 @@ export function LoadPlanTab({ job }: Props) {
                           </Button>
                         </>
                       )}
-                      {isConfirmed && (
-                        <Button
-                          variant="primary"
-                          size="md"
-                          disabled={signOffMutation.isPending}
-                          onClick={() =>
-                            signOffMutation.mutate(undefined, {
-                              onError: reportRefusal(
-                                'The trip plan couldn’t be signed off. Try again.',
-                              ),
-                            })
-                          }
-                        >
-                          {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-                        </Button>
-                      )}
+                      {isConfirmed && <SignOffButton jobId={job.id} />}
                     </Flex>
                   </Flex>
                 </Flex>
