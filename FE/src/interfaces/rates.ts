@@ -41,6 +41,8 @@ export const RatePolicyKeyEnum = {
   AIR_SHIPMENT_MAX_KG: 'AIR_SHIPMENT_MAX_KG',
   /** Hours after a trip before its vehicle drives again (US-F7-02). */
   TURNAROUND_HOURS: 'TURNAROUND_HOURS',
+  /** Hours after a local run to or from the cargo terminal before its vehicle drives again (US-F3-22). */
+  LOCAL_TURNAROUND_HOURS: 'LOCAL_TURNAROUND_HOURS',
   /** How a journey drafted from its quote is timed (US-F3-22). */
   PLAN_START_HOUR: 'PLAN_START_HOUR',
   PLAN_SPEED_KMH: 'PLAN_SPEED_KMH',

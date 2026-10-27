@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -21,6 +22,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.JobStage;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
@@ -379,6 +381,38 @@ class JobTripServiceTest {
         assertThat(service.beforeBorder(flight, job)).isFalse();
         assertThat(service.beforeBorder(toStables, job)).isFalse();
         assertThat(service.documentsDepartureOf(job)).isEqualTo(FLIGHT_SGN);
+    }
+
+    @Test
+    @DisplayName("Đại Nam → Sha Tin: the local run to the cargo terminal waits for the gate, unlike a leg to the hub")
+    void theLocalRunWaitsForTheGate() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toTerminal = tripOn("RD HCM local", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG);
+        toTerminal.getCorridor().setOriginCity("Ho Chi Minh City");
+        toTerminal.getCorridor().setDestinationCity("Ho Chi Minh City");
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        journey(job, toTerminal, flight);
+
+        assertThat(service.beforeBorder(toTerminal, job)).isFalse();
+    }
+
+    @Test
+    @DisplayName("A flight delivers only to an airport; a stable in the city it lands in needs the road trip after it")
+    void aFlightDeliversOnlyToTheAirport() {
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        flight.getCorridor().setOriginCity("Ho Chi Minh City");
+        flight.getCorridor().setDestinationCity("Hong Kong");
+        TransportJob job = job(FLIGHT_SGN);
+        TransportRequest request = new TransportRequest();
+        Place stables = new Place();
+        stables.setKind(PlaceKind.TRAINING_CENTRE);
+        stables.setCity("Hong Kong");
+        request.setDestinationPlace(stables);
+        job.setRequest(request);
+
+        assertThat(JobTripService.reachesDestination(flight, job)).isFalse();
+        stables.setKind(PlaceKind.CARGO_TERMINAL);
+        assertThat(JobTripService.reachesDestination(flight, job)).isTrue();
     }
 
     @Test

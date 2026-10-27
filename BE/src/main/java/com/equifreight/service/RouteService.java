@@ -241,12 +241,12 @@ public class RouteService {
         return routes;
     }
 
-    /** No leg (null) first, then every domestic road corridor touching the city. */
+    /** No leg (null) first, then every domestic road corridor touching the city, other than a local run within it. */
     private static List<Corridor> legsTouching(List<Corridor> network, String city) {
         List<Corridor> legs = new ArrayList<>();
         legs.add(null);
         network.stream()
-                .filter(c -> c.isRoad() && !c.crossesBorder())
+                .filter(c -> c.isRoad() && !c.crossesBorder() && !c.isLocal())
                 .filter(c -> c.getOriginCity().equalsIgnoreCase(city)
                         || c.getDestinationCity().equalsIgnoreCase(city))
                 .forEach(legs::add);

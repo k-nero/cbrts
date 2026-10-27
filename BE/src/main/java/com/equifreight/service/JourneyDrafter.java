@@ -42,8 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Drafts a job's journey from its quoted route for the coordinator to review (US-F3-22): a trip per corridor of the
  * quote, added with Add trip's rules (US-F3-21), and each road route drafted with its border crossings and welfare
- * stops, timed from the departure date with the rate catalog's planning settings. A flight gets its times from "Set
- * flight", so a road trip after it is left untimed. Nothing is confirmed.
+ * stops, timed from the departure date with the rate catalog's planning settings. A flight from or to a stable gets a
+ * local road run to or from the cargo terminal. A flight gets its times from "Set flight", so a road trip after it is
+ * left untimed until then. Nothing is confirmed.
  */
 @Log4j2
 @Service
@@ -111,10 +112,7 @@ public class JourneyDrafter {
                             + " already has trips. Take them off to draft the journey from the quote, or add trips by hand.");
         }
         TransportRequest request = job.getRequest();
-        List<Corridor> quoted = new ArrayList<>();
-        if (request.getFirstLegCorridor() != null) quoted.add(request.getFirstLegCorridor());
-        if (request.getCorridor() != null) quoted.add(request.getCorridor());
-        if (request.getLastLegCorridor() != null) quoted.add(request.getLastLegCorridor());
+        List<Corridor> quoted = legs(request);
         if (quoted.isEmpty()) {
             throw new BusinessException("NO_QUOTED_ROUTE", job.getCode() + "'s request has no route to draft from.");
         }
@@ -172,6 +170,34 @@ public class JourneyDrafter {
                 null);
         log.info("{} journey drafted from the quote", job.getCode());
         return parts;
+    }
+
+    /**
+     * The trips to draft for {@code request}: the corridors it was quoted, the leg to the hub, the corridor and the leg
+     * from it, with a local road run before a flight that leaves from a stable rather than the airport, and after one
+     * that lands in the city of a stable, so a vehicle takes the horses to and from the cargo terminal.
+     */
+    List<Corridor> legs(TransportRequest request) {
+        List<Corridor> out = new ArrayList<>();
+        if (request.getFirstLegCorridor() != null) out.add(request.getFirstLegCorridor());
+        if (request.getCorridor() != null) out.add(request.getCorridor());
+        if (request.getLastLegCorridor() != null) out.add(request.getLastLegCorridor());
+        if (out.isEmpty()) return out;
+        Place origin = request.getOriginPlace();
+        if (!out.getFirst().isRoad() && origin != null && !origin.isTerminal()) {
+            journeys.localRun(origin.getCity()).ifPresent(out::addFirst);
+        }
+        Place destination = request.getDestinationPlace();
+        Corridor last = out.getLast();
+        if (!last.isRoad()
+                && destination != null
+                && !destination.isTerminal()
+                && destination.getCity() != null
+                && (destination.getCity().equalsIgnoreCase(last.getDestinationCity())
+                        || destination.getCity().equalsIgnoreCase(last.getOriginCity()))) {
+            journeys.localRun(destination.getCity()).ifPresent(out::add);
+        }
+        return out;
     }
 
     /**

@@ -2,6 +2,8 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Place;
+import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -10,11 +12,13 @@ import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.enums.BookingKind;
 import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
+import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.RatePolicyRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -43,7 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
  * starts, it can be in the country the trip starts in by then, and no other booking overlaps the trip.
  *
  * <p>Where a vehicle can be comes from its own bookings: its last trip or hold ending by the start leaves it in that
- * trip's destination country; after the turnaround (the rate catalog's {@code TURNAROUND_HOURS}) it is ready there,
+ * trip's destination country; after the turnaround (the rate catalog's {@code TURNAROUND_HOURS}, or
+ * {@code LOCAL_TURNAROUND_HOURS} after a local run to or from the cargo terminal) it is ready there,
  * and it can drive empty to another country along a corridor it works, in that corridor's driving days. With no
  * booking it is ready in its home country. The empty drive isn't booked, so a return load can still take its place.
  *
@@ -56,6 +61,9 @@ public class VehicleAvailability {
     /** The turnaround when the published rate catalog doesn't set one. */
     static final Duration DEFAULT_TURNAROUND = Duration.ofHours(24);
 
+    /** The turnaround after a local run to or from the cargo terminal, when the rate catalog doesn't set one. */
+    static final Duration DEFAULT_LOCAL_TURNAROUND = Duration.ofHours(4);
+
     private static final DateTimeFormatter DAY = BusinessTime.SHORT_DAY.withZone(BusinessTime.ZONE);
     private static final DateTimeFormatter DAY_TIME =
             DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH).withZone(BusinessTime.ZONE);
@@ -65,6 +73,7 @@ public class VehicleAvailability {
     private final RateCatalogVersionRepository versions;
     private final RatePolicyRepository policies;
     private final CorridorRepository corridors;
+    private final RoutePlanRepository routePlans;
     private final Clock clock;
 
     public VehicleAvailability(
@@ -73,19 +82,22 @@ public class VehicleAvailability {
             RateCatalogVersionRepository versions,
             RatePolicyRepository policies,
             CorridorRepository corridors,
+            RoutePlanRepository routePlans,
             Clock clock) {
         this.jobTrips = jobTrips;
         this.bookings = bookings;
         this.versions = versions;
         this.policies = policies;
         this.corridors = corridors;
+        this.routePlans = routePlans;
         this.clock = clock;
     }
 
     /**
      * When the trip runs: from its planned departure (or its jobs' earliest, or their requests' earliest departure
      * date) to its jobs' latest planned arrival, or the start plus its corridor's driving days while the route isn't
-     * planned. The start is null while no date is known.
+     * planned. A local run lasts its own route's hours instead, so its vehicle is free again for the rest of the day.
+     * The start is null while no date is known.
      */
     public record Span(Instant startsAt, Instant endsAt) {}
 
@@ -100,6 +112,10 @@ public class VehicleAvailability {
 
     @Transactional(readOnly = true)
     public Span spanOf(Trip trip) {
+        if (trip.getCorridor() != null && trip.getCorridor().isLocal()) {
+            Optional<Span> own = routeSpanOf(trip);
+            if (own.isPresent()) return own.get();
+        }
         List<TransportJob> jobs = jobTrips.jobsOn(trip);
         Instant startsAt = trip.getPlannedDepartureAt();
         if (startsAt == null) {
@@ -129,6 +145,29 @@ public class VehicleAvailability {
         return new Span(startsAt, endsAt);
     }
 
+    /**
+     * The hours {@code trip}'s own route takes: from its first timed stop to its last, with the stay there (the wait
+     * at the cargo terminal before a flight); empty while fewer than two stops are timed.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Span> routeSpanOf(Trip trip) {
+        if (trip.getId() == null) return Optional.empty();
+        return routePlans
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
+                .or(() -> routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT))
+                .flatMap(plan -> {
+                    List<RouteStop> timed = plan.getStops().stream()
+                            .filter(st -> st.getPlannedAt() != null)
+                            .toList();
+                    if (timed.size() < 2) return Optional.empty();
+                    RouteStop last = timed.getLast();
+                    Instant end = last.getPlannedStayMin() == null
+                            ? last.getPlannedAt()
+                            : last.getPlannedAt().plus(Duration.ofMinutes(last.getPlannedStayMin()));
+                    return Optional.of(new Span(timed.getFirst().getPlannedAt(), end));
+                });
+    }
+
     /** The start of {@code day} in the business time zone. */
     public static Instant startOf(LocalDate day) {
         return day.atStartOfDay(BusinessTime.ZONE).toInstant();
@@ -143,11 +182,20 @@ public class VehicleAvailability {
     /** The turnaround after a trip, from the published rate catalog; 24 hours when it isn't set. */
     @Transactional(readOnly = true)
     public Duration turnaround() {
+        return hours(RatePolicyKey.TURNAROUND_HOURS).orElse(DEFAULT_TURNAROUND);
+    }
+
+    /** The turnaround after a local run, from the published rate catalog; 4 hours when it isn't set. */
+    @Transactional(readOnly = true)
+    public Duration localTurnaround() {
+        return hours(RatePolicyKey.LOCAL_TURNAROUND_HOURS).orElse(DEFAULT_LOCAL_TURNAROUND);
+    }
+
+    private Optional<Duration> hours(RatePolicyKey key) {
         return versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED)
-                .flatMap(v -> policies.findByVersionIdAndKey(v.getId(), RatePolicyKey.TURNAROUND_HOURS))
+                .flatMap(v -> policies.findByVersionIdAndKey(v.getId(), key))
                 .map(p -> Duration.ofMinutes(
-                        p.getValue().multiply(BigDecimal.valueOf(60)).longValue()))
-                .orElse(DEFAULT_TURNAROUND);
+                        p.getValue().multiply(BigDecimal.valueOf(60)).longValue()));
     }
 
     /** The trip's own bookings, and the holds of the requests whose jobs ride it. */
@@ -163,14 +211,22 @@ public class VehicleAvailability {
     }
 
     /**
-     * What every check needs besides the vehicle's bookings: the turnaround, the road network an empty drive can use,
-     * and now (a vehicle with no trip yet can set off from its home city from now on).
+     * What every check needs besides the vehicle's bookings: the turnarounds after a trip and after a local run, the
+     * road network an empty drive can use, and now (a vehicle with no trip yet can set off from its home city from now
+     * on).
      */
-    record Context(Duration turnaround, RoadNetwork roads, Instant now) {}
+    record Context(Duration turnaround, Duration localTurnaround, RoadNetwork roads, Instant now) {
+
+        /** The turnaround after booking {@code b}: a local run's, or a trip's. */
+        Duration after(VehicleBooking b) {
+            return isLocal(b) ? localTurnaround : turnaround;
+        }
+    }
 
     @Transactional(readOnly = true)
     Context context() {
-        return new Context(turnaround(), new RoadNetwork(corridors.findRoadNetwork()), clock.instant());
+        return new Context(
+                turnaround(), localTurnaround(), new RoadNetwork(corridors.findRoadNetwork()), clock.instant());
     }
 
     /** Why {@code vehicle} can't join {@code trip}, or empty when it can. */
@@ -189,21 +245,47 @@ public class VehicleAvailability {
     }
 
     /**
+     * The road corridor a vehicle is held on for {@code request} (US-F7-02): its corridor when it drives; before a
+     * flight, the domestic leg to the hub, else the local run from a stable to the cargo terminal. Empty when nothing
+     * drives before the flight, or while the request has no route.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Corridor> heldCorridor(TransportRequest request) {
+        Corridor corridor = request.getCorridor();
+        if (corridor == null) return Optional.empty();
+        if (corridor.isRoad()) return Optional.of(corridor);
+        if (request.getFirstLegCorridor() != null) return Optional.of(request.getFirstLegCorridor());
+        Place origin = request.getOriginPlace();
+        if (origin == null || origin.isTerminal()) return Optional.empty();
+        return corridors.findLocalRun(origin.getCity());
+    }
+
+    /**
      * Why {@code vehicle} can't run {@code request}'s trip starting on {@code day}, or empty when it can; the
      * request's own hold doesn't count. For the hold at acceptance and the fleet check at review (US-F7-02).
      */
     @Transactional(readOnly = true)
     public Optional<String> refusalFor(Vehicle vehicle, TransportRequest request, LocalDate day) {
+        Corridor corridor = heldCorridor(request).orElse(request.getCorridor());
         Instant start = startOf(day);
         return refusal(
                 vehicle,
-                request.getCorridor(),
-                request.getCorridor() == null ? null : request.getCorridor().getOriginCity(),
+                corridor,
+                startCityOf(request, corridor),
                 start,
-                afterDriving(start, request.getCorridor()),
+                afterDriving(start, corridor),
                 ownOf(request),
                 context(),
                 bookings.findForAvailability(vehicle.getId()));
+    }
+
+    /** Where a vehicle held for {@code request} sets off: the corridor's origin, or before a flight the stable's city. */
+    private static String startCityOf(TransportRequest request, Corridor held) {
+        if (held == null) return null;
+        if (request.getCorridor() != null && request.getCorridor().isRoad()) return held.getOriginCity();
+        return request.getOriginPlace() == null
+                ? held.getOriginCity()
+                : request.getOriginPlace().getCity();
     }
 
     /**
@@ -216,20 +298,12 @@ public class VehicleAvailability {
         Own own = ownOf(request);
         Context context = context();
         List<VehicleBooking> held = bookings.findForAvailability(vehicle.getId());
+        Corridor corridor = heldCorridor(request).orElse(request.getCorridor());
+        String startCity = startCityOf(request, corridor);
         for (LocalDate day = from; !day.isAfter(last); day = day.plusDays(1)) {
             Instant start = startOf(day);
-            Instant end = afterDriving(start, request.getCorridor());
-            if (refusal(
-                            vehicle,
-                            request.getCorridor(),
-                            request.getCorridor() == null
-                                    ? null
-                                    : request.getCorridor().getOriginCity(),
-                            start,
-                            end,
-                            own,
-                            context,
-                            held)
+            Instant end = afterDriving(start, corridor);
+            if (refusal(vehicle, corridor, startCity, start, end, own, context, held)
                     .isEmpty()) {
                 return Optional.of(day);
             }
@@ -306,7 +380,7 @@ public class VehicleAvailability {
                 .max(Comparator.comparing(VehicleBooking::getEndsAt));
         String where = last.map(VehicleAvailability::endCityOf).orElse(vehicle.getHomeCity());
         if (where == null || startCity == null) return Optional.empty();
-        Instant ready = last.map(b -> b.getEndsAt().plus(context.turnaround())).orElse(null);
+        Instant ready = last.map(b -> b.getEndsAt().plus(context.after(b))).orElse(null);
 
         if (RoadNetwork.sameCity(where, startCity)) {
             if (ready != null && ready.isAfter(start)) {
@@ -332,15 +406,42 @@ public class VehicleAvailability {
         return Optional.empty();
     }
 
-    /** The city a booking leaves its vehicle in: a trip's end, in the trip's direction (US-F3-21), or a hold's. */
+    /**
+     * The city a booking leaves its vehicle in: a trip's end, in the trip's direction (US-F3-21), or a hold's: its
+     * corridor's destination, or, before a flight, the city the flight leaves from.
+     */
     private static String endCityOf(VehicleBooking b) {
         if (b.getKind() == BookingKind.JOB && b.getTrip() != null && b.getTrip().getCorridor() != null)
             return b.getTrip().endCity();
         if (b.getKind() == BookingKind.RESERVED
                 && b.getRequest() != null
-                && b.getRequest().getCorridor() != null)
-            return b.getRequest().getCorridor().getDestinationCity();
+                && b.getRequest().getCorridor() != null) {
+            TransportRequest request = b.getRequest();
+            if (request.getCorridor().isRoad()) return request.getCorridor().getDestinationCity();
+            Corridor firstLeg = request.getFirstLegCorridor();
+            String origin = request.getOriginPlace() == null
+                    ? null
+                    : request.getOriginPlace().getCity();
+            if (firstLeg == null || origin == null) return origin;
+            return firstLeg.getOriginCity().equalsIgnoreCase(origin)
+                    ? firstLeg.getDestinationCity()
+                    : firstLeg.getOriginCity();
+        }
         return null;
+    }
+
+    /**
+     * Whether booking {@code b} is a local run: a trip on a local corridor, or the hold for a flight's request that
+     * leaves from a stable, with no domestic leg to the hub.
+     */
+    private static boolean isLocal(VehicleBooking b) {
+        if (b.getKind() == BookingKind.JOB && b.getTrip() != null && b.getTrip().getCorridor() != null)
+            return b.getTrip().getCorridor().isLocal();
+        if (b.getKind() == BookingKind.RESERVED
+                && b.getRequest() != null
+                && b.getRequest().getCorridor() != null)
+            return !b.getRequest().getCorridor().isRoad() && b.getRequest().getFirstLegCorridor() == null;
+        return false;
     }
 
     /**

@@ -70,6 +70,14 @@ public class Corridor extends BaseEntity {
         return mode == TransportMode.ROAD;
     }
 
+    /**
+     * A road route within one city, such as "RD HCM local": the run between a stable and the cargo terminal, a trip of
+     * its own with a vehicle and crew, before or after a flight.
+     */
+    public boolean isLocal() {
+        return isRoad() && originCity != null && originCity.equalsIgnoreCase(destinationCity);
+    }
+
     /** Whether the route leaves the country it starts in: "RD HCM → BKK" and "AIR SGN → HKG" do, "RD DAD → HCM" doesn't. */
     public boolean crossesBorder() {
         return countries().size() > 1;

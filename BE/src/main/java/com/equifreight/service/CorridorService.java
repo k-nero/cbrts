@@ -82,7 +82,8 @@ public class CorridorService {
     }
 
     /**
-     * Adds a route we run. The code is new, the cities differ, the route doesn't already run this way by this mode,
+     * Adds a route we run. The code is new, the cities differ (a road route may stay in one city: the run to its cargo
+     * terminal), the route doesn't already run this way by this mode,
      * each city has a place a request can start or end at, and a road route's crossings lead from the origin's
      * country to the destination's, one after the other. An air route takes no land crossings.
      */
@@ -91,9 +92,9 @@ public class CorridorService {
         String code = request.code().trim();
         String origin = request.originCity().trim();
         String destination = request.destinationCity().trim();
-        if (origin.equalsIgnoreCase(destination)) {
+        if (origin.equalsIgnoreCase(destination) && request.mode() != TransportMode.ROAD) {
             throw new BusinessException(
-                    "CORRIDOR_CITIES", "A route runs between two cities; both ends are " + origin + ".");
+                    "CORRIDOR_CITIES", "A flight runs between two cities; both ends are " + origin + ".");
         }
         checkFlex(request.dateFlexDays());
         if (corridors.existsByCodeIgnoreCase(code)) {

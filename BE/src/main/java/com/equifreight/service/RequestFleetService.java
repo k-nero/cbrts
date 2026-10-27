@@ -72,18 +72,19 @@ public class RequestFleetService {
      */
     @Transactional(readOnly = true)
     public FleetCheckResponse check(TransportRequest request) {
-        Corridor corridor = request.getCorridor();
         LocalDate date = request.getDepartureDate();
-        if (corridor == null || date == null) return null;
+        if (request.getCorridor() == null || date == null) return null;
         FleetCheckResponse.FleetCheckResponseBuilder out =
                 FleetCheckResponse.builder().date(date);
         heldFor(request, out);
-        if (!corridor.isRoad()) {
+        Optional<Corridor> driven = availability.heldCorridor(request);
+        if (driven.isEmpty()) {
             return out.outcome("FLOWN")
-                    .message("Flown: an air trip carries no vehicle.")
+                    .message("Flown from the airport: no vehicle takes the horses to it.")
                     .held(null)
                     .build();
         }
+        Corridor corridor = driven.get();
         List<Vehicle> runners = runners(corridor);
         if (runners.isEmpty()) {
             return out.outcome("NO_VEHICLE")
@@ -151,13 +152,15 @@ public class RequestFleetService {
 
     /**
      * Holds the first vehicle that can run {@code request} on its departure date (US-F7-02): a RESERVED booking from
-     * the start of that day for the corridor's driving days. Nothing is held for an air route, when the request
-     * already has a hold, or when no vehicle can; the request moves on either way.
+     * the start of that day for the corridor's driving days. A flight's request holds the vehicle that takes the
+     * horses to the airport, on the leg to the hub or the local run to the cargo terminal. Nothing is held when no
+     * road comes before the flight, when the request already has a hold, or when no vehicle can; the request moves on
+     * either way.
      */
     @Transactional
     public Optional<VehicleBooking> hold(TransportRequest request) {
-        Corridor corridor = request.getCorridor();
-        if (corridor == null || !corridor.isRoad() || request.getDepartureDate() == null) return Optional.empty();
+        Corridor corridor = availability.heldCorridor(request).orElse(null);
+        if (corridor == null || request.getDepartureDate() == null) return Optional.empty();
         Optional<VehicleBooking> existing = bookings.findFirstByRequest_Id(request.getId());
         if (existing.isPresent()) return existing;
         LocalDate date = request.getDepartureDate();

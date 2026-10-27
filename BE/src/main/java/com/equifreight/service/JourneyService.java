@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.RouteLeg;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
@@ -28,6 +29,7 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,6 +63,7 @@ public class JourneyService {
     private final FlightService flights;
     private final VehicleBookingRepository bookings;
     private final CrewAssignmentRepository crew;
+    private final PlanningDefaults defaults;
     private final AuditService audit;
     private final Clock clock;
 
@@ -76,6 +79,7 @@ public class JourneyService {
             FlightService flights,
             VehicleBookingRepository bookings,
             CrewAssignmentRepository crew,
+            PlanningDefaults defaults,
             AuditService audit,
             Clock clock) {
         this.jobs = jobs;
@@ -89,6 +93,7 @@ public class JourneyService {
         this.flights = flights;
         this.bookings = bookings;
         this.crew = crew;
+        this.defaults = defaults;
         this.audit = audit;
         this.clock = clock;
     }
@@ -326,9 +331,102 @@ public class JourneyService {
                         .build())
                 .toList();
         String reason = "Flight " + request.flightNo() + " set";
+        // The run to the terminal is fitted first, so the flight's route is checked against its new times.
+        retimeAround(jobId, trip, request, true, user);
         var draft = routePlans.createOrUpdateDraft(
                 jobId, tripId, new CreateRoutePlanRequest(null, null, reason, stops, legs), user);
         routePlans.confirmRoutePlan(jobId, tripId, draft.id(), reason, user);
+        retimeAround(jobId, trip, request, false, user);
+    }
+
+    /**
+     * Fits a road trip beside a flight being set to its times, while it is a draft: with {@code toTerminal}, the local run
+     * before it, to reach the cargo terminal the planning settings' hours before take-off; otherwise the trip after it,
+     * to collect the horses those hours after landing, once released. A confirmed route is left for the coordinator to
+     * change.
+     */
+    private void retimeAround(UUID jobId, Trip flight, SetFlightRequest request, boolean toTerminal, User user) {
+        List<TripJob> journey = jobTrips.journey(job(jobId));
+        int at = -1;
+        for (int i = 0; i < journey.size(); i++) {
+            if (journey.get(i).getTrip().getId().equals(flight.getId())) at = i;
+        }
+        if (at < 0) return;
+        PlanningDefaults.Planning planning = defaults.current();
+        if (toTerminal && at > 0 && request.scheduledDepartureAt() != null) {
+            Trip before = journey.get(at - 1).getTrip();
+            Instant reach = request.scheduledDepartureAt().minus(Duration.ofHours(planning.airportBeforeHours()));
+            if (before.getCorridor() != null && before.getCorridor().isLocal()) {
+                draftOf(before).ifPresent(plan -> retime(jobId, before, plan, reach, true, user));
+            }
+        }
+        if (!toTerminal && at + 1 < journey.size() && request.scheduledArrivalAt() != null) {
+            Trip after = journey.get(at + 1).getTrip();
+            Instant collect = request.scheduledArrivalAt().plus(Duration.ofHours(planning.airportAfterHours()));
+            if (after.getCorridor() != null && after.getCorridor().isRoad()) {
+                draftOf(after).ifPresent(plan -> retime(jobId, after, plan, collect, false, user));
+            }
+        }
+    }
+
+    private Optional<RoutePlan> draftOf(Trip trip) {
+        return routePlanRows.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
+    }
+
+    /**
+     * Times {@code plan}'s stops again from its legs' minutes and its stops' stays: from {@code anchor} at its first
+     * stop, or, with {@code toLast}, so that its last stop is reached at {@code anchor}. Untouched when a leg has no
+     * minutes to time it by.
+     */
+    private void retime(UUID jobId, Trip trip, RoutePlan plan, Instant anchor, boolean toLast, User user) {
+        List<RouteStop> stops = plan.getStops();
+        List<Duration> offsets = new ArrayList<>();
+        Duration t = Duration.ZERO;
+        for (int s = 0; s < stops.size(); s++) {
+            if (s > 0) {
+                int seq = stops.get(s).getSeq();
+                Optional<Integer> min = plan.getLegs().stream()
+                        .filter(leg -> leg.getToStop().getSeq() == seq)
+                        .map(RouteLeg::getPlannedMin)
+                        .filter(Objects::nonNull)
+                        .findFirst();
+                if (min.isEmpty()) return;
+                t = t.plusMinutes(min.get());
+            }
+            offsets.add(t);
+            Short stay = stops.get(s).getPlannedStayMin();
+            if (stay != null && s < stops.size() - 1) t = t.plusMinutes(stay);
+        }
+        Instant start = toLast ? anchor.minus(offsets.getLast()) : anchor;
+        List<CreateRoutePlanRequest.StopItem> items = new ArrayList<>();
+        for (int s = 0; s < stops.size(); s++) {
+            RouteStop st = stops.get(s);
+            items.add(CreateRoutePlanRequest.StopItem.builder()
+                    .seq(st.getSeq())
+                    .kind(st.getKind())
+                    .jobId(st.getJob() == null ? null : st.getJob().getId())
+                    .placeId(st.getPlace() == null ? null : st.getPlace().getId())
+                    .borderCrossingId(
+                            st.getBorderCrossing() == null
+                                    ? null
+                                    : st.getBorderCrossing().getId())
+                    .plannedAt(start.plus(offsets.get(s)))
+                    .plannedStayMin(st.getPlannedStayMin())
+                    .details(st.getDetails())
+                    .build());
+        }
+        List<CreateRoutePlanRequest.LegItem> legs = plan.getLegs().stream()
+                .map(leg -> CreateRoutePlanRequest.LegItem.builder()
+                        .seq(leg.getSeq())
+                        .fromStopSeq(leg.getFromStop().getSeq())
+                        .toStopSeq(leg.getToStop().getSeq())
+                        .mode(leg.getMode())
+                        .distanceKm(leg.getDistanceKm())
+                        .plannedMin(leg.getPlannedMin())
+                        .build())
+                .toList();
+        routePlans.createOrUpdateDraft(
+                jobId, trip.getId(), new CreateRoutePlanRequest(null, null, "Timed to the flight", items, legs), user);
     }
 
     /**
@@ -343,15 +441,22 @@ public class JourneyService {
         String destination = destinationCity(job);
         Trip last = journey.getLast().getTrip();
         if (destination != null && !JobTripService.reachesDestination(last, job)) {
-            out.add("Ends in " + last.endCity() + "; the horses go to " + destination + ". Add a trip from "
-                    + last.endCity() + ".");
+            out.add(
+                    destination.equalsIgnoreCase(last.endCity())
+                            ? "Lands at " + last.endCity() + "'s airport; the horses go to "
+                                    + job.getRequest().getDestinationPlace().getName()
+                                    + ". Add the local road trip from the cargo terminal."
+                            : "Ends in " + last.endCity() + "; the horses go to " + destination + ". Add a trip from "
+                                    + last.endCity() + ".");
         }
         List<Corridor> quoted = quoted(job.getRequest());
         List<Corridor> planned = journey.stream()
                 .map(p -> p.getTrip().getCorridor())
                 .filter(Objects::nonNull)
                 .toList();
+        // A local run to or from the cargo terminal is priced by the quote's transfer line, not as a corridor.
         List<String> notQuoted = planned.stream()
+                .filter(c -> !c.isLocal())
                 .filter(c -> quoted.stream().noneMatch(q -> q.getId().equals(c.getId())))
                 .map(Corridor::getCode)
                 .distinct()
@@ -371,6 +476,12 @@ public class JourneyService {
         List<TripJob> journey = jobTrips.journey(job);
         return !journey.isEmpty()
                 && JobTripService.reachesDestination(journey.getLast().getTrip(), job);
+    }
+
+    /** The local road run within {@code city}, between its stables and its cargo terminal, if the catalog has one. */
+    @Transactional(readOnly = true)
+    public Optional<Corridor> localRun(String city) {
+        return corridors.findLocalRun(city);
     }
 
     /** The corridors of the route the customer was quoted, in order: the leg to the hub, the corridor, the leg from it. */

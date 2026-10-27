@@ -179,6 +179,7 @@ describe('policyRows', () => {
         STALL_PAYLOAD_KG: 5504,
         AIR_SHIPMENT_MAX_KG: 20000,
         TURNAROUND_HOURS: 24,
+        LOCAL_TURNAROUND_HOURS: 3,
         PLAN_START_HOUR: 5,
         PLAN_SPEED_KMH: 55,
       },
@@ -199,7 +200,11 @@ describe('policyRows', () => {
       { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
       { key: 'STALL_PAYLOAD_KG', label: 'Stall payload', value: '5,504 kg per stall' },
       { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment', value: '20,000 kg of horses' },
-      { key: 'TURNAROUND_HOURS', label: 'Turnaround', value: '24 h after each trip' },
+      {
+        key: 'TURNAROUND_HOURS',
+        label: 'Turnaround',
+        value: '24 h after each trip · 3 h after a local run',
+      },
       { key: 'PLAN_START_HOUR', label: 'Drafted trips', value: 'Start 05:00 · 55 km/h' },
       {
         key: 'PLAN_WELFARE_EVERY_HOURS',
@@ -232,6 +237,9 @@ describe('policyRows', () => {
     expect(policyRows({}, []).find((r) => r.key === 'STALL_PAYLOAD_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'AIR_SHIPMENT_MAX_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value).toBe('—');
+    expect(
+      policyRows({ TURNAROUND_HOURS: 24 }, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value,
+    ).toBe('24 h after each trip · 4 h after a local run (default)');
     // The planning settings fall back to their defaults (US-F3-22).
     expect(policyRows({}, []).find((r) => r.key === 'PLAN_START_HOUR')?.value).toBe(
       'Start 06:00 · 60 km/h (defaults)',

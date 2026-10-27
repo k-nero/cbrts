@@ -171,6 +171,48 @@ class JourneyDrafterTest {
         verify(journeys, never()).addTrip(any(), any(), any());
     }
 
+    @Test
+    @DisplayName(
+            "A flight from a stable gets the local run to the cargo terminal, and one landing in the stable's city the run from it")
+    void aFlightGetsItsLocalRuns() {
+        JourneyService journeys = mock(JourneyService.class);
+        JourneyDrafter drafter = new JourneyDrafter(
+                mock(TransportJobRepository.class),
+                mock(PlaceRepository.class),
+                mock(RoutePlanRepository.class),
+                mock(RouteStopRepository.class),
+                mock(JobTripService.class),
+                journeys,
+                mock(RoutePlanService.class),
+                mock(PlanningDefaults.class),
+                mock(AuditService.class));
+        Country vn = new Country();
+        Country hk = new Country();
+        Corridor flight = corridor("AIR SGN → HKG", "Ho Chi Minh City", "Hong Kong", 1500, vn, hk, null);
+        flight.setMode(TransportMode.AIR);
+        Corridor hcmLocal = corridor("RD HCM local", "Ho Chi Minh City", "Ho Chi Minh City", 40, vn, vn, null);
+        Corridor hkgLocal = corridor("RD HKG local", "Hong Kong", "Hong Kong", 35, hk, hk, null);
+        when(journeys.localRun("Ho Chi Minh City")).thenReturn(Optional.of(hcmLocal));
+        when(journeys.localRun("Hong Kong")).thenReturn(Optional.of(hkgLocal));
+        TransportRequest request = new TransportRequest();
+        request.setCorridor(flight);
+        request.setOriginPlace(place(PlaceKind.TRAINING_CENTRE, "Ho Chi Minh City"));
+        request.setDestinationPlace(place(PlaceKind.TRAINING_CENTRE, "Hong Kong"));
+
+        assertThat(drafter.legs(request)).containsExactly(hcmLocal, flight, hkgLocal);
+
+        request.setOriginPlace(place(PlaceKind.CARGO_TERMINAL, "Ho Chi Minh City"));
+        request.setDestinationPlace(place(PlaceKind.AIRPORT, "Hong Kong"));
+        assertThat(drafter.legs(request)).containsExactly(flight);
+    }
+
+    private static Place place(PlaceKind kind, String city) {
+        Place p = new Place();
+        p.setKind(kind);
+        p.setCity(city);
+        return p;
+    }
+
     private static Trip trip(Corridor corridor, boolean reversed) {
         Trip t = new Trip();
         t.setId(UUID.randomUUID());

@@ -194,7 +194,14 @@ export const policyRows = (
     {
       key: 'TURNAROUND_HOURS',
       label: 'Turnaround',
-      value: p.TURNAROUND_HOURS == null ? '—' : `${p.TURNAROUND_HOURS} h after each trip`,
+      value:
+        p.TURNAROUND_HOURS == null
+          ? '—'
+          : `${p.TURNAROUND_HOURS} h after each trip · ${
+              p.LOCAL_TURNAROUND_HOURS == null
+                ? '4 h after a local run (default)'
+                : `${p.LOCAL_TURNAROUND_HOURS} h after a local run`
+            }`,
     },
     // US-F3-22: how a drafted journey is timed; a version without them uses the defaults.
     {

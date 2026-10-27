@@ -87,6 +87,7 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "The stall payload"),
             Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"),
             Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"),
+            Map.entry(RatePolicyKey.LOCAL_TURNAROUND_HOURS, "The local turnaround"),
             Map.entry(RatePolicyKey.PLAN_START_HOUR, "The start hour"),
             Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "The average speed"),
             Map.entry(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, "The welfare interval"),
@@ -564,12 +565,11 @@ public class RateCatalogService {
                             key.name(), label + " must be a whole number of kilograms from 1 to 99,999.");
                 }
             }
-            case TURNAROUND_HOURS -> {
+            case TURNAROUND_HOURS, LOCAL_TURNAROUND_HOURS -> {
                 if (value.signum() < 0
                         || value.compareTo(BigDecimal.valueOf(240)) > 0
                         || value.stripTrailingZeros().scale() > 0) {
-                    throw new BusinessException(
-                            key.name(), "The turnaround must be a whole number of hours from 0 to 240.");
+                    throw new BusinessException(key.name(), label + " must be a whole number of hours from 0 to 240.");
                 }
             }
             case PLAN_START_HOUR,
