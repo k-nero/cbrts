@@ -80,6 +80,7 @@ class JourneyServiceTest {
                 mock(FlightService.class),
                 mock(VehicleBookingRepository.class),
                 mock(CrewAssignmentRepository.class),
+                mock(PlanningDefaults.class),
                 audit,
                 Clock.fixed(Instant.parse("2026-10-27T03:00:00Z"), ZoneOffset.UTC));
         TransportRequest request = new TransportRequest();

@@ -199,8 +199,19 @@ public class CatalogSeeder {
             new DemoCorridor(
                     "AIR SGN → HKG", TransportMode.AIR, "Ho Chi Minh City", "Hong Kong", 1500, List.of(), "VN", "HK"),
             // The road trip after the flight, from Hong Kong airport to the stables (US-F3-16).
+            new DemoCorridor("RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of(), "HK", "HK"),
+            // Local runs within a city, between a stable and the airport's cargo terminal, around a flight.
             new DemoCorridor(
-                    "RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", 40, List.of(), "HK", "HK"));
+                    "RD HCM local",
+                    TransportMode.ROAD,
+                    "Ho Chi Minh City",
+                    "Ho Chi Minh City",
+                    40,
+                    List.of(),
+                    "VN",
+                    "VN"),
+            new DemoCorridor("RD PNH local", TransportMode.ROAD, "Phnom Penh", "Phnom Penh", 45, List.of(), "KH", "KH"),
+            new DemoCorridor("RD HKG local", TransportMode.ROAD, "Hong Kong", "Hong Kong", 35, List.of(), "HK", "HK"));
 
     /**
      * The frames' version numbers; Laos needs 30 days (Request review · Override). Hong Kong holds an imported horse

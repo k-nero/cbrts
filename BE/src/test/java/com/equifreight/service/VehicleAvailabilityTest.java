@@ -11,8 +11,11 @@ import com.equifreight.entity.BorderCrossing;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.CorridorCrossing;
 import com.equifreight.entity.Country;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.RatePolicy;
+import com.equifreight.entity.RoutePlan;
+import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -20,16 +23,20 @@ import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.VehicleBooking;
 import com.equifreight.entity.enums.BookingKind;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.RatePolicyKey;
+import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.RatePolicyRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -68,6 +75,7 @@ class VehicleAvailabilityTest {
     private final VehicleBookingRepository bookings = mock(VehicleBookingRepository.class);
     private final RateCatalogVersionRepository versions = mock(RateCatalogVersionRepository.class);
     private final RatePolicyRepository policies = mock(RatePolicyRepository.class);
+    private final RoutePlanRepository routePlans = mock(RoutePlanRepository.class);
     private VehicleAvailability availability;
 
     @BeforeEach
@@ -75,7 +83,7 @@ class VehicleAvailabilityTest {
         // Now is 1 Oct 2026 in Ho Chi Minh City: a vehicle with no trip yet sets off from its home city from then.
         Clock clock = Clock.fixed(
                 LocalDateTime.of(2026, 10, 1, 0, 0).atZone(BusinessTime.ZONE).toInstant(), BusinessTime.ZONE);
-        availability = new VehicleAvailability(jobTrips, bookings, versions, policies, corridors, clock);
+        availability = new VehicleAvailability(jobTrips, bookings, versions, policies, corridors, routePlans, clock);
         when(bookings.findForAvailability(any())).thenReturn(List.of());
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))
                 .thenReturn(Optional.empty());
@@ -371,7 +379,75 @@ class VehicleAvailabilityTest {
                 .contains(LocalDate.of(2026, 10, 10));
     }
 
+    // --- Local runs to and from the cargo terminal (US-F3-22)
+
+    @Test
+    @DisplayName(
+            "a flight's request holds the local run from its stable, the leg to the hub, or nothing from the airport")
+    void heldCorridorBeforeAFlight() {
+        Corridor hcmLocal = road("RD HCM local", vn, vn);
+        cities(hcmLocal, "Ho Chi Minh City", "Ho Chi Minh City", 1);
+        when(corridors.findLocalRun("Ho Chi Minh City")).thenReturn(Optional.of(hcmLocal));
+        TransportRequest fromStable = request(sgnHkg, LocalDate.of(2026, 10, 10));
+        fromStable.setOriginPlace(place(PlaceKind.TRAINING_CENTRE, "Ho Chi Minh City"));
+        TransportRequest fromAirport = request(sgnHkg, LocalDate.of(2026, 10, 10));
+        fromAirport.setOriginPlace(place(PlaceKind.AIRPORT, "Ho Chi Minh City"));
+        TransportRequest viaHub = request(sgnHkg, LocalDate.of(2026, 10, 10));
+        viaHub.setOriginPlace(place(PlaceKind.TRAINING_CENTRE, "Hanoi"));
+        viaHub.setFirstLegCorridor(hcmHan);
+
+        assertThat(availability.heldCorridor(fromStable)).contains(hcmLocal);
+        assertThat(availability.heldCorridor(fromAirport)).isEmpty();
+        assertThat(availability.heldCorridor(viaHub)).contains(hcmHan);
+        assertThat(availability.heldCorridor(request(hcmBkk, LocalDate.of(2026, 10, 10))))
+                .contains(hcmBkk);
+    }
+
+    @Test
+    @DisplayName("a local run lasts its own route's hours, and its vehicle is ready after the shorter local turnaround")
+    void localRunOwnHours() {
+        Corridor hcmLocal = road("RD HCM local", vn, vn);
+        cities(hcmLocal, "Ho Chi Minh City", "Ho Chi Minh City", 1);
+        Vehicle tx447 = runs(vehicle("TX-447", vn, kh, th), hcmLocal, hcmBkk);
+        // Leaves the stable at 06:00, reaches the terminal at 07:00 and waits 4 hours there for the flight.
+        Trip local = trip(hcmLocal, at(10), at(14));
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(stop(1, at(10), null));
+        plan.getStops().add(stop(2, at(10).plus(Duration.ofHours(1)), (short) 240));
+        when(routePlans.findByTrip_IdAndStatus(local.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+
+        VehicleAvailability.Span span = availability.spanOf(local);
+        assertThat(span.startsAt()).isEqualTo(at(10));
+        assertThat(span.endsAt()).isEqualTo(at(10).plus(Duration.ofHours(5)));
+
+        when(bookings.findForAvailability(tx447.getId()))
+                .thenReturn(List.of(booking(tx447, local, span.startsAt(), span.endsAt())));
+        // Free at 11:00, ready 4 hours later: 15:00 the same day.
+        assertThat(availability.refusalFor(tx447, trip(hcmBkk, at(10).plus(Duration.ofHours(9)))))
+                .isEmpty();
+        assertThat(availability.refusalFor(tx447, trip(hcmBkk, at(10).plus(Duration.ofHours(6)))))
+                .contains(
+                        "TX-447 is ready in Ho Chi Minh City on 10 Oct after its last trip; this trip starts 10 Oct.");
+    }
+
     // --- Fixtures
+
+    private static Place place(PlaceKind kind, String city) {
+        Place p = new Place();
+        p.setId(UUID.randomUUID());
+        p.setKind(kind);
+        p.setCity(city);
+        return p;
+    }
+
+    private static RouteStop stop(int seq, Instant at, Short stayMin) {
+        RouteStop st = new RouteStop();
+        st.setSeq((short) seq);
+        st.setPlannedAt(at);
+        st.setPlannedStayMin(stayMin);
+        return st;
+    }
 
     private static TransportRequest request(Corridor corridor, LocalDate departs) {
         TransportRequest r = new TransportRequest();

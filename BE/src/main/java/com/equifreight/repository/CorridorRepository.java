@@ -27,6 +27,12 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
             + " or (lower(c.originCity) = lower(:b) and lower(c.destinationCity) = lower(:a)) order by c.code")
     List<Corridor> findBetweenCities(@Param("a") String a, @Param("b") String b);
 
+    /** The local road run within {@code city}, between its stables and its cargo terminal, if the catalog has one. */
+    default Optional<Corridor> findLocalRun(String city) {
+        if (city == null) return Optional.empty();
+        return findBetweenCities(city, city).stream().filter(Corridor::isLocal).findFirst();
+    }
+
     /** The corridors that start or end in a city: the routes we run from there. */
     @Query(
             "select c from Corridor c where lower(c.originCity) = lower(:city) or lower(c.destinationCity) = lower(:city)"

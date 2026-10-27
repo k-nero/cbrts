@@ -78,11 +78,13 @@ public class JobTripService {
 
     /**
      * Whether {@code trip} ends in the city {@code job}'s horses are going to (US-F3-21). A job with no destination place
-     * is taken to end wherever its trip does.
+     * is taken to end wherever its trip does. A flight lands at the airport: it delivers only to the airport itself, and
+     * a stable in the city it lands in is reached by a local road trip after it.
      */
     public static boolean reachesDestination(Trip trip, TransportJob job) {
         Place destination = job.getRequest() == null ? null : job.getRequest().getDestinationPlace();
         if (destination == null || destination.getCity() == null || trip.getCorridor() == null) return true;
+        if (!trip.getCorridor().isRoad() && !destination.isTerminal()) return false;
         return destination.getCity().equalsIgnoreCase(trip.endCity());
     }
 
@@ -477,23 +479,29 @@ public class JobTripService {
 
     /**
      * Whether the job's part on {@code trip} comes before the border (US-F2-13): the trip stays in one country and a
-     * later trip of its chain crosses a border. Such a trip departs before the dossier is cleared.
+     * later trip of its chain crosses a border. Such a trip departs before the dossier is cleared. A local run to the
+     * cargo terminal doesn't: the horses leave the stable for the flight only once cleared.
      */
     @Transactional(readOnly = true)
     public boolean beforeBorder(Trip trip, TransportJob job) {
-        if (trip.getCorridor() == null || trip.getCorridor().crossesBorder()) return false;
+        if (trip.getCorridor() == null
+                || trip.getCorridor().crossesBorder()
+                || trip.getCorridor().isLocal()) return false;
         return beforeBorderTrips(parts.findByJob_IdOrderByCreatedAt(job.getId()))
                 .contains(trip.getId());
     }
 
-    /** The trips among a job's parts that stay in one country and hand on, somewhere down the chain, to one that doesn't. */
+    /**
+     * The trips among a job's parts that stay in one country and hand on, somewhere down the chain, to one that doesn't,
+     * other than a local run to the cargo terminal.
+     */
     private static Set<UUID> beforeBorderTrips(List<TripJob> all) {
         if (all.stream().noneMatch(JobTripService::crosses)) return Set.of();
         Map<UUID, TripJob> byId =
                 all.stream().filter(p -> p.getId() != null).collect(Collectors.toMap(TripJob::getId, p -> p));
         Set<UUID> trips = new HashSet<>();
         for (TripJob part : all) {
-            if (crosses(part)) continue;
+            if (crosses(part) || local(part)) continue;
             int hops = 0;
             for (TripJob p = nextOf(part, byId); p != null && hops++ < all.size(); p = nextOf(p, byId)) {
                 if (crosses(p)) {
@@ -503,6 +511,11 @@ public class JobTripService {
             }
         }
         return trips;
+    }
+
+    private static boolean local(TripJob part) {
+        return part.getTrip().getCorridor() != null
+                && part.getTrip().getCorridor().isLocal();
     }
 
     private static boolean crosses(TripJob part) {

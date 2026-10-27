@@ -24,6 +24,8 @@ public enum RatePolicyKey {
     AIR_SHIPMENT_MAX_KG,
     /** Hours after a trip ends before its vehicle can drive again: cleaning, disinfection, crew rest (US-F7-02). */
     TURNAROUND_HOURS,
+    /** Hours after a local run within a city, to or from the cargo terminal, before its vehicle can drive again. */
+    LOCAL_TURNAROUND_HOURS,
     /** US-F3-22, drafting a journey from its quote: the hour a drafted first trip starts on the departure date. */
     PLAN_START_HOUR,
     /** The average road speed, km/h, a drafted route's driving time is worked out at. */

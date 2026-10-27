@@ -196,9 +196,12 @@ class CorridorCreateTest {
     }
 
     @Test
-    @DisplayName("both ends in one city, or flex days outside 0 to 7, are refused")
-    void refusesSameCityAndBadFlex() {
-        assertThatThrownBy(() -> service.create(khoi, road("Bangkok", "bangkok", List.of())))
+    @DisplayName("a flight with both ends in one city, or flex days outside 0 to 7, are refused")
+    void refusesSameCityFlightAndBadFlex() {
+        CreateCorridorRequest hop = road("Bangkok", "bangkok", List.of()).toBuilder()
+                .mode(TransportMode.AIR)
+                .build();
+        assertThatThrownBy(() -> service.create(khoi, hop))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("both ends are Bangkok");
         CreateCorridorRequest wide = road("Ho Chi Minh City", "Phnom Penh", List.of(mocBai.getId())).toBuilder()

@@ -166,6 +166,13 @@ export const POLICY_FIELDS: {
   { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment limit, kg', min: 1, max: 99999, step: 1 },
   // US-F7-02: cleaning, disinfection and crew rest after a trip, whole hours.
   { key: 'TURNAROUND_HOURS', label: 'Turnaround after a trip, hours', max: 240, step: 1 },
+  {
+    key: 'LOCAL_TURNAROUND_HOURS',
+    label: 'Turnaround after a local run, hours',
+    max: 240,
+    step: 1,
+    fallback: 4,
+  },
   // US-F3-22: how a journey drafted from its quote is timed, whole numbers.
   { key: 'PLAN_START_HOUR', label: 'Drafted trips start at, hour', max: 23, step: 1, fallback: 6 },
   {
