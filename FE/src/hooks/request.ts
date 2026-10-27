@@ -71,11 +71,16 @@ export const useSaveRequest = () => {
 };
 
 export const useSubmitRequest = () => {
+  const qc = useQueryClient();
   const { cancel, store } = useStoreRequest();
   return useMutation<TransportRequest, unknown, string>({
     onMutate: (id) => cancel(id),
     mutationFn: submitRequest,
-    onSuccess: store,
+    onSuccess: (request) => {
+      store(request);
+      // A submitted request is one of Home's moves, and an answered return leaves its owed items.
+      void qc.invalidateQueries({ queryKey: queryKeys.customerHome() });
+    },
   });
 };
 
@@ -148,12 +153,17 @@ export const useCustomerQuotation = (id: string | undefined) =>
     retry: false,
   });
 
-/** Every read of one request: its page, its quotation and the list rows that show its status. */
+/**
+ * Every read of one request: its page, its quotation, the list rows that show its status, its invoices (the
+ * deposit invoice comes with acceptance) and Home, whose owed items and moves follow the request.
+ */
 const useRefreshRequest = () => {
   const qc = useQueryClient();
   return (id: string) => {
     void qc.invalidateQueries({ queryKey: queryKeys.requests.one(id) });
     void qc.invalidateQueries({ queryKey: queryKeys.requests.pages() });
+    void qc.invalidateQueries({ queryKey: queryKeys.customerInvoices(id) });
+    void qc.invalidateQueries({ queryKey: queryKeys.customerHome() });
   };
 };
 
@@ -199,12 +209,12 @@ export const useRequestQuote = (id: string) => {
 /** Cancel the request before approval (BR-F1-07). */
 export const useCancelRequest = (id: string) => {
   const qc = useQueryClient();
+  const refresh = useRefreshRequest();
   return useMutation<TransportRequest, Error, void>({
     mutationFn: () => cancelRequest(id),
     onSuccess: (request) => {
       qc.setQueryData(queryKeys.requests.one(id), request);
-      void qc.invalidateQueries({ queryKey: queryKeys.requests.quotation(id) });
-      void qc.invalidateQueries({ queryKey: queryKeys.requests.pages() });
+      refresh(id);
     },
   });
 };

@@ -183,22 +183,35 @@ export const cancellationToday = (q: Pick<CustomerQuotation, 'cancellation'>): s
   } to departure.`;
 };
 
-/** The cancellation as it was recorded: "You cancelled on 26 Sep 2026. The fee is 25% of the quotation total." */
-export const cancelledText = (cancelledAt: string | null, pct: number | null): string => {
+/**
+ * The cancellation as it was recorded: "You cancelled on 26 Sep 2026. The fee is 25% of the quotation total."
+ * `quoted`: a quotation was issued, so a 0% fee came from its bands rather than from having no price.
+ */
+export const cancelledText = (
+  cancelledAt: string | null,
+  pct: number | null,
+  quoted: boolean,
+): string => {
   const on = cancelledAt
     ? `You cancelled on ${formatDate(cancelledAt)}.`
     : 'You cancelled this request.';
   if (pct == null) return on;
-  return pct === 0
-    ? `${on} No fee, as no quotation was issued.`
-    : `${on} The fee is ${feePct(pct)} of the quotation total.`;
+  if (pct > 0) return `${on} The fee is ${feePct(pct)} of the quotation total.`;
+  return quoted
+    ? `${on} No fee was due for the notice you gave.`
+    : `${on} No fee, as no quotation was issued.`;
 };
+
+/** The owed panel on a request the logistics manager rejected: nothing is left to answer (BR-F1-04). */
+export const rejectedText = (manager: string): string =>
+  `${manager} turned this request down, so the quotation can’t be answered. The reason is on the request page.`;
 
 /** The quoted pass's chip: the version and where the club's answer stands. */
 export const quotedPassChip = (
   q: Pick<CustomerQuotation, 'status' | 'requestStatus' | 'versionNo'>,
-): { tone: 'info' | 'ok' | 'neutral'; label: string } => {
+): { tone: 'info' | 'ok' | 'neutral' | 'bad'; label: string } => {
   if (q.requestStatus === 'CANCELLED') return { tone: 'neutral', label: 'Cancelled' };
+  if (q.requestStatus === 'REJECTED') return { tone: 'bad', label: 'Rejected' };
   if (q.requestStatus === 'APPROVED') return { tone: 'ok', label: `Approved · v${q.versionNo}` };
   if (q.status === 'ACCEPTED') return { tone: 'ok', label: `Accepted · v${q.versionNo}` };
   if (q.status === 'DECLINED') return { tone: 'neutral', label: `Declined · v${q.versionNo}` };
@@ -215,6 +228,7 @@ export const quotedPassSub = (
 ): string => {
   const on = (iso: string | null) => (iso ? ` ${formatDate(iso)}` : '');
   if (q.requestStatus === 'CANCELLED') return `Request cancelled${on(q.cancelledAt)}.`;
+  if (q.requestStatus === 'REJECTED') return 'Request rejected. The reason is on the request page.';
   if (q.requestStatus === 'APPROVED')
     return 'Approved. The price and the horse list are locked; your document checklist is open.';
   if (q.status === 'ACCEPTED')

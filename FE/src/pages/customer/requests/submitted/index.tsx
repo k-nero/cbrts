@@ -185,7 +185,11 @@ const RequestSubmittedPage: FC = () => {
           ) : request.status === 'CANCELLED' ? (
             <Panel title="Nothing needed from you" extra={<Chip dot={false}>Cancelled</Chip>}>
               <p className="type-body-m m-0 text-ink-2">
-                {cancelledText(request.cancelledAt, request.cancellationFeePct)}
+                {cancelledText(
+                  request.cancelledAt,
+                  request.cancellationFeePct,
+                  request.quotation != null,
+                )}
               </p>
             </Panel>
           ) : callout ? (

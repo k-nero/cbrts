@@ -15,6 +15,8 @@ export const RateBasisEnum = {
   PER_THREE_HORSES: 'PER_THREE_HORSES',
   /** The flight vet: from the policy's horse count, above its value threshold, or on a vet escort. */
   FLIGHT_VET: 'FLIGHT_VET',
+  /** A vet riding with a road move, once per shipment, when the customer asks for a vet escort. */
+  VET_ESCORT: 'VET_ESCORT',
 } as const;
 export type RateBasis = (typeof RateBasisEnum)[keyof typeof RateBasisEnum];
 

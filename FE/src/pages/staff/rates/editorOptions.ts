@@ -14,6 +14,7 @@ export const BASES: Opt<RateBasis>[] = [
   opt('PER_HOUR', 'Per hour (estimated)'),
   opt('PER_THREE_HORSES', 'One per three horses'),
   opt('FLIGHT_VET', 'Flight vet rule'),
+  opt('VET_ESCORT', 'Vet escort on request (road)'),
 ];
 
 export const GROUPS: Opt<string>[] = [

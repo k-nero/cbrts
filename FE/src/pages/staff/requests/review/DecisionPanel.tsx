@@ -25,6 +25,7 @@ import {
   inReview,
   NOTE_MAX,
   noteState,
+  rejectable,
   requestStatusChip,
   restingPanel,
 } from '@/lib/utils';
@@ -32,8 +33,8 @@ import { useCustomRouter } from '@/router/route.hook';
 
 /**
  * The decision (spec §5.2): in review, ask for information, start the quotation or reject; once the
- * customer accepts, approve into a job or reject (US-F1-07); once approved, the job and its team; once
- * expired with a re-quote in draft, the draft to issue (A4). After a
+ * customer accepts, approve into a job or reject (US-F1-07); while quoted, reject (BR-F1-04); once
+ * approved, the job and its team; once expired with a re-quote in draft, the draft to issue (A4). After a
  * return, the page opens the next request the queue held before it, or goes back to Requests.
  */
 export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
@@ -94,12 +95,19 @@ export const DecisionPanel: FC<{ review: RequestReview }> = ({ review }) => {
               <p className="type-label-s m-0 text-ink-2">Rejected with:</p>
               <p className="type-body-s m-0 whitespace-pre-line text-ink">{request.rejectReason}</p>
             </Flex>
+          ) : request.status === 'QUOTED' ? (
+            <p className="type-body-s m-0 text-ink-2">
+              The quotation is with the customer. Until they accept it, you can still reject the
+              request.
+            </p>
           ) : (
             <p className="type-body-s m-0 text-ink-2">
               This request isn&apos;t waiting for review.
             </p>
           )}
           <QuotationAction review={review} primary={resting.requote !== null} />
+          {/* A quoted request can still be turned down before approval (BR-F1-04, A7). */}
+          {rejectable(request.status) && <RejectBox review={review} />}
         </Flex>
       </Panel>
     );

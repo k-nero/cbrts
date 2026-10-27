@@ -12,6 +12,7 @@ export const NOTIFICATION_TONE: Record<NotificationTone, Tone> = {
 
 /** The word beside the tone, so a notification's state is never colour alone (DESIGN.md, Status). */
 export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
+  REQUEST_SUBMITTED: 'To review',
   REQUEST_INFO_REQUIRED: 'Answer needed',
   REQUEST_CANCELLED: 'Cancelled',
   REQUEST_REJECTED: 'Rejected',
