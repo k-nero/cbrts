@@ -429,6 +429,23 @@ class RouteServiceTest {
     }
 
     @Test
+    @DisplayName("Da Nang → Sha Tin: the road to Ho Chi Minh City, the flight, then the road from HKG to the stables")
+    void bothLegsWhenTheStablesAreBeyondTheAirport() {
+        publish("HK", 21);
+        Corridor hkgShaTin = between("RD HKG → Sha Tin", TransportMode.ROAD, "Hong Kong", "Sha Tin", "HK", "HK", 40);
+        when(corridors.findNetwork()).thenReturn(List.of(dadHcm, sgnHkg, hkgShaTin));
+
+        RouteResolution resolution =
+                service.resolve(hoaXuan, null, place("Sha Tin stables", "Sha Tin", "HK"), null, null);
+
+        assertThat(resolution.firstLeg()).isSameAs(dadHcm);
+        assertThat(resolution.corridor()).isSameAs(sgnHkg);
+        assertThat(resolution.lastLeg()).isSameAs(hkgShaTin);
+        assertThat(resolution.route().lastLeg().fromCity()).isEqualTo("Hong Kong");
+        assertThat(resolution.route().lastLeg().toCity()).isEqualTo("Sha Tin");
+    }
+
+    @Test
     @DisplayName("Hong Kong → Da Nang reads the same corridors the other way: the flight, then the road from the hub")
     void theLegFromTheHubIsReadTheOtherWay() {
         publish("HK", 21);
