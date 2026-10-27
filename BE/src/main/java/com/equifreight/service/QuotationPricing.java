@@ -179,7 +179,8 @@ public class QuotationPricing {
                 .map(l ->
                         amounts.containsKey(l.getId()) ? withAmount(asPriced(l), amounts.get(l.getId())) : asPriced(l))
                 .toList();
-        return QuotePricer.retotal(in, rates, lines);
+        // The accepted lines are fixed, so a rate rule added since can't leave the invoice without its totals.
+        return QuotePricer.retotal(in, rates, lines, false);
     }
 
     /** The draft's answer, with the overrides a write could not carry. */

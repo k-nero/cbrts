@@ -338,6 +338,17 @@ public class RequestService {
                 code,
                 null,
                 null);
+        // Core flows §2.3 step 5: the request is in the logistics managers' queue, and they are told.
+        notifications.notify(
+                NotificationKind.REQUEST_SUBMITTED,
+                Audience.role(RoleName.LOGISTICS_MANAGER),
+                Subject.request(saved),
+                club.getName() + " sent " + code + (resubmission ? " again" : ""),
+                resubmission
+                        ? "Version " + revisionNo + " answers the note. It is back in your review queue."
+                        : names.size() + (names.size() == 1 ? " horse" : " horses") + ", departing "
+                                + BusinessTime.DAY.format(saved.getDepartureDate())
+                                + ". It is waiting in your review queue.");
         return RequestMapper.toResponse(saved, resolution.route(), null, List.of(), revisionsOf(saved));
     }
 
@@ -619,7 +630,7 @@ public class RequestService {
             throw new BusinessException(
                     "ARRIVAL_WINDOW",
                     "An arrival window needs a road move with a private "
-                            + "trailer and fixed dates. Choose road and a private trailer, and untick ±3 days, or arrive "
+                            + "trailer and fixed dates. Choose road and a private trailer with fixed dates, or arrive "
                             + "any time on the day.");
         }
         if (start == null || end == null) {

@@ -68,6 +68,10 @@ public final class RequiredRates {
         if (!has(rates, RateBasis.PER_THREE_HORSES)) {
             missing.add(groom(rates, in.corridorCode()));
         }
+        // A vet the customer asked for is priced, never left out: the flight vet by air, the vet escort by road.
+        if (in.vetEscort() && !has(rates, vetBasis(in.mode()))) {
+            missing.add(vet(rates, in.corridorCode(), in.mode()));
+        }
         Integer days = in.quarantineDays();
         if (days == null) {
             if (has(rates, RateBasis.PER_DAY)) {
@@ -129,6 +133,9 @@ public final class RequiredRates {
         }
         if (!has(rates, RateBasis.PER_THREE_HORSES)) {
             missing.add(groom(rates, corridorCode));
+        }
+        if (!has(rates, vetBasis(mode))) {
+            missing.add(vet(rates, corridorCode, mode));
         }
         for (HorseSex sex : CORRIDOR_SEXES) {
             if (!hasIsolation(rates, sex)) {
@@ -221,6 +228,17 @@ public final class RequiredRates {
 
     private static MissingRate groom(RateSet rates, String code) {
         return new MissingRate("D", "Groom", catalog(rates) + "groom rate for " + code + ".");
+    }
+
+    /** The line that prices a vet on this mode: the flight vet by air, the vet escort by road. */
+    private static RateBasis vetBasis(TransportMode mode) {
+        return mode == TransportMode.AIR ? RateBasis.FLIGHT_VET : RateBasis.VET_ESCORT;
+    }
+
+    private static MissingRate vet(RateSet rates, String code, TransportMode mode) {
+        return mode == TransportMode.AIR
+                ? new MissingRate("D", "Flight veterinarian", catalog(rates) + "flight vet rate for " + code + ".")
+                : new MissingRate("D", "Veterinary escort", catalog(rates) + "vet escort rate for " + code + ".");
     }
 
     private static MissingRate isolation(RateSet rates, String code, HorseSex sex) {
