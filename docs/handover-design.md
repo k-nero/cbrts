@@ -24,7 +24,7 @@ Status: in progress. Built: recording the handover at the destination (US-F6-01,
 
 ## Invoices and payments (US-F6-03)
 
-Two invoices per job, generated, never typed (database-design.md, section 13A). Both are due 7 days after they are issued, carry no tax (`tax_pct` 0) and are coded `INV-YYYY-NNNN`. An issued invoice is never edited; voiding, replacing and credit notes are not built yet.
+Two invoices per job, generated, never typed (database-design.md, section 13A). Both are due 7 days after they are issued, carry no tax (`tax_pct` 0) and are coded `INV-YYYY-NNNN`. An issued invoice is never edited. When a request is cancelled by the club or rejected by the logistics manager before approval, its deposit is voided with the reason if nothing was paid on it (US-F6-06, `InvoiceService.voidDepositFor`); a deposit with a payment recorded keeps its amounts and status, and the logistics manager settles it with the club by hand. Replacing an invoice, credit notes and refunds are not built yet.
 
 - **The deposit invoice** is issued as the customer accepts the quotation (`CustomerQuotationService.accept`): one `DEPOSIT` line, the quotation's `deposit_pct` of its total. It has no job yet (the job is created at approval). The club is told (`INVOICE_ISSUED`).
 - **The final invoice** is the logistics manager's, once the handover is settled: accepted, taken as accepted, or a discrepancy whose incident is resolved. The Invoices page lists those jobs under "Ready for the final invoice"; preparing one makes a draft holding, in order:

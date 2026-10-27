@@ -401,6 +401,25 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("a part-paid deposit of a cancelled or rejected request isn't asked for: staff settle it")
+    void anEndedRequestsDepositIsNotAskedFor() {
+        TransportRequest cancelled = request("REQ-2026-0179", RequestStatus.CANCELLED);
+        TransportRequest rejected = request("REQ-2026-0180", RequestStatus.REJECTED);
+        Invoice kept = invoice(
+                quotation(cancelled, QuotationStatus.ACCEPTED),
+                InvoiceKind.DEPOSIT,
+                InvoiceStatus.PARTIALLY_PAID,
+                "11405.76",
+                "500");
+        Invoice keptToo = invoice(
+                quotation(rejected, QuotationStatus.ACCEPTED), InvoiceKind.DEPOSIT, InvoiceStatus.ISSUED, "900", "0");
+        when(invoices.findByClub_IdAndKindInAndStatusIn(eq(club.getId()), anyCollection(), anyCollection()))
+                .thenReturn(List.of(kept, keptToo));
+
+        assertThat(service.get(customer).owed()).isEmpty();
+    }
+
+    @Test
     @DisplayName("only issued or part-paid deposit and final invoices are asked for: not paid ones, drafts or credits")
     @SuppressWarnings("unchecked")
     void onlyUnpaidInvoicesAreAskedFor() {

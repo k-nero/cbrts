@@ -165,8 +165,10 @@ public class CustomerHomeService {
                                 : r.getInfoRequiredNote()));
             }
         }
-        // An unpaid invoice is owed whatever stage its move is at, until it is paid.
-        invoices.findByClub_IdAndKindInAndStatusIn(club.getId(), PAYABLE, UNPAID)
+        // An unpaid invoice is owed whatever stage its move is at, until it is paid. A request that ended before
+        // approval owes nothing more: its unpaid deposit is voided, and one with a payment is settled by staff.
+        invoices.findByClub_IdAndKindInAndStatusIn(club.getId(), PAYABLE, UNPAID).stream()
+                .filter(i -> !ENDED.contains(i.getQuotation().getRequest().getStatus()))
                 .forEach(i -> owed.add(invoiceOwed(i, today)));
         owed.sort(Comparator.comparing(OwedEntryResponse::dueAt, Comparator.nullsLast(Comparator.naturalOrder())));
         int owedRequestCount =
