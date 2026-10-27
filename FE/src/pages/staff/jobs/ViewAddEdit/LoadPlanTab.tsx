@@ -114,7 +114,7 @@ export function LoadPlanTab({ job }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   // A trip of the journey that only flies (US-F3-16) has its flight as its carrier: no trailer to
-  // load. Each job's stall positions are its consignment on the flight, on the Route tab.
+  // load. Each job's stall positions are its consignment on the flight, shown above (US-F3-21).
   const legs = job.routePlan?.legs ?? [];
   const onlyFlies = legs.length > 0 && legs.every((leg) => leg.mode === 'AIR');
   if (onlyFlies) {
@@ -128,7 +128,7 @@ export function LoadPlanTab({ job }: Props) {
             <p className="type-body-m m-0 text-ink-2">
               The flight is this trip’s carrier, so it has no trailer to load:{' '}
               {flights.map((f) => `${f.airline} ${f.flightNo}`).join(', ') || 'flight not set yet'}.
-              Each job’s stall positions and air waybill are its consignment, on the Route tab.
+              Each job’s stall positions and air waybill are its consignment, above.
             </p>
             <span className="type-body-s text-ink-3">
               Flight crew:{' '}

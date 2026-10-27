@@ -70,7 +70,10 @@ export function TripJobsPanel({ job }: { job: JobDetail }) {
 
         {beforeDeparture && (
           <Flex vertical gap={8}>
-            <span className="type-label-s text-ink">Could share this trailer</span>
+            <span className="type-label-s text-ink">
+              Could share this{' '}
+              {job.parts.find((p) => p.current)?.mode === 'AIR' ? 'flight' : 'trailer'}
+            </span>
             <ShareSuggestions job={job} />
           </Flex>
         )}
