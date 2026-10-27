@@ -791,7 +791,10 @@ public class ClearanceService {
 
         Map<UUID, RegulationVersion> versionById = new HashMap<>();
         pins.forEach(p -> versionById.put(p.getRegulationVersion().getId(), p.getRegulationVersion()));
-        List<RegulationRule> rules = regulationRuleRepository.findByVersionIdIn(versionById.keySet());
+        Map<UUID, RegulationRole> roleByVersion = new HashMap<>();
+        pins.forEach(p -> roleByVersion.put(p.getRegulationVersion().getId(), p.getRole()));
+        List<RegulationRule> rules =
+                governingRules(regulationRuleRepository.findByVersionIdIn(versionById.keySet()), roleByVersion);
 
         Set<String> existing = new HashSet<>();
         checklistItemRepository
@@ -840,6 +843,22 @@ public class ClearanceService {
         return checklistItemRepository.findByJobId(jobId).stream()
                 .map(ClearanceMapper::toItemResponse)
                 .toList();
+    }
+
+    /**
+     * One rule per document type, when the origin's and the destination's catalogs both list it: the stricter, a
+     * mandatory rule over an optional one, and on a tie the destination's, the country the horses are imported into.
+     * The pick never depends on the order the rules are read in.
+     */
+    static List<RegulationRule> governingRules(List<RegulationRule> rules, Map<UUID, RegulationRole> roleByVersion) {
+        Comparator<RegulationRule> stricterFirst = Comparator.comparing((RegulationRule r) -> !r.isMandatory())
+                .thenComparing(r -> roleByVersion.get(r.getVersion().getId()) != RegulationRole.DESTINATION)
+                .thenComparing(r -> r.getId() == null ? "" : r.getId().toString());
+        Map<UUID, RegulationRule> byType = new LinkedHashMap<>();
+        rules.stream()
+                .sorted(stricterFirst)
+                .forEach(r -> byType.putIfAbsent(r.getDocumentType().getId(), r));
+        return List.copyOf(byType.values());
     }
 
     /** audit_log.reason holds 500 characters. */

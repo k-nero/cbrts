@@ -162,6 +162,15 @@ public final class ClearanceMapper {
                 .build();
     }
 
+    /** "Hong Kong v2": the country and version number of the catalog {@code rule} belongs to. */
+    private static String catalogOf(RegulationRule rule) {
+        RegulationVersion version = rule.getVersion();
+        if (version == null
+                || version.getCatalog() == null
+                || version.getCatalog().getCountry() == null) return null;
+        return version.getCatalog().getCountry().getName() + " v" + version.getVersionNo();
+    }
+
     public static ChecklistItemResponse toItemResponse(ChecklistItem item) {
         if (item == null) {
             return null;
@@ -195,7 +204,8 @@ public final class ClearanceMapper {
                     .mandatory(item.getRegulationRule().isMandatory())
                     .minDays(item.getRegulationRule().getMinDays())
                     .maxDays(item.getRegulationRule().getMaxDays())
-                    .ruleDescription(item.getRegulationRule().getDescription());
+                    .ruleDescription(item.getRegulationRule().getDescription())
+                    .ruleCatalog(catalogOf(item.getRegulationRule()));
         }
 
         if (item.getHorse() != null) {

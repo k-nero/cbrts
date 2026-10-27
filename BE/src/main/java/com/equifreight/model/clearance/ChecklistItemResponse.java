@@ -24,6 +24,8 @@ public record ChecklistItemResponse(
         Short minDays,
         Short maxDays,
         String ruleDescription,
+        /** The catalog the rule comes from: "Hong Kong v2", the origin's or the destination's pinned version. */
+        String ruleCatalog,
         // Scope targets
         UUID horseId,
         String horseName,

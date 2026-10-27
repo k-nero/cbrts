@@ -96,7 +96,9 @@ const ClearanceChecklist: FC<Props> = ({ jobId, onView, onUpload, withGate = tru
                     )}
                   </Flex>
                 }
-                rule={item.ruleDescription || 'Standard validity validation'}
+                rule={[item.ruleDescription || 'Standard validity validation', item.ruleCatalog]
+                  .filter(Boolean)
+                  .join(' · ')}
                 result={
                   item.validityNote ||
                   (item.status === ChecklistStatusEnum.AWAITING_UPLOAD

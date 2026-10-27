@@ -138,6 +138,8 @@ export interface ChecklistItem {
   minDays?: number;
   maxDays?: number;
   ruleDescription?: string;
+  /** The catalog the rule comes from: "Hong Kong v2", the origin's or the destination's pinned version. */
+  ruleCatalog?: string | null;
   horseId?: string;
   horseName?: string;
   horseMicrochip?: string;
