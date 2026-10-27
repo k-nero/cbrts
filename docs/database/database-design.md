@@ -197,7 +197,7 @@ erDiagram
 | `code` | varchar(40) | Unique `(version_id, corridor_id, code)`. |
 | `group_code` | char(1) | `A`–`H` (origin ground, pre-export, air, escort, documentation, post-arrival, destination ground, surcharges). |
 | `description` | varchar(160) | |
-| `basis` | `RateBasis` | `PER_HORSE`, `PER_SHIPMENT`, `PER_KM`, `PER_DAY`, `PER_CROSSING`, `PER_HOUR`, `PER_POSITION`, `PER_THREE_HORSES` (grooms), `FLIGHT_VET` (from the horse threshold, above the high-value threshold, or when a vet escort is asked for), `VET_ESCORT` (road only: once per shipment when the customer asks for a vet escort; an air move's vet is `FLIGHT_VET`). |
+| `basis` | `RateBasis` | `PER_HORSE`, `PER_SHIPMENT`, `PER_KM`, `PER_DAY`, `PER_CROSSING`, `PER_HOUR`, `PER_POSITION`, `PER_THREE_HORSES` (grooms), `FLIGHT_VET` (air only: from the horse threshold, above the high-value threshold, or when a vet escort is asked for), `VET_ESCORT` (road only: once per shipment when the customer asks for a vet escort; an air move's vet is `FLIGHT_VET`). |
 | `applies_to_sex` | varchar(10) | Pre-export isolation is priced per sex; null for every other line. |
 | `rate` | numeric(14,2) not null | |
 | `min_charge` | numeric(14,2) | "minimum charge applies". |

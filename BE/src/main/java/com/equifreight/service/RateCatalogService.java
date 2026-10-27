@@ -398,6 +398,10 @@ public class RateCatalogService {
                     "BASIS",
                     "Air corridors price the flight by stall position; a road transfer to the terminal is per shipment.");
         }
+        if (r.basis() == RateBasis.FLIGHT_VET && corridor != null && corridor.getMode() == TransportMode.ROAD) {
+            throw new BusinessException(
+                    "BASIS", "A road move's vet is the vet escort line; the flight vet rule is for air corridors.");
+        }
         if (r.basis() == RateBasis.VET_ESCORT && corridor != null && corridor.getMode() == TransportMode.AIR) {
             throw new BusinessException(
                     "BASIS",

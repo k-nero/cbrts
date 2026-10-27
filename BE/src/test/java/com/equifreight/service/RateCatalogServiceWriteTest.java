@@ -437,6 +437,10 @@ class RateCatalogServiceWriteTest {
                 "BASIS",
                 "An air move's vet is the flight vet line; a vet escort on request is for road corridors.");
         assertRefused(
+                () -> service.addLine(lan, lineRequest(road, "VET", RateBasis.FLIGHT_VET), null),
+                "BASIS",
+                "A road move's vet is the vet escort line; the flight vet rule is for air corridors.");
+        assertRefused(
                 () -> service.addLine(
                         lan,
                         with(lineRequest(road, "X", RateBasis.PER_HORSE), b -> b.appliesToTrailer(TrailerType.SHARED)),
@@ -727,9 +731,12 @@ class RateCatalogServiceWriteTest {
                 RateBasis.PER_CROSSING,
                 RateBasis.PER_HOUR,
                 RateBasis.PER_THREE_HORSES,
-                RateBasis.FLIGHT_VET)) {
+                RateBasis.FLIGHT_VET,
+                RateBasis.VET_ESCORT)) {
+            // Each basis on a corridor it is allowed on, so the sex rule is what refuses it.
+            UUID corridor = basis == RateBasis.FLIGHT_VET ? pnhHkg.getId() : hanVte.getId();
             RateLineRequest request = with(
-                    lineRequest(hanVte.getId(), "X", basis),
+                    lineRequest(corridor, "X", basis),
                     b -> b.appliesToSex(com.equifreight.entity.enums.HorseSex.MARE)
                             .defaultQuantity(BigDecimal.ONE));
             assertRefused(

@@ -86,9 +86,17 @@ public final class QuotePricer {
      * included. Over the engine's own lines it gives exactly {@link #price}'s totals.
      */
     public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines) {
+        return retotal(in, rates, lines, true);
+    }
+
+    /**
+     * As above. {@code checkRates} false is for an accepted quotation's lines, which are fixed: a rate rule added since
+     * it was priced (a road vet escort) can't make them incomplete, so only the lines themselves are checked.
+     */
+    public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines, boolean checkRates) {
         StallFit fit = fit(in, rates);
         boolean complete = lines.stream().allMatch(l -> l.amount() != null)
-                && RequiredRates.forRequest(in, rates).isEmpty()
+                && (!checkRates || RequiredRates.forRequest(in, rates).isEmpty())
                 && (fit == null || fit.refusal() == null);
         return totals(in, rates, lines, complete);
     }
@@ -286,7 +294,8 @@ public final class QuotePricer {
                 lines.add(priced(row, "one per three horses · " + n + " ÷ 3, rounded up = " + grooms, grooms, null));
             }
             case FLIGHT_VET -> {
-                String trigger = flightVetTrigger(in, rates);
+                // A road move's vet is the vet escort line, so the flight vet is for air only.
+                String trigger = in.mode() == TransportMode.AIR ? flightVetTrigger(in, rates) : null;
                 if (trigger != null) {
                     lines.add(priced(row, trigger, 1, null));
                 }

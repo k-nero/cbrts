@@ -250,6 +250,20 @@ class QuotePricerTest {
     }
 
     @Test
+    void aRoadMoveNeverPricesTheFlightVet() {
+        RateSet rates = roadRates(
+                kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"),
+                line("FLIGHT_VET", "D", "Flight veterinarian", RateBasis.FLIGHT_VET, "2200"),
+                line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        PricingInput move = askingForAVet(road(TrailerType.SHARED, 700, 0, sizeS(8)));
+
+        PricedQuote quote = QuotePricer.price(move, rates);
+
+        assertThat(find(quote, "Flight veterinarian")).isNull();
+        assertThat(findAll(quote, "Veterinary escort")).hasSize(1);
+    }
+
+    @Test
     void anAirMovesVetIsTheFlightVetNotTheRoadEscort() {
         List<RateRow> lines = new ArrayList<>(pnhHkgLines());
         lines.add(line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
@@ -489,6 +503,24 @@ class QuotePricerTest {
         PricedTotals totals = QuotePricer.retotal(accepted, pinned, quote.lines());
 
         assertThat(totals.fuel()).isNotNull();
+        assertThat(totals.contingency()).isNotNull();
+        assertThat(totals.serviceFee()).isNotNull();
+        assertThat(totals.total()).isNotNull();
+    }
+
+    @Test
+    void anAcceptedQuoteRetotalsWhenARuleAddedSinceWantsAnotherRate() {
+        // Accepted before road vet escorts were priced: its pinned version has no vet escort line, and never will.
+        PricingInput accepted = askingForAVet(
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"))));
+        RateSet pinned =
+                roadRates(kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"));
+        List<PricedLine> fixed = QuotePricer.price(accepted, pinned).lines().stream()
+                .filter(l -> l.amount() != null)
+                .toList();
+
+        assertThat(QuotePricer.retotal(accepted, pinned, fixed).total()).isNull();
+        PricedTotals totals = QuotePricer.retotal(accepted, pinned, fixed, false);
         assertThat(totals.contingency()).isNotNull();
         assertThat(totals.serviceFee()).isNotNull();
         assertThat(totals.total()).isNotNull();
