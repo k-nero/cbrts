@@ -4,6 +4,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
@@ -118,6 +119,7 @@ public class RequestService {
     private final NotificationService notifications;
     private final RequestProgressService progress;
     private final RequestFleetService fleet;
+    private final InvoiceService invoices;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -136,7 +138,8 @@ public class RequestService {
             RateFeeBandRepository feeBands,
             NotificationService notifications,
             RequestProgressService progress,
-            RequestFleetService fleet) {
+            RequestFleetService fleet,
+            InvoiceService invoices) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -154,6 +157,7 @@ public class RequestService {
         this.notifications = notifications;
         this.progress = progress;
         this.fleet = fleet;
+        this.invoices = invoices;
     }
 
     @Transactional(readOnly = true)
@@ -428,6 +432,11 @@ public class RequestService {
         request.setCancellationFeePct(feePct);
         TransportRequest saved = requests.saveAndFlush(request);
         fleet.release(saved, "the club cancelled the request.");
+        Optional<Invoice> toSettle = invoices.voidDepositFor(
+                saved,
+                saved.getCode() + " was cancelled by " + club.getName() + " on " + BusinessTime.DAY.format(today)
+                        + ", before approval",
+                user);
 
         String fee = issued.isEmpty()
                 ? "no fee, as no quotation was issued"
@@ -448,8 +457,16 @@ public class RequestService {
                 Audience.role(RoleName.LOGISTICS_MANAGER),
                 Subject.request(saved),
                 club.getName() + " cancelled " + saved.getCode(),
-                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + ".");
+                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + "."
+                        + toSettle.map(RequestService::depositToSettle).orElse(""));
         return get(user, saved.getId());
+    }
+
+    /** A deposit with a payment on it isn't voided: the logistics manager settles it with the club. */
+    static String depositToSettle(Invoice deposit) {
+        return " Deposit " + deposit.getCode() + " has "
+                + InvoiceService.money(deposit.getQuotation().getCurrency(), deposit.getAmountPaid())
+                + " paid: settle it with the club.";
     }
 
     private static ConflictException notCancellable(TransportRequest request) {

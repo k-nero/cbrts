@@ -23,6 +23,7 @@ import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RateCatalogVersion;
@@ -105,6 +106,7 @@ class RequestServiceTest {
     RateFeeBandRepository feeBands;
     NotificationService notifications;
     RequestProgressService progress;
+    InvoiceService invoices;
     RequestService service;
     User user;
     Club club;
@@ -131,6 +133,7 @@ class RequestServiceTest {
         feeBands = mock(RateFeeBandRepository.class);
         notifications = mock(NotificationService.class);
         progress = mock(RequestProgressService.class);
+        invoices = mock(InvoiceService.class);
         when(progress.of(any(), any())).thenReturn(new RequestProgressService.Progress(List.of(), null));
         service = new RequestService(
                 requests,
@@ -149,7 +152,8 @@ class RequestServiceTest {
                 feeBands,
                 notifications,
                 progress,
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                invoices);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -803,6 +807,42 @@ class RequestServiceTest {
         }
 
         @Test
+        void cancellingEndsTheDepositWithTheReasonTheClubReads() {
+            quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
+
+            service.cancel(user, quoted.getId());
+
+            verify(invoices)
+                    .voidDepositFor(
+                            quoted,
+                            "REQ-2026-0001 was cancelled by Saigon Turf Club on 26 Sep 2026, before approval",
+                            user);
+        }
+
+        @Test
+        void aDepositWithAPaymentIsLeftForTheManagerToSettle() {
+            quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
+            Quotation q = issuedQuotation(quoted, 1);
+            q.setCurrency("USD");
+            Invoice deposit = new Invoice();
+            deposit.setCode("INV-2026-0041");
+            deposit.setQuotation(q);
+            deposit.setAmountPaid(new BigDecimal("500.00"));
+            when(invoices.voidDepositFor(eq(quoted), anyString(), eq(user))).thenReturn(Optional.of(deposit));
+
+            service.cancel(user, quoted.getId());
+
+            verify(notifications)
+                    .notify(
+                            eq(NotificationKind.REQUEST_CANCELLED),
+                            any(),
+                            any(),
+                            eq("Saigon Turf Club cancelled REQ-2026-0001"),
+                            eq("It was customer accepted; fee 25% with 20 days to departure. Deposit INV-2026-0041 has"
+                                    + " USD 500.00 paid: settle it with the club."));
+        }
+
+        @Test
         void withNoQuotationIssuedThereIsNoFee() {
             TransportRequest inReview = submitted();
             inReview.setStatus(RequestStatus.UNDER_REVIEW);
@@ -1260,7 +1300,8 @@ class RequestServiceTest {
                     feeBands,
                     notifications,
                     progress,
-                    mock(RequestFleetService.class));
+                    mock(RequestFleetService.class),
+                    invoices);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 

@@ -57,6 +57,7 @@ class RequestApprovalServiceTest {
     RequestReviewService review;
     AuditService audit;
     NotificationService notifications;
+    InvoiceService invoices;
     RequestApprovalService service;
 
     User yen;
@@ -78,6 +79,7 @@ class RequestApprovalServiceTest {
         review = mock(RequestReviewService.class);
         audit = mock(AuditService.class);
         notifications = mock(NotificationService.class);
+        invoices = mock(InvoiceService.class);
         service = new RequestApprovalService(
                 requests,
                 quotations,
@@ -89,7 +91,8 @@ class RequestApprovalServiceTest {
                 audit,
                 notifications,
                 Clock.fixed(NOW, BusinessTime.ZONE),
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                invoices);
 
         yen = user("Hải Yến", "Vũ");
         lan = user("Thị Lan", "Nguyễn");
@@ -275,6 +278,16 @@ class RequestApprovalServiceTest {
         service.reject(yen, request.getId(), "Capacity gone");
 
         assertThat(request.getStatus()).isEqualTo(RequestStatus.REJECTED);
+        verify(invoices).voidDepositFor(request, "REQ-2026-0194 was rejected: Capacity gone", yen);
+    }
+
+    @Test
+    void aRefusedRejectionLeavesTheDepositAlone() {
+        request.setStatus(RequestStatus.APPROVED);
+
+        assertThatThrownBy(() -> service.reject(yen, request.getId(), "Too late"))
+                .isInstanceOf(ConflictException.class);
+        verify(invoices, never()).voidDepositFor(any(), any(), any());
     }
 
     @Test

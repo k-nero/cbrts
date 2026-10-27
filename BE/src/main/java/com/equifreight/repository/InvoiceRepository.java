@@ -3,6 +3,7 @@ package com.equifreight.repository;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceStatus;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +24,14 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /** The quotation's invoice of a kind that isn't void: at most one (invoices_quotation_id_*_idx). */
     Optional<Invoice> findFirstByQuotation_IdAndKindAndStatusNot(UUID quotationId, InvoiceKind kind, InvoiceStatus not);
+
+    /**
+     * The request's deposit invoice that isn't void, locked so a payment can't be recorded while it is voided. At most
+     * one: only the accepted quotation version carries a deposit.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Invoice> findFirstByQuotation_Request_IdAndKindAndStatusNot(
+            UUID requestId, InvoiceKind kind, InvoiceStatus not);
 
     /** The Invoices list, by status. */
     @EntityGraph(attributePaths = {"club", "job", "quotation", "quotation.request"})

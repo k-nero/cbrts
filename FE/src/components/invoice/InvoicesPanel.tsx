@@ -4,7 +4,7 @@ import { Flex, Skeleton } from 'antd';
 import { INVOICE_KIND, invoiceStatus } from './invoiceFormat';
 
 import { Button, Chip, Panel } from '@/components/ui';
-import type { InvoiceSummary } from '@/interfaces';
+import { InvoiceStatusEnum, type InvoiceSummary } from '@/interfaces';
 import { formatDate, money } from '@/lib/utils';
 
 type Props = {
@@ -17,9 +17,13 @@ type Props = {
   empty?: ReactNode;
 };
 
-/** "$1,002.00 · $1,002.00 due by 31 Oct 2026", or the due day once paid; a draft has none yet. */
+/**
+ * "$1,002.00 · $1,002.00 due by 31 Oct 2026", or the due day once paid; a draft has none yet,
+ * and a void one is no longer owed.
+ */
 const amountLine = (inv: InvoiceSummary) => {
   const total = money(inv.total, inv.currency);
+  if (inv.status === InvoiceStatusEnum.VOID) return `${total} · voided, nothing to pay`;
   if (!inv.dueOn) return `${total} · not issued yet`;
   return inv.amountDue > 0
     ? `${total} · ${money(inv.amountDue, inv.currency)} due by ${formatDate(inv.dueOn)}`

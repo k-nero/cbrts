@@ -10,6 +10,7 @@ import com.equifreight.entity.Payment;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportJob;
+import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HandoverOutcome;
@@ -20,6 +21,7 @@ import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PaymentStatus;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -54,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
@@ -80,6 +83,10 @@ public class InvoiceService {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
     private static final EnumSet<InvoiceStatus> UNPAID = EnumSet.of(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID);
+    /** A request that ended before approval: its deposit is no longer owed. */
+    private static final EnumSet<RequestStatus> ENDED = EnumSet.of(RequestStatus.CANCELLED, RequestStatus.REJECTED);
+    /** {@code invoices.void_reason} is varchar(500). */
+    static final int VOID_REASON_MAX = 500;
 
     private final InvoiceRepository invoices;
     private final PaymentRepository payments;
@@ -147,6 +154,73 @@ public class InvoiceService {
         invoice.getLines().add(line);
         totalUp(invoice);
         return issueNow(invoice, null, acceptedBy);
+    }
+
+    /**
+     * The deposit of a request that ended before approval: cancelled by the club or rejected by the logistics manager.
+     * A deposit with nothing paid is voided with {@code reason}, so the club is no longer asked to pay it and it leaves
+     * the invoices to be paid. One with a payment recorded keeps its amounts and status (a recorded payment is never
+     * edited) and is returned for the logistics manager to settle with the club by hand: keeping the cancellation fee
+     * and refunding the rest are not built yet.
+     *
+     * @return the deposit left to settle; empty when the request had none or it was voided
+     */
+    @Transactional
+    public Optional<Invoice> voidDepositFor(TransportRequest request, String reason, User actor) {
+        if (!ENDED.contains(request.getStatus())) {
+            throw new BusinessException(
+                    "DEPOSIT_NOT_VOIDABLE",
+                    request.getCode() + " is " + words(request.getStatus().name())
+                            + ": its deposit is voided only once the request is cancelled or rejected");
+        }
+        String why = reason == null ? "" : reason.strip();
+        if (why.isEmpty()) {
+            throw new BusinessException(
+                    "REASON_REQUIRED",
+                    "Say why the deposit of " + request.getCode() + " is voided; the club reads it.");
+        }
+        Optional<Invoice> found = invoices.findFirstByQuotation_Request_IdAndKindAndStatusNot(
+                request.getId(), InvoiceKind.DEPOSIT, InvoiceStatus.VOID);
+        if (found.isEmpty()) return Optional.empty();
+        Invoice deposit = found.get();
+        String currency = deposit.getQuotation().getCurrency();
+        if (deposit.getAmountPaid().signum() > 0) {
+            audit.recordDecision(
+                    actor,
+                    "DEPOSIT_TO_SETTLE",
+                    AuditText.fit("Deposit " + deposit.getCode() + " kept: " + money(currency, deposit.getAmountPaid())
+                            + " of " + money(currency, deposit.getTotal()) + " paid before " + request.getCode()
+                            + " ended; settle it with the club"),
+                    ENTITY_TYPE,
+                    deposit.getId(),
+                    deposit.getCode(),
+                    why,
+                    deposit.getStatus().name(),
+                    deposit.getStatus().name());
+            log.info(
+                    "Deposit {} of ended request {} has a payment; left to settle",
+                    deposit.getCode(),
+                    request.getCode());
+            return Optional.of(deposit);
+        }
+        InvoiceStatus before = deposit.getStatus();
+        deposit.setStatus(InvoiceStatus.VOID);
+        deposit.setVoidedAt(clock.instant());
+        deposit.setVoidReason(why.length() > VOID_REASON_MAX ? why.substring(0, VOID_REASON_MAX - 3) + "..." : why);
+        Invoice saved = invoices.save(deposit);
+        audit.recordDecision(
+                actor,
+                "VOID_INVOICE",
+                AuditText.fit("Deposit invoice " + saved.getCode() + " voided: " + money(currency, saved.getTotal())
+                        + " no longer due, as " + request.getCode() + " ended before approval"),
+                ENTITY_TYPE,
+                saved.getId(),
+                saved.getCode(),
+                saved.getVoidReason(),
+                before.name(),
+                InvoiceStatus.VOID.name());
+        log.info("Deposit {} of ended request {} voided", saved.getCode(), request.getCode());
+        return Optional.empty();
     }
 
     // ---------- the final invoice ----------
@@ -639,6 +713,10 @@ public class InvoiceService {
 
     private LocalDate today() {
         return LocalDate.now(clock.withZone(BusinessTime.ZONE));
+    }
+
+    private static String words(String status) {
+        return status.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 
     static String money(String currency, BigDecimal amount) {

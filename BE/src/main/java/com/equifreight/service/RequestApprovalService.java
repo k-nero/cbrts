@@ -60,6 +60,7 @@ public class RequestApprovalService {
     private final NotificationService notifications;
     private final Clock clock;
     private final RequestFleetService fleet;
+    private final InvoiceService invoices;
 
     public RequestApprovalService(
             TransportRequestRepository requests,
@@ -72,7 +73,8 @@ public class RequestApprovalService {
             AuditService audit,
             NotificationService notifications,
             Clock clock,
-            RequestFleetService fleet) {
+            RequestFleetService fleet,
+            InvoiceService invoices) {
         this.requests = requests;
         this.quotations = quotations;
         this.jobs = jobs;
@@ -84,6 +86,7 @@ public class RequestApprovalService {
         this.notifications = notifications;
         this.clock = clock;
         this.fleet = fleet;
+        this.invoices = invoices;
     }
 
     /** Who can be put on the job: every active specialist and coordinator, fewest open jobs first. */
@@ -202,6 +205,7 @@ public class RequestApprovalService {
         request.setRejectReason(reason);
         requests.saveAndFlush(request);
         fleet.release(request, "the request was rejected.");
+        invoices.voidDepositFor(request, request.getCode() + " was rejected: " + reason, manager);
 
         audit.recordDecision(
                 manager,
