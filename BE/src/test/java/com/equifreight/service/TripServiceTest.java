@@ -228,6 +228,34 @@ class TripServiceTest {
     }
 
     @Test
+    @DisplayName(
+            "The domestic leg to the hub leaves before the dossier clears; the job departs at the border (US-F2-13)")
+    void theLegToTheHubLeavesBeforeClearance() {
+        job.setDossierStatus(DossierStatus.OPEN);
+        job.setClearanceReadyAt(null);
+        when(jobTrips.beforeBorder(trip, job)).thenReturn(true);
+
+        record(TripRecordKind.DEPARTED, NOW);
+
+        assertEquals(TripStatus.DEPARTED, job.getTripStatus());
+        assertEquals(JobStage.CLEARANCE, job.getStage());
+        assertNull(job.getDepartedAt());
+    }
+
+    @Test
+    @DisplayName("The leg to the hub still needs the trip plan signed off")
+    void theLegToTheHubNeedsTheSignOff() {
+        job.setDossierStatus(DossierStatus.OPEN);
+        job.setClearanceReadyAt(null);
+        job.setSignedOffAt(null);
+        when(jobTrips.beforeBorder(trip, job)).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> record(TripRecordKind.DEPARTED, NOW));
+        assertEquals("SIGN_OFF_REQUIRED", ex.getCode());
+        verify(records, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Departure on a clear dossier starts the trip")
     void departureStartsTheTrip() {
         record(TripRecordKind.DEPARTED, NOW);

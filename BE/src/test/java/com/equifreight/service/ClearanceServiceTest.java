@@ -215,7 +215,7 @@ class ClearanceServiceTest {
     @DisplayName("reviewDocument refuses approval when validity is RED before writing to database")
     void reviewDocumentRefusesApprovalWhenValidityIsRed() {
         when(documentVersionRepository.findById(documentVersion.getId())).thenReturn(Optional.of(documentVersion));
-        when(validityEngine.evaluate(any(), any(), any()))
+        when(validityEngine.evaluate(any(), any(), any(), any()))
                 .thenReturn(new ValidityEngine.Result(Validity.RED, "Sampling date expired 65 days before departure."));
 
         ReviewDocumentRequest req =
@@ -236,7 +236,7 @@ class ClearanceServiceTest {
         when(checklistItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
-        when(validityEngine.evaluate(any(), any(), any()))
+        when(validityEngine.evaluate(any(), any(), any(), any()))
                 .thenReturn(new ValidityEngine.Result(Validity.GREEN, "Valid document."));
 
         ReviewDocumentRequest req =
@@ -271,7 +271,7 @@ class ClearanceServiceTest {
 
         when(checklistItemRepository.findById(checklistItem.getId())).thenReturn(Optional.of(checklistItem));
         when(fileService.requireAttachable(fileId, specialistUser)).thenReturn(file);
-        when(validityEngine.evaluate(any(), any(), any()))
+        when(validityEngine.evaluate(any(), any(), any(), any()))
                 .thenReturn(new ValidityEngine.Result(Validity.RED, "Booster vaccination out of window."));
 
         DocumentUploadRequest req = DocumentUploadRequest.builder()
@@ -729,7 +729,7 @@ class ClearanceServiceTest {
     @DisplayName("US-F2-03: the check gives the engine's answer and stores nothing")
     void checkAnswersWithoutStoringAnything() {
         User customer = ownerOfTheItem();
-        when(validityEngine.evaluate(eq(checklistItem), any(), eq(job)))
+        when(validityEngine.evaluate(eq(checklistItem), any(), eq(job), any()))
                 .thenReturn(new ValidityEngine.Result(
                         Validity.RED,
                         "Sampled 90 days before departure.",

@@ -22,7 +22,10 @@ public final class TripMapper {
 
     private TripMapper() {}
 
-    /** The trip screen of a job; {@code vehicleCode} is the confirmed load plans' vehicles, or null. */
+    /**
+     * The trip screen of a job; {@code vehicleCode} is the confirmed load plans' vehicles, or null. {@code
+     * beforeBorder}: the trip is a domestic leg before the border, which departs before the dossier clears (US-F2-13).
+     */
     public static TripViewResponse toViewResponse(
             TransportJob job,
             String tripCode,
@@ -33,12 +36,13 @@ public final class TripMapper {
             List<TripHorseResponse> horses,
             List<TripRecordResponse> records,
             Part part,
-            HandoverResponse handover) {
+            HandoverResponse handover,
+            boolean beforeBorder) {
         return new TripViewResponse(
                 job.getCode(),
                 tripCode,
                 part.status(),
-                job.getDossierStatus() == DossierStatus.CLEARANCE_READY,
+                beforeBorder || job.getDossierStatus() == DossierStatus.CLEARANCE_READY,
                 part.plannedDepartureAt(),
                 part.plannedArrivalAt(),
                 job.getWindowStart(),

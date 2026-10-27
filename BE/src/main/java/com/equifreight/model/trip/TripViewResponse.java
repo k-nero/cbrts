@@ -11,6 +11,8 @@ public record TripViewResponse(
         /** The trip's TRP code for staff and the crew; null for the customer, who never sees it. */
         String tripCode,
         TripStatus tripStatus,
+        /* The clearance gate lets this trip depart: the dossier is cleared, or the trip is a domestic leg before the
+         * border, which leaves before it (US-F2-13). */
         boolean clearanceReady,
         Instant plannedDepartureAt,
         Instant plannedArrivalAt,
