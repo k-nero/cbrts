@@ -21,6 +21,7 @@ import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
 import { TripJobsPanel } from './TripJobsPanel';
+import { AssignCrewModal } from './AssignCrewModal';
 
 import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
@@ -83,6 +84,7 @@ export function LoadPlanTab({ job }: Props) {
   const [dragging, setDragging] = useState<Picked | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [trailerToAdd, setTrailerToAdd] = useState<string>();
+  const [assigningTrailerId, setAssigningTrailerId] = useState<string | null>(null);
 
   // The vehicles for this trip, each saying whether it may join it and why not (US-F7-01).
   const tripId = useJobTrip();
@@ -561,7 +563,20 @@ export function LoadPlanTab({ job }: Props) {
                     {/* Crew */}
                     <Col xs={24} md={8}>
                       <Flex vertical gap={6}>
-                        <span className="type-body-s text-ink-3">Crew</span>
+                        <Flex justify="space-between" align="center">
+                          <span className="type-body-s text-ink-3">Crew</span>
+                          {!isConfirmed && trailers.length > 0 && !convoy && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                setAssigningTrailerId(trailers[0]?.tripVehicleId ?? '')
+                              }
+                            >
+                              {job.crew.length > 0 ? 'Change crew' : 'Assign crew'}
+                            </Button>
+                          )}
+                        </Flex>
                         <span className="type-data text-ink">
                           {job.crew.length > 0
                             ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
@@ -691,6 +706,14 @@ export function LoadPlanTab({ job }: Props) {
 
       {/* What follows the pointer: a compact card beside the cursor, so the stall under it
           keeps showing its drop hint. */}
+      {assigningTrailerId !== null && (
+        <AssignCrewModal
+          job={job}
+          tripVehicleId={assigningTrailerId}
+          open={assigningTrailerId !== null}
+          onClose={() => setAssigningTrailerId(null)}
+        />
+      )}
       <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
         {dragging && (
           <div className="w-64">

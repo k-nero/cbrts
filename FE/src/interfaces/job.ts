@@ -190,6 +190,14 @@ export interface CrewMember {
   onFlight: boolean;
 }
 
+export interface CrewCandidate {
+  userId: string;
+  name: string;
+  staffCode?: string | null;
+  email: string;
+  escortKind?: 'DRIVER' | 'GROOM' | null;
+}
+
 export interface LoadPlanConflict {
   horseId?: string | null;
   horseName?: string | null;
