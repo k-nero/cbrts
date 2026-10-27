@@ -178,7 +178,8 @@ class RateCatalogServiceWriteTest {
                 null,
                 null,
                 RateCertainty.FIXED,
-                null);
+                null,
+                false);
     }
 
     static RateLineRequest with(RateLineRequest r, Consumer<RateLineRequest.RateLineRequestBuilder> change) {
@@ -212,6 +213,7 @@ class RateCatalogServiceWriteTest {
         groom.setCertainty(RateCertainty.ESTIMATED);
         groom.setEstimateNote("Billed by the hour.");
         groom.setAppliesToTrailer(TrailerType.PRIVATE);
+        groom.setCoveredByRoadLeg(true);
         RateServiceClass business = new RateServiceClass();
         business.setVersion(v2);
         business.setCorridor(pnhHkg);
@@ -463,7 +465,25 @@ class RateCatalogServiceWriteTest {
                         null),
                 "ESTIMATE_NOTE",
                 "Say why an estimated line may vary.");
+        assertRefused(
+                () -> service.addLine(
+                        lan, with(lineRequest(air, "X", RateBasis.PER_SHIPMENT), b -> b.coveredByRoadLeg(true)), null),
+                "COVERED_BY_ROAD_LEG",
+                "Only a group A or G line is at an end of the move a road leg can cover.");
         verify(lines, never()).save(any());
+    }
+
+    @Test
+    void aTransferAtAnEndCanBeLeftToARoadLeg() {
+        RateLineRequest request = with(
+                lineRequest(pnhHkg.getId(), "TRANSFER_ORIGIN", RateBasis.PER_SHIPMENT),
+                b -> b.group("A").coveredByRoadLeg(true));
+
+        service.addLine(lan, request, null);
+
+        ArgumentCaptor<RateLine> saved = ArgumentCaptor.forClass(RateLine.class);
+        verify(lines).save(saved.capture());
+        assertThat(saved.getValue().isCoveredByRoadLeg()).isTrue();
     }
 
     @Test

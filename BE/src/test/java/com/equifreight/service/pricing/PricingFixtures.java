@@ -54,6 +54,25 @@ final class PricingFixtures {
                 false);
     }
 
+    /** {@code row}, not charged at an end a domestic road leg covers (US-F3-21). */
+    static RateRow coveredByRoadLeg(RateRow row) {
+        return new RateRow(
+                row.id(),
+                row.code(),
+                row.group(),
+                row.description(),
+                row.basis(),
+                row.appliesToSex(),
+                row.appliesToTrailer(),
+                row.rate(),
+                row.minCharge(),
+                row.defaultQuantity(),
+                row.certainty(),
+                row.estimateNote(),
+                row.everyCorridor(),
+                true);
+    }
+
     static RateRow sexLine(String code, String group, String description, HorseSex sex, String rate) {
         return new RateRow(
                 UUID.randomUUID(),
@@ -135,7 +154,8 @@ final class PricingFixtures {
     /** The plan's PNH → HKG rate set, v2. */
     static List<RateRow> pnhHkgLines() {
         List<RateRow> lines = new ArrayList<>();
-        lines.add(line("TRANSFER_ORIGIN", "A", "Road transfer to the cargo terminal", RateBasis.PER_SHIPMENT, "250"));
+        lines.add(coveredByRoadLeg(
+                line("TRANSFER_ORIGIN", "A", "Road transfer to the cargo terminal", RateBasis.PER_SHIPMENT, "250")));
         lines.add(line("LOADING", "A", "Loading and handling at origin", RateBasis.PER_HORSE, "120"));
         lines.add(sexLine("ISO_STALLION", "B", "Pre-export isolation", HorseSex.STALLION, "140"));
         lines.add(sexLine("ISO_MARE", "B", "Pre-export isolation", HorseSex.MARE, "85"));
@@ -148,7 +168,8 @@ final class PricingFixtures {
         lines.add(line("IMPORT_PERMIT", "E", "Hong Kong import permit handling", RateBasis.PER_SHIPMENT, "380"));
         lines.add(line("CROSSING", "E", "Customs and border documentation", RateBasis.PER_CROSSING, "420"));
         lines.add(line("POST_ISO", "F", "Post-arrival isolation, Sha Tin", RateBasis.PER_DAY, "95"));
-        lines.add(line("TRANSFER_DEST", "G", "Road transfer to Sha Tin", RateBasis.PER_SHIPMENT, "300"));
+        lines.add(coveredByRoadLeg(
+                line("TRANSFER_DEST", "G", "Road transfer to Sha Tin", RateBasis.PER_SHIPMENT, "300")));
         lines.add(hourLine(
                 "WAITING",
                 "H",
