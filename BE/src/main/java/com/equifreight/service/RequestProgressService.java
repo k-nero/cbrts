@@ -7,6 +7,7 @@ import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.request.LeadTimeResponse;
 import com.equifreight.model.request.NextStepResponse;
 import com.equifreight.model.request.RequestMapper;
@@ -54,7 +55,12 @@ public class RequestProgressService {
         this.clock = clock;
     }
 
-    public record Progress(List<HistoryEntryResponse> history, NextStepResponse nextStep) {}
+    /** {@code jobCode} is the approved request's job (BR-F1-05), which its trip tracking opens; else null. */
+    public record Progress(List<HistoryEntryResponse> history, NextStepResponse nextStep, String jobCode) {
+        public Progress(List<HistoryEntryResponse> history, NextStepResponse nextStep) {
+            this(history, nextStep, null);
+        }
+    }
 
     /** {@code leadTime} is the request's own, worked out while the customer may still change it; else null. */
     @Transactional(readOnly = true)
@@ -64,7 +70,12 @@ public class RequestProgressService {
                         .filter(this::changesStatus)
                         .map(RequestMapper::toCustomerHistory)
                         .toList();
-        return new Progress(history, nextStep(request, leadTime));
+        String jobCode = request.getStatus() == RequestStatus.APPROVED
+                ? jobs.findByRequestId(request.getId())
+                        .map(TransportJob::getCode)
+                        .orElse(null)
+                : null;
+        return new Progress(history, nextStep(request, leadTime), jobCode);
     }
 
     /** A row whose status after differs from the one before it: a step of the request's lifecycle. */

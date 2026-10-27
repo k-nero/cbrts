@@ -1,5 +1,5 @@
 import { Flex } from 'antd';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { Panel } from '@/components/ui';
 import type { HistoryEntry } from '@/interfaces';
@@ -9,11 +9,12 @@ import { formatDayTime } from '@/lib/utils';
  * A request's history from the audit trail, newest first (BR-F1-08): every decision on the staff
  * review, every status change on the customer's request (US-F1-08); an incident's timeline oldest first.
  */
-export const HistoryPanel: FC<{ history: HistoryEntry[]; title?: string }> = ({
+export const HistoryPanel: FC<{ history: HistoryEntry[]; title?: string; footer?: ReactNode }> = ({
   history,
   title = 'History',
+  footer,
 }) => (
-  <Panel title={title} flush>
+  <Panel title={title} flush footer={footer}>
     <ol className="m-0 list-none p-0">
       {history.map((h, i) => (
         <li

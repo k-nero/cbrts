@@ -11,6 +11,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentType;
+import com.equifreight.entity.Handover;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
@@ -19,6 +20,7 @@ import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InvoiceKind;
@@ -27,8 +29,10 @@ import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
+import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.model.home.CustomerHomeResponse;
 import com.equifreight.repository.ChecklistItemRepository;
+import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
@@ -59,6 +63,7 @@ class CustomerHomeServiceTest {
     private final ChecklistItemRepository checklist = mock(ChecklistItemRepository.class);
     private final HorseRepository horses = mock(HorseRepository.class);
     private final InvoiceRepository invoices = mock(InvoiceRepository.class);
+    private final HandoverRepository handovers = mock(HandoverRepository.class);
     private final User customer = new User();
     private final Club club = new Club();
     private CustomerHomeService service;
@@ -66,7 +71,15 @@ class CustomerHomeServiceTest {
     @BeforeEach
     void setUp() {
         service = new CustomerHomeService(
-                clubs, requests, quotations, jobs, checklist, horses, invoices, Clock.fixed(NOW, BusinessTime.ZONE));
+                clubs,
+                requests,
+                quotations,
+                jobs,
+                checklist,
+                horses,
+                invoices,
+                handovers,
+                Clock.fixed(NOW, BusinessTime.ZONE));
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
         when(clubs.requireClub(customer)).thenReturn(club);
@@ -308,6 +321,50 @@ class CustomerHomeServiceTest {
             assertThat(h.documents()).isEqualTo("0 of 1 cleared");
             assertThat(h.note().text()).isEqualTo("Equine passport overdue");
             assertThat(h.note().tone()).isEqualTo("bad");
+        });
+    }
+
+    private Handover handedOver(TransportJob j, HandoverOutcome outcome) {
+        j.setTripStatus(TripStatus.DELIVERED);
+        Handover h = new Handover();
+        h.setJob(j);
+        h.setHandedOverAt(NOW.minusSeconds(3600));
+        h.setCustomerOutcome(outcome);
+        when(handovers.findByJob_IdIn(any())).thenReturn(List.of(h));
+        return h;
+    }
+
+    @Test
+    @DisplayName("a move whose handover the club accepted is finished: no move, no next departure (US-F6-02)")
+    void acceptedHandoverFinishesTheMove() {
+        TransportRequest r = request("REQ-2026-0001", RequestStatus.APPROVED);
+        TransportJob j = job(r);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        handedOver(j, HandoverOutcome.CONFIRMED_SOUND);
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves()).isEmpty();
+        assertThat(home.nextEvent()).isNull();
+    }
+
+    @Test
+    @DisplayName("a delivered move waits on the club to confirm the handover once it is recorded")
+    void handedOverWaitsOnTheClub() {
+        TransportRequest r = request("REQ-2026-0001", RequestStatus.APPROVED);
+        TransportJob j = job(r);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        handedOver(j, null);
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves()).singleElement().satisfies(m -> {
+            assertThat(m.holds().text()).isEqualTo("Delivered · confirm the handover");
+            assertThat(m.holds().tone()).isEqualTo("warn");
         });
     }
 

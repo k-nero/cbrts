@@ -4,6 +4,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentVersion;
+import com.equifreight.entity.Handover;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
@@ -14,6 +15,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.JobStage;
@@ -30,6 +32,7 @@ import com.equifreight.model.home.NextEventResponse;
 import com.equifreight.model.home.OwedEntryResponse;
 import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.repository.ChecklistItemRepository;
+import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
@@ -88,6 +91,7 @@ public class CustomerHomeService {
     private final ChecklistItemRepository checklist;
     private final HorseRepository horses;
     private final InvoiceRepository invoices;
+    private final HandoverRepository handovers;
     private final Clock clock;
 
     public CustomerHomeService(
@@ -98,6 +102,7 @@ public class CustomerHomeService {
             ChecklistItemRepository checklist,
             HorseRepository horses,
             InvoiceRepository invoices,
+            HandoverRepository handovers,
             Clock clock) {
         this.clubs = clubs;
         this.requests = requests;
@@ -106,6 +111,7 @@ public class CustomerHomeService {
         this.checklist = checklist;
         this.horses = horses;
         this.invoices = invoices;
+        this.handovers = handovers;
         this.clock = clock;
     }
 
@@ -135,9 +141,17 @@ public class CustomerHomeService {
                     requoting.add(q.getRequest().getId());
             });
         }
+        // The customer's answer to each handover: an accepted one finishes the move for them (US-F6-02).
+        Map<UUID, Handover> handoverOf = new HashMap<>();
+        if (!jobOf.isEmpty())
+            handovers
+                    .findByJob_IdIn(
+                            jobOf.values().stream().map(TransportJob::getId).toList())
+                    .forEach(h -> handoverOf.put(h.getJob().getId(), h));
         List<TransportRequest> live = all.stream()
                 .filter(r -> inProgress(
                         r, latestIssued.get(r.getId()), jobOf.get(r.getId()), requoting.contains(r.getId()), today))
+                .filter(r -> !accepted(jobOf.get(r.getId()), handoverOf))
                 .toList();
 
         // One query for every document of the club's jobs that haven't left: the owed ones and each horse's count.
@@ -182,6 +196,7 @@ public class CustomerHomeService {
                         jobOf.get(r.getId()),
                         requoting.contains(r.getId()),
                         owedByJob,
+                        handoverOf,
                         today))
                 .sorted(Comparator.comparingInt((MoveEntryResponse m) -> needsYou(m.holds()))
                         .thenComparing(MoveEntryResponse::departsAt, Comparator.nullsLast(Comparator.naturalOrder())))
@@ -353,6 +368,7 @@ public class CustomerHomeService {
             TransportJob job,
             boolean requoting,
             Map<UUID, List<ChecklistItem>> owedByJob,
+            Map<UUID, Handover> handoverOf,
             LocalDate today) {
         List<String> parts = new ArrayList<>();
         if (job != null) parts.add("job " + job.getCode());
@@ -373,7 +389,9 @@ public class CustomerHomeService {
                 route(r),
                 String.join(" · ", parts),
                 stage(r, job),
-                holds(r, job, requoting, owed, today),
+                job == null
+                        ? holds(r, null, requoting, owed, today)
+                        : holds(r, job, requoting, owed, today, handoverOf.get(job.getId())),
                 departsAt,
                 arrivesAt);
     }
@@ -395,10 +413,37 @@ public class CustomerHomeService {
         };
     }
 
-    /** What holds the move, in words and a tone: Bad or Warn when it waits on the club, Neutral when it doesn't. */
+    /** A move the customer accepted the handover of is finished for them, whether or not the office has closed it. */
+    private static boolean accepted(TransportJob job, Map<UUID, Handover> handoverOf) {
+        Handover h = job == null ? null : handoverOf.get(job.getId());
+        return h != null && h.getCustomerOutcome() == HandoverOutcome.CONFIRMED_SOUND;
+    }
+
     static TonedTextResponse holds(
             TransportRequest r, TransportJob job, boolean requoting, List<ChecklistItem> owed, LocalDate today) {
+        return holds(r, job, requoting, owed, today, null);
+    }
+
+    /**
+     * What holds the move, in words and a tone: Bad or Warn when it waits on the club, Neutral when it doesn't. A
+     * delivered move waits on the handover: the escort recording it, then the customer's answer.
+     */
+    static TonedTextResponse holds(
+            TransportRequest r,
+            TransportJob job,
+            boolean requoting,
+            List<ChecklistItem> owed,
+            LocalDate today,
+            Handover handover) {
         if (job != null) {
+            boolean delivered =
+                    job.getTripStatus() == TripStatus.ARRIVED || job.getTripStatus() == TripStatus.DELIVERED;
+            if (delivered && handover != null && handover.getCustomerOutcome() == HandoverOutcome.PROBLEM_REPORTED)
+                return new TonedTextResponse("Problem reported · with the logistics manager", "neutral");
+            if (delivered && handover != null && handover.getCustomerOutcome() != null)
+                return new TonedTextResponse("Handover accepted · nothing needed", "ok");
+            if (delivered && handover != null && handover.getHandedOverAt() != null)
+                return new TonedTextResponse("Delivered · confirm the handover", "warn");
             if (job.getTripStatus() == TripStatus.HELD) return new TonedTextResponse("On the road · held", "warn");
             if (job.getTripStatus() == TripStatus.DEPARTED) return new TonedTextResponse("On the road", "info");
             if (job.getTripStatus() == TripStatus.ARRIVED || job.getTripStatus() == TripStatus.DELIVERED)

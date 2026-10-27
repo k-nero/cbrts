@@ -198,6 +198,7 @@ public class RequestService {
                         .orElse(null))
                 .history(where.history())
                 .nextStep(where.nextStep())
+                .jobCode(where.jobCode())
                 .build();
     }
 
