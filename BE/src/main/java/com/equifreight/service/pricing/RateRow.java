@@ -26,37 +26,4 @@ public record RateRow(
         RateCertainty certainty,
         String estimateNote,
         boolean everyCorridor,
-        boolean coveredByRoadLeg) {
-
-    /** A line charged whatever covers the ends of the move. */
-    public RateRow(
-            UUID id,
-            String code,
-            String group,
-            String description,
-            RateBasis basis,
-            HorseSex appliesToSex,
-            TrailerType appliesToTrailer,
-            BigDecimal rate,
-            BigDecimal minCharge,
-            BigDecimal defaultQuantity,
-            RateCertainty certainty,
-            String estimateNote,
-            boolean everyCorridor) {
-        this(
-                id,
-                code,
-                group,
-                description,
-                basis,
-                appliesToSex,
-                appliesToTrailer,
-                rate,
-                minCharge,
-                defaultQuantity,
-                certainty,
-                estimateNote,
-                everyCorridor,
-                false);
-    }
-}
+        boolean coveredByRoadLeg) {}

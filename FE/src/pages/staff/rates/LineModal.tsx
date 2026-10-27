@@ -77,6 +77,11 @@ export const LineModal: FC<{
 
   const everyCorridor = useWatch({ control: methods.control, name: 'everyCorridor' }) ?? false;
   const scopeWarning = lineScopeWarning(editing, everyCorridor, view.corridor.code);
+  // A road leg covers an end of the move: group A at the origin, G at the destination (US-F3-21). A ticked box
+  // stays clickable on another group, so it can be cleared.
+  const group = useWatch({ control: methods.control, name: 'group' });
+  const covered = useWatch({ control: methods.control, name: 'coveredByRoadLeg' }) ?? false;
+  const atAnEnd = group?.value === 'A' || group?.value === 'G';
 
   const onSubmit = methods.handleSubmit(async (v) => {
     // Unticking a shared line adds this corridor's own line, which replaces the shared one here only;
@@ -213,7 +218,12 @@ export const LineModal: FC<{
             <FormField
               name="coveredByRoadLeg"
               component="checkbox"
-              componentProps={{ children: 'Not charged when a road leg covers this end' }}
+              componentProps={{
+                children: atAnEnd
+                  ? 'Not charged when a road leg covers this end'
+                  : 'Not charged when a road leg covers this end (groups A and G only)',
+                disabled: !atAnEnd && !covered,
+              }}
             />
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />

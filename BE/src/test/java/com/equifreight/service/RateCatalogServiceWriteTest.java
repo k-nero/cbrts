@@ -213,7 +213,15 @@ class RateCatalogServiceWriteTest {
         groom.setCertainty(RateCertainty.ESTIMATED);
         groom.setEstimateNote("Billed by the hour.");
         groom.setAppliesToTrailer(TrailerType.PRIVATE);
-        groom.setCoveredByRoadLeg(true);
+        RateLine transfer = new RateLine();
+        transfer.setVersion(v2);
+        transfer.setCorridor(pnhHkg);
+        transfer.setCode("TRANSFER_ORIGIN");
+        transfer.setGroupCode("A");
+        transfer.setDescription("Road transfer to the cargo terminal");
+        transfer.setBasis(RateBasis.PER_SHIPMENT);
+        transfer.setRate(new BigDecimal("250"));
+        transfer.setCoveredByRoadLeg(true);
         RateServiceClass business = new RateServiceClass();
         business.setVersion(v2);
         business.setCorridor(pnhHkg);
@@ -236,7 +244,12 @@ class RateCatalogServiceWriteTest {
         cancel.setValue(BigDecimal.TEN);
         when(loader.load(v2.getId()))
                 .thenReturn(new CatalogRows(
-                        v2, List.of(business), List.of(groom), List.of(band), List.of(fuel), List.of(cancel)));
+                        v2,
+                        List.of(business),
+                        List.of(groom, transfer),
+                        List.of(band),
+                        List.of(fuel),
+                        List.of(cancel)));
 
         DraftResult result = service.createDraft(lan);
 
@@ -253,6 +266,7 @@ class RateCatalogServiceWriteTest {
                 .usingRecursiveComparison()
                 .ignoringFields("version", "id", "createdAt", "updatedAt")
                 .isEqualTo(groom);
+        assertThat(copiedLines.getValue().get(1).isCoveredByRoadLeg()).isTrue();
         ArgumentCaptor<List<RateServiceClass>> copiedClasses = listCaptor();
         verify(classes).saveAll(copiedClasses.capture());
         assertThat(copiedClasses.getValue().getFirst().getPositionRate()).isEqualByComparingTo("16800");

@@ -51,6 +51,7 @@ final class PricingFixtures {
                 null,
                 RateCertainty.FIXED,
                 null,
+                false,
                 false);
     }
 
@@ -87,6 +88,7 @@ final class PricingFixtures {
                 null,
                 RateCertainty.FIXED,
                 null,
+                false,
                 false);
     }
 
@@ -104,6 +106,7 @@ final class PricingFixtures {
                 null,
                 RateCertainty.FIXED,
                 null,
+                false,
                 false);
     }
 
@@ -121,6 +124,7 @@ final class PricingFixtures {
                 d(hours),
                 RateCertainty.ESTIMATED,
                 note,
+                false,
                 false);
     }
 
