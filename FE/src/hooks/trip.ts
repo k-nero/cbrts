@@ -11,10 +11,11 @@ export const useTrips = (audience: 'escort' | 'staff' | 'customer', page: number
     refetchInterval: audience === 'staff' ? 30_000 : false,
   });
 
-export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string, tripId?: string) =>
+/** `part` is one trip of a job that spans trips: its id, or its TRP code for the escort (tripApi.get). */
+export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string, part?: string) =>
   useQuery({
-    queryKey: [...queryKeys.trips.one(audience, code), tripId ?? 'current'],
-    queryFn: () => tripApi.get(audience, code, tripId),
+    queryKey: [...queryKeys.trips.one(audience, code), part ?? 'current'],
+    queryFn: () => tripApi.get(audience, code, part),
     enabled: Boolean(code),
     // The customer follows a trip on the road; once it's delivered nothing moves, so stop polling.
     refetchInterval: (query) =>
@@ -23,10 +24,10 @@ export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string,
         : false,
   });
 
-export const useTripRecord = (audience: 'escort' | 'staff', code: string, tripId?: string) => {
+export const useTripRecord = (audience: 'escort' | 'staff', code: string, part?: string) => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: TripRecordInput) => tripApi.record(audience, code, input, tripId),
+    mutationFn: (input: TripRecordInput) => tripApi.record(audience, code, input, part),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.trips.lists() });
       await client.invalidateQueries({ queryKey: queryKeys.trips.one(audience, code) });
