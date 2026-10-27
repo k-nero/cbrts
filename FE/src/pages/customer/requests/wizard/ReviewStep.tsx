@@ -32,7 +32,7 @@ const ReviewStep: FC<StepProps> = ({ saved, saving, onBack, goTo }) => {
   const lead = saved.leadTime;
   // A replace, so Back from the confirmation doesn't land on the draft's review again.
   const toConfirmation = () =>
-    router.replace(router.paths.get('request-submitted', { pathParams: [saved.id] }), {
+    router.replace(router.paths.get('request', { pathParams: [saved.id] }), {
       force: true,
     });
 

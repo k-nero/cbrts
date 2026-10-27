@@ -127,8 +127,8 @@ public class NotificationService {
         boolean customer = audience instanceof Audience.ClubAccounts;
         boolean escort = audience instanceof Audience.Escorts
                 || audience instanceof Audience.RoleHolders(String role) && RoleName.ESCORT.equals(role);
-        // The customer's request page lives at /requests/{id}/submitted (it sends a draft on to the editor).
-        String customerRequest = "/requests/" + subject.requestId() + "/submitted";
+        // The customer's request page lives at /requests/{id} (it sends a draft on to the editor).
+        String customerRequest = "/requests/" + subject.requestId();
         return switch (subject.type()) {
             case TRANSPORT_REQUEST -> customer ? customerRequest : "/staff/requests/" + subject.requestId();
             case QUOTATION ->

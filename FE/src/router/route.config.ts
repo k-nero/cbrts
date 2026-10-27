@@ -91,13 +91,6 @@ export const routesConfig = [
             name: 'request-edit',
           },
           {
-            path: '/submitted',
-            roles: ['*'],
-            type: 'authenticated',
-            breadcrumb: 'Submitted',
-            name: 'request-submitted',
-          },
-          {
             path: '/quotation',
             roles: ['*'],
             type: 'authenticated',
