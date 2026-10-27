@@ -238,6 +238,26 @@ final class PricingFixtures {
                 in.weightsRequired());
     }
 
+    /** The same input with the customer asking for a vet escort. */
+    static PricingInput askingForAVet(PricingInput in) {
+        return new PricingInput(
+                in.mode(),
+                in.corridorCode(),
+                in.fromCity(),
+                in.toCity(),
+                in.destinationCountryName(),
+                in.distanceKm(),
+                in.crossingCount(),
+                in.airClass(),
+                in.trailer(),
+                in.insurance(),
+                true,
+                in.quarantineDays(),
+                in.horses(),
+                in.arrivalWindow(),
+                in.weightsRequired());
+    }
+
     /** The same input as the customer's estimate prices it: a draft's missing weight isn't refused. */
     static PricingInput estimateOf(PricingInput in) {
         return new PricingInput(

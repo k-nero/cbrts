@@ -62,6 +62,15 @@ export interface Crossing {
   toCountry: string;
 }
 
+/** A domestic road leg to or from a hub (US-F1-09), read in the direction of travel: "Da Nang → Ho Chi Minh City". */
+export interface HubLeg {
+  corridorId: string;
+  code: string;
+  fromCity: string;
+  toCity: string;
+  distanceKm: number | null;
+}
+
 /**
  * A corridor we run, read in the direction of travel (GET /customer/routes). Without a destination
  * (the alternatives on a route we don't run) the countries, crossBorder and lead time are null.
@@ -81,6 +90,10 @@ export interface Route {
   earliestDeparture: string | null;
   /** How far flexible dates can move on this route, 0 to 7 days (#115); 0 runs on fixed dates only. */
   dateFlexDays: number;
+  /** The road leg from the origin's city to the hub this corridor leaves from (US-F1-09); null when none. */
+  firstLeg?: HubLeg | null;
+  /** The road leg from the hub this corridor arrives in to the destination's city; null when none. */
+  lastLeg?: HubLeg | null;
 }
 
 export interface LeadTime {

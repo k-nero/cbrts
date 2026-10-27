@@ -69,10 +69,13 @@ public class RouteService {
         this.clock = clock;
     }
 
-    /** Pickup and delivery points; welfare stops are stops on a trip, not ends of one. */
+    /**
+     * Pickup and delivery points. Welfare stops are stops on a trip, not ends of one, and airports and cargo terminals
+     * are where we change carrier, which the route plans (US-F1-09): the customer names where the horses start and end.
+     */
     @Transactional(readOnly = true)
     public Page<PlaceResponse> places(String q, Pageable pageable) {
-        Specification<Place> spec = (root, query, cb) -> cb.notEqual(root.get("kind"), PlaceKind.WELFARE_STOP);
+        Specification<Place> spec = (root, query, cb) -> cb.not(root.get("kind").in(NOT_AN_END));
         if (q != null && !q.isBlank()) {
             String like = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
             spec = spec.and((root, query, cb) ->
@@ -82,6 +85,10 @@ public class RouteService {
     }
 
     /** Every catalogued place a route plan can stop at (US-F3-17), welfare stops included, by name or city. */
+    /** Places that are never a request's pickup or delivery point. */
+    private static final Set<PlaceKind> NOT_AN_END =
+            EnumSet.of(PlaceKind.WELFARE_STOP, PlaceKind.AIRPORT, PlaceKind.CARGO_TERMINAL);
+
     @Transactional(readOnly = true)
     public Page<PlaceResponse> stopPlaces(String q, Pageable pageable) {
         Specification<Place> spec = Specification.unrestricted();
@@ -113,21 +120,35 @@ public class RouteService {
                 return List.of();
             }
             return corridors.findTouchingCity(from.getCity()).stream()
-                    .map(c -> describeFrom(c, from, null).route())
+                    .map(c -> describeFrom(c, from, null, from.getCity()).route())
                     .toList();
         }
         Place to = findPlace(toPlaceId);
         if (from.getCity() == null || to.getCity() == null) {
             return List.of();
         }
-        return corridors.findBetweenCities(from.getCity(), to.getCity()).stream()
-                .map(c -> describeFrom(c, from, to).route())
+        List<Corridor> direct = corridors.findBetweenCities(from.getCity(), to.getCity());
+        if (!direct.isEmpty()) {
+            return direct.stream()
+                    .map(c -> describeFrom(c, from, to, from.getCity()).route())
+                    .toList();
+        }
+        // No corridor joins the two cities: the shortest route by way of hubs for each mode (US-F1-09).
+        Map<TransportMode, HubRoute> shortest = new LinkedHashMap<>();
+        viaHubs(from.getCity(), to.getCity()).stream()
+                .sorted(Comparator.comparingInt(HubRoute::distanceKm))
+                .forEach(r -> shortest.putIfAbsent(r.corridor().getMode(), r));
+        return shortest.values().stream()
+                .map(r -> describe(r.corridor(), r.firstLeg(), r.lastLeg(), from, to))
                 .toList();
     }
 
     /**
      * R-05: both ends must be places; with a mode, the corridor of that mode, otherwise the only mode run
-     * between the two cities. A forward corridor wins over a reversed one. A typed end never resolves.
+     * between the two cities. A forward corridor wins over a reversed one. A typed end never resolves. When no
+     * corridor of the mode joins the two cities, the route goes by way of hubs (US-F1-09): a domestic road leg to the
+     * city a cross-border corridor leaves from, that corridor, and a domestic road leg from where it arrives, the
+     * shortest such route.
      */
     public RouteResolution resolve(
             Place origin, String originText, Place destination, String destinationText, TransportMode mode) {
@@ -136,36 +157,142 @@ public class RouteService {
         boolean destinationServed = destinationText != null
                 && places.existsByCityIgnoreCaseAndKindNot(destinationText, PlaceKind.WELFARE_STOP);
         if (origin == null || destination == null || origin.getCity() == null || destination.getCity() == null) {
-            return new RouteResolution(null, null, Set.of(), null, originServed, destinationServed);
+            return new RouteResolution(null, null, null, null, Set.of(), null, originServed, destinationServed);
         }
         List<Corridor> candidates = corridors.findBetweenCities(origin.getCity(), destination.getCity());
         Set<TransportMode> modesRun = EnumSet.noneOf(TransportMode.class);
         candidates.forEach(c -> modesRun.add(c.getMode()));
+        // A mode no corridor runs between the two cities may still run by way of hubs.
+        List<HubRoute> viaHubs = modesRun.size() == TransportMode.values().length
+                ? List.of()
+                : viaHubs(origin.getCity(), destination.getCity()).stream()
+                        .filter(r -> !modesRun.contains(r.corridor().getMode()))
+                        .toList();
+        viaHubs.forEach(r -> modesRun.add(r.corridor().getMode()));
         TransportMode chosen = mode != null
                 ? mode
                 : (modesRun.size() == 1 ? modesRun.iterator().next() : null);
-        Optional<Corridor> corridor = chosen == null
-                ? Optional.empty()
-                : candidates.stream()
-                        .filter(c -> c.getMode() == chosen)
-                        .min(Comparator.comparing(c -> isReversed(c, origin) ? 1 : 0));
-        if (corridor.isEmpty()) {
-            return new RouteResolution(null, null, Set.copyOf(modesRun), null, false, false);
+        if (chosen == null) {
+            return new RouteResolution(null, null, null, null, Set.copyOf(modesRun), null, false, false);
         }
-        Described described = describeFrom(corridor.get(), origin, destination);
+        Optional<HubRoute> route = candidates.stream()
+                .filter(c -> c.getMode() == chosen)
+                .min(Comparator.comparing(c -> isReversed(c, origin.getCity()) ? 1 : 0))
+                .map(c -> new HubRoute(c, null, null))
+                .or(() -> viaHubs.stream()
+                        .filter(r -> r.corridor().getMode() == chosen)
+                        .min(Comparator.comparingInt(HubRoute::distanceKm)));
+        if (route.isEmpty()) {
+            return new RouteResolution(null, null, null, null, Set.copyOf(modesRun), null, false, false);
+        }
+        HubRoute r = route.get();
+        Described described = describeFrom(r.corridor(), origin, destination, r.departureCity(origin.getCity()));
         return new RouteResolution(
-                corridor.get(), described.route(), Set.copyOf(modesRun), described.catalogMissingFor(), false, false);
+                r.corridor(),
+                r.firstLeg(),
+                r.lastLeg(),
+                withLegs(described.route(), r, origin.getCity(), destination.getCity()),
+                Set.copyOf(modesRun),
+                described.catalogMissingFor(),
+                false,
+                false);
+    }
+
+    /**
+     * A route by way of hubs (US-F1-09): a corridor that crosses a border, with the domestic road legs that bring
+     * the horses to the city it leaves from and take them on from the city it arrives in.
+     */
+    record HubRoute(Corridor corridor, Corridor firstLeg, Corridor lastLeg) {
+
+        int distanceKm() {
+            return km(corridor) + km(firstLeg) + km(lastLeg);
+        }
+
+        /** The city the corridor is travelled from: the first leg's far end, else the origin's city. */
+        String departureCity(String originCity) {
+            return firstLeg == null ? originCity : otherEnd(firstLeg, originCity);
+        }
+
+        private static int km(Corridor c) {
+            return c == null || c.getDistanceKm() == null ? 0 : c.getDistanceKm();
+        }
+    }
+
+    /**
+     * The routes between two cities by way of hubs (US-F1-09), from one query for the corridor network: a domestic
+     * road leg from the origin's city, or none, then a corridor that crosses a border, then a domestic road leg to the
+     * destination's city, or none, with at least one leg. Two domestic corridors are never chained into a domestic
+     * route, and a route never goes through a hub only to come back.
+     */
+    List<HubRoute> viaHubs(String fromCity, String toCity) {
+        List<Corridor> network = corridors.findNetwork();
+        List<HubRoute> routes = new ArrayList<>();
+        for (Corridor first : legsTouching(network, fromCity)) {
+            String hubOut = first == null ? fromCity : otherEnd(first, fromCity);
+            for (Corridor last : legsTouching(network, toCity)) {
+                if (first == null && last == null) continue;
+                String hubIn = last == null ? toCity : otherEnd(last, toCity);
+                if (hubOut.equalsIgnoreCase(toCity) || hubIn.equalsIgnoreCase(fromCity)) continue;
+                for (Corridor c : network) {
+                    if (c.crossesBorder() && joins(c, hubOut, hubIn)) routes.add(new HubRoute(c, first, last));
+                }
+            }
+        }
+        return routes;
+    }
+
+    /** No leg (null) first, then every domestic road corridor touching the city. */
+    private static List<Corridor> legsTouching(List<Corridor> network, String city) {
+        List<Corridor> legs = new ArrayList<>();
+        legs.add(null);
+        network.stream()
+                .filter(c -> c.isRoad() && !c.crossesBorder())
+                .filter(c -> c.getOriginCity().equalsIgnoreCase(city)
+                        || c.getDestinationCity().equalsIgnoreCase(city))
+                .forEach(legs::add);
+        return legs;
+    }
+
+    private static boolean joins(Corridor c, String a, String b) {
+        return (c.getOriginCity().equalsIgnoreCase(a) && c.getDestinationCity().equalsIgnoreCase(b))
+                || (c.getOriginCity().equalsIgnoreCase(b)
+                        && c.getDestinationCity().equalsIgnoreCase(a));
+    }
+
+    private static String otherEnd(Corridor c, String city) {
+        return c.getOriginCity().equalsIgnoreCase(city) ? c.getDestinationCity() : c.getOriginCity();
+    }
+
+    private static RouteResponse withLegs(RouteResponse route, HubRoute r, String fromCity, String toCity) {
+        if (route == null || (r.firstLeg() == null && r.lastLeg() == null)) return route;
+        return route.toBuilder()
+                .firstLeg(r.firstLeg() == null ? null : RouteMapper.toLegResponse(r.firstLeg(), fromCity))
+                .lastLeg(
+                        r.lastLeg() == null
+                                ? null
+                                : RouteMapper.toLegResponse(r.lastLeg(), otherEnd(r.lastLeg(), toCity)))
+                .build();
+    }
+
+    /** A stored request's route: its corridor read from where it is travelled, with its domestic legs (US-F1-09). */
+    public RouteResponse describe(
+            Corridor corridor, Corridor firstLeg, Corridor lastLeg, Place origin, Place destination) {
+        HubRoute r = new HubRoute(corridor, firstLeg, lastLeg);
+        RouteResponse route = describeFrom(corridor, origin, destination, r.departureCity(origin.getCity()))
+                .route();
+        return destination == null ? route : withLegs(route, r, origin.getCity(), destination.getCity());
     }
 
     /** A stored corridor, read from the request's origin. */
     public RouteResponse describe(Corridor corridor, Place origin, Place destination) {
-        return describeFrom(corridor, origin, destination).route();
+        return describeFrom(corridor, origin, destination, origin.getCity()).route();
     }
 
     private record Described(RouteResponse route, String catalogMissingFor) {}
 
-    private Described describeFrom(Corridor corridor, Place origin, Place destination) {
-        boolean reversed = isReversed(corridor, origin);
+    /** {@code fromCity}: where the corridor is travelled from, the origin's city or the hub its first leg reaches. */
+    private Described describeFrom(Corridor corridor, Place origin, Place destination, String fromCity) {
+        boolean reversed = isReversed(corridor, fromCity);
         List<CorridorCrossing> ordered = new ArrayList<>(corridor.getCrossings());
         ordered.sort(Comparator.comparingInt(CorridorCrossing::getSeq));
         if (reversed) {
@@ -217,8 +344,8 @@ public class RouteService {
                 null);
     }
 
-    private static boolean isReversed(Corridor corridor, Place origin) {
-        return !corridor.getOriginCity().equalsIgnoreCase(origin.getCity());
+    private static boolean isReversed(Corridor corridor, String fromCity) {
+        return !corridor.getOriginCity().equalsIgnoreCase(fromCity);
     }
 
     private static void put(Map<String, String> countries, Country country) {

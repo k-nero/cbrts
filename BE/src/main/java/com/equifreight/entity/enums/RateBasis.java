@@ -14,5 +14,7 @@ public enum RateBasis {
     /** Grooms: one per three horses, rounded up. */
     PER_THREE_HORSES,
     /** The flight veterinarian: from FLIGHT_VET_MIN_HORSES, above HIGH_VALUE_THRESHOLD, or on a vet-escort request. */
-    FLIGHT_VET
+    FLIGHT_VET,
+    /** A vet riding with a road move, once per shipment, when the customer asks for a vet escort. */
+    VET_ESCORT
 }

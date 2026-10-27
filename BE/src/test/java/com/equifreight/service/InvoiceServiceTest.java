@@ -33,11 +33,14 @@ import com.equifreight.entity.enums.LineCertainty;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PaymentMethod;
 import com.equifreight.entity.enums.QuotationStatus;
+import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
+import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.invoice.ActualQuantityRequest;
 import com.equifreight.model.invoice.InvoiceLineResponse;
 import com.equifreight.model.invoice.InvoiceResponse;
+import com.equifreight.model.invoice.InvoiceSummaryResponse;
 import com.equifreight.model.invoice.RecordPaymentRequest;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.IncidentRepository;
@@ -426,5 +429,162 @@ class InvoiceServiceTest {
         assertEquals(d, service.issueDeposit(quotation, null));
         verify(codes, org.mockito.Mockito.times(1)).next(CodePrefix.INV, 2026);
         verify(pricing, never()).totalsWith(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Request review lists the request's invoices, the deposit first and a draft final invoice included")
+    void aRequestsInvoicesForStaff() {
+        Invoice d = deposited();
+        d.setClub(club);
+        Invoice draft = new Invoice();
+        draft.setId(UUID.randomUUID());
+        draft.setCode("INV-2026-0042");
+        draft.setKind(InvoiceKind.FINAL);
+        draft.setQuotation(quotation);
+        draft.setJob(job);
+        draft.setClub(club);
+        UUID requestId = quotation.getRequest().getId();
+        when(requests.existsById(requestId)).thenReturn(true);
+        when(invoices.findByQuotation_Request_IdOrderByCreatedAtAsc(requestId)).thenReturn(List.of(d, draft));
+
+        List<InvoiceSummaryResponse> rows = service.forRequest(requestId);
+
+        assertEquals(
+                List.of("INV-2026-0041", "INV-2026-0042"),
+                rows.stream().map(InvoiceSummaryResponse::code).toList());
+        assertEquals(InvoiceStatus.DRAFT, rows.get(1).status());
+        assertEquals("CBRT-2026-041", rows.get(1).jobCode());
+    }
+
+    @Test
+    @DisplayName("A request that doesn't exist has no invoices to list: not found")
+    void anUnknownRequestsInvoices() {
+        UUID unknown = UUID.randomUUID();
+        when(requests.existsById(unknown)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> service.forRequest(unknown));
+        verify(invoices, never()).findByQuotation_Request_IdOrderByCreatedAtAsc(any());
+    }
+
+    // ---------- a request that ends before approval ----------
+
+    /** The request ended, with its deposit found for voiding. */
+    private TransportRequest ended(RequestStatus status, Invoice found) {
+        TransportRequest request = quotation.getRequest();
+        request.setStatus(status);
+        when(invoices.findFirstByQuotation_Request_IdAndKindAndStatusNot(
+                        request.getId(), InvoiceKind.DEPOSIT, InvoiceStatus.VOID))
+                .thenReturn(Optional.ofNullable(found));
+        return request;
+    }
+
+    @Test
+    @DisplayName("A cancelled request's unpaid deposit is voided with the reason, its amounts untouched, and audited")
+    void anUnpaidDepositIsVoided() {
+        Invoice d = deposited();
+        TransportRequest request = ended(RequestStatus.CANCELLED, d);
+
+        Optional<Invoice> toSettle = service.voidDepositFor(
+                request, "  REQ-2026-0041 was cancelled by Saigon Turf Club on 24 Oct 2026, before approval ", yen);
+
+        assertTrue(toSettle.isEmpty());
+        assertEquals(InvoiceStatus.VOID, d.getStatus());
+        assertEquals(NOW, d.getVoidedAt());
+        assertEquals(
+                "REQ-2026-0041 was cancelled by Saigon Turf Club on 24 Oct 2026, before approval", d.getVoidReason());
+        assertEquals(new BigDecimal("1002.00"), d.getTotal());
+        assertEquals(BigDecimal.ZERO, d.getAmountPaid());
+        verify(audit)
+                .recordDecision(
+                        yen,
+                        "VOID_INVOICE",
+                        "Deposit invoice INV-2026-0041 voided: USD 1,002.00 no longer due, as REQ-2026-0041 ended"
+                                + " before approval",
+                        "INVOICE",
+                        d.getId(),
+                        "INV-2026-0041",
+                        "REQ-2026-0041 was cancelled by Saigon Turf Club on 24 Oct 2026, before approval",
+                        "ISSUED",
+                        "VOID");
+        verify(notifications, never())
+                .notify(eq(NotificationKind.PAYMENT_RECORDED), any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("A rejected request's unpaid deposit is voided too, a long reason cut to fit")
+    void aRejectedRequestsDepositIsVoided() {
+        Invoice d = deposited();
+        TransportRequest request = ended(RequestStatus.REJECTED, d);
+
+        service.voidDepositFor(request, "REQ-2026-0041 was rejected: " + "x".repeat(500), yen);
+
+        assertEquals(InvoiceStatus.VOID, d.getStatus());
+        assertEquals(InvoiceService.VOID_REASON_MAX, d.getVoidReason().length());
+        assertTrue(d.getVoidReason().endsWith("..."));
+    }
+
+    @Test
+    @DisplayName("A deposit with a payment recorded is never voided or edited: it is left for the manager to settle")
+    void aPaidDepositIsLeftToSettle() {
+        Invoice d = deposited();
+        d.setAmountPaid(new BigDecimal("500.00"));
+        d.setStatus(InvoiceStatus.PARTIALLY_PAID);
+        TransportRequest request = ended(RequestStatus.CANCELLED, d);
+
+        Optional<Invoice> toSettle = service.voidDepositFor(request, "Cancelled by the club", yen);
+
+        assertEquals(Optional.of(d), toSettle);
+        assertEquals(InvoiceStatus.PARTIALLY_PAID, d.getStatus());
+        assertEquals(new BigDecimal("500.00"), d.getAmountPaid());
+        assertEquals(new BigDecimal("1002.00"), d.getTotal());
+        assertEquals(null, d.getVoidedAt());
+        verify(audit)
+                .recordDecision(
+                        yen,
+                        "DEPOSIT_TO_SETTLE",
+                        "Deposit INV-2026-0041 kept: USD 500.00 of USD 1,002.00 paid before REQ-2026-0041 ended;"
+                                + " settle it with the club",
+                        "INVOICE",
+                        d.getId(),
+                        "INV-2026-0041",
+                        "Cancelled by the club",
+                        "PARTIALLY_PAID",
+                        "PARTIALLY_PAID");
+        verify(audit, never())
+                .recordDecision(any(), eq("VOID_INVOICE"), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A request with no deposit has nothing to void")
+    void noDepositNothingToVoid() {
+        TransportRequest request = ended(RequestStatus.REJECTED, null);
+
+        assertTrue(service.voidDepositFor(request, "Capacity gone", yen).isEmpty());
+        verify(audit, never()).recordDecision(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A deposit is voided only once its request is cancelled or rejected, and with a reason")
+    void voidingIsRefused() {
+        Invoice d = deposited();
+        TransportRequest request = ended(RequestStatus.CUSTOMER_ACCEPTED, d);
+
+        BusinessException live =
+                assertThrows(BusinessException.class, () -> service.voidDepositFor(request, "Changed our mind", yen));
+        assertEquals("DEPOSIT_NOT_VOIDABLE", live.getCode());
+        assertEquals(
+                "REQ-2026-0041 is customer accepted: its deposit is voided only once the request is cancelled or"
+                        + " rejected",
+                live.getMessage());
+
+        request.setStatus(RequestStatus.CANCELLED);
+        BusinessException noReason =
+                assertThrows(BusinessException.class, () -> service.voidDepositFor(request, "   ", yen));
+        assertEquals("REASON_REQUIRED", noReason.getCode());
+        assertEquals("Say why the deposit of REQ-2026-0041 is voided; the club reads it.", noReason.getMessage());
+
+        assertEquals(InvoiceStatus.ISSUED, d.getStatus());
+        verify(audit, never())
+                .recordDecision(any(), eq("VOID_INVOICE"), any(), any(), any(), any(), any(), any(), any());
     }
 }

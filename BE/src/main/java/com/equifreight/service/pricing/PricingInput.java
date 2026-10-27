@@ -32,4 +32,52 @@ public record PricingInput(
          * The customer's estimate on a draft, and the final invoice re-totalling an accepted quotation, don't: weight
          * never prices a line.
          */
-        boolean weightsRequired) {}
+        boolean weightsRequired,
+        /** The domestic road legs to and from hubs (US-F1-09); empty for a move a corridor joins. */
+        List<RoadLeg> legs) {
+
+    public PricingInput {
+        legs = legs == null ? List.of() : List.copyOf(legs);
+    }
+
+    /** A move between two cities a corridor joins: no domestic legs. */
+    public PricingInput(
+            TransportMode mode,
+            String corridorCode,
+            String fromCity,
+            String toCity,
+            String destinationCountryName,
+            Integer distanceKm,
+            int crossingCount,
+            ServiceClass airClass,
+            TrailerType trailer,
+            InsuranceOption insurance,
+            boolean vetEscort,
+            Integer quarantineDays,
+            List<PricingHorse> horses,
+            boolean arrivalWindow,
+            boolean weightsRequired) {
+        this(
+                mode,
+                corridorCode,
+                fromCity,
+                toCity,
+                destinationCountryName,
+                distanceKm,
+                crossingCount,
+                airClass,
+                trailer,
+                insurance,
+                vetEscort,
+                quarantineDays,
+                horses,
+                arrivalWindow,
+                weightsRequired,
+                List.of());
+    }
+
+    /** The trailer a domestic leg is priced with: the request's, or a private trailer on a move that flies. */
+    public TrailerType legTrailer() {
+        return trailer == null ? TrailerType.PRIVATE : trailer;
+    }
+}

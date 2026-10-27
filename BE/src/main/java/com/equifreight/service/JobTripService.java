@@ -28,9 +28,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,14 +67,33 @@ public class JobTripService {
     }
 
     /**
-     * The approved job's own trip, on the request's corridor, with every horse of the request on it.
+     * The approved job's own trip, on the request's corridor, with every horse of the request on it. A request that
+     * goes by way of hubs (US-F1-09) starts on its domestic leg to the hub instead, and its journey is the chain: that
+     * leg, the corridor that crosses the border, then the leg from the hub, each a trip of its own (US-F3-16).
+     * Returns the journey's first trip.
      */
     @Transactional
     public Trip createForJob(TransportJob job, User createdBy, Instant at) {
+        Corridor firstLeg = job.getRequest().getFirstLegCorridor();
+        Corridor lastLeg = job.getRequest().getLastLegCorridor();
+        Trip first =
+                startTrip(job, firstLeg != null ? firstLeg : job.getRequest().getCorridor(), createdBy, at);
+        Trip previous = first;
+        if (firstLeg != null) {
+            Trip crossing = newTrip(job.getRequest().getCorridor(), createdBy, at);
+            planNext(job, previous, crossing);
+            previous = crossing;
+        }
+        if (lastLeg != null) planNext(job, previous, newTrip(lastLeg, createdBy, at));
+        return first;
+    }
+
+    /** The journey's first trip, on {@code corridor}, with every horse of the request on it. */
+    private Trip startTrip(TransportJob job, Corridor corridor, User createdBy, Instant at) {
         Trip trip = new Trip();
         trip.setCode(
                 codeService.next(CodePrefix.TRP, at.atZone(BusinessTime.ZONE).getYear()));
-        trip.setCorridor(job.getRequest().getCorridor());
+        trip.setCorridor(corridor);
         trip.setCreatedBy(createdBy);
         trip = trips.save(trip);
         for (RequestHorse requestHorse : job.getRequest().getHorses()) {
@@ -405,6 +426,101 @@ public class JobTripService {
                 .orElse(List.of());
     }
 
+    /**
+     * The trip of the job's journey that carries the clearance gate (US-F2-13): the first one that crosses a border,
+     * or the journey's first trip when none does, as on a domestic move. A trip before it is a domestic leg into the
+     * city the move leaves the country from, and departs without the cleared dossier. Empty while the job has no trip.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Trip> borderTripOf(TransportJob job) {
+        List<TripJob> journey = journeyOf(job);
+        return journey.stream()
+                .map(TripJob::getTrip)
+                .filter(t -> t.getCorridor().crossesBorder())
+                .findFirst()
+                .or(() -> journey.stream().findFirst().map(TripJob::getTrip));
+    }
+
+    /**
+     * Whether the job's part on {@code trip} comes before the border (US-F2-13): the trip stays in one country and a
+     * later trip of its chain crosses a border. Such a trip departs before the dossier is cleared.
+     */
+    @Transactional(readOnly = true)
+    public boolean beforeBorder(Trip trip, TransportJob job) {
+        if (trip.getCorridor() == null || trip.getCorridor().crossesBorder()) return false;
+        return beforeBorderTrips(parts.findByJob_IdOrderByCreatedAt(job.getId()))
+                .contains(trip.getId());
+    }
+
+    /** The trips among a job's parts that stay in one country and hand on, somewhere down the chain, to one that doesn't. */
+    private static Set<UUID> beforeBorderTrips(List<TripJob> all) {
+        if (all.stream().noneMatch(JobTripService::crosses)) return Set.of();
+        Map<UUID, TripJob> byId =
+                all.stream().filter(p -> p.getId() != null).collect(Collectors.toMap(TripJob::getId, p -> p));
+        Set<UUID> trips = new HashSet<>();
+        for (TripJob part : all) {
+            if (crosses(part)) continue;
+            int hops = 0;
+            for (TripJob p = nextOf(part, byId); p != null && hops++ < all.size(); p = nextOf(p, byId)) {
+                if (crosses(p)) {
+                    trips.add(part.getTrip().getId());
+                    break;
+                }
+            }
+        }
+        return trips;
+    }
+
+    private static boolean crosses(TripJob part) {
+        return part.getTrip().getCorridor() != null
+                && part.getTrip().getCorridor().crossesBorder();
+    }
+
+    /**
+     * The departure a job's documents are checked against (US-F2-13): the planned departure of the trip that crosses
+     * the border when a domestic leg comes first, since the export checks happen where the move leaves the country.
+     * Otherwise, and until that trip's route is confirmed, the job's own planned departure.
+     */
+    @Transactional(readOnly = true)
+    public Instant documentsDepartureOf(TransportJob job) {
+        List<TripJob> journey = journeyOf(job);
+        for (int i = 1; i < journey.size(); i++) {
+            Trip trip = journey.get(i).getTrip();
+            if (journey.get(0).getTrip().getCorridor().crossesBorder()) break;
+            if (trip.getCorridor().crossesBorder())
+                return trip.getPlannedDepartureAt() != null
+                        ? trip.getPlannedDepartureAt()
+                        : job.getPlannedDepartureAt();
+        }
+        return job.getPlannedDepartureAt();
+    }
+
+    /** The job's parts in journey order, from its first trip along the chain; one query for the parts. */
+    private List<TripJob> journeyOf(TransportJob job) {
+        List<TripJob> all = parts.findByJob_IdOrderByCreatedAt(job.getId());
+        Map<UUID, TripJob> byId =
+                all.stream().filter(p -> p.getId() != null).collect(Collectors.toMap(TripJob::getId, p -> p));
+        Set<UUID> handedOnTo = all.stream()
+                .map(p -> p.getNext() == null ? null : p.getNext().getId())
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<TripJob> journey = new ArrayList<>();
+        TripJob p = all.stream()
+                .filter(x -> !handedOnTo.contains(x.getId()))
+                .findFirst()
+                .orElse(null);
+        // A chain never loops; the bound only guards against bad data.
+        while (p != null && journey.size() < all.size()) {
+            journey.add(p);
+            p = nextOf(p, byId);
+        }
+        return journey;
+    }
+
+    private static TripJob nextOf(TripJob part, Map<UUID, TripJob> byId) {
+        return part.getNext() == null ? null : byId.get(part.getNext().getId());
+    }
+
     /** The job's part on the next trip of its chain after {@code trip}; empty on the last trip of its journey. */
     @Transactional(readOnly = true)
     public Optional<TripJob> partAfter(Trip trip, TransportJob job) {
@@ -648,7 +764,10 @@ public class JobTripService {
                 .filter(th -> th.getStatus() != TripHorseStatus.MOVED && th.getStatus() != TripHorseStatus.HANDED_ON)
                 .toList();
         List<TripJob> all = parts.findByJob_IdOrderByCreatedAt(job.getId());
+        // A domestic leg before the border doesn't depart the job (US-F2-13).
+        Set<UUID> domesticLegs = beforeBorderTrips(all);
         all.stream()
+                .filter(p -> !domesticLegs.contains(p.getTrip().getId()))
                 .map(TripJob::getDepartedAt)
                 .filter(java.util.Objects::nonNull)
                 .min(Instant::compareTo)
@@ -682,7 +801,11 @@ public class JobTripService {
         job.setTripStatus(summary);
         // Delivered only once every horse is: a part delivered early doesn't deliver the job.
         job.setDeliveredAt(null);
-        if (summary != TripStatus.NOT_STARTED && job.getStage() != JobStage.CLOSED) job.setStage(JobStage.TRIP);
+        boolean pastBorder = activePartsOf(job).stream()
+                        .anyMatch(p -> !domesticLegs.contains(p.getTrip().getId()))
+                || job.getDepartedAt() != null;
+        if (summary != TripStatus.NOT_STARTED && pastBorder && job.getStage() != JobStage.CLOSED)
+            job.setStage(JobStage.TRIP);
     }
 
     /**

@@ -398,6 +398,15 @@ public class RateCatalogService {
                     "BASIS",
                     "Air corridors price the flight by stall position; a road transfer to the terminal is per shipment.");
         }
+        if (r.basis() == RateBasis.FLIGHT_VET && corridor != null && corridor.getMode() == TransportMode.ROAD) {
+            throw new BusinessException(
+                    "BASIS", "A road move's vet is the vet escort line; the flight vet rule is for air corridors.");
+        }
+        if (r.basis() == RateBasis.VET_ESCORT && corridor != null && corridor.getMode() == TransportMode.AIR) {
+            throw new BusinessException(
+                    "BASIS",
+                    "An air move's vet is the flight vet line; a vet escort on request is for road corridors.");
+        }
         if (r.appliesToSex() != null && r.basis() != RateBasis.PER_HORSE && r.basis() != RateBasis.PER_DAY) {
             throw new BusinessException("APPLIES_TO_SEX", "Only a per-horse or per-day line can be for one sex.");
         }

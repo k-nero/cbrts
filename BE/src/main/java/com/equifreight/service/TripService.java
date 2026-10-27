@@ -447,7 +447,9 @@ public class TripService {
 
     /**
      * The first departure needs the cleared dossier and the manager's sign-off of the trip plan (US-F2-08,
-     * US-F3-08). A later FLIGHT_DEPARTED, the next leg of a trip already on its way, only re-checks the gate.
+     * US-F3-08). A later FLIGHT_DEPARTED, the next leg of a trip already on its way, only re-checks the gate. A
+     * domestic leg before the border, into the city the move leaves the country from, needs only the sign-off: the
+     * gate sits on the trip that crosses the border (US-F2-13).
      */
     private void requireDepartureAllowed(TransportJob job, TripJob part, Instant occurredAt) {
         // A part already on its way doesn't wait for the job's other part, whose documents are re-checked for its
@@ -455,6 +457,7 @@ public class TripService {
         boolean otherPartWaits =
                 part.getDepartedAt() != null && jobTrips.activePartsOf(job).size() > 1;
         if (!otherPartWaits
+                && !jobTrips.beforeBorder(part.getTrip(), job)
                 && (job.getDossierStatus() != DossierStatus.CLEARANCE_READY
                         || job.getClearanceReadyAt() == null
                         || job.getClearanceReadyAt().isAfter(occurredAt)))
@@ -583,6 +586,9 @@ public class TripService {
                     part.setStatus(TripStatus.DEPARTED);
                     if (part.getDepartedAt() == null) part.setDepartedAt(at);
                     job.setTripStatus(TripStatus.DEPARTED);
+                    // A domestic leg before the border moves the horses, but the job departs, and its documents
+                    // settle, only when it leaves the country (US-F2-13).
+                    if (jobTrips.beforeBorder(trip, job)) return;
                     job.setStage(JobStage.TRIP);
                     if (job.getDepartedAt() == null) job.setDepartedAt(at);
                 });
@@ -590,7 +596,7 @@ public class TripService {
                 riding.forEach(job -> {
                     jobTrips.partOf(trip, job).setStatus(TripStatus.HELD);
                     job.setTripStatus(TripStatus.HELD);
-                    job.setStage(JobStage.TRIP);
+                    if (!jobTrips.beforeBorder(trip, job)) job.setStage(JobStage.TRIP);
                 });
             case LEFT_STOP, CLEARED_BORDER ->
                 riding.forEach(job -> {
@@ -848,7 +854,8 @@ public class TripService {
                 recordResponses,
                 part,
                 TripMapper.toHandoverResponse(
-                        handovers.findByJob_Id(job.getId()).orElse(null)));
+                        handovers.findByJob_Id(job.getId()).orElse(null)),
+                jobTrips.beforeBorder(trip, job));
     }
 
     /**

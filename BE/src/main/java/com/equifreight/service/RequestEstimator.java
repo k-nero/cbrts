@@ -1,6 +1,5 @@
 package com.equifreight.service;
 
-import com.equifreight.entity.Corridor;
 import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.ArrivalMode;
@@ -84,7 +83,7 @@ public class RequestEstimator {
                     : resolution.modesRun().iterator().next();
             request.setMode(mode);
             if (request.getCorridor() == null || request.getCorridor().getMode() != mode) {
-                request.setCorridor(corridorFor(request, mode));
+                useRoute(request, mode);
             }
             assumptions.add("Assumes " + modeWord(mode) + " until you choose a service on step 3.");
         }
@@ -131,7 +130,7 @@ public class RequestEstimator {
         }
         RateSet rates = rows.forCorridor(r.getCorridor().getId());
         ServiceClass airClass = r.getMode() == TransportMode.AIR ? r.getAirClass() : null;
-        PricedQuote quote = QuotePricer.price(inputs.inputFor(r, airClass, false), rates);
+        PricedQuote quote = QuotePricer.price(inputs.inputFor(r, airClass, false, rows), rates);
         return new Priced(EstimateBand.of(quote, rates), quote);
     }
 
@@ -151,7 +150,7 @@ public class RequestEstimator {
             } else {
                 options.get("mode").add(effect(value, current, rows, variant(base, v -> {
                     v.setMode(mode);
-                    v.setCorridor(corridorFor(base, mode));
+                    useRoute(v, mode);
                     v.setTrailer(mode == TransportMode.ROAD ? TrailerType.SHARED : null);
                     v.setAirClass(mode == TransportMode.AIR ? ServiceClass.BUSINESS : null);
                     v.setArrivalMode(ArrivalMode.ANY_TIME);
@@ -267,14 +266,17 @@ public class RequestEstimator {
 
     // --- helpers ------------------------------------------------------------------------------------------
 
-    private Corridor corridorFor(TransportRequest request, TransportMode mode) {
-        return routes.resolve(
-                        request.getOriginPlace(),
-                        request.getOriginText(),
-                        request.getDestinationPlace(),
-                        request.getDestinationText(),
-                        mode)
-                .corridor();
+    /** The request's route by {@code mode}: its corridor and the domestic legs to and from hubs (US-F1-09). */
+    private void useRoute(TransportRequest request, TransportMode mode) {
+        RouteResolution r = routes.resolve(
+                request.getOriginPlace(),
+                request.getOriginText(),
+                request.getDestinationPlace(),
+                request.getDestinationText(),
+                mode);
+        request.setCorridor(r.corridor());
+        request.setFirstLegCorridor(r.firstLeg());
+        request.setLastLegCorridor(r.lastLeg());
     }
 
     /** A copy of the request's priced fields, changed for one alternative; never saved. */
@@ -285,6 +287,8 @@ public class RequestEstimator {
         v.setDestinationPlace(base.getDestinationPlace());
         v.setDestinationText(base.getDestinationText());
         v.setCorridor(base.getCorridor());
+        v.setFirstLegCorridor(base.getFirstLegCorridor());
+        v.setLastLegCorridor(base.getLastLegCorridor());
         v.setMode(base.getMode());
         v.setTrailer(base.getTrailer());
         v.setAirClass(base.getAirClass());

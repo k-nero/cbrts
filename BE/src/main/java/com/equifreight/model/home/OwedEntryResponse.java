@@ -5,8 +5,9 @@ import java.util.UUID;
 import lombok.Builder;
 
 /**
- * One thing the club owes: a document, an answer to a quotation, or an answer to the manager's note.
- * {@code kind} ({@code DOCUMENT}, {@code QUOTATION}, {@code ANSWER}) tells the page where the action opens.
+ * One thing the club owes: a document, an answer to a quotation, an answer to the manager's note, or an unpaid invoice.
+ * {@code kind} ({@code DOCUMENT}, {@code QUOTATION}, {@code ANSWER}, {@code INVOICE}) tells the page where the action
+ * opens.
  */
 @Builder
 public record OwedEntryResponse(
@@ -15,6 +16,8 @@ public record OwedEntryResponse(
         UUID requestId,
         /* The checklist item, for a document; else null. */
         UUID itemId,
+        /* The invoice, for an invoice to pay; else null. */
+        UUID invoiceId,
         /* {@code overdue}, {@code soon} or {@code upcoming}. */
         String urgency,
         String title,

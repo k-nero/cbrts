@@ -57,11 +57,15 @@ public class CatalogSeeder {
     private static final List<DemoPlace> PLACES = List.of(
             new DemoPlace("Phú Thọ training centre", PlaceKind.TRAINING_CENTRE, "Ho Chi Minh City", "VN"),
             new DemoPlace("Sóc Sơn quarantine station", PlaceKind.QUARANTINE, "Hanoi", "VN"),
+            // A city no cross-border corridor leaves from: its moves abroad go by way of Ho Chi Minh City (US-F1-09).
+            new DemoPlace("Hòa Xuân racing stables", PlaceKind.STABLE, "Da Nang", "VN"),
             new DemoPlace("Phnom Penh Equestrian Centre", PlaceKind.STABLE, "Phnom Penh", "KH"),
             new DemoPlace("Chao Phraya Racing Stables", PlaceKind.STABLE, "Bangkok", "TH"),
             new DemoPlace("Vientiane racing stables", PlaceKind.STABLE, "Vientiane", "LA"),
             new DemoPlace("Kuala Lumpur equestrian centre", PlaceKind.STABLE, "Kuala Lumpur", "MY"),
-            new DemoPlace("Sha Tin stables", PlaceKind.STABLE, "Hong Kong", "HK"),
+            // In Sha Tin, not Hong Kong: a flight lands at HKG, so the move to the stables is the road leg
+            // "RD HKG → Sha Tin" (US-F1-09), not the flight's own end.
+            new DemoPlace("Sha Tin stables", PlaceKind.STABLE, "Sha Tin", "HK"),
             // Where a journey of several trips changes carrier (US-F3-16): road to the airport, the flight, road again.
             new DemoPlace("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.AIRPORT, "Ho Chi Minh City", "VN"),
             new DemoPlace("Techo International Airport cargo terminal (PNH)", PlaceKind.AIRPORT, "Phnom Penh", "KH"),
@@ -132,6 +136,9 @@ public class CatalogSeeder {
                     "LA"),
             new DemoCorridor(
                     "RD HCM → HAN", TransportMode.ROAD, "Ho Chi Minh City", "Hanoi", 1700, List.of(), "VN", "VN"),
+            // The domestic leg to the hub: Da Nang → Hong Kong goes by road to Ho Chi Minh City, then flies (US-F1-09).
+            new DemoCorridor(
+                    "RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City", 960, List.of(), "VN", "VN"),
             new DemoCorridor(
                     "AIR PNH → HKG", TransportMode.AIR, "Phnom Penh", "Hong Kong", 1550, List.of(), "KH", "HK"),
             new DemoCorridor(

@@ -9,11 +9,13 @@ import type { RequestStatus } from './request';
 
 export interface OwedEntry {
   id: string;
-  /** Where the action opens: the document, the quotation, or the request to answer. */
-  kind: 'DOCUMENT' | 'QUOTATION' | 'ANSWER';
+  /** Where the action opens: the document, the quotation, the request to answer, or the invoice. */
+  kind: 'DOCUMENT' | 'QUOTATION' | 'ANSWER' | 'INVOICE';
   requestId: string;
   /** The checklist item, for a document. */
   itemId: string | null;
+  /** The invoice, for an invoice to pay. */
+  invoiceId: string | null;
   urgency: Urgency;
   title: string;
   /** "CBRT-2026-041 · Silver Bell · Proof of ownership". */

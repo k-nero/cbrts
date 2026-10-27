@@ -1,5 +1,7 @@
 /** What happened (BE NotificationKind). The kind decides the tone and the word the bell shows. */
 export const NotificationKindEnum = {
+  /** A club submitted a request, or sent it again after a return; the logistics managers review it. */
+  REQUEST_SUBMITTED: 'REQUEST_SUBMITTED',
   REQUEST_INFO_REQUIRED: 'REQUEST_INFO_REQUIRED',
   REQUEST_CANCELLED: 'REQUEST_CANCELLED',
   REQUEST_REJECTED: 'REQUEST_REJECTED',

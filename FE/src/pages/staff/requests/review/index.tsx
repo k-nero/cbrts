@@ -7,13 +7,15 @@ import { DecisionPanel } from './DecisionPanel';
 import { FleetPanel } from './FleetPanel';
 import { SentPanel } from './SentPanel';
 
+import { InvoicesPanel } from '@/components/invoice/InvoicesPanel';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import { RequestNotFound } from '@/components/request/RequestNotFound';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui';
+import { useStaffRequestInvoices } from '@/hooks/invoice';
 import { useRequestReview } from '@/hooks/staffRequest';
-import { inReview, queueWords, reviewSubject, reviewSummary } from '@/lib/utils';
+import { inReview, queueWords, reviewSubject, reviewSummary, routeEnds } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /**
@@ -25,6 +27,7 @@ const RequestReviewPage: FC = () => {
   const router = useCustomRouter();
   const query = useRequestReview(id);
   const review = query.data;
+  const invoices = useStaffRequestInvoices(review?.request.id);
   const toList = () => router.push(router.paths.get('requests'));
   const open = (target: string) =>
     router.push(router.paths.get('request-review', { pathParams: [target] }));
@@ -45,8 +48,8 @@ const RequestReviewPage: FC = () => {
   const { request, queue } = review;
   // The header describes what the customer sent, never a returned request's unsent edits.
   const subject = reviewSubject(review);
-  const from = subject.route?.fromCity ?? subject.origin?.city ?? '—';
-  const to = subject.route?.toCity ?? subject.destination?.city ?? '—';
+  const from = (subject.route && routeEnds(subject.route).from) ?? subject.origin?.city ?? '—';
+  const to = (subject.route && routeEnds(subject.route).to) ?? subject.destination?.city ?? '—';
 
   return (
     <Flex vertical gap={28}>
@@ -90,6 +93,14 @@ const RequestReviewPage: FC = () => {
         <Flex vertical gap={24} className="min-w-0">
           <ChecksPanel checks={review.checks} inReview={inReview(request.status)} />
           {review.fleet && <FleetPanel fleet={review.fleet} />}
+          <InvoicesPanel
+            invoices={invoices.data}
+            loading={invoices.isPending}
+            onOpen={(inv) =>
+              router.push(router.paths.get('invoice-detail', { pathParams: [inv.id] }))
+            }
+            empty="No invoice yet. The deposit invoice is issued when the customer accepts the quotation."
+          />
           <SentPanel key={request.id} revisions={review.revisions} />
           <HistoryPanel history={review.history} />
         </Flex>

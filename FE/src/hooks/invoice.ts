@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { invoiceApi, invoicesListApi } from '@/apis/invoice';
+import { queryKeys } from '@/constant/query';
 import { useCrudResource } from '@/hooks/crud';
 import type {
   ActualQuantityInput,
@@ -18,6 +19,14 @@ export const useInvoiceList = (view: InvoiceView) => {
 
 export const useReadyForInvoice = () =>
   useQuery({ queryKey: ['invoices', 'ready'], queryFn: invoiceApi.ready });
+
+/** Request review's Invoices panel; under `invoices`, so issuing or a payment refreshes it. */
+export const useStaffRequestInvoices = (requestId: string | undefined) =>
+  useQuery({
+    queryKey: ['invoices', 'request', requestId],
+    queryFn: () => invoiceApi.ofRequestForStaff(requestId as string),
+    enabled: Boolean(requestId),
+  });
 
 export const useInvoice = (id: string) =>
   useQuery({ queryKey: ['invoice', id], queryFn: () => invoiceApi.get(id), enabled: Boolean(id) });
@@ -58,7 +67,7 @@ export const useRecordPayment = (id: string) =>
 /** The customer's side. */
 export const useRequestInvoices = (requestId: string) =>
   useQuery({
-    queryKey: ['customer-invoices', requestId],
+    queryKey: queryKeys.customerInvoices(requestId),
     queryFn: () => invoiceApi.ofRequest(requestId),
     enabled: Boolean(requestId),
   });

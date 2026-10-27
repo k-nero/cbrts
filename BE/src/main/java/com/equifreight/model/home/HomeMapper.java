@@ -2,6 +2,7 @@ package com.equifreight.model.home;
 
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
 import java.time.Instant;
@@ -56,6 +57,22 @@ public final class HomeMapper {
                 .reason(reason)
                 .dueAt(dueAt)
                 .actionLabel("Ask for a re-quote")
+                .build();
+    }
+
+    public static OwedEntryResponse toInvoiceOwed(
+            Invoice invoice, String urgency, String title, String subject, String reason, Instant dueAt) {
+        return OwedEntryResponse.builder()
+                .id(invoice.getId().toString())
+                .kind("INVOICE")
+                .requestId(invoice.getQuotation().getRequest().getId())
+                .invoiceId(invoice.getId())
+                .urgency(urgency)
+                .title(title)
+                .subject(subject)
+                .reason(reason)
+                .dueAt(dueAt)
+                .actionLabel("Open invoice")
                 .build();
     }
 

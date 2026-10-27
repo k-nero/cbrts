@@ -23,6 +23,7 @@ import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RateCatalogVersion;
@@ -35,9 +36,11 @@ import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.FeeBandKind;
 import com.equifreight.entity.enums.HorseSex;
+import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.StallType;
 import com.equifreight.entity.enums.TrailerType;
@@ -59,6 +62,8 @@ import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import com.equifreight.repository.RequestRevisionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.notification.Audience;
+import com.equifreight.service.notification.Subject;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -101,6 +106,7 @@ class RequestServiceTest {
     RateFeeBandRepository feeBands;
     NotificationService notifications;
     RequestProgressService progress;
+    InvoiceService invoices;
     RequestService service;
     User user;
     Club club;
@@ -127,6 +133,7 @@ class RequestServiceTest {
         feeBands = mock(RateFeeBandRepository.class);
         notifications = mock(NotificationService.class);
         progress = mock(RequestProgressService.class);
+        invoices = mock(InvoiceService.class);
         when(progress.of(any(), any())).thenReturn(new RequestProgressService.Progress(List.of(), null));
         service = new RequestService(
                 requests,
@@ -145,7 +152,8 @@ class RequestServiceTest {
                 feeBands,
                 notifications,
                 progress,
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                invoices);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -422,7 +430,7 @@ class RequestServiceTest {
     @Test
     void aWindowNeedsRoadAPrivateTrailerAndFixedDates() {
         String message = "An arrival window needs a road move with a private trailer and fixed dates. Choose road "
-                + "and a private trailer, and untick ±3 days, or arrive any time on the day.";
+                + "and a private trailer with fixed dates, or arrive any time on the day.";
         RequestDraftRequest air = window("08:00", "12:00").toBuilder()
                 .mode(TransportMode.AIR)
                 .trailer(null)
@@ -559,7 +567,7 @@ class RequestServiceTest {
         submitted.setOriginPlace(phuTho);
         submitted.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(submitted.getId(), CLUB_ID)).thenReturn(Optional.of(submitted));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
 
         RequestResponse response = service.get(user, submitted.getId());
 
@@ -612,7 +620,7 @@ class RequestServiceTest {
         quoted.setOriginPlace(phuTho);
         quoted.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(quoted.getId(), CLUB_ID)).thenReturn(Optional.of(quoted));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(quoted.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(issuedQuotation(quoted, 2)));
 
@@ -632,7 +640,7 @@ class RequestServiceTest {
         inReview.setOriginPlace(phuTho);
         inReview.setDestinationPlace(chaoPhraya);
         when(requests.findByIdAndClubId(inReview.getId(), CLUB_ID)).thenReturn(Optional.of(inReview));
-        when(routes.describe(corridor, phuTho, chaoPhraya)).thenReturn(route(21));
+        when(routes.describe(corridor, null, null, phuTho, chaoPhraya)).thenReturn(route(21));
 
         assertThat(service.get(user, inReview.getId()).quotation()).isNull();
     }
@@ -796,6 +804,42 @@ class RequestServiceTest {
             service.cancel(user, quoted.getId());
 
             assertThat(quoted.getStatus()).isEqualTo(RequestStatus.CANCELLED);
+        }
+
+        @Test
+        void cancellingEndsTheDepositWithTheReasonTheClubReads() {
+            quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
+
+            service.cancel(user, quoted.getId());
+
+            verify(invoices)
+                    .voidDepositFor(
+                            quoted,
+                            "REQ-2026-0001 was cancelled by Saigon Turf Club on 26 Sep 2026, before approval",
+                            user);
+        }
+
+        @Test
+        void aDepositWithAPaymentIsLeftForTheManagerToSettle() {
+            quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
+            Quotation q = issuedQuotation(quoted, 1);
+            q.setCurrency("USD");
+            Invoice deposit = new Invoice();
+            deposit.setCode("INV-2026-0041");
+            deposit.setQuotation(q);
+            deposit.setAmountPaid(new BigDecimal("500.00"));
+            when(invoices.voidDepositFor(eq(quoted), anyString(), eq(user))).thenReturn(Optional.of(deposit));
+
+            service.cancel(user, quoted.getId());
+
+            verify(notifications)
+                    .notify(
+                            eq(NotificationKind.REQUEST_CANCELLED),
+                            any(),
+                            any(),
+                            eq("Saigon Turf Club cancelled REQ-2026-0001"),
+                            eq("It was customer accepted; fee 25% with 20 days to departure. Deposit INV-2026-0041 has"
+                                    + " USD 500.00 paid: settle it with the club."));
         }
 
         @Test
@@ -1065,6 +1109,42 @@ class RequestServiceTest {
         }
 
         @Test
+        void submitTellsTheLogisticsManagers() {
+            service.submit(user, draft.getId());
+
+            verify(notifications)
+                    .notify(
+                            eq(NotificationKind.REQUEST_SUBMITTED),
+                            eq(Audience.role(RoleName.LOGISTICS_MANAGER)),
+                            any(Subject.class),
+                            eq("Saigon Turf Club sent REQ-2026-0193"),
+                            eq("2 horses, departing 30 Oct 2026. It is waiting in your review queue."));
+        }
+
+        @Test
+        void aResubmissionTellsTheManagersItIsBack() {
+            backToTheCustomer(Instant.parse("2026-09-20T02:00:00Z"));
+
+            service.submit(user, draft.getId());
+
+            verify(notifications)
+                    .notify(
+                            eq(NotificationKind.REQUEST_SUBMITTED),
+                            eq(Audience.role(RoleName.LOGISTICS_MANAGER)),
+                            any(Subject.class),
+                            eq("Saigon Turf Club sent REQ-2026-0195 again"),
+                            eq("Version 2 answers the note. It is back in your review queue."));
+        }
+
+        @Test
+        void aBlockedSubmitTellsNoOne() {
+            draft.setDepartureDate(null);
+
+            assertThatThrownBy(() -> service.submit(user, draft.getId())).isInstanceOf(ConflictException.class);
+            verifyNoInteractions(notifications);
+        }
+
+        @Test
         void submitCopiesTheRoutesCurrentFlexDays() {
             draft.setDateFlexDays((short) 3);
             hcmBkk.setDateFlexDays((short) 5);
@@ -1220,7 +1300,8 @@ class RequestServiceTest {
                     feeBands,
                     notifications,
                     progress,
-                    mock(RequestFleetService.class));
+                    mock(RequestFleetService.class),
+                    invoices);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 
@@ -1438,7 +1519,7 @@ class RequestServiceTest {
         assertThat(response.status()).isEqualTo(com.equifreight.service.pricing.EstimateStatus.UNAVAILABLE);
         assertThat(response.message())
                 .isEqualTo("An arrival window needs a road move with a private trailer and fixed dates. Choose road "
-                        + "and a private trailer, and untick ±3 days, or arrive any time on the day.");
+                        + "and a private trailer with fixed dates, or arrive any time on the day.");
     }
 
     @Test

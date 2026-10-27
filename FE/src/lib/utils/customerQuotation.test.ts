@@ -5,6 +5,7 @@ import type { CustomerQuotation, CustomerQuoteGroup } from '@/interfaces';
 import {
   quotedPassChip,
   quotedPassSub,
+  rejectedText,
   cancellationToday,
   cancelledText,
   noticeBandLabel,
@@ -253,14 +254,20 @@ describe('cancellationToday', () => {
 
 describe('cancelledText', () => {
   test('a fee taken from the quotation', () => {
-    expect(cancelledText('2026-09-26T02:14:00Z', 25)).toBe(
+    expect(cancelledText('2026-09-26T02:14:00Z', 25, true)).toBe(
       'You cancelled on 26 Sep 2026. The fee is 25% of the quotation total.',
     );
   });
 
   test('no quotation, no fee', () => {
-    expect(cancelledText('2026-09-26T02:14:00Z', 0)).toBe(
+    expect(cancelledText('2026-09-26T02:14:00Z', 0, false)).toBe(
       'You cancelled on 26 Sep 2026. No fee, as no quotation was issued.',
+    );
+  });
+
+  test('a quotation whose bands asked no fee for the notice given', () => {
+    expect(cancelledText('2026-09-26T02:14:00Z', 0, true)).toBe(
+      'You cancelled on 26 Sep 2026. No fee was due for the notice you gave.',
     );
   });
 });
@@ -282,6 +289,24 @@ describe('quotedPassChip', () => {
       label: 'Cancelled',
     });
   });
+
+  test('a rejected request wins over the version, answered or not', () => {
+    expect(quotedPassChip({ status: 'ISSUED', requestStatus: 'REJECTED', versionNo: 1 })).toEqual({
+      tone: 'bad',
+      label: 'Rejected',
+    });
+    expect(quotedPassChip({ status: 'ACCEPTED', requestStatus: 'REJECTED', versionNo: 1 })).toEqual(
+      { tone: 'bad', label: 'Rejected' },
+    );
+  });
+});
+
+describe('rejectedText', () => {
+  test('names who turned it down and where the reason is', () => {
+    expect(rejectedText('Vũ Hải Yến')).toBe(
+      'Vũ Hải Yến turned this request down, so the quotation can’t be answered. The reason is on the request page.',
+    );
+  });
 });
 
 describe('quotedPassSub', () => {
@@ -296,5 +321,18 @@ describe('quotedPassSub', () => {
         cancelledAt: null,
       }),
     ).toBe('Expired 27 Oct 2026. It no longer holds its price.');
+  });
+
+  test('a rejected request points to its reason', () => {
+    expect(
+      quotedPassSub({
+        status: 'ISSUED',
+        requestStatus: 'REJECTED',
+        validUntil: '2026-10-27T16:59:59.999Z',
+        acceptedAt: null,
+        declinedAt: null,
+        cancelledAt: null,
+      }),
+    ).toBe('Request rejected. The reason is on the request page.');
   });
 });

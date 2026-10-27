@@ -52,6 +52,10 @@ describe('basisWords', () => {
     expect(basisWords(line({ basis: 'FLIGHT_VET' }), policies)).toBe('8+ horses or > $250,000.00');
   });
 
+  test('a road vet escort is priced when the customer asks', () => {
+    expect(basisWords(line({ basis: 'VET_ESCORT' }), policies)).toBe('when the customer asks');
+  });
+
   test('a road rate names its trailer and minimum', () => {
     expect(
       basisWords(line({ basis: 'PER_KM', appliesToTrailer: 'PRIVATE', minCharge: 400 }), policies),

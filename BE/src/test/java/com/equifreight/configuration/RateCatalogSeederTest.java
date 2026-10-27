@@ -141,8 +141,9 @@ class RateCatalogSeederTest {
         assertThat(codesOn(all, pnhHkg))
                 .containsExactlyInAnyOrder(
                         "TRANSFER_ORIGIN", "TRANSFER_DEST", "HANDLING", "GROOM", "FLIGHT_VET", "IMPORT_PERMIT");
-        assertThat(codesOn(all, hcmBkk)).containsExactlyInAnyOrder("ROAD_SHARED", "ROAD_PRIVATE", "CROSSING");
-        assertThat(codesOn(all, hanVte)).containsExactly("ROAD_SHARED");
+        assertThat(codesOn(all, hcmBkk))
+                .containsExactlyInAnyOrder("ROAD_SHARED", "ROAD_PRIVATE", "CROSSING", "VET_ESCORT");
+        assertThat(codesOn(all, hanVte)).containsExactlyInAnyOrder("ROAD_SHARED", "VET_ESCORT");
         assertThat(all.stream().filter(l -> l.getBasis() == RateBasis.PER_HOUR))
                 .allSatisfy(l -> assertThat(l.getDefaultQuantity()).isNotNull());
 

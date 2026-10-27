@@ -1,6 +1,7 @@
 package com.equifreight.service.pricing;
 
 import static com.equifreight.service.pricing.PricingFixtures.air;
+import static com.equifreight.service.pricing.PricingFixtures.askingForAVet;
 import static com.equifreight.service.pricing.PricingFixtures.classRow;
 import static com.equifreight.service.pricing.PricingFixtures.d;
 import static com.equifreight.service.pricing.PricingFixtures.estimateOf;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class QuotePricerTest {
@@ -228,6 +230,49 @@ class QuotePricerTest {
                 sexLine("ISO_GELDING", "B", "Pre-export isolation", HorseSex.GELDING, "70")));
         lines.addAll(List.of(extra));
         return rates(List.of(), lines);
+    }
+
+    @Test
+    void aRoadVetEscortIsPricedOnlyWhenTheCustomerAsks() {
+        RateSet rates = roadRates(
+                kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"),
+                line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        PricingInput move =
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000")));
+
+        assertThat(find(QuotePricer.price(move, rates), "Veterinary escort")).isNull();
+
+        PricedLine vet = find(QuotePricer.price(askingForAVet(move), rates), "Veterinary escort");
+        assertThat(vet.group()).isEqualTo("D");
+        assertThat(vet.quantity()).isEqualByComparingTo("1");
+        assertThat(vet.amount()).isEqualByComparingTo("650.00");
+        assertThat(vet.basisText()).isEqualTo("vet escort requested");
+    }
+
+    @Test
+    void aRoadMoveNeverPricesTheFlightVet() {
+        RateSet rates = roadRates(
+                kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"),
+                line("FLIGHT_VET", "D", "Flight veterinarian", RateBasis.FLIGHT_VET, "2200"),
+                line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        PricingInput move = askingForAVet(road(TrailerType.SHARED, 700, 0, sizeS(8)));
+
+        PricedQuote quote = QuotePricer.price(move, rates);
+
+        assertThat(find(quote, "Flight veterinarian")).isNull();
+        assertThat(findAll(quote, "Veterinary escort")).hasSize(1);
+    }
+
+    @Test
+    void anAirMovesVetIsTheFlightVetNotTheRoadEscort() {
+        List<RateRow> lines = new ArrayList<>(pnhHkgLines());
+        lines.add(line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650"));
+        RateSet rates = rates(pnhHkgRates().classes(), lines);
+
+        PricedQuote quote = QuotePricer.price(askingForAVet(pnhHkgBusiness()), rates);
+
+        assertThat(find(quote, "Veterinary escort")).isNull();
+        assertThat(find(quote, "Flight veterinarian")).isNotNull();
     }
 
     @Test
@@ -458,6 +503,24 @@ class QuotePricerTest {
         PricedTotals totals = QuotePricer.retotal(accepted, pinned, quote.lines());
 
         assertThat(totals.fuel()).isNotNull();
+        assertThat(totals.contingency()).isNotNull();
+        assertThat(totals.serviceFee()).isNotNull();
+        assertThat(totals.total()).isNotNull();
+    }
+
+    @Test
+    void anAcceptedQuoteRetotalsWhenARuleAddedSinceWantsAnotherRate() {
+        // Accepted before road vet escorts were priced: its pinned version has no vet escort line, and never will.
+        PricingInput accepted = askingForAVet(
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"))));
+        RateSet pinned =
+                roadRates(kmLine("ROAD_SHARED", "Road freight, shared load", TrailerType.SHARED, "2.40", "400"));
+        List<PricedLine> fixed = QuotePricer.price(accepted, pinned).lines().stream()
+                .filter(l -> l.amount() != null)
+                .toList();
+
+        assertThat(QuotePricer.retotal(accepted, pinned, fixed).total()).isNull();
+        PricedTotals totals = QuotePricer.retotal(accepted, pinned, fixed, false);
         assertThat(totals.contingency()).isNotNull();
         assertThat(totals.serviceFee()).isNotNull();
         assertThat(totals.total()).isNotNull();
@@ -867,5 +930,63 @@ class QuotePricerTest {
                                 l.estimateNote())
                         : l)
                 .toList();
+    }
+    // ---------- domestic legs to and from hubs (US-F1-09) ----------
+
+    private static PricingInput withLeg(PricingInput in, RoadLeg leg) {
+        return new PricingInput(
+                in.mode(),
+                in.corridorCode(),
+                in.fromCity(),
+                in.toCity(),
+                in.destinationCountryName(),
+                in.distanceKm(),
+                in.crossingCount(),
+                in.airClass(),
+                in.trailer(),
+                in.insurance(),
+                in.vetEscort(),
+                in.quarantineDays(),
+                in.horses(),
+                in.arrivalWindow(),
+                in.weightsRequired(),
+                List.of(leg));
+    }
+
+    private static RoadLeg toTheHub(Integer km, RateRow... freight) {
+        return new RoadLeg("A", "RD DAD → HCM", "Da Nang", "Phnom Penh", km, List.of(freight));
+    }
+
+    @Test
+    @DisplayName("The leg to the hub is a group A line, its corridor's per-km rate over its own distance")
+    void theLegToTheHubIsPricedInGroupA() {
+        RateRow privateRoad =
+                kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400");
+        PricedQuote without = QuotePricer.price(pnhHkgBusiness(), pnhHkgRates());
+
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960, privateRoad)), pnhHkgRates());
+
+        PricedLine leg = find(quote, "Road freight Da Nang → Phnom Penh");
+        assertThat(leg.group()).isEqualTo("A");
+        assertThat(leg.lineKey()).isEqualTo("LEG_A_ROAD_PRIVATE");
+        // A flight has no trailer of its own: the leg goes by private trailer.
+        assertThat(leg.description()).contains("private trailer");
+        assertThat(leg.amount()).isEqualByComparingTo("3456.00");
+        assertThat(leg.basisText()).isEqualTo("per km · 960 km · RD DAD → HCM");
+        assertThat(group(quote, "A")).isEqualByComparingTo(group(without, "A").add(d("3456.00")));
+        assertThat(quote.missing()).isEmpty();
+        assertThat(quote.totals().total()).isGreaterThan(without.totals().total());
+    }
+
+    @Test
+    @DisplayName(
+            "A leg whose corridor has no road rate is a missing rate in its group, so the quotation can't be issued")
+    void aLegWithNoRoadRateIsMissing() {
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960)), pnhHkgRates());
+
+        assertThat(quote.missing()).singleElement().satisfies(m -> {
+            assertThat(m.group()).isEqualTo("A");
+            assertThat(m.why()).contains("private-trailer road rate for RD DAD → HCM");
+        });
     }
 }

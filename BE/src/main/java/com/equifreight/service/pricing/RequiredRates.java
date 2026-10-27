@@ -48,11 +48,29 @@ public final class RequiredRates {
                         null, "Corridor distance", in.corridorCode() + " has no distance in the corridor catalog."));
             }
         }
+        for (RoadLeg leg : in.legs()) {
+            if (legFreight(leg, in.legTrailer()) == null) {
+                String kind = in.legTrailer() == TrailerType.SHARED ? "shared-load" : "private-trailer";
+                missing.add(new MissingRate(
+                        leg.group(),
+                        PricingText.fitDescription("Road freight " + leg.fromCity() + " → " + leg.toCity() + ", "
+                                + PricingText.trailerWord(in.legTrailer())),
+                        catalog(rates) + kind + " road rate for " + leg.code() + "."));
+            }
+            if (leg.distanceKm() == null) {
+                missing.add(new MissingRate(
+                        null, "Corridor distance", leg.code() + " has no distance in the corridor catalog."));
+            }
+        }
         if (in.crossingCount() > 0 && !has(rates, RateBasis.PER_CROSSING)) {
             missing.add(crossing(rates, in.corridorCode()));
         }
         if (!has(rates, RateBasis.PER_THREE_HORSES)) {
             missing.add(groom(rates, in.corridorCode()));
+        }
+        // A vet the customer asked for is priced, never left out: the flight vet by air, the vet escort by road.
+        if (in.vetEscort() && !has(rates, vetBasis(in.mode()))) {
+            missing.add(vet(rates, in.corridorCode(), in.mode()));
         }
         Integer days = in.quarantineDays();
         if (days == null) {
@@ -116,6 +134,9 @@ public final class RequiredRates {
         if (!has(rates, RateBasis.PER_THREE_HORSES)) {
             missing.add(groom(rates, corridorCode));
         }
+        if (!has(rates, vetBasis(mode))) {
+            missing.add(vet(rates, corridorCode, mode));
+        }
         for (HorseSex sex : CORRIDOR_SEXES) {
             if (!hasIsolation(rates, sex)) {
                 missing.add(isolation(rates, corridorCode, sex));
@@ -150,6 +171,14 @@ public final class RequiredRates {
     static ClassRow classRow(RateSet rates, ServiceClass serviceClass) {
         return rates.classes().stream()
                 .filter(c -> c.serviceClass() == serviceClass)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** The leg's per-km road row for the trailer (US-F1-09), or null when its corridor has none. */
+    static RateRow legFreight(RoadLeg leg, TrailerType trailer) {
+        return leg.freight().stream()
+                .filter(l -> l.appliesToTrailer() == null || l.appliesToTrailer() == trailer)
                 .findFirst()
                 .orElse(null);
     }
@@ -199,6 +228,17 @@ public final class RequiredRates {
 
     private static MissingRate groom(RateSet rates, String code) {
         return new MissingRate("D", "Groom", catalog(rates) + "groom rate for " + code + ".");
+    }
+
+    /** The line that prices a vet on this mode: the flight vet by air, the vet escort by road. */
+    private static RateBasis vetBasis(TransportMode mode) {
+        return mode == TransportMode.AIR ? RateBasis.FLIGHT_VET : RateBasis.VET_ESCORT;
+    }
+
+    private static MissingRate vet(RateSet rates, String code, TransportMode mode) {
+        return mode == TransportMode.AIR
+                ? new MissingRate("D", "Flight veterinarian", catalog(rates) + "flight vet rate for " + code + ".")
+                : new MissingRate("D", "Veterinary escort", catalog(rates) + "vet escort rate for " + code + ".");
     }
 
     private static MissingRate isolation(RateSet rates, String code, HorseSex sex) {

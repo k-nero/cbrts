@@ -175,7 +175,12 @@ public class RequestReviewService {
 
         RouteResponse stored = request.getCorridor() == null || request.getOriginPlace() == null
                 ? null
-                : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
+                : routes.describe(
+                        request.getCorridor(),
+                        request.getFirstLegCorridor(),
+                        request.getLastLegCorridor(),
+                        request.getOriginPlace(),
+                        request.getDestinationPlace());
         List<RevisionSummaryResponse> summaries = all.stream()
                 .map(v -> RevisionSummaryResponse.builder()
                         .revisionNo(v.getRevisionNo())

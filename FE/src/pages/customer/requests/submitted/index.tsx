@@ -4,15 +4,16 @@ import { Navigate, useParams } from 'react-router-dom';
 
 import CancelRequestModal from '../CancelRequestModal';
 import DocumentsCallout from './DocumentsCallout';
-import { InvoicesPanel } from './InvoicesPanel';
 import { WhereItStands } from './WhereItStands';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
 
+import { InvoicesPanel } from '@/components/invoice/InvoicesPanel';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, Chip, OwedItem, Panel } from '@/components/ui';
+import { useRequestInvoices } from '@/hooks/invoice';
 import { useRequest, useWizardHorses } from '@/hooks/request';
 import {
   cancelledText,
@@ -34,6 +35,7 @@ const RequestSubmittedPage: FC = () => {
   const router = useCustomRouter();
   const query = useRequest(id);
   const horses = useWizardHorses();
+  const { data: invoices } = useRequestInvoices(id);
   const request = query.data;
   const [cancelling, setCancelling] = useState(false);
 
@@ -183,7 +185,11 @@ const RequestSubmittedPage: FC = () => {
           ) : request.status === 'CANCELLED' ? (
             <Panel title="Nothing needed from you" extra={<Chip dot={false}>Cancelled</Chip>}>
               <p className="type-body-m m-0 text-ink-2">
-                {cancelledText(request.cancelledAt, request.cancellationFeePct)}
+                {cancelledText(
+                  request.cancelledAt,
+                  request.cancellationFeePct,
+                  request.quotation != null,
+                )}
               </p>
             </Panel>
           ) : callout ? (
@@ -213,7 +219,12 @@ const RequestSubmittedPage: FC = () => {
           )}
           {request.status === 'APPROVED' && <DocumentsCallout requestId={request.id} />}
           <WhereItStands request={request} />
-          <InvoicesPanel requestId={request.id} />
+          <InvoicesPanel
+            invoices={invoices}
+            onOpen={(inv) =>
+              router.push(router.paths.get('request-invoice', { pathParams: [request.id, inv.id] }))
+            }
+          />
           {history}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.

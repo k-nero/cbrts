@@ -43,6 +43,8 @@ export const basisWords = (
       const value = policies.HIGH_VALUE_THRESHOLD;
       return `${horses ?? '?'}+ horses or > ${value == null ? '?' : money(value)}`;
     }
+    case 'VET_ESCORT':
+      return 'when the customer asks';
     case 'PER_KM': {
       const parts = ['per km'];
       if (line.appliesToTrailer) parts.push(TRAILER_LABELS[line.appliesToTrailer].toLowerCase());

@@ -26,6 +26,7 @@ import {
   reviewRows,
   roadRuns,
   routePlanLine,
+  routeEnds,
   routeSentence,
   routeStops,
   departureHint,
@@ -423,6 +424,29 @@ describe('route words', () => {
       ['Poipet – Aranyaprathet', 'Border 2', 'upcoming'],
       ['Bangkok', '~960 km', 'upcoming'],
     ]);
+  });
+
+  test('by way of a hub (US-F1-09): the road leg to Ho Chi Minh City, then the flight', () => {
+    const viaHub = {
+      ...sgnHkg,
+      firstLeg: {
+        corridorId: 'c-dad',
+        code: 'RD DAD → HCM',
+        fromCity: 'Da Nang',
+        toCity: 'Ho Chi Minh City',
+        distanceKm: 960,
+      },
+    };
+    expect(routeSentence(viaHub)).toBe(
+      'About 2,460 km by air, by road to Ho Chi Minh City first, worked out from your route.',
+    );
+    expect(routeStops(viaHub).map((s) => [s.name, s.kind])).toEqual([
+      ['Da Nang', 'Pickup'],
+      ['Ho Chi Minh City', 'Hub · ~960 km'],
+      ['Hong Kong', '~1,500 km'],
+    ]);
+    expect(routeEnds(viaHub)).toEqual({ from: 'Da Nang', to: 'Hong Kong' });
+    expect(routeEnds(sgnHkg)).toEqual({ from: 'Ho Chi Minh City', to: 'Hong Kong' });
   });
 
   test('borders summary', () => {

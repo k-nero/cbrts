@@ -4,6 +4,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.AuditLog;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.RequestHorse;
@@ -118,6 +119,7 @@ public class RequestService {
     private final NotificationService notifications;
     private final RequestProgressService progress;
     private final RequestFleetService fleet;
+    private final InvoiceService invoices;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -136,7 +138,8 @@ public class RequestService {
             RateFeeBandRepository feeBands,
             NotificationService notifications,
             RequestProgressService progress,
-            RequestFleetService fleet) {
+            RequestFleetService fleet,
+            InvoiceService invoices) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -154,6 +157,7 @@ public class RequestService {
         this.notifications = notifications;
         this.progress = progress;
         this.fleet = fleet;
+        this.invoices = invoices;
     }
 
     @Transactional(readOnly = true)
@@ -294,6 +298,8 @@ public class RequestService {
 
         request.getHorses().forEach(RequestService::snapshot);
         request.setCorridor(resolution.corridor());
+        request.setFirstLegCorridor(resolution.firstLeg());
+        request.setLastLegCorridor(resolution.lastLeg());
         // The range shown at this submission is kept to compare the quotation against; never a quotation itself.
         EstimateResult estimate = estimator.rangeFor(request);
         boolean ranged = estimate.status() == EstimateStatus.READY;
@@ -336,6 +342,17 @@ public class RequestService {
                 code,
                 null,
                 null);
+        // Core flows §2.3 step 5: the request is in the logistics managers' queue, and they are told.
+        notifications.notify(
+                NotificationKind.REQUEST_SUBMITTED,
+                Audience.role(RoleName.LOGISTICS_MANAGER),
+                Subject.request(saved),
+                club.getName() + " sent " + code + (resubmission ? " again" : ""),
+                resubmission
+                        ? "Version " + revisionNo + " answers the note. It is back in your review queue."
+                        : names.size() + (names.size() == 1 ? " horse" : " horses") + ", departing "
+                                + BusinessTime.DAY.format(saved.getDepartureDate())
+                                + ". It is waiting in your review queue.");
         return RequestMapper.toResponse(saved, resolution.route(), null, List.of(), revisionsOf(saved));
     }
 
@@ -415,6 +432,11 @@ public class RequestService {
         request.setCancellationFeePct(feePct);
         TransportRequest saved = requests.saveAndFlush(request);
         fleet.release(saved, "the club cancelled the request.");
+        Optional<Invoice> toSettle = invoices.voidDepositFor(
+                saved,
+                saved.getCode() + " was cancelled by " + club.getName() + " on " + BusinessTime.DAY.format(today)
+                        + ", before approval",
+                user);
 
         String fee = issued.isEmpty()
                 ? "no fee, as no quotation was issued"
@@ -435,8 +457,16 @@ public class RequestService {
                 Audience.role(RoleName.LOGISTICS_MANAGER),
                 Subject.request(saved),
                 club.getName() + " cancelled " + saved.getCode(),
-                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + ".");
+                "It was " + before.name().toLowerCase().replace('_', ' ') + "; " + fee + "."
+                        + toSettle.map(RequestService::depositToSettle).orElse(""));
         return get(user, saved.getId());
+    }
+
+    /** A deposit with a payment on it isn't voided: the logistics manager settles it with the club. */
+    static String depositToSettle(Invoice deposit) {
+        return " Deposit " + deposit.getCode() + " has "
+                + InvoiceService.money(deposit.getQuotation().getCurrency(), deposit.getAmountPaid())
+                + " paid: settle it with the club.";
     }
 
     private static ConflictException notCancellable(TransportRequest request) {
@@ -617,7 +647,7 @@ public class RequestService {
             throw new BusinessException(
                     "ARRIVAL_WINDOW",
                     "An arrival window needs a road move with a private "
-                            + "trailer and fixed dates. Choose road and a private trailer, and untick ±3 days, or arrive "
+                            + "trailer and fixed dates. Choose road and a private trailer with fixed dates, or arrive "
                             + "any time on the day.");
         }
         if (start == null || end == null) {
@@ -668,6 +698,8 @@ public class RequestService {
         request.setVetEscort(draft.vetEscort());
         RouteResolution resolution = resolve(request);
         request.setCorridor(resolution.corridor());
+        request.setFirstLegCorridor(resolution.firstLeg());
+        request.setLastLegCorridor(resolution.lastLeg());
         request.setDateFlexDays((short) LeadTimePolicy.flexDaysFor(draft.dateFlexDays(), routeFlexDays(resolution)));
         return resolution;
     }
@@ -705,7 +737,12 @@ public class RequestService {
         if (!editable(request.getStatus())) {
             RouteResponse route = request.getCorridor() == null || request.getOriginPlace() == null
                     ? null
-                    : routes.describe(request.getCorridor(), request.getOriginPlace(), request.getDestinationPlace());
+                    : routes.describe(
+                            request.getCorridor(),
+                            request.getFirstLegCorridor(),
+                            request.getLastLegCorridor(),
+                            request.getOriginPlace(),
+                            request.getDestinationPlace());
             return RequestMapper.toResponse(request, route, null, List.of(), revisionsOf(request));
         }
         LocalDate today = LocalDate.now(clock);

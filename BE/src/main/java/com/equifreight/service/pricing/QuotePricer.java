@@ -51,6 +51,10 @@ public final class QuotePricer {
         for (RateRow row : rates.lines()) {
             expand(in, rates, row, lines);
         }
+        for (RoadLeg leg : in.legs()) {
+            RateRow freight = RequiredRates.legFreight(leg, in.legTrailer());
+            if (freight != null && leg.distanceKm() != null) lines.add(legLine(in, leg, freight));
+        }
         List<MissingRate> missing = RequiredRates.forRequest(in, rates);
         for (int i = 0; i < missing.size(); i++) {
             MissingRate gap = missing.get(i);
@@ -82,9 +86,17 @@ public final class QuotePricer {
      * included. Over the engine's own lines it gives exactly {@link #price}'s totals.
      */
     public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines) {
+        return retotal(in, rates, lines, true);
+    }
+
+    /**
+     * As above. {@code checkRates} false is for an accepted quotation's lines, which are fixed: a rate rule added since
+     * it was priced (a road vet escort) can't make them incomplete, so only the lines themselves are checked.
+     */
+    public static PricedTotals retotal(PricingInput in, RateSet rates, List<PricedLine> lines, boolean checkRates) {
         StallFit fit = fit(in, rates);
         boolean complete = lines.stream().allMatch(l -> l.amount() != null)
-                && RequiredRates.forRequest(in, rates).isEmpty()
+                && (!checkRates || RequiredRates.forRequest(in, rates).isEmpty())
                 && (fit == null || fit.refusal() == null);
         return totals(in, rates, lines, complete);
     }
@@ -282,15 +294,52 @@ public final class QuotePricer {
                 lines.add(priced(row, "one per three horses · " + n + " ÷ 3, rounded up = " + grooms, grooms, null));
             }
             case FLIGHT_VET -> {
-                String trigger = flightVetTrigger(in, rates);
+                // A road move's vet is the vet escort line, so the flight vet is for air only.
+                String trigger = in.mode() == TransportMode.AIR ? flightVetTrigger(in, rates) : null;
                 if (trigger != null) {
                     lines.add(priced(row, trigger, 1, null));
+                }
+            }
+            case VET_ESCORT -> {
+                // An air move's vet is the flight vet, so this line is for road only.
+                if (in.mode() == TransportMode.ROAD && in.vetEscort()) {
+                    lines.add(priced(row, "vet escort requested", 1, null));
                 }
             }
             case PER_POSITION -> {
                 // Stall positions are priced from the service class table, never from a line.
             }
         }
+    }
+
+    /**
+     * A domestic leg to or from a hub (US-F1-09): its corridor's per-km road rate over its own distance, in the leg's
+     * group (A before the border, G after), so the volume break and the arrival window count it as ground.
+     */
+    private static PricedLine legLine(PricingInput in, RoadLeg leg, RateRow row) {
+        BigDecimal km = BigDecimal.valueOf(leg.distanceKm());
+        BigDecimal amount = cents(row.rate().multiply(km));
+        String basis = "per km · " + leg.distanceKm() + " km · " + leg.code();
+        if (row.minCharge() != null && row.minCharge().compareTo(amount) > 0) {
+            amount = cents(row.minCharge());
+            basis += " · minimum charge applies";
+        }
+        return new PricedLine(
+                leg.group(),
+                "LEG_" + leg.group() + "_" + row.code(),
+                PricingText.fitDescription("Road freight " + leg.fromCity() + " → " + leg.toCity() + ", "
+                        + PricingText.trailerWord(in.legTrailer())),
+                row.basis(),
+                basis,
+                km,
+                row.rate(),
+                amount,
+                LineSource.CATALOG,
+                row.id(),
+                null,
+                null,
+                certainty(row),
+                row.estimateNote());
     }
 
     private static PricedLine perKm(PricingInput in, RateRow row) {

@@ -12,7 +12,7 @@ A job that flies is really three moves: trailers take the horses from their stab
 | --- | --- |
 | Shape | **A chain of trips per job:** one trip per leg of the journey, e.g. road → air → road. The job stays the commercial and legal unit. |
 | The flight | **Its own trip.** An air trip's flight plays the part a trailer plays on a road trip: the flight number takes the vehicle's place, so no rule is broken by a trip that has no trailer. |
-| Who makes the chain | **The fleet coordinator, while planning.** Approval still puts the job on one trip; the coordinator adds the next trip on the Route tab. Nothing is split automatically. |
+| Who makes the chain | **The fleet coordinator, while planning,** except for a request that goes by way of hubs (US-F1-09): its approval puts the job on the chain its route names, the domestic leg to the hub, the corridor that crosses the border, and the leg from the hub. Otherwise approval puts the job on one trip and the coordinator adds the next trip on the Route tab. |
 | Corridors | **Every trip has a catalog corridor of its own mode.** The air trip uses an air corridor ("AIR BKK → HKG"); each road trip a road corridor ("RD VTE → BKK", "RD HKG → Sha Tin"). Sharing a trip with other jobs keeps working, because sharing is "same corridor". |
 | Price | **Unchanged.** The quotation already covers door to door (ground lines and air). Splitting the journey into trips is planning only, like sharing; invoices stay per job. |
 
@@ -62,7 +62,7 @@ Removing a trip from the chain is the reverse, before either trip departs.
 
 **Handing on.** The record that ends trip N at its `TRANSFER` stop (`ACCEPTED_BY_AIRLINE` when a road trip leaves the horses with the airline, `RELEASED_BY_AIRLINE` when the air trip lands them) marks the job's horses `HANDED_ON` there and `ON_TRIP` on trip N+1. The job's part on trip N is done; the trip is done when no job is left on it, as today.
 
-**Departure.** Each trip departs on its own and keeps the clearance gate: every job with horses `ON_TRIP` must be `CLEARANCE_READY`. Trip N+1 can't depart before its horses are handed on to it. Planned times must follow each other: trip N+1's pickup at or after trip N's transfer, plus quarantine (the `QUARANTINE` stop's planned stay).
+**Departure.** Each trip departs on its own and keeps the clearance gate: every job with horses `ON_TRIP` must be `CLEARANCE_READY`. The exception is a domestic leg before the border (US-F2-13): a trip that stays in one country and hands on, down the chain, to one that crosses a border departs, and is signed off, before the dossier clears, because the export checks happen where the move leaves the country. The job itself departs only with the trip that crosses the border: until then its `departed_at` stays empty, its stage doesn't move to Trip, and its documents stay open and are checked against that trip's planned departure (the job's own until that trip's route is confirmed). Trip N+1 can't depart before its horses are handed on to it. Planned times must follow each other: trip N+1's pickup at or after trip N's transfer, plus quarantine (the `QUARANTINE` stop's planned stay).
 
 **Delivery and handover.** Only the last trip has the job's `DELIVERY`; handover, the late-arrival penalty and the final invoice work as today. An arrival window (road only, private trailer) applies to the last trip's delivery.
 
@@ -89,7 +89,7 @@ Removing a trip from the chain is the reverse, before either trip departs.
 
 ## Not in scope
 
-- Automatic chains at approval.
+- Automatic chains at approval, other than the domestic legs of a route by way of hubs (US-F1-09).
 - Pricing per trip; the quote stays door to door.
 - A trip with two flights for one air leg (already out of scope in shared flights).
 

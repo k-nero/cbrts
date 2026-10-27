@@ -90,11 +90,24 @@ public class TransportRequest extends BaseEntity {
     @JoinColumn(name = "corridor_id")
     private Corridor corridor;
 
+    /**
+     * The domestic road leg from the origin's city to the hub {@link #corridor} leaves from (US-F1-09): Da Nang →
+     * Ho Chi Minh City before the flight. Null when the corridor starts in the origin's city.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "first_leg_corridor_id")
+    private Corridor firstLegCorridor;
+
+    /** The domestic road leg from the hub {@link #corridor} arrives in to the destination's city; null when none. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_leg_corridor_id")
+    private Corridor lastLegCorridor;
+
     /** Required once submitted. */
     private LocalDate departureDate;
 
     /**
-     * 0 or 3 ("My dates can move by ±3 days").
+     * 0 for fixed dates; otherwise the route's flexible days, 1 to 7, copied at submission (#115).
      */
     @Column(nullable = false)
     private short dateFlexDays;

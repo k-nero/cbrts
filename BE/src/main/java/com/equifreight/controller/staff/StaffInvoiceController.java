@@ -56,6 +56,12 @@ public class StaffInvoiceController {
         return invoices.readyForFinal();
     }
 
+    @Operation(summary = "A request's invoices: the deposit from acceptance, then its job's, oldest first")
+    @GetMapping("/api/v1/staff/requests/{requestId}/invoices")
+    public List<InvoiceSummaryResponse> ofRequest(@PathVariable UUID requestId) {
+        return invoices.forRequest(requestId);
+    }
+
     @GetMapping("/api/v1/staff/invoices/{id}")
     public InvoiceResponse get(@PathVariable UUID id) {
         return invoices.get(id);

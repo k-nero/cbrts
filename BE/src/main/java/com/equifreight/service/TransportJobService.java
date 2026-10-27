@@ -154,10 +154,19 @@ public class TransportJobService {
         List<CrewMemberResponse> crew = crewAssignmentService.getCrew(job.getId(), tripId);
 
         com.equifreight.model.clearance.ClearanceStatusResponse gate = clearanceService.getClearanceStatus(job.getId());
-        boolean isClear = gate.clearanceReady();
+        Optional<Trip> shown = jobTrips.findTripOf(job.getId(), tripId);
+        // A domestic leg before the border leaves before the dossier clears; the gate is on the trip that crosses
+        // (US-F2-13).
+        boolean domesticLeg = shown.map(t -> jobTrips.beforeBorder(t, job)).orElse(false);
+        boolean isClear = gate.clearanceReady() || domesticLeg;
         String gateState = isClear ? "Clear" : "Locked";
         String gateSummary;
-        if (isClear) {
+        if (domesticLeg && !gate.clearanceReady()) {
+            gateSummary = jobTrips.borderTripOf(job)
+                    .map(border -> "This leg stays in one country and can depart before the dossier clears. The"
+                            + " clearance gate is on " + border.getCode() + ", which crosses the border.")
+                    .orElse("This leg stays in one country and can depart before the dossier clears.");
+        } else if (isClear) {
             gateSummary = "Dossier cleared. Vehicle and trip departure may proceed.";
         } else if (gate.outstandingIssues().isEmpty()) {
             gateSummary = "Clearance gate is locked. Documents are awaiting clearance.";
@@ -167,14 +176,13 @@ public class TransportJobService {
                     gate.outstandingIssues().size());
         }
 
-        List<TripJobResponse> tripJobs = jobTrips.findTripOf(job.getId(), tripId)
-                .map(trip -> jobTrips.jobsOn(trip).stream()
+        List<TripJobResponse> tripJobs = shown.map(trip -> jobTrips.jobsOn(trip).stream()
                         .map(JobMapper::toTripJobResponse)
                         .toList())
                 .orElse(List.of());
         return JobMapper.toDetailResponse(
                 job,
-                jobTrips.findTripOf(job.getId(), tripId).map(Trip::getCode).orElse(null),
+                shown.map(Trip::getCode).orElse(null),
                 getBlockingReason(job),
                 getNextStepOwner(job),
                 gateState,
@@ -230,7 +238,8 @@ public class TransportJobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         // Only the logistics manager signs off (US-F3-08); enforced once, by @PreAuthorize on the controller.
-        // Clearance gate check: every job on the trip must be CLEAR (US-F3-08, US-F3-11)
+        // Clearance gate check: every job on the trip must be CLEAR (US-F3-08, US-F3-11), except on a domestic leg
+        // before the border, which leaves before the dossier clears (US-F2-13).
         Trip trip = jobTrips.tripOf(jobId, tripId);
         if (jobTrips.partDeparted(trip, job)) {
             throw new BusinessException("Cannot sign off trip plan: the job departed on " + job.getDepartedAt());
@@ -238,6 +247,7 @@ public class TransportJobService {
         List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
         if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
         for (TransportJob onTrip : jobsOnTrip) {
+            if (jobTrips.beforeBorder(trip, onTrip)) continue;
             com.equifreight.model.clearance.ClearanceStatusResponse gate =
                     clearanceService.getClearanceStatus(onTrip.getId());
             if (!gate.clearanceReady()) {

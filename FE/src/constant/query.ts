@@ -13,6 +13,8 @@ export const queryKeys = {
   },
   roles: () => ['admin', 'roles'] as const,
   customerHome: () => ['customer', 'home'] as const,
+  /** A request's invoices as the club reads them (the deposit invoice comes with acceptance). */
+  customerInvoices: (requestId: string) => ['customer-invoices', requestId] as const,
   horses: {
     all: () => ['horses'] as const,
     one: (id: string) => ['horses', id] as const,

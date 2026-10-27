@@ -27,6 +27,7 @@ import com.equifreight.model.quotation.StartResult;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
+import com.equifreight.service.pricing.PricingText;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -164,9 +165,26 @@ public class QuotationDraftService {
         if (request.getMode() != TransportMode.AIR) {
             throw new BusinessException("NOT_AN_AIR_REQUEST", "Only an air move has a service class.");
         }
+        ServiceClass was = QuotationPricing.pricedClass(q, request);
         q.setAirClass(airClass);
         List<String> dropped = pricing.price(q, request);
-        return pricing.toResponse(quotations.save(q), request, dropped);
+        Quotation saved = quotations.save(q);
+        if (airClass != was) {
+            StringBuilder summary = new StringBuilder("Quotation " + label(q) + " priced in "
+                    + PricingText.classWord(airClass) + " class instead of " + PricingText.classWord(was));
+            QuotationIssueService.appendDropped(summary, dropped);
+            audit.recordDecision(
+                    manager,
+                    "QUOTATION_CLASS_CHANGED",
+                    AuditText.fit(summary.toString()),
+                    ENTITY_TYPE,
+                    request.getId(),
+                    request.getCode(),
+                    null,
+                    null,
+                    null);
+        }
+        return pricing.toResponse(saved, request, dropped);
     }
 
     public QuotationDraftResponse reprice(User manager, UUID requestId) {

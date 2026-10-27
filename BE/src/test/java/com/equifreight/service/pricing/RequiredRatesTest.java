@@ -1,6 +1,7 @@
 package com.equifreight.service.pricing;
 
 import static com.equifreight.service.pricing.PricingFixtures.air;
+import static com.equifreight.service.pricing.PricingFixtures.askingForAVet;
 import static com.equifreight.service.pricing.PricingFixtures.classRow;
 import static com.equifreight.service.pricing.PricingFixtures.estimateOf;
 import static com.equifreight.service.pricing.PricingFixtures.horse;
@@ -83,6 +84,34 @@ class RequiredRatesTest {
 
         RateSet eitherTrailer = rates(List.of(), roadLines(kmLine("ROAD", "Road freight", null, "3.00", null)));
         assertThat(RequiredRates.forRequest(privateMove, eitherTrailer)).isEmpty();
+    }
+
+    @Test
+    void aRoadVetEscortTheCustomerAskedForNeedsItsRate() {
+        PricingInput move = askingForAVet(
+                road(TrailerType.SHARED, 700, 0, List.of(horse("Lotus Crown", HorseSex.GELDING, "M", 32, "90000"))));
+        RateSet noVet = rates(List.of(), roadLines(kmLine("ROAD", "Road freight", null, "3.00", null)));
+
+        assertThat(RequiredRates.forRequest(move, noVet))
+                .containsExactly(new MissingRate(
+                        "D", "Veterinary escort", "Rate catalog v2 has no vet escort rate for RD HAN → VTE."));
+
+        RateSet withVet = rates(
+                List.of(),
+                roadLines(
+                        kmLine("ROAD", "Road freight", null, "3.00", null),
+                        line("VET_ESCORT", "D", "Veterinary escort, road", RateBasis.VET_ESCORT, "650")));
+        assertThat(RequiredRates.forRequest(move, withVet)).isEmpty();
+    }
+
+    @Test
+    void anAirVetEscortTheCustomerAskedForNeedsTheFlightVetRate() {
+        RateSet noFlightVet = rates(pnhHkgRates().classes(), without(pnhHkgLines(), "FLIGHT_VET"));
+
+        assertThat(RequiredRates.forRequest(pnhHkgBusiness(), noFlightVet)).isEmpty();
+        assertThat(RequiredRates.forRequest(askingForAVet(pnhHkgBusiness()), noFlightVet))
+                .containsExactly(new MissingRate(
+                        "D", "Flight veterinarian", "Rate catalog v2 has no flight vet rate for AIR PNH → HKG."));
     }
 
     @Test
@@ -189,9 +218,20 @@ class RequiredRatesTest {
                         "Road freight Hanoi → Vientiane, private trailer",
                         "Customs and border documentation",
                         "Groom",
+                        "Veterinary escort",
                         "Pre-export isolation · stallion",
                         "Pre-export isolation · mare",
                         "Pre-export isolation · gelding");
+    }
+
+    @Test
+    void anAirCorridorWithoutAFlightVetListsIt() {
+        RateSet noFlightVet = new RateSet(
+                2, pnhHkgRates().classes(), without(pnhHkgLines(), "FLIGHT_VET"), standardBreaks(), standardPolicies());
+
+        assertThat(descriptions(RequiredRates.forCorridor(
+                        TransportMode.AIR, "AIR PNH → HKG", "Phnom Penh", "Hong Kong", 0, noFlightVet)))
+                .contains("Flight veterinarian");
     }
 
     @Test

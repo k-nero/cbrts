@@ -82,7 +82,7 @@ public class QuotationPricing {
         q.setAirClass(pricedClass(q, request));
         CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
         RateSet rates = rows.forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, q.getAirClass(), true);
+        PricingInput in = inputs.inputFor(request, q.getAirClass(), true, rows);
         PricedQuote priced = QuotePricer.price(in, rates);
 
         Map<String, QuotationLine> overrides = new LinkedHashMap<>();
@@ -153,9 +153,9 @@ public class QuotationPricing {
      * pricing the lines again.
      */
     public void retotal(Quotation q, TransportRequest request) {
-        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
-                .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
+        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
+        RateSet rates = rows.forCorridor(request.getCorridor().getId());
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true, rows);
         List<PricedLine> stored = q.getLines().stream()
                 .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
                         .thenComparing(QuotationLine::getPosition))
@@ -169,17 +169,18 @@ public class QuotationPricing {
      * invoice's actual quantities (US-F6-03). The rates are the quotation's pinned catalog; nothing is stored.
      */
     public PricedTotals totalsWith(Quotation q, TransportRequest request, java.util.Map<UUID, BigDecimal> amounts) {
-        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
-                .forCorridor(request.getCorridor().getId());
+        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
+        RateSet rates = rows.forCorridor(request.getCorridor().getId());
         // An accepted quotation may predate the weight check (no limits in its pinned version, no snapshot weights).
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request), false);
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), false, rows);
         List<PricedLine> lines = q.getLines().stream()
                 .sorted(java.util.Comparator.comparing(QuotationLine::getGroupCode)
                         .thenComparing(QuotationLine::getPosition))
                 .map(l ->
                         amounts.containsKey(l.getId()) ? withAmount(asPriced(l), amounts.get(l.getId())) : asPriced(l))
                 .toList();
-        return QuotePricer.retotal(in, rates, lines);
+        // The accepted lines are fixed, so a rate rule added since can't leave the invoice without its totals.
+        return QuotePricer.retotal(in, rates, lines, false);
     }
 
     /** The draft's answer, with the overrides a write could not carry. */
@@ -233,9 +234,9 @@ public class QuotationPricing {
             List<String> blockers) {}
 
     public Evaluation evaluate(Quotation q, TransportRequest request) {
-        RateSet rates = loader.load(q.getRateCatalogVersion().getId())
-                .forCorridor(request.getCorridor().getId());
-        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true);
+        CatalogRows rows = loader.load(q.getRateCatalogVersion().getId());
+        RateSet rates = rows.forCorridor(request.getCorridor().getId());
+        PricingInput in = inputs.inputFor(request, pricedClass(q, request), true, rows);
         PricedQuote now = QuotePricer.price(in, rates);
         PricedTotals expected = QuotePricer.retotal(in, rates, adjusted(now.lines(), q.getLines()));
         boolean stale = QuotationMapper.repriceNeeded(q, now, expected);
