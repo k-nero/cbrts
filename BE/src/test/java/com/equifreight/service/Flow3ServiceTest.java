@@ -280,7 +280,9 @@ class Flow3ServiceTest {
                 auditService,
                 notificationService,
                 mock(CodeService.class),
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                mock(com.equifreight.repository.FlightRepository.class));
     }
 
     @Test

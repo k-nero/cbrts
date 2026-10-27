@@ -234,7 +234,9 @@ class ConvoyTest {
                 audit,
                 mock(NotificationService.class),
                 mock(CodeService.class),
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                mock(com.equifreight.repository.FlightRepository.class));
     }
 
     @Test

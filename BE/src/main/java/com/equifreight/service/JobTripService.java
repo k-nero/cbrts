@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
@@ -67,30 +68,48 @@ public class JobTripService {
     }
 
     /**
-     * The approved job's own trip, on the request's corridor, with every horse of the request on it. A request that
-     * goes by way of hubs (US-F1-09) starts on its domestic leg to the hub instead, and its journey is the chain: that
-     * leg, the corridor that crosses the border, then the leg from the hub, each a trip of its own (US-F3-16).
-     * Returns the journey's first trip.
+     * The first trip of {@code job}'s journey (US-F3-21): a new trip on {@code corridor}, run in the direction
+     * {@code reversed} says, with every horse of the request on it. The coordinator adds it; approval makes no trip.
      */
     @Transactional
-    public Trip createForJob(TransportJob job, User createdBy, Instant at) {
-        Corridor firstLeg = job.getRequest().getFirstLegCorridor();
-        Corridor lastLeg = job.getRequest().getLastLegCorridor();
-        Trip first =
-                startTrip(job, firstLeg != null ? firstLeg : job.getRequest().getCorridor(), createdBy, at);
-        Trip previous = first;
-        if (firstLeg != null) {
-            Trip crossing = newTrip(job.getRequest().getCorridor(), createdBy, at);
-            planNext(job, previous, crossing);
-            previous = crossing;
+    public Trip startJourney(TransportJob job, Corridor corridor, boolean reversed, User createdBy, Instant at) {
+        return startTrip(job, corridor, reversed, createdBy, at);
+    }
+
+    /**
+     * Whether {@code trip} ends in the city {@code job}'s horses are going to (US-F3-21). A job with no destination place
+     * is taken to end wherever its trip does.
+     */
+    public static boolean reachesDestination(Trip trip, TransportJob job) {
+        Place destination = job.getRequest() == null ? null : job.getRequest().getDestinationPlace();
+        if (destination == null || destination.getCity() == null || trip.getCorridor() == null) return true;
+        return destination.getCity().equalsIgnoreCase(trip.endCity());
+    }
+
+    /**
+     * The city {@code job}'s journey has reached (US-F3-21): the end of its last trip, or its origin's city while it has
+     * no trip. The next trip the coordinator adds starts there.
+     */
+    @Transactional(readOnly = true)
+    public String journeyEndCity(TransportJob job) {
+        List<TripJob> journey = journeyOf(job);
+        if (journey.isEmpty()) {
+            Place origin = job.getRequest().getOriginPlace();
+            return origin == null ? null : origin.getCity();
         }
-        if (lastLeg != null) planNext(job, previous, newTrip(lastLeg, createdBy, at));
-        return first;
+        return journey.getLast().getTrip().endCity();
+    }
+
+    /** The job's parts in journey order (US-F3-16, US-F3-21): its first trip, then the trips its chain hands on to. */
+    @Transactional(readOnly = true)
+    public List<TripJob> journey(TransportJob job) {
+        return journeyOf(job);
     }
 
     /** The journey's first trip, on {@code corridor}, with every horse of the request on it. */
-    private Trip startTrip(TransportJob job, Corridor corridor, User createdBy, Instant at) {
+    private Trip startTrip(TransportJob job, Corridor corridor, boolean reversed, User createdBy, Instant at) {
         Trip trip = new Trip();
+        trip.setReversed(reversed);
         trip.setCode(
                 codeService.next(CodePrefix.TRP, at.atZone(BusinessTime.ZONE).getYear()));
         trip.setCorridor(corridor);
@@ -114,7 +133,10 @@ public class JobTripService {
 
     @Transactional(readOnly = true)
     public Trip tripOf(UUID jobId) {
-        return findTripOf(jobId).orElseThrow(() -> ResourceNotFoundException.of("Trip of job", jobId));
+        // A job approved with no trip yet waits for the coordinator's first trip (US-F3-21).
+        return findTripOf(jobId)
+                .orElseThrow(() -> new BusinessException(
+                        "NO_TRIP", "This job has no trip yet. Add its first trip on the Trip tab."));
     }
 
     /**
@@ -229,19 +251,17 @@ public class JobTripService {
         return tripVehicles.save(tripVehicle);
     }
 
-    /**
-     * A new trip for {@code job} alone, on its request's corridor, with no horses yet: the job's horses move onto it
-     * with {@link #moveJob}.
-     */
-    @Transactional
-    public Trip newTripFor(TransportJob job, User createdBy, Instant at) {
-        return newTrip(job.getRequest().getCorridor(), createdBy, at);
-    }
-
     /** A new trip on {@code corridor}, with no horses yet: a later trip of a job's chain, say (US-F3-16). */
     @Transactional
     public Trip newTrip(Corridor corridor, User createdBy, Instant at) {
+        return newTrip(corridor, false, createdBy, at);
+    }
+
+    /** As above, run in the direction {@code reversed} says (US-F3-21). */
+    @Transactional
+    public Trip newTrip(Corridor corridor, boolean reversed, User createdBy, Instant at) {
         Trip trip = new Trip();
+        trip.setReversed(reversed);
         trip.setCode(
                 codeService.next(CodePrefix.TRP, at.atZone(BusinessTime.ZONE).getYear()));
         trip.setCorridor(corridor);
@@ -337,6 +357,20 @@ public class JobTripService {
         parts.saveAndFlush(next);
         part.setNext(next);
         return parts.saveAndFlush(part);
+    }
+
+    /**
+     * Takes the job off {@code trip}, the first and only trip of its journey, before it departs (US-F3-21): its horses
+     * and its part there go, and the job has no trip again.
+     */
+    @Transactional
+    public void leaveJourney(TransportJob job, Trip trip) {
+        List<TripHorse> rows = tripHorses.findByTrip_IdOrderByCreatedAt(trip.getId()).stream()
+                .filter(th -> th.getJob().getId().equals(job.getId()))
+                .toList();
+        tripHorses.deleteAll(rows);
+        parts.findByTrip_IdAndJob_Id(trip.getId(), job.getId()).ifPresent(parts::delete);
+        parts.flush();
     }
 
     /**
@@ -484,6 +518,15 @@ public class JobTripService {
     @Transactional(readOnly = true)
     public Instant documentsDepartureOf(TransportJob job) {
         List<TripJob> journey = journeyOf(job);
+        // With no trip planned yet, the documents follow the request's departure date (US-F3-21).
+        if (journey.isEmpty()
+                && job.getPlannedDepartureAt() == null
+                && job.getRequest().getDepartureDate() != null) {
+            return job.getRequest()
+                    .getDepartureDate()
+                    .atStartOfDay(BusinessTime.ZONE)
+                    .toInstant();
+        }
         for (int i = 1; i < journey.size(); i++) {
             Trip trip = journey.get(i).getTrip();
             if (journey.get(0).getTrip().getCorridor().crossesBorder()) break;
@@ -673,7 +716,9 @@ public class JobTripService {
                     Optional.ofNullable(part.getTrip().getCorridor())
                             .map(c -> c.getMode())
                             .orElse(null),
-                    part.getNext() != null));
+                    part.getNext() != null,
+                    part.getTrip().getCorridor() == null ? null : part.getTrip().startCity(),
+                    part.getTrip().getCorridor() == null ? null : part.getTrip().endCity()));
         }
         return described;
     }

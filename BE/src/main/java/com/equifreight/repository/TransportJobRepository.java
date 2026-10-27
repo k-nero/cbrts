@@ -86,7 +86,8 @@ public interface TransportJobRepository
     Optional<TransportJob> findByCodeForUpdate(@Param("code") String code);
 
     /**
-     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists.
+     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists. A job
+     * with no trip yet (US-F3-21) has no trip page, so it isn't listed.
      */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
@@ -95,11 +96,16 @@ public interface TransportJobRepository
                  where r.trip.id in (select th.trip.id from TripHorse th where th.job = j)))
             from TransportJob j join j.request rq left join rq.originPlace o left join rq.destinationPlace d
             where rq.club.id = :clubId
-            """, countQuery = "select count(j) from TransportJob j where j.request.club.id = :clubId")
+              and exists (select 1 from TripHorse th where th.job = j)
+            """, countQuery = """
+                    select count(j) from TransportJob j
+                    where j.request.club.id = :clubId and exists (select 1 from TripHorse th where th.job = j)
+                    """)
     Page<TripSummaryResponse> findAllByClubId(@Param("clubId") UUID clubId, Pageable pageable);
 
     /**
-     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists.
+     * Origin and destination are optional on a request, so they are left-joined: a job without them still lists. A job
+     * with no trip yet (US-F3-21) has no trip page, so it isn't listed.
      */
     @Query(value = """
             select new com.equifreight.model.trip.TripSummaryResponse(
@@ -110,11 +116,13 @@ public interface TransportJobRepository
             where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                               com.equifreight.entity.enums.JobStage.TRIP,
                               com.equifreight.entity.enums.JobStage.HANDOVER)
+              and exists (select 1 from TripHorse th where th.job = j)
             """, countQuery = """
                     select count(j) from TransportJob j
                     where j.stage in (com.equifreight.entity.enums.JobStage.CLEARANCE,
                                       com.equifreight.entity.enums.JobStage.TRIP,
                                       com.equifreight.entity.enums.JobStage.HANDOVER)
+                      and exists (select 1 from TripHorse th where th.job = j)
                     """)
     Page<TripSummaryResponse> findActiveTrips(Pageable pageable);
 

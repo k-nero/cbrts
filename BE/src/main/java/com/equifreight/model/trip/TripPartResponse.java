@@ -28,4 +28,7 @@ public record TripPartResponse(
         String corridorCode,
         TransportMode mode,
         /** True when this part hands its horses on to the next trip of the job's chain (US-F3-16). */
-        boolean handsOn) {}
+        boolean handsOn,
+        /** The cities the trip runs from and to, its corridor read in the trip's direction (US-F3-21). */
+        String startCity,
+        String endCity) {}

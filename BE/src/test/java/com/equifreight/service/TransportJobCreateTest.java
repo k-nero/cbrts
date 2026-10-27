@@ -3,7 +3,7 @@ package com.equifreight.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Quotation;
@@ -43,7 +43,9 @@ class TransportJobCreateTest {
                 mock(AuditService.class),
                 mock(NotificationService.class),
                 codes,
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                mock(com.equifreight.repository.FlightRepository.class));
         TransportRequest request = new TransportRequest();
         request.setWindowStart(Instant.parse("2027-01-20T02:00:00Z"));
         request.setWindowEnd(Instant.parse("2027-01-20T05:00:00Z"));
@@ -67,7 +69,7 @@ class TransportJobCreateTest {
         assertThat(job.getStage()).isEqualTo(JobStage.DOCUMENTS);
         assertThat(job.getDossierStatus()).isEqualTo(DossierStatus.OPEN);
         assertThat(job.getPlannedDepartureAt()).isNull();
-        // It travels on a trip of its own (US-F3-09).
-        verify(jobTrips).createForJob(job, yen, at);
+        // No trip yet: the fleet coordinator adds the journey's first trip (US-F3-21).
+        verifyNoInteractions(jobTrips);
     }
 }

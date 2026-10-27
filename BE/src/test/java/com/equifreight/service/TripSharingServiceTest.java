@@ -424,7 +424,7 @@ class TripSharingServiceTest {
         TripHorse joiningHorse = horse(hostTrip, joining);
         when(jobTrips.horsesOn(hostTrip)).thenReturn(List.of(horse(hostTrip, host), joiningHorse));
         Trip own = trip("TRP-2026-003");
-        when(jobTrips.newTrip(corridor, khoi, NOW)).thenReturn(own);
+        when(jobTrips.newTrip(corridor, false, khoi, NOW)).thenReturn(own);
         joining.setSignedOffAt(NOW);
 
         service.takeOff(host.getId(), joining.getId(), khoi);
@@ -452,7 +452,7 @@ class TripSharingServiceTest {
     @DisplayName("A job alone on its trip has nothing to be taken off")
     void aJobAloneStays() {
         assertThrows(BusinessException.class, () -> service.takeOff(host.getId(), host.getId(), khoi));
-        verify(jobTrips, never()).newTrip(any(), any(), any());
+        verify(jobTrips, never()).newTrip(any(), org.mockito.ArgumentMatchers.anyBoolean(), any(), any());
     }
 
     // ---------- suggestions (US-F3-13) ----------
