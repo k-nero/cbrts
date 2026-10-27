@@ -201,8 +201,14 @@ public class TripService {
 
     @Transactional(readOnly = true)
     public TripViewResponse escortTrip(String code, User user) {
+        return escortTrip(code, user, null);
+    }
+
+    /** With {@code tripCode}, the escort's own trip of a journey they crew more than one leg of (US-F3-16). */
+    @Transactional(readOnly = true)
+    public TripViewResponse escortTrip(String code, User user, String tripCode) {
         TransportJob job = job(code);
-        Trip trip = crewedPart(job, user, code);
+        Trip trip = crewedPart(job, user, code, tripCode);
         // The cab surface is per trailer (US-F3-14): the escort sees the horses on the trailers they ride. The
         // flight crew looks after every horse on the flight, so they see them all (US-F3-15).
         List<CrewAssignment> places = crew.findByTrip_IdAndUser_Id(trip.getId(), user.getId());
@@ -248,8 +254,13 @@ public class TripService {
 
     @Transactional
     public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request) {
+        return addEscortRecord(code, user, request, null);
+    }
+
+    @Transactional
+    public TripRecordResponse addEscortRecord(String code, User user, TripRecordRequest request, String tripCode) {
         TransportJob job = jobForUpdate(code);
-        return addRecord(job, crewedPart(job, user, code), user, request, Channel.CAB_TABLET);
+        return addRecord(job, crewedPart(job, user, code, tripCode), user, request, Channel.CAB_TABLET);
     }
 
     @Transactional
@@ -265,12 +276,14 @@ public class TripService {
 
     /**
      * The part of the job this escort crews, once released to them (US-F5-06): on a job that spans trips, the crew of
-     * each trip sees and records their own part.
+     * each trip sees and records their own part. An escort crewing several legs of a journey names the one with
+     * {@code tripCode}; without it, the latest.
      */
-    private Trip crewedPart(TransportJob job, User user, String code) {
+    private Trip crewedPart(TransportJob job, User user, String code, String tripCode) {
         List<TripJob> parts = new ArrayList<>(jobTrips.partsOf(job));
         java.util.Collections.reverse(parts);
         for (TripJob part : parts) {
+            if (tripCode != null && !tripCode.equals(part.getTrip().getCode())) continue;
             if (part.released() && crew.existsByTrip_IdAndUser_Id(part.getTrip().getId(), user.getId())) {
                 return part.getTrip();
             }

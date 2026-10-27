@@ -1,9 +1,10 @@
 /* =====================================================================
    Trip: the escort's cab surface (Flow 4, on the road). Not the office
    job page with bigger buttons: a tablet in a sunlit cab, used with
-   gloves between tasks. So: the Light theme (read in glare), one line of
-   context at the top, the task first, 48 px toggles, times at 28 px, and
-   the one gold action docked at the bottom edge. These records are the
+   gloves between tasks. So: drawn in Light (read in glare; the app follows
+   the escort's theme, so Dark at night), one line of context at the top,
+   the task first, 48 px toggles, times at 28 px, and the one gold action
+   docked at the bottom edge. These records are the
    only source of the customer's route positions and arrival condition.
    ===================================================================== */
 var TRIP_LOAD = [['Shadowfax', 'Stall 1 · standard'], ['Copper King', 'Stall 2 · box'], ['Nightfall', 'Stall 4 · climate'], ['Silver Bell', 'Stall 6 · standard']];

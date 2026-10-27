@@ -46,8 +46,11 @@ public class TripController {
 
     @GetMapping("/api/v1/escort/trips/{jobCode}")
     @PreAuthorize("hasRole('ESCORT')")
-    public TripViewResponse escortTrip(@PathVariable String jobCode, @AuthenticationPrincipal User user) {
-        return trips.escortTrip(jobCode, user);
+    public TripViewResponse escortTrip(
+            @PathVariable String jobCode,
+            @AuthenticationPrincipal User user,
+            @RequestParam(value = "tripCode", required = false) String tripCode) {
+        return trips.escortTrip(jobCode, user, tripCode);
     }
 
     @PostMapping("/api/v1/escort/trips/{jobCode}/records")
@@ -55,8 +58,9 @@ public class TripController {
     public TripRecordResponse escortRecord(
             @PathVariable String jobCode,
             @AuthenticationPrincipal User user,
+            @RequestParam(value = "tripCode", required = false) String tripCode,
             @Valid @RequestBody TripRecordRequest request) {
-        return trips.addEscortRecord(jobCode, user, request);
+        return trips.addEscortRecord(jobCode, user, request, tripCode);
     }
 
     @GetMapping("/api/v1/staff/trips")
