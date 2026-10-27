@@ -4,6 +4,7 @@ import { App, Flex } from 'antd';
 import { FlightPanel } from './FlightPanel';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
+import { RecordDepartureButton } from './RecordDepartureButton';
 import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
 
@@ -256,36 +257,36 @@ export function RouteTab({ job }: Props) {
         </Flex>
       </Flex>
 
-      {/* Departure Gate / Action */}
-      <div className="p-6 rounded-xl border border-line bg-card">
-        <Flex vertical gap={16}>
-          {!isGateClear ? (
-            <>
-              <Callout tone="bad" title="Departure can’t be recorded yet">
-                {job.clearanceGateSummary ||
-                  'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
-              </Callout>
-              <div>
-                <Button variant="primary" size="md" disabled leadingIcon="lock">
-                  Record departure
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Callout tone="ok" title="Clear to depart">
-                {job.clearanceGateSummary ||
-                  'The dossier is cleared. The driver may record departure.'}
-              </Callout>
-              <div>
-                <Button variant="primary" size="md" leadingIcon="arrow-right">
-                  Record departure
-                </Button>
-              </div>
-            </>
-          )}
-        </Flex>
-      </div>
+      {/* Departure gate and action; once the trip has left, On the road takes over. */}
+      {!departed && (
+        <div className="p-6 rounded-xl border border-line bg-card">
+          <Flex vertical gap={16}>
+            {!isGateClear ? (
+              <>
+                <Callout tone="bad" title="Departure can’t be recorded yet">
+                  {job.clearanceGateSummary ||
+                    'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
+                </Callout>
+                <div>
+                  <Button variant="primary" size="md" disabled leadingIcon="lock">
+                    Record departure
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Callout tone="ok" title="Clear to depart">
+                  {job.clearanceGateSummary ||
+                    'The dossier is cleared. The driver may record departure.'}
+                </Callout>
+                <div>
+                  <RecordDepartureButton job={job} part={part} />
+                </div>
+              </>
+            )}
+          </Flex>
+        </div>
+      )}
 
       {/* Version History */}
       {allVersions && allVersions.length > 1 && (
