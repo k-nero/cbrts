@@ -1,5 +1,4 @@
 import type { FC } from 'react';
-import { Flex } from 'antd';
 
 import { FLEET_CHIP } from './fleetCheck';
 
@@ -16,14 +15,17 @@ export const FleetPanel: FC<{ fleet: FleetCheck }> = ({ fleet }) => {
   const chip = FLEET_CHIP[fleet.outcome];
   return (
     <Panel title="Fleet" extra={<Chip tone={chip.tone}>{chip.label}</Chip>} flush>
-      <Flex vertical gap={2} className="px-6 py-3.5">
+      {/* Plain divs: AntD's Flex styles override Tailwind padding, which left the text at the panel's edge. */}
+      <div className="flex flex-col gap-0.5 px-6 py-3.5">
         <span className="type-label-m text-ink">{fleet.message}</span>
-        <span className="type-body-s text-ink-3">
-          {`By the fleet calendar, for ${formatDate(fleet.date)} and the flexible dates.`}
-        </span>
-      </Flex>
+        {fleet.outcome !== 'FLOWN' && (
+          <span className="type-body-s text-ink-3">
+            {`By the fleet calendar, for ${formatDate(fleet.date)} and the flexible dates.`}
+          </span>
+        )}
+      </div>
       {fleet.held !== null && (
-        <Flex align="center" gap={12} className="border-t border-line px-6 py-3.5">
+        <div className="flex items-center gap-3 border-t border-line px-6 py-3.5">
           {fleet.held ? (
             <>
               <Chip tone="ok">Held</Chip>
@@ -39,7 +41,7 @@ export const FleetPanel: FC<{ fleet: FleetCheck }> = ({ fleet }) => {
               </span>
             </>
           )}
-        </Flex>
+        </div>
       )}
     </Panel>
   );
