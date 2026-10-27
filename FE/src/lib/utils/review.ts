@@ -12,6 +12,13 @@ import type {
   TransportRequest,
 } from '@/interfaces';
 
+/** BR-F1-04: the manager can reject from submission until approval (BE RequestApprovalService.REJECTABLE). */
+export const rejectable = (status: RequestStatus): boolean =>
+  status === 'SUBMITTED' ||
+  status === 'UNDER_REVIEW' ||
+  status === 'QUOTED' ||
+  status === 'CUSTOMER_ACCEPTED';
+
 /** Waiting on the manager: the only statuses the checks and the decision apply to. */
 export const inReview = (status: RequestStatus): boolean =>
   status === 'SUBMITTED' || status === 'UNDER_REVIEW';

@@ -183,15 +183,23 @@ export const cancellationToday = (q: Pick<CustomerQuotation, 'cancellation'>): s
   } to departure.`;
 };
 
-/** The cancellation as it was recorded: "You cancelled on 26 Sep 2026. The fee is 25% of the quotation total." */
-export const cancelledText = (cancelledAt: string | null, pct: number | null): string => {
+/**
+ * The cancellation as it was recorded: "You cancelled on 26 Sep 2026. The fee is 25% of the quotation total."
+ * `quoted`: a quotation was issued, so a 0% fee came from its bands rather than from having no price.
+ */
+export const cancelledText = (
+  cancelledAt: string | null,
+  pct: number | null,
+  quoted: boolean,
+): string => {
   const on = cancelledAt
     ? `You cancelled on ${formatDate(cancelledAt)}.`
     : 'You cancelled this request.';
   if (pct == null) return on;
-  return pct === 0
-    ? `${on} No fee, as no quotation was issued.`
-    : `${on} The fee is ${feePct(pct)} of the quotation total.`;
+  if (pct > 0) return `${on} The fee is ${feePct(pct)} of the quotation total.`;
+  return quoted
+    ? `${on} No fee was due for the notice you gave.`
+    : `${on} No fee, as no quotation was issued.`;
 };
 
 /** The quoted pass's chip: the version and where the club's answer stands. */

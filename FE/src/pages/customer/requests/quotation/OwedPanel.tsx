@@ -61,7 +61,7 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
     return (
       <Panel title="Nothing to answer" extra={<Chip dot={false}>Cancelled</Chip>}>
         <p className="type-body-m m-0 text-ink-2">
-          {cancelledText(quotation.cancelledAt, quotation.cancellationFeePct)}
+          {cancelledText(quotation.cancelledAt, quotation.cancellationFeePct, true)}
         </p>
       </Panel>
     );

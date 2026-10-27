@@ -253,14 +253,20 @@ describe('cancellationToday', () => {
 
 describe('cancelledText', () => {
   test('a fee taken from the quotation', () => {
-    expect(cancelledText('2026-09-26T02:14:00Z', 25)).toBe(
+    expect(cancelledText('2026-09-26T02:14:00Z', 25, true)).toBe(
       'You cancelled on 26 Sep 2026. The fee is 25% of the quotation total.',
     );
   });
 
   test('no quotation, no fee', () => {
-    expect(cancelledText('2026-09-26T02:14:00Z', 0)).toBe(
+    expect(cancelledText('2026-09-26T02:14:00Z', 0, false)).toBe(
       'You cancelled on 26 Sep 2026. No fee, as no quotation was issued.',
+    );
+  });
+
+  test('a quotation whose bands asked no fee for the notice given', () => {
+    expect(cancelledText('2026-09-26T02:14:00Z', 0, true)).toBe(
+      'You cancelled on 26 Sep 2026. No fee was due for the notice you gave.',
     );
   });
 });

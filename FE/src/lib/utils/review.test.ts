@@ -12,6 +12,7 @@ import {
   queueRoute,
   quotationAction,
   queueWords,
+  rejectable,
   restingPanel,
   reviewSubject,
   reviewSummary,
@@ -162,6 +163,16 @@ describe('in review', () => {
     expect(inReview('UNDER_REVIEW')).toBe(true);
     expect(inReview('INFO_REQUIRED')).toBe(false);
     expect(inReview('REJECTED')).toBe(false);
+  });
+
+  test('the manager can reject from submission until approval, a quoted request included', () => {
+    expect(rejectable('SUBMITTED')).toBe(true);
+    expect(rejectable('UNDER_REVIEW')).toBe(true);
+    expect(rejectable('QUOTED')).toBe(true);
+    expect(rejectable('CUSTOMER_ACCEPTED')).toBe(true);
+    expect(rejectable('INFO_REQUIRED')).toBe(false);
+    expect(rejectable('EXPIRED')).toBe(false);
+    expect(rejectable('APPROVED')).toBe(false);
   });
 });
 

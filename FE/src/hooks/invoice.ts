@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { invoiceApi, invoicesListApi } from '@/apis/invoice';
+import { queryKeys } from '@/constant/query';
 import { useCrudResource } from '@/hooks/crud';
 import type {
   ActualQuantityInput,
@@ -66,7 +67,7 @@ export const useRecordPayment = (id: string) =>
 /** The customer's side. */
 export const useRequestInvoices = (requestId: string) =>
   useQuery({
-    queryKey: ['customer-invoices', requestId],
+    queryKey: queryKeys.customerInvoices(requestId),
     queryFn: () => invoiceApi.ofRequest(requestId),
     enabled: Boolean(requestId),
   });
