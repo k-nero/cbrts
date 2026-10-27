@@ -305,6 +305,7 @@ public class DataSeeder implements ApplicationRunner {
         seedDemoJobs();
         seedRegulations();
         seedAuthoritiesAndQuarantinePlaces();
+        seedHongKongAuthorities();
         seedClearanceSubmissionsAndNotes();
     }
 
@@ -1140,6 +1141,25 @@ public class DataSeeder implements ApplicationRunner {
                 "KH",
                 "Dangkao, Phnom Penh");
         log.info("Seeded regulatory authorities and quarantine stations");
+    }
+
+    /**
+     * Hong Kong's authorities and a quarantine station, so a move to Sha Tin can file its import permit and customs
+     * dossier, and schedule a post-arrival quarantine. Added by name on every start, so a database seeded before
+     * them gets them too.
+     */
+    private void seedHongKongAuthorities() {
+        if (countryRepository.findByCode("HK").isEmpty()) return;
+        createAuthority(
+                "Agriculture, Fisheries and Conservation Department (AFCD)", "HK", AuthorityKind.VETERINARY, (short) 7);
+        createAuthority("Customs and Excise Department, Hong Kong", "HK", AuthorityKind.CUSTOMS, (short) 2);
+        createAuthority("Hong Kong Equine Quarantine Station", "HK", AuthorityKind.QUARANTINE, (short) 1);
+        createPlaceIfMissing(
+                "Hong Kong Equine Quarantine Station",
+                PlaceKind.QUARANTINE,
+                "Hong Kong",
+                "HK",
+                "New Territories, Hong Kong");
     }
 
     private void createAuthority(String name, String countryCode, AuthorityKind kind, short slaDays) {
