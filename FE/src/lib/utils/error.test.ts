@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { apiErrorCode, apiErrorView, formRefusal } from './error';
+import { apiErrorCode, apiErrorView, formRefusal, noTripYet } from './error';
 
 const FALLBACK = 'Something went wrong. Try again.';
 const refused = (status: number, data: object) => ({ response: { status, data } });
@@ -95,5 +95,21 @@ describe('apiErrorCode', () => {
   test('nothing without an ApiError body', () => {
     expect(apiErrorCode(new Error('Network Error'))).toBeNull();
     expect(apiErrorCode(undefined)).toBeNull();
+  });
+});
+
+describe('noTripYet', () => {
+  test('a job approved before its first trip answers NO_TRIP, which is no failure', () => {
+    expect(
+      noTripYet(refused(400, { error: 'NO_TRIP', message: 'This job has no trip yet.' })),
+    ).toBe(true);
+  });
+
+  test('any other refusal or a dropped connection is a failure', () => {
+    expect(noTripYet(refused(400, { error: 'TRIP_NOT_FOUND', message: 'No such trip.' }))).toBe(
+      false,
+    );
+    expect(noTripYet(refused(500, {}))).toBe(false);
+    expect(noTripYet(new Error('Network Error'))).toBe(false);
   });
 });
