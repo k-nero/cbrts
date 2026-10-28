@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tripApi } from '@/apis/trip';
 import { queryKeys } from '@/constant/query';
 import { TripStatusEnum, type TripRecordInput } from '@/interfaces';
+import { noTripYet } from '@/lib/utils';
 
 export const useTrips = (audience: 'escort' | 'staff' | 'customer', page: number) =>
   useQuery({
@@ -17,6 +18,10 @@ export const useTrip = (audience: 'escort' | 'staff' | 'customer', code: string,
     queryKey: [...queryKeys.trips.one(audience, code), part ?? 'current'],
     queryFn: () => tripApi.get(audience, code, part),
     enabled: Boolean(code),
+    // An approved job has no trip until the coordinator adds its first (US-F3-21): the page shows the job
+    // without one, so that answer is neither retried nor sent to the error boundary.
+    retry: (count, error) => !noTripYet(error) && count < 1,
+    throwOnError: (error, query) => query.state.data === undefined && !noTripYet(error),
     // The customer follows a trip on the road; once it's delivered nothing moves, so stop polling.
     refetchInterval: (query) =>
       audience === 'customer' && query.state.data?.tripStatus !== TripStatusEnum.DELIVERED
