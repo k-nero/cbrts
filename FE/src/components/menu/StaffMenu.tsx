@@ -67,7 +67,6 @@ const ROLE_MENU: Partial<Record<RoleName, { label?: string; items: Entry[] }[]>>
       label: 'Catalogs',
       items: [
         ['regulations', 'Regulations', <BookOutlined key="i" />],
-        ['rates', 'Rates', <TagOutlined key="i" />],
       ],
     },
   ],
