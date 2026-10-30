@@ -16,6 +16,7 @@ import {
   departsText,
   moneyRows,
   owedKind,
+  departedSentence,
   quotationCallout,
   expiredSentence,
   holdsReason,
@@ -150,6 +151,12 @@ describe('owedKind', () => {
 
   test('once asked, the next version is being prepared', () => {
     expect(owedKind(q('EXPIRED', '2026-11-20', 3), today)).toBe('requoting');
+  });
+
+  test('an issued quotation can no longer be answered once its departure has come', () => {
+    expect(owedKind(q('ISSUED', '2026-10-25'), today)).toBe('departed');
+    expect(owedKind(q('ISSUED', '2026-10-01'), today)).toBe('departed');
+    expect(owedKind(q('ISSUED', '2026-10-26'), today)).toBe('answer');
   });
 
   test('a departure today or before leaves nothing to re-quote', () => {
@@ -334,5 +341,13 @@ describe('quotedPassSub', () => {
         cancelledAt: null,
       }),
     ).toBe('Request rejected. The reason is on the request page.');
+  });
+});
+
+describe('departedSentence', () => {
+  test('says the departure has come and what the customer can do', () => {
+    expect(departedSentence({ request: { departureDate: '2026-10-25' } })).toBe(
+      'The departure on 25 Oct 2026 has come, so this quotation can’t be accepted. Start a new request for a later date.',
+    );
   });
 });

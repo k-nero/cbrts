@@ -97,13 +97,23 @@ export const owedKind = (
     request: Pick<CustomerQuotation['request'], 'departureDate'>;
   },
   today: string,
-): 'answer' | 'requote' | 'requoting' | 'expired' | 'accepted' | 'declined' => {
+): 'answer' | 'departed' | 'requote' | 'requoting' | 'expired' | 'accepted' | 'declined' => {
   if (q.status === 'ACCEPTED') return 'accepted';
   if (q.status === 'DECLINED') return 'declined';
-  if (q.status !== 'EXPIRED') return 'answer';
+  // An issued quotation can't be accepted once its departure has come (the backend refuses it too).
+  if (q.status !== 'EXPIRED')
+    return q.request.departureDate && q.request.departureDate <= today ? 'departed' : 'answer';
   if (q.nextVersion != null) return 'requoting';
   // The departure is a calendar day, so the ISO strings compare as days.
   return q.request.departureDate && q.request.departureDate > today ? 'requote' : 'expired';
+};
+
+/** The owed panel's sentence on an issued quotation whose departure has come: nothing can be booked for that day. */
+export const departedSentence = (q: {
+  request: Pick<CustomerQuotation['request'], 'departureDate'>;
+}): string => {
+  const departure = q.request.departureDate ? ` on ${formatDay(q.request.departureDate)}` : '';
+  return `The departure${departure} has come, so this quotation can’t be accepted. Start a new request for a later date.`;
 };
 
 /**
