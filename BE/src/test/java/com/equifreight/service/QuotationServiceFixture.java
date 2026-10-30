@@ -92,7 +92,8 @@ abstract class QuotationServiceFixture {
         users = mock(UserRepository.class);
         audit = mock(AuditService.class);
         snapshots = new Snapshots(JsonMapper.builder().build());
-        pricing = new QuotationPricing(loader, inputs, versions, users, quotations, snapshots);
+        pricing = new QuotationPricing(
+                loader, inputs, versions, users, quotations, snapshots, Clock.fixed(NOW, BusinessTime.ZONE));
         service = new QuotationDraftService(
                 requests, quotations, versions, pricing, codes, audit, Clock.fixed(NOW, BusinessTime.ZONE));
 

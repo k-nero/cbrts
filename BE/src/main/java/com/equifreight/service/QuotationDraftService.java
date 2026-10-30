@@ -349,7 +349,14 @@ public class QuotationDraftService {
         line.setDescription(body.description().strip());
         line.setQuantity(body.quantity());
         line.setUnitRate(cents(body.unitRate()));
-        line.setCatalogAmount(cents(body.quantity().multiply(body.unitRate())));
+        BigDecimal amount = cents(body.quantity().multiply(body.unitRate()));
+        if (amount.compareTo(QuotationPricing.MAX_AMOUNT) > 0) {
+            throw new BusinessException(
+                    "AMOUNT_TOO_LARGE",
+                    "This line comes to " + QuotationPricing.amountText(amount) + "; a quotation holds at most "
+                            + QuotationPricing.amountText(QuotationPricing.MAX_AMOUNT) + " a line.");
+        }
+        line.setCatalogAmount(amount);
         boolean estimated = body.certainty() == RateCertainty.ESTIMATED;
         line.setCertainty(estimated ? LineCertainty.ESTIMATED : LineCertainty.FIXED);
         line.setEstimateNote(estimated ? body.estimateNote().strip() : null);

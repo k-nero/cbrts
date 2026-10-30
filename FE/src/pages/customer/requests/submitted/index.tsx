@@ -22,6 +22,7 @@ import {
   cancelledText,
   estimateStub,
   formatDate,
+  ict,
   fromRequest,
   latestRevision,
   passChip,
@@ -78,7 +79,13 @@ const RequestSubmittedPage: FC = () => {
       />
     </>
   );
-  const callout = request.quotation ? quotationCallout(request.quotation) : null;
+  const callout = request.quotation
+    ? quotationCallout(
+        request.quotation,
+        request.departureDate,
+        ict(new Date().toISOString()).format('YYYY-MM-DD'),
+      )
+    : null;
   const history = request.history?.length ? <HistoryPanel history={request.history} /> : null;
   const toList = () => router.push(router.paths.get('my-requests'));
   const back = { label: 'My requests', onClick: toList };

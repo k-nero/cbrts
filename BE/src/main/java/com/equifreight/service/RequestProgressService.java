@@ -90,6 +90,11 @@ public class RequestProgressService {
         return status == null || status.isNull() ? null : status.asString();
     }
 
+    private boolean departureAhead(TransportRequest request) {
+        LocalDate departure = request.getDepartureDate();
+        return departure == null || departure.isAfter(LocalDate.now(clock.withZone(BusinessTime.ZONE)));
+    }
+
     private NextStepResponse nextStep(TransportRequest request, LeadTimeResponse leadTime) {
         return switch (request.getStatus()) {
             case DRAFT, REJECTED, CANCELLED -> null;
@@ -100,6 +105,8 @@ public class RequestProgressService {
                 yours("Answer the logistics manager's note and send your request again", answerBy(request, leadTime));
             case QUOTED ->
                 issued(request)
+                        // Accepting is refused once the departure has come, as CustomerQuotationService.accept does.
+                        .filter(q -> departureAhead(request))
                         .map(q -> yours(
                                 "Accept or decline quotation " + q.getCode() + " v" + q.getVersionNo(),
                                 LocalDate.ofInstant(q.getValidUntil(), BusinessTime.ZONE)))

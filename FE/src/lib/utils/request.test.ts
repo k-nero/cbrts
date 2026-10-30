@@ -37,6 +37,7 @@ import {
   toDraftInput,
   windowLength,
   type WizardValues,
+  moveRef,
 } from './request';
 
 import {
@@ -910,5 +911,12 @@ describe("the route's flexible dates (#115)", () => {
     expect(departureHint(route({ earliestDeparture: '2026-11-29', dateFlexDays: 3 }), true)).toBe(
       'Earliest departure 2 Dec 2026 · 21 days’ notice, plus 3 for dates that can move',
     );
+  });
+});
+
+describe('moveRef', () => {
+  test('a submitted request shows its code; a draft, which has none yet, says Draft', () => {
+    expect(moveRef({ requestCode: 'REQ-2026-0193' })).toBe('REQ-2026-0193');
+    expect(moveRef({ requestCode: null })).toBe('Draft');
   });
 });

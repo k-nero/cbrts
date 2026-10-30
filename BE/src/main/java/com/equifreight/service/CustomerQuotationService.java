@@ -107,6 +107,14 @@ public class CustomerQuotationService {
         requireShown(body == null ? null : body.versionNo(), q);
         Instant now = clock.instant();
         requireOpen(request, q, now);
+        // A move can't be booked for a day already come; declining stays possible, it books nothing.
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.ofInstant(now, BusinessTime.ZONE))) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(departure)
+                            + " has come, so this quotation can't be accepted. Start a new request for a later date.");
+        }
 
         q.setStatus(QuotationStatus.ACCEPTED);
         q.setAcceptedAt(now);

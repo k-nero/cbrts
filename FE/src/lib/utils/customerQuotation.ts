@@ -97,13 +97,23 @@ export const owedKind = (
     request: Pick<CustomerQuotation['request'], 'departureDate'>;
   },
   today: string,
-): 'answer' | 'requote' | 'requoting' | 'expired' | 'accepted' | 'declined' => {
+): 'answer' | 'departed' | 'requote' | 'requoting' | 'expired' | 'accepted' | 'declined' => {
   if (q.status === 'ACCEPTED') return 'accepted';
   if (q.status === 'DECLINED') return 'declined';
-  if (q.status !== 'EXPIRED') return 'answer';
+  // An issued quotation can't be accepted once its departure has come (the backend refuses it too).
+  if (q.status !== 'EXPIRED')
+    return q.request.departureDate && q.request.departureDate <= today ? 'departed' : 'answer';
   if (q.nextVersion != null) return 'requoting';
   // The departure is a calendar day, so the ISO strings compare as days.
   return q.request.departureDate && q.request.departureDate > today ? 'requote' : 'expired';
+};
+
+/** The owed panel's sentence on an issued quotation whose departure has come: nothing can be booked for that day. */
+export const departedSentence = (q: {
+  request: Pick<CustomerQuotation['request'], 'departureDate'>;
+}): string => {
+  const departure = q.request.departureDate ? ` on ${formatDay(q.request.departureDate)}` : '';
+  return `The departure${departure} has come, so this quotation can’t be accepted. Start a new request for a later date.`;
 };
 
 /**
@@ -134,9 +144,14 @@ export const holdsReason = (issuedAt: string, validUntil: string, manager: strin
 export const departsText = (day: string | null, flexDays: number): string =>
   day ? `${formatDay(day)}${flexDays ? ` ±${flexDays} d` : ''}` : '—';
 
-/** The submitted page's pointer to the quotation, worded by where the quotation stands. */
+/**
+ * The submitted page's pointer to the quotation, worded by where the quotation stands. With the departure and today
+ * (ISO days), an issued quotation whose departure has come says it can no longer be accepted.
+ */
 export const quotationCallout = (
   ref: QuotationIssuedRef,
+  departureDate?: string | null,
+  today?: string,
 ): { tone: 'info' | 'ok'; title: string; body: string } => {
   const label = `${ref.code} v${ref.versionNo}`;
   const until = ref.validUntil ? formatDate(ref.validUntil) : null;
@@ -157,6 +172,12 @@ export const quotationCallout = (
       tone: 'ok',
       title: `You accepted quotation ${label}.`,
       body: 'Its price and horse list hold for this move.',
+    };
+  if (ref.status === 'ISSUED' && departureDate && today && departureDate <= today)
+    return {
+      tone: 'info',
+      title: `Quotation ${label} can no longer be accepted.`,
+      body: `Its departure on ${formatDay(departureDate)} has come. Start a new request for a later date.`,
     };
   return {
     tone: 'info',
