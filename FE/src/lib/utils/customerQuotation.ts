@@ -144,9 +144,14 @@ export const holdsReason = (issuedAt: string, validUntil: string, manager: strin
 export const departsText = (day: string | null, flexDays: number): string =>
   day ? `${formatDay(day)}${flexDays ? ` ±${flexDays} d` : ''}` : '—';
 
-/** The submitted page's pointer to the quotation, worded by where the quotation stands. */
+/**
+ * The submitted page's pointer to the quotation, worded by where the quotation stands. With the departure and today
+ * (ISO days), an issued quotation whose departure has come says it can no longer be accepted.
+ */
 export const quotationCallout = (
   ref: QuotationIssuedRef,
+  departureDate?: string | null,
+  today?: string,
 ): { tone: 'info' | 'ok'; title: string; body: string } => {
   const label = `${ref.code} v${ref.versionNo}`;
   const until = ref.validUntil ? formatDate(ref.validUntil) : null;
@@ -167,6 +172,12 @@ export const quotationCallout = (
       tone: 'ok',
       title: `You accepted quotation ${label}.`,
       body: 'Its price and horse list hold for this move.',
+    };
+  if (ref.status === 'ISSUED' && departureDate && today && departureDate <= today)
+    return {
+      tone: 'info',
+      title: `Quotation ${label} can no longer be accepted.`,
+      body: `Its departure on ${formatDay(departureDate)} has come. Start a new request for a later date.`,
     };
   return {
     tone: 'info',

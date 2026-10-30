@@ -190,6 +190,16 @@ describe('quotationCallout', () => {
       body: 'It holds its price until 27 Oct 2026.',
     });
   });
+  test('an issued one whose departure has come can no longer be accepted', () => {
+    expect(quotationCallout({ ...ref, status: 'ISSUED' }, '2026-10-25', '2026-10-25')).toEqual({
+      tone: 'info',
+      title: 'Quotation Q-2026-0189 v2 can no longer be accepted.',
+      body: 'Its departure on 25 Oct 2026 has come. Start a new request for a later date.',
+    });
+    expect(quotationCallout({ ...ref, status: 'ISSUED' }, '2026-10-26', '2026-10-25').title).toBe(
+      'Your quotation is ready: Q-2026-0189 v2.',
+    );
+  });
   test('an expired one says so', () => {
     expect(quotationCallout({ ...ref, status: 'EXPIRED' })).toEqual({
       tone: 'info',
