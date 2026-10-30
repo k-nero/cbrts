@@ -29,6 +29,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.ManualLineRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuoteGroupResponse;
 import com.equifreight.model.quotation.QuoteLineResponse;
@@ -497,6 +498,45 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
         Quotation q = startedWithIds();
         q.getLines().forEach(l -> l.setLineKey(null));
         return q;
+    }
+
+    // --- amounts too large to store ---------------------------------------------------------------------
+
+    @Test
+    void aManualLineTooLargeToStoreIsRefused() {
+        service.start(yen, request.getId());
+        ManualLineRequest huge = new ManualLineRequest(
+                "H",
+                "Huge",
+                new BigDecimal("99999999.99"),
+                new BigDecimal("999999999999.99"),
+                RateCertainty.FIXED,
+                null,
+                "probe");
+
+        assertThatThrownBy(() -> service.addLine(yen, request.getId(), huge))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageStartingWith("This line comes to 99,999,999,989,999,000,000.00;")
+                .hasMessageEndingWith("a quotation holds at most 999,999,999,999.99 a line.")
+                .extracting("code")
+                .isEqualTo("AMOUNT_TOO_LARGE");
+    }
+
+    @Test
+    void anOverrideThatPushesTheTotalTooHighIsRefused() {
+        Quotation q = legacyDraftWithIds();
+        UUID groom = q.getLines().stream()
+                .filter(l -> l.getDescription().equals("Flying groom"))
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        assertThatThrownBy(() -> service.override(yen, request.getId(), groom, override("999999999999.99")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageStartingWith("The quotation total would come to ")
+                .hasMessageEndingWith("; a quotation holds at most 999,999,999,999.99. Check the amounts.")
+                .extracting("code")
+                .isEqualTo("AMOUNT_TOO_LARGE");
     }
 
     @Test

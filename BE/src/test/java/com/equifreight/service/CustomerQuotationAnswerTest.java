@@ -32,6 +32,7 @@ import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -140,6 +141,29 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     @Test
     void theLastValidDayStillAccepts() {
         at(AFTER_EXPIRY.minusSeconds(3_600)).accept(bookings, request.getId());
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+    }
+
+    @Test
+    void aQuotationCantBeAcceptedOnceTheDepartureHasCome() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        assertThatThrownBy(() -> at(Instant.parse("2026-10-22T05:00:00Z")).accept(bookings, request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("The departure on 22 Oct 2026 has come, so this quotation can't be accepted. Start a new"
+                        + " request for a later date.")
+                .extracting("code")
+                .isEqualTo("DEPARTURE_PASSED");
+        assertNothingWritten();
+    }
+
+    @Test
+    void theEveningBeforeTheDepartureStillAccepts() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        // 21 Oct, 23:00 in Vietnam.
+        at(Instant.parse("2026-10-21T16:00:00Z")).accept(bookings, request.getId());
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
     }
