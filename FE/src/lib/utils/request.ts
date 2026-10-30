@@ -761,3 +761,6 @@ export const nextStepDeadline = (
   }
   return null;
 };
+
+/** How a move names its request: the code once submitted; a draft has none yet. */
+export const moveRef = (m: { requestCode: string | null }): string => m.requestCode ?? 'Draft';
