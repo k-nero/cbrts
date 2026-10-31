@@ -36,7 +36,7 @@ const CheckboxGroupField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, value, ...field } }) => {
+      render={({ field: { onChange, value, ...field }, labelId }) => {
         if (readOnly) {
           const selectedValues = Array.isArray(value) ? value : [];
           return (
@@ -56,6 +56,7 @@ const CheckboxGroupField = <TFieldValues extends FieldValues = FieldValues>({
 
         return (
           <Checkbox.Group
+            aria-labelledby={labelId}
             {...props}
             {...field}
             value={value || []}

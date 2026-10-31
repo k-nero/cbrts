@@ -34,9 +34,10 @@ const PasswordField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, ...field } }) => {
+      render={({ field: { onChange, onBlur, ...field }, inputId }) => {
         return (
           <Input.Password
+            id={inputId}
             disabled={disabled}
             {...props}
             {...field}
