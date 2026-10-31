@@ -257,17 +257,33 @@ function routePanel(title, sub, stops, gate, facts) {
   }
   return p;
 }
+/* the move's history, newest first, as the app's History panel: the day and time in a 120 px column, then what
+   happened over who did it, and any photos the escort took on that record. The app writes "18 Oct, 08:34" */
 function historyPanel(rows, more) {
   var p = panel('History', { gap: 0, pad: [20, 24, 12, 24] });
   add(p, VV({ name: 'Title', pad: [0, 0, 12, 0] }, [Tx('History', 'Heading/H4')]));
-  rows.forEach(function (r) {
-    var row = H({ name: r[1], gap: 20, pad: [10, 0, 10, 0], cross: 'CENTER' });
-    borderSide(row, 'border/default', 'top');
-    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/tertiary', { w: 150 }), Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary', { w: 220, align: 'RIGHT' })]);
+  rows.forEach(function (r, i) {
+    var row = H({ name: r[1], gap: 16, pad: [12, 0, 12, 0], cross: 'MIN' });
+    if (i > 0) borderSide(row, 'border/default', 'top');
+    var what = VV({ name: 'What', gap: 2 });
+    addAll(what, [Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary')]);
+    if (r[3]) add(what, tripPhotos(r[3]));
+    addAll(row, [Tx(r[0].replace(' · ', ', '), 'Mono/Caption', 'text/tertiary', { w: 120 }), fillW(what)]);
     add(p, fillW(row));
   });
   if (more) add(p, VV({ name: 'More', pad: [8, 0, 4, 0] }, [btn('Ghost', 'SM', more)]));
   return p;
+}
+/* the photos on an escort's record, 72 px with the horse beneath; a click opens them full size in the app */
+function tripPhotos(horses) {
+  var r = H({ name: 'Photos', gap: 10, pad: [4, 0, 0, 0] });
+  horses.forEach(function (n) {
+    var v = VV({ name: n, gap: 4 });
+    add(v, H({ name: 'Photo', w: 72, h: 72, radius: 6, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' }, [Ic('eye', 16, 'text/tertiary')]));
+    add(v, Tx(n, 'Mono/Caption', 'text/tertiary'));
+    add(r, v);
+  });
+  return r;
 }
 /* people on the move: first name + role + what they handle */
 function peoplePanel(people, title) {
@@ -300,47 +316,28 @@ var HCMC_PNH = [
 function stopsWith(states, times) { return HCMC_PNH.map(function (s, i) { return [states[i], s[0], s[1], times ? times[i] : s[2]]; }); }
 
 /* ---------- My requests ---------- */
-/* the requests table, the same with no rows (first run) or three; a row opens with its chevron */
-var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 96, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
+/* the club's requests, newest first, as the app's list table: the code (or Draft and the day it was started),
+   the route with its places, the horse count, the departure, one status chip and the row's one action.
+   After approval the request stays Approved, so the chip reads where its move is (BR-F1-05) */
+var REQ_COLS = [['Request', 150, null, 'Mono/Caption'], ['Route', null], ['Horses', 80, null, 'Mono/Data'], ['Departs', 130, null, 'Mono/Data', null, 'Unsorted'], ['Status', 140], ['', 230, 'RIGHT']];
+/* a row that opens with its chevron, as on the staff lists */
 function rowOpen() { var i = Ic('arrow-right', 16, 'text/tertiary'); i.name = 'Open'; return i; }
-/* a move's stage at a glance under its name: seven segments, the stages done solid, the current one in the
-   secondary ink, the rest faint. Position, not status, so it never takes a status colour */
-function stageTrack(s) {
-  var v = VV({ name: 'Stage · ' + s, gap: 6 });
-  var segs = H({ name: 'Track', gap: 3 });
-  var at = STAGES.indexOf(s);
-  for (var i = 0; i < 7; i++) add(segs, rect(14, 4, i < at ? 'text/primary' : i === at ? 'text/secondary' : 'border/default', 'Segment', 2));
-  addAll(v, [stageMark(s), segs]);
-  return v;
-}
 function scrMyRequests() {
-  /* what is owed, with the date the first of it is due */
-  var owe = function (n, tone, due) {
-    if (!n) return Tx('Nothing needed', 'Body/S', 'text/tertiary');
-    var v = VV({ name: 'Owed', gap: 4, cross: 'MAX' });
-    addAll(v, [chip(tone, 'You owe ' + n), Tx(due, 'Mono/Caption', 'text/tertiary')]);
-    return v;
+  var route = function (cities, places) {
+    if (!cities) return Tx('Route not set', 'Body/S', 'text/tertiary');
+    var v = VV({ name: 'Route', gap: 2 }); addAll(v, [Tx(cities, 'Label/S'), Tx(places, 'Body/S', 'text/tertiary')]); return v;
   };
-  /* the route with its mode, as on the pass */
-  var route = function (a, b, mode) {
-    var r = H({ name: 'Route', gap: 10, cross: 'MIN' });
-    var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]);
-    addAll(r, [VV({ name: 'Mode', pad: [1, 0, 0, 0] }, [Ic(mode, 16, 'text/tertiary')]), v]);
-    return r;
-  };
-  var horses = function (names) { return coatRow(COAT041.filter(function (c) { return names.indexOf(c[0]) >= 0; }), String(names.length)); };
-  /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
-  var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
+  var draft = function (started) { var v = VV({ name: 'Draft', gap: 4 }); addAll(v, [chip('Neutral', 'Draft'), Tx('Started ' + started, 'Mono/Caption', 'text/tertiary')]); return v; };
+  var acts = function (list) { var h = H({ name: 'Actions', gap: 8, cross: 'CENTER' }); list.forEach(function (b) { add(h, btn(b[0], 'SM', b[1])); }); return h; };
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer', 'truck'), horses(['Shadowfax', 'Nightfall', 'Copper King', 'Silver Bell']), '18 Oct 2026', stageTrack('Documents'), owe(4, 'Bad', 'First due 4 Oct'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class', 'plane'), horses(['Shadowfax', 'Nightfall']), '20 Nov 2026', stageTrack('Quotation'), owe(1, 'Warn', 'Due 30 Sep'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load', 'truck'), horses(['Shadowfax', 'Nightfall']), '30 Oct 2026', stageTrack('Request'), owe(0), rowOpen()] }
+    { cells: [draft('26 Sep'), route(null), '1', '—', chip('Neutral', 'Draft'), acts([['Secondary', 'Continue draft'], ['Ghost', 'Discard']])] },
+    { cells: ['REQ-2026-0193', route('Ho Chi Minh City → Bangkok', 'Phú Thọ training centre → Chao Phraya Racing Stables'), '2', '30 Oct 2026', chip('Info', 'Submitted'), Tx('', 'Body/S')] },
+    { cells: ['REQ-2026-0179', route('Phnom Penh → Hong Kong', 'Phnom Penh Equestrian Centre → Sha Tin Racecourse'), '2', '20 Nov 2026', chip('Info', 'Quoted'), acts([['Primary', 'Review quotation']])] },
+    { cells: ['REQ-2026-0162', route('Ho Chi Minh City → Phnom Penh', 'Phú Thọ training centre → Phnom Penh Equestrian Centre'), '4', '18 Oct 2026', chip('Info', 'Documents'), acts([['Secondary', 'Open documents']])] }
   ]);
-  tableFoot(t, 3, 3, 'requests');
-  var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
-    count: '3 active requests', order: 'Order: what needs you first', table: t });
-  var hint = Tx('Your request number stays the same from submission to handover; the quotation and job codes appear beside it once they exist.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '3 active, 1 past · Saigon Turf Club'], [], false), [list, hint], '26 Sep 2026');
+  tableFoot(t, 4, 4, 'requests');
+  var list = tableBlock({ count: '4 requests', order: 'Order: newest first', table: t });
+  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '4 requests · Saigon Turf Club.'], [btn('Secondary', 'MD', 'Request transport', { lead: 'plus' })], false), [list], '26 Sep 2026');
 }
 
 /* ---------- Detail: in review (submitted Sat 26 Sep) ---------- */
@@ -414,12 +411,13 @@ function scrTrackTransit() {
   var route = onTheRoad();
   var log = panel('Condition log', { gap: 12 });
   add(log, Tx('Latest condition log', 'Heading/H4'));
-  [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom'], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
+  [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom', ['Nightfall', 'Copper King']], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
     var e = VV({ name: r[0], gap: 4, pad: [12, 0, 0, 0] });
     borderSide(e, 'border/default', 'top');
     var h = H({ name: 'Head', gap: 10, cross: 'CENTER' });
     addAll(h, [Tx(r[0], 'Mono/Data', 'text/primary'), Tx(r[2], 'Body/S', 'text/tertiary')]);
     addAll(e, [h, Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    if (r[3]) add(e, tripPhotos(r[3]));
     add(log, fillW(e));
   });
   var stagesP = stagePanel([
@@ -427,7 +425,8 @@ function scrTrackTransit() {
     ['Done', '23 of 23 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
     ['Current', 'On the road with Minh, driver, and two grooms since 06:05. Planned to arrive inside your ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ' window.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
-  var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
+  /* the escort's records in the app's words, newest first; a condition check carries its photos */
+  var hist = historyPanel([['18 Oct · 08:40', 'Condition check logged.', 'Hoa, groom', ['Nightfall', 'Copper King']], ['18 Oct · 08:34', 'Cleared the border at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver']], 'Show all 31 events');
   return trackScreen('Tracking · In transit', pass041(['Arrives in about', '4 h', '12:30 · in your window'], [stageMark('Trip')]), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
@@ -440,10 +439,14 @@ function scrTrackDelivered() {
   route.insertChild(1, map041('done', 408, 280));
   var arr = panel('Arrival record', { gap: 12 });
   add(arr, Tx('Arrival condition', 'Heading/H4'));
-  [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.'], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
+  [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.', true], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
     var row = H({ name: h[0], gap: 16, pad: [10, 0, 10, 0], cross: 'CENTER' });
     borderSide(row, 'border/default', 'top');
-    addAll(row, [Tx(h[0], 'Heading/H4', 'text/primary', { w: 140 }), Tx(h[1], 'Body/S', 'text/secondary', { fill: true }), chip('Ok', 'Sound')]);
+    /* the note, with any photo the groom took of that horse beneath it */
+    var note = VV({ name: 'Note', gap: 4 });
+    add(note, Tx(h[1], 'Body/S', 'text/secondary', { fill: true }));
+    if (h[2]) add(note, tripPhotos([h[0]]));
+    addAll(row, [Tx(h[0], 'Heading/H4', 'text/primary', { w: 140 }), fillW(note), chip('Ok', 'Sound')]);
     add(arr, fillW(row));
   });
   add(arr, Tx('Logged at 12:48 by Hoa, groom. Handed over to Sophea, receiving groom.', 'Body/S', 'text/tertiary', { fill: true }));
@@ -452,7 +455,7 @@ function scrTrackDelivered() {
     ['Done', 'Delivered at 12:41, 11 minutes after plan.', 'Done', '18 Oct'],
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
-  var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
+  var hist = historyPanel([['18 Oct · 12:48', 'Handed over to your receiver, with each horse’s condition.', 'Hoa, groom', ['Nightfall']], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 10:21', 'Left Svay Rieng.', 'Minh, driver']], 'Show all 36 events');
   return trackScreen('Tracking · Delivered', pass041(['Delivered', '12:41', '18 Oct · inside your window'], [stageMark('Handover')]), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 

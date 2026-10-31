@@ -89,11 +89,13 @@ function cabScreen(name, bar, strip, task, right, dock) {
   var s = VV({ name: name, w: SCREEN_W, fill: 'bg/canvas' });
   if (COLL.light) s.setExplicitVariableModeForCollection(COLL.color, COLL.light);
   var body = H({ name: 'Body', gap: 24 });
-  right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
-  addAll(body, [fillW(task), right]);
+  add(body, fillW(task));
+  /* a task with nothing beside it or nothing to save (handed on) has no side column and no dock */
+  if (right) { right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED'; add(body, right); }
   var main = VV({ name: 'Main', gap: 20, pad: [20, 32, 28, 32] });
   addAll(main, [fillW(strip), fillW(body)]);
-  addAll(s, [fillW(bar), fillW(main), fillW(dock)]);
+  addAll(s, [fillW(bar), fillW(main)]);
+  if (dock) add(s, fillW(dock));
   return s;
 }
 /* a 48 px toggle. Ticked is a strong neutral box, the same as the Checkbox everywhere:
@@ -297,6 +299,19 @@ function scrTripHeld() {
     cabStrip([['Done', 'Phnom Penh', 'Pickup', INC40.loaded, 'Departed'], ['Held', 'Bavet – Mộc Bài', 'Border', INC40.held, 'Held since'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '—', 'Waits on the decision'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '—', 'Waits on the decision']]),
     task, right, cabDock('Waiting for Yến’s decision', 'Nothing to record until she decides; any water or checks you log go on the trip record.', null));
 }
+/* ---------- CBRT-2026-042, 17 Oct 00:52: the first leg ends at a transfer (US-F3-16) ----------
+   TRP-2026-002 delivered its horses to the cargo terminal for the flight, TRP-2026-003. The receiver's handover
+   is recorded on the last trip, so this leg has nothing left to record: no dock, no Report emergency */
+function scrTripHandedOn() {
+  var task = panel('Handed on', { gap: 0, pad: 0, clip: true });
+  add(task, fillW(taskHead('Handed on to TRP-2026-003', 'You recorded the delivery at Tân Sơn Nhất cargo terminal at 00:40.')));
+  var body = VV({ name: 'Fields', gap: 18, pad: [4, 24, 24, 24] });
+  add(body, callout('Info', 'Nothing left to record on this trip', 'TRP-2026-003 takes the horses on from here, and the handover to the receiver is recorded at the delivery on the last trip.'));
+  add(task, fillW(body));
+  return cabScreen('Escort · Handed on', cabBar({ code: 'CBRT-2026-042', route: 'Da Nang → Ho Chi Minh City', pill: 'Handed on', pillTone: 'Ok', synced: true, sync: 'All records sent', now: '00:52', user: ['Nguyễn Văn Tùng', 'Driver', 'NT'] }),
+    cabStrip([['Done', 'Da Nang', 'Pickup', '06:05', 'Departed'], ['Done', 'Quy Nhơn', 'Welfare stop', '11:20', 'Left checkpoint'], ['Done', 'Nha Trang', 'Welfare stop', '17:05', 'Left checkpoint'], ['Done', 'Tân Sơn Nhất cargo terminal', 'Hand on to the next trip', '00:40', 'Handed on to the next trip']]),
+    task, null, null);
+}
 /* ---------- The office side of the same trip: Khôi at 08:41 on 18 Oct ----------
    The coordinator watches what the cab records against the route he planned. Positions come
    only from recorded checkpoints, as on the customer's page, so nothing here is a guess.
@@ -379,4 +394,4 @@ function scrTripCoordinator() {
   });
 }
 async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
-async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld], 'Escort · Welfare stop'); }
+async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld, scrTripHandedOn], 'Escort · Welfare stop'); }
