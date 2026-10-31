@@ -214,9 +214,10 @@ public final class JobMapper {
 
     /**
      * A route plan of {@code jobId}'s trip with its stops and legs; {@code flightsByLegId} holds the flight of each
-     * air leg.
+     * air leg, and {@code welfareStopsNeeded} the welfare stops the trip's drive needs.
      */
-    public static RoutePlanResponse toRoutePlanResponse(RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId) {
+    public static RoutePlanResponse toRoutePlanResponse(
+            RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId, int welfareStopsNeeded) {
         return RoutePlanResponse.builder()
                 .id(plan.getId())
                 .jobId(jobId)
@@ -232,6 +233,7 @@ public final class JobMapper {
                 .legs(plan.getLegs().stream()
                         .map(leg -> toLegResponse(leg, flightsByLegId.get(leg.getId())))
                         .toList())
+                .welfareStopsNeeded(welfareStopsNeeded)
                 .build();
     }
 

@@ -33,6 +33,7 @@ public class RoutePlanService {
     private final JobTripService jobTrips;
     private final AuditService auditService;
     private final TripNotices notices;
+    private final PlanningDefaults planningDefaults;
 
     public RoutePlanService(
             RoutePlanRepository routePlanRepository,
@@ -46,7 +47,8 @@ public class RoutePlanService {
             ClearanceService clearanceService,
             JobTripService jobTrips,
             AuditService auditService,
-            TripNotices notices) {
+            TripNotices notices,
+            PlanningDefaults planningDefaults) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
@@ -59,6 +61,7 @@ public class RoutePlanService {
         this.jobTrips = jobTrips;
         this.auditService = auditService;
         this.notices = notices;
+        this.planningDefaults = planningDefaults;
     }
 
     @Transactional(readOnly = true)
@@ -70,9 +73,12 @@ public class RoutePlanService {
     @Transactional(readOnly = true)
     public List<RoutePlanResponse> getRoutePlans(UUID jobId, UUID tripId) {
         return jobTrips.findTripOf(jobId, tripId)
-                .map(trip -> routePlanRepository.findByTrip_IdOrderByVersionNoDesc(trip.getId()).stream()
-                        .map(plan -> toResponse(plan, jobId))
-                        .toList())
+                .map(trip -> {
+                    int welfareNeeded = welfareStopsNeeded(trip, planningDefaults.current());
+                    return routePlanRepository.findByTrip_IdOrderByVersionNoDesc(trip.getId()).stream()
+                            .map(plan -> toResponse(plan, jobId, welfareNeeded))
+                            .toList();
+                })
                 .orElse(List.of());
     }
 
@@ -123,6 +129,10 @@ public class RoutePlanService {
                 .findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
         Trip trip = jobTrips.tripOf(jobId, tripId);
+        requireTimesInOrder(request.stops().stream()
+                .sorted(Comparator.comparingInt(CreateRoutePlanRequest.StopItem::seq))
+                .map(st -> new TimedStop(st.kind(), st.plannedAt(), st.plannedStayMin()))
+                .toList());
 
         // Find the trip's draft or create its next version
         Optional<RoutePlan> draftOpt = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
@@ -279,15 +289,20 @@ public class RoutePlanService {
         }
 
         if (plan.getStops().size() < 2) {
-            throw new BusinessException("A route plan must contain at least 2 stops (pickup and delivery)");
+            throw new BusinessException("A route needs at least a pickup and a delivery. Add the missing stop.");
         }
         // The trip reaches ARRIVED only at a DELIVERY stop, so a plan without one could never be delivered; a trip of
         // a job's chain ends where it hands the horses on to the next trip instead (US-F3-16).
         if (plan.getStops().getFirst().getKind() != RouteStopKind.PICKUP
                 || !ENDS.contains(plan.getStops().getLast().getKind())) {
             throw new BusinessException(
-                    "A route plan must start with the pickup and end with the delivery or transfer stop");
+                    "A route starts with the pickup and ends with the delivery or the hand-on. Move those stops to the"
+                            + " ends of the route.");
         }
+        requireTimesInOrder(plan.getStops().stream()
+                .map(st -> new TimedStop(st.getKind(), st.getPlannedAt(), st.getPlannedStayMin()))
+                .toList());
+        requireWelfareStops(trip, plan.getStops());
 
         // Every job on the trip is picked up and delivered on this route (US-F3-11), and with an arrival window its
         // delivery stop is planned before the window closes.
@@ -319,8 +334,10 @@ public class RoutePlanService {
                         .filter(st -> st.getPlannedAt().isAfter(onTrip.getWindowEnd()))
                         .findFirst()
                         .ifPresent(st -> {
-                            throw new BusinessException("Delivery stop planned time " + st.getPlannedAt()
-                                    + " is after the arrival window close " + onTrip.getWindowEnd());
+                            throw new BusinessException(onTrip.getCode() + "'s delivery is planned at "
+                                    + AT.format(st.getPlannedAt()) + ", after its arrival window closes at "
+                                    + AT.format(onTrip.getWindowEnd())
+                                    + ". Plan the delivery earlier, or agree a later window with the customer.");
                         });
             }
             requireInOrder(trip, plan.getStops(), onTrip, job);
@@ -634,6 +651,85 @@ public class RoutePlanService {
 
     private static final DateTimeFormatter AT =
             DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH).withZone(BusinessTime.ZONE);
+
+    /** A stop as the time-order check reads it: what it is, when it is planned and how long the horses stay. */
+    private record TimedStop(RouteStopKind kind, Instant plannedAt, Short stayMin) {}
+
+    /** How a stop kind reads in a message. */
+    private static String nameOf(RouteStopKind kind) {
+        return switch (kind) {
+            case PICKUP -> "the pickup";
+            case BORDER -> "the border crossing";
+            case WELFARE -> "a welfare stop";
+            case DELIVERY -> "the delivery";
+            case AIRPORT_OUT -> "the airport departure";
+            case AIRPORT_IN -> "the airport arrival";
+            case QUARANTINE -> "quarantine";
+            case REFUELLING -> "a refuelling stop";
+            case TRANSFER -> "the hand-on";
+        };
+    }
+
+    /**
+     * The planned times run forward along the route: each timed stop is planned no earlier than the timed stop before
+     * it plus the stay there. A stop with no time yet isn't checked, so a draft can be timed bit by bit.
+     */
+    static void requireTimesInOrder(List<TimedStop> stops) {
+        TimedStop last = null;
+        int lastNo = 0;
+        for (int i = 0; i < stops.size(); i++) {
+            TimedStop st = stops.get(i);
+            if (st.plannedAt() == null) continue;
+            if (last != null) {
+                Instant leaves = last.stayMin() == null
+                        ? last.plannedAt()
+                        : last.plannedAt().plus(Duration.ofMinutes(last.stayMin()));
+                if (st.plannedAt().isBefore(leaves)) {
+                    String stay = last.stayMin() == null || last.stayMin() == 0
+                            ? ""
+                            : " (" + AT.format(last.plannedAt()) + " plus a " + last.stayMin() + " min stay)";
+                    throw new BusinessException(
+                            "ROUTE_TIMES_OUT_OF_ORDER",
+                            "Stop " + (i + 1) + ", " + nameOf(st.kind()) + ", is planned at "
+                                    + AT.format(st.plannedAt())
+                                    + ", before the horses leave stop " + lastNo + ", " + nameOf(last.kind()) + ", at "
+                                    + AT.format(leaves) + stay
+                                    + ". Plan it later, or recalculate the times from the departure.");
+                }
+            }
+            last = st;
+            lastNo = i + 1;
+        }
+    }
+
+    /**
+     * The welfare stops {@code trip}'s road drive needs, as the journey drafter plans them (US-F3-22): one per
+     * {@code welfareEveryHours} of driving over the corridor's distance. None for a flight or a corridor with no
+     * distance.
+     */
+    static int welfareStopsNeeded(Trip trip, PlanningDefaults.Planning planning) {
+        Corridor corridor = trip == null ? null : trip.getCorridor();
+        if (corridor == null || !corridor.isRoad()) return 0;
+        return planning.welfareStopsFor(planning.driveMin(corridor.getDistanceKm()));
+    }
+
+    /** A road route is confirmed with at least the welfare stops its drive needs (US-F3-22). */
+    private void requireWelfareStops(Trip trip, List<RouteStop> stops) {
+        PlanningDefaults.Planning planning = planningDefaults.current();
+        int needed = welfareStopsNeeded(trip, planning);
+        long has = stops.stream()
+                .filter(st -> st.getKind() == RouteStopKind.WELFARE)
+                .count();
+        if (has >= needed) return;
+        long hours = Math.round(planning.driveMin(trip.getCorridor().getDistanceKm()) / 60.0);
+        throw new BusinessException(
+                "ROUTE_WELFARE_STOPS_SHORT",
+                "The drive takes about " + hours + " h, so the route needs " + needed + " welfare "
+                        + (needed == 1 ? "stop" : "stops") + ", one every " + planning.welfareEveryHours()
+                        + " h of driving; it has " + has + ". Add "
+                        + (needed - has == 1 ? "a welfare stop" : (needed - has) + " welfare stops")
+                        + " before you confirm.");
+    }
 
     /** Where and when a job's horses are ready to leave a trip's transfer stop for the next trip of its journey. */
     private record Handoff(Place place, Instant at) {}
@@ -1035,10 +1131,14 @@ public class RoutePlanService {
     }
 
     public RoutePlanResponse toResponse(RoutePlan plan, UUID jobId) {
+        return toResponse(plan, jobId, welfareStopsNeeded(plan.getTrip(), planningDefaults.current()));
+    }
+
+    private RoutePlanResponse toResponse(RoutePlan plan, UUID jobId, int welfareStopsNeeded) {
         Map<UUID, Flight> flightsByLegId = new HashMap<>();
         for (RouteLeg leg : plan.getLegs()) {
             flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
         }
-        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId);
+        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId, welfareStopsNeeded);
     }
 }

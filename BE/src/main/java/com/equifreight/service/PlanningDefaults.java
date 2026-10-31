@@ -38,7 +38,18 @@ public class PlanningDefaults {
             int welfareStopMin,
             int borderStopMin,
             int airportBeforeHours,
-            int airportAfterHours) {}
+            int airportAfterHours) {
+
+        /** The driving time of {@code distanceKm} at the planned speed, in minutes; null when the distance isn't known. */
+        public Integer driveMin(Integer distanceKm) {
+            return distanceKm == null ? null : (int) Math.round(distanceKm * 60.0 / speedKmh);
+        }
+
+        /** The welfare stops a drive of {@code driveMin} needs: one per {@code welfareEveryHours} of driving. */
+        public int welfareStopsFor(Integer driveMin) {
+            return driveMin == null ? 0 : Math.max(0, (driveMin - 1) / (welfareEveryHours * 60));
+        }
+    }
 
     private final RateCatalogVersionRepository versions;
     private final RatePolicyRepository policies;
