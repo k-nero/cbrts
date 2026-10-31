@@ -136,7 +136,7 @@ const ColumnSettingButton = <T,>({
       classNames={{ root: popoverClassName }}
     >
       <Tooltip title={labels.triggerTooltip}>
-        <Button type="text" className={triggerClassName}>
+        <Button type="text" className={triggerClassName} aria-label={labels.triggerTooltip}>
           <ColumnsIcon />
         </Button>
       </Tooltip>

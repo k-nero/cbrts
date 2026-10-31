@@ -319,7 +319,7 @@ function stopsWith(states, times) { return HCMC_PNH.map(function (s, i) { return
 /* the club's requests, newest first, as the app's list table: the code (or Draft and the day it was started),
    the route with its places, the horse count, the departure, one status chip and the row's one action.
    After approval the request stays Approved, so the chip reads where its move is (BR-F1-05) */
-var REQ_COLS = [['Request', 150, null, 'Mono/Caption'], ['Route', null], ['Horses', 80, null, 'Mono/Data'], ['Departs', 130, null, 'Mono/Data', null, 'Unsorted'], ['Status', 140], ['', 230, 'RIGHT']];
+var REQ_COLS = [['Request', 140, null, 'Mono/Caption'], ['Route', null], ['Horses', 72, null, 'Mono/Data'], ['Departs', 124, null, 'Mono/Data', null, 'Unsorted'], ['Status', 250], ['', 190, 'RIGHT']];
 /* a row that opens with its chevron, as on the staff lists */
 function rowOpen() { var i = Ic('arrow-right', 16, 'text/tertiary'); i.name = 'Open'; return i; }
 function scrMyRequests() {
@@ -327,17 +327,28 @@ function scrMyRequests() {
     if (!cities) return Tx('Route not set', 'Body/S', 'text/tertiary');
     var v = VV({ name: 'Route', gap: 2 }); addAll(v, [Tx(cities, 'Label/S'), Tx(places, 'Body/S', 'text/tertiary')]); return v;
   };
-  var draft = function (started) { var v = VV({ name: 'Draft', gap: 4 }); addAll(v, [chip('Neutral', 'Draft'), Tx('Started ' + started, 'Mono/Caption', 'text/tertiary')]); return v; };
+  /* the code is the row's link, so every row opens from the keyboard; a draft's link is the day it was started */
+  var code = function (c) { return Tx(c, 'Mono/Caption', 'text/primary', { underline: true }); };
+  var started = function (d) { return Tx('Started ' + d, 'Body/S', 'text/secondary', { underline: true }); };
+  /* the chip, what holds it in Your moves' words and tone, and the club's deadline twice */
+  var HOLDS = { warn: 'status/warn/fg', bad: 'status/bad/fg', neutral: 'text/secondary' };
+  var status = function (tone, label, holds, holdsTone, due) {
+    var v = VV({ name: 'Status', gap: 6 });
+    addAll(v, [chip(tone, label), Tx(holds, 'Body/S', HOLDS[holdsTone], { name: 'What holds it' })]);
+    if (due) add(v, Tx(due, 'Mono/Caption', 'text/secondary', { name: 'Due' }));
+    return v;
+  };
   var acts = function (list) { var h = H({ name: 'Actions', gap: 8, cross: 'CENTER' }); list.forEach(function (b) { add(h, btn(b[0], 'SM', b[1])); }); return h; };
+  /* needs you first, the soonest due on top, then the rest */
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [draft('26 Sep'), route(null), '1', '—', chip('Neutral', 'Draft'), acts([['Secondary', 'Continue draft'], ['Ghost', 'Discard']])] },
-    { cells: ['REQ-2026-0193', route('Ho Chi Minh City → Bangkok', 'Phú Thọ training centre → Chao Phraya Racing Stables'), '2', '30 Oct 2026', chip('Info', 'Submitted'), Tx('', 'Body/S')] },
-    { cells: ['REQ-2026-0179', route('Phnom Penh → Hong Kong', 'Phnom Penh Equestrian Centre → Sha Tin Racecourse'), '2', '20 Nov 2026', chip('Info', 'Quoted'), acts([['Primary', 'Review quotation']])] },
-    { cells: ['REQ-2026-0162', route('Ho Chi Minh City → Phnom Penh', 'Phú Thọ training centre → Phnom Penh Equestrian Centre'), '4', '18 Oct 2026', chip('Info', 'Documents'), acts([['Secondary', 'Open documents']])] }
+    { cells: [code('REQ-2026-0162'), route('Ho Chi Minh City → Phnom Penh', 'Phú Thọ training centre → Phnom Penh Equestrian Centre'), '4', '18 Oct 2026', status('Info', 'Documents', 'Departure locked · you owe 4', 'bad', 'By 25 Sep 2026 · Overdue by 1 day'), acts([['Secondary', 'Open documents']])] },
+    { cells: [code('REQ-2026-0179'), route('Phnom Penh → Hong Kong', 'Phnom Penh Equestrian Centre → Sha Tin Racecourse'), '2', '20 Nov 2026', status('Info', 'Quoted', 'Quotation waiting for you', 'warn', 'By 3 Oct 2026 · Due in 7 days'), acts([['Primary', 'Review quotation']])] },
+    { cells: [started('26 Sep'), route(null), '1', '—', status('Neutral', 'Draft', 'Draft · finish and submit it', 'warn'), acts([['Secondary', 'Continue draft'], ['Ghost', 'Discard']])] },
+    { cells: [code('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Phú Thọ training centre → Chao Phraya Racing Stables'), '2', '30 Oct 2026', status('Info', 'Submitted', 'In review · nothing needed', 'neutral'), Tx('', 'Body/S')] }
   ]);
-  tableFoot(t, 4, 4, 'requests');
-  var list = tableBlock({ count: '4 requests', order: 'Order: newest first', table: t });
-  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '4 requests · Saigon Turf Club.'], [btn('Secondary', 'MD', 'Request transport', { lead: 'plus' })], false), [list], '26 Sep 2026');
+  /* one page holds them all: no pager, no table tools */
+  var list = tableBlock({ count: '4 requests', order: 'Order: what needs you first, the soonest due on top', table: t });
+  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '4 requests · Saigon Turf Club.'], [], false), [list], '26 Sep 2026');
 }
 
 /* ---------- Detail: in review (submitted Sat 26 Sep) ---------- */

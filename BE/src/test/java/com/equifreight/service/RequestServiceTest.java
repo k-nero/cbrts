@@ -48,6 +48,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.model.request.Blocker;
 import com.equifreight.model.request.RequestDraftRequest;
 import com.equifreight.model.request.RequestHorseInput;
@@ -73,6 +74,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -84,6 +86,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Spec R-01 to R-05, R-08 and R-09: building and editing a draft request. */
@@ -107,6 +110,7 @@ class RequestServiceTest {
     NotificationService notifications;
     RequestProgressService progress;
     InvoiceService invoices;
+    CustomerHomeService home;
     RequestService service;
     User user;
     Club club;
@@ -134,6 +138,7 @@ class RequestServiceTest {
         notifications = mock(NotificationService.class);
         progress = mock(RequestProgressService.class);
         invoices = mock(InvoiceService.class);
+        home = mock(CustomerHomeService.class);
         when(progress.of(any(), any())).thenReturn(new RequestProgressService.Progress(List.of(), null));
         service = new RequestService(
                 requests,
@@ -153,7 +158,8 @@ class RequestServiceTest {
                 notifications,
                 progress,
                 mock(RequestFleetService.class),
-                invoices);
+                invoices,
+                home);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -596,6 +602,48 @@ class RequestServiceTest {
         assertThat(service.list(user, RequestStatus.DRAFT, pageable).getContent())
                 .extracting(RequestSummaryResponse::id)
                 .containsExactly(second.getId());
+    }
+
+    @Test
+    void needsYouFirstPutsWhatTheClubOwesOnTopSoonestDueFirst() {
+        TransportRequest ended = draft(shadowfax);
+        TransportRequest waiting = draft(nightfall);
+        TransportRequest dueLater = draft(copperKing);
+        TransportRequest dueSoon = draft(shadowfax);
+        TransportRequest overdue = draft(nightfall);
+        when(requests.findByClubId(eq(CLUB_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(ended, waiting, dueLater, dueSoon, overdue)));
+        when(home.attentionOf(eq(CLUB_ID), anyCollection()))
+                .thenReturn(Map.of(
+                        waiting.getId(),
+                        new CustomerHomeService.Attention(
+                                new TonedTextResponse("In review · nothing needed", "neutral"), null),
+                        dueLater.getId(),
+                        new CustomerHomeService.Attention(
+                                new TonedTextResponse("Quotation waiting for you", "warn"), LocalDate.of(2026, 11, 9)),
+                        dueSoon.getId(),
+                        new CustomerHomeService.Attention(
+                                new TonedTextResponse("Quotation waiting for you", "warn"), LocalDate.of(2026, 11, 3)),
+                        overdue.getId(),
+                        new CustomerHomeService.Attention(
+                                new TonedTextResponse("Departure locked · you owe 1", "bad"),
+                                LocalDate.of(2026, 11, 20))));
+
+        Page<RequestSummaryResponse> first =
+                service.list(user, null, PageRequest.of(0, 3, Sort.by(RequestService.NEEDS_YOU)));
+        Page<RequestSummaryResponse> second =
+                service.list(user, null, PageRequest.of(1, 3, Sort.by(RequestService.NEEDS_YOU)));
+
+        assertThat(first.getContent())
+                .extracting(RequestSummaryResponse::id)
+                .containsExactly(overdue.getId(), dueSoon.getId(), dueLater.getId());
+        assertThat(first.getContent().get(1).dueOn()).isEqualTo(LocalDate.of(2026, 11, 3));
+        assertThat(first.getContent().get(1).holds().text()).isEqualTo("Quotation waiting for you");
+        assertThat(second.getContent())
+                .extracting(RequestSummaryResponse::id)
+                .containsExactly(waiting.getId(), ended.getId());
+        assertThat(first.getTotalElements()).isEqualTo(5);
+        assertThat(second.getContent().get(1).holds()).isNull();
     }
 
     // --- slice 6: the request names its issued quotation ----------------------------------------------
@@ -1301,7 +1349,8 @@ class RequestServiceTest {
                     notifications,
                     progress,
                     mock(RequestFleetService.class),
-                    invoices);
+                    invoices,
+                    home);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 

@@ -50,7 +50,7 @@ public class RequestController {
         this.moves = moves;
     }
 
-    // Sortable: createdAt, departureDate, submittedAt.
+    // Sortable: createdAt, departureDate, submittedAt, and needsYou (RequestService.NEEDS_YOU), the page's own order.
     @GetMapping("/requests")
     public Page<RequestSummaryResponse> list(
             @AuthenticationPrincipal User user,
