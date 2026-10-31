@@ -1,3 +1,5 @@
+import type { Tone } from '@/components/ui';
+
 import type { HorseSex } from './horse';
 import type { QuotationIssuedRef } from './quotation';
 import type { TransportMode } from './job';
@@ -238,6 +240,10 @@ export interface RequestSummary {
   quotation: QuotationIssuedRef | null;
   /** Where an approved request's move stands, read from its job: the request itself stays Approved. */
   move?: MoveProgress | null;
+  /** What holds it, in words and a tone ("Quotation waiting for you"); null once nothing does. */
+  holds?: { text: string; tone: Tone } | null;
+  /** YYYY-MM-DD, the day the club's step is due by; null when it has none or isn't theirs. */
+  dueOn?: string | null;
 }
 
 /** An approved request's move in a word and a tone, and whether its page tracks the trip yet. */
