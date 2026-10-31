@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-import { emptyLeg, emptyStop, routeDraftSchema, toForm, toInput, totals } from './routeDraft';
+import {
+  emptyLeg,
+  emptyStop,
+  recalculatedTimes,
+  routeChecks,
+  routeDraftSchema,
+  toForm,
+  toInput,
+  totals,
+} from './routeDraft';
 
 import type { JobDetail, RoutePlan } from '@/interfaces';
 
@@ -107,6 +116,97 @@ describe('routeDraftSchema', () => {
     expect(issues).toEqual(
       expect.arrayContaining(['stops.1.crossing', 'legs.1.airline', 'legs.1.flightNo']),
     );
+  });
+
+  test('a stop planned before the horses leave the stop before it is refused; untimed stops are skipped', () => {
+    const form = toForm(null, job);
+    form.stops.splice(1, 0, { ...emptyStop('WELFARE'), place: { value: 'w', label: 'W' } });
+    form.stops.splice(2, 0, { ...emptyStop('WELFARE'), place: { value: 'w2', label: 'W2' } });
+    form.legs.push(emptyLeg(), emptyLeg());
+    form.stops[0].plannedAt = '2026-11-02T08:00';
+    form.stops[1].plannedAt = '2026-11-02T12:00';
+    form.stops[1].stayMin = 45;
+    form.stops[3].plannedAt = '2026-11-02T12:30';
+    const issues = routeDraftSchema.safeParse(form).error?.issues;
+    expect(issues?.map((i) => i.path.join('.'))).toEqual(['stops.3.plannedAt']);
+    expect(issues?.[0].message).toBe(
+      'Before the horses leave stop 2 at 2 Nov, 12:45. Plan it later, or recalculate the times.',
+    );
+    form.stops[3].plannedAt = '2026-11-02T12:45';
+    expect(routeDraftSchema.safeParse(form).success).toBe(true);
+  });
+});
+
+describe('recalculatedTimes', () => {
+  test('each stop is the one before plus its stay and the leg time, up to the first leg with no time', () => {
+    const form = toForm(null, job);
+    form.stops.splice(1, 0, emptyStop('BORDER'), emptyStop('WELFARE'));
+    form.legs.push(emptyLeg(), emptyLeg());
+    expect(recalculatedTimes(form)).toBeNull();
+
+    form.stops[0].plannedAt = '2026-11-02T22:00';
+    form.stops[1].stayMin = 90;
+    form.legs[0].plannedMin = 120;
+    form.legs[1].plannedMin = 60;
+    form.stops[3].plannedAt = '2026-11-01T09:00';
+    expect(recalculatedTimes(form)).toEqual({
+      times: ['2026-11-02T22:00', '2026-11-03T00:00', '2026-11-03T02:30', '2026-11-01T09:00'],
+      missingLeg: 3,
+    });
+    form.legs[2].plannedMin = 30;
+    expect(recalculatedTimes(form)?.times.at(-1)).toBe('2026-11-03T03:00');
+  });
+});
+
+describe('routeChecks', () => {
+  const stop = (seq: number, kind: string, plannedAt: string | null, plannedStayMin?: number) => ({
+    id: `s${seq}`,
+    seq,
+    kind,
+    plannedAt,
+    plannedStayMin,
+  });
+  const routed = (stops: ReturnType<typeof stop>[], welfareStopsNeeded: number) =>
+    ({ stops, legs: [], welfareStopsNeeded }) as unknown as RoutePlan;
+
+  test('times running backwards and a missing welfare stop hold the route back', () => {
+    const checks = routeChecks(
+      routed(
+        [
+          stop(1, 'PICKUP', '2026-11-02T01:00:00Z'),
+          stop(2, 'BORDER', '2026-11-02T05:00:00Z', 90),
+          stop(3, 'WELFARE', '2026-11-02T03:00:00Z', 45),
+          stop(4, 'DELIVERY', null),
+        ],
+        2,
+      ),
+      job,
+    );
+    expect(checks.map((c) => [c.key, c.ok, c.blocks])).toEqual([
+      ['order', false, true],
+      ['untimed', false, false],
+      ['welfare', false, true],
+    ]);
+    expect(checks[0].label).toBe(
+      'Stop 3 is planned at 2 Nov, 10:00, before the horses leave stop 2 at 2 Nov, 13:30.',
+    );
+    expect(checks[2].label).toBe('1 of the 2 welfare stops the drive needs.');
+  });
+
+  test('a delivery after the arrival window is a failing check', () => {
+    const late = { ...job, windowEnd: '2026-11-02T07:00:00Z' } as JobDetail;
+    const checks = routeChecks(
+      routed(
+        [stop(1, 'PICKUP', '2026-11-02T01:00:00Z'), stop(2, 'DELIVERY', '2026-11-02T08:00:00Z')],
+        0,
+      ),
+      late,
+    );
+    expect(checks.every((c) => c.key === 'window' || c.ok)).toBe(true);
+    expect(checks.find((c) => c.key === 'window')).toMatchObject({
+      ok: false,
+      label: 'The delivery at 2 Nov, 15:00 is after the arrival window closes at 2 Nov, 14:00.',
+    });
   });
 });
 

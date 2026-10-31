@@ -2,9 +2,15 @@ import dayjs from 'dayjs';
 import { z } from 'zod';
 
 import type { JobDetail, RouteDraftInput, RoutePlan, RouteStopKind } from '@/interfaces';
+import { formatDayTime } from '@/lib/utils';
 
 /** The editor's date-time value, in the browser's local time (as the vehicle booking form). */
 export const LOCAL_DATETIME = 'YYYY-MM-DDTHH:mm';
+const SHOWN = 'D MMM, HH:mm';
+
+/** When the horses leave a stop: its planned time plus its stay. */
+const leavesAt = (at: dayjs.Dayjs, stayMin: number | null | undefined) =>
+  stayMin ? at.add(stayMin, 'minute') : at;
 
 /** The stop kinds a coordinator plans, in the order they usually come (US-F3-17). */
 export const STOP_KINDS: { value: RouteStopKind; label: string }[] = [
@@ -72,6 +78,20 @@ export const routeDraftSchema = z
     changeReason: z.string().trim().max(500),
   })
   .superRefine((r, ctx) => {
+    // The times run forward: a stop is planned no earlier than the horses leave the timed stop before it (the server
+    // refuses the same). An untimed stop is skipped, so the route can be timed bit by bit.
+    let before: { no: number; leaves: dayjs.Dayjs } | null = null;
+    for (const [i, s] of r.stops.entries()) {
+      if (!s.plannedAt) continue;
+      const at = dayjs(s.plannedAt);
+      if (before && at.isBefore(before.leaves))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['stops', i, 'plannedAt'],
+          message: `Before the horses leave stop ${before.no} at ${before.leaves.format(SHOWN)}. Plan it later, or recalculate the times.`,
+        });
+      before = { no: i + 1, leaves: leavesAt(at, s.stayMin) };
+    }
     const last = r.stops.at(-1)?.kind.value;
     if (r.stops[0]?.kind.value !== 'PICKUP')
       ctx.addIssue({
@@ -237,3 +257,99 @@ export const toInput = (form: RouteDraftForm, job: JobDetail): RouteDraftInput =
     };
   }),
 });
+
+/**
+ * The stops' planned times worked out from the departure (the first stop's time): each stop is the one before plus
+ * its stay and the leg's time. They stop at the first leg with no time, which `missingLeg` names (from 1); null when
+ * the first stop has no time yet.
+ */
+export const recalculatedTimes = (
+  form: Pick<RouteDraftForm, 'stops' | 'legs'>,
+): { times: string[]; missingLeg: number | null } | null => {
+  const start = form.stops[0]?.plannedAt;
+  if (!start) return null;
+  const times = [start];
+  let at = dayjs(start);
+  for (let i = 1; i < form.stops.length; i++) {
+    const legMin = form.legs[i - 1]?.plannedMin;
+    if (legMin == null) {
+      return { times: [...times, ...form.stops.slice(i).map((s) => s.plannedAt)], missingLeg: i };
+    }
+    at = leavesAt(at, form.stops[i - 1].stayMin).add(legMin, 'minute');
+    times.push(at.format(LOCAL_DATETIME));
+  }
+  return { times, missingLeg: null };
+};
+
+/** One check a route passes before it is confirmed; `blocks` when the server would refuse the route. */
+export interface RouteCheck {
+  key: string;
+  ok: boolean;
+  blocks: boolean;
+  label: string;
+}
+
+/**
+ * The checks shown above Confirm, the ones the server runs when the route is confirmed: the times run forward, the
+ * drive has its welfare stops, and the job's delivery is inside its arrival window. Stops with no time yet are a
+ * warning only.
+ */
+export const routeChecks = (plan: RoutePlan, job: JobDetail): RouteCheck[] => {
+  const stops = [...plan.stops].sort((a, b) => a.seq - b.seq);
+  const checks: RouteCheck[] = [];
+
+  let before: { no: number; leaves: dayjs.Dayjs } | null = null;
+  let backwards: string | null = null;
+  for (const [i, s] of stops.entries()) {
+    if (!s.plannedAt) continue;
+    const at = dayjs(s.plannedAt);
+    if (before && at.isBefore(before.leaves)) {
+      backwards = `Stop ${i + 1} is planned at ${formatDayTime(s.plannedAt)}, before the horses leave stop ${before.no} at ${formatDayTime(before.leaves.toISOString())}.`;
+      break;
+    }
+    before = { no: i + 1, leaves: leavesAt(at, s.plannedStayMin) };
+  }
+  checks.push({
+    key: 'order',
+    ok: backwards === null,
+    blocks: true,
+    label: backwards ?? 'The times run in order, stays included.',
+  });
+
+  const untimed = stops.filter((s) => !s.plannedAt).length;
+  if (untimed > 0)
+    checks.push({
+      key: 'untimed',
+      ok: false,
+      blocks: false,
+      label: `${untimed} ${untimed === 1 ? 'stop has' : 'stops have'} no planned time yet.`,
+    });
+
+  const needed = plan.welfareStopsNeeded ?? 0;
+  const welfare = stops.filter((s) => s.kind === 'WELFARE').length;
+  checks.push({
+    key: 'welfare',
+    ok: welfare >= needed,
+    blocks: true,
+    label:
+      needed === 0
+        ? `${welfare} welfare ${welfare === 1 ? 'stop' : 'stops'}; this drive needs none.`
+        : `${welfare} of the ${needed} welfare ${needed === 1 ? 'stop' : 'stops'} the drive needs.`,
+  });
+
+  const delivery = stops.find(
+    (s) => s.kind === 'DELIVERY' && (s.jobId == null || s.jobId === job.id) && s.plannedAt,
+  );
+  if (job.windowEnd && delivery?.plannedAt) {
+    const late = dayjs(delivery.plannedAt).isAfter(dayjs(job.windowEnd));
+    checks.push({
+      key: 'window',
+      ok: !late,
+      blocks: true,
+      label: late
+        ? `The delivery at ${formatDayTime(delivery.plannedAt)} is after the arrival window closes at ${formatDayTime(job.windowEnd)}.`
+        : `The delivery at ${formatDayTime(delivery.plannedAt)} is inside the arrival window.`,
+    });
+  }
+  return checks;
+};

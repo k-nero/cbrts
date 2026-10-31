@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { App, Flex } from 'antd';
+import { Flex } from 'antd';
 
+import { ConfirmRouteModal } from './ConfirmRouteModal';
 import { FlightPanel } from './FlightPanel';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
 import { RecordDepartureButton } from './RecordDepartureButton';
+import { RouteChecks } from './RouteChecks';
+import { routeChecks } from './routeDraft';
 import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
-import { useCanPlanTrips, useConfirmRoutePlan, useRoutePlans } from '@/hooks/useJob';
+import { useCanPlanTrips, useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
 
 interface Props {
   job: JobDetail;
@@ -20,9 +22,8 @@ interface Props {
 export function RouteTab({ job }: Props) {
   const routePlan = job.routePlan;
   const { data: allVersions } = useRoutePlans(job.id);
-  const { message } = App.useApp();
-  const confirmRoute = useConfirmRoutePlan(job.id);
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   // The trip of the journey this tab plans, and the one that hands the horses on to it (US-F3-16).
   const index = job.parts.findIndex((part) => part.current);
@@ -57,6 +58,9 @@ export function RouteTab({ job }: Props) {
         onClose={() => setEditing(false)}
       />
     ) : null;
+  // The checks the server runs on confirmation, shown before Confirm; a failing one holds it back.
+  const checks = draft ? routeChecks(draft, job) : [];
+  const blocked = checks.some((c) => c.blocks && !c.ok);
   const draftPanel =
     draft && planning && !editing ? (
       <Callout tone="warn" title={`Draft v${draft.versionNo} isn’t confirmed yet`}>
@@ -67,28 +71,31 @@ export function RouteTab({ job }: Props) {
               : 'Confirm it to set the trip’s dates; the load plan and sign-off follow.'}
             {draft.changeReason ? ` Reason: ${draft.changeReason}` : ''}
           </span>
-          <Flex gap={8}>
+          <RouteChecks checks={checks} />
+          <Flex gap={8} align="center" wrap>
             <Button
               variant="primary"
               size="sm"
-              disabled={confirmRoute.isPending}
-              onClick={() =>
-                confirmRoute.mutate(
-                  { planId: draft.id },
-                  {
-                    onSuccess: () => message.success(`Route v${draft.versionNo} confirmed.`),
-                    onError: (error) =>
-                      message.error(apiErrorMessage(error, 'The route was not confirmed.')),
-                  },
-                )
-              }
+              disabled={blocked}
+              onClick={() => setConfirming(true)}
             >
-              {confirmRoute.isPending ? 'Confirming...' : `Confirm draft v${draft.versionNo}`}
+              {`Confirm draft v${draft.versionNo}`}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
               Edit draft
             </Button>
+            {blocked && (
+              <span className="type-body-s text-ink-3">Fix the checks marked Fix to confirm.</span>
+            )}
           </Flex>
+          <ConfirmRouteModal
+            job={job}
+            draft={draft}
+            confirmed={confirmed}
+            checks={checks}
+            open={confirming}
+            onClose={() => setConfirming(false)}
+          />
         </Flex>
       </Callout>
     ) : null;
