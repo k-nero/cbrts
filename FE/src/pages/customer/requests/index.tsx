@@ -1,17 +1,21 @@
 import { type FC, useMemo, useState } from 'react';
-import { Flex } from 'antd';
+import { Flex, Grid, Pagination } from 'antd';
 import type { TableColumnsType } from 'antd';
 
 import DiscardDraftModal from './DiscardDraftModal';
+import { RequestAction } from './RequestAction';
+import { RequestCard } from './RequestCard';
+import { RequestLink } from './RequestLink';
+import { RequestStatusCell } from './RequestStatusCell';
 import { RouteCell } from './RouteCell';
 
 import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
-import { Button, Callout, Chip, Panel } from '@/components/ui';
+import { Button, Callout, Panel } from '@/components/ui';
 import { useMe } from '@/hooks/auth';
-import { useRequests } from '@/hooks/request';
+import { NEEDS_YOU_FIRST, useRequests } from '@/hooks/request';
 import type { RequestSummary } from '@/interfaces';
-import { formatDay, ict, requestStatusChip } from '@/lib/utils';
+import { formatDay } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /** My requests (spec §7): the club's requests, and a way back into a draft. */
@@ -24,119 +28,52 @@ const MyRequestsPage: FC = () => {
   const total = listQuery.data?.totalElements;
   const byDeparture = pageState.sort?.field === 'departureDate' ? pageState.sort : undefined;
   const empty = total === 0;
+  const manyPages = (total ?? 0) > pageState.size;
+  // Below the table's width (lg), each request is a card: the status column would scroll away first.
+  const narrow = Grid.useBreakpoint().lg === false;
   const toNew = () => router.push(router.paths.get('request-new'));
 
+  // One clock for the page's "Due in 3 days", read when the list arrives.
+  const now = useMemo(
+    () => new Date(listQuery.dataUpdatedAt || Date.now()).toISOString(),
+    [listQuery.dataUpdatedAt],
+  );
   const columns = useMemo<TableColumnsType<RequestSummary>>(
     () => [
-      {
-        title: 'Request',
-        key: 'code',
-        width: 170,
-        render: (_, r) =>
-          r.code ? (
-            <span className="type-caption text-ink">{r.code}</span>
-          ) : (
-            <Flex component="span" vertical align="start" gap={4}>
-              <Chip>Draft</Chip>
-              <span className="type-caption text-ink-3">
-                Started {ict(r.createdAt).format('D MMM')}
-              </span>
-            </Flex>
-          ),
-      },
-      { title: 'Route', key: 'route', width: 340, render: (_, r) => <RouteCell row={r} /> },
+      { title: 'Request', key: 'code', width: 150, render: (_, r) => <RequestLink row={r} /> },
+      { title: 'Route', key: 'route', width: 320, render: (_, r) => <RouteCell row={r} /> },
       {
         title: 'Horses',
         key: 'horseCount',
-        width: 96,
-        render: (_, r) => <span className="type-data text-ink">{r.horseCount}</span>,
+        width: 88,
+        render: (_, r) => (
+          <span className="type-data text-ink">{r.horseCount > 0 ? r.horseCount : '—'}</span>
+        ),
       },
       {
         title: 'Departs',
         key: 'departureDate',
-        width: 150,
+        width: 140,
         sorter: true,
         render: (_, r) => <span className="type-data text-ink">{formatDay(r.departureDate)}</span>,
       },
       {
         title: 'Status',
         key: 'status',
-        width: 150,
-        // After approval the request stays Approved; its move says where it is.
-        render: (_, r) => {
-          const chip = r.move
-            ? { tone: r.move.tone, label: r.move.label }
-            : requestStatusChip(r.status);
-          return <Chip tone={chip.tone}>{chip.label}</Chip>;
-        },
+        width: 260,
+        ellipsis: false,
+        render: (_, r) => <RequestStatusCell row={r} now={now} />,
       },
       {
+        title: <span className="sr-only">Next step</span>,
         key: 'actions',
-        width: 230,
+        width: 210,
         // The buttons go their own way; the click doesn't open the row as well.
         onCell: () => ({ onClick: (e) => e.stopPropagation() }),
-        render: (_, r) =>
-          r.status === 'DRAFT' ? (
-            <Flex component="span" justify="end" gap={8}>
-              <Button
-                size="sm"
-                onClick={() =>
-                  router.push(router.paths.get('request-edit', { pathParams: [r.id] }))
-                }
-              >
-                Continue draft
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setDiscarding(r.id)}>
-                Discard
-              </Button>
-            </Flex>
-          ) : r.status === 'INFO_REQUIRED' ? (
-            <Flex component="span" justify="end">
-              <Button
-                size="sm"
-                onClick={() => router.push(router.paths.get('request', { pathParams: [r.id] }))}
-              >
-                Answer
-              </Button>
-            </Flex>
-          ) : r.move ? (
-            <Flex component="span" justify="end">
-              <Button
-                size="sm"
-                variant={r.move.tone === 'warn' ? 'primary' : 'secondary'}
-                onClick={() =>
-                  router.push(
-                    router.paths.get(r.move?.tracking ? 'request' : 'request-documents', {
-                      pathParams: [r.id],
-                    }),
-                  )
-                }
-              >
-                {!r.move.tracking
-                  ? 'Open documents'
-                  : r.move.label === 'Completed'
-                    ? 'Open the record'
-                    : r.move.tone === 'warn'
-                      ? 'Open the move'
-                      : 'Track the move'}
-              </Button>
-            </Flex>
-          ) : r.quotation ? (
-            <Flex component="span" justify="end">
-              <Button
-                size="sm"
-                variant={r.status === 'QUOTED' ? 'primary' : 'secondary'}
-                onClick={() =>
-                  router.push(router.paths.get('request-quotation', { pathParams: [r.id] }))
-                }
-              >
-                {r.status === 'QUOTED' ? 'Review quotation' : 'Open quotation'}
-              </Button>
-            </Flex>
-          ) : null,
+        render: (_, r) => <RequestAction row={r} onDiscard={setDiscarding} />,
       },
     ],
-    [router],
+    [now],
   );
 
   const count =
@@ -149,13 +86,6 @@ const MyRequestsPage: FC = () => {
         title="My requests"
         summary={
           total === undefined ? undefined : `${count}${me?.clubName ? ` · ${me.clubName}` : ''}.`
-        }
-        right={
-          !empty && (
-            <Button leadingIcon="plus" onClick={toNew}>
-              Request transport
-            </Button>
-          )
         }
       />
 
@@ -189,7 +119,7 @@ const MyRequestsPage: FC = () => {
             <span className="type-body-s text-ink-3">
               {byDeparture
                 ? `Sorted by departure, ${byDeparture.order === 'ascend' ? 'earliest' : 'latest'} first`
-                : 'Order: newest first'}
+                : 'Order: what needs you first, the soonest due on top'}
             </span>
             {byDeparture && (
               <Button
@@ -199,7 +129,7 @@ const MyRequestsPage: FC = () => {
                   setPageState((p) => ({
                     ...p,
                     number: 0,
-                    sort: { field: 'createdAt', order: 'descend' },
+                    sort: NEEDS_YOU_FIRST,
                   }))
                 }
               >
@@ -207,42 +137,67 @@ const MyRequestsPage: FC = () => {
               </Button>
             )}
           </Flex>
-          <Table<RequestSummary>
-            id="my-requests"
-            rowKey="id"
-            columns={columns}
-            dataSource={listQuery.data?.content ?? []}
-            loading={listQuery.isPending || listQuery.isFetching}
-            onRefresh={() => void listQuery.refetch()}
-            refreshing={listQuery.isFetching && !listQuery.isPending}
-            ignoreKeys={['actions']}
-            // A row opens its request: a draft in the editor, any other at its request page.
-            onRow={(r) => ({
-              onClick: () =>
-                router.push(
-                  router.paths.get(r.status === 'DRAFT' ? 'request-edit' : 'request', {
-                    pathParams: [r.id],
-                  }),
-                ),
-              className: 'cursor-pointer',
-            })}
-            pagination={{
-              current: pageState.number + 1,
-              pageSize: pageState.size,
-              total: total ?? 0,
-              showTotal: (all, [from, to]) => `${from}–${to} of ${all} requests`,
-            }}
-            onChange={(pagination, _filters, sorter) => {
-              const s = Array.isArray(sorter) ? sorter[0] : sorter;
-              setPageState({
-                number: (pagination.current ?? 1) - 1,
-                size: pagination.pageSize ?? pageState.size,
-                sort: s?.order
-                  ? { field: String(s.columnKey), order: s.order }
-                  : { field: 'createdAt', order: 'descend' },
-              });
-            }}
-          />
+          {narrow ? (
+            <Flex vertical gap={16}>
+              <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label="My requests">
+                {(listQuery.data?.content ?? []).map((r) => (
+                  <RequestCard key={r.id} row={r} now={now} onDiscard={setDiscarding} />
+                ))}
+              </ul>
+              <Pagination
+                align="center"
+                hideOnSinglePage
+                current={pageState.number + 1}
+                pageSize={pageState.size}
+                total={total ?? 0}
+                onChange={(page) => setPageState((p) => ({ ...p, number: page - 1 }))}
+              />
+            </Flex>
+          ) : (
+            <Table<RequestSummary>
+              id="my-requests"
+              rowKey="id"
+              aria-label="My requests"
+              columns={columns}
+              dataSource={listQuery.data?.content ?? []}
+              // A refetch keeps the rows in place; only the first read shows the loading state.
+              loading={listQuery.isPending}
+              // A club's handful of requests needs no table tools; a long list gets them back.
+              {...(manyPages && {
+                onRefresh: () => void listQuery.refetch(),
+                refreshing: listQuery.isFetching && !listQuery.isPending,
+              })}
+              resizableColumns={false}
+              showColumnSettings={false}
+              ignoreKeys={['actions']}
+              // A row opens its request: a draft in the editor, any other at its request page.
+              onRow={(r) => ({
+                onClick: () =>
+                  router.push(
+                    router.paths.get(r.status === 'DRAFT' ? 'request-edit' : 'request', {
+                      pathParams: [r.id],
+                    }),
+                  ),
+                className: 'cursor-pointer',
+              })}
+              pagination={{
+                current: pageState.number + 1,
+                pageSize: pageState.size,
+                total: total ?? 0,
+                hideOnSinglePage: true,
+                showSizeChanger: manyPages,
+                showTotal: (all, [from, to]) => `${from}–${to} of ${all} requests`,
+              }}
+              onChange={(pagination, _filters, sorter) => {
+                const s = Array.isArray(sorter) ? sorter[0] : sorter;
+                setPageState({
+                  number: (pagination.current ?? 1) - 1,
+                  size: pagination.pageSize ?? pageState.size,
+                  sort: s?.order ? { field: String(s.columnKey), order: s.order } : NEEDS_YOU_FIRST,
+                });
+              }}
+            />
+          )}
         </Flex>
       )}
 

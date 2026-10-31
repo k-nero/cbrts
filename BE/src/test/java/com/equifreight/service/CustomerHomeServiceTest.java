@@ -31,6 +31,7 @@ import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.model.home.CustomerHomeResponse;
+import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
@@ -43,6 +44,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -223,6 +225,37 @@ class CustomerHomeServiceTest {
             assertThat(m.stage()).isEqualTo("Quotation");
             assertThat(m.holds().text()).isEqualTo("Quotation waiting for you");
         });
+    }
+
+    @Test
+    @DisplayName("My requests reads what holds each request and when the club's step is due, as Your moves words it")
+    void attentionOfEachRequest() {
+        TransportRequest quoted = request("REQ-2026-0179", RequestStatus.QUOTED);
+        TransportRequest submitted = request("REQ-2026-0193", RequestStatus.SUBMITTED);
+        TransportRequest approved = request("REQ-2026-0162", RequestStatus.APPROVED);
+        TransportRequest rejected = request("REQ-2026-0150", RequestStatus.REJECTED);
+        Quotation q = quotation(quoted, QuotationStatus.ISSUED);
+        TransportJob j = job(approved);
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        when(checklist.findOnUndepartedJobsOfClub(club.getId()))
+                .thenReturn(List.of(
+                        owedDocument(j, horse("Nightfall"), LocalDate.of(2026, 10, 25)),
+                        owedDocument(j, horse("Copper King"), LocalDate.of(2026, 10, 18))));
+
+        Map<UUID, CustomerHomeService.Attention> attention =
+                service.attentionOf(club.getId(), List.of(quoted, submitted, approved, rejected));
+
+        assertThat(attention.get(quoted.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("Quotation waiting for you", "warn"), LocalDate.of(2026, 10, 21)));
+        assertThat(attention.get(submitted.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("In review · nothing needed", "neutral"), null));
+        assertThat(attention.get(approved.getId()).holds().text()).isEqualTo("Departure locked · you owe 2");
+        assertThat(attention.get(approved.getId()).due()).isEqualTo(LocalDate.of(2026, 10, 18));
+        assertThat(attention).doesNotContainKey(rejected.getId());
     }
 
     @Test

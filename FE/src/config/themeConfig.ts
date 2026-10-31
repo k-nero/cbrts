@@ -102,7 +102,16 @@ const buildThemeAntd = (mode: ThemeMode): ThemeConfig => {
         itemSelectedColor: p.textPrimary,
         inkBarColor: p.accent,
       },
+      // Gold on paper is 2.2:1, too faint for text or a marker; where AntD draws the primary as
+      // text (the current page, the active sort), it takes the gold ink, as links and the menu do.
+      Pagination: {
+        colorPrimary: p.accentText,
+        colorPrimaryHover: p.accentText,
+        itemActiveColor: p.accentText,
+        itemActiveColorHover: p.accentText,
+      },
       Table: {
+        colorPrimary: p.accentText,
         headerBg: p.bgSunken,
         headerColor: p.textTertiary,
         headerSortActiveBg: p.bgMuted,
