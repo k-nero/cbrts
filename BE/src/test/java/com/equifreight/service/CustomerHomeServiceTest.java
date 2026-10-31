@@ -184,6 +184,22 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("an issued quotation is no longer owed once its departure has come")
+    void quotedRequestPastItsDepartureIsNotOwed() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).isEmpty();
+    }
+
+    @Test
     @DisplayName("an issued quotation is owed until it is answered, due when it stops holding its price")
     void quotedRequestIsOwed() {
         TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);

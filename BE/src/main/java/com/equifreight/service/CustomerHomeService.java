@@ -165,7 +165,12 @@ public class CustomerHomeService {
         owedItems.forEach(ci -> owed.add(documentOwed(ci, today)));
         for (TransportRequest r : live) {
             Quotation q = latestIssued.get(r.getId());
-            if (r.getStatus() == RequestStatus.QUOTED && q != null && q.getStatus() == QuotationStatus.ISSUED) {
+            // Once the departure has come an issued quotation can't be accepted, so nothing is owed on it.
+            boolean ahead = r.getDepartureDate() == null || r.getDepartureDate().isAfter(today);
+            if (r.getStatus() == RequestStatus.QUOTED
+                    && q != null
+                    && q.getStatus() == QuotationStatus.ISSUED
+                    && ahead) {
                 owed.add(quotationOwed(r, q, today));
             } else if (r.getStatus() == RequestStatus.EXPIRED && q != null && !requoting.contains(r.getId())) {
                 owed.add(requoteOwed(r, q, today));

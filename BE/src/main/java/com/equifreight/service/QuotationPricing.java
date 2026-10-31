@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateCatalogVersion;
@@ -15,6 +16,7 @@ import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.UserStatus;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.repository.QuotationRepository;
@@ -31,6 +33,8 @@ import com.equifreight.service.pricing.RateSet;
 import com.equifreight.service.pricing.RateSetLoader;
 import com.equifreight.service.quotation.Snapshots;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -49,6 +53,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class QuotationPricing {
 
+    private final Clock clock;
     private final RateSetLoader loader;
     private final PricingInputs inputs;
     private final RateCatalogVersionRepository versions;
@@ -63,7 +68,9 @@ public class QuotationPricing {
             RateCatalogVersionRepository versions,
             UserRepository users,
             QuotationRepository quotations,
-            Snapshots snapshots) {
+            Snapshots snapshots,
+            Clock clock) {
+        this.clock = clock;
         this.loader = loader;
         this.inputs = inputs;
         this.versions = versions;
@@ -253,6 +260,11 @@ public class QuotationPricing {
         if (stale) {
             blockers.add("The request changed since this was priced. Re-price it first.");
         }
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.now(clock.withZone(BusinessTime.ZONE)))) {
+            blockers.add("The departure on " + BusinessTime.DAY.format(departure)
+                    + " has come. Return the request to the customer for a new date.");
+        }
         int versionNo = q.getRateCatalogVersion().getVersionNo();
         if (rates.policies().get(RatePolicyKey.QUOTE_VALIDITY_DAYS) == null) {
             blockers.add("Rate catalog v" + versionNo + " has no quote validity.");
@@ -364,7 +376,32 @@ public class QuotationPricing {
         return line;
     }
 
+    /** The most a money column holds (numeric(14, 2)): a line amount, a total, every figure on a quotation. */
+    public static final BigDecimal MAX_AMOUNT = new BigDecimal("999999999999.99");
+
+    /** "1,234.50": an amount as the too-large refusals state it. */
+    static String amountText(BigDecimal amount) {
+        return String.format(java.util.Locale.US, "%,.2f", amount);
+    }
+
     private static void store(Quotation q, PricedTotals totals) {
+        // A figure too large to store is the manager's typing, not a conflict: say so before the database refuses it.
+        java.util.stream.Stream.of(
+                        totals.subtotal(),
+                        totals.fuel(),
+                        totals.insurance(),
+                        totals.contingency(),
+                        totals.serviceFee(),
+                        totals.total())
+                .filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.naturalOrder())
+                .filter(largest -> largest.compareTo(MAX_AMOUNT) > 0)
+                .ifPresent(largest -> {
+                    throw new BusinessException(
+                            "AMOUNT_TOO_LARGE",
+                            "The quotation total would come to " + amountText(largest) + "; a quotation holds at most "
+                                    + amountText(MAX_AMOUNT) + ". Check the amounts.");
+                });
         q.setSubtotal(totals.subtotal());
         q.setVolumeBreak(totals.volumeBreak());
         q.setArrivalWindowSurcharge(totals.arrivalWindow());
