@@ -247,7 +247,8 @@ class Flow3ServiceTest {
                 clearanceService,
                 jobTrips,
                 auditService,
-                tripNotices);
+                tripNotices,
+                PlanningStub.planningDefaults());
         loadPlanService = new LoadPlanService(
                 loadPlanRepository,
                 loadPlanStallRepository,

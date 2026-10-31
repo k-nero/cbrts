@@ -226,8 +226,8 @@ public class JourneyDrafter {
             Collections.reverse(crossings);
         }
         Integer distance = corridor.getDistanceKm();
-        Integer driveMin = distance == null ? null : (int) Math.round(distance * 60.0 / planning.speedKmh());
-        int needed = driveMin == null ? 0 : Math.max(0, (driveMin - 1) / (planning.welfareEveryHours() * 60));
+        Integer driveMin = planning.driveMin(distance);
+        int needed = planning.welfareStopsFor(driveMin);
 
         Set<String> ends = new HashSet<>();
         for (Place p : new Place[] {from, to})

@@ -19,4 +19,6 @@ public record RoutePlanResponse(
         Instant supersededAt,
         String changeReason,
         List<RouteStopResponse> stops,
-        List<RouteLegResponse> legs) {}
+        List<RouteLegResponse> legs,
+        /** The welfare stops the trip's drive needs before the route can be confirmed; 0 for a flight. */
+        int welfareStopsNeeded) {}

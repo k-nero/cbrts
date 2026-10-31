@@ -35,7 +35,7 @@ const TextareaField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, ...field } }) => {
+      render={({ field: { onChange, onBlur, ...field }, inputId }) => {
         if (readOnly) {
           const minHeight = props.rows ? `${props.rows * 22 + 16}px` : '80px';
           return (
@@ -52,6 +52,7 @@ const TextareaField = <TFieldValues extends FieldValues = FieldValues>({
         }
         return (
           <Input.TextArea
+            id={inputId}
             disabled={disabled}
             {...props}
             {...field}

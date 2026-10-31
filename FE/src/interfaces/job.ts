@@ -353,6 +353,8 @@ export interface RoutePlan {
   changeReason?: string | null;
   stops: RouteStop[];
   legs: RouteLeg[];
+  /** The welfare stops the trip's drive needs before the route can be confirmed; 0 for a flight. */
+  welfareStopsNeeded: number;
 }
 
 export interface JobSummary extends BaseEntity {

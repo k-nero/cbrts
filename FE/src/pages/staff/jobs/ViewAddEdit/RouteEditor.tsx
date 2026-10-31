@@ -1,5 +1,5 @@
-import { type FC, Fragment, useMemo } from 'react';
-import { useFieldArray } from 'react-hook-form';
+import { type FC, Fragment, useMemo, useState } from 'react';
+import { useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
@@ -8,14 +8,15 @@ import {
   emptyStop,
   LOCAL_DATETIME,
   MODES,
+  recalculatedTimes,
   type RouteDraftForm,
   routeDraftSchema,
   STOP_KINDS,
   toForm,
   toInput,
 } from './routeDraft';
+import { StopPlaceField } from './StopPlaceField';
 
-import { routeStopApi } from '@/apis/job';
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
@@ -25,15 +26,6 @@ import type { JobDetail, RoutePlan } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
 const SHOWN_DATETIME = 'D MMM YYYY, HH:mm';
-
-/** Every catalogued place whose name or city matches what is typed, with its kind and city. */
-const loadPlaces = (q: string) =>
-  routeStopApi.places(q).then((places) =>
-    places.map((p) => ({
-      value: p.id,
-      label: `${p.name}, ${p.city} · ${p.kind.toLowerCase().replace('_', ' ')}`,
-    })),
-  );
 
 /**
  * The Route tab's editor (US-F3-17): the trip's stops in order with the leg between each pair, saved as the trip's
@@ -58,8 +50,13 @@ export const RouteEditor: FC<{
   });
   const stops = useFieldArray({ control: methods.control, name: 'stops' });
   const legs = useFieldArray({ control: methods.control, name: 'legs' });
-  const kinds = methods.watch('stops').map((s) => s.kind?.value);
-  const modes = methods.watch('legs').map((l) => l.mode?.value);
+  const modes = (useWatch({ control: methods.control, name: 'legs' }) ?? []).map(
+    (l) => l.mode?.value,
+  );
+  // What the last move or recalculation changed, said once under the stops.
+  const [notice, setNotice] = useState<{ tone: 'warn' | 'ok'; title: string; body: string } | null>(
+    null,
+  );
   const crossingOptions = (crossings.data ?? []).map((c) => ({
     value: c.id,
     label: `${c.name} (${c.fromCountry} – ${c.toCountry})`,
@@ -73,6 +70,51 @@ export const RouteEditor: FC<{
   const removeStop = (at: number) => {
     stops.remove(at);
     legs.remove(at < stops.fields.length - 1 ? at : at - 1);
+  };
+  // Swapping stops i and i + 1: the leg between them still joins the same two places, but the legs either side now
+  // join different ones, so their distance and time are cleared to be planned again (the mode stays).
+  const swapStops = (i: number) => {
+    stops.swap(i, i + 1);
+    const cleared = [i - 1, i + 1].filter((l) => l >= 0 && l < legs.fields.length);
+    cleared.forEach((l) =>
+      legs.update(l, { ...emptyLeg(), mode: methods.getValues(`legs.${l}.mode`) }),
+    );
+    setNotice({
+      tone: 'warn',
+      title: `Stops ${i + 1} and ${i + 2} swapped`,
+      body:
+        cleared.length > 0
+          ? `${cleared.map((l) => `Leg ${l + 1}`).join(' and ')} now ${cleared.length === 1 ? 'joins' : 'join'} different places, so ${cleared.length === 1 ? 'its' : 'their'} distance and time were cleared. Enter them, then recalculate the times from the departure.`
+          : 'Check the planned times, or recalculate them from the departure.',
+    });
+  };
+  // Departure plus each stay and leg time, for every stop after the first.
+  const recalculate = () => {
+    const result = recalculatedTimes(methods.getValues());
+    if (!result) {
+      setNotice({
+        tone: 'warn',
+        title: 'No departure time',
+        body: 'Set the first stop’s planned time; the others are worked out from it.',
+      });
+      return;
+    }
+    result.times.forEach((t, i) => {
+      if (i > 0) methods.setValue(`stops.${i}.plannedAt`, t, { shouldValidate: true });
+    });
+    setNotice(
+      result.missingLeg == null
+        ? {
+            tone: 'ok',
+            title: 'Times recalculated',
+            body: 'Each stop is the one before plus its stay and the leg’s time.',
+          }
+        : {
+            tone: 'warn',
+            title: `Times recalculated up to stop ${result.missingLeg}`,
+            body: `Leg ${result.missingLeg} has no time, so the stops after it keep theirs. Enter its time and recalculate again.`,
+          },
+    );
   };
 
   const onSubmit = methods.handleSubmit((v) =>
@@ -111,32 +153,12 @@ export const RouteEditor: FC<{
                       />
                     </div>
                     <div className="min-w-64 flex-1">
-                      {kinds[i] === 'BORDER' ? (
-                        <FormField
-                          name={`stops.${i}.crossing`}
-                          label="Crossing"
-                          component="select"
-                          componentProps={{
-                            isRequired: true,
-                            options: crossingOptions,
-                            isLoading: crossings.isLoading,
-                            placeholder: 'Choose a crossing',
-                          }}
-                        />
-                      ) : (
-                        <FormField
-                          name={`stops.${i}.place`}
-                          label="Place"
-                          component="async-select"
-                          componentProps={{
-                            isRequired: true,
-                            loadOptions: loadPlaces,
-                            defaultOptions: true,
-                            cacheOptions: true,
-                            placeholder: 'A place or a city',
-                          }}
-                        />
-                      )}
+                      <StopPlaceField
+                        FormField={FormField}
+                        index={i}
+                        crossingOptions={crossingOptions}
+                        crossingsLoading={crossings.isLoading}
+                      />
                     </div>
                     <div className="w-56">
                       <FormField
@@ -163,13 +185,13 @@ export const RouteEditor: FC<{
                         icon="arrow-up"
                         label={`Move stop ${i + 1} up`}
                         disabled={i === 0}
-                        onClick={() => stops.swap(i, i - 1)}
+                        onClick={() => swapStops(i - 1)}
                       />
                       <IconButton
                         icon="chevron-down"
                         label={`Move stop ${i + 1} down`}
                         disabled={i === stops.fields.length - 1}
-                        onClick={() => stops.swap(i, i + 1)}
+                        onClick={() => swapStops(i)}
                       />
                       <IconButton
                         icon="x"
@@ -285,6 +307,17 @@ export const RouteEditor: FC<{
                 )}
               </Fragment>
             ))}
+
+            {notice && (
+              <Callout tone={notice.tone} title={notice.title}>
+                {notice.body}
+              </Callout>
+            )}
+            <div>
+              <Button size="sm" variant="secondary" leadingIcon="clock" onClick={recalculate}>
+                Recalculate times from departure
+              </Button>
+            </div>
 
             {supersedes && (
               <FormField

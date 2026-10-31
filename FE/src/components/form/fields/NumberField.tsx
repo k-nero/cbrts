@@ -35,7 +35,7 @@ const NumberField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, ...field } }) => {
+      render={({ field: { onChange, onBlur, ...field }, inputId }) => {
         if (readOnly) {
           return (
             <ReadOnlyFieldDisplay
@@ -48,6 +48,7 @@ const NumberField = <TFieldValues extends FieldValues = FieldValues>({
         }
         return (
           <InputNumber
+            id={inputId}
             disabled={disabled}
             {...props}
             {...field}
