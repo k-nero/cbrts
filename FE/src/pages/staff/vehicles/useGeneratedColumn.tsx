@@ -146,7 +146,8 @@ export const useGeneratedVehicleColumn = ({
       },
       {
         key: 'actions',
-        width: 480,
+        // Wide enough for the longest row (Set maintenance), so no row overflows and Delete's right edge lines up.
+        width: 520,
         // Delete sits at the cell's right edge, so it lines up in one column whatever the status button says.
         render: (_, v) =>
           v.status === VehicleStatusEnum.RETIRED ? (
