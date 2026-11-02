@@ -3,6 +3,7 @@ package com.equifreight.repository;
 import com.equifreight.entity.QuarantinePeriod;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -14,17 +15,17 @@ public interface QuarantinePeriodRepository
         extends JpaRepository<QuarantinePeriod, UUID>, JpaSpecificationExecutor<QuarantinePeriod> {
 
     /**
-     * Lấy tất cả đợt cách ly của 1 chuyến vận chuyển.
+     * Every quarantine of a job.
      */
     List<QuarantinePeriod> findByJobId(UUID jobId);
 
     /**
-     * Lấy đợt cách ly theo từng con ngựa trong 1 job.
+     * A horse's quarantines within a job.
      */
     List<QuarantinePeriod> findByJobIdAndHorseId(UUID jobId, UUID horseId);
 
     /**
-     * Kiểm tra tất cả đợt cách ly của job đã hoàn thành chưa (completedAt != null).
+     * Whether every quarantine of the job is completed (completedAt is set).
      */
     @Query("""
             SELECT COUNT(q) = 0 FROM QuarantinePeriod q
@@ -33,7 +34,7 @@ public interface QuarantinePeriodRepository
     boolean areAllQuarantinesCompleted(@Param("jobId") UUID jobId);
 
     /**
-     * Lấy các đợt cách ly theo địa điểm (trạm kiểm dịch).
+     * The quarantines held at a place (a quarantine station).
      */
     List<QuarantinePeriod> findByPlaceId(UUID placeId);
 
@@ -41,6 +42,12 @@ public interface QuarantinePeriodRepository
      * The job's quarantines at a station that are not completed yet.
      */
     List<QuarantinePeriod> findByJobIdAndPlaceIdAndCompletedAtIsNull(UUID jobId, UUID placeId);
+
+    /**
+     * The job's quarantines that are not completed yet, with their stations.
+     */
+    @EntityGraph(attributePaths = "place")
+    List<QuarantinePeriod> findByJobIdAndCompletedAtIsNullOrderByStartsOn(UUID jobId);
 
     boolean existsByPlaceId(UUID placeId);
 }

@@ -39,6 +39,21 @@ public class QuarantineRules {
         return quarantines.findByJobIdAndPlaceIdAndCompletedAtIsNull(job.getId(), place.getId());
     }
 
+    /** The job's quarantines that are not completed yet, at every station, earliest first. */
+    @Transactional(readOnly = true)
+    public List<QuarantinePeriod> heldFor(TransportJob job) {
+        if (job == null || job.getId() == null) return List.of();
+        return quarantines.findByJobIdAndCompletedAtIsNullOrderByStartsOn(job.getId());
+    }
+
+    /** A quarantine's days in a sentence: "20–27 Nov", or "28 Nov–3 Dec" across a month. */
+    public static String period(LocalDate startsOn, LocalDate endsOn) {
+        if (startsOn.getMonth() == endsOn.getMonth() && startsOn.getYear() == endsOn.getYear()) {
+            return startsOn.getDayOfMonth() + "–" + BusinessTime.SHORT_DAY.format(endsOn);
+        }
+        return BusinessTime.SHORT_DAY.format(startsOn) + "–" + BusinessTime.SHORT_DAY.format(endsOn);
+    }
+
     /** Refuses a transfer into the station after a quarantine there has started. */
     public void requireArrivesBy(Trip trip, TransportJob job, Place place, Instant transferAt) {
         if (transferAt == null) return;

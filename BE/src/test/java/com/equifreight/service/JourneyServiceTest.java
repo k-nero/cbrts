@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.QuarantinePeriod;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
@@ -34,6 +35,7 @@ import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +55,7 @@ class JourneyServiceTest {
     private final JobTripService jobTrips = mock(JobTripService.class);
     private final RoutePlanService routePlans = mock(RoutePlanService.class);
     private final AuditService audit = mock(AuditService.class);
+    private final QuarantineRules quarantines = mock(QuarantineRules.class);
     private JourneyService service;
 
     private final Corridor dadHcm = corridor("RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City");
@@ -63,6 +66,9 @@ class JourneyServiceTest {
     private final Place shaTin = place("Sha Tin stables", PlaceKind.STABLE, "Sha Tin");
     private final Place sgn = place("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.CARGO_TERMINAL, "Ho Chi Minh City");
     private final Place hkg = place("HKG cargo terminal", PlaceKind.CARGO_TERMINAL, "Hong Kong");
+    private final Place phuTho = place("Phú Thọ isolation barn", PlaceKind.QUARANTINE, "Ho Chi Minh City");
+    private final Corridor hcmLocal =
+            corridor("RD HCM local", TransportMode.ROAD, "Ho Chi Minh City", "Ho Chi Minh City");
     private final User khoi = new User();
     private TransportJob job;
 
@@ -81,6 +87,7 @@ class JourneyServiceTest {
                 mock(VehicleBookingRepository.class),
                 mock(CrewAssignmentRepository.class),
                 mock(PlanningDefaults.class),
+                quarantines,
                 audit,
                 Clock.fixed(Instant.parse("2026-10-27T03:00:00Z"), ZoneOffset.UTC));
         TransportRequest request = new TransportRequest();
@@ -98,7 +105,7 @@ class JourneyServiceTest {
         when(jobTrips.journeyEndCity(job)).thenReturn("Da Nang");
         when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(sgn));
         when(places.findByCityIgnoreCase("Hong Kong")).thenReturn(List.of(hkg));
-        for (Corridor c : List.of(dadHcm, sgnHkg, hkgShaTin, pnhHkg)) {
+        for (Corridor c : List.of(dadHcm, sgnHkg, hkgShaTin, pnhHkg, hcmLocal)) {
             when(corridors.findById(c.getId())).thenReturn(Optional.of(c));
         }
         when(jobTrips.startJourney(eq(job), any(), anyBoolean(), any(), any()))
@@ -125,7 +132,8 @@ class JourneyServiceTest {
         Corridor hcmDad = corridor("RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City");
         when(corridors.findById(hcmDad.getId())).thenReturn(Optional.of(hcmDad));
         job.getRequest().getOriginPlace().setCity("Ho Chi Minh City");
-        when(places.findByCityIgnoreCase("Da Nang")).thenReturn(List.of(hoaXuan));
+        when(places.findByCityIgnoreCase("Da Nang"))
+                .thenReturn(List.of(place("Đà Nẵng cargo terminal", PlaceKind.CARGO_TERMINAL, "Da Nang")));
 
         service.addTrip(job.getId(), hcmDad.getId(), khoi);
 
@@ -199,6 +207,97 @@ class JourneyServiceTest {
     }
 
     @Test
+    @DisplayName("A road trip that hands on offers the quarantine stations in the city it ends in (US-F3-22)")
+    void aRoadTripOffersTheQuarantineStation() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        when(corridors.findTouchingCity("Da Nang")).thenReturn(List.of(dadHcm));
+
+        List<JourneyCorridorResponse> next = service.nextCorridors(job.getId());
+
+        assertThat(next.getFirst().quarantineStations()).singleElement().satisfies(s -> {
+            assertThat(s.placeName()).isEqualTo("Phú Thọ isolation barn");
+            assertThat(s.startsOn()).isEqualTo(LocalDate.parse("2026-11-20"));
+            assertThat(s.endsOn()).isEqualTo(LocalDate.parse("2026-11-27"));
+        });
+    }
+
+    @Test
+    @DisplayName("A flight offers no quarantine station to end at")
+    void aFlightOffersNoStation() {
+        quarantine(place("HKG quarantine", PlaceKind.QUARANTINE, "Hong Kong"), "2026-11-20", "2026-11-27");
+        when(jobTrips.journeyEndCity(job)).thenReturn("Ho Chi Minh City");
+        when(corridors.findTouchingCity("Ho Chi Minh City")).thenReturn(List.of(sgnHkg));
+
+        assertThat(service.nextCorridors(job.getId()).getFirst().quarantineStations())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("A trip added to the quarantine station ends there with a transfer (US-F3-22)")
+    void aTripEndsAtTheQuarantineStation() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+
+        service.addTrip(job.getId(), dadHcm.getId(), phuTho.getId(), khoi);
+
+        verify(routePlans)
+                .startRoute(any(), eq(job), eq(hoaXuan), eq(RouteStopKind.TRANSFER), eq(phuTho), eq(khoi), any());
+    }
+
+    @Test
+    @DisplayName("The trip after the station collects the horses there and takes them to the cargo terminal")
+    void theTripAfterTheStationCollectsThere() {
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, phuTho);
+        when(jobTrips.journeyEndCity(job)).thenReturn("Ho Chi Minh City");
+        when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(phuTho, sgn));
+
+        service.addTrip(job.getId(), hcmLocal.getId(), khoi);
+
+        verify(routePlans).startRoute(any(), eq(job), eq(phuTho), eq(RouteStopKind.TRANSFER), eq(sgn), eq(khoi), any());
+    }
+
+    @Test
+    @DisplayName("Ending a trip at a station where the job has no quarantine is refused")
+    void aStationWithoutQuarantineIsRefused() {
+        when(quarantines.heldFor(job)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.addTrip(job.getId(), dadHcm.getId(), phuTho.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("CBRT-2026-042 has no quarantine scheduled at that station in Ho Chi Minh City."
+                        + " Schedule it on the Authorities tab first.");
+        verify(jobTrips, never()).startJourney(any(), any(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A trip that delivers can't end at a quarantine station")
+    void aDeliveringTripCantEndAtAStation() {
+        Place hkgQuarantine = place("HKG quarantine", PlaceKind.QUARANTINE, "Sha Tin");
+        quarantine(hkgQuarantine, "2026-11-20", "2026-11-27");
+        journey(trip("TRP-2026-003", sgnHkg, false));
+        when(jobTrips.journeyEndCity(job)).thenReturn("Hong Kong");
+
+        assertThatThrownBy(() -> service.addTrip(job.getId(), hkgShaTin.getId(), hkgQuarantine.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("only a trip that hands them on can end at a quarantine station");
+    }
+
+    @Test
+    @DisplayName("The journey warns while no trip takes the horses to a scheduled quarantine (US-F3-22)")
+    void theJourneyWarnsOfAnUnreachedQuarantine() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, sgn);
+
+        assertThat(service.warnings(job))
+                .contains("Quarantine at Phú Thọ isolation barn, 20–27 Nov: no trip takes the horses there yet.");
+
+        handsOnAt(road, phuTho);
+        assertThat(service.warnings(job)).noneMatch(w -> w.startsWith("Quarantine at"));
+    }
+
+    @Test
     @DisplayName("Only the last trip of the journey is taken off")
     void onlyTheLastTripIsTakenOff() {
         Trip road = trip("TRP-2026-002", dadHcm, false);
@@ -260,6 +359,25 @@ class JourneyServiceTest {
                         "Ends in Phnom Penh; the horses go to Sha Tin. Add a trip from Phnom Penh.",
                         "Quoted by way of RD DAD → HCM, AIR SGN → HKG, RD HKG → Sha Tin; this journey runs AIR PNH → HKG."
                                 + " The price was worked out on the quoted route.");
+    }
+
+    private void quarantine(Place station, String startsOn, String endsOn) {
+        QuarantinePeriod q = new QuarantinePeriod();
+        q.setJob(job);
+        q.setPlace(station);
+        q.setStartsOn(LocalDate.parse(startsOn));
+        q.setEndsOn(LocalDate.parse(endsOn));
+        when(quarantines.heldFor(job)).thenReturn(List.of(q));
+    }
+
+    private void handsOnAt(Trip trip, Place place) {
+        RouteStop transfer = new RouteStop();
+        transfer.setKind(RouteStopKind.TRANSFER);
+        transfer.setJob(job);
+        transfer.setPlace(place);
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(transfer);
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)).thenReturn(Optional.of(plan));
     }
 
     private void journey(Trip... legs) {
