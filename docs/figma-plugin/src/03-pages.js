@@ -1376,6 +1376,8 @@ function readyPanel(steps, waiting, action) {
     add(state, chip(st[0], st[1]));
     var what = VV({ name: 'What', gap: 2 });
     addAll(what, [Tx(st[2], 'Label/M'), Tx(st[3], 'Body/S', 'text/secondary', { fill: true })]);
+    /* a step's own action, under what was found: the open gate's way to what is outstanding */
+    if (st[5]) { var act = H({ name: 'Action', pad: [8, 0, 0, 0] }); add(act, st[5]); add(what, act); }
     addAll(row, [state, fillW(what), Tx(st[4], 'Body/S', 'text/tertiary', { align: 'RIGHT' })]);
     add(p, fillW(row));
   });
@@ -1395,6 +1397,10 @@ function scrRoute() {
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
   });
+  /* the trip's clearance gate as a chip, last in the strip; what is outstanding is Ready to depart's Clearance row */
+  var gateCell = VV({ name: 'Clearance', gap: 4 });
+  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip('Bad', 'Departure locked')]);
+  add(strip, gateCell);
   var tl = VV({ name: 'Timeline', gap: 0 });
   /* the day shows on the first stop and wherever it changes; between two stops the leg, under a 2 px rule */
   var LEGS = ['Road · 70 km · 2 h 30 min', 'Road · 40 km · 30 min', 'Road · 130 km · 2 h 15 min'];
@@ -1420,12 +1426,11 @@ function scrRoute() {
     ['Ok', 'Done', 'Route', 'Confirmed v1.', STAFF.khoi[0]],
     ['Ok', 'Done', 'Load plan', 'Confirmed by Đỗ Minh Khôi.', STAFF.khoi[0]],
     ['Ok', 'Done', 'Crew', '3 people assigned.', STAFF.khoi[0]],
-    ['Bad', 'Locked', 'Clearance', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.', STAFF.lan[0]],
+    ['Bad', 'Locked', 'Clearance', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.', STAFF.lan[0], btn('Secondary', 'SM', 'View outstanding items', { trail: 'arrow-right' })],
     ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
-    'Waiting on clearance · ' + STAFF.lan[0] + '.', btn('Secondary', 'MD', 'View outstanding items', { trail: 'arrow-right' }));
+    'Waiting on clearance · ' + STAFF.lan[0] + '.', null);
   var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
-  var gate = fillW(jobGate());
-  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, gate, tl, refuse])], { noGate: true });
+  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])], { noGate: true });
 }
 
 /* The journey summary and the redesigned rail (2 Nov 2026): on a job of two or more trips, a summary strip of the
