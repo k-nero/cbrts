@@ -213,9 +213,9 @@ export const policyRows = (
           : `Start ${String(p.PLAN_START_HOUR ?? 6).padStart(2, '0')}:00 · ${p.PLAN_SPEED_KMH ?? 60} km/h`,
     },
     {
-      key: 'PLAN_WELFARE_EVERY_HOURS',
+      key: 'PLAN_WELFARE_STOP_MIN',
       label: 'Drafted stops',
-      value: `Welfare every ${p.PLAN_WELFARE_EVERY_HOURS ?? 4} h, ${p.PLAN_WELFARE_STOP_MIN ?? 45} min · border ${p.PLAN_BORDER_STOP_MIN ?? 90} min`,
+      value: `Welfare ${p.PLAN_WELFARE_STOP_MIN ?? 45} min · border ${p.PLAN_BORDER_STOP_MIN ?? 90} min`,
     },
     {
       key: 'PLAN_AIRPORT_BEFORE_HOURS',

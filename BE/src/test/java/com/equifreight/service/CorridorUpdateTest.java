@@ -162,6 +162,33 @@ class CorridorUpdateTest {
     }
 
     @Test
+    @DisplayName("a road route's welfare stops are set, cleared, and refused past 20")
+    void setsWelfareStops() {
+        CorridorResponse saved = service.update(khoi, ID, same().welfareStops(2).build());
+        assertThat(saved.welfareStops()).isEqualTo(2);
+        verify(audit)
+                .recordDecision(
+                        eq(khoi),
+                        eq("CORRIDOR_UPDATED"),
+                        eq("Edited route RD HCM → BKK: RD HCM → BKK, 890 km, ±3 days, 2 days, via Mộc Bài – Bavet,"
+                                + " Poipet – Aranyaprathet → RD HCM → BKK, 890 km, ±3 days, 2 days, 2 welfare stops,"
+                                + " via Mộc Bài – Bavet, Poipet – Aranyaprathet."),
+                        eq("CORRIDOR"),
+                        eq(ID),
+                        eq("RD HCM → BKK"),
+                        any(),
+                        any(),
+                        any());
+
+        assertThat(service.update(khoi, ID, same().build()).welfareStops()).isNull();
+
+        assertThatThrownBy(
+                        () -> service.update(khoi, ID, same().welfareStops(21).build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Welfare stops must be a whole number from 0 to 20.");
+    }
+
+    @Test
     @DisplayName("saving it unchanged writes nothing to the audit log")
     void noChangeNoAudit() {
         service.update(khoi, ID, same().build());

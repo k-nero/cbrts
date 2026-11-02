@@ -289,10 +289,14 @@ export interface RouteCheck {
   label: string;
 }
 
+/** How far the legs may add up from the corridor's distance before it is worth a look: real roads differ a little. */
+const CORRIDOR_MARGIN = 0.1;
+
 /**
- * The checks shown above Confirm, the ones the server runs when the route is confirmed: the times run forward, the
- * drive has its welfare stops, and the job's delivery is inside its arrival window. Stops with no time yet are a
- * warning only.
+ * The checks shown above Confirm. The ones the server runs when the route is confirmed hold it back: the times run
+ * forward and the job's delivery is inside its arrival window. The rest are warnings only: stops with no time yet, fewer
+ * welfare stops than the corridor plans for (a station may be closed), and road legs that don't add up to the
+ * corridor's distance.
  */
 export const routeChecks = (plan: RoutePlan, job: JobDetail): RouteCheck[] => {
   const stops = [...plan.stops].sort((a, b) => a.seq - b.seq);
@@ -325,17 +329,34 @@ export const routeChecks = (plan: RoutePlan, job: JobDetail): RouteCheck[] => {
       label: `${untimed} ${untimed === 1 ? 'stop has' : 'stops have'} no planned time yet.`,
     });
 
-  const needed = plan.welfareStopsNeeded ?? 0;
-  const welfare = stops.filter((s) => s.kind === 'WELFARE').length;
-  checks.push({
-    key: 'welfare',
-    ok: welfare >= needed,
-    blocks: true,
-    label:
-      needed === 0
-        ? `${welfare} welfare ${welfare === 1 ? 'stop' : 'stops'}; this drive needs none.`
-        : `${welfare} of the ${needed} welfare ${needed === 1 ? 'stop' : 'stops'} the drive needs.`,
-  });
+  // Named mid-sentence in the labels below.
+  const corridor = job.parts.find((p) => p.current)?.corridorCode ?? 'the corridor';
+  const planned = plan.corridorWelfareStops;
+  if (planned) {
+    const welfare = stops.filter((s) => s.kind === 'WELFARE').length;
+    checks.push({
+      key: 'welfare',
+      ok: welfare >= planned,
+      blocks: false,
+      label: `${welfare} of the ${planned} welfare ${planned === 1 ? 'stop' : 'stops'} ${corridor} plans for.`,
+    });
+  }
+
+  const corridorKm = plan.corridorDistanceKm;
+  const roadLegs = plan.legs.filter((l) => l.mode === 'ROAD');
+  if (corridorKm && roadLegs.length > 0) {
+    const unknown = roadLegs.filter((l) => l.distanceKm == null).length;
+    const total = roadLegs.reduce((sum, l) => sum + (l.distanceKm ?? 0), 0);
+    checks.push({
+      key: 'distance',
+      ok: unknown === 0 && Math.abs(total - corridorKm) <= corridorKm * CORRIDOR_MARGIN,
+      blocks: false,
+      label:
+        unknown > 0
+          ? `${unknown === 1 ? 'A leg has' : `${unknown} legs have`} no distance yet; ${corridor} is ${corridorKm} km.`
+          : `The legs add up to ${total} km; ${corridor} is ${corridorKm} km.`,
+    });
+  }
 
   const delivery = stops.find(
     (s) => s.kind === 'DELIVERY' && (s.jobId == null || s.jobId === job.id) && s.plannedAt,

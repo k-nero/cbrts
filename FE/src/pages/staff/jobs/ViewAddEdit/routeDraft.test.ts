@@ -17,6 +17,7 @@ const job = {
   id: 'job-41',
   originPlace: { id: 'hcm', name: 'Phú Thọ training centre' },
   destinationPlace: { id: 'pnh', name: 'Phnom Penh Equestrian Centre' },
+  parts: [{ current: true, corridorCode: 'RD HCM → PNH' }],
 } as unknown as JobDetail;
 
 const plan = {
@@ -166,10 +167,10 @@ describe('routeChecks', () => {
     plannedAt,
     plannedStayMin,
   });
-  const routed = (stops: ReturnType<typeof stop>[], welfareStopsNeeded: number) =>
-    ({ stops, legs: [], welfareStopsNeeded }) as unknown as RoutePlan;
+  const routed = (stops: ReturnType<typeof stop>[], corridorWelfareStops: number | null) =>
+    ({ stops, legs: [], corridorWelfareStops }) as unknown as RoutePlan;
 
-  test('times running backwards and a missing welfare stop hold the route back', () => {
+  test('times running backwards hold the route back; a missing welfare stop is a warning', () => {
     const checks = routeChecks(
       routed(
         [
@@ -185,12 +186,18 @@ describe('routeChecks', () => {
     expect(checks.map((c) => [c.key, c.ok, c.blocks])).toEqual([
       ['order', false, true],
       ['untimed', false, false],
-      ['welfare', false, true],
+      ['welfare', false, false],
     ]);
     expect(checks[0].label).toBe(
       'Stop 3 is planned at 2 Nov, 10:00, before the horses leave stop 2 at 2 Nov, 13:30.',
     );
-    expect(checks[2].label).toBe('1 of the 2 welfare stops the drive needs.');
+    expect(checks[2].label).toBe('1 of the 2 welfare stops RD HCM → PNH plans for.');
+  });
+
+  test('a corridor that plans for no welfare stops has no welfare check', () => {
+    const route = [stop(1, 'PICKUP', null), stop(2, 'DELIVERY', null)];
+    expect(routeChecks(routed(route, null), job).map((c) => c.key)).not.toContain('welfare');
+    expect(routeChecks(routed(route, 0), job).map((c) => c.key)).not.toContain('welfare');
   });
 
   test('a delivery after the arrival window is a failing check', () => {
@@ -207,6 +214,40 @@ describe('routeChecks', () => {
       ok: false,
       label: 'The delivery at 2 Nov, 15:00 is after the arrival window closes at 2 Nov, 14:00.',
     });
+  });
+});
+
+describe('routeChecks · corridor distance', () => {
+  const leg = (distanceKm: number | null, mode = 'ROAD') => ({ mode, distanceKm });
+  const plan = (legs: ReturnType<typeof leg>[], corridorDistanceKm: number | null) =>
+    ({ stops: [], legs, corridorDistanceKm }) as unknown as RoutePlan;
+  const onCorridor = {
+    ...job,
+    parts: [{ current: true, corridorCode: 'RD HKG → Sha Tin' }],
+  } as unknown as JobDetail;
+  const distance = (p: RoutePlan) => routeChecks(p, onCorridor).find((c) => c.key === 'distance');
+
+  test('legs far from the corridor are a warning that names both', () => {
+    expect(distance(plan([leg(90)], 40))).toEqual({
+      key: 'distance',
+      ok: false,
+      blocks: false,
+      label: 'The legs add up to 90 km; RD HKG → Sha Tin is 40 km.',
+    });
+  });
+
+  test('legs within a tenth of the corridor pass; split legs are added up', () => {
+    expect(distance(plan([leg(320), leg(320), leg(321)], 960))?.ok).toBe(true);
+    expect(distance(plan([leg(44)], 40))?.ok).toBe(true);
+  });
+
+  test('a leg with no distance is a warning; a flight or an unknown corridor is not checked', () => {
+    expect(distance(plan([leg(null)], 960))).toMatchObject({
+      ok: false,
+      label: 'A leg has no distance yet; RD HKG → Sha Tin is 960 km.',
+    });
+    expect(distance(plan([leg(1500, 'AIR')], 1500))).toBeUndefined();
+    expect(distance(plan([leg(90)], null))).toBeUndefined();
   });
 });
 

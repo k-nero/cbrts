@@ -50,10 +50,10 @@ class JourneyDrafterTest {
     private final Place svayRieng = place("Svay Rieng welfare stop", PlaceKind.WELFARE_STOP, "Svay Rieng", kh);
 
     @Test
-    @DisplayName("A road route crosses its borders in order and takes a welfare stop per interval of driving")
+    @DisplayName("A road route crosses its borders in order and takes the welfare stops its corridor plans for")
     void aRoadRouteHasItsBorderAndWelfareStops() {
-        // 480 km at 60 km/h is 8 h of driving: one welfare stop at the 4 h interval (a second would fall at the end).
         Trip trip = trip(corridor("RD HCM → PNH", "Ho Chi Minh City", "Phnom Penh", 480, vn, kh, mocBai), false);
+        trip.getCorridor().setWelfareStops((short) 1);
 
         JourneyDrafter.DraftRoute route = JourneyDrafter.road(
                 trip, phuTho, RouteStopKind.DELIVERY, phnomPenh, START, false, DEFAULTS, List.of(svayRieng));
@@ -81,6 +81,7 @@ class JourneyDrafterTest {
     @DisplayName("A route run the other way crosses the border from the other side")
     void aReversedRouteReadsItsCountriesBackwards() {
         Trip trip = trip(corridor("RD HCM → PNH", "Ho Chi Minh City", "Phnom Penh", 480, vn, kh, mocBai), true);
+        trip.getCorridor().setWelfareStops((short) 1);
 
         JourneyDrafter.DraftRoute route = JourneyDrafter.road(
                 trip, phnomPenh, RouteStopKind.DELIVERY, phuTho, START, false, DEFAULTS, List.of(svayRieng));
@@ -98,6 +99,7 @@ class JourneyDrafterTest {
         Place hoaXuan = place("Hòa Xuân racing stables", PlaceKind.STABLE, "Da Nang", vn);
         Place sgn = place("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.CARGO_TERMINAL, "Ho Chi Minh City", vn);
         Trip trip = trip(corridor("RD DAD → HCM", "Da Nang", "Ho Chi Minh City", 960, vn, vn, null), false);
+        trip.getCorridor().setWelfareStops((short) 3);
 
         JourneyDrafter.DraftRoute route = JourneyDrafter.road(
                 trip, hoaXuan, RouteStopKind.TRANSFER, sgn, START, true, DEFAULTS, List.of(svayRieng));
@@ -106,10 +108,24 @@ class JourneyDrafterTest {
                 .extracting(JourneyDrafter.DraftStop::kind)
                 .containsExactly(RouteStopKind.PICKUP, RouteStopKind.TRANSFER);
         assertThat(route.notes())
-                .containsExactly("The drive takes about 16 h, so it needs 3 welfare stops; the catalog has 0 in"
-                        + " Vietnam. Add one if the drive needs a rest.");
+                .containsExactly("RD DAD → HCM plans for 3 welfare stops; the catalog has 0 in Vietnam. Add the ones"
+                        + " still open, or plan without them.");
         // Before the flight the horses wait at the cargo terminal: 4 h by default.
         assertThat(route.stops().getLast().stayMin()).isEqualTo((short) 240);
+    }
+
+    @Test
+    @DisplayName("A corridor that sets no welfare stops gets none, however long the drive, and no note")
+    void aCorridorWithoutWelfareStopsGetsNone() {
+        Trip trip = trip(corridor("RD HCM → PNH", "Ho Chi Minh City", "Phnom Penh", 960, vn, kh, mocBai), false);
+
+        JourneyDrafter.DraftRoute route = JourneyDrafter.road(
+                trip, phuTho, RouteStopKind.DELIVERY, phnomPenh, START, false, DEFAULTS, List.of(svayRieng));
+
+        assertThat(route.stops())
+                .extracting(JourneyDrafter.DraftStop::kind)
+                .containsExactly(RouteStopKind.PICKUP, RouteStopKind.BORDER, RouteStopKind.DELIVERY);
+        assertThat(route.notes()).isEmpty();
     }
 
     @Test
@@ -137,7 +153,7 @@ class JourneyDrafterTest {
 
         assertThat(planning.speedKmh()).isEqualTo(80);
         assertThat(planning.startHour()).isEqualTo(5);
-        assertThat(planning.welfareEveryHours()).isEqualTo(4);
+        assertThat(planning.welfareStopMin()).isEqualTo(45);
         assertThat(planning.borderStopMin()).isEqualTo(90);
         assertThat(planning.airportAfterHours()).isEqualTo(3);
     }
