@@ -10,11 +10,11 @@ const CONNECTION_FG = { ok: 'text-ink-3', warn: 'text-warn', bad: 'text-bad' } a
 
 /**
  * The job's trips, in journey order, inside the Trip tab (US-F3-16, US-F3-21): the trip chosen here is the one
- * planned beside it. Each says where it stands as a chip in tone plus word (its next open step, Locked, Ready, On the
- * road) with who holds it, its cities in full and when it leaves; the chosen one is the Nav item's active pill (Muted
- * Navy, Gold Ink label). Between two trips, where one hands the horses on, the time the next leaves after it. The
- * coordinator builds the journey here: Add trip at the foot, from the city it has reached, and take the last trip off
- * before it departs.
+ * planned beside it. Each is three short lines: its number and mode with where it stands (a chip: its next open step,
+ * Locked, Ready, On the road), its cities in full, and when it leaves; its code and who holds the step are in the
+ * tooltip. The chosen one is the Nav item's active pill (Muted Navy, Gold Ink label). A connection between two trips
+ * shows only when it is too tight. The coordinator builds the journey here: Add trip at the foot, from the city it has
+ * reached, and take the last trip off before it departs.
  */
 export const JourneyRail: FC<{
   parts: TripPart[];
@@ -33,19 +33,22 @@ export const JourneyRail: FC<{
       <span className="type-mono-label px-3 text-ink-3">
         Journey · {parts.length} {parts.length === 1 ? 'trip' : 'trips'}
       </span>
-      <ol className="m-0 flex list-none flex-col p-0">
+      <ol className="m-0 flex list-none flex-col gap-1 p-0">
         {parts.map((part, index) => {
           const standing = standings[index];
           const onward = standing?.onward ?? null;
+          // Only a connection that needs attention is shown between two trips.
+          const tight = part.handsOn && onward && onward.tone !== 'ok' ? onward : null;
           return (
             <Fragment key={part.tripId}>
               <li>
                 <button
                   type="button"
                   aria-current={part.current ? 'page' : undefined}
+                  title={[part.tripCode, standing?.line].filter(Boolean).join(' · ')}
                   onClick={() => onShow(part.tripId)}
                   className={cx(
-                    'focus-ring flex w-full cursor-pointer flex-col gap-1.5 rounded-md border-0 px-3 py-3 text-left transition-colors',
+                    'focus-ring flex w-full cursor-pointer flex-col gap-1 rounded-md border-0 px-3 py-2.5 text-left transition-colors',
                     part.current ? 'bg-muted' : 'bg-transparent hover:bg-muted',
                   )}
                 >
@@ -56,14 +59,18 @@ export const JourneyRail: FC<{
                       className={part.current ? 'text-gold-ink' : 'text-ink-3'}
                     />
                     <span
-                      className={cx('type-label-s', part.current ? 'text-gold-ink' : 'text-ink')}
+                      className={cx('type-label-s', part.current ? 'text-gold-ink' : 'text-ink-2')}
                     >
                       {index + 1} · {part.mode === 'AIR' ? 'Flight' : 'Road'}
                     </span>
-                    <span className="type-caption ml-auto text-ink-3">{part.tripCode}</span>
+                    {standing && (
+                      <Chip tone={standing.tone} className="ml-auto">
+                        {standing.word}
+                      </Chip>
+                    )}
                   </span>
                   {/* Cities in full: two lines rather than cut short. */}
-                  <span className="type-data text-ink-2 [overflow-wrap:anywhere]">
+                  <span className="type-label-m text-ink">
                     {part.startCity && part.endCity
                       ? `${part.startCity} → ${part.endCity}`
                       : (part.corridorCode ?? '—')}
@@ -73,38 +80,17 @@ export const JourneyRail: FC<{
                       ? `Leaves ${formatDayTime(part.plannedDepartureAt)}`
                       : 'Not planned'}
                   </span>
-                  {standing && (
-                    <span className="flex flex-col items-start gap-1 pt-0.5">
-                      <Chip tone={standing.tone}>{standing.word}</Chip>
-                      <span className="type-caption text-ink-3">{standing.line}</span>
-                    </span>
-                  )}
                 </button>
               </li>
-              {index < parts.length - 1 && (
+              {tight && (
                 <li
-                  aria-label={
-                    part.handsOn
-                      ? `Connection to ${parts[index + 1].tripCode}`
-                      : `Then ${parts[index + 1].tripCode}`
-                  }
-                  className="ml-[18px] flex min-h-3 items-center border-l-2 border-line py-1.5 pl-3"
-                >
-                  {part.handsOn && (
-                    <span
-                      className={cx(
-                        'type-caption flex items-center gap-1.5',
-                        onward ? CONNECTION_FG[onward.tone] : 'text-ink-3',
-                      )}
-                    >
-                      {onward && onward.tone !== 'ok' && <Icon name="alert" size={12} />}
-                      {onward
-                        ? onward.minutes < 0
-                          ? `Connection ${onward.gap}`
-                          : `${onward.gap} to connect`
-                        : 'Connection not planned'}
-                    </span>
+                  className={cx(
+                    'type-caption flex items-center gap-1.5 px-3',
+                    CONNECTION_FG[tight.tone],
                   )}
+                >
+                  <Icon name="alert" size={12} />
+                  {tight.minutes < 0 ? `Connection ${tight.gap}` : `${tight.gap} to connect`}
                 </li>
               )}
             </Fragment>

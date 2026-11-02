@@ -1273,15 +1273,14 @@ function journeyRail(parts, active, addFrom) {
     var top = H({ name: 'Head', gap: 8, cross: 'CENTER' });
     var gap = H({ name: 'Gap' });
     /* with a standing (the redesigned rail), the code moves to the head and the trip says where it stands */
-    var right = p.step ? Tx(p.code.split(' ')[0], 'Mono/Caption', 'text/tertiary') : Tx(p.status, 'Mono/Caption', 'text/tertiary');
-    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), right]);
-    if (p.step) {
-      var stand = VV({ name: 'Standing', gap: 4 });
-      addAll(stand, [chip(p.tone, p.step), Tx(p.who, 'Mono/Caption', 'text/tertiary', { fill: true })]);
-      addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary', { fill: true }), Tx(p.leaves, 'Mono/Caption', 'text/tertiary'), fillW(stand)]);
-    } else addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
+    /* with a standing (the simplified rail), three lines: mode and the chip, the cities in full, when it leaves */
+    var right = p.step ? chip(p.tone, p.step) : Tx(p.status, 'Mono/Caption', 'text/tertiary');
+    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/secondary'), fillW(gap), right]);
+    if (p.step) addAll(row, [fillW(top), Tx(p.route, 'Label/M', 'text/primary', { fill: true }), Tx(p.leaves, 'Mono/Caption', 'text/tertiary')]);
+    else addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
     add(r, fillW(row));
-    if (p.link && i < parts.length - 1) {
+    /* a connection shows only when it needs attention */
+    if (p.link && p.link[1] !== 'text/tertiary' && i < parts.length - 1) {
       var lk = H({ name: 'Connection', gap: 6, cross: 'CENTER', pad: [6, 0, 6, 12] });
       lk.strokes = [P('border/default')]; lk.strokeAlign = 'INSIDE';
       lk.strokeTopWeight = 0; lk.strokeBottomWeight = 0; lk.strokeRightWeight = 0; lk.strokeLeftWeight = 2;
