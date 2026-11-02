@@ -23,7 +23,7 @@ type Props = {
 };
 
 /**
- * Edit route: its code, distance, flexible and driving days, and by road the border crossings it
+ * Edit route: its code, distance, flexible and driving days, and by road its welfare stops and the border crossings it
  * takes in order from the origin. Its mode and two cities stay: they are what it is priced and quoted
  * by. The server refuses a code another route has, crossings that don't lead from the origin's
  * country to the destination's, and a re-route a vehicle on the route has no permit for.
@@ -53,6 +53,7 @@ const EditCorridorModal: FC<Props> = ({ corridor, onClose, onAddCrossing }) => {
       distanceKm: corridor.distanceKm,
       dateFlexDays: corridor.dateFlexDays,
       drivingDays: corridor.drivingDays,
+      welfareStops: corridor.welfareStops,
       crossings: corridor.crossings.flatMap((name) => {
         const id = crossings.data?.find((c) => c.name === name)?.id;
         const match = crossingOptions.find((o) => o.value === id);
@@ -71,6 +72,7 @@ const EditCorridorModal: FC<Props> = ({ corridor, onClose, onAddCrossing }) => {
           distanceKm: v.distanceKm,
           dateFlexDays: v.dateFlexDays,
           drivingDays: byRoad ? v.drivingDays : null,
+          welfareStops: byRoad ? v.welfareStops : null,
           crossingIds: byRoad ? (v.crossings ?? []).map((c) => c.value) : [],
         },
       });
@@ -157,6 +159,18 @@ const EditCorridorModal: FC<Props> = ({ corridor, onClose, onAddCrossing }) => {
                   label="Driving days"
                   component="number"
                   componentProps={{ isRequired: true, min: 1, max: 30 }}
+                />
+              )}
+              {byRoad && (
+                <FormField
+                  name="welfareStops"
+                  label="Welfare stops"
+                  component="number"
+                  componentProps={{
+                    min: 0,
+                    max: 20,
+                    instruction: 'How many a route plans for; empty for none.',
+                  }}
                 />
               )}
             </Flex>

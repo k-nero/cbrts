@@ -9,7 +9,8 @@ import java.util.UUID;
 import lombok.Builder;
 
 /**
- * A change to a route we run: its code, distance, flexible and driving days, and for a road route the border crossings
+ * A change to a route we run: its code, distance, flexible and driving days, and for a road route its welfare stops and
+ * the border crossings
  * it takes, in order from the origin. Its mode and two cities stay: they are what the route is, and what it is priced
  * and quoted by.
  */
@@ -20,6 +21,8 @@ public record UpdateCorridorRequest(
         @NotNull Integer dateFlexDays,
         /* 1 to 30; ignored on an air route. */
         Integer drivingDays,
+        /* 0 to 20 on a road route, or null for none; ignored on an air route. */
+        Integer welfareStops,
         List<UUID> crossingIds) {
 
     public UpdateCorridorRequest {

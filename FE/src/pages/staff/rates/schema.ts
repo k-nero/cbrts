@@ -183,14 +183,6 @@ export const POLICY_FIELDS: {
     step: 5,
     fallback: 60,
   },
-  {
-    key: 'PLAN_WELFARE_EVERY_HOURS',
-    label: 'Welfare stop every, hours',
-    min: 1,
-    max: 24,
-    step: 1,
-    fallback: 4,
-  },
   { key: 'PLAN_WELFARE_STOP_MIN', label: 'Welfare stop, minutes', max: 600, step: 5, fallback: 45 },
   { key: 'PLAN_BORDER_STOP_MIN', label: 'Border stop, minutes', max: 1440, step: 15, fallback: 90 },
   {

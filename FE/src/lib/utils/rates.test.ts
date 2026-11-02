@@ -207,9 +207,9 @@ describe('policyRows', () => {
       },
       { key: 'PLAN_START_HOUR', label: 'Drafted trips', value: 'Start 05:00 · 55 km/h' },
       {
-        key: 'PLAN_WELFARE_EVERY_HOURS',
+        key: 'PLAN_WELFARE_STOP_MIN',
         label: 'Drafted stops',
-        value: 'Welfare every 4 h, 45 min · border 90 min',
+        value: 'Welfare 45 min · border 90 min',
       },
       {
         key: 'PLAN_AIRPORT_BEFORE_HOURS',

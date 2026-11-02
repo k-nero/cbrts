@@ -46,6 +46,7 @@ export const RatePolicyKeyEnum = {
   /** How a journey drafted from its quote is timed (US-F3-22). */
   PLAN_START_HOUR: 'PLAN_START_HOUR',
   PLAN_SPEED_KMH: 'PLAN_SPEED_KMH',
+  /** Retired: each road route sets its own welfare stops; the server refuses it on a draft. */
   PLAN_WELFARE_EVERY_HOURS: 'PLAN_WELFARE_EVERY_HOURS',
   PLAN_WELFARE_STOP_MIN: 'PLAN_WELFARE_STOP_MIN',
   PLAN_BORDER_STOP_MIN: 'PLAN_BORDER_STOP_MIN',

@@ -654,6 +654,11 @@ class RateCatalogServiceWriteTest {
         Map<RatePolicyKey, BigDecimal> nullValue = new EnumMap<>(RatePolicyKey.class);
         nullValue.put(RatePolicyKey.CONTINGENCY_PCT, null);
         assertRefused(() -> service.putPolicies(lan, nullValue, view), "CONTINGENCY_PCT", "Contingency needs a value.");
+        // Retired: each road route sets its own welfare stops (V39).
+        assertRefused(
+                () -> service.putPolicies(lan, Map.of(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, BigDecimal.ONE), view),
+                "PLAN_WELFARE_EVERY_HOURS",
+                "The welfare interval is retired. Set each road route's welfare stops on Routes instead.");
         verify(policies, never()).save(any());
     }
 

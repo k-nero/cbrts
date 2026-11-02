@@ -39,6 +39,10 @@ public final class RouteMapper {
                 .distanceKm(corridor.getDistanceKm())
                 .dateFlexDays(corridor.getDateFlexDays())
                 .drivingDays(corridor.getDrivingDays())
+                .welfareStops(
+                        corridor.getWelfareStops() == null
+                                ? null
+                                : corridor.getWelfareStops().intValue())
                 .crossings(crossings)
                 .countries(
                         corridor.getOriginCountry() == null

@@ -161,7 +161,10 @@ class RateCatalogSeederTest {
         verify(policies).saveAll(seededPolicies.capture());
         assertThat(seededPolicies.getValue())
                 .extracting(p -> p.getKey())
-                .containsExactlyInAnyOrder(RatePolicyKey.values());
+                // Every key but the retired welfare interval: road routes set their own welfare stops (V39).
+                .containsExactlyInAnyOrder(java.util.Arrays.stream(RatePolicyKey.values())
+                        .filter(k -> k != RatePolicyKey.PLAN_WELFARE_EVERY_HOURS)
+                        .toArray(RatePolicyKey[]::new));
         assertThat(seededPolicies.getValue())
                 .filteredOn(p -> p.getKey() == RatePolicyKey.ESTIMATE_BAND_PCT)
                 .singleElement()
