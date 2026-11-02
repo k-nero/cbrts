@@ -1236,7 +1236,7 @@ function jobGate(gateBody, gateState) {
   setP(gate, { Body: gateBody || '9 items must clear first: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.' });
   return gate;
 }
-/* noGate: a road trip's Route view carries the gate under its summary strip instead */
+/* noGate: a road trip with a route carries the gate in its summary strip instead */
 function jobHead(tab, gateBody, stage, gateState, noGate) {
   var gate = noGate ? null : jobGate(gateBody, gateState);
   var tabs = H({ name: 'Tabs', gap: 24, main: 'SPACE_BETWEEN', cross: 'CENTER' });
@@ -1253,14 +1253,19 @@ function jobHead(tab, gateBody, stage, gateState, noGate) {
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
   var job = jobHead.job || JOB;
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: gate ? [gate, tabs] : [tabs], rule: false });
+  /* the gate isn't in the header: it opens the tab's content, under the tabs (see jobScreen) */
+  jobHead.gate = gate;
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: [tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
   jobHead.job = o.job || null;
   var head = jobHead(tab, o.gate, o.stage, o.gateState, o.noGate);
   jobHead.job = null;
-  return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(blocks), o.today);
+  /* the gate is first under the tabs; a road trip with a route carries it in its summary strip instead (noGate) */
+  var gate = jobHead.gate ? [fillW(jobHead.gate)] : [];
+  jobHead.gate = null;
+  return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(gate, blocks), o.today);
 }
 /* the job's trips in journey order (US-F3-16, US-F3-21): the chosen one is the Nav item's active pill */
 var ONE_TRIP = [{ mode: 'Road', icon: 'truck', status: 'not started', route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014 · 18 Oct, 06:00' }];

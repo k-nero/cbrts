@@ -88,10 +88,32 @@ function JobWorkspace() {
   const { data: job } = useJobDetail(id || '');
   useBreadcrumb({ id, label: job?.code, tab: activeTab.label });
 
+  // The gate says what holds it, first under the tabs (DESIGN.md, Clearance Gate), and leads to the items from the
+  // Trip and Authorities tabs. A road trip with a route carries it as a chip in its summary strip instead.
   const items = useMemo<TabsProps['items']>(
     () =>
-      job ? TABS.map(({ key, label, render }) => ({ key, label, children: render(job) })) : [],
-    [job],
+      job
+        ? TABS.map(({ key, label, render }) => ({
+            key,
+            label,
+            children: (
+              <Flex vertical gap={24}>
+                {!(key === 'trip' && routeCarriesGate(job)) && (
+                  <JobGate
+                    job={job}
+                    onOpenClearance={
+                      key === 'clearance'
+                        ? null
+                        : () => setSearchParams({ tab: 'clearance' }, { replace: true })
+                    }
+                  />
+                )}
+                {render(job)}
+              </Flex>
+            ),
+          }))
+        : [],
+    [job, setSearchParams],
   );
 
   if (!job) {
@@ -194,18 +216,6 @@ function JobWorkspace() {
               . The Trip tab plans {job.parts.find((p) => p.current)?.tripCode ?? job.tripCode}; the
               other part goes on as planned.
             </Callout>
-          )}
-          {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate).
-              A road trip's Load plan and Route views carry it as a chip in their summary strip instead. */}
-          {!(activeTab.key === 'trip' && routeCarriesGate(job)) && (
-            <JobGate
-              job={job}
-              onOpenClearance={
-                activeTab.key === 'clearance'
-                  ? null
-                  : () => setSearchParams({ tab: 'clearance' }, { replace: true })
-              }
-            />
           )}
         </Flex>
 
