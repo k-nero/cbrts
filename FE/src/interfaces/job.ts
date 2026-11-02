@@ -403,8 +403,12 @@ export interface JobDetail extends BaseEntity {
   /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
   transportSpecialist?: string | null;
   coordinator?: string | null;
+  /** The gate of the trip shown: a domestic leg before the border is clear early (US-F2-13). */
   clearanceGateState: 'Locked' | 'Clear';
   clearanceGateSummary: string;
+  /** The dossier's own gate, the same whichever trip is shown: what the Clearance and Authorities tabs show. */
+  dossierGateState: 'Locked' | 'Clear';
+  dossierGateSummary: string;
   horses: JobHorse[];
   loadPlan: TripLoad | null;
   routePlan?: RoutePlan | null;
