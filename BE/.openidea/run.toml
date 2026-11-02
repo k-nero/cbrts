@@ -1,0 +1,17 @@
+[[configurations]]
+id = "application:com.equifreight.EquiFreightApplication"
+name = "EquiFreightApplication"
+kind = "spring-boot"
+command = "java"
+args = ["-cp", "${classpath}", "com.equifreight.EquiFreightApplication", "--spring.profiles.active=dev"]
+module = ""
+debug-adapter = "java-debug"
+params = { activeProfiles = "dev", classpath = "${classpath}", mainClass = "com.equifreight.EquiFreightApplication", programArgs = "" }
+
+[[configurations]]
+id = "gradle:task:::bootRun"
+name = "equifreight [bootRun]"
+kind = "gradle"
+command = "/Users/thanh.nguyen/Documents/dev/cbrts/BE/gradlew"
+args = ["bootRun"]
+env = { JAVA_HOME = "/opt/homebrew/Cellar/graalvm/25.4.4.1.1/libexec/graalvm.jdk/Contents/Home" }
