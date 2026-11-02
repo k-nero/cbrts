@@ -355,6 +355,8 @@ export interface RoutePlan {
   legs: RouteLeg[];
   /** The welfare stops the trip's drive needs before the route can be confirmed; 0 for a flight. */
   welfareStopsNeeded: number;
+  /** The road corridor's distance, which the legs are checked against; null for a flight or when unknown. */
+  corridorDistanceKm?: number | null;
 }
 
 export interface JobSummary extends BaseEntity {

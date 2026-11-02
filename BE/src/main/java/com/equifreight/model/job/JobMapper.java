@@ -214,10 +214,15 @@ public final class JobMapper {
 
     /**
      * A route plan of {@code jobId}'s trip with its stops and legs; {@code flightsByLegId} holds the flight of each
-     * air leg, and {@code welfareStopsNeeded} the welfare stops the trip's drive needs.
+     * air leg, {@code welfareStopsNeeded} the welfare stops the trip's drive needs, and {@code corridorDistanceKm} the
+     * road corridor's distance (null for a flight).
      */
     public static RoutePlanResponse toRoutePlanResponse(
-            RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId, int welfareStopsNeeded) {
+            RoutePlan plan,
+            UUID jobId,
+            Map<UUID, Flight> flightsByLegId,
+            int welfareStopsNeeded,
+            Integer corridorDistanceKm) {
         return RoutePlanResponse.builder()
                 .id(plan.getId())
                 .jobId(jobId)
@@ -234,6 +239,7 @@ public final class JobMapper {
                         .map(leg -> toLegResponse(leg, flightsByLegId.get(leg.getId())))
                         .toList())
                 .welfareStopsNeeded(welfareStopsNeeded)
+                .corridorDistanceKm(corridorDistanceKm)
                 .build();
     }
 

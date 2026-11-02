@@ -99,6 +99,7 @@ export function RouteTab({ job }: Props) {
 
   // While the route is edited the editor is the whole view: the timeline, the strip and the panels around it come
   // back on save or cancel, so the route is never on screen twice.
+  const corridorKm = (draft ?? confirmed)?.corridorDistanceKm;
   if (editing && planning) {
     return (
       <Flex ref={root} vertical gap={24} className="scroll-mt-6">
@@ -107,13 +108,17 @@ export function RouteTab({ job }: Props) {
           job={job}
           from={draft ?? confirmed}
           supersedes={confirmed !== null}
-          note={
+          note={[
             part?.handsOn
               ? 'The route ends where it hands the horses on to the next trip.'
               : job.windowStart && job.windowEnd
                 ? `Arrival window: ${formatWindow()}.`
-                : 'No arrival window is set for this job.'
-          }
+                : 'No arrival window is set for this job.',
+            // The distance the legs are checked against and the welfare stops counted from.
+            corridorKm ? `${part?.corridorCode ?? 'The corridor'} is ${corridorKm} km.` : null,
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onClose={stopEditing}
         />
       </Flex>

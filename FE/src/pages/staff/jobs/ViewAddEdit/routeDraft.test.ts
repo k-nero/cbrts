@@ -210,6 +210,40 @@ describe('routeChecks', () => {
   });
 });
 
+describe('routeChecks · corridor distance', () => {
+  const leg = (distanceKm: number | null, mode = 'ROAD') => ({ mode, distanceKm });
+  const plan = (legs: ReturnType<typeof leg>[], corridorDistanceKm: number | null) =>
+    ({ stops: [], legs, welfareStopsNeeded: 0, corridorDistanceKm }) as unknown as RoutePlan;
+  const onCorridor = {
+    ...job,
+    parts: [{ current: true, corridorCode: 'RD HKG → Sha Tin' }],
+  } as unknown as JobDetail;
+  const distance = (p: RoutePlan) => routeChecks(p, onCorridor).find((c) => c.key === 'distance');
+
+  test('legs far from the corridor are a warning that names both', () => {
+    expect(distance(plan([leg(90)], 40))).toEqual({
+      key: 'distance',
+      ok: false,
+      blocks: false,
+      label: 'The legs add up to 90 km; RD HKG → Sha Tin is 40 km.',
+    });
+  });
+
+  test('legs within a tenth of the corridor pass; split legs are added up', () => {
+    expect(distance(plan([leg(320), leg(320), leg(321)], 960))?.ok).toBe(true);
+    expect(distance(plan([leg(44)], 40))?.ok).toBe(true);
+  });
+
+  test('a leg with no distance is a warning; a flight or an unknown corridor is not checked', () => {
+    expect(distance(plan([leg(null)], 960))).toMatchObject({
+      ok: false,
+      label: 'A leg has no distance yet; RD HKG → Sha Tin is 960 km.',
+    });
+    expect(distance(plan([leg(1500, 'AIR')], 1500))).toBeUndefined();
+    expect(distance(plan([leg(90)], null))).toBeUndefined();
+  });
+});
+
 describe('totals', () => {
   test('distance adds up the legs; duration runs from the first planned stop to the last', () => {
     const form = toForm(null, job);

@@ -852,7 +852,8 @@ public class RoutePlanService {
      * The first route of a trip a coordinator adds to {@code job}'s journey (US-F3-21): the job's pickup at
      * {@code from}, then its {@code endKind} (DELIVERY where the journey ends, else TRANSFER, where the next trip
      * collects the horses) at {@code to}, with no times yet. A road trip's route is a draft the coordinator plans on the
-     * Route view. A flight's is confirmed at once, airport to airport by air: its times come from the flight.
+     * Route view, its leg the corridor's distance and driving time at the planned speed, as a drafted journey's legs
+     * are. A flight's is confirmed at once, airport to airport by air: its times come from the flight.
      */
     @Transactional
     public RoutePlan startRoute(
@@ -863,7 +864,18 @@ public class RoutePlanService {
                 List.of(
                         new StopCopy(null, job, RouteStopKind.PICKUP, from, null),
                         new StopCopy(null, job, endKind, to, null)));
-        if (trip.getCorridor().isRoad()) return draft;
+        if (trip.getCorridor().isRoad()) {
+            Integer km = trip.getCorridor().getDistanceKm();
+            Integer driveMin = planningDefaults.current().driveMin(km);
+            for (RouteLeg leg : draft.getLegs()) {
+                leg.setDistanceKm(km);
+                leg.setPlannedMin(driveMin);
+                routeLegRepository.save(leg);
+            }
+            draft.setDistanceKm(km);
+            draft.setDurationMin(driveMin);
+            return routePlanRepository.save(draft);
+        }
         for (RouteLeg leg : draft.getLegs()) {
             leg.setMode(TransportMode.AIR);
             leg.setVehicle(null);
@@ -1139,6 +1151,9 @@ public class RoutePlanService {
         for (RouteLeg leg : plan.getLegs()) {
             flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
         }
-        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId, welfareStopsNeeded);
+        // A road trip's legs are checked against its corridor's distance; a flight's aren't.
+        Corridor corridor = plan.getTrip() == null ? null : plan.getTrip().getCorridor();
+        Integer corridorKm = corridor != null && corridor.isRoad() ? corridor.getDistanceKm() : null;
+        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId, welfareStopsNeeded, corridorKm);
     }
 }

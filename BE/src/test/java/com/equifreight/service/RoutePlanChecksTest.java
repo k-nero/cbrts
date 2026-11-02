@@ -24,6 +24,8 @@ class RoutePlanChecksTest {
     private final RoutePlanRepository plans = mock(RoutePlanRepository.class);
     private final TransportJobRepository jobs = mock(TransportJobRepository.class);
     private final JobTripService jobTrips = mock(JobTripService.class);
+    private final RouteStopRepository stopRows = mock(RouteStopRepository.class);
+    private final RouteLegRepository legRows = mock(RouteLegRepository.class);
     private RoutePlanService service;
 
     private final TransportJob job = new TransportJob();
@@ -41,10 +43,12 @@ class RoutePlanChecksTest {
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobTrips.tripOf(job.getId(), null)).thenReturn(trip);
         when(plans.save(any(RoutePlan.class))).thenAnswer(i -> i.getArgument(0));
+        when(stopRows.save(any(RouteStop.class))).thenAnswer(i -> i.getArgument(0));
+        when(legRows.save(any(RouteLeg.class))).thenAnswer(i -> i.getArgument(0));
         service = new RoutePlanService(
                 plans,
-                mock(RouteStopRepository.class),
-                mock(RouteLegRepository.class),
+                stopRows,
+                legRows,
                 mock(FlightRepository.class),
                 jobs,
                 mock(PlaceRepository.class),
@@ -193,5 +197,35 @@ class RoutePlanChecksTest {
         assertThat(refused.getMessage())
                 .isEqualTo("CBRT-2026-041's delivery is planned at 2 Dec 15:00, after its arrival window closes at"
                         + " 2 Dec 14:00. Plan the delivery earlier, or agree a later window with the customer.");
+    }
+
+    @Test
+    @DisplayName("A road trip added by hand starts with its leg at the corridor's distance and driving time")
+    void aRoadRouteStartedByHandTakesTheCorridor() {
+        corridor.setDistanceKm(960);
+
+        RoutePlan draft =
+                service.startRoute(trip, job, new Place(), RouteStopKind.DELIVERY, new Place(), new User(), null);
+
+        assertThat(draft.getStatus()).isEqualTo(RoutePlanStatus.DRAFT);
+        assertThat(draft.getLegs()).singleElement().satisfies(leg -> {
+            assertThat(leg.getMode()).isEqualTo(TransportMode.ROAD);
+            assertThat(leg.getDistanceKm()).isEqualTo(960);
+            // 960 km at the default 60 km/h.
+            assertThat(leg.getPlannedMin()).isEqualTo(960);
+        });
+        assertThat(draft.getDistanceKm()).isEqualTo(960);
+        assertThat(draft.getDurationMin()).isEqualTo(960);
+    }
+
+    @Test
+    @DisplayName("A road route carries its corridor's distance for the legs to be checked against; a flight's doesn't")
+    void theResponseCarriesTheRoadCorridorsDistance() {
+        corridor.setDistanceKm(40);
+        RoutePlan plan = planOf(stop(RouteStopKind.PICKUP, null, null), stop(RouteStopKind.DELIVERY, null, null));
+        assertThat(service.toResponse(plan, job.getId()).corridorDistanceKm()).isEqualTo(40);
+
+        corridor.setMode(TransportMode.AIR);
+        assertThat(service.toResponse(plan, job.getId()).corridorDistanceKm()).isNull();
     }
 }
