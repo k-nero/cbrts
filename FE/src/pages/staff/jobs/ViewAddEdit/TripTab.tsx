@@ -1,24 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { App, Flex, Segmented } from 'antd';
 
 import { AddTripModal } from './AddTripModal';
 import { FlightTrip } from './FlightTrip';
+import { journeyStandings, openingTrip } from './journey';
 import { JourneyRail } from './JourneyRail';
+import { JourneySummary } from './JourneySummary';
 import { LoadPlanTab } from './LoadPlanTab';
 import { RouteTab } from './RouteTab';
 
 import { Button, Callout, Icon } from '@/components/ui';
-import { useCanPlanTrips, useDraftJourney, useRemoveTrip } from '@/hooks/useJob';
+import {
+  useCanPlanTrips,
+  useCanSignOffTripPlan,
+  useDraftJourney,
+  useJourneyDetails,
+  useRemoveTrip,
+} from '@/hooks/useJob';
 import type { JobDetail, TripPart } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 
 export type TripView = 'load-plan' | 'route';
 
 /**
- * The Trip tab (US-F3-21): the job's journey rail, and beside it the trip chosen there. A road trip
- * switches between its Load plan and its Route; a flight shows only its flight. The coordinator
- * builds the journey on the rail: Add trip from the city it has reached, Take off the last trip.
+ * The Trip tab (US-F3-21): on a journey of two or more trips, a summary strip of the whole journey; then the
+ * journey rail, each trip with where it stands, and beside it the trip chosen there. A road trip switches between
+ * its Load plan and its Route; a flight shows only its flight. The tab opens on the first trip that waits on the
+ * viewer. The coordinator builds the journey on the rail: Add trip from the city it has reached, take the last off.
  */
 export function TripTab({ job }: { job: JobDetail }) {
   const { message, modal } = App.useApp();
@@ -27,6 +36,35 @@ export function TripTab({ job }: { job: JobDetail }) {
   const planner = useCanPlanTrips();
   const remove = useRemoveTrip(job.id);
   const drafting = useDraftJourney(job.id);
+  const canSignOff = useCanSignOffTripPlan();
+
+  // Each trip's own page, so the rail and the summary can say where every trip stands.
+  const details = useJourneyDetails(
+    job.id,
+    job.parts.map((p) => p.tripId),
+  );
+  const standings =
+    job.parts.length > 1
+      ? journeyStandings(
+          job.parts,
+          details.map((d) => d.data),
+          { canPlan: planner, canSignOff },
+        )
+      : [];
+  // With no trip asked for, open on the first trip that waits on the viewer, once every trip has said.
+  const opening = standings.every((s) => s.word !== '…') ? openingTrip(standings) : null;
+  const askedTrip = searchParams.get('trip');
+  useEffect(() => {
+    if (!askedTrip && opening && !opening.current)
+      setSearchParams(
+        {
+          tab: 'trip',
+          trip: opening.tripId,
+          ...(searchParams.get('view') ? { view: searchParams.get('view')! } : {}),
+        },
+        { replace: true },
+      );
+  }, [askedTrip, opening, searchParams, setSearchParams]);
 
   const part = job.parts.find((p) => p.current) ?? null;
   const show = (trip: string, view?: TripView) =>
@@ -132,49 +170,53 @@ export function TripTab({ job }: { job: JobDetail }) {
   }
 
   return (
-    <Flex gap={24} align="start">
-      <JourneyRail
-        parts={job.parts}
-        onShow={(trip) => show(trip)}
-        addFrom={addFrom}
-        onAdd={planner ? () => setAdding(true) : null}
-        onRemove={planner ? takeOff : null}
-      />
-      <div className="min-w-0 flex-1">
-        <Flex vertical gap={24}>
-          {warnings}
-          {part && (
-            <Flex align="center" justify="space-between" gap={16} wrap>
-              <Flex vertical gap={2}>
-                <span className="type-h4 text-ink">
-                  {part.startCity} → {part.endCity}
-                </span>
-                <span className="type-data text-ink-3">
-                  {part.tripCode} · {part.corridorCode}
-                  {part.handsOn ? ' · hands on to the next trip' : ''}
-                </span>
+    <Flex vertical gap={24}>
+      <JourneySummary parts={job.parts} standings={standings} />
+      <Flex gap={24} align="start">
+        <JourneyRail
+          parts={job.parts}
+          standings={standings}
+          onShow={(trip) => show(trip)}
+          addFrom={addFrom}
+          onAdd={planner ? () => setAdding(true) : null}
+          onRemove={planner ? takeOff : null}
+        />
+        <div className="min-w-0 flex-1">
+          <Flex vertical gap={24}>
+            {warnings}
+            {part && (
+              <Flex align="center" justify="space-between" gap={16} wrap>
+                <Flex vertical gap={2}>
+                  <span className="type-h4 text-ink">
+                    {part.startCity} → {part.endCity}
+                  </span>
+                  <span className="type-data text-ink-3">
+                    {part.tripCode} · {part.corridorCode}
+                    {part.handsOn ? ' · hands on to the next trip' : ''}
+                  </span>
+                </Flex>
+                {part.mode !== 'AIR' && (
+                  <Segmented<TripView>
+                    value={view}
+                    onChange={(v) => show(part.tripId, v)}
+                    options={[
+                      { label: 'Load plan', value: 'load-plan' },
+                      { label: 'Route', value: 'route' },
+                    ]}
+                  />
+                )}
               </Flex>
-              {part.mode !== 'AIR' && (
-                <Segmented<TripView>
-                  value={view}
-                  onChange={(v) => show(part.tripId, v)}
-                  options={[
-                    { label: 'Load plan', value: 'load-plan' },
-                    { label: 'Route', value: 'route' },
-                  ]}
-                />
-              )}
-            </Flex>
-          )}
-          {part?.mode === 'AIR' ? (
-            <FlightTrip job={job} part={part} />
-          ) : view === 'route' ? (
-            <RouteTab job={job} />
-          ) : (
-            <LoadPlanTab job={job} />
-          )}
-        </Flex>
-      </div>
+            )}
+            {part?.mode === 'AIR' ? (
+              <FlightTrip job={job} part={part} />
+            ) : view === 'route' ? (
+              <RouteTab job={job} />
+            ) : (
+              <LoadPlanTab job={job} />
+            )}
+          </Flex>
+        </div>
+      </Flex>
       {addModal}
     </Flex>
   );

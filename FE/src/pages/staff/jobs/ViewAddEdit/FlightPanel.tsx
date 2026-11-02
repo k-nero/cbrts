@@ -44,7 +44,7 @@ export function FlightPanel({ job }: { job: JobDetail }) {
               <Chip tone={full ? 'bad' : 'neutral'}>
                 {flight.stallCapacity != null
                   ? `${taken} of ${flight.stallCapacity} stall positions`
-                  : `${taken} stall positions · capacity not set`}
+                  : `${taken} stall ${taken === 1 ? 'position' : 'positions'} · capacity not set`}
               </Chip>
             }
           >

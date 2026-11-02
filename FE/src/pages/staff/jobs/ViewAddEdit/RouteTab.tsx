@@ -1,22 +1,37 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Flex } from 'antd';
 
 import { ConfirmRouteModal } from './ConfirmRouteModal';
+import { DepartureReadiness } from './DepartureReadiness';
 import { FlightPanel } from './FlightPanel';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
-import { RecordDepartureButton } from './RecordDepartureButton';
+import { departureReadiness } from './readiness';
+import { legLine, span, stopTimes } from './timeline';
+import { TripConnections } from './TripConnections';
 import { RouteChecks } from './RouteChecks';
 import { routeChecks } from './routeDraft';
 import { RouteEditor } from './RouteEditor';
 import { ShareSuggestions } from './ShareSuggestions';
 
-import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
+import { Button, Callout, Chip, cx, Panel, TimelineStop } from '@/components/ui';
 import { useCanPlanTrips, useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
+import { formatTime, ict } from '@/lib/utils';
 
 interface Props {
   job: JobDetail;
+}
+
+/** How much of the arrival window the delivery leaves spare (DESIGN.md, arrival window on the Route plan). */
+function windowSpare(plannedAt: string, windowEnd: string) {
+  const minutes = ict(windowEnd).diff(ict(plannedAt), 'minute');
+  const closes = formatTime(windowEnd);
+  if (minutes === 0) return `Planned as the window closes at ${closes}.`;
+  return minutes > 0
+    ? `Planned ${span(minutes)} before the window closes at ${closes}.`
+    : `Planned ${span(minutes)} after the window closes at ${closes}.`;
 }
 
 export function RouteTab({ job }: Props) {
@@ -24,6 +39,7 @@ export function RouteTab({ job }: Props) {
   const { data: allVersions } = useRoutePlans(job.id);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [, setSearchParams] = useSearchParams();
 
   // The trip of the journey this tab plans, and the one that hands the horses on to it (US-F3-16).
   const index = job.parts.findIndex((part) => part.current);
@@ -137,23 +153,18 @@ export function RouteTab({ job }: Props) {
     );
   }
 
-  const isGateClear = job.clearanceGateState === 'Clear';
+  // What the trip still needs before it leaves; the one gold action is the first open step's.
+  const readiness = departureReadiness(
+    job,
+    part,
+    before,
+    // A draft waiting to be confirmed holds the route open, and the gold with it.
+    (confirmed !== null || routePlan.status === 'CONFIRMED') && !draft,
+  );
 
   const formatWindow = () => {
     if (job.windowStart && job.windowEnd) {
-      const s = new Date(job.windowStart).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const e = new Date(job.windowEnd).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const d = new Date(job.windowEnd).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-      });
-      return `${d}, ${s}–${e}`;
+      return `${ict(job.windowEnd).format('D MMM')}, ${formatTime(job.windowStart)}–${formatTime(job.windowEnd)}`;
     }
     return 'Any time';
   };
@@ -166,54 +177,39 @@ export function RouteTab({ job }: Props) {
     ? (stops.at(-1)?.placeName ?? job.destinationCity)
     : job.destinationCity;
   const welfareCount = stops.filter((s) => s.kind === 'WELFARE').length;
+  const times = stopTimes(stops);
   const borderCrossing = stops.find((s) => s.kind === 'BORDER')?.borderCrossingName || 'None';
 
   return (
-    <Flex vertical gap={32}>
+    <Flex vertical gap={24}>
       {chainPanel}
       {draftPanel}
       {editor}
-      {sharePanel}
 
-      {/* Summary Strip (matching Figma scrRoute) */}
-      <div className="p-6 rounded-xl border border-line bg-card shadow-xs">
-        <Flex wrap gap={32} align="center" justify="space-between">
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Origin</span>
-            <span className="type-label-m text-ink">{origin}</span>
+      {/* Summary strip (Figma "Fleet & route coordinator · Route plan") */}
+      <div className="flex flex-wrap gap-x-10 gap-y-4 rounded-lg border border-line bg-card px-6 py-[18px]">
+        {[
+          ['Origin', origin],
+          ['Destination', destination],
+          ['Distance', routePlan.distanceKm ? `${routePlan.distanceKm} km` : '—'],
+          [
+            'Duration',
+            routePlan.durationMin ? `${+(routePlan.durationMin / 60).toFixed(1)} h` : '—',
+          ],
+          ['Border crossing', borderCrossing],
+          ['Welfare stops', welfareCount],
+          ['Arrival window', part?.handsOn ? 'Hands on to the next trip' : formatWindow()],
+        ].map(([label, value]) => (
+          <Flex key={label} vertical gap={4}>
+            <span className="type-body-s text-ink-3">{label}</span>
+            <span className="type-label-m text-ink">{value}</span>
           </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Destination</span>
-            <span className="type-label-m text-ink">{destination}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Distance</span>
-            <span className="type-label-m text-ink">{routePlan.distanceKm || 0} km</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Duration</span>
-            <span className="type-label-m text-ink">
-              {routePlan.durationMin ? `${(routePlan.durationMin / 60).toFixed(1)} h` : '—'}
-            </span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Border crossing</span>
-            <span className="type-label-m text-ink">{borderCrossing}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Welfare stops</span>
-            <span className="type-label-m text-ink">{welfareCount}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Arrival window</span>
-            <span className="type-label-m text-ink">
-              {part?.handsOn ? 'Hands on to the next trip' : formatWindow()}
-            </span>
-          </Flex>
-        </Flex>
+        ))}
       </div>
 
       <FlightPanel job={job} />
+
+      <TripConnections job={job} />
 
       {/* Timeline of Stops */}
       <Flex vertical gap={16}>
@@ -221,12 +217,7 @@ export function RouteTab({ job }: Props) {
           <h3 className="type-h3 text-ink">Timeline</h3>
           <Flex gap={8} align="center">
             {planning && !draft && !editing && (
-              <Button
-                variant="secondary"
-                size="sm"
-
-                onClick={() => setEditing(true)}
-              >
+              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
                 Edit route
               </Button>
             )}
@@ -234,14 +225,13 @@ export function RouteTab({ job }: Props) {
           </Flex>
         </Flex>
 
-        <Flex vertical gap={16}>
-          {stops.map((stop) => {
-            const timeStr = stop.plannedAt
-              ? new Date(stop.plannedAt).toLocaleTimeString('en-GB', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '—';
+        <div className="flex flex-col">
+          {stops.map((stop, i) => {
+            const timeStr = times[i];
+            // The leg to the next stop, under a 2 px rule beneath the marker (DESIGN.md, Route editor).
+            const leg =
+              i < stops.length - 1 ? routePlan.legs?.find((l) => l.fromStopId === stop.id) : null;
+            const line = leg ? legLine(leg) : null;
 
             // On a shared trip each pickup and delivery names its job (US-F3-11).
             const shared = new Set(stops.map((s) => s.jobCode).filter(Boolean)).size > 1;
@@ -250,50 +240,66 @@ export function RouteTab({ job }: Props) {
                 ? stop.borderCrossingName || 'Border'
                 : stop.placeName || 'Stop';
             const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
+            // The delivery says how much of the arrival window the plan leaves spare.
+            const spare =
+              stop.kind === 'DELIVERY' &&
+              (!stop.jobCode || stop.jobCode === job.code) &&
+              !part?.handsOn &&
+              job.windowStart &&
+              job.windowEnd &&
+              stop.plannedAt
+                ? windowSpare(stop.plannedAt, job.windowEnd)
+                : null;
+            const details = [stop.details, spare].filter(Boolean).join(' ');
 
             return (
-              <TimelineStop
-                key={stop.id}
-                kind={stop.kind}
-                stop={stopName}
-                time={timeStr}
-                details={stop.details || undefined}
-              />
+              <div key={stop.id} className="flex flex-col">
+                <TimelineStop
+                  kind={stop.kind}
+                  stop={stopName}
+                  time={timeStr}
+                  details={details || undefined}
+                />
+                {i < stops.length - 1 && (
+                  <div className="ml-[17px] min-h-4 border-l-2 border-line py-2.5 pl-[33px]">
+                    {line && (
+                      <span
+                        className={cx(
+                          'type-caption',
+                          line.missingTime ? 'text-warn' : 'text-ink-3',
+                        )}
+                      >
+                        {line.text}
+                        {line.missingTime &&
+                          ' · the welfare stops this drive needs can’t be checked'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
-        </Flex>
+        </div>
       </Flex>
 
-      {/* Departure gate and action; once the trip has left, On the road takes over. */}
-      {!departed && (
-        <div className="p-6 rounded-xl border border-line bg-card">
-          <Flex vertical gap={16}>
-            {!isGateClear ? (
-              <>
-                <Callout tone="bad" title="Departure can’t be recorded yet">
-                  {job.clearanceGateSummary ||
-                    'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
-                </Callout>
-                <div>
-                  <Button variant="primary" size="md" disabled leadingIcon="lock">
-                    Record departure
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <Callout tone="ok" title="Clear to depart">
-                  {job.clearanceGateSummary ||
-                    'The dossier is cleared. The driver may record departure.'}
-                </Callout>
-                <div>
-                  <RecordDepartureButton job={job} part={part} />
-                </div>
-              </>
-            )}
-          </Flex>
-        </div>
+      {/* Ready to depart, until the trip leaves and On the road takes over; hidden while the route is edited. */}
+      {!departed && !editing && (
+        <DepartureReadiness
+          job={job}
+          part={part}
+          steps={readiness}
+          onOpenLoadPlan={() =>
+            setSearchParams(
+              { tab: 'trip', ...(part ? { trip: part.tripId } : {}), view: 'load-plan' },
+              { replace: true },
+            )
+          }
+          onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+        />
       )}
+
+      {/* Not in the Route plan frame, so after its blocks: sharing and joining (US-F3-13, US-F3-18). */}
+      {sharePanel}
 
       {/* Version History */}
       {allVersions && allVersions.length > 1 && (

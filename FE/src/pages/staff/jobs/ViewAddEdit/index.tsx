@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
-import { Callout, ClearanceGate, StageMark } from '@/components/ui';
+import { Button, Callout, ClearanceGate, StageMark } from '@/components/ui';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
@@ -104,11 +104,15 @@ function JobWorkspace() {
     : 'Not scheduled';
 
   const trailerCodes = job.loadPlan?.vehicles.map((v) => v.vehicleCode) ?? [];
+  const flown = job.parts.find((p) => p.current)?.mode === 'AIR';
   const trailerCode =
     trailerCodes.length === 0
-      ? 'vehicle'
+      ? flown
+        ? 'flown'
+        : 'no trailer yet'
       : `${trailerCodes.length === 1 ? 'trailer' : 'trailers'} ${trailerCodes.join(', ')}`;
-  const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
+  const horseCount = job.horses?.length ?? 0;
+  const metaText = `${horseCount} ${horseCount === 1 ? 'horse' : 'horses'} · ${trailerCode} · departs ${departureDateStr}`;
   // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
   const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
 
@@ -183,9 +187,25 @@ function JobWorkspace() {
               other part goes on as planned.
             </Callout>
           )}
+          {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate). */}
           <ClearanceGate
             state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
-          ></ClearanceGate>
+            action={
+              job.clearanceGateState !== 'Clear' &&
+              activeTab.key !== 'clearance' && (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  trailingIcon="arrow-right"
+                  onClick={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+                >
+                  View outstanding items
+                </Button>
+              )
+            }
+          >
+            {job.clearanceGateSummary}
+          </ClearanceGate>
         </Flex>
 
         {tabsView}
