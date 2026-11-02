@@ -4,6 +4,7 @@ import { App, Col, Flex, Row, Skeleton } from 'antd';
 import PageHeader from '@/components/PageHeader';
 import { Callout, Chip, StageMark } from '@/components/ui';
 import { useDocumentReviewDetail, useReviewDocument } from '@/hooks/clearance';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { DocumentReviewEnum, type ReviewDocumentRequest } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
@@ -27,6 +28,13 @@ const DocumentReviewPage: FC = () => {
   const { message } = App.useApp();
 
   const { data: detail } = useDocumentReviewDetail(id);
+  // A document has no code; the trail names it as the page title does ("Bella · Health certificate").
+  useBreadcrumb({
+    id,
+    label:
+      detail &&
+      `${detail.item.horseName ? `${detail.item.horseName} · ` : ''}${detail.item.documentTypeName || 'Document'}`,
+  });
   const reviewMutation = useReviewDocument(detail?.jobId);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
