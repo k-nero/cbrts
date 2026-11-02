@@ -41,5 +41,6 @@ public interface QuarantinePeriodRepository
      * The job's quarantines at a station that are not completed yet.
      */
     List<QuarantinePeriod> findByJobIdAndPlaceIdAndCompletedAtIsNull(UUID jobId, UUID placeId);
+
     boolean existsByPlaceId(UUID placeId);
 }
