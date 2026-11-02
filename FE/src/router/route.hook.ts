@@ -13,7 +13,14 @@ export type RouteName = NameInto<typeof routesConfig>;
 
 type AdditionOption = { force?: boolean };
 
-type MatchedConfig = Pick<RouteConfigItem, 'roles' | 'type' | 'name' | 'breadcrumb'>;
+type MatchedConfig = Pick<RouteConfigItem, 'roles' | 'type' | 'name' | 'breadcrumb'> & {
+  /** The path up to and including this route's segment, e.g. "/staff/jobs/3f2a…". */
+  href: string;
+  /** The URL segment this route matched, without its slash; a record's id on a dynamic route. */
+  segment: string;
+  /** Whether the route's path is a placeholder ("/{id}"), so the segment names a record. */
+  dynamic: boolean;
+};
 
 /** The config of every route along `pathname`, outermost first. */
 export function configsForPath(pathname: string): MatchedConfig[] {
@@ -23,14 +30,19 @@ export function configsForPath(pathname: string): MatchedConfig[] {
     .map((s) => `/${s}`);
   let level: readonly RouteConfigItem[] = routesConfig;
   const result: MatchedConfig[] = [];
+  let href = '';
   for (const segment of segments) {
     const found = level.find((c) => DYNAMIC_PATH_REGEX.test(c.path) || c.path === segment);
     if (!found) break;
+    href += segment;
     result.push({
       roles: found.roles,
       type: found.type,
       name: found.name,
       breadcrumb: found.breadcrumb,
+      href,
+      segment: segment.slice(1),
+      dynamic: DYNAMIC_PATH_REGEX.test(found.path),
     });
     level = found.children ?? [];
   }

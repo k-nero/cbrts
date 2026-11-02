@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import Table from '@/components/table';
 import { Button, Callout, Panel, Tabs } from '@/components/ui';
 import { useReviewQueue } from '@/hooks/staffRequest';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import type { QueueRow } from '@/interfaces';
 import { useCustomRouter } from '@/router/route.hook';
 import { useGeneratedRequestColumn } from '@/pages/staff/requests/useGeneratedRequestColumn.tsx';
@@ -27,6 +28,8 @@ const TABS: { key: View; label: string }[] = [
 const RequestsPage: FC = () => {
   const [params, setParams] = useSearchParams();
   const view: View = params.get('view') === 'quotes' ? 'quotes' : 'queue';
+  // The queue is the page itself; Quotes out adds a part ("Requests / Quotes out").
+  useBreadcrumb({ tab: view === 'quotes' ? TABS[1].label : undefined });
   const router = useCustomRouter();
   const [page, setPage] = useState(0);
   const query = useReviewQueue(page);

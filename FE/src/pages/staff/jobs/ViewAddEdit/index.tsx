@@ -4,6 +4,7 @@ import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
 import { Callout, StageMark } from '@/components/ui';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 import { useRouterNavigation } from '@/router/route.hook';
@@ -85,6 +86,7 @@ function JobWorkspace() {
 
   // A failed load (404 included) goes to the error boundary; until the job arrives, the page is a skeleton.
   const { data: job } = useJobDetail(id || '');
+  useBreadcrumb({ id, label: job?.code, tab: activeTab.label });
 
   const items = useMemo<TabsProps['items']>(
     () =>
