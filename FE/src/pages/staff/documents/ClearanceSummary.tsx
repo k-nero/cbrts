@@ -70,7 +70,7 @@ const ClearanceSummary: FC<Props> = ({ jobId, status, withGate = true }) => {
           />
         </Col>
       </Row>
-{/*
+      {/*
       {status.outstandingIssues.length > 0 && (
         <Callout tone="bad" title="What holds departure">
           <div className="mt-1">
