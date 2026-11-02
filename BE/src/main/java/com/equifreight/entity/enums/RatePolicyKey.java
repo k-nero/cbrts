@@ -30,7 +30,10 @@ public enum RatePolicyKey {
     PLAN_START_HOUR,
     /** The average road speed, km/h, a drafted route's driving time is worked out at. */
     PLAN_SPEED_KMH,
-    /** Hours of driving between two welfare stops on a drafted route. */
+    /**
+     * Retired: hours of driving between two welfare stops. Each road corridor sets its welfare stops now (V39); kept
+     * so versions that set it still load, refused when a draft tries to set it, and read by nothing.
+     */
     PLAN_WELFARE_EVERY_HOURS,
     /** Minutes a drafted route stays at a welfare stop. */
     PLAN_WELFARE_STOP_MIN,

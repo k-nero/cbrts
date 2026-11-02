@@ -203,8 +203,8 @@ public class JourneyDrafter {
     /**
      * A road trip's drafted route (US-F3-22): the pickup at {@code from}, then, country by country in the trip's
      * direction, the welfare stops in that country and the border crossing out of it, then the {@code endKind} at
-     * {@code to}. Welfare stops are the catalog's welfare places in the countries passed through, one per
-     * {@code welfareEveryHours} of driving. The driving time, the corridor's distance at the planned speed, is shared
+     * {@code to}. Welfare stops are the catalog's welfare places in the countries passed through, as many as the
+     * corridor plans for (none when it sets none). The driving time, the corridor's distance at the planned speed, is shared
      * equally between the legs; border and welfare stops add their stays, and a transfer before a flight its wait at
      * the cargo terminal. Untimed when {@code start} is null.
      */
@@ -227,7 +227,7 @@ public class JourneyDrafter {
         }
         Integer distance = corridor.getDistanceKm();
         Integer driveMin = planning.driveMin(distance);
-        int needed = planning.welfareStopsFor(driveMin);
+        int needed = corridor.getWelfareStops() == null ? 0 : corridor.getWelfareStops();
 
         Set<String> ends = new HashSet<>();
         for (Place p : new Place[] {from, to})
@@ -282,10 +282,10 @@ public class JourneyDrafter {
 
         List<String> notes = new ArrayList<>();
         if (found < needed) {
-            notes.add("The drive takes about " + Math.round(driveMin / 60.0) + " h, so it needs " + needed
-                    + " welfare " + (needed == 1 ? "stop" : "stops") + "; the catalog has " + found + " in "
+            notes.add(corridor.getCode() + " plans for " + needed + " welfare " + (needed == 1 ? "stop" : "stops")
+                    + "; the catalog has " + found + " in "
                     + String.join(", ", countries.stream().map(Country::getName).toList())
-                    + ". Add one if the drive needs a rest.");
+                    + ". Add the ones still open, or plan without them.");
         }
         if (distance == null)
             notes.add(corridor.getCode() + " has no distance, so its times are left for you to plan.");

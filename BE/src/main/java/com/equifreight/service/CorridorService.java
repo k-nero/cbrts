@@ -136,6 +136,7 @@ public class CorridorService {
                 request.drivingDays() == null
                         ? Corridor.drivingDaysFor(request.distanceKm())
                         : request.drivingDays().shortValue());
+        corridor.setWelfareStops(request.mode() == TransportMode.ROAD ? welfareStops(request.welfareStops()) : null);
         corridor.setOriginCountry(from);
         corridor.setDestinationCountry(to);
         for (int i = 0; i < route.size(); i++) {
@@ -198,6 +199,7 @@ public class CorridorService {
         if (corridor.isRoad() && request.drivingDays() != null) {
             corridor.setDrivingDays(request.drivingDays().shortValue());
         }
+        if (corridor.isRoad()) corridor.setWelfareStops(welfareStops(request.welfareStops()));
         if (crossingsChanged) {
             corridor.getCrossings().clear();
             // Flush the removals first: (corridor, seq) is unique, and the new rows reuse the same seqs.
@@ -260,7 +262,16 @@ public class CorridorService {
                 null);
     }
 
-    /** "RD HCM → PNH, 230 km, ±3 days, 1 day, via Mộc Bài – Bavet", for the audit log. */
+    /** A road route's welfare stops, 0 to 20, or null for none. */
+    private static Short welfareStops(Integer stops) {
+        if (stops == null) return null;
+        if (stops < 0 || stops > 20) {
+            throw new BusinessException("CORRIDOR_WELFARE_STOPS", "Welfare stops must be a whole number from 0 to 20.");
+        }
+        return stops.shortValue();
+    }
+
+    /** "RD HCM → PNH, 230 km, ±3 days, 1 day, 2 welfare stops, via Mộc Bài – Bavet", for the audit log. */
     private static String describe(Corridor c) {
         List<String> via = c.getCrossings().stream()
                 .map(cc -> cc.getBorderCrossing().getName())
@@ -269,6 +280,9 @@ public class CorridorService {
                 + (c.getDistanceKm() == null ? "" : ", " + c.getDistanceKm() + " km")
                 + ", " + words(c.getDateFlexDays())
                 + (c.isRoad() ? ", " + dayWords(c.getDrivingDays()) : "")
+                + (c.getWelfareStops() == null
+                        ? ""
+                        : ", " + c.getWelfareStops() + " welfare " + (c.getWelfareStops() == 1 ? "stop" : "stops"))
                 + (via.isEmpty() ? "" : ", via " + String.join(", ", via));
     }
 
