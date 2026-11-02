@@ -15,12 +15,18 @@ import PlaceList from './PlaceList';
 import PageHeader from '@/components/PageHeader';
 import { Tabs } from '@/components/ui';
 import { useCorridorList, useDeleteBorderCrossing, usePlaceList } from '@/hooks/routeCatalog';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useBorderCrossings } from '@/hooks/useJob';
 import type { BorderCrossing, Corridor, Place } from '@/interfaces';
 
 const TABS = ['routes', 'crossings', 'places'] as const;
 type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, string> = {
+  routes: 'Routes',
+  crossings: 'Border crossings',
+  places: 'Places',
+};
 
 const asTab = (value: string | null): Tab =>
   TABS.includes(value as Tab) ? (value as Tab) : 'routes';
@@ -37,6 +43,8 @@ const placeSortNote = (field: string, order: 'ascend' | 'descend') =>
 const CorridorsPage = () => {
   const [params, setParams] = useSearchParams();
   const tab = asTab(params.get('tab'));
+  // The first tab is the page itself ("Routes"); the others add a part ("Routes / Places").
+  useBreadcrumb({ tab: tab === 'routes' ? undefined : TAB_LABELS[tab] });
   const crud = useCorridorList();
   const places = usePlaceList();
   const crossings = useBorderCrossings(true);
@@ -118,9 +126,9 @@ const CorridorsPage = () => {
           activeKey={tab}
           onChange={setTab}
           items={[
-            { key: 'routes', label: 'Routes', count: routeTotal },
-            { key: 'crossings', label: 'Border crossings', count: crossingTotal },
-            { key: 'places', label: 'Places', count: placeTotal },
+            { key: 'routes', label: TAB_LABELS.routes, count: routeTotal },
+            { key: 'crossings', label: TAB_LABELS.crossings, count: crossingTotal },
+            { key: 'places', label: TAB_LABELS.places, count: placeTotal },
           ]}
         />
 

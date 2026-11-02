@@ -11,6 +11,7 @@ import { InvoiceLines } from '@/components/invoice/InvoiceLines';
 import PageHeader from '@/components/PageHeader';
 import { Button, Chip, Panel } from '@/components/ui';
 import { useInvoice, useIssueInvoice } from '@/hooks/invoice';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import type { InvoiceLine } from '@/interfaces';
 import { apiErrorMessage, formatDate, formatDayTime, money } from '@/lib/utils';
 
@@ -32,6 +33,7 @@ export default function InvoiceDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { message } = App.useApp();
   const { data: invoice } = useInvoice(id);
+  useBreadcrumb({ id, label: invoice?.code });
   const issue = useIssueInvoice(id);
   const [editing, setEditing] = useState<InvoiceLine | null>(null);
   if (!invoice) return <Skeleton active paragraph={{ rows: 8 }} />;

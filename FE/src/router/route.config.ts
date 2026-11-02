@@ -150,7 +150,23 @@ export const routesConfig = [
     breadcrumb: '',
     name: 'staff',
     children: [
-      { path: '/jobs', roles: ['*'], type: 'authenticated', breadcrumb: 'Jobs', name: 'jobs' },
+      {
+        path: '/jobs',
+        roles: ['*'],
+        type: 'authenticated',
+        breadcrumb: 'Jobs',
+        name: 'jobs',
+        children: [
+          // Labelled by the job's code once the page has it (useBreadcrumb).
+          {
+            path: '/{id}',
+            roles: ['*'],
+            type: 'authenticated',
+            breadcrumb: 'Job',
+            name: 'job-detail',
+          },
+        ],
+      },
       {
         // Every staff role has one; the bell in the top bar opens it.
         path: '/notifications',
@@ -165,13 +181,6 @@ export const routesConfig = [
         type: 'authenticated',
         breadcrumb: 'Trip progress',
         name: 'staff-trips',
-      },
-      {
-        path: '/jobs/:id',
-        roles: ['*'],
-        type: 'authenticated',
-        breadcrumb: 'Job workspace',
-        name: 'job-detail',
       },
       {
         path: '/overview',
@@ -261,11 +270,21 @@ export const routesConfig = [
         name: 'documents',
         children: [
           {
-            path: '/review/{id}',
+            // Not a page of its own: no label, so the trail goes Documents / the document.
+            path: '/review',
             roles: [TS],
             type: 'authenticated',
-            breadcrumb: 'Review',
-            name: 'document-review',
+            breadcrumb: '',
+            name: 'document-reviews',
+            children: [
+              {
+                path: '/{id}',
+                roles: [TS],
+                type: 'authenticated',
+                breadcrumb: 'Document',
+                name: 'document-review',
+              },
+            ],
           },
         ],
       },

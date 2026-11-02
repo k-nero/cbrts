@@ -24,6 +24,7 @@ import {
   useReviseQuotation,
   useStartQuotation,
 } from '@/hooks/staffRequest';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import type { QuotationDraft, ServiceClass } from '@/interfaces';
 import { queryKeys } from '@/constant/query';
 import {
@@ -50,6 +51,7 @@ const QuotationBuilderPage: FC = () => {
   const [params, setParams] = useSearchParams();
   const version = Number(params.get('version')) || undefined;
   const query = useQuotation(id, version);
+  useBreadcrumb({ id, label: query.data?.request.code });
   const start = useStartQuotation();
   const changeClass = useChangeQuotationClass();
   const reprice = useRepriceQuotation();
