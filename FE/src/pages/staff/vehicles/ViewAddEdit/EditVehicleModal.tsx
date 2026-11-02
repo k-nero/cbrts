@@ -2,8 +2,8 @@ import { type FC, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
-import { cityOptions, corridorOptions, countryOptions } from '../vehicleOptions';
-import { type PermitsForm, permitsSchema } from './schema';
+import { cityOptions, corridorOptions, countryOptions, KIND_OPTIONS } from '../vehicleOptions';
+import { type EditVehicleForm, editVehicleSchema } from './schema';
 
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -12,7 +12,7 @@ import BaseModal from '@/components/modal/BaseModal';
 import { useCatalogPlaces, useCountries } from '@/hooks/routeCatalog';
 import { useCorridors } from '@/hooks/useJob';
 import { useUpdateVehicle } from '@/hooks/useVehicle';
-import type { Vehicle } from '@/interfaces';
+import type { Vehicle, VehicleKind } from '@/interfaces';
 import { apiErrorMessage } from '@/lib';
 
 type Props = {
@@ -22,11 +22,12 @@ type Props = {
 };
 
 /**
- * Countries and corridors (US-F7-01): where a vehicle is based, the countries it holds permits for
- * and the road corridors it works. The server refuses taking away a permit one of its corridors
- * needs, or a corridor or home country a trip it is still on depends on, naming what needs it.
+ * Edit vehicle: its code, kind and payload, where it is based, the countries it holds permits for and
+ * the road corridors it works (US-F7-01). Its stalls stay as they are. The server refuses a code
+ * another vehicle has, taking away a permit one of its corridors needs, or a corridor or home country
+ * a trip it is still on depends on, naming what needs it.
  */
-const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
+const EditVehicleModal: FC<Props> = ({ vehicle, onClose }) => {
   const { message } = App.useApp();
   const open = vehicle !== null;
   const update = useUpdateVehicle();
@@ -36,7 +37,7 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
   const corridors = useCorridors(open);
   const countryChoices = useMemo(() => countryOptions(countries.data), [countries.data]);
   const corridorChoices = useMemo(() => corridorOptions(corridors.data), [corridors.data]);
-  const methods = useFormCustom<PermitsForm>({ resolver: zodResolver(permitsSchema) });
+  const methods = useFormCustom<EditVehicleForm>({ resolver: zodResolver(editVehicleSchema) });
 
   useEffect(() => {
     if (!vehicle) return;
@@ -45,6 +46,9 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
       value: c.id,
     });
     methods.reset({
+      code: vehicle.code,
+      kind: KIND_OPTIONS.find((k) => k.value === vehicle.kind) ?? null,
+      payloadKg: vehicle.payloadKg,
       homeCity: vehicle.homeCity ? { label: vehicle.homeCity, value: vehicle.homeCity } : null,
       permittedCountries: (vehicle.permittedCountries ?? []).map(asOption),
       operatingCorridors: (vehicle.operatingCorridors ?? []).map(asOption),
@@ -57,12 +61,15 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
       const saved = await update.mutateAsync({
         id: vehicle.id,
         body: {
+          code: v.code,
+          kind: v.kind?.value as VehicleKind,
+          payloadKg: v.payloadKg,
           homeCity: v.homeCity?.value,
           permittedCountryIds: (v.permittedCountries ?? []).map((c) => c.value),
           operatingCorridorIds: (v.operatingCorridors ?? []).map((c) => c.value),
         },
       });
-      void message.success(`${saved.code}’s countries and corridors saved.`);
+      void message.success(`${saved.code} saved.`);
       onClose();
     } catch (err) {
       methods.setError('form_error', {
@@ -75,7 +82,7 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
     <BaseModal
       open={open}
       onCancel={onClose}
-      title={vehicle ? `${vehicle.code} · Countries and corridors` : 'Countries and corridors'}
+      title={vehicle ? `${vehicle.code} · Edit vehicle` : 'Edit vehicle'}
     >
       <FormWrapper
         methods={methods}
@@ -87,6 +94,26 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
       >
         {({ FormField }) => (
           <>
+            <Flex gap={16}>
+              <FormField
+                name="code"
+                label="Vehicle code"
+                component="text"
+                componentProps={{ isRequired: true, placeholder: 'TX-550', maxLength: 20 }}
+              />
+              <FormField
+                name="kind"
+                label="Kind"
+                component="select"
+                componentProps={{ isRequired: true, options: KIND_OPTIONS }}
+              />
+            </Flex>
+            <FormField
+              name="payloadKg"
+              label="Payload (kg)"
+              component="number"
+              componentProps={{ isRequired: true, min: 500, max: 40000, step: 100 }}
+            />
             <FormField
               name="homeCity"
               label="Based in"
@@ -133,4 +160,4 @@ const EditPermitsModal: FC<Props> = ({ vehicle, onClose }) => {
   );
 };
 
-export default EditPermitsModal;
+export default EditVehicleModal;

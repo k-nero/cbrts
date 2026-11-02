@@ -1,10 +1,12 @@
 import { Flex } from 'antd';
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Chip, Icon, Panel } from '@/components/ui';
 import { useFleetCalendar, useVehicles } from '@/hooks/useVehicle';
 import { type VehicleKind, VehicleKindEnum } from '@/interfaces';
 
 export default function FleetCalendarPage() {
+  const navigate = useNavigate();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('ALL');
   const [selectedKind, setSelectedKind] = useState<VehicleKind | 'ALL'>('ALL');
   const [startDate, setStartDate] = useState<string>('');
@@ -156,8 +158,21 @@ export default function FleetCalendarPage() {
                           ? 'info'
                           : 'neutral';
 
+                  // A trip's booking opens the job's Trip tab on that trip; a shared trip, its first job.
+                  const jobIds = b.jobIds ?? (b.jobId ? [b.jobId] : []);
+                  const jobCodes = b.jobCode?.split(', ') ?? [];
+                  const tripHref = (jobId: string) =>
+                    `/staff/jobs/${jobId}?tab=trip${b.tripId ? `&trip=${b.tripId}` : ''}`;
+                  const opens = jobIds.length > 0 ? tripHref(jobIds[0]) : null;
+
                   return (
-                    <div key={b.id} className="py-4">
+                    <div
+                      key={b.id}
+                      className={
+                        opens ? '-mx-3 cursor-pointer rounded-lg px-3 py-4 hover:bg-muted' : 'py-4'
+                      }
+                      onClick={opens ? () => void navigate(opens) : undefined}
+                    >
                       <Flex wrap gap={16} align="center" justify="space-between">
                         <Flex gap={16} align="center">
                           <Flex
@@ -180,7 +195,23 @@ export default function FleetCalendarPage() {
                                     {' · '}
                                   </>
                                 )}
-                                Job <span className="font-mono font-medium">{b.jobCode}</span>
+                                {jobCodes.length > 1 ? 'Jobs ' : 'Job '}
+                                {jobCodes.map((code, i) => (
+                                  <span key={code}>
+                                    {i > 0 && ', '}
+                                    {jobIds[i] ? (
+                                      <Link
+                                        to={tripHref(jobIds[i])}
+                                        className="font-mono font-medium text-ink! underline"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {code}
+                                      </Link>
+                                    ) : (
+                                      <span className="font-mono font-medium">{code}</span>
+                                    )}
+                                  </span>
+                                ))}
                               </span>
                             ) : b.requestCode ? (
                               <span className="type-body-s text-ink-2">

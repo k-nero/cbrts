@@ -35,23 +35,31 @@ const checkPermits = (
     });
 };
 
-/** Edit countries and corridors: the vehicle's home country, permits and operating corridors. */
-export const permitsSchema = z.object(permitFields).superRefine(checkPermits);
-export type PermitsForm = z.infer<typeof permitsSchema>;
+const vehicleFields = {
+  code: z.string().trim().min(1, 'Enter the vehicle code, e.g. TX-550.').max(20),
+  kind: option('Pick trailer or truck.'),
+  payloadKg: z.number('Enter the payload in kg.').int().min(500, 'At least 500 kg.').max(40000),
+  ...permitFields,
+};
 
-/** Add vehicle: the code, kind and payload, how many stalls it starts with, and its countries. */
+const checkKind = (v: { kind: unknown }, ctx: z.RefinementCtx) => {
+  if (v.kind === null)
+    ctx.addIssue({ code: 'custom', path: ['kind'], message: 'Pick trailer or truck.' });
+};
+
+/** Edit vehicle: its code, kind and payload, where it is based, its permits and corridors. */
+export const editVehicleSchema = z.object(vehicleFields).superRefine((v, ctx) => {
+  checkPermits(v, ctx);
+  checkKind(v, ctx);
+});
+export type EditVehicleForm = z.infer<typeof editVehicleSchema>;
+
+/** Add vehicle: the above, and how many stalls it starts with. */
 export const vehicleSchema = z
-  .object({
-    code: z.string().trim().min(1, 'Enter the vehicle code, e.g. TX-550.').max(20),
-    kind: option('Pick trailer or truck.'),
-    payloadKg: z.number('Enter the payload in kg.').int().min(500, 'At least 500 kg.').max(40000),
-    stallCount: option('Pick how many stalls.'),
-    ...permitFields,
-  })
+  .object({ ...vehicleFields, stallCount: option('Pick how many stalls.') })
   .superRefine((v, ctx) => {
     checkPermits(v, ctx);
-    if (v.kind === null)
-      ctx.addIssue({ code: 'custom', path: ['kind'], message: 'Pick trailer or truck.' });
+    checkKind(v, ctx);
     if (v.stallCount === null)
       ctx.addIssue({ code: 'custom', path: ['stallCount'], message: 'Pick how many stalls.' });
   });
