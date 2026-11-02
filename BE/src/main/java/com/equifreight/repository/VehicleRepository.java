@@ -27,4 +27,12 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID>, JpaSpec
     @Query("SELECT c.id, COUNT(v) FROM Vehicle v JOIN v.operatingCorridors c WHERE c.id IN :corridorIds "
             + "AND v.status <> com.equifreight.entity.enums.VehicleStatus.RETIRED GROUP BY c.id")
     List<Object[]> countRunningByCorridor(@Param("corridorIds") Collection<UUID> corridorIds);
+
+    /** The vehicles that aren't retired and run {@code corridorId}. */
+    @Query("SELECT v FROM Vehicle v JOIN v.operatingCorridors c WHERE c.id = :corridorId "
+            + "AND v.status <> com.equifreight.entity.enums.VehicleStatus.RETIRED")
+    List<Vehicle> findRunning(@Param("corridorId") UUID corridorId);
+
+    /** A vehicle is based in the city. */
+    boolean existsByHomeCityIgnoreCase(String homeCity);
 }

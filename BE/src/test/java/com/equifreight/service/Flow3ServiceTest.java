@@ -234,7 +234,8 @@ class Flow3ServiceTest {
                 mock(TripVehicleRepository.class),
                 availability,
                 auditService,
-                mock(PlaceRepository.class));
+                mock(PlaceRepository.class),
+                mock(CatalogUsage.class));
         routePlanService = new RoutePlanService(
                 routePlanRepository,
                 routeStopRepository,

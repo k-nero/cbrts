@@ -1,5 +1,6 @@
 package com.equifreight.model.fleet;
 
+import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import java.util.List;
 import java.util.UUID;
@@ -10,6 +11,9 @@ import lombok.Builder;
  */
 @Builder
 public record UpdateVehicleRequest(
+        /* A new code must not be another vehicle's. */
+        String code,
+        VehicleKind kind,
         Integer payloadKg,
         VehicleStatus status,
         /* The city it is based in (US-F7-03); its home country follows. */

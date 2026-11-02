@@ -39,4 +39,6 @@ public interface LoadPlanStallRepository extends JpaRepository<LoadPlanStall, UU
     @Modifying(flushAutomatically = true)
     @Query("delete from LoadPlanStall s where s.loadPlan.id = :loadPlanId")
     void deleteAllForLoadPlan(@Param("loadPlanId") UUID loadPlanId);
+
+    boolean existsByVehicleStallVehicleId(UUID vehicleId);
 }

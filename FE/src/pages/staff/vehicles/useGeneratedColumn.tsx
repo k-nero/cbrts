@@ -16,11 +16,13 @@ import { formatDate } from '@/lib/utils';
  */
 export const useGeneratedVehicleColumn = ({
   onBook,
-  onEditPermits,
+  onEdit,
+  onDelete,
   onSetAvailableOn,
 }: {
   onBook: (v: Vehicle) => void;
-  onEditPermits: (v: Vehicle) => void;
+  onEdit: (v: Vehicle) => void;
+  onDelete: (v: Vehicle) => void;
   onSetAvailableOn: (v: Vehicle) => void;
 }) => {
   const { message } = App.useApp();
@@ -146,13 +148,17 @@ export const useGeneratedVehicleColumn = ({
         key: 'actions',
         width: 480,
         render: (_, v) =>
-          v.status === VehicleStatusEnum.RETIRED ? null : (
+          v.status === VehicleStatusEnum.RETIRED ? (
+            <Button variant="danger" size="sm" onClick={() => onDelete(v)}>
+              Delete
+            </Button>
+          ) : (
             <Flex gap={8}>
               <Button variant="secondary" size="sm" onClick={() => onBook(v)}>
                 Book slot
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => onEditPermits(v)}>
-                Countries and corridors
+              <Button variant="ghost" size="sm" onClick={() => onEdit(v)}>
+                Edit
               </Button>
               <Button variant="ghost" size="sm" onClick={() => onSetAvailableOn(v)}>
                 Expected back
@@ -165,9 +171,12 @@ export const useGeneratedVehicleColumn = ({
               >
                 {v.status === VehicleStatusEnum.ACTIVE ? 'Set maintenance' : 'Set active'}
               </Button>
+              <Button variant="danger" size="sm" onClick={() => onDelete(v)}>
+                Delete
+              </Button>
             </Flex>
           ),
       },
     ];
-  }, [message, onBook, onEditPermits, onSetAvailableOn, update]);
+  }, [message, onBook, onDelete, onEdit, onSetAvailableOn, update]);
 };

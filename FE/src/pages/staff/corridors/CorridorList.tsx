@@ -8,13 +8,15 @@ import type { Corridor } from '@/interfaces';
 
 type Props = {
   crud: ReturnType<typeof useCorridorList>;
+  onEdit: (c: Corridor) => void;
+  onDelete: (c: Corridor) => void;
   onEditDrivingDays: (c: Corridor) => void;
 };
 
 /** The routes we run, paged and sorted by the server (code, A to Z, until a header is clicked). */
-const CorridorList: FC<Props> = ({ crud, onEditDrivingDays }) => {
+const CorridorList: FC<Props> = ({ crud, onEdit, onDelete, onEditDrivingDays }) => {
   const { listQuery, pageState, setPageState } = crud;
-  const columns = useGeneratedCorridorColumn({ onEditDrivingDays });
+  const columns = useGeneratedCorridorColumn({ onEdit, onDelete, onEditDrivingDays });
   return (
     <Table<Corridor>
       id="corridors"
@@ -24,6 +26,7 @@ const CorridorList: FC<Props> = ({ crud, onEditDrivingDays }) => {
       loading={listQuery.isPending || listQuery.isFetching}
       onRefresh={() => void listQuery.refetch()}
       refreshing={listQuery.isFetching && !listQuery.isPending}
+      ignoreKeys={['actions']}
       sorter={
         pageState.sort ? { columnKey: pageState.sort.field, order: pageState.sort.order } : null
       }

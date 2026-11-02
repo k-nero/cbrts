@@ -56,7 +56,8 @@ class CorridorCreateTest {
                 places,
                 crossings,
                 audit,
-                mock(VehicleRepository.class));
+                mock(VehicleRepository.class),
+                mock(CatalogUsage.class));
         when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(place("Phú Thọ", vn)));
         when(places.findByCityIgnoreCase("Phnom Penh")).thenReturn(List.of(place("Phnom Penh stables", kh)));
         when(places.findByCityIgnoreCase("Bangkok")).thenReturn(List.of(place("Chao Phraya stables", th)));

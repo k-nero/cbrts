@@ -50,4 +50,6 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Trip t where t.id = :id")
     void deleteTrip(@Param("id") UUID id);
+
+    boolean existsByCorridorId(UUID corridorId);
 }

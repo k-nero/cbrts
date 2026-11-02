@@ -34,13 +34,14 @@ class RouteCatalogServiceTest {
     private final BorderCrossingRepository crossings = mock(BorderCrossingRepository.class);
     private final CountryRepository countries = mock(CountryRepository.class);
     private final AuditService audit = mock(AuditService.class);
+    private final CatalogUsage usage = mock(CatalogUsage.class);
     private final User khoi = new User();
     private final Country kh = new Country();
     private RouteCatalogService service;
 
     @BeforeEach
     void setUp() {
-        service = new RouteCatalogService(places, crossings, countries, audit);
+        service = new RouteCatalogService(places, crossings, countries, audit, usage);
         kh.setId(UUID.randomUUID());
         kh.setCode("KH");
         kh.setName("Cambodia");
@@ -107,5 +108,137 @@ class RouteCatalogServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("A border crossing joins two different countries.");
         verify(crossings, never()).saveAndFlush(any(BorderCrossing.class));
+    }
+
+    private Place siemReapStables() {
+        Place p = new Place();
+        p.setId(UUID.randomUUID());
+        p.setName("Siem Reap stables");
+        p.setKind(PlaceKind.STABLE);
+        p.setCity("Siem Reap");
+        p.setCountry(kh);
+        when(places.findById(p.getId())).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    @Test
+    @DisplayName("a place is renamed in its own city even while requests use it")
+    void renamesAPlaceInUse() {
+        Place p = siemReapStables();
+        when(usage.placeInUse(p)).thenReturn(Optional.of("Requests start or end at Siem Reap stables."));
+
+        PlaceResponse saved = service.updatePlace(khoi, p.getId(), stables("Angkor stables"));
+
+        assertThat(saved.name()).isEqualTo("Angkor stables");
+        assertThat(saved.city()).isEqualTo("Siem Reap");
+    }
+
+    @Test
+    @DisplayName("a place in use can't move to another city")
+    void refusesMovingAPlaceInUse() {
+        Place p = siemReapStables();
+        when(usage.placeInUse(p)).thenReturn(Optional.of("Requests start or end at Siem Reap stables."));
+        CreatePlaceRequest moved =
+                stables("Siem Reap stables").toBuilder().city("Battambang").build();
+
+        assertThatThrownBy(() -> service.updatePlace(khoi, p.getId(), moved))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Requests start or end at Siem Reap stables. It stays in Siem Reap.");
+        assertThat(p.getCity()).isEqualTo("Siem Reap");
+    }
+
+    @Test
+    @DisplayName("the last place in a city a route runs to can't be deleted")
+    void refusesDeletingTheLastPlaceOfARouteCity() {
+        Place p = siemReapStables();
+        when(usage.placeInUse(p)).thenReturn(Optional.empty());
+        when(usage.lastPlaceOfCity(p)).thenReturn(Optional.of("Siem Reap stables is the last place in Siem Reap."));
+
+        assertThatThrownBy(() -> service.deletePlace(khoi, p.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Siem Reap stables is the last place in Siem Reap.");
+        verify(places, never()).delete(any(Place.class));
+    }
+
+    @Test
+    @DisplayName("a place nothing needs is deleted")
+    void deletesAnUnusedPlace() {
+        Place p = siemReapStables();
+        when(usage.placeInUse(p)).thenReturn(Optional.empty());
+        when(usage.lastPlaceOfCity(p)).thenReturn(Optional.empty());
+
+        service.deletePlace(khoi, p.getId());
+
+        verify(places).delete(p);
+    }
+
+    private BorderCrossing poipet(Country th) {
+        BorderCrossing b = new BorderCrossing();
+        b.setId(UUID.randomUUID());
+        b.setName("Poipet – Aranyaprathet");
+        b.setFromCountry(kh);
+        b.setToCountry(th);
+        when(crossings.findById(b.getId())).thenReturn(Optional.of(b));
+        when(crossings.saveAndFlush(any(BorderCrossing.class))).thenAnswer(inv -> inv.getArgument(0));
+        return b;
+    }
+
+    private Country thailand() {
+        Country th = new Country();
+        th.setId(UUID.randomUUID());
+        th.setCode("TH");
+        th.setName("Thailand");
+        when(countries.findById(th.getId())).thenReturn(Optional.of(th));
+        return th;
+    }
+
+    @Test
+    @DisplayName("a crossing a route takes can't join other countries")
+    void refusesMovingACrossingInUse() {
+        Country th = thailand();
+        Country la = new Country();
+        la.setId(UUID.randomUUID());
+        la.setName("Laos");
+        when(countries.findById(la.getId())).thenReturn(Optional.of(la));
+        BorderCrossing b = poipet(th);
+        when(usage.crossingInUse(b)).thenReturn(Optional.of("RD PNH → BKK takes Poipet – Aranyaprathet."));
+        CreateBorderCrossingRequest moved = CreateBorderCrossingRequest.builder()
+                .name("Poipet – Aranyaprathet")
+                .fromCountryId(kh.getId())
+                .toCountryId(la.getId())
+                .build();
+
+        assertThatThrownBy(() -> service.updateBorderCrossing(khoi, b.getId(), moved))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Its countries stay as they are.");
+    }
+
+    @Test
+    @DisplayName("a crossing in use can still be renamed and turned the other way")
+    void renamesACrossingInUse() {
+        Country th = thailand();
+        BorderCrossing b = poipet(th);
+        when(usage.crossingInUse(b)).thenReturn(Optional.of("RD PNH → BKK takes Poipet – Aranyaprathet."));
+        CreateBorderCrossingRequest renamed = CreateBorderCrossingRequest.builder()
+                .name("Aranyaprathet – Poipet")
+                .fromCountryId(th.getId())
+                .toCountryId(kh.getId())
+                .roadOnly(true)
+                .build();
+
+        service.updateBorderCrossing(khoi, b.getId(), renamed);
+
+        assertThat(b.getName()).isEqualTo("Aranyaprathet – Poipet");
+        assertThat(b.isRoadOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a crossing in use can't be deleted")
+    void refusesDeletingACrossingInUse() {
+        BorderCrossing b = poipet(thailand());
+        when(usage.crossingInUse(b)).thenReturn(Optional.of("RD PNH → BKK takes Poipet – Aranyaprathet."));
+
+        assertThatThrownBy(() -> service.deleteBorderCrossing(khoi, b.getId())).isInstanceOf(ConflictException.class);
+        verify(crossings, never()).delete(any(BorderCrossing.class));
     }
 }

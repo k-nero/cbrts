@@ -58,4 +58,7 @@ public interface CorridorRepository extends JpaRepository<Corridor, UUID> {
     @Query("SELECT DISTINCT c FROM Corridor c LEFT JOIN FETCH c.crossings cc LEFT JOIN FETCH cc.borderCrossing b "
             + "LEFT JOIN FETCH b.toCountry LEFT JOIN FETCH c.originCountry LEFT JOIN FETCH c.destinationCountry")
     List<Corridor> findNetwork();
+
+    /** A route starts or ends in the city. */
+    boolean existsByOriginCityIgnoreCaseOrDestinationCityIgnoreCase(String originCity, String destinationCity);
 }

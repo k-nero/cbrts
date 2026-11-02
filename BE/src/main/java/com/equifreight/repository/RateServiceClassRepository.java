@@ -15,4 +15,6 @@ public interface RateServiceClassRepository extends JpaRepository<RateServiceCla
 
     Optional<RateServiceClass> findByVersionIdAndCorridorIdAndServiceClass(
             UUID versionId, UUID corridorId, ServiceClass serviceClass);
+
+    boolean existsByCorridorId(UUID corridorId);
 }

@@ -46,6 +46,8 @@ export interface Place {
   city: string;
   countryCode: string;
   countryName: string;
+  /** Null when none was given. */
+  address?: string | null;
 }
 
 /** One end of a request: a catalog place, or the city the customer typed (`text`). */

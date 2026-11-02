@@ -23,4 +23,6 @@ public interface RateVolumeBreakRepository extends JpaRepository<RateVolumeBreak
     @Modifying
     @Query("delete from RateVolumeBreak b where b.version.id = :versionId and b.corridor is null")
     void deleteGlobalBands(@Param("versionId") UUID versionId);
+
+    boolean existsByCorridorId(UUID corridorId);
 }

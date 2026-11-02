@@ -8,11 +8,15 @@ import { type Corridor, TransportModeEnum } from '@/interfaces';
 
 /**
  * Routes columns: the route, mode, border crossings, distance, flexible dates, and how many vehicles
- * run it (US-F7-01): a road route nobody runs can't be planned.
+ * run it (US-F7-01): a road route nobody runs can't be planned. The row's Edit opens Edit route; Delete asks first.
  */
 export const useGeneratedCorridorColumn = ({
+  onEdit,
+  onDelete,
   onEditDrivingDays,
 }: {
+  onEdit: (c: Corridor) => void;
+  onDelete: (c: Corridor) => void;
   onEditDrivingDays: (c: Corridor) => void;
 }) =>
   useMemo<TableColumnsType<Corridor>>(
@@ -101,6 +105,20 @@ export const useGeneratedCorridorColumn = ({
           );
         },
       },
+      {
+        key: 'actions',
+        width: 180,
+        render: (_, c) => (
+          <Flex gap={8}>
+            <Button variant="ghost" size="sm" onClick={() => onEdit(c)}>
+              Edit
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => onDelete(c)}>
+              Delete
+            </Button>
+          </Flex>
+        ),
+      },
     ],
-    [onEditDrivingDays],
+    [onDelete, onEdit, onEditDrivingDays],
   );

@@ -26,6 +26,20 @@ export const corridorSchema = z
   });
 export type CorridorForm = z.infer<typeof corridorSchema>;
 
+/** Edit route: its code, distance, flexible and driving days, and by road its crossings in order. */
+export const editCorridorSchema = z.object({
+  code: z.string().trim().min(1, 'Enter the route code, e.g. RD HCM → PNH.').max(40),
+  crossings: z.array(z.object({ label: z.string(), value: z.string() })).nullable(),
+  distanceKm: z.number().int().positive('Enter a distance above 0 km.').nullable(),
+  dateFlexDays: z.number('Enter 0 to 7 days.').int().min(0, 'At least 0.').max(7, 'At most 7.'),
+  drivingDays: z
+    .number('Enter 1 to 30 days.')
+    .int('Whole days only.')
+    .min(1, 'At least 1 day.')
+    .max(30, 'At most 30 days.'),
+});
+export type EditCorridorForm = z.infer<typeof editCorridorSchema>;
+
 /** Add place: a pickup, delivery or stop point in a city. */
 export const placeSchema = z
   .object({
