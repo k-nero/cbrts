@@ -47,7 +47,8 @@ export const DepartureReadiness: FC<Props> = ({
   // the Clearance row while the gate is open, the only place the Route view shows what is outstanding.
   const action = (() => {
     if (!next) return null;
-    if ((next.action === 'load-plan' || next.action === 'crew') && canPlan)
+    // A flight has no load plan, and its flight crew are assigned on the same page, above.
+    if ((next.action === 'load-plan' || next.action === 'crew') && canPlan && part?.mode !== 'AIR')
       return (
         <Button variant="primary" size="md" trailingIcon="arrow-right" onClick={onOpenLoadPlan}>
           {next.action === 'crew' ? 'Assign the crew' : 'Open the load plan'}
