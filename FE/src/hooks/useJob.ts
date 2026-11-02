@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { corridorApi, jobApi, jobsListApi, routeStopApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
@@ -45,6 +45,19 @@ export const useJobDetail = (jobId: string, options?: { refetchInterval?: number
     refetchInterval: options?.refetchInterval,
   });
 };
+
+/**
+ * The job's page for every trip of its journey, so the journey rail and band can say where each trip stands. Each
+ * shares its cache with the trip's own page; a job of one trip asks for nothing extra.
+ */
+export const useJourneyDetails = (jobId: string, tripIds: string[]) =>
+  useQueries({
+    queries: (tripIds.length > 1 ? tripIds : []).map((trip) => ({
+      queryKey: jobKey(jobId, trip),
+      queryFn: () => jobApi.getDetail(jobId, trip),
+      enabled: Boolean(jobId),
+    })),
+  });
 
 export const useLoadPlan = (jobId: string) => {
   const trip = useJobTrip();

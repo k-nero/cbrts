@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { FlightPanel } from './FlightPanel';
 import { type FlightForm, flightSchema } from './flightSchema';
 import { LoadPlanTab } from './LoadPlanTab';
+import { TripConnections } from './TripConnections';
 
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
@@ -32,6 +33,7 @@ export const FlightTrip: FC<{ job: JobDetail; part: TripPart }> = ({ job, part }
 
   return (
     <Flex vertical gap={24}>
+      <TripConnections job={job} />
       {!flight && (
         <Callout tone="warn" title="The flight isn’t set yet">
           Enter the airline’s flight and its times: they set this trip’s dates, and the trip can’t

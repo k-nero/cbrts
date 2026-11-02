@@ -121,8 +121,9 @@ var STATS = { components: 0, variants: 0 };
 
 function flush() { var p = PENDING.splice(0); return Promise.all(p); }
 /* queue a text style; a node removed before the style lands (e.g. a table dropped for an error state) is not an error */
-function styleLater(t, id) {
-  PENDING.push(t.setTextStyleIdAsync(id).catch(function (e) { if (!t.removed) throw e; }));
+/* a text style carries its own decoration, so an underline goes back on once the style lands */
+function styleLater(t, id, deco) {
+  PENDING.push(t.setTextStyleIdAsync(id).then(function () { if (deco) t.textDecoration = deco; }).catch(function (e) { if (!t.removed) throw e; }));
 }
 
 /* ---------------------------------------------------------------------
@@ -278,12 +279,13 @@ function Tx(str, style, color, o) {
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   if (s.upper) t.textCase = 'UPPER';
   t.characters = String(str);
-  if (!o.noStyle) styleLater(t, s.id);
+  if (!o.noStyle) styleLater(t, s.id, o.underline ? 'UNDERLINE' : null);
   t.fills = [P(color || 'text/primary')];
   if (o.align) t.textAlignHorizontal = o.align;
   if (o.w) { t.textAutoResize = 'HEIGHT'; t.resize(o.w, t.height); } else t.textAutoResize = 'WIDTH_AND_HEIGHT';
   if (o.fill) { t.textAutoResize = 'HEIGHT'; fillW(t); }
   if (o.strike) t.textDecoration = 'STRIKETHROUGH';
+  if (o.underline) t.textDecoration = 'UNDERLINE';
   if (o.opacity != null) t.opacity = o.opacity;
   return t;
 }
@@ -2501,9 +2503,14 @@ var JOB_WINDOW = { from: '11:00', until: '14:00', text: '18 Oct, 11:00–14:00' 
 /* US-F3-21: the Trip tab plans the trip chosen on its journey rail; Clearance and Authorities cover the whole job */
 var JOB_TABS = [['Trip', 'Khôi, fleet & route coordinator'], ['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist']];
 /* one header for every tab of a job: route title, code, stage, the clearance gate, then tabs with the tab's owner */
-function jobHead(tab, gateBody, stage, gateState) {
+function jobGate(gateBody, gateState) {
   var gate = inst(C.gate, { State: gateState || 'Locked' });
   setP(gate, { Body: gateBody || '9 items must clear first: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.' });
+  return gate;
+}
+/* noGate: a road trip's Route view carries the gate under its summary strip instead */
+function jobHead(tab, gateBody, stage, gateState, noGate) {
+  var gate = noGate ? null : jobGate(gateBody, gateState);
   var tabs = H({ name: 'Tabs', gap: 24, main: 'SPACE_BETWEEN', cross: 'CENTER' });
   borderSide(tabs, 'border/default', 'bottom');
   var list = H({ name: 'Tab list', gap: 28 });
@@ -2518,12 +2525,12 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
   var job = jobHead.job || JOB;
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: gate ? [gate, tabs] : [tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
   jobHead.job = o.job || null;
-  var head = jobHead(tab, o.gate, o.stage, o.gateState);
+  var head = jobHead(tab, o.gate, o.stage, o.gateState, o.noGate);
   jobHead.job = null;
   return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(blocks), o.today);
 }
@@ -2541,13 +2548,27 @@ function journeyRail(parts, active, addFrom) {
     var on = i === active;
     var row = VV({ name: 'Trip · ' + p.code.split(' ')[0], gap: 4, pad: [10, 12, 10, 12], radius: 8, fill: on ? 'surface/muted' : null });
     var top = H({ name: 'Head', gap: 8, cross: 'CENTER' });
-    var status = Tx(p.status, 'Mono/Caption', 'text/tertiary');
     var gap = H({ name: 'Gap' });
-    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), status]);
-    addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
+    /* with a standing (the redesigned rail), the code moves to the head and the trip says where it stands */
+    /* with a standing (the simplified rail), three lines: mode and the chip, the cities in full, when it leaves */
+    var right = p.step ? chip(p.tone, p.step) : Tx(p.status, 'Mono/Caption', 'text/tertiary');
+    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/secondary'), fillW(gap), right]);
+    if (p.step) addAll(row, [fillW(top), Tx(p.route, 'Label/M', 'text/primary', { fill: true }), Tx(p.leaves, 'Mono/Caption', 'text/tertiary')]);
+    else addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
     add(r, fillW(row));
+    /* a connection shows only when it needs attention */
+    if (p.link && p.link[1] !== 'text/tertiary' && i < parts.length - 1) {
+      var lk = H({ name: 'Connection', gap: 6, cross: 'CENTER', pad: [6, 0, 6, 12] });
+      lk.strokes = [P('border/default')]; lk.strokeAlign = 'INSIDE';
+      lk.strokeTopWeight = 0; lk.strokeBottomWeight = 0; lk.strokeRightWeight = 0; lk.strokeLeftWeight = 2;
+      if (p.link[1] !== 'text/tertiary') add(lk, Ic('alert', 12, p.link[1]));
+      add(lk, Tx(p.link[0], 'Mono/Caption', p.link[1]));
+      var lkRow = H({ name: 'Connection row', pad: [0, 0, 0, 18] });
+      add(lkRow, lk);
+      add(r, fillW(lkRow));
+    }
   });
-  if (parts.length > 1) add(r, btn('Ghost', 'SM', 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
+  if (parts.length > 1) add(r, btn('Ghost', 'SM', parts[0].step ? 'Take ' + parts[parts.length - 1].code.split(' ')[0] + ' off the journey' : 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
   if (addFrom) add(r, btn('Secondary', 'SM', 'Add trip from ' + addFrom, { lead: 'plus' }));
   return r;
 }
@@ -2610,6 +2631,35 @@ function scrClearance() {
   addAll(top, [fillW(s), input('Date', 'Default', 'Planned departure', '18 Oct 2026', 'Changing it re-checks all 23 documents before it saves.')]);
   return jobScreen('Transport specialist · Clearance checklist', 'Clearance', STAFF.lan, [top, docTableTabs('staff'), docTable('staff')]);
 }
+/* Ready to depart (Trip tab, Route view): each step a chip in tone plus word, what was found and who holds it. The
+   one gold action is the first open step's when it is the viewer's; Record departure is a disabled Secondary until
+   every step is done, and only then the gold. */
+function readyPanel(steps, waiting, action) {
+  var p = panel('Ready to depart', { gap: 0, pad: 0, clip: true });
+  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [20, 24, 16, 24] });
+  borderSide(head, 'border/default', 'bottom');
+  var done = steps.filter(function (st) { return st[1] === 'Done'; }).length;
+  addAll(head, [Tx('Ready to depart', 'Heading/H4'), Tx(done + ' of ' + steps.length + ' done', 'Mono/Data', 'text/tertiary')]);
+  add(p, fillW(head));
+  steps.forEach(function (st, i) {
+    var row = H({ name: 'Step · ' + st[2], gap: 16, pad: [14, 24, 14, 24] });
+    if (i < steps.length - 1) borderSide(row, 'border/default', 'bottom');
+    var state = H({ name: 'State', w: 88 });
+    add(state, chip(st[0], st[1]));
+    var what = VV({ name: 'What', gap: 2 });
+    addAll(what, [Tx(st[2], 'Label/M'), Tx(st[3], 'Body/S', 'text/secondary', { fill: true })]);
+    addAll(row, [state, fillW(what), Tx(st[4], 'Body/S', 'text/tertiary', { align: 'RIGHT' })]);
+    add(p, fillW(row));
+  });
+  var foot = H({ name: 'Footer', gap: 24, main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [14, 24, 14, 24], fill: 'bg/sunken' });
+  borderSide(foot, 'border/default', 'top');
+  var acts = H({ name: 'Actions', gap: 12, cross: 'CENTER' });
+  if (action) add(acts, action);
+  add(acts, btn('Secondary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
+  addAll(foot, [Tx(waiting, 'Body/S', 'text/secondary'), acts]);
+  add(p, fillW(foot));
+  return p;
+}
 function scrRoute() {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
   [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
@@ -2617,21 +2667,69 @@ function scrRoute() {
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
   });
-  var tl = VV({ name: 'Timeline', gap: 16 });
-  [['Pickup', 'Phú Thọ training centre, HCMC', '06:00', 'Loading and condition check, logged with photos.'],
+  var tl = VV({ name: 'Timeline', gap: 0 });
+  /* the day shows on the first stop and wherever it changes; between two stops the leg, under a 2 px rule */
+  var LEGS = ['Road · 70 km · 2 h 30 min', 'Road · 40 km · 30 min', 'Road · 130 km · 2 h 15 min'];
+  [['Pickup', 'Phú Thọ training centre, HCMC', '18 Oct, 06:00', 'Loading and condition check, logged with photos.'],
    ['Border', 'Mộc Bài – Bavet border', '08:30', 'Vietnam export clearance and Cambodia entry. Recorded per leg as Cleared or Held.'],
    ['Welfare', 'Svay Rieng welfare stop', '09:30', '45-minute rest, water and hay, welfare check by the escort.'],
-   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s) {
+   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s, i) {
     var st = inst(C.stop, { Kind: s[0] });
     setP(st, { Stop: s[1], Time: s[2], Details: s[3] });
     st.name = 'Stop · ' + s[1];
     add(tl, fillW(st));
+    if (i < LEGS.length) {
+      var leg = H({ name: 'Leg · ' + (i + 1), pad: [10, 0, 10, 33] });
+      leg.strokes = [P('border/default')]; leg.strokeAlign = 'INSIDE';
+      leg.strokeTopWeight = 0; leg.strokeBottomWeight = 0; leg.strokeRightWeight = 0; leg.strokeLeftWeight = 2;
+      add(leg, Tx(LEGS[i], 'Mono/Caption', 'text/tertiary'));
+      var legRow = H({ name: 'Leg row', pad: [0, 0, 0, 17] });
+      add(legRow, leg);
+      add(tl, fillW(legRow));
+    }
   });
-  var refuse = VV({ name: 'Depart', gap: 16 });
-  add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
-  add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
+  var refuse = readyPanel([
+    ['Ok', 'Done', 'Route', 'Confirmed v1.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Load plan', 'Confirmed by Đỗ Minh Khôi.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Crew', '3 people assigned.', STAFF.khoi[0]],
+    ['Bad', 'Locked', 'Clearance', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.', STAFF.lan[0]],
+    ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
+    'Waiting on clearance · ' + STAFF.lan[0] + '.', btn('Secondary', 'MD', 'View outstanding items', { trail: 'arrow-right' }));
   var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
-  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])]);
+  var gate = fillW(jobGate());
+  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, gate, tl, refuse])], { noGate: true });
+}
+
+/* The journey summary and the redesigned rail (2 Nov 2026): on a job of two or more trips, a summary strip of the
+   whole journey runs above the rail; each rail row says where its trip stands (its first open step and who holds
+   it) and the connection between two trips sits under a 2 px rule. Neither carries gold, which stays with the chosen
+   trip's Ready to depart. The tab opens on the first trip, in journey order, that waits on the viewer. */
+var JOURNEY = [
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00', leaves: 'Leaves 16 Oct, 06:00', tone: 'Warn', step: 'Crew', who: 'Waiting on crew · Đỗ Minh Khôi', link: ['18 h 40 min to connect', 'text/tertiary'] },
+  { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40', leaves: 'Leaves 17 Oct, 23:40', tone: 'Bad', step: 'Locked', who: 'Waiting on clearance · Nguyễn Thị Lan', link: ['Connection not planned', 'text/tertiary'] },
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned', leaves: 'Not planned', tone: 'Warn', step: 'Route', who: 'Waiting on route · Đỗ Minh Khôi' }];
+function journeySummary() {
+  var strip = H({ name: 'Journey summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
+  [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']].forEach(function (c) {
+    var cell = VV({ name: c[0], gap: 4 });
+    addAll(cell, [Tx(c[0], 'Body/S', 'text/tertiary'), Tx(c[1], 'Label/M', c[2])]);
+    add(strip, cell);
+  });
+  return strip;
+}
+function scrJourney() {
+  var part = { route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002', corridor: 'RD DAD → HCM' };
+  var ready = readyPanel([
+    ['Ok', 'Done', 'Route', 'Confirmed v1.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Load plan', 'Confirmed by Đỗ Minh Khôi.', STAFF.khoi[0]],
+    ['Warn', 'To do', 'Crew', 'TX-447 needs a driver and 1 more groom.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Clearance', 'This leg stays in one country and can depart before the dossier clears. The clearance gate is on TRP-2026-003, which crosses the border.', STAFF.lan[0]],
+    ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
+    'Waiting on crew · ' + STAFF.khoi[0] + '.', btn('Primary', 'MD', 'Assign the crew', { trail: 'arrow-right' }));
+  return jobScreen('Fleet & route coordinator · Trip · Journey', 'Trip', STAFF.khoi, [journeySummary(), tripBody(JOURNEY, 0, null, tripHead(part, 'Route'), [ready])], {
+    job: CHAIN_JOB, stage: 'Documents', gateState: 'Clear',
+    gate: 'This leg stays in one country and can depart before the dossier clears. The clearance gate is on TRP-2026-003, which crosses the border.'
+  });
 }
 
 /* ---------------------------------------------------------------------
@@ -3597,6 +3695,7 @@ var SIDEBAR_FRAMES = {
   'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Fleet & route coordinator · Trip · Flight': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
+  'Fleet & route coordinator · Trip · Journey': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
   'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
@@ -3911,17 +4010,33 @@ function routePanel(title, sub, stops, gate, facts) {
   }
   return p;
 }
+/* the move's history, newest first, as the app's History panel: the day and time in a 120 px column, then what
+   happened over who did it, and any photos the escort took on that record. The app writes "18 Oct, 08:34" */
 function historyPanel(rows, more) {
   var p = panel('History', { gap: 0, pad: [20, 24, 12, 24] });
   add(p, VV({ name: 'Title', pad: [0, 0, 12, 0] }, [Tx('History', 'Heading/H4')]));
-  rows.forEach(function (r) {
-    var row = H({ name: r[1], gap: 20, pad: [10, 0, 10, 0], cross: 'CENTER' });
-    borderSide(row, 'border/default', 'top');
-    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/tertiary', { w: 150 }), Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary', { w: 220, align: 'RIGHT' })]);
+  rows.forEach(function (r, i) {
+    var row = H({ name: r[1], gap: 16, pad: [12, 0, 12, 0], cross: 'MIN' });
+    if (i > 0) borderSide(row, 'border/default', 'top');
+    var what = VV({ name: 'What', gap: 2 });
+    addAll(what, [Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary')]);
+    if (r[3]) add(what, tripPhotos(r[3]));
+    addAll(row, [Tx(r[0].replace(' · ', ', '), 'Mono/Caption', 'text/tertiary', { w: 120 }), fillW(what)]);
     add(p, fillW(row));
   });
   if (more) add(p, VV({ name: 'More', pad: [8, 0, 4, 0] }, [btn('Ghost', 'SM', more)]));
   return p;
+}
+/* the photos on an escort's record, 72 px with the horse beneath; a click opens them full size in the app */
+function tripPhotos(horses) {
+  var r = H({ name: 'Photos', gap: 10, pad: [4, 0, 0, 0] });
+  horses.forEach(function (n) {
+    var v = VV({ name: n, gap: 4 });
+    add(v, H({ name: 'Photo', w: 72, h: 72, radius: 6, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' }, [Ic('eye', 16, 'text/tertiary')]));
+    add(v, Tx(n, 'Mono/Caption', 'text/tertiary'));
+    add(r, v);
+  });
+  return r;
 }
 /* people on the move: first name + role + what they handle */
 function peoplePanel(people, title) {
@@ -3954,47 +4069,39 @@ var HCMC_PNH = [
 function stopsWith(states, times) { return HCMC_PNH.map(function (s, i) { return [states[i], s[0], s[1], times ? times[i] : s[2]]; }); }
 
 /* ---------- My requests ---------- */
-/* the requests table, the same with no rows (first run) or three; a row opens with its chevron */
-var REQ_COLS = [['Request', 150, null, 'Mono/Caption', null, 'Unsorted'], ['Route', null], ['Horses', 96, 'RIGHT', 'Mono/Data'], ['Departs', 110, null, 'Mono/Caption', 'text/secondary', 'Unsorted'], ['Stage', 170, null, null, null, 'Unsorted'], ['', 150, 'RIGHT'], ['', 24, 'RIGHT']];
+/* the club's requests, newest first, as the app's list table: the code (or Draft and the day it was started),
+   the route with its places, the horse count, the departure, one status chip and the row's one action.
+   After approval the request stays Approved, so the chip reads where its move is (BR-F1-05) */
+var REQ_COLS = [['Request', 140, null, 'Mono/Caption'], ['Route', null], ['Horses', 72, null, 'Mono/Data'], ['Departs', 124, null, 'Mono/Data', null, 'Unsorted'], ['Status', 250], ['', 190, 'RIGHT']];
+/* a row that opens with its chevron, as on the staff lists */
 function rowOpen() { var i = Ic('arrow-right', 16, 'text/tertiary'); i.name = 'Open'; return i; }
-/* a move's stage at a glance under its name: seven segments, the stages done solid, the current one in the
-   secondary ink, the rest faint. Position, not status, so it never takes a status colour */
-function stageTrack(s) {
-  var v = VV({ name: 'Stage · ' + s, gap: 6 });
-  var segs = H({ name: 'Track', gap: 3 });
-  var at = STAGES.indexOf(s);
-  for (var i = 0; i < 7; i++) add(segs, rect(14, 4, i < at ? 'text/primary' : i === at ? 'text/secondary' : 'border/default', 'Segment', 2));
-  addAll(v, [stageMark(s), segs]);
-  return v;
-}
 function scrMyRequests() {
-  /* what is owed, with the date the first of it is due */
-  var owe = function (n, tone, due) {
-    if (!n) return Tx('Nothing needed', 'Body/S', 'text/tertiary');
-    var v = VV({ name: 'Owed', gap: 4, cross: 'MAX' });
-    addAll(v, [chip(tone, 'You owe ' + n), Tx(due, 'Mono/Caption', 'text/tertiary')]);
+  var route = function (cities, places) {
+    if (!cities) return Tx('Route not set', 'Body/S', 'text/tertiary');
+    var v = VV({ name: 'Route', gap: 2 }); addAll(v, [Tx(cities, 'Label/S'), Tx(places, 'Body/S', 'text/tertiary')]); return v;
+  };
+  /* the code is the row's link, so every row opens from the keyboard; a draft's link is the day it was started */
+  var code = function (c) { return Tx(c, 'Mono/Caption', 'text/primary', { underline: true }); };
+  var started = function (d) { return Tx('Started ' + d, 'Body/S', 'text/secondary', { underline: true }); };
+  /* the chip, what holds it in Your moves' words and tone, and the club's deadline twice */
+  var HOLDS = { warn: 'status/warn/fg', bad: 'status/bad/fg', neutral: 'text/secondary' };
+  var status = function (tone, label, holds, holdsTone, due) {
+    var v = VV({ name: 'Status', gap: 6 });
+    addAll(v, [chip(tone, label), Tx(holds, 'Body/S', HOLDS[holdsTone], { name: 'What holds it' })]);
+    if (due) add(v, Tx(due, 'Mono/Caption', 'text/secondary', { name: 'Due' }));
     return v;
   };
-  /* the route with its mode, as on the pass */
-  var route = function (a, b, mode) {
-    var r = H({ name: 'Route', gap: 10, cross: 'MIN' });
-    var v = VV({ name: 'Stack', gap: 2 }); addAll(v, [Tx(a, 'Label/S'), Tx(b, 'Body/S', 'text/tertiary')]);
-    addAll(r, [VV({ name: 'Mode', pad: [1, 0, 0, 0] }, [Ic(mode, 16, 'text/tertiary')]), v]);
-    return r;
-  };
-  var horses = function (names) { return coatRow(COAT041.filter(function (c) { return names.indexOf(c[0]) >= 0; }), String(names.length)); };
-  /* the customer's reference never changes; quotation and job codes sit beside it once they exist */
-  var ref = function (req, also) { var v = VV({ name: 'Reference', gap: 2 }); add(v, Tx(req, 'Mono/Caption', 'text/primary')); if (also) add(v, Tx(also, 'Mono/Caption', 'text/tertiary')); return v; };
+  var acts = function (list) { var h = H({ name: 'Actions', gap: 8, cross: 'CENTER' }); list.forEach(function (b) { add(h, btn(b[0], 'SM', b[1])); }); return h; };
+  /* needs you first, the soonest due on top, then the rest */
   var t = tbl('Requests', REQ_COLS, [
-    { cells: [ref('REQ-2026-0162', 'Job CBRT-2026-041'), route('Ho Chi Minh City → Phnom Penh', 'Road, private trailer', 'truck'), horses(['Shadowfax', 'Nightfall', 'Copper King', 'Silver Bell']), '18 Oct 2026', stageTrack('Documents'), owe(4, 'Bad', 'First due 4 Oct'), rowOpen()], hl: true },
-    { cells: [ref('REQ-2026-0179', 'Quote Q-2026-0188'), route('Phnom Penh → Hong Kong (Sha Tin)', 'Air, business class', 'plane'), horses(['Shadowfax', 'Nightfall']), '20 Nov 2026', stageTrack('Quotation'), owe(1, 'Warn', 'Due 30 Sep'), rowOpen()] },
-    { cells: [ref('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Road, shared load', 'truck'), horses(['Shadowfax', 'Nightfall']), '30 Oct 2026', stageTrack('Request'), owe(0), rowOpen()] }
+    { cells: [code('REQ-2026-0162'), route('Ho Chi Minh City → Phnom Penh', 'Phú Thọ training centre → Phnom Penh Equestrian Centre'), '4', '18 Oct 2026', status('Info', 'Documents', 'Departure locked · you owe 4', 'bad', 'By 25 Sep 2026 · Overdue by 1 day'), acts([['Secondary', 'Open documents']])] },
+    { cells: [code('REQ-2026-0179'), route('Phnom Penh → Hong Kong', 'Phnom Penh Equestrian Centre → Sha Tin Racecourse'), '2', '20 Nov 2026', status('Info', 'Quoted', 'Quotation waiting for you', 'warn', 'By 3 Oct 2026 · Due in 7 days'), acts([['Primary', 'Review quotation']])] },
+    { cells: [started('26 Sep'), route(null), '1', '—', status('Neutral', 'Draft', 'Draft · finish and submit it', 'warn'), acts([['Secondary', 'Continue draft'], ['Ghost', 'Discard']])] },
+    { cells: [code('REQ-2026-0193'), route('Ho Chi Minh City → Bangkok', 'Phú Thọ training centre → Chao Phraya Racing Stables'), '2', '30 Oct 2026', status('Info', 'Submitted', 'In review · nothing needed', 'neutral'), Tx('', 'Body/S')] }
   ]);
-  tableFoot(t, 3, 3, 'requests');
-  var list = tableBlock({ tabs: [['Active · 3', 'Active'], ['Past · 1', 'Default']], filters: [filterField('Search', 'Search', 'Code, route or horse', { placeholder: true })],
-    count: '3 active requests', order: 'Order: what needs you first', table: t });
-  var hint = Tx('Your request number stays the same from submission to handover; the quotation and job codes appear beside it once they exist.', 'Body/S', 'text/tertiary', { w: 760 });
-  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '3 active, 1 past · Saigon Turf Club'], [], false), [list, hint], '26 Sep 2026');
+  /* one page holds them all: no pager, no table tools */
+  var list = tableBlock({ count: '4 requests', order: 'Order: what needs you first, the soonest due on top', table: t });
+  return trackScreen('Tracking · My requests', trackHead('My requests', [null, '4 requests · Saigon Turf Club.'], [], false), [list], '26 Sep 2026');
 }
 
 /* ---------- Detail: in review (submitted Sat 26 Sep) ---------- */
@@ -4068,12 +4175,13 @@ function scrTrackTransit() {
   var route = onTheRoad();
   var log = panel('Condition log', { gap: 12 });
   add(log, Tx('Latest condition log', 'Heading/H4'));
-  [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom'], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
+  [['08:40', 'All four horses settled and drinking after the border check. Nightfall sweated during loading and is calm now.', 'Hoa, groom', ['Nightfall', 'Copper King']], ['06:02', 'Loaded without incident. Copper King in the box stall, Nightfall in the climate stall.', 'Minh, driver']].forEach(function (r) {
     var e = VV({ name: r[0], gap: 4, pad: [12, 0, 0, 0] });
     borderSide(e, 'border/default', 'top');
     var h = H({ name: 'Head', gap: 10, cross: 'CENTER' });
     addAll(h, [Tx(r[0], 'Mono/Data', 'text/primary'), Tx(r[2], 'Body/S', 'text/tertiary')]);
     addAll(e, [h, Tx(r[1], 'Body/S', 'text/secondary', { fill: true })]);
+    if (r[3]) add(e, tripPhotos(r[3]));
     add(log, fillW(e));
   });
   var stagesP = stagePanel([
@@ -4081,7 +4189,8 @@ function scrTrackTransit() {
     ['Done', '23 of 23 documents cleared.', '', '14 Oct'], ['Done', 'Dossiers approved; quarantine complete.', 'Done', '17 Oct'],
     ['Current', 'On the road with Minh, driver, and two grooms since 06:05. Planned to arrive inside your ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ' window.', 'Arrives in about 4 h', '12:30'], ['Upcoming', 'You confirm handover and condition on arrival.', 'Due within 2 days', 'by 20 Oct']
   ], 'Where it stands');
-  var hist = historyPanel([['18 Oct · 08:34', 'Cleared Vietnam export and Cambodia entry at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver'], ['17 Oct · 16:20', 'Clearance complete; departure unlocked.', 'Lan, transport specialist']], 'Show all 31 events');
+  /* the escort's records in the app's words, newest first; a condition check carries its photos */
+  var hist = historyPanel([['18 Oct · 08:40', 'Condition check logged.', 'Hoa, groom', ['Nightfall', 'Copper King']], ['18 Oct · 08:34', 'Cleared the border at Mộc Bài – Bavet.', 'Minh, driver'], ['18 Oct · 06:05', 'Departed Phú Thọ training centre.', 'Minh, driver']], 'Show all 31 events');
   return trackScreen('Tracking · In transit', pass041(['Arrives in about', '4 h', '12:30 · in your window'], [stageMark('Trip')]), [lead, route, split(stagesP, log, SIDE.wide), hist], '18 Oct 2026, 08:41');
 }
 
@@ -4094,10 +4203,14 @@ function scrTrackDelivered() {
   route.insertChild(1, map041('done', 408, 280));
   var arr = panel('Arrival record', { gap: 12 });
   add(arr, Tx('Arrival condition', 'Heading/H4'));
-  [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.'], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
+  [['Shadowfax', 'Sound. Ate on arrival.'], ['Nightfall', 'Sound. Slight sweat at unloading, settled within 10 min.', true], ['Copper King', 'Sound. Walked off calmly.'], ['Silver Bell', 'Sound. Drinking well.']].forEach(function (h) {
     var row = H({ name: h[0], gap: 16, pad: [10, 0, 10, 0], cross: 'CENTER' });
     borderSide(row, 'border/default', 'top');
-    addAll(row, [Tx(h[0], 'Heading/H4', 'text/primary', { w: 140 }), Tx(h[1], 'Body/S', 'text/secondary', { fill: true }), chip('Ok', 'Sound')]);
+    /* the note, with any photo the groom took of that horse beneath it */
+    var note = VV({ name: 'Note', gap: 4 });
+    add(note, Tx(h[1], 'Body/S', 'text/secondary', { fill: true }));
+    if (h[2]) add(note, tripPhotos([h[0]]));
+    addAll(row, [Tx(h[0], 'Heading/H4', 'text/primary', { w: 140 }), fillW(note), chip('Ok', 'Sound')]);
     add(arr, fillW(row));
   });
   add(arr, Tx('Logged at 12:48 by Hoa, groom. Handed over to Sophea, receiving groom.', 'Body/S', 'text/tertiary', { fill: true }));
@@ -4106,7 +4219,7 @@ function scrTrackDelivered() {
     ['Done', 'Delivered at 12:41, 11 minutes after plan.', 'Done', '18 Oct'],
     ['Current', 'Confirm receipt and condition, or report a problem.', 'Due in 2 days', '20 Oct']
   ]);
-  var hist = historyPanel([['18 Oct · 12:48', 'Arrival condition logged for 4 horses.', 'Hoa, groom'], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 09:36', 'Welfare stop at Svay Rieng, 45 minutes.', 'Minh, driver']], 'Show all 36 events');
+  var hist = historyPanel([['18 Oct · 12:48', 'Handed over to your receiver, with each horse’s condition.', 'Hoa, groom', ['Nightfall']], ['18 Oct · 12:41', 'Delivered at Phnom Penh Equestrian Centre.', 'Minh, driver'], ['18 Oct · 10:21', 'Left Svay Rieng.', 'Minh, driver']], 'Show all 36 events');
   return trackScreen('Tracking · Delivered', pass041(['Delivered', '12:41', '18 Oct · inside your window'], [stageMark('Handover')]), [lead, split(column([arr, stagesP]), route, SIDE.wide), hist], '18 Oct 2026, 12:50');
 }
 
@@ -5008,9 +5121,10 @@ async function eAuthorities() { return insertChainCall([scrAuthorities, scrAutho
 /* =====================================================================
    Trip: the escort's cab surface (Flow 4, on the road). Not the office
    job page with bigger buttons: a tablet in a sunlit cab, used with
-   gloves between tasks. So: the Light theme (read in glare), one line of
-   context at the top, the task first, 48 px toggles, times at 28 px, and
-   the one gold action docked at the bottom edge. These records are the
+   gloves between tasks. So: drawn in Light (read in glare; the app follows
+   the escort's theme, so Dark at night), one line of context at the top,
+   the task first, 48 px toggles, times at 28 px, and the one gold action
+   docked at the bottom edge. These records are the
    only source of the customer's route positions and arrival condition.
    ===================================================================== */
 var TRIP_LOAD = [['Shadowfax', 'Stall 1 · standard'], ['Copper King', 'Stall 2 · box'], ['Nightfall', 'Stall 4 · climate'], ['Silver Bell', 'Stall 6 · standard']];
@@ -5095,11 +5209,13 @@ function cabScreen(name, bar, strip, task, right, dock) {
   var s = VV({ name: name, w: SCREEN_W, fill: 'bg/canvas' });
   if (COLL.light) s.setExplicitVariableModeForCollection(COLL.color, COLL.light);
   var body = H({ name: 'Body', gap: 24 });
-  right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED';
-  addAll(body, [fillW(task), right]);
+  add(body, fillW(task));
+  /* a task with nothing beside it or nothing to save (handed on) has no side column and no dock */
+  if (right) { right.resize(SIDE.narrow, right.height); right.layoutSizingHorizontal = 'FIXED'; add(body, right); }
   var main = VV({ name: 'Main', gap: 20, pad: [20, 32, 28, 32] });
   addAll(main, [fillW(strip), fillW(body)]);
-  addAll(s, [fillW(bar), fillW(main), fillW(dock)]);
+  addAll(s, [fillW(bar), fillW(main)]);
+  if (dock) add(s, fillW(dock));
   return s;
 }
 /* a 48 px toggle. Ticked is a strong neutral box, the same as the Checkbox everywhere:
@@ -5303,6 +5419,19 @@ function scrTripHeld() {
     cabStrip([['Done', 'Phnom Penh', 'Pickup', INC40.loaded, 'Departed'], ['Held', 'Bavet – Mộc Bài', 'Border', INC40.held, 'Held since'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '—', 'Waits on the decision'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '—', 'Waits on the decision']]),
     task, right, cabDock('Waiting for Yến’s decision', 'Nothing to record until she decides; any water or checks you log go on the trip record.', null));
 }
+/* ---------- CBRT-2026-042, 17 Oct 00:52: the first leg ends at a transfer (US-F3-16) ----------
+   TRP-2026-002 delivered its horses to the cargo terminal for the flight, TRP-2026-003. The receiver's handover
+   is recorded on the last trip, so this leg has nothing left to record: no dock, no Report emergency */
+function scrTripHandedOn() {
+  var task = panel('Handed on', { gap: 0, pad: 0, clip: true });
+  add(task, fillW(taskHead('Handed on to TRP-2026-003', 'You recorded the delivery at Tân Sơn Nhất cargo terminal at 00:40.')));
+  var body = VV({ name: 'Fields', gap: 18, pad: [4, 24, 24, 24] });
+  add(body, callout('Info', 'Nothing left to record on this trip', 'TRP-2026-003 takes the horses on from here, and the handover to the receiver is recorded at the delivery on the last trip.'));
+  add(task, fillW(body));
+  return cabScreen('Escort · Handed on', cabBar({ code: 'CBRT-2026-042', route: 'Da Nang → Ho Chi Minh City', pill: 'Handed on', pillTone: 'Ok', synced: true, sync: 'All records sent', now: '00:52', user: ['Nguyễn Văn Tùng', 'Driver', 'NT'] }),
+    cabStrip([['Done', 'Da Nang', 'Pickup', '06:05', 'Departed'], ['Done', 'Quy Nhơn', 'Welfare stop', '11:20', 'Left checkpoint'], ['Done', 'Nha Trang', 'Welfare stop', '17:05', 'Left checkpoint'], ['Done', 'Tân Sơn Nhất cargo terminal', 'Hand on to the next trip', '00:40', 'Handed on to the next trip']]),
+    task, null, null);
+}
 /* ---------- The office side of the same trip: Khôi at 08:41 on 18 Oct ----------
    The coordinator watches what the cab records against the route he planned. Positions come
    only from recorded checkpoints, as on the customer's page, so nothing here is a guess.
@@ -5385,7 +5514,7 @@ function scrTripCoordinator() {
   });
 }
 async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
-async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld], 'Escort · Welfare stop'); }
+async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld, scrTripHandedOn], 'Escort · Welfare stop'); }
 /* =====================================================================
    Handover and closing. The escort records delivery once: condition on
    arrival, what was handed over, and who received it. The customer then
@@ -6489,6 +6618,472 @@ function scrAuditDenied() {
     headAdmin('Audit log', 'Kept for the logistics manager.', null), p], 'Sat 26 Sep 2026');
 }
 var AUDIT_SCREENS = [scrAudit, scrAuditFiltered, scrAuditEmpty, scrAuditDenied];
+/* =====================================================================
+   Invoices and route history (customer). The final invoice is the
+   accepted quotation settled against what happened: fixed lines as
+   quoted, estimated lines at their actual quantity with the reason, a
+   late-arrival credit when a window was missed, minus the deposit. It is
+   generated, never typed, and an issued invoice is never edited.
+   A re-routed move shows every route the customer was ever given: the
+   current plan in full, and each earlier one with why it changed.
+   ===================================================================== */
+
+/* CBRT-2026-041, accepted as Q-2026-0168 v2 on 10 Sep: [group, name, lines]
+   line: [description, basis, quoted qty, rate, actual qty, why it changed] */
+var Q041 = [
+  ['A', 'Ground transport · road', [
+    ['Private trailer, Ho Chi Minh City → Phnom Penh', 'per km · 240 km', 240, 6.5],
+    ['Loading and handling', 'per horse', 4, 120]]],
+  ['B', 'Pre-export', [
+    ['Veterinary inspection and bloods', 'per horse', 4, 310]]],
+  ['D', 'Escort', [
+    ['Grooms', 'one per three horses · 4 ÷ 3, rounded up = 2', 2, 380]]],
+  ['E', 'Documentation', [
+    ['Export health certificate', 'per horse', 4, 180],
+    ['Customs and border documentation', 'per crossing · 1', 1, 420],
+    ['Cambodia import permit handling', 'per shipment', 1, 380]]],
+  ['H', 'Surcharges', [
+    ['Arrival window, 18 Oct 11:00–14:00', '20% of ground lines (A) · $2,040', 1, 408],
+    ['Waiting time at the border', 'per hour · 2 h estimated', 2, 95, 1, 'The queue at Mộc Bài – Bavet took 36 min (07:58–08:34), billed as 1 started hour.']]]
+];
+var INV041 = { code: 'INV-2026-0041', deposit: 'INV-2026-0029', quote: 'Q-2026-0168 v2', issued: '19 Oct 2026', due: '26 Oct 2026', paidOn: '10 Sep' };
+/* the fixed calculation order of the quotation, on quoted or actual quantities */
+function totals041(actual) {
+  var t = { sub: 0, ground: 0 };
+  Q041.forEach(function (g) {
+    g[2].forEach(function (l) {
+      var q = actual && l[4] != null ? l[4] : l[2];
+      var a = Math.round(q * l[3] * 100) / 100;
+      t.sub += a;
+      if (g[0] === 'A') t.ground += a;
+    });
+  });
+  t.brk = Math.round(t.ground * 0.10 * 100) / 100;
+  t.base1 = t.sub - t.brk;
+  t.cont = Math.round(t.base1 * 0.05 * 100) / 100;
+  t.base2 = t.base1 + t.cont;
+  t.fee = Math.round(t.base2 * 0.12 * 100) / 100;
+  t.total = Math.round((t.base2 + t.fee) * 100) / 100;
+  return t;
+}
+var T041Q = totals041(false), T041 = totals041(true);
+T041.deposit = Math.round(T041Q.total * 0.30 * 100) / 100;
+T041.due = Math.round((T041.total - T041.deposit) * 100) / 100;
+
+/* the ledger: each line says whether it is as quoted or actual; an actual line carries its reason underneath */
+function invoiceLedger() {
+  var table = panel('Invoice lines', { gap: 0, pad: 0, clip: true });
+  var th = H({ name: 'Table header', gap: 16, pad: [12, 20, 12, 20], fill: 'bg/sunken' });
+  addAll(th, [Tx('Item', 'Mono/Eyebrow', 'text/tertiary', { fill: true }), Tx('Qty', 'Mono/Eyebrow', 'text/tertiary', { w: 48, align: 'RIGHT' }), Tx('Rate', 'Mono/Eyebrow', 'text/tertiary', { w: 88, align: 'RIGHT' }), Tx('Amount', 'Mono/Eyebrow', 'text/tertiary', { w: 104, align: 'RIGHT' }), Tx('', 'Mono/Eyebrow', 'text/tertiary', { w: 96 })]);
+  add(table, fillW(th));
+  Q041.forEach(function (g) {
+    var gsum = 0;
+    g[2].forEach(function (l) { gsum += (l[4] != null ? l[4] : l[2]) * l[3]; });
+    var gh = H({ name: 'Group ' + g[0], gap: 12, pad: [18, 20, 10, 20], cross: 'CENTER' });
+    var badge = H({ name: 'Letter', w: 26, h: 26, radius: 6, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
+    add(badge, Tx(g[0], 'Mono/Chip', 'text/secondary'));
+    addAll(gh, [badge, Tx(g[1], 'Heading/H4', 'text/primary', { fill: true }), Tx(money(gsum), 'Mono/Data', 'text/secondary')]);
+    add(table, fillW(gh));
+    g[2].forEach(function (l) {
+      var changed = l[4] != null;
+      var q = changed ? l[4] : l[2];
+      var row = H({ name: 'Line · ' + l[0], gap: 16, pad: [10, 20, 10, 20], cross: 'CENTER', fill: changed ? 'surface/raised' : null });
+      borderSide(row, 'border/default', 'top');
+      var d = VV({ name: 'Item', gap: 2 });
+      addAll(d, [Tx(l[0], 'Label/M', 'text/primary', { fill: true }), Tx(l[1], 'Body/S', 'text/tertiary', { fill: true })]);
+      var tag = H({ name: 'Tag', w: 96, main: 'MAX' });
+      add(tag, chip(changed ? 'Info' : 'Neutral', changed ? 'Actual' : 'As quoted', { noDot: true }));
+      addAll(row, [fillW(d), Tx(String(q), 'Mono/Data', 'text/primary', { w: 48, align: 'RIGHT' }), Tx(money(l[3]), 'Mono/Data', 'text/secondary', { w: 88, align: 'RIGHT' }), Tx(money(q * l[3]), 'Mono/Data', 'text/primary', { w: 104, align: 'RIGHT' }), tag]);
+      add(table, fillW(row));
+      if (changed) {
+        var why = H({ name: 'Why · ' + l[0], gap: 10, pad: [0, 20, 12, 20], fill: 'surface/raised' });
+        addAll(why, [Ic('info', 16, 'status/info/fg'), Tx('Quoted ' + l[2] + ' × ' + money(l[3]) + ' = ' + money(l[2] * l[3]) + '. ' + l[5], 'Body/S', 'text/secondary', { fill: true })]);
+        add(table, fillW(why));
+      }
+    });
+  });
+  return table;
+}
+function invoiceTotals() {
+  var tot = panel('Totals', { gap: 12 });
+  [['Lines subtotal', 'Groups A–H, as invoiced', money(T041.sub)],
+   ['Volume break, 4–7 horses', '10% of ground lines (A) · ' + money(T041.ground), '−' + money(T041.brk)],
+   ['Transit insurance', 'Your own policy, PVI Insurance', money(0)],
+   ['Contingency', '5% of ' + money(T041.base1), money(T041.cont)],
+   ['Service fee', '12% of ' + money(T041.base2), money(T041.fee)],
+   ['VAT', 'International transport, 0%', money(0)]].forEach(function (r) {
+    var row = H({ name: r[0], gap: 16, cross: 'CENTER' });
+    var l = VV({ name: 'Label', gap: 2 });
+    addAll(l, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/tertiary')]);
+    addAll(row, [fillW(l), Tx(r[2], 'Mono/Data', 'text/primary', { align: 'RIGHT' })]);
+    add(tot, fillW(row));
+  });
+  add(tot, divider());
+  add(tot, dlRow('Invoice total', money(T041.total), { labelStyle: 'Label/M' }));
+  add(tot, dlRow('Deposit paid ' + INV041.paidOn + ' · ' + INV041.deposit, '−' + money(T041.deposit), { labelStyle: 'Body/S' }));
+  add(tot, divider());
+  var due = H({ name: 'Amount due', cross: 'CENTER', main: 'SPACE_BETWEEN' });
+  addAll(due, [Tx('Amount due, USD', 'Heading/H3'), Tx(money(T041.due), 'Display/M')]);
+  add(tot, fillW(due));
+  add(tot, Tx('Worked out in the quotation’s fixed order on the actual quantities. The deposit was 30% of the quotation total, ' + money(T041Q.total) + '.', 'Body/S', 'text/tertiary', { fill: true }));
+  return tot;
+}
+function scrInvoice() {
+  var left = column([invoiceLedger(), invoiceTotals()]);
+
+  var cmp = panel('Against your quotation', { gap: 12 });
+  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(head, [Tx('Against your quotation', 'Heading/H4'), chip('Ok', 'Lower by ' + money(T041Q.total - T041.total), { noDot: true })]);
+  addAll(cmp, [fillW(head), dlRow('Quotation ' + INV041.quote, money(T041Q.total)), dlRow('This invoice', money(T041.total)),
+    Tx('One line changed: waiting time at the border, billed for 1 hour instead of the 2 estimated. Every other line is as quoted.', 'Body/S', 'text/tertiary', { fill: true })]);
+
+  var win = panel('Arrival window', { gap: 10 });
+  var wh = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(wh, [Tx('Arrival window', 'Heading/H4'), chip('Ok', 'Kept')]);
+  addAll(win, [fillW(wh), dlRow('Your window', '18 Oct, 11:00–14:00'), dlRow('Delivered', '18 Oct, 12:41'),
+    Tx('Delivered inside the window, so no late-arrival credit applies. Had we been late, the credit would appear here as its own line.', 'Body/S', 'text/tertiary', { fill: true })]);
+
+  var pay = panel('How to pay', { gap: 10 });
+  addAll(pay, [Tx('How to pay', 'Heading/H4'), Tx('By bank transfer, with the invoice code as the reference. We record transfers by hand within 1 working day; this page then shows the invoice as paid.', 'Body/S', 'text/secondary', { fill: true }),
+    dlRow('Reference', INV041.code), dlRow('Account name', 'EquiFreight', { valueStyle: 'Label/S' }), dlRow('Account', '0000 0000 0000'),
+    Tx('Prototype: placeholder bank details.', 'Body/S', 'text/tertiary')]);
+
+  var hist = panel('Invoices for this move', { gap: 0, pad: [20, 24, 12, 24] });
+  add(hist, VV({ name: 'Title', pad: [0, 0, 12, 0] }, [Tx('Invoices for this move', 'Heading/H4')]));
+  [[INV041.deposit, 'Deposit · issued 10 Sep', money(T041.deposit), 'Ok', 'Paid'], [INV041.code, 'Final · issued 19 Oct', money(T041.due), 'Warn', 'Due 26 Oct']].forEach(function (r) {
+    var row = H({ name: r[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
+    borderSide(row, 'border/default', 'top');
+    var t = VV({ name: 'Text', gap: 2 });
+    addAll(t, [Tx(r[0], 'Mono/Data', 'text/primary'), Tx(r[1], 'Body/S', 'text/tertiary')]);
+    addAll(row, [fillW(t), Tx(r[2], 'Mono/Data', 'text/primary', { align: 'RIGHT' }), chip(r[3], r[4])]);
+    add(hist, fillW(row));
+  });
+  var right = column([cmp, win, pay, hist]);
+
+  var lead = owedPanel('1 item', 'Yến, logistics manager, issued the final invoice on 19 Oct after you confirmed the handover. It settles your quotation against what happened on the trip.',
+    [owedItem('Soon', 'Pay the final invoice', INV041.code + ' · ' + money(T041.due), 'By bank transfer with ' + INV041.code + ' as the reference. The deposit you paid on ' + INV041.paidOn + ' is already taken off.', 'Due in 7 days', INV041.due, 'Download invoice (PDF)', 'file')],
+    { chipTone: 'Warn', chipLabel: 'Payment due' }, null);
+  return trackScreen('Tracking · Invoice', pass041(['Amount due', money(T041.due), 'by ' + INV041.due], [stageMark('Handover'), chip('Warn', 'Payment due')], { codes: ['REQ-2026-0162', 'CBRT-2026-041', INV041.code] }), [lead, split(left, right, SIDE.narrow)], '19 Oct 2026, 10:05');
+}
+
+/* ---------- CBRT-2026-040, 29 Sep 09:40: re-routed through Xa Mát ---------- */
+/* the decision Yến recorded at the hold (13-incidents) becomes route plan v2; v1 stays visible with its reason */
+var REROUTE040 = {
+  now: '09:40', changed: '09:24', by: 'Khôi, fleet & route coordinator',
+  reason: 'Mộc Bài is closed to vehicles over 10 t until 16:00 for a bridge inspection.',
+  message: 'Mộc Bài is closed until 16:00 for a bridge inspection. We are re-routing Mekong Star through Xa Mát, with a rest stop at 11:10. New arrival about 15:40 at your yard.',
+  v2: [['Done', 'Phnom Penh', 'Pickup · Sokha Stables', '05:30'], ['Current', 'Bavet', 'Held 08:12–09:25, turned back', '09:25'], ['Upcoming', 'Xa Mát – Trapeang Phlong', 'Border', 'exp. 10:50'], ['Upcoming', 'Xa Mát yard', 'Rest stop · unloaded', '11:10'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '15:40']],
+  v1: [['Upcoming', 'Phnom Penh', 'Pickup', '05:30'], ['Upcoming', 'Bavet – Mộc Bài', 'Border', '08:00'], ['Upcoming', 'Tây Ninh', 'Welfare stop', '09:30'], ['Upcoming', 'Ho Chi Minh City', 'Delivery', '13:30']]
+};
+/* CBRT-2026-040's two plans on one map: v2 through Xa Mát drawn, v1 through Mộc Bài faint and dashed */
+function map040(w, h) {
+  return jobMap({ w: w, h: h, bounds: [104.6, 106.95, 10.65, 11.9],
+    border: [[106.3, 11.9], [106.0, 11.7], [106.2, 11.42], [106.12, 11.08], [105.95, 10.88], [105.7, 10.65]],
+    areas: [['VIETNAM', 106.6, 11.5], ['CAMBODIA', 105.3, 11.2]],
+    paths: [{ pts: [[104.92, 11.56], [105.3, 11.35], [105.8, 11.09], [106.12, 11.08]], kind: 'done' },
+      { pts: [[106.12, 11.08], [105.75, 11.45], [106.0, 11.7], [106.06, 11.6], [106.1, 11.31], [106.66, 10.86]], kind: 'todo' },
+      { pts: [[106.12, 11.08], [106.36, 11.03], [106.66, 10.86]], kind: 'old' }],
+    stops: [[104.92, 11.56, 'Phnom Penh', '05:30 · Sokha Stables', 'stop', 'done', 'b'], [106.12, 11.08, 'Bavet', 'held 08:12–09:25', 'gate', 'done', 'b'], [106.0, 11.7, 'Xa Mát – Trapeang Phlong', 'exp. 10:50', 'gate', 'next', 'l'], [106.06, 11.6, 'Xa Mát yard', '11:10 · rest, unloaded', 'stop', 'todo', 'r'], [106.66, 10.86, 'Ho Chi Minh City', '15:40', 'stop', 'todo', 'r'], [106.36, 11.03, 'Tây Ninh', 'v1 welfare 09:30', 'stop', 'old', 'r']],
+    at: [106.12, 11.08, 'Last confirmed 09:25'] });
+}
+/* the current plan in full, then each earlier plan, newest first, with when, who and why it changed */
+function routeHistoryPanel() {
+  var p = panel('Route', { gap: 18 });
+  var h = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'MAX' });
+  addAll(h, [VV({ name: 'Title', gap: 2 }, [Tx('Route · version 2', 'Heading/H4'), Tx('Positions come from checkpoints the escort records. Between checkpoints we show the last confirmed one, never a guess.', 'Body/S', 'text/tertiary', { fill: true })]), Tx('Updated ' + REROUTE040.now, 'Mono/Caption', 'text/tertiary')]);
+  h.children[0].layoutSizingHorizontal = 'FILL';
+  addAll(p, [fillW(h), map040(728, 400), mapLegend(['done', 'todo', 'old']), fillW(routeList(REROUTE040.v2))]);
+  add(p, divider());
+  add(p, Tx('Earlier plans', 'Label/S', 'text/secondary'));
+  var old = VV({ name: 'Version 1', gap: 12, pad: [16, 18, 16, 18], radius: 8, fill: 'bg/sunken' });
+  var oh = H({ name: 'Head', gap: 12, main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  addAll(oh, [Tx('Version 1 · via Bavet – Mộc Bài', 'Label/M'), chip('Neutral', 'Replaced ' + REROUTE040.changed, { noDot: true })]);
+  var why = H({ name: 'Why', gap: 10 });
+  addAll(why, [Ic('info', 16, 'text/secondary'), Tx('Replaced on 29 Sep at ' + REROUTE040.changed + ' by ' + REROUTE040.by + '. ' + REROUTE040.reason, 'Body/S', 'text/secondary', { fill: true })]);
+  addAll(old, [fillW(oh), fillW(why), fillW(routeList(REROUTE040.v1)), btn('Ghost', 'SM', 'Hide version 1')]);
+  add(p, fillW(old));
+  return p;
+}
+function scrTrackRerouted() {
+  var lead = nothingOwed('Nothing needed from you', 'Mộc Bài is closed until 16:00, so Mekong Star is going through the Xa Mát crossing instead. She rests unloaded at the Xa Mát yard at 11:10.', 'Arrives in about 6 h', '15:40');
+  var msg = panel('Message from Yến', { gap: 8 });
+  var mh = H({ name: 'Head', gap: 8, cross: 'CENTER' });
+  addAll(mh, [Tx('09:20', 'Mono/Caption', 'text/tertiary'), Tx('Yến, logistics manager', 'Body/S', 'text/tertiary')]);
+  addAll(msg, [Tx('Message from Yến', 'Heading/H4'), fillW(mh), Tx(REROUTE040.message, 'Body/M', 'text/primary', { fill: true })]);
+  var change = panel('What changes for you', { gap: 10 });
+  add(change, Tx('What changes for you', 'Heading/H4'));
+  [['Arrival', '15:40 instead of 13:30'], ['Price', 'Unchanged; the extra 95 km is ours'], ['Documents', '1 new, filed by Lan']].forEach(function (r) { add(change, factRow(r)); });
+  var people = peoplePanel([['Tùng', 'driver', 'Driving Mekong Star on the new route.'], ['Yến', 'logistics manager', 'Decided the re-route and answers your questions.'], ['Lan', 'transport specialist', 'Files the declaration for the Xa Mát crossing.']]);
+  var hist = historyPanel([['29 Sep · 09:25', 'Left Bavet for the Xa Mát crossing.', 'Tùng, driver'], ['29 Sep · 09:24', 'Route changed to version 2, via Xa Mát – Trapeang Phlong.', 'Khôi, fleet & route coordinator'], ['29 Sep · 09:20', 'Re-route decided; message sent to you.', 'Yến, logistics manager'], ['29 Sep · 08:12', 'Held at Bavet: Mộc Bài closed until 16:00.', 'Tùng, driver']], 'Show all 27 events');
+  var s = trackScreen('Tracking · Re-routed', passHead({ back: true, codes: ['REQ-2026-0144', 'CBRT-2026-040'], chips: [stageMark('Trip'), chip('Warn', 'Re-routed')], from: ['PNH', 'Phnom Penh'], to: ['HCM', 'Ho Chi Minh City'], facts: [['Departed', '29 Sep · 05:30', true], ['Horse', coatRow([['Mekong Star', 'coat/bay']], 'Mekong Star')], ['Border', 'Xa Mát – Trapeang Phlong'], ['Trailer', 'Shared load']], stub: ['Arrives about', '15:40', 'planned 13:30 · 95 km added'] }),
+    [lead, split(routeHistoryPanel(), column([msg, change, people]), SIDE.narrow), hist], '29 Sep 2026, ' + REROUTE040.now);
+  var nm = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Account name'; });
+  var ini = s.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Initials'; });
+  if (nm) nm.characters = 'Sokha Stables';
+  if (ini) ini.characters = 'SS';
+  return s;
+}
+async function eInvoice() {
+  await insertChainCall([scrTrackRerouted], 'Tracking · In transit');
+  return insertChainCall([scrInvoice], 'Tracking · Closed');
+}
+/* =====================================================================
+   The travel pass as a page header, and a move's own route map.
+   Once a request is approved the move has a pass (the landing introduces
+   it), so every customer page about an approved move opens on it: the
+   codes and stage, the route as the title, the facts that matter, and a
+   stub that says the one thing that matters now. Pages before approval
+   (in review, the quotation) keep the plain header: there is no pass yet.
+   The route map is the landing's schematic map zoomed to one move:
+   travelled road solid, road still to go dotted, a replaced plan dashed
+   and faint, and the last confirmed position, never a guess.
+   ===================================================================== */
+
+/* the horses on a pass, as coat swatches */
+var COAT041 = [['Shadowfax', 'coat/grey'], ['Nightfall', 'coat/black'], ['Copper King', 'coat/chestnut'], ['Silver Bell', 'coat/grey']];
+function coatRow(horses, label) {
+  var r = H({ name: 'Horses', gap: 8, cross: 'CENTER' });
+  var sw = H({ name: 'Coats', gap: -4, cross: 'CENTER' });
+  horses.forEach(function (h) { add(sw, F({ name: 'Coat · ' + h[0], w: 16, h: 16, radius: 999, fill: h[1], stroke: 'surface/card', sw: 2 })); });
+  addAll(r, [sw, Tx(label, 'Label/M', 'text/primary')]);
+  return r;
+}
+/* o: { back, codes: [..], chips: [..], from: [code, city], to: [code, city], mode, facts: [[label, value, mono] | [label, node]], stub: [label, value, sub, tone] } */
+function passHead(o) {
+  var wrap = VV({ name: 'Page header', gap: 14, pad: [HEAD_TOP.owner, 0, 0, 0] });
+  if (o.back) add(wrap, btn('Ghost', 'SM', o.back === true ? 'My requests' : o.back, { lead: 'arrow-left' }));
+  var pass = H({ name: 'Travel pass', radius: 16, fill: 'surface/card', stroke: 'border/default', clip: true });
+  effect(pass, 'Elevation/1 Card');
+  var main = VV({ name: 'Pass', gap: 18, pad: [22, 28, 24, 28] });
+  var top = H({ name: 'Top', gap: 16, main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  var codes = H({ name: 'Codes', gap: 8, cross: 'CENTER' });
+  o.codes.forEach(function (c, i) { if (i) add(codes, Tx('·', 'Body/S', 'text/tertiary')); add(codes, Tx(c, 'Mono/Caption', 'text/secondary', { name: 'Code' })); });
+  var chips = H({ name: 'Status', gap: 10, cross: 'CENTER' });
+  o.chips.forEach(function (c) { add(chips, c); });
+  addAll(top, [codes, chips]);
+  var end = function (c, align) { var v = VV({ name: c[1], gap: 2, cross: align }); addAll(v, [Tx(c[0], 'Mono/Caption', 'text/tertiary', { name: 'City code' }), Tx(c[1], 'Display/M', 'text/primary', { name: 'City' })]); return v; };
+  var leg = H({ name: 'Leg', gap: 10, cross: 'CENTER', pad: [16, 0, 0, 0] });
+  addAll(leg, [fillW(rect(20, 1, 'border/strong', 'Line')), Ic(o.mode === 'air' ? 'plane' : 'truck', 20, 'text/secondary'), fillW(rect(20, 1, 'border/strong', 'Line'))]);
+  var route = H({ name: 'Title', gap: 20, cross: 'CENTER' });
+  addAll(route, [end(o.from, 'MIN'), fillW(leg), end(o.to, 'MAX')]);
+  var facts = H({ name: 'Facts', gap: 40, pad: [16, 0, 0, 0] });
+  borderSide(facts, 'border/default', 'top');
+  o.facts.forEach(function (f) {
+    var c = VV({ name: f[0], gap: 4 });
+    add(c, Tx(f[0], 'Body/S', 'text/tertiary'));
+    add(c, typeof f[1] === 'string' ? Tx(f[1], f[2] ? 'Mono/Data' : 'Label/M', 'text/primary') : f[1]);
+    add(facts, c);
+  });
+  addAll(main, [fillW(top), fillW(route), fillW(facts)]);
+  var perf = VV({ name: 'Perforation', gap: 8, pad: [10, 0, 10, 0], w: 4, cross: 'CENTER', clip: true });
+  /* the tear line must stay shorter than the pass, or its dots set the pass height */
+  for (var k = 0; k < 14; k++) add(perf, dot(3, 'border/strong', 'Hole'));
+  var stub = VV({ name: 'Stub', gap: 6, pad: [24, 24, 24, 24], w: 240, fill: 'bg/sunken', main: 'CENTER' });
+  addAll(stub, [Tx(o.stub[0], 'Body/S', 'text/secondary', { name: 'Label' }), Tx(o.stub[1], 'Display/M', o.stub[3] || 'text/primary', { name: 'Value' }), Tx(o.stub[2], 'Mono/Caption', 'text/tertiary', { name: 'Sub', w: 192 })]);
+  addAll(pass, [fillW(main), perf, stub]);
+  perf.layoutSizingVertical = 'FILL'; stub.layoutSizingVertical = 'FILL';
+  add(wrap, fillW(pass));
+  return wrap;
+}
+/* CBRT-2026-041's pass: only the stub and the chips change from page to page */
+function pass041(stub, chips, o) {
+  o = o || {};
+  return passHead({ back: o.back != null ? o.back : true, codes: o.codes || ['REQ-2026-0162', 'CBRT-2026-041'], chips: chips, from: ['HCM', 'Ho Chi Minh City'], to: ['PNH', 'Phnom Penh'],
+    facts: [['Departs', '18 Oct · 06:00', true], ['Horses', coatRow(COAT041, '4 horses')], ['Border', 'Mộc Bài – Bavet'], ['Trailer', 'TX-447 · private', true], ['Arrival window', '11:00–14:00', true]], stub: stub });
+}
+
+/* ---------- a move's own route ----------
+   bounds: [lon0, lon1, lat0, lat1]; paths: [{ pts: [[lon, lat]...], kind: 'done' | 'todo' | 'old' }];
+   stops: [lon, lat, name, note, kind ('stop' | 'gate'), state ('done' | 'next' | 'old'), side ('r' | 'l' | 'a' | 'b')];
+   at: [lon, lat, text] the last confirmed position; border: [[lon, lat]...] a faint national border (borders: several) */
+function jobMap(o) {
+  var w = o.w, h = o.h, pad = 56, b = o.bounds;
+  var X = function (lon) { return Math.round(pad + (lon - b[0]) / (b[1] - b[0]) * (w - 2 * pad)); };
+  var Y = function (lat) { return Math.round(pad + (b[3] - lat) / (b[3] - b[2]) * (h - 2 * pad)); };
+  var m = F({ name: 'Route map', w: w, h: h, fill: 'bg/sunken', radius: 12, clip: true });
+  var put = function (n, x, y) { m.appendChild(n); n.x = Math.round(x); n.y = Math.round(y); return n; };
+  for (var gx = 64; gx < w; gx += 64) { var v = rect(1, h, 'border/default', 'Grid'); v.opacity = 0.5; put(v, gx, 0); }
+  for (var gy = 64; gy < h; gy += 64) { var hz = rect(w, 1, 'border/default', 'Grid'); hz.opacity = 0.5; put(hz, 0, gy); }
+  var line = function (pts) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p[0]) + ' ' + Y(p[1]); }).join(' '); };
+  var layer = function (name, ds, token, weight, dash, opacity) {
+    var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" fill="none" xmlns="http://www.w3.org/2000/svg">' + ds.map(function (d) { return '<path d="' + d + '" stroke="#000" stroke-width="2"/>'; }).join('') + '</svg>';
+    var f = figma.createNodeFromSvg(svg); f.name = name; f.fills = [];
+    f.findAll(function (n) { return n.type === 'VECTOR'; }).forEach(function (vv) { vv.strokes = [P(token)]; vv.strokeWeight = weight; vv.strokeCap = 'ROUND'; vv.strokeJoin = 'ROUND'; if (dash) vv.dashPattern = dash; });
+    if (opacity != null) f.opacity = opacity;
+    return put(f, 0, 0);
+  };
+  (o.borders || (o.border ? [o.border] : [])).forEach(function (bd) { layer('National border', [line(bd)], 'text/tertiary', 1, [2, 5], 0.8); });
+  (o.areas || []).forEach(function (a) { var t = Tx(a[0], 'Mono/Eyebrow', 'text/tertiary', { name: 'Area · ' + a[0] }); put(t, X(a[1]) - t.width / 2, Y(a[2]) - t.height / 2); });
+  var by = function (k) { return o.paths.filter(function (p) { return p.kind === k; }).map(function (p) { return line(p.pts); }); };
+  if (by('old').length) layer('Replaced plan', by('old'), 'text/tertiary', 2, [6, 6], 0.9);
+  if (by('todo').length) layer('Still to go', by('todo'), 'text/secondary', 3, [1, 8]);
+  if (by('done').length) layer('Travelled', by('done'), 'text/primary', 4);
+  o.stops.forEach(function (s) {
+    var x = X(s[0]), y = Y(s[1]), old = s[5] === 'old';
+    var mk;
+    if (s[4] === 'gate') {
+      mk = H({ name: 'Gate · ' + s[2], w: 22, h: 22, radius: 999, fill: 'surface/card', stroke: old ? 'border/strong' : 'text/primary', sw: 1.5, main: 'CENTER', cross: 'CENTER' });
+      add(mk, Ic('flag', 12, old ? 'text/tertiary' : 'text/primary'));
+      put(mk, x - 11, y - 11);
+    } else {
+      mk = dot(14, s[5] === 'done' ? 'text/primary' : 'surface/card', 'Stop · ' + s[2]);
+      mk.strokes = [P(old ? 'border/strong' : 'text/primary')]; mk.strokeWeight = 3; mk.strokeAlign = 'INSIDE';
+      put(mk, x - 7, y - 7);
+    }
+    /* a small map names only where the move starts and ends; the stop list beside it names the rest */
+    if (o.w < 600 && s !== o.stops[0] && s[0] !== o.end) return;
+    var lb = VV({ name: 'Label · ' + s[2], gap: 0, cross: s[6] === 'l' ? 'MAX' : (s[6] === 'a' || s[6] === 'b') ? 'CENTER' : 'MIN' });
+    addAll(lb, [Tx(s[2], 'Label/S', old ? 'text/tertiary' : 'text/primary'), Tx(s[3], 'Mono/Caption', s[5] === 'next' ? 'status/info/fg' : 'text/tertiary')]);
+    m.appendChild(lb);
+    var side = s[6] || 'r';
+    lb.x = Math.round(side === 'r' ? x + 16 : side === 'l' ? x - 16 - lb.width : x - lb.width / 2);
+    lb.y = Math.round(side === 'a' ? y - 20 - lb.height : side === 'b' ? y + 18 : y - 16);
+  });
+  if (o.at) {
+    var ax = X(o.at[0]), ay = Y(o.at[1]);
+    var ring = dot(44, 'status/info/bg', 'Position · halo'); ring.opacity = 0.9; put(ring, ax - 22, ay - 22);
+    var pin = H({ name: 'Position', w: 30, h: 30, radius: 999, fill: 'text/primary', main: 'CENTER', cross: 'CENTER' });
+    add(pin, Ic('truck', 16, 'bg/canvas'));
+    put(pin, ax - 15, ay - 15);
+    var tag = H({ name: 'Last confirmed', gap: 8, pad: [6, 10, 6, 10], radius: 8, fill: 'surface/card', stroke: 'border/default', cross: 'CENTER' });
+    addAll(tag, [dot(8, 'status/info/fg', 'Live'), Tx(o.at[2], 'Label/S', 'text/primary')]);
+    m.appendChild(tag); tag.x = Math.round(ax - tag.width / 2); tag.y = Math.round(ay - 62);
+  }
+  return m;
+}
+/* the map legend: what each line means, in the same order as the map draws them */
+function mapLegend(kinds, names) {
+  var r = H({ name: 'Legend', gap: 24, cross: 'CENTER' });
+  /* the samples are drawn from the same marks as the map: a solid bar, dots, dashes */
+  var sample = function (k) {
+    var sm = H({ name: 'Sample', gap: k === 'todo' ? 5 : 4, cross: 'CENTER', w: 28, h: 4 });
+    if (k === 'done') add(sm, fillW(rect(28, 4, 'text/primary', 'Solid', 2)));
+    else if (k === 'todo') { for (var i = 0; i < 4; i++) add(sm, dot(3, 'text/secondary', 'Dot')); }
+    else { for (var j = 0; j < 3; j++) add(sm, rect(6, 2, 'text/tertiary', 'Dash')); }
+    return sm;
+  };
+  [['done', 'Travelled'], ['todo', 'Still to go'], ['old', 'Replaced plan']].forEach(function (k) {
+    if (kinds.indexOf(k[0]) < 0) return;
+    var it = H({ name: k[1], gap: 8, cross: 'CENTER' });
+    addAll(it, [sample(k[0]), Tx((names && names[k[0]]) || k[1], 'Body/S', 'text/secondary')]);
+    add(r, it);
+  });
+  return r;
+}
+/* CBRT-2026-041 on National Road 1: Phú Thọ, Mộc Bài – Bavet, the Svay Rieng welfare stop, Phnom Penh */
+var MAP041 = {
+  bounds: [104.6, 106.95, 10.65, 11.75],
+  border: [[106.35, 11.75], [106.2, 11.42], [106.12, 11.08], [105.95, 10.88], [105.7, 10.65]],
+  areas: [['VIETNAM', 106.55, 11.45], ['CAMBODIA', 105.35, 11.25]],
+  road: [[106.66, 10.86], [106.12, 11.08], [105.8, 11.09], [105.3, 11.35], [104.92, 11.56]]
+};
+function map041(state, w, h) {
+  var r = MAP041.road, done = { plan: 0, transit: 2, done: 5 }[state];
+  var paths = [];
+  if (done) paths.push({ pts: r.slice(0, done), kind: 'done' });
+  if (done < r.length) paths.push({ pts: r.slice(Math.max(done - 1, 0)), kind: 'todo' });
+  var st = function (i) { return state === 'done' || (state === 'transit' && i < 2) ? 'done' : (state === 'transit' && i === 2 ? 'next' : 'todo'); };
+  var times = state === 'done' ? ['06:05', '08:34', '09:36', '12:41'] : state === 'transit' ? ['06:05 · departed', '08:34 · cleared', 'exp. 09:30', 'exp. 12:30'] : ['06:00', '08:30', '09:30', '12:30'];
+  return jobMap({ w: w, h: h, end: 104.92, bounds: MAP041.bounds, border: MAP041.border, areas: MAP041.areas, paths: paths,
+    stops: [[106.66, 10.86, 'Phú Thọ training centre', times[0], 'stop', st(0), 'b'], [106.12, 11.08, 'Mộc Bài – Bavet', times[1], 'gate', st(1), 'b'], [105.8, 11.09, 'Svay Rieng welfare stop', times[2], 'stop', st(2), 'b'], [104.92, 11.56, 'Phnom Penh Equestrian Centre', times[3], 'stop', st(3), 'a']],
+    at: state === 'transit' ? [106.12, 11.08, 'Last confirmed 08:34'] : null });
+}
+/* =====================================================================
+   Invoices (logistics manager). Every invoice is generated from an
+   accepted quotation, never typed: a deposit invoice at acceptance and a
+   final invoice after handover. The list reads overdue first, then by due
+   date; a payment is recorded against one invoice at a time, and a
+   recorded payment is never edited (a mistake is reversed with a refund
+   entry, so both stay in the audit log). Demo date: Wed 21 Oct 2026, so
+   INV-2026-0041 matches the customer's Tracking · Invoice.
+   ===================================================================== */
+
+/* [code, kind, club, for (job or quote), issued, due, due note, total, amount due, status tone, status] */
+var INVOICES = [
+  ['INV-2026-0038', 'Final', 'Mekong Racing Club', 'CBRT-2026-036', '6 Oct 2026', '13 Oct 2026', '8 days overdue', 9412.40, 9412.40, 'Bad', 'Overdue'],
+  ['INV-2026-0040', 'Final', 'Vientiane Turf Club', 'CBRT-2026-039', '14 Oct 2026', '21 Oct 2026', 'Due today', 12880.00, 4880.00, 'Warn', 'Partly paid'],
+  ['INV-2026-0041', 'Final', 'Saigon Turf Club', 'CBRT-2026-041', '19 Oct 2026', '26 Oct 2026', 'In 5 days', 6890.18, 4789.61, 'Neutral', 'Issued'],
+  ['INV-2026-0042', 'Deposit', 'Đà Lạt Highland Stables', 'Q-2026-0201', '20 Oct 2026', '27 Oct 2026', 'In 6 days', 3240.00, 3240.00, 'Neutral', 'Issued'],
+  ['INV-2026-0044', 'Deposit', 'Saigon Turf Club', 'Q-2026-0188', '29 Sep 2026', '6 Oct 2026', 'Paid 2 Oct', 11405.76, 0, 'Ok', 'Paid'],
+  ['INV-2026-0029', 'Deposit', 'Saigon Turf Club', 'Q-2026-0168', '10 Sep 2026', '17 Sep 2026', 'Paid 10 Sep', 2100.57, 0, 'Ok', 'Paid']
+];
+var INV_TODAY = 'Wed 21 Oct 2026';
+function invoiceRows(compact, selected) {
+  return INVOICES.map(function (r) {
+    var due = twoLine(r[5], r[6], r[9] === 'Bad' ? 'status/bad/fg' : null);
+    var st = chip(r[9], r[10], { noDot: r[9] === 'Neutral' });
+    var open = Ic('arrow-right', 16, 'text/tertiary');
+    if (compact) {
+      /* beside the payment panel there is no room for a club column: the club leads the invoice cell */
+      var both = VV({ name: 'Invoice', gap: 2 });
+      addAll(both, [Tx(r[2], 'Label/S'), Tx(r[0] + ' · ' + r[1], 'Mono/Caption', 'text/tertiary')]);
+      return { cells: [both, due, money(r[8]), st, open], hl: r[0] === selected };
+    }
+    var ref = VV({ name: 'Invoice', gap: 2 });
+    addAll(ref, [Tx(r[0], 'Mono/Caption', 'text/primary'), Tx(r[1] + ' · ' + r[3], 'Mono/Caption', 'text/tertiary')]);
+    var club = VV({ name: 'Club', gap: 2 });
+    addAll(club, [Tx(r[2], 'Label/S'), Tx(r[1] === 'Final' ? 'After handover' : 'On acceptance', 'Body/S', 'text/tertiary')]);
+    return { cells: [ref, club, r[4], due, money(r[7]), money(r[8]), st, open], hl: r[0] === selected };
+  });
+}
+var INV_COLS = [['Invoice', 170, null, null, null, 'Unsorted'], ['Club', null], ['Issued', 110, null, 'Mono/Caption', 'text/secondary'], ['Due', 130, null, null, null, 'Unsorted'], ['Total', 110, 'RIGHT', 'Mono/Data'], ['Amount due', 120, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Status', 130], ['', 24, 'RIGHT']];
+var INV_COLS_COMPACT = [['Invoice', null, null, null, null, 'Unsorted'], ['Due', 120, null, null, null, 'Unsorted'], ['Amount due', 110, 'RIGHT', 'Mono/Data', null, 'Unsorted'], ['Status', 120], ['', 24, 'RIGHT']];
+function invoiceTable(compact, selected) {
+  var t = tbl('Invoices', compact ? INV_COLS_COMPACT : INV_COLS, invoiceRows(compact, selected));
+  tableFoot(t, INVOICES.length, INVOICES.length, 'invoices');
+  return t;
+}
+function invoicesHead() { return headAdmin('Invoices', 'Deposit and final invoices from accepted quotations. Generated, never typed; record each payment as it arrives.', null, false); }
+/* the four sums the manager acts on; the counts are the point of this view */
+function invoiceStats() {
+  var r = H({ name: 'Stats', gap: 16 });
+  [['Neutral', '$22,322.01', 'Outstanding · 4 invoices'], ['Bad', '$9,412.40', 'Overdue · 1 invoice'], ['Warn', '$12,909.61', 'Due this week · 3'], ['Ok', '$19,405.76', 'Received in October']].forEach(function (s) {
+    var t = stat(s[0], s[1], s[2]); add(r, fillW(t));
+  });
+  return r;
+}
+function invoiceBlock(table, count) {
+  return tableBlock({ tabs: [['All · 6', 'Active'], ['To be paid · 4', 'Default'], ['Overdue · 1', 'Default'], ['Paid · 2', 'Default']],
+    filters: [filterField('Search', 'Search', 'Invoice, club or job', { placeholder: true }), filterField('Select', 'Kind', 'Deposit and final')],
+    count: count || '6 invoices', order: 'Order: overdue first, then by due date', table: table });
+}
+function scrInvoices() {
+  return adminScreen('Logistics manager · Invoices', 'Invoices', ['Invoices'], STAFF.yen, [
+    invoicesHead(), invoiceStats(), invoiceBlock(invoiceTable(false)),
+    Tx('An issued invoice is never edited: it is voided and replaced, or corrected with a credit note. Each row opens the invoice as the club sees it.', 'Body/S', 'text/tertiary', { w: 760 })
+  ], INV_TODAY);
+}
+/* recording a payment: the invoice's sums on top, four fields, and what saving does, in words */
+function recordPanel() {
+  var p = panel('Record a payment', { gap: 16, w: SIDE.narrow });
+  var h = VV({ name: 'Head', gap: 4 });
+  addAll(h, [Tx('Record a payment', 'Heading/H4'), Tx('INV-2026-0041 · Final invoice · Saigon Turf Club', 'Mono/Caption', 'text/tertiary')]);
+  add(p, fillW(h));
+  var sums = VV({ name: 'Sums', gap: 8 });
+  addAll(sums, [dlRow('Job', 'CBRT-2026-041 · HCM → PNH'), dlRow('Invoice total', money(6890.18)), dlRow('Deposit paid, INV-2026-0029', '−' + money(2100.57)), divider(),
+    dlRow('Amount due', money(4789.61), { labelStyle: 'Label/M', valueStyle: 'Mono/Data L' }), dlRow('Due', '26 Oct 2026 · in 5 days', { valueStyle: 'Label/S' })]);
+  add(p, fillW(sums));
+  var form = VV({ name: 'Form', gap: 14 });
+  addAll(form, [input('Text', 'Focus', 'Amount received (USD)', '$4,789.61', 'The full amount due. Less leaves the invoice Partly paid.', { fill: true }),
+    input('Select', 'Default', 'Method', 'Bank transfer', null, { fill: true }),
+    input('Text', 'Default', 'Bank reference', 'VCB 211026-88341', 'As it appears on the statement, so the payment can be traced.', { fill: true }),
+    input('Date', 'Default', 'Received on', '21 Oct 2026', null, { fill: true })]);
+  add(p, fillW(form));
+  add(p, callout('Ok', 'This settles the invoice', 'INV-2026-0041 becomes Paid, Saigon Turf Club gets a receipt by email, and CBRT-2026-041 can close.'));
+  var acts = H({ name: 'Actions', gap: 12 });
+  addAll(acts, [btn('Primary', 'MD', 'Record payment', { lead: 'check' }), btn('Ghost', 'MD', 'Cancel')]);
+  add(p, acts);
+  add(p, Tx('A recorded payment can’t be edited. A mistake is reversed with a refund entry, and both stay in the audit log.', 'Body/S', 'text/tertiary', { fill: true }));
+  return p;
+}
+function scrInvoicePay() {
+  var body = H({ name: 'Body', gap: 24 });
+  addAll(body, [fillW(invoiceTable(true, 'INV-2026-0041')), recordPanel()]);
+  return adminScreen('Logistics manager · Invoices · Record payment', 'Invoices', ['Invoices', 'INV-2026-0041'], STAFF.yen, [
+    invoicesHead(), invoiceStats(), invoiceBlock(body)
+  ], INV_TODAY);
+}
+async function eStaffInvoices() { return insertChainCall([scrInvoices, scrInvoicePay], 'Logistics manager · Incident · Customer report'); }
 /* ---------------------------------------------------------------------
    Main
    --------------------------------------------------------------------- */
@@ -6527,7 +7122,7 @@ async function main() {
 
   await figma.setCurrentPageAsync(screens);
   var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest2Window(), scrRequest2NotRun(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
-  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrFlightTrip(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld()];
+  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrFlightTrip(), scrJourney(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld(), scrTripHandedOn()];
   row1.concat(row2).forEach(primaryTheme);
   await flush();
   var lbl1 = Tx('Owner portal', 'Display/M');

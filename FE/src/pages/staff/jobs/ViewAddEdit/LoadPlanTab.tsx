@@ -611,9 +611,11 @@ export function LoadPlanTab({ job }: Props) {
                           {job.clearanceGateState === 'Clear' ? 'Clear to depart' : 'Locked'}
                         </Chip>
                         <span className="type-body-s text-ink-3">
+                          {/* Clear: the gate's own sentence, which on a domestic leg says why it may leave. Locked:
+                              the band above names the items. */}
                           {job.clearanceGateState === 'Clear'
-                            ? 'Dossier complete.'
-                            : 'Departure stays locked until clearance is ready.'}
+                            ? job.clearanceGateSummary || 'Clear to depart.'
+                            : 'Departure stays locked until the outstanding items clear.'}
                         </span>
                       </Flex>
                     </Col>

@@ -181,9 +181,7 @@ public class TransportJobService {
         } else if (gate.outstandingIssues().isEmpty()) {
             gateSummary = "Clearance gate is locked. Documents are awaiting clearance.";
         } else {
-            gateSummary = String.format(
-                    "Clearance gate is locked. %d items are outstanding before departure can be recorded.",
-                    gate.outstandingIssues().size());
+            gateSummary = lockedSummary(gate.outstandingIssues());
         }
 
         // The sign-off is the trip's, recorded on each job's part of it (US-F3-08).
@@ -205,7 +203,7 @@ public class TransportJobService {
                         routePlan,
                         crew,
                         tripJobs,
-                        jobTrips.describeParts(job, tripId))
+                        withArrivals(job, jobTrips.describeParts(job, tripId)))
                 .toBuilder()
                 .journeyEndCity(jobTrips.journeyEndCity(job))
                 .journeyComplete(journeys.complete(job))
@@ -225,6 +223,43 @@ public class TransportJobService {
      * Which trips of the job's journey the clearance gate holds back (US-F2-13, US-F3-21): the trip that crosses the
      * border and every trip after it; a domestic leg before it can leave first. Null while the job has no trip.
      */
+    /**
+     * Each part's planned arrival, from its trip's confirmed route: the job's delivery stop, or the transfer stop
+     * where it hands the horses on to the next trip (US-F3-16). The Trip tab checks each connection against it.
+     */
+    private List<com.equifreight.model.trip.TripPartResponse> withArrivals(
+            TransportJob job, List<com.equifreight.model.trip.TripPartResponse> parts) {
+        return parts.stream()
+                .map(p -> p.plannedArrivalAt() != null
+                        ? p
+                        : p.toBuilder()
+                                .plannedArrivalAt(routePlanRepository
+                                        .findByTrip_IdAndStatus(p.tripId(), RoutePlanStatus.CONFIRMED)
+                                        .flatMap(r -> r.getStops().stream()
+                                                .filter(st -> (st.getKind() == RouteStopKind.DELIVERY
+                                                                || st.getKind() == RouteStopKind.TRANSFER)
+                                                        && st.getJob() != null
+                                                        && st.getJob().getId().equals(job.getId())
+                                                        && st.getPlannedAt() != null)
+                                                .map(st -> st.getPlannedAt())
+                                                .findFirst())
+                                        .orElse(null))
+                                .build())
+                .toList();
+    }
+
+    /**
+     * The locked gate in words, naming what holds it: the first three outstanding items, then how many more, so the
+     * coordinator sees what to chase without leaving the trip.
+     */
+    static String lockedSummary(List<String> issues) {
+        int shown = Math.min(3, issues.size());
+        String named = String.join("; ", issues.subList(0, shown));
+        String more = issues.size() > shown ? "; and " + (issues.size() - shown) + " more" : "";
+        return (issues.size() == 1 ? "1 item is" : issues.size() + " items are") + " outstanding: " + named + more
+                + ".";
+    }
+
     private String clearanceJourneyNote(TransportJob job) {
         List<com.equifreight.entity.TripJob> journey = jobTrips.journey(job);
         Optional<Trip> border = jobTrips.borderTripOf(job);
