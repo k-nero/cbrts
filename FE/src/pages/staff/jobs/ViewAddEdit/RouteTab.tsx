@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Flex } from 'antd';
 
@@ -41,6 +41,18 @@ export function RouteTab({ job }: Props) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [, setSearchParams] = useSearchParams();
+  // The editor takes the timeline's place and gives it back on save or cancel; bring that spot into view when it
+  // swaps, since Edit draft sits above it and saving a draft adds its callout above.
+  const slot = useRef<HTMLDivElement>(null);
+  const wasEditing = useRef(editing);
+  useEffect(() => {
+    if (wasEditing.current === editing) return;
+    wasEditing.current = editing;
+    const top = slot.current?.getBoundingClientRect().top;
+    if (top !== undefined && (top < 0 || top > window.innerHeight)) {
+      slot.current?.scrollIntoView({ block: 'start' });
+    }
+  }, [editing]);
 
   // The trip of the journey this tab plans, and the one that hands the horses on to it (US-F3-16).
   const index = job.parts.findIndex((part) => part.current);
@@ -185,7 +197,6 @@ export function RouteTab({ job }: Props) {
     <Flex vertical gap={24}>
       {chainPanel}
       {draftPanel}
-      {editor}
 
       {/* Summary strip (Figma "Fleet & route coordinator · Route plan") */}
       <div className="flex flex-wrap gap-x-10 gap-y-4 rounded-lg border border-line bg-card px-6 py-[18px]">
@@ -218,76 +229,83 @@ export function RouteTab({ job }: Props) {
 
       <TripConnections job={job} />
 
-      {/* Timeline of Stops */}
-      <Flex vertical gap={16}>
-        <Flex align="center" justify="space-between">
-          <h3 className="type-h3 text-ink">Timeline</h3>
-          <Flex gap={8} align="center">
-            {planning && !draft && !editing && (
-              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                Edit route
-              </Button>
-            )}
-            <Chip tone="neutral">Version {routePlan.versionNo}</Chip>
-          </Flex>
-        </Flex>
+      {/* Timeline of Stops, or the route editor in its place while the route is edited. */}
+      <div ref={slot} className="scroll-mt-6">
+        {editor ?? (
+          <Flex vertical gap={16}>
+            <Flex align="center" justify="space-between">
+              <h3 className="type-h3 text-ink">Timeline</h3>
+              <Flex gap={8} align="center">
+                {planning && !draft && (
+                  <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                    Edit route
+                  </Button>
+                )}
+                <Chip tone="neutral">Version {routePlan.versionNo}</Chip>
+              </Flex>
+            </Flex>
 
-        <div className="flex flex-col">
-          {stops.map((stop, i) => {
-            const timeStr = times[i];
-            // The leg to the next stop, under a 2 px rule beneath the marker (DESIGN.md, Route editor).
-            const leg =
-              i < stops.length - 1 ? routePlan.legs?.find((l) => l.fromStopId === stop.id) : null;
-            const line = leg ? legLine(leg) : null;
+            <div className="flex flex-col">
+              {stops.map((stop, i) => {
+                const timeStr = times[i];
+                // The leg to the next stop, under a 2 px rule beneath the marker (DESIGN.md, Route editor).
+                const leg =
+                  i < stops.length - 1
+                    ? routePlan.legs?.find((l) => l.fromStopId === stop.id)
+                    : null;
+                const line = leg ? legLine(leg) : null;
 
-            // On a shared trip each pickup and delivery names its job (US-F3-11).
-            const shared = new Set(stops.map((s) => s.jobCode).filter(Boolean)).size > 1;
-            const placeName =
-              stop.kind === 'BORDER'
-                ? stop.borderCrossingName || 'Border'
-                : stop.placeName || 'Stop';
-            const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
-            // The delivery says how much of the arrival window the plan leaves spare.
-            const spare =
-              stop.kind === 'DELIVERY' &&
-              (!stop.jobCode || stop.jobCode === job.code) &&
-              !part?.handsOn &&
-              job.windowStart &&
-              job.windowEnd &&
-              stop.plannedAt
-                ? windowSpare(stop.plannedAt, job.windowEnd)
-                : null;
-            const details = [stop.details, spare].filter(Boolean).join(' ');
+                // On a shared trip each pickup and delivery names its job (US-F3-11).
+                const shared = new Set(stops.map((s) => s.jobCode).filter(Boolean)).size > 1;
+                const placeName =
+                  stop.kind === 'BORDER'
+                    ? stop.borderCrossingName || 'Border'
+                    : stop.placeName || 'Stop';
+                const stopName =
+                  shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
+                // The delivery says how much of the arrival window the plan leaves spare.
+                const spare =
+                  stop.kind === 'DELIVERY' &&
+                  (!stop.jobCode || stop.jobCode === job.code) &&
+                  !part?.handsOn &&
+                  job.windowStart &&
+                  job.windowEnd &&
+                  stop.plannedAt
+                    ? windowSpare(stop.plannedAt, job.windowEnd)
+                    : null;
+                const details = [stop.details, spare].filter(Boolean).join(' ');
 
-            return (
-              <div key={stop.id} className="flex flex-col">
-                <TimelineStop
-                  kind={stop.kind}
-                  stop={stopName}
-                  time={timeStr}
-                  details={details || undefined}
-                />
-                {i < stops.length - 1 && (
-                  <div className="ml-[17px] min-h-4 border-l-2 border-line py-2.5 pl-[33px]">
-                    {line && (
-                      <span
-                        className={cx(
-                          'type-caption',
-                          line.missingTime ? 'text-warn' : 'text-ink-3',
+                return (
+                  <div key={stop.id} className="flex flex-col">
+                    <TimelineStop
+                      kind={stop.kind}
+                      stop={stopName}
+                      time={timeStr}
+                      details={details || undefined}
+                    />
+                    {i < stops.length - 1 && (
+                      <div className="ml-[17px] min-h-4 border-l-2 border-line py-2.5 pl-[33px]">
+                        {line && (
+                          <span
+                            className={cx(
+                              'type-caption',
+                              line.missingTime ? 'text-warn' : 'text-ink-3',
+                            )}
+                          >
+                            {line.text}
+                            {line.missingTime &&
+                              ' · the welfare stops this drive needs can’t be checked'}
+                          </span>
                         )}
-                      >
-                        {line.text}
-                        {line.missingTime &&
-                          ' · the welfare stops this drive needs can’t be checked'}
-                      </span>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Flex>
+                );
+              })}
+            </div>
+          </Flex>
+        )}
+      </div>
 
       {/* Ready to depart, until the trip leaves and On the road takes over; hidden while the route is edited. */}
       {!departed && !editing && (
