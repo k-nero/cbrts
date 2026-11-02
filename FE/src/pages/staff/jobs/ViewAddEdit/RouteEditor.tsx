@@ -1,5 +1,5 @@
 import { type FC, Fragment, useMemo, useState } from 'react';
-import { useFieldArray, useWatch } from 'react-hook-form';
+import { useFieldArray, useFormState, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 
@@ -20,7 +20,7 @@ import { StopPlaceField } from './StopPlaceField';
 import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
-import { Button, Callout, IconButton, Panel } from '@/components/ui';
+import { Button, Callout, IconButton } from '@/components/ui';
 import { useBorderCrossings, useSaveRouteDraft } from '@/hooks/useJob';
 import type { JobDetail, RoutePlan } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
@@ -30,7 +30,8 @@ const SHOWN_DATETIME = 'D MMM YYYY, HH:mm';
 /**
  * The Route tab's editor (US-F3-17): the trip's stops in order with the leg between each pair, saved as the trip's
  * draft. It starts from the draft, else the confirmed route, else the job's pickup and delivery places. The server
- * checks the route again when it is confirmed.
+ * checks the route again when it is confirmed. It takes over the Route view while it is open (DESIGN.md, Route
+ * editor), with Cancel and Save draft in a bar that stays on screen.
  */
 export const RouteEditor: FC<{
   job: JobDetail;
@@ -38,9 +39,12 @@ export const RouteEditor: FC<{
   from: RoutePlan | null;
   /** Whether a confirmed route will be superseded, so a reason is asked for. */
   supersedes: boolean;
-  onClose: () => void;
-}> = ({ job, from, supersedes, onClose }) => {
-  const { message } = App.useApp();
+  /** What the route has to meet, under the editor's title: the arrival window, or the hand-on to the next trip. */
+  note?: string;
+  /** Called with true after a save, false on cancel. */
+  onClose: (saved: boolean) => void;
+}> = ({ job, from, supersedes, note, onClose }) => {
+  const { message, modal } = App.useApp();
   const save = useSaveRouteDraft(job.id);
   const crossings = useBorderCrossings(true);
   const initial = useMemo(() => toForm(from, job), [from, job]);
@@ -48,6 +52,7 @@ export const RouteEditor: FC<{
     resolver: zodResolver(routeDraftSchema),
     defaultValues: initial,
   });
+  const { isDirty } = useFormState({ control: methods.control });
   const stops = useFieldArray({ control: methods.control, name: 'stops' });
   const legs = useFieldArray({ control: methods.control, name: 'legs' });
   const modes = (useWatch({ control: methods.control, name: 'legs' }) ?? []).map(
@@ -121,21 +126,50 @@ export const RouteEditor: FC<{
     save.mutate(toInput(v, job), {
       onSuccess: (plan) => {
         message.success(`Route draft v${plan.versionNo} saved. Confirm it when it's ready.`);
-        onClose();
+        onClose(true);
       },
     }),
   );
 
+  // Many minutes of input: Cancel asks before throwing changes away (leaving the page asks through FormWrapper).
+  const cancel = () => {
+    if (!isDirty) {
+      onClose(false);
+      return;
+    }
+    // Closed once the dialog has gone, so its scroll lock is lifted before the view scrolls back.
+    let discard = false;
+    modal.confirm({
+      title: 'Discard your changes to the route?',
+      content: from
+        ? `The trip keeps v${from.versionNo} as it was.`
+        : 'The trip stays without a route.',
+      okText: 'Discard changes',
+      cancelText: 'Keep editing',
+      onOk: () => {
+        discard = true;
+      },
+      afterClose: () => {
+        if (discard) onClose(false);
+      },
+    });
+  };
+
   return (
-    <Panel title={from ? `Edit route · from v${from.versionNo}` : 'Plan the route'} className="p-4">
+    <section className="flex flex-col gap-4">
+      <Flex vertical gap={4}>
+        <h3 className="type-h3 m-0 text-ink">
+          {from ? `Editing route · from v${from.versionNo}` : 'Plan the route'}
+        </h3>
+        {note && <span className="type-body-s text-ink-3">{note}</span>}
+      </Flex>
       <FormWrapper
         methods={methods}
         isSubmitting={save.isPending}
         mode="edit"
-        onCancel={onClose}
+        onCancel={cancel}
         onFinish={onSubmit}
         layout="vertical"
-        force
       >
         {({ FormField }) => (
           <Flex vertical gap={12}>
@@ -335,13 +369,14 @@ export const RouteEditor: FC<{
                 {apiErrorMessage(save.error, 'Something went wrong. Try again.')}
               </Callout>
             )}
-            <Flex justify="end" gap={8}>
+            {/* Stays on screen however long the route is (as the cab's dock does). */}
+            <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t border-line-strong bg-canvas py-4">
               <CancelButton label="Cancel" />
               <SubmitButton label="Save draft" />
-            </Flex>
+            </div>
           </Flex>
         )}
       </FormWrapper>
-    </Panel>
+    </section>
   );
 };

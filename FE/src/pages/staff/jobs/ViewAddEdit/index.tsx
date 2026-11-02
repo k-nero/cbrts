@@ -7,6 +7,7 @@ import { Callout, StageMark } from '@/components/ui';
 import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
+import { useRouterNavigation } from '@/router/route.hook';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { ClearanceTab } from './ClearanceTab';
@@ -73,6 +74,7 @@ function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
+  const { navigateWithConfirmation } = useRouterNavigation();
   const asked = searchParams.get('tab');
   const oldView = asked ? OLD_TABS[asked] : undefined;
   useEffect(() => {
@@ -126,9 +128,12 @@ function JobWorkspace() {
         // The chosen trip and view stay in the URL, so coming back to the Trip tab opens them again.
         const trip = searchParams.get('trip');
         const view = searchParams.get('view');
-        setSearchParams(
-          { tab: key, ...(trip ? { trip } : {}), ...(view ? { view } : {}) },
-          { replace: true },
+        // Leaving the Trip tab drops a route being edited, so it asks first when the editor has changes.
+        navigateWithConfirmation(() =>
+          setSearchParams(
+            { tab: key, ...(trip ? { trip } : {}), ...(view ? { view } : {}) },
+            { replace: true },
+          ),
         );
       }}
       items={items}
