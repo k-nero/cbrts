@@ -33,12 +33,12 @@ export const tripView = (job: JobDetail, asked: string | null): TripView =>
       : 'load-plan';
 
 /**
- * True when the trip shown is a road trip with a route: both its Load plan and Route views open with its summary strip,
- * which carries the clearance gate as a chip, so the page header leaves the gate out.
+ * True when the trip shown has a route: a road trip's Load plan and Route views and a flight open with its summary
+ * strip, which carries the clearance gate as a chip, so the Trip tab leaves the gate panel out.
  */
 export const routeCarriesGate = (job: JobDetail) => {
   const part = job.parts.find((p) => p.current);
-  return Boolean(part && part.mode !== 'AIR' && job.routePlan);
+  return Boolean(part && job.routePlan);
 };
 
 /**

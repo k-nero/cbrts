@@ -1,11 +1,15 @@
 import { type FC, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { App, Flex } from 'antd';
 import dayjs from 'dayjs';
 
+import { DepartureReadiness } from './DepartureReadiness';
 import { FlightPanel } from './FlightPanel';
 import { type FlightForm, flightSchema } from './flightSchema';
 import { LoadPlanTab } from './LoadPlanTab';
+import { departureReadiness } from './readiness';
+import { RouteSummary } from './RouteSummary';
 import { TripConnections } from './TripConnections';
 
 import { CancelButton } from '@/components/form/CancelButton';
@@ -24,15 +28,23 @@ const SHOWN_DATETIME = 'D MMM YYYY, HH:mm';
  * A flight of the journey (US-F3-21): no load plan and no route to edit. Its route runs from one
  * cargo terminal to the other, confirmed when the trip was added; the coordinator sets the
  * airline's flight here, and its times become the times of the airport stops, checked against the
- * trips before and after. Below it, each job's consignment and the flight crew and sign-off.
+ * trips before and after. It opens with its summary strip, which carries the clearance gate as a chip; below the
+ * schedule, each job's consignment and the flight crew, then Ready to depart as on a road trip.
  */
 export const FlightTrip: FC<{ job: JobDetail; part: TripPart }> = ({ job, part }) => {
   const [open, setOpen] = useState(false);
   const planning = useCanPlanTrips() && part.status === 'NOT_STARTED';
   const flight = (job.routePlan?.legs ?? []).find((leg) => leg.mode === 'AIR')?.flight ?? null;
+  const [, setSearchParams] = useSearchParams();
+
+  // The trip that hands the horses on to this one, if any (US-F3-16).
+  const index = job.parts.findIndex((p) => p.tripId === part.tripId);
+  const before = index > 0 && job.parts[index - 1].handsOn ? job.parts[index - 1] : null;
+  const readiness = departureReadiness(job, part, before, job.routePlan?.status === 'CONFIRMED');
 
   return (
     <Flex vertical gap={24}>
+      {job.routePlan && <RouteSummary job={job} routePlan={job.routePlan} />}
       <TripConnections job={job} />
       {!flight && (
         <Callout tone="warn" title="The flight isn’t set yet">
@@ -66,6 +78,16 @@ export const FlightTrip: FC<{ job: JobDetail; part: TripPart }> = ({ job, part }
       </Panel>
       <FlightPanel job={job} />
       <LoadPlanTab job={job} />
+      {/* Ready to depart, until the flight leaves. */}
+      {part.status === 'NOT_STARTED' && (
+        <DepartureReadiness
+          job={job}
+          part={part}
+          steps={readiness}
+          onOpenLoadPlan={() => undefined}
+          onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+        />
+      )}
       <FlightModal
         job={job}
         part={part}

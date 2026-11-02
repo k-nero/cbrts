@@ -1349,13 +1349,19 @@ function scrFlightTrip() {
   addAll(cons, [fillW(chh), fillW(row)]);
   var crew = panel('This trip flies', { gap: 12 });
   addAll(crew, [Tx('This trip flies', 'Heading/H4'),
-    Tx('The flight is this trip’s carrier, so it has no trailer to load. Flight crew: Lê Thị Hoa (flying groom), Dr Phạm An (flight vet).', 'Body/S', 'text/secondary', { fill: true }),
-    btn('Primary', 'MD', 'Sign off trip plan')]);
-  var body = tripBody(CHAIN, 1, null, tripHead(part, null), [sched, cons, crew]);
-  return jobScreen('Fleet & route coordinator · Trip · Flight', 'Trip', STAFF.khoi, [body], {
-    job: CHAIN_JOB,
-    gate: 'Clearance gates TRP-2026-003 (the flight Ho Chi Minh City → Hong Kong) and every trip after it. TRP-2026-002 (Da Nang → Ho Chi Minh City) can leave before.'
-  });
+    Tx('The flight is this trip’s carrier, so it has no trailer to load. Flight crew: Lê Thị Hoa (flying groom), Dr Phạm An (flight vet).', 'Body/S', 'text/secondary', { fill: true })]);
+  /* as on a road trip: the strip first, with the gate as its chip, and Ready to depart last, with Sign off */
+  var strip = routeSummary([['Origin', 'Tân Sơn Nhất cargo terminal (SGN)'], ['Destination', 'HKIA cargo terminal (HKG)'], ['Distance', '1,500 km'], ['Duration', '3.7 h'], ['Flight', 'Cathay Cargo CX 2071'], ['Arrival window', 'Hands on to the next trip']]);
+  var ready = readyPanel([
+    ['Ok', 'Done', 'Route', 'Confirmed.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Flight', 'Cathay Cargo CX 2071, times set.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Crew', '2 people on the flight.', STAFF.khoi[0]],
+    ['Bad', 'Locked', 'Clearance', 'Clearance gates TRP-2026-003 (the flight Ho Chi Minh City → Hong Kong) and every trip after it.', STAFF.lan[0], btn('Secondary', 'SM', 'View outstanding items', { trail: 'arrow-right' })],
+    ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager'],
+    ['Neutral', 'Waiting', 'Horses handed on', 'TRP-2026-002 hands them on in Ho Chi Minh City; it can’t leave before then.', 'The escort']],
+    'Waiting on clearance · ' + STAFF.lan[0] + '.', null);
+  var body = tripBody(CHAIN, 1, null, tripHead(part, null), [strip, sched, cons, crew, ready]);
+  return jobScreen('Fleet & route coordinator · Trip · Flight', 'Trip', STAFF.khoi, [body], { job: CHAIN_JOB, noGate: true });
 }
 /* Lan's checklist is the customer's All documents list, in the same words, with the holder named for staff */
 function scrClearance() {
@@ -1395,11 +1401,12 @@ function readyPanel(steps, waiting, action) {
   add(p, fillW(foot));
   return p;
 }
-/* A road trip's summary strip, first on its Load plan and Route views above every callout: the route's facts, then
-   its clearance gate as a chip (the page header leaves the gate out). */
-function routeSummary() {
+/* A trip's summary strip, first on a road trip's Load plan and Route views and on a flight, above every callout: the
+   route's facts (by road its crossing and welfare stops, on a flight the airline's flight), then its clearance gate as
+   a chip (the Trip tab shows no gate panel). */
+function routeSummary(cells) {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
+  (cells || [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]]).forEach(function (s) {
     var c = VV({ name: s[0], gap: 4 });
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);

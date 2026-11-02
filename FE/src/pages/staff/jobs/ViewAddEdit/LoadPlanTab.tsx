@@ -134,10 +134,8 @@ export function LoadPlanTab({ job }: Props) {
               {flights.map((f) => `${f.airline} ${f.flightNo}`).join(', ') || 'flight not set yet'}.
               Each job’s stall positions and air waybill are its consignment, above.
             </p>
+            {/* Sign-off is Ready to depart's, below, as on a road trip. */}
             <FlightCrew job={job} />
-            <div>
-              <SignOffButton job={job} />
-            </div>
           </Flex>
         </Panel>
       </Flex>
