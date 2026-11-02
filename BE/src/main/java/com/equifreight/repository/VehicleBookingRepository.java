@@ -45,4 +45,6 @@ public interface VehicleBookingRepository extends JpaRepository<VehicleBooking, 
 
     @Query("SELECT b FROM VehicleBooking b WHERE b.startsAt < :rangeEnd AND b.endsAt > :rangeStart")
     List<VehicleBooking> findInDateRange(@Param("rangeStart") Instant rangeStart, @Param("rangeEnd") Instant rangeEnd);
+
+    boolean existsByVehicleId(UUID vehicleId);
 }

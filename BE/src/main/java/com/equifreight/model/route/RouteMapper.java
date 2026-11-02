@@ -19,6 +19,7 @@ public final class RouteMapper {
                 .city(place.getCity())
                 .countryCode(place.getCountry().getCode())
                 .countryName(place.getCountry().getName())
+                .address(place.getAddress())
                 .build();
     }
 

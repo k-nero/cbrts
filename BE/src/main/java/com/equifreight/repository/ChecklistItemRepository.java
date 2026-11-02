@@ -81,4 +81,6 @@ public interface ChecklistItemRepository
             ORDER BY ci.dueDate NULLS LAST
             """)
     List<ChecklistItem> findOnUndepartedJobsOfClub(@Param("clubId") UUID clubId);
+
+    boolean existsByBorderCrossingId(UUID borderCrossingId);
 }

@@ -34,4 +34,6 @@ public interface TripVehicleRepository extends JpaRepository<TripVehicle, UUID> 
             @Param("vehicleId") UUID vehicleId,
             @Param("corridorIds") Collection<UUID> corridorIds,
             @Param("now") Instant now);
+
+    boolean existsByVehicleId(UUID vehicleId);
 }

@@ -20,4 +20,9 @@ public interface CorridorCrossingRepository extends JpaRepository<CorridorCrossi
             order by cc.seq
             """)
     List<CorridorCrossing> findWithCrossingByCorridorIdIn(@Param("corridorIds") Collection<UUID> corridorIds);
+
+    /** The codes of the routes that take the crossing, A to Z. */
+    @Query("SELECT DISTINCT cc.corridor.code FROM CorridorCrossing cc WHERE cc.borderCrossing.id = :crossingId "
+            + "ORDER BY cc.corridor.code")
+    List<String> findCorridorCodesByBorderCrossingId(@Param("crossingId") UUID crossingId);
 }

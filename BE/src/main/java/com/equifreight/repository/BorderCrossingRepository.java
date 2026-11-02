@@ -24,4 +24,6 @@ public interface BorderCrossingRepository extends JpaRepository<BorderCrossing, 
     /** These crossings with both countries, for a new corridor's border check. */
     @EntityGraph(attributePaths = {"fromCountry", "toCountry"})
     List<BorderCrossing> findByIdIn(Collection<UUID> ids);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
 }

@@ -70,6 +70,7 @@ public class VehicleService {
     private final VehicleAvailability availability;
     private final AuditService audit;
     private final PlaceRepository places;
+    private final CatalogUsage usage;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
@@ -82,7 +83,8 @@ public class VehicleService {
             TripVehicleRepository tripVehicles,
             VehicleAvailability availability,
             AuditService audit,
-            PlaceRepository places) {
+            PlaceRepository places,
+            CatalogUsage usage) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleStallRepository = vehicleStallRepository;
         this.vehicleBookingRepository = vehicleBookingRepository;
@@ -94,6 +96,26 @@ public class VehicleService {
         this.availability = availability;
         this.audit = audit;
         this.places = places;
+        this.usage = usage;
+    }
+
+    /**
+     * Deletes a vehicle nothing has used yet, with its stalls, permits and corridors. One that has been on a trip, on
+     * a load plan or booked on the fleet calendar stays on record, and the refusal says so.
+     */
+    @Transactional
+    public void delete(User actor, UUID id) {
+        Vehicle vehicle = vehicleRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+        usage.vehicleInUse(vehicle).ifPresent(reason -> {
+            throw new ConflictException("VEHICLE_IN_USE", reason);
+        });
+        String code = vehicle.getCode();
+        vehicleRepository.delete(vehicle);
+        vehicleRepository.flush();
+        audit.recordDecision(
+                actor, "VEHICLE_DELETED", "Deleted vehicle " + code + ".", ENTITY_TYPE, id, code, null, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -215,6 +237,22 @@ public class VehicleService {
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
 
+        if (request.code() != null && !request.code().isBlank()) {
+            String code = request.code().trim();
+            if (!code.equals(vehicle.getCode())) {
+                vehicleRepository
+                        .findByCode(code)
+                        .filter(other -> !other.getId().equals(id))
+                        .ifPresent(other -> {
+                            throw new ConflictException(
+                                    "DUPLICATE_CODE", "Vehicle with code " + code + " already exists");
+                        });
+                vehicle.setCode(code);
+            }
+        }
+        if (request.kind() != null) {
+            vehicle.setKind(request.kind());
+        }
         if (request.payloadKg() != null && request.payloadKg() > 0) {
             vehicle.setPayloadKg(request.payloadKg());
         }
