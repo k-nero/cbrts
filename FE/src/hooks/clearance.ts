@@ -392,6 +392,25 @@ export const useCreateQuarantine = (jobId: string | null | undefined) => {
 };
 
 /**
+ * Change a scheduled quarantine's station or dates.
+ */
+export const useUpdateQuarantine = (jobId: string | null | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: CreateQuarantinePeriodRequest & { id: string }) => {
+      const res = await clearanceApi.updateQuarantine(id, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (jobId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.quarantines(jobId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.clearance.status(jobId) });
+      }
+    },
+  });
+};
+
+/**
  * Complete quarantine inspection mutation.
  */
 export const useCompleteQuarantine = (jobId: string | null | undefined) => {

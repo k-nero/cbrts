@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { Button, Chip, Panel } from '@/components/ui';
 import { useCompleteQuarantine } from '@/hooks/clearance';
 import type { QuarantinePeriod } from '@/interfaces';
+import { apiErrorMessage, ict } from '@/lib/utils';
 import { quarantineRule } from './labels';
 
 type Props = {
@@ -13,6 +14,8 @@ type Props = {
   loading: boolean;
   /** Absent for a read-only viewer, who can neither schedule nor sign off a quarantine. */
   onSchedule?: () => void;
+  /** Opens a scheduled quarantine to change its station or dates; absent for a read-only viewer. */
+  onChange?: (quarantine: QuarantinePeriod) => void;
   /** The pinned destination catalog and its minimum stay; both absent before the job is approved. */
   minDays?: number;
   destination?: string;
@@ -24,6 +27,7 @@ const QuarantineList: FC<Props> = ({
   quarantines,
   loading,
   onSchedule,
+  onChange,
   minDays,
   destination,
 }) => {
@@ -35,10 +39,12 @@ const QuarantineList: FC<Props> = ({
     try {
       await complete.mutateAsync(quarantineId);
       message.success('Quarantine inspection confirmed. Clearance gate re-evaluated.');
-    } catch {
-      message.error('Failed to confirm quarantine completion.');
+    } catch (err: unknown) {
+      message.error(apiErrorMessage(err, 'Failed to confirm quarantine completion.'));
     }
   };
+  // A quarantine is completed from its last day, in Indochina Time; the server refuses it before then.
+  const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,6 +87,7 @@ const QuarantineList: FC<Props> = ({
             const end = dayjs(q.endsOn);
             const durationDays = end.diff(start, 'day');
             const meetsMinimum = minDays === undefined || durationDays >= minDays;
+            const ended = q.endsOn <= today;
 
             return (
               <Panel
@@ -103,26 +110,46 @@ const QuarantineList: FC<Props> = ({
                 footer={
                   <div className="flex items-center justify-between">
                     <span className="type-body-s text-ink-3">
-                      The station veterinarian signs off before the horses leave.
+                      {q.isCompleted || ended
+                        ? 'The station veterinarian signs off before the horses leave.'
+                        : `The station veterinarian signs off from ${end.format('D MMM')}, the quarantine’s last day.`}
                     </span>
-                    {!q.isCompleted && onSchedule && (
-                      <Popconfirm
-                        title="Confirm quarantine completion?"
-                        description="Has the station veterinarian inspected the horses and certified them fit for transit?"
-                        onConfirm={() => confirmInspection(q.id)}
-                        okText="Confirm inspection"
-                        cancelText="Cancel"
-                      >
+                    <span className="flex items-center gap-2">
+                      {!q.isCompleted && onChange && (
+                        <Button variant="secondary" size="sm" onClick={() => onChange(q)}>
+                          Change dates
+                        </Button>
+                      )}
+                      {!q.isCompleted && onSchedule && !ended && (
                         <Button
-                          variant="primary"
+                          variant="secondary"
                           size="sm"
-                          leadingIcon="check"
-                          disabled={complete.isPending}
+                          leadingIcon="lock"
+                          disabled
+                          title={`Can be confirmed from ${end.format('D MMM')}`}
                         >
                           Confirm veterinary inspection
                         </Button>
-                      </Popconfirm>
-                    )}
+                      )}
+                      {!q.isCompleted && onSchedule && ended && (
+                        <Popconfirm
+                          title="Confirm quarantine completion?"
+                          description="Has the station veterinarian inspected the horses and certified them fit for transit?"
+                          onConfirm={() => confirmInspection(q.id)}
+                          okText="Confirm inspection"
+                          cancelText="Cancel"
+                        >
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            leadingIcon="check"
+                            disabled={complete.isPending}
+                          >
+                            Confirm veterinary inspection
+                          </Button>
+                        </Popconfirm>
+                      )}
+                    </span>
                   </div>
                 }
               >

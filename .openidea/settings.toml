@@ -1,0 +1,6 @@
+[languages.node]
+packageManager = "bun"
+interpreter = "/Users/thanh.nguyen/.bun/bin/node"
+
+[languages.typescript]
+version = "workspace"

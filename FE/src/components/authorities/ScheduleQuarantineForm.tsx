@@ -2,7 +2,11 @@ import { type FC, useEffect } from 'react';
 import { App, DatePicker, Form, Select } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Button, Callout } from '@/components/ui';
-import { useCreateQuarantine, useQuarantineFacilities } from '@/hooks/clearance';
+import {
+  useCreateQuarantine,
+  useQuarantineFacilities,
+  useUpdateQuarantine,
+} from '@/hooks/clearance';
 import { apiErrorMessage } from '@/lib/utils';
 import { quarantineRule } from './labels';
 import type { Props } from './ScheduleQuarantineModal';
@@ -13,12 +17,15 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
   jobId,
   minDays,
   destination,
+  editing,
   onClose,
 }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm<Values>();
   const { data: stations = [], isLoading: loadingStations } = useQuarantineFacilities();
   const create = useCreateQuarantine(jobId);
+  const update = useUpdateQuarantine(jobId);
+  const saving = create.isPending || update.isPending;
   const rule = quarantineRule(minDays, destination);
 
   // Default to the first station, also when the list arrives after the dialog opened.
@@ -33,16 +40,29 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
       message.error(`The quarantine must last at least ${rule}.`);
       return;
     }
+    const period = {
+      placeId,
+      startsOn: start.format('YYYY-MM-DD'),
+      endsOn: end.format('YYYY-MM-DD'),
+    };
     try {
-      await create.mutateAsync({
-        placeId,
-        startsOn: start.format('YYYY-MM-DD'),
-        endsOn: end.format('YYYY-MM-DD'),
-      });
-      message.success('Quarantine period scheduled successfully.');
+      if (editing) {
+        await update.mutateAsync({ id: editing.id, horseId: editing.horseId, ...period });
+        message.success('Quarantine period changed.');
+      } else {
+        await create.mutateAsync(period);
+        message.success('Quarantine period scheduled successfully.');
+      }
       onClose();
     } catch (err: unknown) {
-      message.error(apiErrorMessage(err, 'The quarantine could not be scheduled.'));
+      message.error(
+        apiErrorMessage(
+          err,
+          editing
+            ? 'The quarantine could not be changed.'
+            : 'The quarantine could not be scheduled.',
+        ),
+      );
     }
   };
 
@@ -51,7 +71,11 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
       form={form}
       layout="vertical"
       className="mt-4"
-      initialValues={{ dates: [dayjs(), dayjs().add(minDays ?? 7, 'day')] }}
+      initialValues={
+        editing
+          ? { placeId: editing.placeId, dates: [dayjs(editing.startsOn), dayjs(editing.endsOn)] }
+          : { dates: [dayjs(), dayjs().add(minDays ?? 7, 'day')] }
+      }
       onFinish={submit}
     >
       <Form.Item
@@ -92,8 +116,8 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
         <Button variant="secondary" size="sm" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" size="sm" type="submit" disabled={create.isPending}>
-          Schedule quarantine
+        <Button variant="primary" size="sm" type="submit" disabled={saving}>
+          {editing ? 'Save changes' : 'Schedule quarantine'}
         </Button>
       </div>
     </Form>
