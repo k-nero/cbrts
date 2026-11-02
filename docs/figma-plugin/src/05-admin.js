@@ -933,6 +933,7 @@ var SIDEBAR_FRAMES = {
   'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Fleet & route coordinator · Trip · Flight': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
+  'Fleet & route coordinator · Trip · Journey': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
   'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],

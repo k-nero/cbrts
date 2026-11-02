@@ -1271,13 +1271,28 @@ function journeyRail(parts, active, addFrom) {
     var on = i === active;
     var row = VV({ name: 'Trip · ' + p.code.split(' ')[0], gap: 4, pad: [10, 12, 10, 12], radius: 8, fill: on ? 'surface/muted' : null });
     var top = H({ name: 'Head', gap: 8, cross: 'CENTER' });
-    var status = Tx(p.status, 'Mono/Caption', 'text/tertiary');
     var gap = H({ name: 'Gap' });
-    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), status]);
-    addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
+    /* with a standing (the redesigned rail), the code moves to the head and the trip says where it stands */
+    var right = p.step ? Tx(p.code.split(' ')[0], 'Mono/Caption', 'text/tertiary') : Tx(p.status, 'Mono/Caption', 'text/tertiary');
+    addAll(top, [Ic(p.icon, 14, on ? 'accent/text' : 'text/tertiary'), Tx((i + 1) + ' · ' + p.mode, 'Label/S', on ? 'accent/text' : 'text/primary'), fillW(gap), right]);
+    if (p.step) {
+      var stand = VV({ name: 'Standing', gap: 4 });
+      addAll(stand, [chip(p.tone, p.step), Tx(p.who, 'Mono/Caption', 'text/tertiary', { fill: true })]);
+      addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary', { fill: true }), Tx(p.leaves, 'Mono/Caption', 'text/tertiary'), fillW(stand)]);
+    } else addAll(row, [fillW(top), Tx(p.route, 'Mono/Data', 'text/secondary'), Tx(p.code, 'Mono/Caption', 'text/tertiary')]);
     add(r, fillW(row));
+    if (p.link && i < parts.length - 1) {
+      var lk = H({ name: 'Connection', gap: 6, cross: 'CENTER', pad: [6, 0, 6, 12] });
+      lk.strokes = [P('border/default')]; lk.strokeAlign = 'INSIDE';
+      lk.strokeTopWeight = 0; lk.strokeBottomWeight = 0; lk.strokeRightWeight = 0; lk.strokeLeftWeight = 2;
+      if (p.link[1] !== 'text/tertiary') add(lk, Ic('alert', 12, p.link[1]));
+      add(lk, Tx(p.link[0], 'Mono/Caption', p.link[1]));
+      var lkRow = H({ name: 'Connection row', pad: [0, 0, 0, 18] });
+      add(lkRow, lk);
+      add(r, fillW(lkRow));
+    }
   });
-  if (parts.length > 1) add(r, btn('Ghost', 'SM', 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
+  if (parts.length > 1) add(r, btn('Ghost', 'SM', parts[0].step ? 'Take ' + parts[parts.length - 1].code.split(' ')[0] + ' off the journey' : 'Take off ' + parts[parts.length - 1].code.split(' ')[0]));
   if (addFrom) add(r, btn('Secondary', 'SM', 'Add trip from ' + addFrom, { lead: 'plus' }));
   return r;
 }
@@ -1340,6 +1355,35 @@ function scrClearance() {
   addAll(top, [fillW(s), input('Date', 'Default', 'Planned departure', '18 Oct 2026', 'Changing it re-checks all 23 documents before it saves.')]);
   return jobScreen('Transport specialist · Clearance checklist', 'Clearance', STAFF.lan, [top, docTableTabs('staff'), docTable('staff')]);
 }
+/* Ready to depart (Trip tab, Route view): each step a chip in tone plus word, what was found and who holds it. The
+   one gold action is the first open step's when it is the viewer's; Record departure is a disabled Secondary until
+   every step is done, and only then the gold. */
+function readyPanel(steps, waiting, action) {
+  var p = panel('Ready to depart', { gap: 0, pad: 0, clip: true });
+  var head = H({ name: 'Head', main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [20, 24, 16, 24] });
+  borderSide(head, 'border/default', 'bottom');
+  var done = steps.filter(function (st) { return st[1] === 'Done'; }).length;
+  addAll(head, [Tx('Ready to depart', 'Heading/H4'), Tx(done + ' of ' + steps.length + ' done', 'Mono/Data', 'text/tertiary')]);
+  add(p, fillW(head));
+  steps.forEach(function (st, i) {
+    var row = H({ name: 'Step · ' + st[2], gap: 16, pad: [14, 24, 14, 24] });
+    if (i < steps.length - 1) borderSide(row, 'border/default', 'bottom');
+    var state = H({ name: 'State', w: 88 });
+    add(state, chip(st[0], st[1]));
+    var what = VV({ name: 'What', gap: 2 });
+    addAll(what, [Tx(st[2], 'Label/M'), Tx(st[3], 'Body/S', 'text/secondary', { fill: true })]);
+    addAll(row, [state, fillW(what), Tx(st[4], 'Body/S', 'text/tertiary', { align: 'RIGHT' })]);
+    add(p, fillW(row));
+  });
+  var foot = H({ name: 'Footer', gap: 24, main: 'SPACE_BETWEEN', cross: 'CENTER', pad: [14, 24, 14, 24], fill: 'bg/sunken' });
+  borderSide(foot, 'border/default', 'top');
+  var acts = H({ name: 'Actions', gap: 12, cross: 'CENTER' });
+  if (action) add(acts, action);
+  add(acts, btn('Secondary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
+  addAll(foot, [Tx(waiting, 'Body/S', 'text/secondary'), acts]);
+  add(p, fillW(foot));
+  return p;
+}
 function scrRoute() {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
   [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
@@ -1347,21 +1391,68 @@ function scrRoute() {
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
   });
-  var tl = VV({ name: 'Timeline', gap: 16 });
-  [['Pickup', 'Phú Thọ training centre, HCMC', '06:00', 'Loading and condition check, logged with photos.'],
+  var tl = VV({ name: 'Timeline', gap: 0 });
+  /* the day shows on the first stop and wherever it changes; between two stops the leg, under a 2 px rule */
+  var LEGS = ['Road · 70 km · 2 h 30 min', 'Road · 40 km · 30 min', 'Road · 130 km · 2 h 15 min'];
+  [['Pickup', 'Phú Thọ training centre, HCMC', '18 Oct, 06:00', 'Loading and condition check, logged with photos.'],
    ['Border', 'Mộc Bài – Bavet border', '08:30', 'Vietnam export clearance and Cambodia entry. Recorded per leg as Cleared or Held.'],
    ['Welfare', 'Svay Rieng welfare stop', '09:30', '45-minute rest, water and hay, welfare check by the escort.'],
-   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s) {
+   ['Delivery', 'Phnom Penh Equestrian Centre', '12:30', 'Handover to the receiving groom with a final condition log. Planned 1 h 30 min before the window closes at 14:00.']].forEach(function (s, i) {
     var st = inst(C.stop, { Kind: s[0] });
     setP(st, { Stop: s[1], Time: s[2], Details: s[3] });
     st.name = 'Stop · ' + s[1];
     add(tl, fillW(st));
+    if (i < LEGS.length) {
+      var leg = H({ name: 'Leg · ' + (i + 1), pad: [10, 0, 10, 33] });
+      leg.strokes = [P('border/default')]; leg.strokeAlign = 'INSIDE';
+      leg.strokeTopWeight = 0; leg.strokeBottomWeight = 0; leg.strokeRightWeight = 0; leg.strokeLeftWeight = 2;
+      add(leg, Tx(LEGS[i], 'Mono/Caption', 'text/tertiary'));
+      var legRow = H({ name: 'Leg row', pad: [0, 0, 0, 17] });
+      add(legRow, leg);
+      add(tl, fillW(legRow));
+    }
   });
-  var refuse = VV({ name: 'Depart', gap: 16 });
-  add(refuse, callout('Bad', 'Departure can’t be recorded yet', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct. Record departure opens when the gate is clear.'));
-  add(refuse, btn('Primary', 'MD', 'Record departure', { state: 'Disabled', lead: 'lock' }));
+  var refuse = readyPanel([
+    ['Ok', 'Done', 'Route', 'Confirmed v1.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Load plan', 'Confirmed by Đỗ Minh Khôi.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Crew', '3 people assigned.', STAFF.khoi[0]],
+    ['Bad', 'Locked', 'Clearance', '9 items are outstanding: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.', STAFF.lan[0]],
+    ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
+    'Waiting on clearance · ' + STAFF.lan[0] + '.', btn('Secondary', 'MD', 'View outstanding items', { trail: 'arrow-right' }));
   var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
   return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])]);
+}
+
+/* The journey summary and the redesigned rail (2 Nov 2026): on a job of two or more trips, a summary strip of the
+   whole journey runs above the rail; each rail row says where its trip stands (its first open step and who holds
+   it) and the connection between two trips sits under a 2 px rule. Neither carries gold, which stays with the chosen
+   trip's Ready to depart. The tab opens on the first trip, in journey order, that waits on the viewer. */
+var JOURNEY = [
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00', leaves: 'Leaves 16 Oct, 06:00', tone: 'Warn', step: 'Crew', who: 'Waiting on crew · Đỗ Minh Khôi', link: ['18 h 40 min to connect', 'text/tertiary'] },
+  { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40', leaves: 'Leaves 17 Oct, 23:40', tone: 'Bad', step: 'Locked', who: 'Waiting on clearance · Nguyễn Thị Lan', link: ['Connection not planned', 'text/tertiary'] },
+  { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned', leaves: 'Not planned', tone: 'Warn', step: 'Route', who: 'Waiting on route · Đỗ Minh Khôi' }];
+function journeySummary() {
+  var strip = H({ name: 'Journey summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
+  [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']].forEach(function (c) {
+    var cell = VV({ name: c[0], gap: 4 });
+    addAll(cell, [Tx(c[0], 'Body/S', 'text/tertiary'), Tx(c[1], 'Label/M', c[2])]);
+    add(strip, cell);
+  });
+  return strip;
+}
+function scrJourney() {
+  var part = { route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002', corridor: 'RD DAD → HCM' };
+  var ready = readyPanel([
+    ['Ok', 'Done', 'Route', 'Confirmed v1.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Load plan', 'Confirmed by Đỗ Minh Khôi.', STAFF.khoi[0]],
+    ['Warn', 'To do', 'Crew', 'TX-447 needs a driver and 1 more groom.', STAFF.khoi[0]],
+    ['Ok', 'Done', 'Clearance', 'This leg stays in one country and can depart before the dossier clears. The clearance gate is on TRP-2026-003, which crosses the border.', STAFF.lan[0]],
+    ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
+    'Waiting on crew · ' + STAFF.khoi[0] + '.', btn('Primary', 'MD', 'Assign the crew', { trail: 'arrow-right' }));
+  return jobScreen('Fleet & route coordinator · Trip · Journey', 'Trip', STAFF.khoi, [journeySummary(), tripBody(JOURNEY, 0, null, tripHead(part, 'Route'), [ready])], {
+    job: CHAIN_JOB, stage: 'Documents', gateState: 'Clear',
+    gate: 'This leg stays in one country and can depart before the dossier clears. The clearance gate is on TRP-2026-003, which crosses the border.'
+  });
 }
 
 /* ---------------------------------------------------------------------
