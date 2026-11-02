@@ -1,8 +1,10 @@
 package com.equifreight.service;
 
 import com.equifreight.configuration.AppConstants;
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.NotificationKind;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -82,7 +84,7 @@ public class AuthoritySubmissionService {
 
     @Transactional(readOnly = true)
     public List<com.equifreight.model.route.PlaceResponse> listQuarantineFacilities() {
-        return placeRepository.findByKind(com.equifreight.entity.enums.PlaceKind.QUARANTINE).stream()
+        return placeRepository.findByKind(PlaceKind.QUARANTINE).stream()
                 .map(com.equifreight.model.route.RouteMapper::toResponse)
                 .toList();
     }
@@ -281,19 +283,7 @@ public class AuthoritySubmissionService {
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
 
-        if (request.endsOn().isBefore(request.startsOn())) {
-            throw new BusinessException("Quarantine end date cannot precede start date.");
-        }
-        // The pinned destination catalog sets the minimum stay; a shorter one is refused, not warned about.
-        clearanceService.destinationVersion(jobId).ifPresent(destination -> {
-            long days = ChronoUnit.DAYS.between(request.startsOn(), request.endsOn());
-            if (days < destination.getQuarantineMinDays())
-                throw new BusinessException(
-                        "QUARANTINE_TOO_SHORT",
-                        "%s requires at least %d days of quarantine; this period is %d."
-                                .formatted(
-                                        destination.getCatalog().getName(), destination.getQuarantineMinDays(), days));
-        });
+        requireValidPeriod(jobId, place, request.startsOn(), request.endsOn());
 
         QuarantinePeriod quarantine = new QuarantinePeriod();
         quarantine.setJob(job);
@@ -320,16 +310,107 @@ public class AuthoritySubmissionService {
     }
 
     /**
-     * Confirm quarantine completion by supervising vet / transport specialist.
+     * A quarantine is held at a quarantine station, ends on or after it starts, and lasts at least the pinned
+     * destination catalog's minimum: a shorter one is refused, not warned about.
+     */
+    private void requireValidPeriod(UUID jobId, Place place, LocalDate startsOn, LocalDate endsOn) {
+        if (place.getKind() != PlaceKind.QUARANTINE) {
+            throw new BusinessException("%s is not a quarantine station.".formatted(place.getName()));
+        }
+        if (endsOn.isBefore(startsOn)) {
+            throw new BusinessException("Quarantine end date cannot precede start date.");
+        }
+        clearanceService.destinationVersion(jobId).ifPresent(destination -> {
+            long days = ChronoUnit.DAYS.between(startsOn, endsOn);
+            if (days < destination.getQuarantineMinDays())
+                throw new BusinessException(
+                        "QUARANTINE_TOO_SHORT",
+                        "%s requires at least %d days of quarantine; this period is %d."
+                                .formatted(
+                                        destination.getCatalog().getName(), destination.getQuarantineMinDays(), days));
+        });
+    }
+
+    /**
+     * Change a scheduled quarantine's station, dates or horse. A completed one stays as it was certified.
+     */
+    @Transactional
+    public QuarantinePeriodResponse updateQuarantine(
+            UUID quarantineId, CreateQuarantinePeriodRequest request, User specialist) {
+        QuarantinePeriod quarantine = quarantinePeriodRepository
+                .findById(quarantineId)
+                .orElseThrow(() -> ResourceNotFoundException.of("QuarantinePeriod", quarantineId));
+        if (quarantine.getCompletedAt() != null) {
+            throw new BusinessException("This quarantine period has already been completed.");
+        }
+        TransportJob job = quarantine.getJob();
+        Place place = placeRepository
+                .findById(request.placeId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Place", request.placeId()));
+        Horse horse = null;
+        if (request.horseId() != null) {
+            horse = horseRepository
+                    .findById(request.horseId())
+                    .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
+        }
+        requireValidPeriod(job.getId(), place, request.startsOn(), request.endsOn());
+
+        String before = "%s, %s to %s"
+                .formatted(
+                        quarantine.getPlace().getName(),
+                        BusinessTime.SHORT_DAY.format(quarantine.getStartsOn()),
+                        BusinessTime.SHORT_DAY.format(quarantine.getEndsOn()));
+        String after = "%s, %s to %s"
+                .formatted(
+                        place.getName(),
+                        BusinessTime.SHORT_DAY.format(request.startsOn()),
+                        BusinessTime.SHORT_DAY.format(request.endsOn()));
+        quarantine.setHorse(horse);
+        quarantine.setPlace(place);
+        quarantine.setStartsOn(request.startsOn());
+        quarantine.setEndsOn(request.endsOn());
+        QuarantinePeriod saved = quarantinePeriodRepository.save(quarantine);
+
+        auditService.recordDecision(
+                specialist,
+                "QUARANTINE_CHANGED",
+                String.format("Changed quarantine for job %s.", job.getCode()),
+                "QUARANTINE_PERIOD",
+                saved.getId(),
+                job.getCode(),
+                null,
+                before,
+                after);
+
+        clearanceService.evaluateClearanceGate(job.getId());
+        return ClearanceMapper.toQuarantineResponse(saved);
+    }
+
+    /**
+     * Confirm quarantine completion by supervising vet / transport specialist, from the quarantine's last day.
      */
     @Transactional
     public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist) {
+        return completeQuarantine(quarantineId, specialist, LocalDate.now(BusinessTime.ZONE));
+    }
+
+    /** As above, on {@code today} in business time. */
+    @Transactional
+    public QuarantinePeriodResponse completeQuarantine(UUID quarantineId, User specialist, LocalDate today) {
         QuarantinePeriod quarantine = quarantinePeriodRepository
                 .findById(quarantineId)
                 .orElseThrow(() -> ResourceNotFoundException.of("QuarantinePeriod", quarantineId));
 
         if (quarantine.getCompletedAt() != null) {
             throw new BusinessException("This quarantine period has already been completed.");
+        }
+        if (today.isBefore(quarantine.getEndsOn())) {
+            throw new BusinessException(
+                    "QUARANTINE_NOT_ENDED",
+                    "The quarantine at %s ends on %s; it can be completed from then."
+                            .formatted(
+                                    quarantine.getPlace().getName(),
+                                    BusinessTime.SHORT_DAY.format(quarantine.getEndsOn())));
         }
 
         quarantine.setCompletedAt(Instant.now());

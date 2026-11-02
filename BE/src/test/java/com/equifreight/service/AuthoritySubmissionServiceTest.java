@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.*;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.NotificationKind;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
@@ -161,8 +163,7 @@ class AuthoritySubmissionServiceTest {
         RegulationVersion destination = new RegulationVersion();
         destination.setCatalog(catalog);
         destination.setQuarantineMinDays((short) 7);
-        Place station = new Place();
-        station.setId(UUID.randomUUID());
+        Place station = station();
         when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(placeRepository.findById(station.getId())).thenReturn(Optional.of(station));
         when(clearanceService.destinationVersion(job.getId())).thenReturn(Optional.of(destination));
@@ -212,5 +213,108 @@ class AuthoritySubmissionServiceTest {
                         any(),
                         eq("DOSSIER_LATE:" + late.getId()));
         verifyNoMoreInteractions(notificationService);
+    }
+
+    private static Place station() {
+        Place station = new Place();
+        station.setId(UUID.randomUUID());
+        station.setName("Đại Nam isolation barn");
+        station.setKind(PlaceKind.QUARANTINE);
+        return station;
+    }
+
+    private QuarantinePeriod scheduled(Place station) {
+        QuarantinePeriod quarantine = new QuarantinePeriod();
+        quarantine.setId(UUID.randomUUID());
+        quarantine.setJob(job);
+        quarantine.setPlace(station);
+        quarantine.setStartsOn(LocalDate.of(2026, 11, 20));
+        quarantine.setEndsOn(LocalDate.of(2026, 11, 27));
+        when(quarantinePeriodRepository.findById(quarantine.getId())).thenReturn(Optional.of(quarantine));
+        return quarantine;
+    }
+
+    @Test
+    @DisplayName("A quarantine can't be completed before its last day (US-F3-22)")
+    void aQuarantineIsNotCompletedBeforeItsEnd() {
+        QuarantinePeriod quarantine = scheduled(station());
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.completeQuarantine(quarantine.getId(), specialist, LocalDate.of(2026, 11, 26)));
+
+        assertEquals("QUARANTINE_NOT_ENDED", ex.getCode());
+        assertEquals(
+                "The quarantine at Đại Nam isolation barn ends on 27 Nov; it can be completed from then.",
+                ex.getMessage());
+        verify(quarantinePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A quarantine is completed on its last day, and the clearance gate is re-run")
+    void aQuarantineIsCompletedOnItsLastDay() {
+        QuarantinePeriod quarantine = scheduled(station());
+        when(quarantinePeriodRepository.save(quarantine)).thenReturn(quarantine);
+
+        service.completeQuarantine(quarantine.getId(), specialist, LocalDate.of(2026, 11, 27));
+
+        assertNotNull(quarantine.getCompletedAt());
+        verify(clearanceService).evaluateClearanceGate(job.getId());
+    }
+
+    @Test
+    @DisplayName("A scheduled quarantine's dates and station can be changed, and the change is audited")
+    void aScheduledQuarantineCanBeChanged() {
+        QuarantinePeriod quarantine = scheduled(station());
+        Place other = station();
+        other.setName("Phú Thọ quarantine station");
+        when(placeRepository.findById(other.getId())).thenReturn(Optional.of(other));
+        when(quarantinePeriodRepository.save(quarantine)).thenReturn(quarantine);
+
+        service.updateQuarantine(
+                quarantine.getId(),
+                new CreateQuarantinePeriodRequest(
+                        null, other.getId(), LocalDate.of(2026, 11, 21), LocalDate.of(2026, 11, 28)),
+                specialist);
+
+        assertEquals(other, quarantine.getPlace());
+        assertEquals(LocalDate.of(2026, 11, 28), quarantine.getEndsOn());
+        verify(auditService)
+                .recordDecision(
+                        eq(specialist),
+                        eq("QUARANTINE_CHANGED"),
+                        any(),
+                        eq("QUARANTINE_PERIOD"),
+                        eq(quarantine.getId()),
+                        eq("CBRT-2026-041"),
+                        any(),
+                        eq("Đại Nam isolation barn, 20 Nov to 27 Nov"),
+                        eq("Phú Thọ quarantine station, 21 Nov to 28 Nov"));
+        verify(clearanceService).evaluateClearanceGate(job.getId());
+    }
+
+    @Test
+    @DisplayName("A completed quarantine can't be changed, and a quarantine is only held at a quarantine station")
+    void aCompletedQuarantineOrAnotherPlaceIsRefused() {
+        QuarantinePeriod done = scheduled(station());
+        done.setCompletedAt(Instant.parse("2026-11-27T02:00:00Z"));
+        CreateQuarantinePeriodRequest request = new CreateQuarantinePeriodRequest(
+                null, done.getPlace().getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27));
+        assertThrows(BusinessException.class, () -> service.updateQuarantine(done.getId(), request, specialist));
+
+        Place stables = station();
+        stables.setKind(PlaceKind.STABLE);
+        stables.setName("Sha Tin Racecourse stables (HKJC)");
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(stables.getId())).thenReturn(Optional.of(stables));
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.createQuarantine(
+                        job.getId(),
+                        new CreateQuarantinePeriodRequest(
+                                null, stables.getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27)),
+                        specialist));
+        assertEquals("Sha Tin Racecourse stables (HKJC) is not a quarantine station.", ex.getMessage());
+        verify(quarantinePeriodRepository, never()).save(any());
     }
 }

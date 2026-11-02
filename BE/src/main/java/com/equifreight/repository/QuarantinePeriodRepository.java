@@ -36,4 +36,9 @@ public interface QuarantinePeriodRepository
      * Lấy các đợt cách ly theo địa điểm (trạm kiểm dịch).
      */
     List<QuarantinePeriod> findByPlaceId(UUID placeId);
+
+    /**
+     * The job's quarantines at a station that are not completed yet.
+     */
+    List<QuarantinePeriod> findByJobIdAndPlaceIdAndCompletedAtIsNull(UUID jobId, UUID placeId);
 }

@@ -248,7 +248,8 @@ class Flow3ServiceTest {
                 jobTrips,
                 auditService,
                 tripNotices,
-                PlanningStub.planningDefaults());
+                PlanningStub.planningDefaults(),
+                mock(QuarantineRules.class));
         loadPlanService = new LoadPlanService(
                 loadPlanRepository,
                 loadPlanStallRepository,

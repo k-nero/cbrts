@@ -83,7 +83,8 @@ class RouteIncidentRevisionTest {
                 jobTrips,
                 audit,
                 mock(TripNotices.class),
-                PlanningStub.planningDefaults());
+                PlanningStub.planningDefaults(),
+                mock(QuarantineRules.class));
     }
 
     @Test
