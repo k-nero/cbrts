@@ -101,6 +101,8 @@ function JobWorkspace() {
                 {!(key === 'trip' && routeCarriesGate(job)) && (
                   <JobGate
                     job={job}
+                    // Clearance and Authorities cover the whole job: the dossier's gate, whichever trip is chosen.
+                    dossier={key !== 'trip'}
                     onOpenClearance={
                       key === 'clearance'
                         ? null

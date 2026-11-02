@@ -32,7 +32,8 @@ public record JobDetailResponse(
         /** The team assigned at approval (US-F1-07); null on jobs approved before teams were kept. */
         String transportSpecialist,
         String coordinator,
-        String clearanceGateState, // "Locked" or "Clear"
+        /** The gate of the trip shown, "Locked" or "Clear": a domestic leg before the border is clear early (US-F2-13). */
+        String clearanceGateState,
         String clearanceGateSummary,
         List<JobHorseResponse> horses,
         TripLoadResponse loadPlan,
@@ -50,6 +51,12 @@ public record JobDetailResponse(
         List<String> journeyWarnings,
         /** Which trips of the journey the clearance gate holds back, in words; null with no trip (US-F3-21). */
         String clearanceJourneyNote,
+        /**
+         * The dossier's own gate, "Locked" or "Clear", whichever trip is shown: what the job-wide Clearance and
+         * Authorities tabs show.
+         */
+        String dossierGateState,
+        String dossierGateSummary,
         /** When the manager signed off the plan of the trip shown, and who; null until then (US-F3-08). */
         Instant tripSignedOffAt,
         String tripSignedOffBy) {}
