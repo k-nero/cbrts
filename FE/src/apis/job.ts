@@ -151,14 +151,17 @@ export const jobApi = {
   journeyCorridors: (jobId: string) =>
     client.get<JourneyCorridor[]>(`/staff/jobs/${jobId}/journey/corridors`).then((r) => r.data),
 
-  /** US-F3-21: adds a trip on `corridorId` to the end of the job's journey. */
   /** US-F3-22: drafts the job's journey from its quoted route, every road route drafted and timed. */
   draftJourney: (jobId: string) =>
     client.post<TripPart[]>(`/staff/jobs/${jobId}/journey/draft`).then((r) => r.data),
 
-  addTrip: (jobId: string, corridorId: string) =>
+  /**
+   * US-F3-21: adds a trip on `corridorId` to the end of the job's journey; US-F3-22: ending at the
+   * quarantine station `quarantinePlaceId` when given.
+   */
+  addTrip: (jobId: string, corridorId: string, quarantinePlaceId?: string) =>
     client
-      .post<TripPart[]>(`/staff/jobs/${jobId}/journey/trips`, { corridorId })
+      .post<TripPart[]>(`/staff/jobs/${jobId}/journey/trips`, { corridorId, quarantinePlaceId })
       .then((r) => r.data),
 
   /** US-F3-21: takes the journey's last trip off before it departs. */
