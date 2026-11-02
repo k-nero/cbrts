@@ -23,6 +23,23 @@ import { apiErrorMessage } from '@/lib/utils';
 
 export type TripView = 'load-plan' | 'route';
 
+/** The view a trip opens on: the one asked for, else the one still to do (its load plan until confirmed). */
+export const tripView = (job: JobDetail, asked: string | null): TripView =>
+  asked === 'route' || asked === 'load-plan'
+    ? asked
+    : job.loadPlan?.status === 'CONFIRMED'
+      ? 'route'
+      : 'load-plan';
+
+/**
+ * True when the trip shown is a road trip on its Route view with a route: that view carries the clearance gate under
+ * its summary strip, so the page header leaves it out.
+ */
+export const routeCarriesGate = (job: JobDetail, asked: string | null) => {
+  const part = job.parts.find((p) => p.current);
+  return Boolean(part && part.mode !== 'AIR' && job.routePlan && tripView(job, asked) === 'route');
+};
+
 /**
  * The Trip tab (US-F3-21): on a journey of two or more trips, a summary strip of the whole journey; then the
  * journey rail, each trip with where it stands, and beside it the trip chosen there. A road trip switches between
@@ -69,14 +86,7 @@ export function TripTab({ job }: { job: JobDetail }) {
   const part = job.parts.find((p) => p.current) ?? null;
   const show = (trip: string, view?: TripView) =>
     setSearchParams({ tab: 'trip', trip, ...(view ? { view } : {}) }, { replace: true });
-  // The trip opens on the view still to do: its load plan until confirmed, then its route.
-  const asked = searchParams.get('view');
-  const view: TripView =
-    asked === 'route' || asked === 'load-plan'
-      ? asked
-      : job.loadPlan?.status === 'CONFIRMED'
-        ? 'route'
-        : 'load-plan';
+  const view = tripView(job, searchParams.get('view'));
 
   const addFrom = job.journeyComplete ? null : job.journeyEndCity;
   const takeOff = (last: TripPart) =>

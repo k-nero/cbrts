@@ -3,13 +3,14 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
-import { Button, Callout, ClearanceGate, StageMark } from '@/components/ui';
+import { Callout, StageMark } from '@/components/ui';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { ClearanceTab } from './ClearanceTab';
-import { TripTab } from './TripTab';
+import { JobGate } from './JobGate';
+import { routeCarriesGate, TripTab } from './TripTab';
 
 /**
  * A job's tabs, each with the role that owns it (DESIGN.md, job page): the Trip tab plans the trip
@@ -187,25 +188,18 @@ function JobWorkspace() {
               other part goes on as planned.
             </Callout>
           )}
-          {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate). */}
-          <ClearanceGate
-            state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
-            action={
-              job.clearanceGateState !== 'Clear' &&
-              activeTab.key !== 'clearance' && (
-                <Button
-                  variant="secondary"
-                  size="md"
-                  trailingIcon="arrow-right"
-                  onClick={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
-                >
-                  View outstanding items
-                </Button>
-              )
-            }
-          >
-            {job.clearanceGateSummary}
-          </ClearanceGate>
+          {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate).
+              A trip's Route view carries it under its summary strip instead. */}
+          {!(activeTab.key === 'trip' && routeCarriesGate(job, searchParams.get('view'))) && (
+            <JobGate
+              job={job}
+              onOpenClearance={
+                activeTab.key === 'clearance'
+                  ? null
+                  : () => setSearchParams({ tab: 'clearance' }, { replace: true })
+              }
+            />
+          )}
         </Flex>
 
         {tabsView}

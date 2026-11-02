@@ -2503,9 +2503,14 @@ var JOB_WINDOW = { from: '11:00', until: '14:00', text: '18 Oct, 11:00–14:00' 
 /* US-F3-21: the Trip tab plans the trip chosen on its journey rail; Clearance and Authorities cover the whole job */
 var JOB_TABS = [['Trip', 'Khôi, fleet & route coordinator'], ['Clearance', 'Lan, transport specialist'], ['Authorities', 'Lan, transport specialist']];
 /* one header for every tab of a job: route title, code, stage, the clearance gate, then tabs with the tab's owner */
-function jobHead(tab, gateBody, stage, gateState) {
+function jobGate(gateBody, gateState) {
   var gate = inst(C.gate, { State: gateState || 'Locked' });
   setP(gate, { Body: gateBody || '9 items must clear first: 4 uploads from the customer, 4 export health certificates and the Cambodia import permit. Pre-export quarantine runs 10–17 Oct.' });
+  return gate;
+}
+/* noGate: a road trip's Route view carries the gate under its summary strip instead */
+function jobHead(tab, gateBody, stage, gateState, noGate) {
+  var gate = noGate ? null : jobGate(gateBody, gateState);
   var tabs = H({ name: 'Tabs', gap: 24, main: 'SPACE_BETWEEN', cross: 'CENTER' });
   borderSide(tabs, 'border/default', 'bottom');
   var list = H({ name: 'Tab list', gap: 28 });
@@ -2520,12 +2525,12 @@ function jobHead(tab, gateBody, stage, gateState) {
   addAll(tabs, [list, own]);
   /* the tabs carry the rule, so the header itself has none */
   var job = jobHead.job || JOB;
-  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: [gate, tabs], rule: false });
+  return pageHeader({ shell: 'staff', back: 'Jobs', title: job.title, code: job.code, summary: job.meta, right: [stageMark(stage || 'Documents')], below: gate ? [gate, tabs] : [tabs], rule: false });
 }
 function jobScreen(name, tab, user, blocks, o) {
   o = o || {};
   jobHead.job = o.job || null;
-  var head = jobHead(tab, o.gate, o.stage, o.gateState);
+  var head = jobHead(tab, o.gate, o.stage, o.gateState, o.noGate);
   jobHead.job = null;
   return adminScreen(name, 'Jobs', ['Jobs', (o.job || JOB).code, tab], user, [head].concat(blocks), o.today);
 }
@@ -2691,7 +2696,8 @@ function scrRoute() {
     ['Neutral', 'Waiting', 'Sign-off', 'The logistics manager signs off the route, load and crew together.', 'Logistics manager']],
     'Waiting on clearance · ' + STAFF.lan[0] + '.', btn('Secondary', 'MD', 'View outstanding items', { trail: 'arrow-right' }));
   var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
-  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, tl, refuse])]);
+  var gate = fillW(jobGate());
+  return jobScreen('Fleet & route coordinator · Route plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Route'), [strip, gate, tl, refuse])], { noGate: true });
 }
 
 /* The journey summary and the redesigned rail (2 Nov 2026): on a job of two or more trips, a summary strip of the

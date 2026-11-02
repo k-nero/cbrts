@@ -5,6 +5,7 @@ import { Flex } from 'antd';
 import { ConfirmRouteModal } from './ConfirmRouteModal';
 import { DepartureReadiness } from './DepartureReadiness';
 import { FlightPanel } from './FlightPanel';
+import { JobGate } from './JobGate';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
 import { departureReadiness } from './readiness';
@@ -206,6 +207,12 @@ export function RouteTab({ job }: Props) {
           </Flex>
         ))}
       </div>
+
+      {/* The gate for this trip, under where it starts and ends (the page header leaves it out here). */}
+      <JobGate
+        job={job}
+        onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+      />
 
       <FlightPanel job={job} />
 
