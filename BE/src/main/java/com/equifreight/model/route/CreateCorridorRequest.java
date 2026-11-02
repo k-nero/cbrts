@@ -24,6 +24,8 @@ public record CreateCorridorRequest(
         Integer dateFlexDays,
         /* 1 to 30; from the distance at 500 km a day when left out (US-F7-02). */
         Integer drivingDays,
+        /* 0 to 20 on a road route, or left out for none; ignored on an air route. */
+        Integer welfareStops,
         List<UUID> crossingIds) {
 
     public CreateCorridorRequest {

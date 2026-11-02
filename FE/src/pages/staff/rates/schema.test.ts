@@ -46,7 +46,7 @@ describe('policySchema', () => {
     expect(plan({ PLAN_START_HOUR: 23, PLAN_SPEED_KMH: 10 })).toBe(true);
     expect(plan({ PLAN_START_HOUR: 24 })).toBe(false);
     expect(plan({ PLAN_SPEED_KMH: 5 })).toBe(false);
-    expect(plan({ PLAN_WELFARE_EVERY_HOURS: 0 })).toBe(false);
+    expect(plan({ PLAN_WELFARE_STOP_MIN: 601 })).toBe(false);
     expect(plan({ PLAN_BORDER_STOP_MIN: 1441 })).toBe(false);
   });
 

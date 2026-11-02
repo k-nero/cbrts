@@ -100,6 +100,16 @@ export function RouteTab({ job }: Props) {
   // While the route is edited the editor is the whole view: the timeline, the strip and the panels around it come
   // back on save or cancel, so the route is never on screen twice.
   const corridorKm = (draft ?? confirmed)?.corridorDistanceKm;
+  const welfarePlanned = (draft ?? confirmed)?.corridorWelfareStops;
+  const corridorFacts = [
+    corridorKm ? `is ${corridorKm} km` : null,
+    welfarePlanned
+      ? `plans for ${welfarePlanned} welfare ${welfarePlanned === 1 ? 'stop' : 'stops'}`
+      : null,
+  ].filter(Boolean);
+  const corridorLine = corridorFacts.length
+    ? `${part?.corridorCode ?? 'The corridor'} ${corridorFacts.join(' and ')}.`
+    : null;
   if (editing && planning) {
     return (
       <Flex ref={root} vertical gap={24} className="scroll-mt-6">
@@ -114,8 +124,8 @@ export function RouteTab({ job }: Props) {
               : job.windowStart && job.windowEnd
                 ? `Arrival window: ${formatWindow()}.`
                 : 'No arrival window is set for this job.',
-            // The distance the legs are checked against and the welfare stops counted from.
-            corridorKm ? `${part?.corridorCode ?? 'The corridor'} is ${corridorKm} km.` : null,
+            // What the legs and welfare stops are checked against.
+            corridorLine,
           ]
             .filter(Boolean)
             .join(' ')}

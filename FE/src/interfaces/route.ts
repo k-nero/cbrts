@@ -28,6 +28,8 @@ export interface CreateCorridorInput {
   destinationCity: string;
   distanceKm: number | null;
   dateFlexDays: number;
+  /** 0 to 20 on a road route, or null for none; ignored on an air route. */
+  welfareStops: number | null;
   crossingIds: string[];
 }
 
@@ -38,6 +40,8 @@ export interface UpdateCorridorInput {
   dateFlexDays: number;
   /** 1 to 30; ignored on an air route. */
   drivingDays: number | null;
+  /** 0 to 20 on a road route, or null for none; ignored on an air route. */
+  welfareStops: number | null;
   crossingIds: string[];
 }
 

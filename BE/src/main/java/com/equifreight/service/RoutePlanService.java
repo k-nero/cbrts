@@ -73,12 +73,9 @@ public class RoutePlanService {
     @Transactional(readOnly = true)
     public List<RoutePlanResponse> getRoutePlans(UUID jobId, UUID tripId) {
         return jobTrips.findTripOf(jobId, tripId)
-                .map(trip -> {
-                    int welfareNeeded = welfareStopsNeeded(trip, planningDefaults.current());
-                    return routePlanRepository.findByTrip_IdOrderByVersionNoDesc(trip.getId()).stream()
-                            .map(plan -> toResponse(plan, jobId, welfareNeeded))
-                            .toList();
-                })
+                .map(trip -> routePlanRepository.findByTrip_IdOrderByVersionNoDesc(trip.getId()).stream()
+                        .map(plan -> toResponse(plan, jobId))
+                        .toList())
                 .orElse(List.of());
     }
 
@@ -302,7 +299,6 @@ public class RoutePlanService {
         requireTimesInOrder(plan.getStops().stream()
                 .map(st -> new TimedStop(st.getKind(), st.getPlannedAt(), st.getPlannedStayMin()))
                 .toList());
-        requireWelfareStops(trip, plan.getStops());
 
         // Every job on the trip is picked up and delivered on this route (US-F3-11), and with an arrival window its
         // delivery stop is planned before the window closes.
@@ -700,35 +696,6 @@ public class RoutePlanService {
             last = st;
             lastNo = i + 1;
         }
-    }
-
-    /**
-     * The welfare stops {@code trip}'s road drive needs, as the journey drafter plans them (US-F3-22): one per
-     * {@code welfareEveryHours} of driving over the corridor's distance. None for a flight or a corridor with no
-     * distance.
-     */
-    static int welfareStopsNeeded(Trip trip, PlanningDefaults.Planning planning) {
-        Corridor corridor = trip == null ? null : trip.getCorridor();
-        if (corridor == null || !corridor.isRoad()) return 0;
-        return planning.welfareStopsFor(planning.driveMin(corridor.getDistanceKm()));
-    }
-
-    /** A road route is confirmed with at least the welfare stops its drive needs (US-F3-22). */
-    private void requireWelfareStops(Trip trip, List<RouteStop> stops) {
-        PlanningDefaults.Planning planning = planningDefaults.current();
-        int needed = welfareStopsNeeded(trip, planning);
-        long has = stops.stream()
-                .filter(st -> st.getKind() == RouteStopKind.WELFARE)
-                .count();
-        if (has >= needed) return;
-        long hours = Math.round(planning.driveMin(trip.getCorridor().getDistanceKm()) / 60.0);
-        throw new BusinessException(
-                "ROUTE_WELFARE_STOPS_SHORT",
-                "The drive takes about " + hours + " h, so the route needs " + needed + " welfare "
-                        + (needed == 1 ? "stop" : "stops") + ", one every " + planning.welfareEveryHours()
-                        + " h of driving; it has " + has + ". Add "
-                        + (needed - has == 1 ? "a welfare stop" : (needed - has) + " welfare stops")
-                        + " before you confirm.");
     }
 
     /** Where and when a job's horses are ready to leave a trip's transfer stop for the next trip of its journey. */
@@ -1143,17 +1110,13 @@ public class RoutePlanService {
     }
 
     public RoutePlanResponse toResponse(RoutePlan plan, UUID jobId) {
-        return toResponse(plan, jobId, welfareStopsNeeded(plan.getTrip(), planningDefaults.current()));
-    }
-
-    private RoutePlanResponse toResponse(RoutePlan plan, UUID jobId, int welfareStopsNeeded) {
         Map<UUID, Flight> flightsByLegId = new HashMap<>();
         for (RouteLeg leg : plan.getLegs()) {
             flightRepository.findByRouteLegId(leg.getId()).ifPresent(f -> flightsByLegId.put(leg.getId(), f));
         }
-        // A road trip's legs are checked against its corridor's distance; a flight's aren't.
+        // A road trip's legs and welfare stops are checked against its corridor; a flight's aren't.
         Corridor corridor = plan.getTrip() == null ? null : plan.getTrip().getCorridor();
-        Integer corridorKm = corridor != null && corridor.isRoad() ? corridor.getDistanceKm() : null;
-        return JobMapper.toRoutePlanResponse(plan, jobId, flightsByLegId, welfareStopsNeeded, corridorKm);
+        return JobMapper.toRoutePlanResponse(
+                plan, jobId, flightsByLegId, corridor != null && corridor.isRoad() ? corridor : null);
     }
 }

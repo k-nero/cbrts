@@ -149,35 +149,16 @@ class RoutePlanChecksTest {
     }
 
     @Test
-    @DisplayName("A road route short of the welfare stops its drive needs is refused at confirmation (US-F3-22)")
-    void aRouteShortOfWelfareStopsIsRefused() {
-        // 600 km at the default 60 km/h is 10 h of driving: one welfare stop every 4 h makes two.
+    @DisplayName("A road route short of its corridor's welfare stops is still confirmed: a station may be closed")
+    void aRouteShortOfWelfareStopsIsConfirmed() {
         corridor.setDistanceKm(600);
+        corridor.setWelfareStops((short) 2);
         RoutePlan plan = planOf(
                 stop(RouteStopKind.PICKUP, "2026-12-01T23:00:00Z", null),
                 stop(RouteStopKind.WELFARE, "2026-12-02T03:00:00Z", 45),
                 stop(RouteStopKind.DELIVERY, "2026-12-02T10:00:00Z", null));
 
-        BusinessException refused = assertThrows(
-                BusinessException.class, () -> service.confirmRoutePlan(job.getId(), plan.getId(), null, new User()));
-
-        assertThat(refused.getMessage())
-                .isEqualTo("The drive takes about 10 h, so the route needs 2 welfare stops, one every 4 h of driving;"
-                        + " it has 1. Add a welfare stop before you confirm.");
-        assertThat(plan.getStatus()).isEqualTo(RoutePlanStatus.DRAFT);
-    }
-
-    @Test
-    @DisplayName("A road route with the welfare stops its drive needs is confirmed, and a draft may still be short")
-    void aRouteWithEnoughWelfareStopsIsConfirmed() {
-        corridor.setDistanceKm(600);
-        RoutePlan plan = planOf(
-                stop(RouteStopKind.PICKUP, "2026-12-01T23:00:00Z", null),
-                stop(RouteStopKind.WELFARE, "2026-12-02T03:00:00Z", 45),
-                stop(RouteStopKind.WELFARE, "2026-12-02T07:00:00Z", 45),
-                stop(RouteStopKind.DELIVERY, "2026-12-02T10:00:00Z", null));
-
-        assertThat(service.toResponse(plan, job.getId()).welfareStopsNeeded()).isEqualTo(2);
+        assertThat(service.toResponse(plan, job.getId()).corridorWelfareStops()).isEqualTo(2);
         service.confirmRoutePlan(job.getId(), plan.getId(), null, new User());
 
         assertThat(plan.getStatus()).isEqualTo(RoutePlanStatus.CONFIRMED);
@@ -219,13 +200,20 @@ class RoutePlanChecksTest {
     }
 
     @Test
-    @DisplayName("A road route carries its corridor's distance for the legs to be checked against; a flight's doesn't")
-    void theResponseCarriesTheRoadCorridorsDistance() {
+    @DisplayName(
+            "A road route carries its corridor's distance and welfare stops to be checked against; a flight doesn't")
+    void theResponseCarriesTheRoadCorridor() {
         corridor.setDistanceKm(40);
         RoutePlan plan = planOf(stop(RouteStopKind.PICKUP, null, null), stop(RouteStopKind.DELIVERY, null, null));
-        assertThat(service.toResponse(plan, job.getId()).corridorDistanceKm()).isEqualTo(40);
+        assertThat(service.toResponse(plan, job.getId()))
+                .satisfies(r -> assertThat(r.corridorDistanceKm()).isEqualTo(40))
+                // None set on the corridor: none are checked.
+                .satisfies(r -> assertThat(r.corridorWelfareStops()).isNull());
 
+        corridor.setWelfareStops((short) 1);
         corridor.setMode(TransportMode.AIR);
-        assertThat(service.toResponse(plan, job.getId()).corridorDistanceKm()).isNull();
+        assertThat(service.toResponse(plan, job.getId()))
+                .satisfies(r -> assertThat(r.corridorDistanceKm()).isNull())
+                .satisfies(r -> assertThat(r.corridorWelfareStops()).isNull());
     }
 }

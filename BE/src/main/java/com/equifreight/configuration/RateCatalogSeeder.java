@@ -75,7 +75,6 @@ public class RateCatalogSeeder {
             // How a journey drafted from its quote is timed (US-F3-22).
             Map.entry(RatePolicyKey.PLAN_START_HOUR, "6"),
             Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "60"),
-            Map.entry(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, "4"),
             Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "45"),
             Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "90"),
             Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "4"),

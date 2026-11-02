@@ -1,5 +1,6 @@
 package com.equifreight.model.job;
 
+import com.equifreight.entity.Corridor;
 import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Flight;
 import com.equifreight.entity.FlightAllocation;
@@ -214,15 +215,11 @@ public final class JobMapper {
 
     /**
      * A route plan of {@code jobId}'s trip with its stops and legs; {@code flightsByLegId} holds the flight of each
-     * air leg, {@code welfareStopsNeeded} the welfare stops the trip's drive needs, and {@code corridorDistanceKm} the
-     * road corridor's distance (null for a flight).
+     * air leg, and {@code corridor} the road corridor its legs and welfare stops are checked against (null for a
+     * flight).
      */
     public static RoutePlanResponse toRoutePlanResponse(
-            RoutePlan plan,
-            UUID jobId,
-            Map<UUID, Flight> flightsByLegId,
-            int welfareStopsNeeded,
-            Integer corridorDistanceKm) {
+            RoutePlan plan, UUID jobId, Map<UUID, Flight> flightsByLegId, Corridor corridor) {
         return RoutePlanResponse.builder()
                 .id(plan.getId())
                 .jobId(jobId)
@@ -238,8 +235,11 @@ public final class JobMapper {
                 .legs(plan.getLegs().stream()
                         .map(leg -> toLegResponse(leg, flightsByLegId.get(leg.getId())))
                         .toList())
-                .welfareStopsNeeded(welfareStopsNeeded)
-                .corridorDistanceKm(corridorDistanceKm)
+                .corridorDistanceKm(corridor == null ? null : corridor.getDistanceKm())
+                .corridorWelfareStops(
+                        corridor == null || corridor.getWelfareStops() == null
+                                ? null
+                                : corridor.getWelfareStops().intValue())
                 .build();
     }
 
