@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Flex } from 'antd';
+import { Flex, Tooltip } from 'antd';
 
 import { ConfirmRouteModal } from './ConfirmRouteModal';
 import { DepartureReadiness } from './DepartureReadiness';
@@ -216,37 +216,53 @@ export function RouteTab({ job }: Props) {
   const times = stopTimes(stops);
   const borderCrossing = stops.find((s) => s.kind === 'BORDER')?.borderCrossingName || 'None';
 
+  // The trip's clearance gate is a cell of the strip; only a locked gate, with what is outstanding and the way to it,
+  // also opens as a panel under the callouts.
+  const clear = job.clearanceGateState === 'Clear';
+  const facts: [string, ReactNode][] = [
+    ['Origin', origin],
+    ['Destination', destination],
+    ['Distance', routePlan.distanceKm ? `${routePlan.distanceKm} km` : '—'],
+    ['Duration', routePlan.durationMin ? `${+(routePlan.durationMin / 60).toFixed(1)} h` : '—'],
+    ['Border crossing', borderCrossing],
+    ['Welfare stops', welfareCount],
+    ['Arrival window', part?.handsOn ? 'Hands on to the next trip' : formatWindow()],
+    [
+      'Clearance',
+      <Tooltip key="gate" title={job.clearanceGateSummary}>
+        <span className="w-fit">
+          <Chip tone={clear ? 'ok' : 'bad'}>{clear ? 'Clear to depart' : 'Departure locked'}</Chip>
+        </span>
+      </Tooltip>,
+    ],
+  ];
+
   return (
     <Flex ref={root} vertical gap={24} className="scroll-mt-6">
-      {chainPanel}
-      {draftPanel}
-
-      {/* Summary strip (Figma "Fleet & route coordinator · Route plan") */}
+      {/* Summary strip (Figma "Fleet & route coordinator · Route plan"): always first, above every callout. */}
       <div className="flex flex-wrap gap-x-10 gap-y-4 rounded-lg border border-line bg-card px-6 py-[18px]">
-        {[
-          ['Origin', origin],
-          ['Destination', destination],
-          ['Distance', routePlan.distanceKm ? `${routePlan.distanceKm} km` : '—'],
-          [
-            'Duration',
-            routePlan.durationMin ? `${+(routePlan.durationMin / 60).toFixed(1)} h` : '—',
-          ],
-          ['Border crossing', borderCrossing],
-          ['Welfare stops', welfareCount],
-          ['Arrival window', part?.handsOn ? 'Hands on to the next trip' : formatWindow()],
-        ].map(([label, value]) => (
+        {facts.map(([label, value]) => (
           <Flex key={label} vertical gap={4}>
             <span className="type-body-s text-ink-3">{label}</span>
-            <span className="type-label-m text-ink">{value}</span>
+            {typeof value === 'object' ? (
+              value
+            ) : (
+              <span className="type-label-m text-ink">{value}</span>
+            )}
           </Flex>
         ))}
       </div>
 
-      {/* The gate for this trip, under where it starts and ends (the page header leaves it out here). */}
-      <JobGate
-        job={job}
-        onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
-      />
+      {chainPanel}
+      {draftPanel}
+
+      {/* A locked gate for this trip, with what is outstanding (the page header leaves the gate out here). */}
+      {!clear && (
+        <JobGate
+          job={job}
+          onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+        />
+      )}
 
       <FlightPanel job={job} />
 

@@ -1395,6 +1395,10 @@ function scrRoute() {
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
   });
+  /* the trip's clearance gate as a chip, last in the strip; a locked gate also opens as its panel below */
+  var gateCell = VV({ name: 'Clearance', gap: 4 });
+  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip('Bad', 'Departure locked')]);
+  add(strip, gateCell);
   var tl = VV({ name: 'Timeline', gap: 0 });
   /* the day shows on the first stop and wherever it changes; between two stops the leg, under a 2 px rule */
   var LEGS = ['Road · 70 km · 2 h 30 min', 'Road · 40 km · 30 min', 'Road · 130 km · 2 h 15 min'];
