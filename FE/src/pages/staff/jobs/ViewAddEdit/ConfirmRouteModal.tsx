@@ -54,7 +54,11 @@ export const ConfirmRouteModal: FC<{
           <FactCell label="Stops" value={stops.length} />
           <FactCell
             label="Welfare stops"
-            value={`${welfare} of ${draft.welfareStopsNeeded} needed`}
+            value={
+              draft.corridorWelfareStops
+                ? `${welfare} of ${draft.corridorWelfareStops} planned`
+                : welfare
+            }
           />
           <FactCell
             label="Distance"

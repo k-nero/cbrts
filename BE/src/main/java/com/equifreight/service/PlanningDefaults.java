@@ -24,7 +24,6 @@ public class PlanningDefaults {
     public static final Map<RatePolicyKey, Bounds> BOUNDS = Map.of(
             RatePolicyKey.PLAN_START_HOUR, new Bounds(0, 23, "o'clock", 6),
             RatePolicyKey.PLAN_SPEED_KMH, new Bounds(10, 120, "km/h", 60),
-            RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, new Bounds(1, 24, "hours", 4),
             RatePolicyKey.PLAN_WELFARE_STOP_MIN, new Bounds(0, 600, "minutes", 45),
             RatePolicyKey.PLAN_BORDER_STOP_MIN, new Bounds(0, 1440, "minutes", 90),
             RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, new Bounds(0, 72, "hours", 4),
@@ -34,7 +33,6 @@ public class PlanningDefaults {
     public record Planning(
             int startHour,
             int speedKmh,
-            int welfareEveryHours,
             int welfareStopMin,
             int borderStopMin,
             int airportBeforeHours,
@@ -43,11 +41,6 @@ public class PlanningDefaults {
         /** The driving time of {@code distanceKm} at the planned speed, in minutes; null when the distance isn't known. */
         public Integer driveMin(Integer distanceKm) {
             return distanceKm == null ? null : (int) Math.round(distanceKm * 60.0 / speedKmh);
-        }
-
-        /** The welfare stops a drive of {@code driveMin} needs: one per {@code welfareEveryHours} of driving. */
-        public int welfareStopsFor(Integer driveMin) {
-            return driveMin == null ? 0 : Math.max(0, (driveMin - 1) / (welfareEveryHours * 60));
         }
     }
 
@@ -80,7 +73,6 @@ public class PlanningDefaults {
         return new Planning(
                 v.apply(RatePolicyKey.PLAN_START_HOUR),
                 v.apply(RatePolicyKey.PLAN_SPEED_KMH),
-                v.apply(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS),
                 v.apply(RatePolicyKey.PLAN_WELFARE_STOP_MIN),
                 v.apply(RatePolicyKey.PLAN_BORDER_STOP_MIN),
                 v.apply(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS),

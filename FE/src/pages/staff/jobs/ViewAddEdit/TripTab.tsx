@@ -20,6 +20,7 @@ import {
 } from '@/hooks/useJob';
 import type { JobDetail, TripPart } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
+import { useRouterNavigation } from '@/router/route.hook';
 
 export type TripView = 'load-plan' | 'route';
 
@@ -32,12 +33,12 @@ export const tripView = (job: JobDetail, asked: string | null): TripView =>
       : 'load-plan';
 
 /**
- * True when the trip shown is a road trip on its Route view with a route: that view carries the clearance gate under
- * its summary strip, so the page header leaves it out.
+ * True when the trip shown has a route: a road trip's Load plan and Route views and a flight open with its summary
+ * strip, which carries the clearance gate as a chip, so the Trip tab leaves the gate panel out.
  */
-export const routeCarriesGate = (job: JobDetail, asked: string | null) => {
+export const routeCarriesGate = (job: JobDetail) => {
   const part = job.parts.find((p) => p.current);
-  return Boolean(part && part.mode !== 'AIR' && job.routePlan && tripView(job, asked) === 'route');
+  return Boolean(part && job.routePlan);
 };
 
 /**
@@ -54,6 +55,7 @@ export function TripTab({ job }: { job: JobDetail }) {
   const remove = useRemoveTrip(job.id);
   const drafting = useDraftJourney(job.id);
   const canSignOff = useCanSignOffTripPlan();
+  const { navigateWithConfirmation } = useRouterNavigation();
 
   // Each trip's own page, so the rail and the summary can say where every trip stands.
   const details = useJourneyDetails(
@@ -84,8 +86,11 @@ export function TripTab({ job }: { job: JobDetail }) {
   }, [askedTrip, opening, searchParams, setSearchParams]);
 
   const part = job.parts.find((p) => p.current) ?? null;
+  // Another trip or view leaves a route being edited, so it asks first when the editor has changes.
   const show = (trip: string, view?: TripView) =>
-    setSearchParams({ tab: 'trip', trip, ...(view ? { view } : {}) }, { replace: true });
+    navigateWithConfirmation(() =>
+      setSearchParams({ tab: 'trip', trip, ...(view ? { view } : {}) }, { replace: true }),
+    );
   const view = tripView(job, searchParams.get('view'));
 
   const addFrom = job.journeyComplete ? null : job.journeyEndCity;
@@ -220,7 +225,7 @@ export function TripTab({ job }: { job: JobDetail }) {
             {part?.mode === 'AIR' ? (
               <FlightTrip job={job} part={part} />
             ) : view === 'route' ? (
-              <RouteTab job={job} />
+              <RouteTab key={part?.tripId} job={job} />
             ) : (
               <LoadPlanTab job={job} />
             )}

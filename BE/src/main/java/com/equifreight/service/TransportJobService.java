@@ -183,6 +183,15 @@ public class TransportJobService {
         } else {
             gateSummary = lockedSummary(gate.outstandingIssues());
         }
+        // The dossier's own gate, the same whichever trip is shown: the job-wide tabs show this one.
+        boolean dossierClear = !noTrip && gate.clearanceReady();
+        String dossierSummary = noTrip
+                ? "No trip planned yet. The fleet coordinator adds the journey's first trip."
+                : dossierClear
+                        ? "Dossier cleared. Vehicle and trip departure may proceed."
+                        : gate.outstandingIssues().isEmpty()
+                                ? "Clearance gate is locked. Documents are awaiting clearance."
+                                : lockedSummary(gate.outstandingIssues());
 
         // The sign-off is the trip's, recorded on each job's part of it (US-F3-08).
         Optional<com.equifreight.entity.TripJob> signedOff =
@@ -209,6 +218,8 @@ public class TransportJobService {
                 .journeyComplete(journeys.complete(job))
                 .journeyWarnings(journeys.warnings(job))
                 .clearanceJourneyNote(clearanceJourneyNote(job))
+                .dossierGateState(dossierClear ? "Clear" : "Locked")
+                .dossierGateSummary(dossierSummary)
                 .tripSignedOffAt(signedOff
                         .map(com.equifreight.entity.TripJob::getSignedOffAt)
                         .orElse(null))

@@ -16,6 +16,12 @@ export const corridorSchema = z
     crossings: z.array(z.object({ label: z.string(), value: z.string() })).nullable(),
     distanceKm: z.number().int().positive('Enter a distance above 0 km.').nullable(),
     dateFlexDays: z.number('Enter 0 to 7 days.').int().min(0, 'At least 0.').max(7, 'At most 7.'),
+    welfareStops: z
+      .number('Enter 0 to 20 stops.')
+      .int('Whole stops only.')
+      .min(0, 'At least 0.')
+      .max(20, 'At most 20.')
+      .nullable(),
   })
   .superRefine((v, ctx) => {
     if (v.mode === null) pick(ctx, 'mode', 'Pick road or air.');
@@ -26,7 +32,7 @@ export const corridorSchema = z
   });
 export type CorridorForm = z.infer<typeof corridorSchema>;
 
-/** Edit route: its code, distance, flexible and driving days, and by road its crossings in order. */
+/** Edit route: its code, distance, flexible and driving days, and by road its welfare stops and crossings in order. */
 export const editCorridorSchema = z.object({
   code: z.string().trim().min(1, 'Enter the route code, e.g. RD HCM → PNH.').max(40),
   crossings: z.array(z.object({ label: z.string(), value: z.string() })).nullable(),
@@ -37,6 +43,12 @@ export const editCorridorSchema = z.object({
     .int('Whole days only.')
     .min(1, 'At least 1 day.')
     .max(30, 'At most 30 days.'),
+  welfareStops: z
+    .number('Enter 0 to 20 stops.')
+    .int('Whole stops only.')
+    .min(0, 'At least 0.')
+    .max(20, 'At most 20.')
+    .nullable(),
 });
 export type EditCorridorForm = z.infer<typeof editCorridorSchema>;
 

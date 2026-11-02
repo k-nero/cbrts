@@ -90,7 +90,6 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.LOCAL_TURNAROUND_HOURS, "The local turnaround"),
             Map.entry(RatePolicyKey.PLAN_START_HOUR, "The start hour"),
             Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "The average speed"),
-            Map.entry(RatePolicyKey.PLAN_WELFARE_EVERY_HOURS, "The welfare interval"),
             Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "The welfare stop"),
             Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "The border stop"),
             Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "The time before a flight"),
@@ -534,6 +533,12 @@ public class RateCatalogService {
     }
 
     private static void checkPolicy(RatePolicyKey key, BigDecimal value) {
+        // Retired: each road route sets its own welfare stops now (V39).
+        if (key == RatePolicyKey.PLAN_WELFARE_EVERY_HOURS) {
+            throw new BusinessException(
+                    key.name(),
+                    "The welfare interval is retired. Set each road route's welfare stops on Routes instead.");
+        }
         String label = POLICY_LABELS.get(key);
         if (value == null) {
             throw new BusinessException(key.name(), label + " needs a value.");
@@ -574,7 +579,6 @@ public class RateCatalogService {
             }
             case PLAN_START_HOUR,
                     PLAN_SPEED_KMH,
-                    PLAN_WELFARE_EVERY_HOURS,
                     PLAN_WELFARE_STOP_MIN,
                     PLAN_BORDER_STOP_MIN,
                     PLAN_AIRPORT_BEFORE_HOURS,

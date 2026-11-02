@@ -1025,6 +1025,28 @@ class Flow3ServiceTest {
     }
 
     @Test
+    @DisplayName("A domestic leg's gate is clear early, while the dossier's own gate stays locked (US-F2-13)")
+    void jobDetail_dossierGateIsTheSameForEveryTrip() {
+        TransportJob job = readyJob();
+        stubPlansAndCrew(job, List.of());
+        ClearanceStatusResponse locked = ClearanceStatusResponse.builder()
+                .clearanceReady(false)
+                .outstandingIssues(List.of())
+                .build();
+        when(clearanceService.getClearanceStatus(job.getId())).thenReturn(locked);
+        when(jobTrips.findTripOf(job.getId(), null)).thenReturn(Optional.of(trip));
+        when(jobTrips.journey(job)).thenReturn(List.of(new TripJob()));
+        when(jobTrips.beforeBorder(trip, job)).thenReturn(true);
+
+        JobDetailResponse detail = transportJobService.getJobDetail(job.getId());
+
+        assertEquals("Clear", detail.clearanceGateState());
+        assertTrue(detail.clearanceGateSummary().startsWith("This leg stays in one country"));
+        assertEquals("Locked", detail.dossierGateState());
+        assertEquals("Clearance gate is locked. Documents are awaiting clearance.", detail.dossierGateSummary());
+    }
+
+    @Test
     @DisplayName("Sign-off is refused while the journey ends short of the destination city (US-F3-21)")
     void signOff_refusesAJourneyShortOfTheDestination() {
         TransportJob job = readyJob();

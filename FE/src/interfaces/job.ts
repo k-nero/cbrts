@@ -97,6 +97,8 @@ export interface Corridor {
   dateFlexDays: number;
   /** Days to drive it one way: a trip's length before its route is planned, and an empty drive back (US-F7-02). */
   drivingDays: number;
+  /** The welfare stops a road route plans for; null when none are set, and on an air route. */
+  welfareStops: number | null;
   /** The border crossings it takes, in order from the origin. */
   crossings: string[];
   /** The countries it passes through, in order: ['VN', 'KH', 'TH'] (US-F7-01). */
@@ -353,8 +355,10 @@ export interface RoutePlan {
   changeReason?: string | null;
   stops: RouteStop[];
   legs: RouteLeg[];
-  /** The welfare stops the trip's drive needs before the route can be confirmed; 0 for a flight. */
-  welfareStopsNeeded: number;
+  /** The road corridor's distance, which the legs are checked against; null for a flight or when unknown. */
+  corridorDistanceKm?: number | null;
+  /** The welfare stops the road corridor plans for, which the route is checked against; null when none are set. */
+  corridorWelfareStops?: number | null;
 }
 
 export interface JobSummary extends BaseEntity {
@@ -399,8 +403,12 @@ export interface JobDetail extends BaseEntity {
   /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
   transportSpecialist?: string | null;
   coordinator?: string | null;
+  /** The gate of the trip shown: a domestic leg before the border is clear early (US-F2-13). */
   clearanceGateState: 'Locked' | 'Clear';
   clearanceGateSummary: string;
+  /** The dossier's own gate, the same whichever trip is shown: what the Clearance and Authorities tabs show. */
+  dossierGateState: 'Locked' | 'Clear';
+  dossierGateSummary: string;
   horses: JobHorse[];
   loadPlan: TripLoad | null;
   routePlan?: RoutePlan | null;

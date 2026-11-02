@@ -7,6 +7,7 @@ import { Callout, StageMark } from '@/components/ui';
 import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
+import { useRouterNavigation } from '@/router/route.hook';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { ClearanceTab } from './ClearanceTab';
@@ -73,6 +74,7 @@ function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
+  const { navigateWithConfirmation } = useRouterNavigation();
   const asked = searchParams.get('tab');
   const oldView = asked ? OLD_TABS[asked] : undefined;
   useEffect(() => {
@@ -86,10 +88,34 @@ function JobWorkspace() {
   const { data: job } = useJobDetail(id || '');
   useBreadcrumb({ id, label: job?.code, tab: activeTab.label });
 
+  // The gate says what holds it, first under the tabs (DESIGN.md, Clearance Gate), and leads to the items from the
+  // Trip and Authorities tabs. A road trip with a route carries it as a chip in its summary strip instead.
   const items = useMemo<TabsProps['items']>(
     () =>
-      job ? TABS.map(({ key, label, render }) => ({ key, label, children: render(job) })) : [],
-    [job],
+      job
+        ? TABS.map(({ key, label, render }) => ({
+            key,
+            label,
+            children: (
+              <Flex vertical gap={24}>
+                {!(key === 'trip' && routeCarriesGate(job)) && (
+                  <JobGate
+                    job={job}
+                    // Clearance and Authorities cover the whole job: the dossier's gate, whichever trip is chosen.
+                    dossier={key !== 'trip'}
+                    onOpenClearance={
+                      key === 'clearance'
+                        ? null
+                        : () => setSearchParams({ tab: 'clearance' }, { replace: true })
+                    }
+                  />
+                )}
+                {render(job)}
+              </Flex>
+            ),
+          }))
+        : [],
+    [job, setSearchParams],
   );
 
   if (!job) {
@@ -126,9 +152,12 @@ function JobWorkspace() {
         // The chosen trip and view stay in the URL, so coming back to the Trip tab opens them again.
         const trip = searchParams.get('trip');
         const view = searchParams.get('view');
-        setSearchParams(
-          { tab: key, ...(trip ? { trip } : {}), ...(view ? { view } : {}) },
-          { replace: true },
+        // Leaving the Trip tab drops a route being edited, so it asks first when the editor has changes.
+        navigateWithConfirmation(() =>
+          setSearchParams(
+            { tab: key, ...(trip ? { trip } : {}), ...(view ? { view } : {}) },
+            { replace: true },
+          ),
         );
       }}
       items={items}
@@ -189,18 +218,6 @@ function JobWorkspace() {
               . The Trip tab plans {job.parts.find((p) => p.current)?.tripCode ?? job.tripCode}; the
               other part goes on as planned.
             </Callout>
-          )}
-          {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate).
-              A trip's Route view carries it under its summary strip instead. */}
-          {!(activeTab.key === 'trip' && routeCarriesGate(job, searchParams.get('view'))) && (
-            <JobGate
-              job={job}
-              onOpenClearance={
-                activeTab.key === 'clearance'
-                  ? null
-                  : () => setSearchParams({ tab: 'clearance' }, { replace: true })
-              }
-            />
           )}
         </Flex>
 
