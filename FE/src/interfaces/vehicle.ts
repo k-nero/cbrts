@@ -63,12 +63,15 @@ export interface VehicleBooking extends BaseEntity {
   vehicleId: string;
   vehicleCode: string;
   vehicleKind?: VehicleKind;
-  /** The trip's TRP code, for a JOB booking. */
+  /** The trip's id and TRP code, for a JOB booking: the job page opens on it. */
+  tripId?: string | null;
   tripCode?: string | null;
   /** Set when the trip carries one job. */
   jobId?: string | null;
   /** The codes of the trip's jobs, comma-separated. */
   jobCode?: string | null;
+  /** The ids of the trip's jobs, in the order of `jobCode`. */
+  jobIds?: string[];
   /** The request a RESERVED booking holds the vehicle for (US-F7-02). */
   requestCode?: string | null;
   kind: 'JOB' | 'MAINTENANCE' | 'HOLD' | 'RESERVED';
@@ -95,6 +98,9 @@ export interface CreateVehicleInput {
 
 /** A missing field stays as it is; a list replaces the whole set. */
 export interface UpdateVehicleInput {
+  /** A new code must not be another vehicle's. */
+  code?: string;
+  kind?: VehicleKind;
   payloadKg?: number;
   status?: VehicleStatus;
   homeCity?: string;

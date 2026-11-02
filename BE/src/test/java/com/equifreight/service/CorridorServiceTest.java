@@ -46,7 +46,8 @@ class CorridorServiceTest {
                 mock(PlaceRepository.class),
                 mock(BorderCrossingRepository.class),
                 audit,
-                mock(VehicleRepository.class));
+                mock(VehicleRepository.class),
+                mock(CatalogUsage.class));
         hcmPnh = new Corridor();
         hcmPnh.setId(ID);
         hcmPnh.setCode("RD HCM → PNH");

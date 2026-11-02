@@ -12,7 +12,7 @@ export const MODE_OPTIONS: Option[] = [
   { label: 'Air', value: TransportModeEnum.AIR },
 ];
 
-const PLACE_KIND_LABEL: Record<PlaceKind, string> = {
+export const PLACE_KIND_LABEL: Record<PlaceKind, string> = {
   [PlaceKindEnum.STABLE]: 'Stable',
   [PlaceKindEnum.TRAINING_CENTRE]: 'Training centre',
   [PlaceKindEnum.RACECOURSE]: 'Racecourse',

@@ -32,4 +32,6 @@ public interface PlaceRepository extends JpaRepository<Place, UUID>, JpaSpecific
     boolean existsByNameIgnoreCaseAndCityIgnoreCase(String name, String city);
 
     List<Place> findByCountryCode(String countryCode);
+
+    boolean existsByNameIgnoreCaseAndCityIgnoreCaseAndIdNot(String name, String city, UUID id);
 }

@@ -31,6 +31,16 @@ export interface CreateCorridorInput {
   crossingIds: string[];
 }
 
+/** PUT /staff/corridors/{id}: its mode and two cities stay as they are. */
+export interface UpdateCorridorInput {
+  code: string;
+  distanceKm: number | null;
+  dateFlexDays: number;
+  /** 1 to 30; ignored on an air route. */
+  drivingDays: number | null;
+  crossingIds: string[];
+}
+
 /** POST /staff/places. */
 export interface CreatePlaceInput {
   name: string;

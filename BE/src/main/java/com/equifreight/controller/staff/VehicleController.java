@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -68,6 +69,14 @@ public class VehicleController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateVehicleRequest request) {
         return vehicleService.update(user, id, request);
+    }
+
+    /** Deletes a vehicle nothing has used yet; one with trips, a load plan or bookings is refused. */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public void delete(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        vehicleService.delete(user, id);
     }
 
     /** US-F7-02: the date the vehicle is expected back, or null to clear it. */

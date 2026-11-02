@@ -36,4 +36,6 @@ public interface QuarantinePeriodRepository
      * Lấy các đợt cách ly theo địa điểm (trạm kiểm dịch).
      */
     List<QuarantinePeriod> findByPlaceId(UUID placeId);
+
+    boolean existsByPlaceId(UUID placeId);
 }
