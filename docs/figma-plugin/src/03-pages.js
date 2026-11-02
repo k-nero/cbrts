@@ -1183,7 +1183,7 @@ function scrLoadPlan() {
   var tiles = H({ name: 'Tiles', gap: 16 });
   addAll(tiles, [fillW(stat('Neutral', '3/6', 'Positions filled')), fillW(stat('Bad', '1', 'Conflict')), fillW(stat('Warn', '1', 'Horse to place'))]);
   var part = { route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014', corridor: 'RD HCM → PNH' };
-  return jobScreen('Fleet & route coordinator · Load plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Load plan'), [tiles, body])]);
+  return jobScreen('Fleet & route coordinator · Load plan', 'Trip', STAFF.khoi, [tripBody(ONE_TRIP, 0, null, tripHead(part, 'Load plan'), [routeSummary(), tiles, body])], { noGate: true });
 }
 
 /* ---------------------------------------------------------------------
@@ -1390,17 +1390,23 @@ function readyPanel(steps, waiting, action) {
   add(p, fillW(foot));
   return p;
 }
-function scrRoute() {
+/* A road trip's summary strip, first on its Load plan and Route views above every callout: the route's facts, then
+   its clearance gate as a chip (the page header leaves the gate out). */
+function routeSummary() {
   var strip = H({ name: 'Summary', gap: 40, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
   [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]].forEach(function (s) {
     var c = VV({ name: s[0], gap: 4 });
     addAll(c, [Tx(s[0], 'Body/S', 'text/tertiary'), Tx(s[1], 'Label/M')]);
     add(strip, c);
   });
-  /* the trip's clearance gate as a chip, last in the strip; what is outstanding is Ready to depart's Clearance row */
+  /* what is outstanding is Ready to depart's Clearance row */
   var gateCell = VV({ name: 'Clearance', gap: 4 });
   addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip('Bad', 'Departure locked')]);
   add(strip, gateCell);
+  return strip;
+}
+function scrRoute() {
+  var strip = routeSummary();
   var tl = VV({ name: 'Timeline', gap: 0 });
   /* the day shows on the first stop and wherever it changes; between two stops the leg, under a 2 px rule */
   var LEGS = ['Road · 70 km · 2 h 30 min', 'Road · 40 km · 30 min', 'Road · 130 km · 2 h 15 min'];

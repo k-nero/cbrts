@@ -16,6 +16,7 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
+import { RouteSummary } from './RouteSummary';
 import { FlightCrew } from './FlightCrew';
 import { SignOffButton } from './SignOffButton';
 import { BiosecurityWarnings } from './BiosecurityWarnings';
@@ -143,12 +144,16 @@ export function LoadPlanTab({ job }: Props) {
     );
   }
 
+  // The route's summary strip leads the Load plan view as it leads the Route view, and carries the trip's gate.
+  const routeSummary = job.routePlan ? <RouteSummary job={job} routePlan={job.routePlan} /> : null;
+
   if (!loadPlan) {
     const defaultVehicle = activeVehicles?.find((v) => v.available !== false);
     const vehicleToUse = selectedVehicleId || defaultVehicle?.id;
 
     return (
       <Flex vertical gap={24}>
+        {routeSummary}
         <TripJobsPanel job={job} />
         <div className="p-12">
           <Flex vertical align="center" justify="center">
@@ -327,6 +332,7 @@ export function LoadPlanTab({ job }: Props) {
       onDragCancel={() => setDragging(null)}
     >
       <Flex vertical gap={24}>
+        {routeSummary}
         {/* The jobs sharing this trip (US-F3-11) */}
         <TripJobsPanel job={job} />
 

@@ -196,8 +196,8 @@ function JobWorkspace() {
             </Callout>
           )}
           {/* The gate says what holds it, and leads to the items from any other tab (DESIGN.md, Clearance Gate).
-              A trip's Route view carries it under its summary strip instead. */}
-          {!(activeTab.key === 'trip' && routeCarriesGate(job, searchParams.get('view'))) && (
+              A road trip's Load plan and Route views carry it as a chip in their summary strip instead. */}
+          {!(activeTab.key === 'trip' && routeCarriesGate(job)) && (
             <JobGate
               job={job}
               onOpenClearance={
