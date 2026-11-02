@@ -5,7 +5,6 @@ import { Flex, Tooltip } from 'antd';
 import { ConfirmRouteModal } from './ConfirmRouteModal';
 import { DepartureReadiness } from './DepartureReadiness';
 import { FlightPanel } from './FlightPanel';
-import { JobGate } from './JobGate';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
 import { departureReadiness } from './readiness';
@@ -216,8 +215,8 @@ export function RouteTab({ job }: Props) {
   const times = stopTimes(stops);
   const borderCrossing = stops.find((s) => s.kind === 'BORDER')?.borderCrossingName || 'None';
 
-  // The trip's clearance gate is a cell of the strip; only a locked gate, with what is outstanding and the way to it,
-  // also opens as a panel under the callouts.
+  // The trip's clearance gate is a chip in the strip; what is outstanding, and the way to it, is Ready to depart's
+  // Clearance row.
   const clear = job.clearanceGateState === 'Clear';
   const facts: [string, ReactNode][] = [
     ['Origin', origin],
@@ -255,14 +254,6 @@ export function RouteTab({ job }: Props) {
 
       {chainPanel}
       {draftPanel}
-
-      {/* A locked gate for this trip, with what is outstanding (the page header leaves the gate out here). */}
-      {!clear && (
-        <JobGate
-          job={job}
-          onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
-        />
-      )}
 
       <FlightPanel job={job} />
 

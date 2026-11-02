@@ -43,7 +43,8 @@ export const DepartureReadiness: FC<Props> = ({
 
   const owner = (s: ReadinessStep) => stepOwner(job, s);
 
-  // The first open step's action: gold when it is the viewer's to do, Secondary for the clearance hand-off.
+  // The first open step's action, gold when it is the viewer's to do. The clearance hand-off isn't here: it sits on
+  // the Clearance row while the gate is open, the only place the Route view shows what is outstanding.
   const action = (() => {
     if (!next) return null;
     if ((next.action === 'load-plan' || next.action === 'crew') && canPlan)
@@ -53,12 +54,6 @@ export const DepartureReadiness: FC<Props> = ({
         </Button>
       );
     if (next.action === 'sign-off' && canSignOff) return <SignOffButton job={job} />;
-    if (next.action === 'clearance')
-      return (
-        <Button variant="secondary" size="md" trailingIcon="arrow-right" onClick={onOpenClearance}>
-          View outstanding items
-        </Button>
-      );
     return null;
   })();
 
@@ -109,6 +104,18 @@ export const DepartureReadiness: FC<Props> = ({
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="type-label-m text-ink">{s.label}</span>
               <span className="type-body-s text-ink-2">{s.detail}</span>
+              {s.key === 'clearance' && s.state !== 'done' && (
+                <span className="mt-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    trailingIcon="arrow-right"
+                    onClick={onOpenClearance}
+                  >
+                    View outstanding items
+                  </Button>
+                </span>
+              )}
             </span>
             <span className="type-body-s text-ink-3 text-right">{owner(s)}</span>
           </li>
