@@ -1,5 +1,0 @@
-[languages.java]
-jdk = "/opt/homebrew/Cellar/graalvm/25.4.4.1.1/libexec/graalvm.jdk/Contents/Home"
-jdtlsJdk = "/opt/homebrew/Cellar/graalvm/25.4.4.1.1/libexec/graalvm.jdk/Contents/Home"
-[languages.java.gradle]
-jvm = ""

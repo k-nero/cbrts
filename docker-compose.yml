@@ -2,7 +2,7 @@ name: equifreight
 
 services:
   db:
-    image: postgres:19beta4-trixie
+    image: postgres:19rc1-trixie
     restart: unless-stopped
     environment:
       POSTGRES_DB: cbrtsdb
