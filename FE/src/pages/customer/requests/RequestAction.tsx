@@ -3,6 +3,7 @@ import { Flex } from 'antd';
 
 import { Button } from '@/components/ui';
 import type { RequestSummary } from '@/interfaces';
+import { quotationButton } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
 /** The one step a request's row offers, by its state: only what the club owes is Primary. */
@@ -60,17 +61,19 @@ export const RequestAction: FC<{ row: RequestSummary; onDiscard: (id: string) =>
         </Button>
       </Flex>
     );
-  if (r.quotation)
+  if (r.quotation) {
+    const button = quotationButton(r);
     return (
       <Flex component="span" justify="end">
         <Button
           size="sm"
-          variant={r.status === 'QUOTED' ? 'primary' : 'secondary'}
+          variant={button.primary ? 'primary' : 'secondary'}
           onClick={() => router.push(router.paths.get('request-quotation', { pathParams: [r.id] }))}
         >
-          {r.status === 'QUOTED' ? 'Review quotation' : 'Open quotation'}
+          {button.label}
         </Button>
       </Flex>
     );
+  }
   return null;
 };

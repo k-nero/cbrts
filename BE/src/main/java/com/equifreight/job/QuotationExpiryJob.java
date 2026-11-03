@@ -17,6 +17,7 @@ import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -63,14 +64,17 @@ public class QuotationExpiryJob {
         int expired = 0;
         for (Quotation q : quotations.findByStatusAndValidUntilBefore(QuotationStatus.ISSUED, now)) {
             if (stillIssuedBefore(q, now)) {
-                expire(q);
+                expire(q, now);
                 expired++;
             }
         }
         Instant soon = now.plus(Duration.ofHours(24));
         for (Quotation q :
                 quotations.findByStatusAndReminderSentAtIsNullAndValidUntilBefore(QuotationStatus.ISSUED, soon)) {
-            if (stillIssuedBefore(q, soon)
+            // From the departure day on it can't be accepted, so there is nothing to remind the club of. A quoted
+            // request can't change its departure, so that is checked before the row is locked.
+            if (!departureCome(q.getRequest(), now)
+                    && stillIssuedBefore(q, soon)
                     && q.getReminderSentAt() == null
                     && q.getRequest().getStatus() == RequestStatus.QUOTED) {
                 remind(q, now);
@@ -91,7 +95,7 @@ public class QuotationExpiryJob {
         return q.getStatus() == QuotationStatus.ISSUED && q.getValidUntil().isBefore(before);
     }
 
-    private void expire(Quotation q) {
+    private void expire(Quotation q, Instant now) {
         q.setStatus(QuotationStatus.EXPIRED);
         quotations.save(q);
         TransportRequest request = q.getRequest();
@@ -115,11 +119,22 @@ public class QuotationExpiryJob {
         String manager = q.getPreparedBy() == null
                 ? "the logistics manager"
                 : q.getPreparedBy().displayName();
+        // A re-quote can be asked for up to the day before departure (CustomerQuotationService.requote).
         notify(
                 q,
                 NotificationKind.QUOTATION_EXPIRED,
                 "Quotation " + q.getCode() + " has expired",
-                "Ask " + manager + " for a re-quote to have it priced again from the rate catalog in force now.");
+                departureCome(request, now)
+                        ? "The departure on " + BusinessTime.DAY.format(request.getDepartureDate())
+                                + " has come, so it can't be re-quoted. Start a new request for a later date."
+                        : "Ask " + manager
+                                + " for a re-quote to have it priced again from the rate catalog in force now.");
+    }
+
+    /** The departure day has come, in Vietnam time; a request without a date has none to come. */
+    private static boolean departureCome(TransportRequest request, Instant now) {
+        LocalDate departure = request.getDepartureDate();
+        return departure != null && !departure.isAfter(LocalDate.ofInstant(now, BusinessTime.ZONE));
     }
 
     private void remind(Quotation q, Instant now) {
