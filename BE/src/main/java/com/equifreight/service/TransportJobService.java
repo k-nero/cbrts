@@ -217,6 +217,7 @@ public class TransportJobService {
                 .journeyEndCity(jobTrips.journeyEndCity(job))
                 .journeyComplete(journeys.complete(job))
                 .journeyWarnings(journeys.warnings(job))
+                .quarantineDetours(journeys.quarantineDetours(job))
                 .clearanceJourneyNote(clearanceJourneyNote(job))
                 .dossierGateState(dossierClear ? "Clear" : "Locked")
                 .dossierGateSummary(dossierSummary)

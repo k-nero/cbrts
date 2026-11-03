@@ -25,6 +25,13 @@ export const STOP_KINDS: { value: RouteStopKind; label: string }[] = [
   { value: 'DELIVERY', label: 'Delivery' },
 ];
 
+/**
+ * The kinds a stop can be given in the editor. A quarantine isn't one: a stay there would keep the trailer and crew
+ * booked while the horses wait, and the journey's quarantine checks don't see it. The trip into the station hands the
+ * horses on there instead, and the next trip collects them (US-F3-22). A stop saved as Quarantine still reads so.
+ */
+export const EDITOR_STOP_KINDS = STOP_KINDS.filter((k) => k.value !== 'QUARANTINE');
+
 export const MODES = [
   { value: 'ROAD', label: 'Road' },
   { value: 'AIR', label: 'Air' },
