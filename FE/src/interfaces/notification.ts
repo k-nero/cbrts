@@ -19,6 +19,12 @@ export const NotificationKindEnum = {
   DOSSIER_REFUSED: 'DOSSIER_REFUSED',
   DOSSIER_LATE: 'DOSSIER_LATE',
   DOCUMENTS_DUE: 'DOCUMENTS_DUE',
+  /** A quarantine was scheduled for the job (US-F3-22): the coordinator plans around it, the club hears where. */
+  QUARANTINE_SCHEDULED: 'QUARANTINE_SCHEDULED',
+  QUARANTINE_CHANGED: 'QUARANTINE_CHANGED',
+  QUARANTINE_COMPLETED: 'QUARANTINE_COMPLETED',
+  /** A quarantine clashes with the job's planned trips; the approving manager hears. */
+  QUARANTINE_CONFLICT: 'QUARANTINE_CONFLICT',
   TRIP_RELEASED: 'TRIP_RELEASED',
   TRIP_HELD: 'TRIP_HELD',
   TRIP_SHARED: 'TRIP_SHARED',
