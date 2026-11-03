@@ -1270,6 +1270,9 @@ function jobScreen(name, tab, user, blocks, o) {
 /* the job's trips in journey order (US-F3-16, US-F3-21): the chosen one is the Nav item's active pill */
 var ONE_TRIP = [{ mode: 'Road', icon: 'truck', route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014 · 18 Oct, 06:00', leaves: 'Leaves 18 Oct, 06:00', tone: 'Bad', step: 'Locked' }];
 var CHAIN_JOB = { code: 'CBRT-2026-042', title: 'Da Nang → Sha Tin', meta: '2 horses · road, flight, road · departs 16 Oct 2026, 06:00' };
+/* a journey through a pre-export quarantine (US-F3-22): one quarantine, the same station and days on every frame */
+var Q_JOB = { code: 'CBRT-2026-051', title: 'Ho Chi Minh City → Sha Tin', meta: '4 horses · road, flight, road · quarantine 11–25 Nov 2026' };
+var Q051 = { station: 'Đại Nam Racecourse isolation barn', days: '11–25 Nov', first: '11 Nov', last: '25 Nov', min: 14, catalog: 'Hong Kong import' };
 function journeyRail(parts, active, addFrom) {
   var r = VV({ name: 'Journey rail', gap: 8, w: 240 });
   add(r, Tx('Journey · ' + parts.length + (parts.length === 1 ? ' trip' : ' trips'), 'Mono/Caption', 'text/tertiary'));
@@ -1316,9 +1319,10 @@ function tripHead(part, view) {
   }
   return h;
 }
-/* the Trip tab's body: the rail, then the chosen trip */
-function tripBody(parts, active, addFrom, head, blocks) {
+/* the Trip tab's body: the rail, then the chosen trip; the journey's Warn callouts (warns) come above its head */
+function tripBody(parts, active, addFrom, head, blocks, warns) {
   var c = VV({ name: 'Chosen trip', gap: 24 });
+  (warns || []).forEach(function (w) { add(c, callout('Warn', w)); });
   add(c, fillW(head));
   blocks.forEach(function (b) { add(c, fillW(b)); });
   var row = H({ name: 'Trip tab', gap: 24 });
@@ -1397,7 +1401,7 @@ function readyPanel(steps, waiting, action) {
 /* A trip's summary strip, first on a road trip's Load plan and Route views and on a flight, above every callout: the
    route's facts (by road its crossing and welfare stops, on a flight the airline's flight), then its clearance gate as
    a chip (the Trip tab shows no gate panel). */
-function routeSummary(cells) {
+function routeSummary(cells, gate) {
   /* the cells wrap to a second line rather than run past the page, as the shipped strip does */
   var strip = H({ name: 'Summary', gap: 40, rowGap: 16, wrap: true, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
   (cells || [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]]).forEach(function (s) {
@@ -1407,7 +1411,7 @@ function routeSummary(cells) {
   });
   /* what is outstanding is Ready to depart's Clearance row */
   var gateCell = VV({ name: 'Clearance', gap: 4 });
-  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip('Bad', 'Departure locked')]);
+  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip.apply(null, gate || ['Bad', 'Departure locked'])]);
   add(strip, gateCell);
   return strip;
 }
@@ -1453,9 +1457,9 @@ var JOURNEY = [
   { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00', leaves: 'Leaves 16 Oct, 06:00', tone: 'Warn', step: 'Crew', who: 'Waiting on crew · Đỗ Minh Khôi', link: ['18 h 40 min to connect', 'text/tertiary'] },
   { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40', leaves: 'Leaves 17 Oct, 23:40', tone: 'Bad', step: 'Locked', who: 'Waiting on clearance · Nguyễn Thị Lan', link: ['Connection not planned', 'text/tertiary'] },
   { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned', leaves: 'Not planned', tone: 'Warn', step: 'Route', who: 'Waiting on route · Đỗ Minh Khôi' }];
-function journeySummary() {
+function journeySummary(cells) {
   var strip = H({ name: 'Journey summary', gap: 40, rowGap: 16, wrap: true, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']].forEach(function (c) {
+  (cells || [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']]).forEach(function (c) {
     var cell = VV({ name: c[0], gap: 4 });
     addAll(cell, [Tx(c[0], 'Body/S', 'text/tertiary'), Tx(c[1], 'Label/M', c[2])]);
     add(strip, cell);

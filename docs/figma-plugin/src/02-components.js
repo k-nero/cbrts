@@ -270,7 +270,14 @@ function buildDataDisplay(parent) {
 }
 function stat(tone, value, label) { var s = inst(C.stat, { Tone: tone }); setP(s, { Value: value, Label: label }); s.name = 'Stat · ' + label; return s; }
 function progress(tone, value) { var p = inst(C.progress, { Tone: tone, Value: String(value) }); p.name = 'Progress'; return fillW(p); }
-function callout(tone, title, body) { var c = inst(C.callout, { Tone: tone }); setP(c, { Title: title, Body: body }); c.name = 'Callout · ' + title; return fillW(c); }
+/* body null: a title-only callout, as the journey's warnings are */
+function callout(tone, title, body) {
+  var c = inst(C.callout, { Tone: tone });
+  setP(c, body == null ? { Title: title } : { Title: title, Body: body });
+  if (body == null) c.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Body'; }).visible = false;
+  c.name = 'Callout · ' + title;
+  return fillW(c);
+}
 
 /* ---------- Brass nameplate ---------- */
 function buildNameplate(parent) {
