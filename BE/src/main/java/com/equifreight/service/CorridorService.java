@@ -6,6 +6,7 @@ import com.equifreight.entity.CorridorCrossing;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.User;
+import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
@@ -14,6 +15,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.route.CorridorResponse;
 import com.equifreight.model.route.CreateCorridorRequest;
 import com.equifreight.model.route.RouteMapper;
+import com.equifreight.model.route.UpdateCorridorRequest;
 import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
@@ -24,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -52,6 +55,7 @@ public class CorridorService {
     private final BorderCrossingRepository crossings;
     private final AuditService audit;
     private final VehicleRepository vehicles;
+    private final CatalogUsage usage;
 
     public CorridorService(
             CorridorRepository corridors,
@@ -59,13 +63,15 @@ public class CorridorService {
             PlaceRepository places,
             BorderCrossingRepository crossings,
             AuditService audit,
-            VehicleRepository vehicles) {
+            VehicleRepository vehicles,
+            CatalogUsage usage) {
         this.corridors = corridors;
         this.corridorCrossings = corridorCrossings;
         this.places = places;
         this.crossings = crossings;
         this.audit = audit;
         this.vehicles = vehicles;
+        this.usage = usage;
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +88,8 @@ public class CorridorService {
     }
 
     /**
-     * Adds a route we run. The code is new, the cities differ, the route doesn't already run this way by this mode,
+     * Adds a route we run. The code is new, the cities differ (a road route may stay in one city: the run to its cargo
+     * terminal), the route doesn't already run this way by this mode,
      * each city has a place a request can start or end at, and a road route's crossings lead from the origin's
      * country to the destination's, one after the other. An air route takes no land crossings.
      */
@@ -91,9 +98,9 @@ public class CorridorService {
         String code = request.code().trim();
         String origin = request.originCity().trim();
         String destination = request.destinationCity().trim();
-        if (origin.equalsIgnoreCase(destination)) {
+        if (origin.equalsIgnoreCase(destination) && request.mode() != TransportMode.ROAD) {
             throw new BusinessException(
-                    "CORRIDOR_CITIES", "A route runs between two cities; both ends are " + origin + ".");
+                    "CORRIDOR_CITIES", "A flight runs between two cities; both ends are " + origin + ".");
         }
         checkFlex(request.dateFlexDays());
         if (corridors.existsByCodeIgnoreCase(code)) {
@@ -129,6 +136,7 @@ public class CorridorService {
                 request.drivingDays() == null
                         ? Corridor.drivingDaysFor(request.distanceKm())
                         : request.drivingDays().shortValue());
+        corridor.setWelfareStops(request.mode() == TransportMode.ROAD ? welfareStops(request.welfareStops()) : null);
         corridor.setOriginCountry(from);
         corridor.setDestinationCountry(to);
         for (int i = 0; i < route.size(); i++) {
@@ -152,6 +160,130 @@ public class CorridorService {
                 null,
                 null);
         return RouteMapper.toCorridorResponse(saved, names);
+    }
+
+    /**
+     * Edits a route: its code, distance, flexible and driving days, and a road route's border crossings. The code stays
+     * unique, the crossings still lead from the origin's country to the destination's, and every vehicle that runs the
+     * route keeps a permit for each country the new crossings take it through. A change is audited; none changes
+     * nothing.
+     */
+    @Transactional
+    public CorridorResponse update(User actor, UUID id, UpdateCorridorRequest request) {
+        Corridor corridor = corridors.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Corridor", id));
+        String code = request.code().trim();
+        checkFlex(request.dateFlexDays());
+        if (!code.equalsIgnoreCase(corridor.getCode()) && corridors.existsByCodeIgnoreCase(code)) {
+            throw new ConflictException("CORRIDOR_CODE", "The code " + code + " is already used. Pick another.");
+        }
+        List<BorderCrossing> route = orderedCrossings(request.crossingIds());
+        if (!corridor.isRoad() && !route.isEmpty()) {
+            throw new BusinessException(
+                    "CORRIDOR_CROSSINGS", "An air route crosses no land border. Remove its border crossings.");
+        }
+        List<UUID> before = corridor.getCrossings().stream()
+                .map(cc -> cc.getBorderCrossing().getId())
+                .toList();
+        boolean crossingsChanged =
+                !before.equals(route.stream().map(BorderCrossing::getId).toList());
+        if (corridor.isRoad() && crossingsChanged) {
+            checkChain(route, corridor.getOriginCountry(), corridor.getDestinationCountry());
+        }
+        if (corridor.isRoad() && request.drivingDays() != null) checkDrivingDays(request.drivingDays());
+
+        String was = describe(corridor);
+        String oldCode = corridor.getCode();
+        corridor.setCode(code);
+        corridor.setDistanceKm(request.distanceKm());
+        corridor.setDateFlexDays(request.dateFlexDays().shortValue());
+        if (corridor.isRoad() && request.drivingDays() != null) {
+            corridor.setDrivingDays(request.drivingDays().shortValue());
+        }
+        if (corridor.isRoad()) corridor.setWelfareStops(welfareStops(request.welfareStops()));
+        if (crossingsChanged) {
+            corridor.getCrossings().clear();
+            // Flush the removals first: (corridor, seq) is unique, and the new rows reuse the same seqs.
+            corridors.saveAndFlush(corridor);
+            for (int i = 0; i < route.size(); i++) {
+                CorridorCrossing cc = new CorridorCrossing();
+                cc.setCorridor(corridor);
+                cc.setSeq((short) (i + 1));
+                cc.setBorderCrossing(route.get(i));
+                corridor.getCrossings().add(cc);
+            }
+            for (Vehicle vehicle : vehicles.findRunning(id)) {
+                vehicle.refusalToRun(corridor).ifPresent(reason -> {
+                    throw new BusinessException(
+                            "VEHICLE_PERMIT", reason + " Give it the permit or take the route off it first.");
+                });
+            }
+        }
+        Corridor saved = corridors.saveAndFlush(corridor);
+        List<String> names = route.stream().map(BorderCrossing::getName).toList();
+        String now = describe(saved);
+        if (!Objects.equals(was, now)) {
+            audit.recordDecision(
+                    actor,
+                    "CORRIDOR_UPDATED",
+                    "Edited route " + oldCode + ": " + was + " → " + now + ".",
+                    ENTITY_TYPE,
+                    saved.getId(),
+                    code.length() <= AUDIT_CODE_MAX ? code : null,
+                    null,
+                    null,
+                    null);
+        }
+        return RouteMapper.toCorridorResponse(saved, names);
+    }
+
+    /**
+     * Deletes a route nothing has used yet, with its border crossings. A route requests or trips ran on, that a rate
+     * version prices, or that a vehicle works stays, and the refusal says which.
+     */
+    @Transactional
+    public void delete(User actor, UUID id) {
+        Corridor corridor = corridors.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Corridor", id));
+        usage.corridorInUse(corridor).ifPresent(reason -> {
+            throw new ConflictException("CORRIDOR_IN_USE", reason);
+        });
+        String code = corridor.getCode();
+        corridors.delete(corridor);
+        corridors.flush();
+        audit.recordDecision(
+                actor,
+                "CORRIDOR_DELETED",
+                "Deleted route " + code + ": " + corridor.getOriginCity() + " → " + corridor.getDestinationCity()
+                        + " by " + modeWord(corridor.getMode()) + ".",
+                ENTITY_TYPE,
+                id,
+                code.length() <= AUDIT_CODE_MAX ? code : null,
+                null,
+                null,
+                null);
+    }
+
+    /** A road route's welfare stops, 0 to 20, or null for none. */
+    private static Short welfareStops(Integer stops) {
+        if (stops == null) return null;
+        if (stops < 0 || stops > 20) {
+            throw new BusinessException("CORRIDOR_WELFARE_STOPS", "Welfare stops must be a whole number from 0 to 20.");
+        }
+        return stops.shortValue();
+    }
+
+    /** "RD HCM → PNH, 230 km, ±3 days, 1 day, 2 welfare stops, via Mộc Bài – Bavet", for the audit log. */
+    private static String describe(Corridor c) {
+        List<String> via = c.getCrossings().stream()
+                .map(cc -> cc.getBorderCrossing().getName())
+                .toList();
+        return c.getCode()
+                + (c.getDistanceKm() == null ? "" : ", " + c.getDistanceKm() + " km")
+                + ", " + words(c.getDateFlexDays())
+                + (c.isRoad() ? ", " + dayWords(c.getDrivingDays()) : "")
+                + (c.getWelfareStops() == null
+                        ? ""
+                        : ", " + c.getWelfareStops() + " welfare " + (c.getWelfareStops() == 1 ? "stop" : "stops"))
+                + (via.isEmpty() ? "" : ", via " + String.join(", ", via));
     }
 
     /** Sets the route's flex days and writes the decision to the audit log; the same value changes nothing. */

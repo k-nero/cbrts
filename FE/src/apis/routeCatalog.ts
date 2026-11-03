@@ -8,10 +8,14 @@ import type {
   CreateCorridorInput,
   CreatePlaceInput,
   Place,
+  UpdateCorridorInput,
 } from '@/interfaces';
 
 /** The routes we run, paged and sorted by the server; the coordinator adds new ones. */
 export const corridorsApi = makeCrudApi<Corridor, CreateCorridorInput>('/staff/corridors');
+
+/** Every catalogued place, paged, searched and sorted by the server (name, city). */
+export const placesApi = makeCrudApi<Place, CreatePlaceInput>('/staff/places');
 
 /** The places, border crossings and countries a new route is built from. */
 export const routeCatalogApi = {
@@ -24,7 +28,14 @@ export const routeCatalogApi = {
     client.post<Place>('/staff/places', body).then((r) => r.data),
   createBorderCrossing: (body: CreateBorderCrossingInput) =>
     client.post<BorderCrossing>('/staff/border-crossings', body).then((r) => r.data),
+  updateBorderCrossing: (id: string, body: CreateBorderCrossingInput) =>
+    client.put<BorderCrossing>(`/staff/border-crossings/${id}`, body).then((r) => r.data),
+  deleteBorderCrossing: (id: string) =>
+    client.delete(`/staff/border-crossings/${id}`).then(() => undefined),
   countries: () => client.get<CountryOption[]>('/staff/countries').then((r) => r.data),
+  /** Edits a route: its code, distance, flexible and driving days, and a road route's crossings. */
+  updateCorridor: (id: string, body: UpdateCorridorInput) =>
+    client.put<Corridor>(`/staff/corridors/${id}`, body).then((r) => r.data),
   /** How many days the route takes to drive one way, 1 to 30 (US-F7-02). */
   setDrivingDays: (id: string, drivingDays: number) =>
     client

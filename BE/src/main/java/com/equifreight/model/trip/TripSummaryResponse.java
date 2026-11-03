@@ -5,6 +5,7 @@ import com.equifreight.entity.enums.TripRecordKind;
 import com.equifreight.entity.enums.TripStatus;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.Builder;
 
 /**
@@ -23,7 +24,9 @@ public record TripSummaryResponse(
         /** The jobs on the escort's trip; the one job elsewhere. */
         List<String> jobCodes,
         /** Where the trip stands, on the office board only (US-F4-04); null elsewhere. */
-        Progress progress) {
+        Progress progress,
+        /** The request the job was approved from, on the customer's list only: its page tracks the trip. */
+        UUID requestId) {
 
     /**
      * The leg the trip is on, from the last stop with a checkpoint to the next stop on its confirmed route, and its
@@ -48,18 +51,29 @@ public record TripSummaryResponse(
             Instant lastUpdate,
             String tripCode,
             List<String> jobCodes) {
-        this(jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, null);
+        this(jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, null, null);
     }
 
     public TripSummaryResponse withProgress(Progress progress) {
         return new TripSummaryResponse(
-                jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, progress);
+                jobCode, tripStatus, origin, destination, lastUpdate, tripCode, jobCodes, progress, requestId);
     }
 
     /** A job's row, as the customer's and the office's lists select it. */
     public TripSummaryResponse(
             String jobCode, TripStatus tripStatus, String origin, String destination, Instant lastUpdate) {
         this(jobCode, tripStatus, origin, destination, lastUpdate, null, List.of(jobCode));
+    }
+
+    /** A job's row on the customer's list, with the request its page opens. */
+    public TripSummaryResponse(
+            String jobCode,
+            TripStatus tripStatus,
+            String origin,
+            String destination,
+            Instant lastUpdate,
+            UUID requestId) {
+        this(jobCode, tripStatus, origin, destination, lastUpdate, null, List.of(jobCode), null, requestId);
     }
 
     /** A job's row on a trip the escort crews; the service folds a trip's rows into one. */

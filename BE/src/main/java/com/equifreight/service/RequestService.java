@@ -60,6 +60,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -72,7 +73,9 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -94,6 +97,9 @@ public class RequestService {
     static final String INFO_REQUIRED_ACTION = "REQUEST_INFO_REQUIRED";
 
     /** Every state after submission and before APPROVED (BR-F1-07). */
+    /** The sort key of the needs-you-first order: not a column, the list works it out (see {@link #list}). */
+    public static final String NEEDS_YOU = "needsYou";
+
     private static final Set<RequestStatus> CANCELLABLE = Set.of(
             RequestStatus.SUBMITTED,
             RequestStatus.UNDER_REVIEW,
@@ -101,6 +107,10 @@ public class RequestService {
             RequestStatus.QUOTED,
             RequestStatus.CUSTOMER_ACCEPTED,
             RequestStatus.EXPIRED);
+
+    /** The blockers that leave a request without a route we run. */
+    private static final Set<String> ROUTE_BLOCKERS =
+            Set.of("ORIGIN_MISSING", "DESTINATION_MISSING", "PLACE_NOT_CHOSEN", "ROUTE_NOT_RUN", "MODE_MISSING");
 
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
@@ -120,6 +130,7 @@ public class RequestService {
     private final RequestProgressService progress;
     private final RequestFleetService fleet;
     private final InvoiceService invoices;
+    private final CustomerHomeService home;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -139,7 +150,8 @@ public class RequestService {
             NotificationService notifications,
             RequestProgressService progress,
             RequestFleetService fleet,
-            InvoiceService invoices) {
+            InvoiceService invoices,
+            CustomerHomeService home) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -158,14 +170,46 @@ public class RequestService {
         this.progress = progress;
         this.fleet = fleet;
         this.invoices = invoices;
+        this.home = home;
     }
 
+    /**
+     * The club's requests, a page at a time. Sorted by {@value #NEEDS_YOU}, the rows the club owes come first, the
+     * soonest due on top, then the rest by departure (as Your moves orders them); that order is worked out over the
+     * club's whole list, which is a club's few dozen requests, not a table to page in the database.
+     */
     @Transactional(readOnly = true)
     public Page<RequestSummaryResponse> list(User user, RequestStatus status, Pageable pageable) {
         Club club = clubs.requireClub(user);
-        Page<TransportRequest> page = status == null
-                ? requests.findByClubId(club.getId(), pageable)
-                : requests.findByClubIdAndStatus(club.getId(), status, pageable);
+        Page<TransportRequest> page;
+        Map<UUID, CustomerHomeService.Attention> attention;
+        if (pageable.getSort().getOrderFor(NEEDS_YOU) != null) {
+            Pageable all = Pageable.unpaged(Sort.by(Sort.Direction.DESC, "createdAt"));
+            List<TransportRequest> rows = (status == null
+                            ? requests.findByClubId(club.getId(), all)
+                            : requests.findByClubIdAndStatus(club.getId(), status, all))
+                    .getContent();
+            attention = home.attentionOf(club.getId(), rows);
+            List<TransportRequest> ranked = rows.stream()
+                    .sorted(Comparator.comparingInt((TransportRequest r) -> rank(attention.get(r.getId())))
+                            .thenComparing(
+                                    r -> attention.get(r.getId()) == null
+                                            ? null
+                                            : attention.get(r.getId()).due(),
+                                    Comparator.nullsLast(Comparator.naturalOrder()))
+                            .thenComparing(
+                                    TransportRequest::getDepartureDate,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                    .toList();
+            int from = (int) Math.min(pageable.getOffset(), ranked.size());
+            int to = Math.min(from + pageable.getPageSize(), ranked.size());
+            page = new PageImpl<>(ranked.subList(from, to), pageable, ranked.size());
+        } else {
+            page = status == null
+                    ? requests.findByClubId(club.getId(), pageable)
+                    : requests.findByClubIdAndStatus(club.getId(), status, pageable);
+            attention = home.attentionOf(club.getId(), page.getContent());
+        }
         Map<UUID, Long> counts = new LinkedHashMap<>();
         if (!page.isEmpty()) {
             requests.countHorses(page.map(TransportRequest::getId).getContent())
@@ -179,9 +223,19 @@ public class RequestService {
                     .forEach(q -> issued.merge(
                             q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
         }
-        return page.map(r -> RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)).toBuilder()
-                .quotation(issued.containsKey(r.getId()) ? issuedRef(issued.get(r.getId())) : null)
-                .build());
+        return page.map(r -> {
+            CustomerHomeService.Attention a = attention.get(r.getId());
+            return RequestMapper.toSummary(r, counts.getOrDefault(r.getId(), 0L)).toBuilder()
+                    .quotation(issued.containsKey(r.getId()) ? issuedRef(issued.get(r.getId())) : null)
+                    .holds(a == null ? null : a.holds())
+                    .dueOn(a == null ? null : a.due())
+                    .build();
+        });
+    }
+
+    /** Bad first, then Warn (the club owes it), then the rest, then a request nothing holds any more. */
+    private static int rank(CustomerHomeService.Attention a) {
+        return a == null ? 3 : CustomerHomeService.needsYou(a.holds());
     }
 
     @Transactional(readOnly = true)
@@ -198,6 +252,7 @@ public class RequestService {
                         .orElse(null))
                 .history(where.history())
                 .nextStep(where.nextStep())
+                .jobCode(where.jobCode())
                 .build();
     }
 
@@ -226,7 +281,27 @@ public class RequestService {
                 request.getHorses().stream().map(rh -> rh.getHorse().getId()).collect(Collectors.toSet());
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
+        requireRouteOnceSent(request, resolution);
         return toResponse(requests.saveAndFlush(request), resolution);
+    }
+
+    /**
+     * A request once sent keeps a route we run (transport_requests_route_check). Back with the club for information, an
+     * edit that leaves it without one is refused with the reason the submit check gives, before the database does.
+     */
+    private void requireRouteOnceSent(TransportRequest request, RouteResolution resolution) {
+        if (request.getSubmittedAt() == null || request.getCorridor() != null) {
+            return;
+        }
+        List<String> why = SubmissionCheck.blockers(request, resolution, LocalDate.now(clock)).stream()
+                .filter(b -> ROUTE_BLOCKERS.contains(b.code()))
+                .map(Blocker::message)
+                .toList();
+        throw new ConflictException(
+                "ROUTE_REQUIRED",
+                request.getCode() + " was sent to us, so it has to stay on a route we run. "
+                        + (why.isEmpty() ? "Choose where the horses are collected and delivered." : why.getFirst()),
+                why);
     }
 
     /**

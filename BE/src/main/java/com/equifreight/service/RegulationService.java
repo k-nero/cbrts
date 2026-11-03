@@ -242,7 +242,7 @@ public class RegulationService {
                     + changedParameters(published, version).size();
         }
 
-        int pinned = (int) jobRegulationPinRepository.countByRegulationVersionId(versionId);
+        int pinned = (int) jobRegulationPinRepository.countByRegulationVersionIdAndSupersededAtIsNull(versionId);
         return ClearanceMapper.toVersionResponse(version, pinned, ruleResponses, changesCount);
     }
 

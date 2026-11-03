@@ -63,6 +63,10 @@ class RequestFleetServiceTest {
                 .thenReturn(Optional.of("busy"));
         when(availability.earliestStart(any(), any(), any(), any())).thenReturn(Optional.empty());
         when(bookings.saveAndFlush(any(VehicleBooking.class))).thenAnswer(i -> i.getArgument(0));
+        when(availability.heldCorridor(any()))
+                .thenAnswer(i -> Optional.ofNullable(
+                                i.<TransportRequest>getArgument(0).getCorridor())
+                        .filter(Corridor::isRoad));
     }
 
     @Test

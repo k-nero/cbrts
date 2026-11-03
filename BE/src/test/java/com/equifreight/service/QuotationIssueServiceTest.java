@@ -45,6 +45,7 @@ import com.equifreight.service.quotation.QuotationSnapshot;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,14 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
         startedWithIds();
 
         assertBlocked("Nightfall is size XL (96 in); business gives 48 in.");
+    }
+
+    @Test
+    void aDepartureThatHasComeBlocksIssue() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 19));
+        startedWithIds();
+
+        assertBlocked("The departure on 19 Oct 2026 has come. Return the request to the customer for a new date.");
     }
 
     @Test

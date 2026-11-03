@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { Button, cx, Icon, Perforation, StageMark, type Tone, TONE_FG } from '@/components/ui';
 import type { CustomerHome, MoveEntry } from '@/interfaces';
 import { settle, stagger } from '@/lib/motion';
-import { formatDate, formatDayTime, spanUntil } from '@/lib/utils';
+import { formatDate, formatDayTime, moveRef, spanUntil } from '@/lib/utils';
 
 /* "What holds it" is quiet Mist when nothing is needed; every other tone speaks in its colour. */
 const holdsTone = (tone: Tone) => (tone === 'neutral' ? 'text-ink-2' : TONE_FG[tone]);
@@ -56,11 +56,11 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
       {home.moves.map((m) => {
         const d = departs(m, home.asOf);
         return (
-          <motion.li key={m.requestCode} variants={settle}>
+          <motion.li key={m.requestId} variants={settle}>
             <button
               type="button"
               onClick={() => onOpen(m)}
-              aria-label={`Open ${m.requestCode}, ${m.route}`}
+              aria-label={`Open ${moveRef(m)}, ${m.route}`}
               className={cx(
                 'focus-ring group flex w-full cursor-pointer overflow-hidden rounded-lg border',
                 'border-line bg-card p-0 text-left transition-colors hover:border-line-strong',
@@ -76,7 +76,7 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
                     <Flex component="span" vertical gap={4} className="min-w-0 flex-1">
                       <span className="type-h4 text-ink">{m.route}</span>
                       <Flex component="span" align="baseline" gap={8}>
-                        <span className="type-caption shrink-0 text-ink-2">{m.requestCode}</span>
+                        <span className="type-caption shrink-0 text-ink-2">{moveRef(m)}</span>
                         <span className="type-body-s text-ink-3">{m.detail}</span>
                       </Flex>
                     </Flex>

@@ -66,6 +66,7 @@ const AddCorridorModal: FC<Props> = ({ open, create, onClose, onAddPlace, onAddC
       crossings: [],
       distanceKm: null,
       dateFlexDays: 3,
+      welfareStops: null,
     });
   }, [methods, open]);
 
@@ -78,6 +79,7 @@ const AddCorridorModal: FC<Props> = ({ open, create, onClose, onAddPlace, onAddC
         destinationCity: v.destinationCity?.value ?? '',
         distanceKm: v.distanceKm,
         dateFlexDays: v.dateFlexDays,
+        welfareStops: byRoad ? v.welfareStops : null,
         crossingIds: byRoad ? (v.crossings ?? []).map((c) => c.value) : [],
       });
       void message.success(`${created.code} added. Price it in the draft rate version next.`);
@@ -184,6 +186,18 @@ const AddCorridorModal: FC<Props> = ({ open, create, onClose, onAddPlace, onAddC
                   instruction: 'How far a request’s dates can move; 0 is fixed dates only.',
                 }}
               />
+              {byRoad && (
+                <FormField
+                  name="welfareStops"
+                  label="Welfare stops"
+                  component="number"
+                  componentProps={{
+                    min: 0,
+                    max: 20,
+                    instruction: 'How many a route plans for; empty for none.',
+                  }}
+                />
+              )}
             </Flex>
             <Flex justify="end" gap={8}>
               <CancelButton label="Cancel" />

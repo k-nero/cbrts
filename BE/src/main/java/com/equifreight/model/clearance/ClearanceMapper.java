@@ -162,6 +162,15 @@ public final class ClearanceMapper {
                 .build();
     }
 
+    /** "Hong Kong v2": the country and version number of the catalog {@code rule} belongs to. */
+    private static String catalogOf(RegulationRule rule) {
+        RegulationVersion version = rule.getVersion();
+        if (version == null
+                || version.getCatalog() == null
+                || version.getCatalog().getCountry() == null) return null;
+        return version.getCatalog().getCountry().getName() + " v" + version.getVersionNo();
+    }
+
     public static ChecklistItemResponse toItemResponse(ChecklistItem item) {
         if (item == null) {
             return null;
@@ -177,6 +186,8 @@ public final class ClearanceMapper {
                 .evaluatedAt(item.getEvaluatedAt())
                 .holder(item.getHolder())
                 .dueDate(item.getDueDate())
+                .droppedAt(item.getDroppedAt())
+                .addedByUpdate(item.isAddedByUpdate())
                 .currentVersion(toVersionResponse(item.getCurrentVersion()))
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt());
@@ -192,10 +203,12 @@ public final class ClearanceMapper {
         if (item.getRegulationRule() != null) {
             builder.regulationRuleId(item.getRegulationRule().getId())
                     .ruleKind(item.getRegulationRule().getRuleKind())
-                    .mandatory(item.getRegulationRule().isMandatory())
+                    .mandatory(item.getDroppedAt() == null
+                            && item.getRegulationRule().isMandatory())
                     .minDays(item.getRegulationRule().getMinDays())
                     .maxDays(item.getRegulationRule().getMaxDays())
-                    .ruleDescription(item.getRegulationRule().getDescription());
+                    .ruleDescription(item.getRegulationRule().getDescription())
+                    .ruleCatalog(catalogOf(item.getRegulationRule()));
         }
 
         if (item.getHorse() != null) {

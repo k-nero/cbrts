@@ -27,7 +27,7 @@ export const PoliciesModal: FC<{
     if (!open) return;
     methods.reset(
       Object.fromEntries(
-        POLICY_FIELDS.map((f) => [f.key, view.policies[f.key] ?? null]),
+        POLICY_FIELDS.map((f) => [f.key, view.policies[f.key] ?? f.fallback ?? null]),
       ) as PolicyForm,
     );
   }, [methods, open, view]);

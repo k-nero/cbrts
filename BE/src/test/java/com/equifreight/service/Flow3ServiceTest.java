@@ -16,6 +16,7 @@ import com.equifreight.model.clearance.ClearanceStatusResponse;
 import com.equifreight.model.fleet.VehicleBookingRequest;
 import com.equifreight.model.fleet.VehicleBookingResponse;
 import com.equifreight.model.job.AssignCrewRequest;
+import com.equifreight.model.job.JobDetailResponse;
 import com.equifreight.model.job.LoadPlanConflictResponse;
 import com.equifreight.model.job.MoveHorseRequest;
 import com.equifreight.repository.*;
@@ -98,6 +99,9 @@ class Flow3ServiceTest {
 
     @Mock
     private JobTripService jobTrips;
+
+    private final com.equifreight.repository.FlightRepository flights =
+            mock(com.equifreight.repository.FlightRepository.class);
 
     /** The trip every job in these tests travels on alone. */
     private final Trip trip = trip();
@@ -230,7 +234,8 @@ class Flow3ServiceTest {
                 mock(TripVehicleRepository.class),
                 availability,
                 auditService,
-                mock(PlaceRepository.class));
+                mock(PlaceRepository.class),
+                mock(CatalogUsage.class));
         routePlanService = new RoutePlanService(
                 routePlanRepository,
                 routeStopRepository,
@@ -243,7 +248,8 @@ class Flow3ServiceTest {
                 clearanceService,
                 jobTrips,
                 auditService,
-                tripNotices);
+                tripNotices,
+                PlanningStub.planningDefaults());
         loadPlanService = new LoadPlanService(
                 loadPlanRepository,
                 loadPlanStallRepository,
@@ -280,7 +286,9 @@ class Flow3ServiceTest {
                 auditService,
                 notificationService,
                 mock(CodeService.class),
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                flights);
     }
 
     @Test
@@ -991,6 +999,96 @@ class Flow3ServiceTest {
                         eq(Subject.job(job)),
                         contains("Trip plan signed off"),
                         any());
+    }
+
+    @Test
+    @DisplayName("The job page says when the trip shown was signed off, and by whom (US-F3-08)")
+    void jobDetail_showsTheTripSignOff() {
+        TransportJob job = readyJob();
+        User manager = user("yen.vu@equifreight.vn", RoleName.LOGISTICS_MANAGER);
+        stubPlansAndCrew(job, List.of());
+        TripJob part = new TripJob();
+        part.setTrip(trip);
+        part.setJob(job);
+        when(jobTrips.findPartOf(trip, job)).thenReturn(Optional.of(part));
+
+        assertNull(transportJobService.getJobDetail(job.getId()).tripSignedOffAt());
+
+        Instant at = Instant.parse("2026-11-16T09:00:00Z");
+        part.setSignedOffAt(at);
+        part.setSignedOffBy(manager);
+        JobDetailResponse detail = transportJobService.getJobDetail(job.getId());
+
+        assertEquals(at, detail.tripSignedOffAt());
+        assertEquals(manager.displayName(), detail.tripSignedOffBy());
+    }
+
+    @Test
+    @DisplayName("A domestic leg's gate is clear early, while the dossier's own gate stays locked (US-F2-13)")
+    void jobDetail_dossierGateIsTheSameForEveryTrip() {
+        TransportJob job = readyJob();
+        stubPlansAndCrew(job, List.of());
+        ClearanceStatusResponse locked = ClearanceStatusResponse.builder()
+                .clearanceReady(false)
+                .outstandingIssues(List.of())
+                .build();
+        when(clearanceService.getClearanceStatus(job.getId())).thenReturn(locked);
+        when(jobTrips.findTripOf(job.getId(), null)).thenReturn(Optional.of(trip));
+        when(jobTrips.journey(job)).thenReturn(List.of(new TripJob()));
+        when(jobTrips.beforeBorder(trip, job)).thenReturn(true);
+
+        JobDetailResponse detail = transportJobService.getJobDetail(job.getId());
+
+        assertEquals("Clear", detail.clearanceGateState());
+        assertTrue(detail.clearanceGateSummary().startsWith("This leg stays in one country"));
+        assertEquals("Locked", detail.dossierGateState());
+        assertEquals("Clearance gate is locked. Documents are awaiting clearance.", detail.dossierGateSummary());
+    }
+
+    @Test
+    @DisplayName("Sign-off is refused while the journey ends short of the destination city (US-F3-21)")
+    void signOff_refusesAJourneyShortOfTheDestination() {
+        TransportJob job = readyJob();
+        Corridor toAirport = new Corridor();
+        toAirport.setCode("RD DAD → HCM");
+        toAirport.setOriginCity("Da Nang");
+        toAirport.setDestinationCity("Ho Chi Minh City");
+        trip.setCorridor(toAirport);
+        Place stables = new Place();
+        stables.setName("Sha Tin stables");
+        stables.setCity("Sha Tin");
+        job.getRequest().setDestinationPlace(stables);
+        stubPlansAndCrew(job, List.of());
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> transportJobService.signOffTripPlan(job.getId(), new User()));
+
+        assertEquals(
+                "Cannot sign off trip plan: CBRT-2026-041's journey ends in Ho Chi Minh City; the horses go to Sha Tin."
+                        + " Add the trip there first.",
+                refused.getMessage());
+        assertNull(job.getSignedOffAt());
+    }
+
+    @Test
+    @DisplayName("A flight is signed off only once its flight and times are set (US-F3-21)")
+    void signOff_refusesAFlightWithoutItsTimes() {
+        TransportJob job = readyJob();
+        stubPlansAndCrew(job, List.of());
+        RouteLeg air = new RouteLeg();
+        air.setId(UUID.randomUUID());
+        air.setMode(TransportMode.AIR);
+        RoutePlan route = new RoutePlan();
+        route.setTrip(trip);
+        route.getLegs().add(air);
+        when(routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(route));
+        when(flights.findByRouteLegId(air.getId())).thenReturn(Optional.empty());
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> transportJobService.signOffTripPlan(job.getId(), new User()));
+
+        assertEquals("Cannot sign off trip plan: enter the flight and its times first.", refused.getMessage());
     }
 
     @Test

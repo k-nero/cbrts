@@ -13,4 +13,6 @@ public interface RateLineRepository extends JpaRepository<RateLine, UUID> {
 
     /** Whether any catalog version holds a line: the rate seeder runs only on a catalog without rates. */
     boolean existsBy();
+
+    boolean existsByCorridorId(UUID corridorId);
 }

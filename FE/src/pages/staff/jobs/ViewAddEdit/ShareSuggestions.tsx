@@ -19,6 +19,7 @@ export function ShareSuggestions({ job }: { job: JobDetail }) {
   const canPlan = useCanPlanTrips();
   const beforeDeparture = job.tripStatus === 'NOT_STARTED' && canPlan;
   const suggestions = useShareSuggestions(job.id, beforeDeparture);
+  const flies = job.parts.find((p) => p.current)?.mode === 'AIR';
   const share = useShareTrip(job.id);
 
   if (!beforeDeparture) return null;
@@ -33,8 +34,9 @@ export function ShareSuggestions({ job }: { job: JobDetail }) {
   if (suggestions.data.length === 0) {
     return (
       <span className="type-body-s text-ink-3">
-        No approved job fits this trailer: same corridor, a shared trailer, a departure day both
-        jobs allow and room on the trailers.
+        {flies
+          ? 'No approved job fits this flight: same corridor, a departure day both jobs allow and room in its stall positions.'
+          : 'No approved job fits this trailer: same corridor, a shared trailer, a departure day both jobs allow and room on the trailers.'}
       </span>
     );
   }
@@ -90,7 +92,9 @@ export function ShareSuggestions({ job }: { job: JobDetail }) {
                 >
                   {toAccept.length > 0
                     ? `Accept ${toAccept.length === 1 ? 'the warning' : `${toAccept.length} warnings`} and share`
-                    : 'Share this trailer'}
+                    : flies
+                      ? 'Share this flight'
+                      : 'Share this trailer'}
                 </Button>
               </Flex>
               <BiosecurityWarnings warnings={s.warnings} />

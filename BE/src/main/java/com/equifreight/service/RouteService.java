@@ -14,6 +14,7 @@ import com.equifreight.model.route.CrossingResponse;
 import com.equifreight.model.route.PlaceResponse;
 import com.equifreight.model.route.RouteMapper;
 import com.equifreight.model.route.RouteResponse;
+import com.equifreight.model.route.RouteTerminalRunResponse;
 import com.equifreight.repository.BorderCrossingRepository;
 import com.equifreight.repository.CorridorRepository;
 import com.equifreight.repository.PlaceRepository;
@@ -241,12 +242,12 @@ public class RouteService {
         return routes;
     }
 
-    /** No leg (null) first, then every domestic road corridor touching the city. */
+    /** No leg (null) first, then every domestic road corridor touching the city, other than a local run within it. */
     private static List<Corridor> legsTouching(List<Corridor> network, String city) {
         List<Corridor> legs = new ArrayList<>();
         legs.add(null);
         network.stream()
-                .filter(c -> c.isRoad() && !c.crossesBorder())
+                .filter(c -> c.isRoad() && !c.crossesBorder() && !c.isLocal())
                 .filter(c -> c.getOriginCity().equalsIgnoreCase(city)
                         || c.getDestinationCity().equalsIgnoreCase(city))
                 .forEach(legs::add);
@@ -325,7 +326,12 @@ public class RouteService {
                                     .findFirst());
             if (version.isEmpty()) {
                 return new Described(
-                        RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, names, null, null),
+                        withPlaces(
+                                RouteMapper.toRouteResponse(corridor, reversed, crossings, codes, names, null, null),
+                                corridor,
+                                origin,
+                                destination,
+                                fromCity),
                         countries.get(code));
             }
             published.put(code, version.get());
@@ -333,15 +339,70 @@ public class RouteService {
         int required = LeadTimePolicy.requiredDays(codes, published);
         LocalDate today = LocalDate.now(clock);
         return new Described(
-                RouteMapper.toRouteResponse(
+                withPlaces(
+                        RouteMapper.toRouteResponse(
+                                corridor,
+                                reversed,
+                                crossings,
+                                codes,
+                                names,
+                                required,
+                                LeadTimePolicy.earliestDeparture(today, required)),
                         corridor,
-                        reversed,
-                        crossings,
-                        codes,
-                        names,
-                        required,
-                        LeadTimePolicy.earliestDeparture(today, required)),
+                        origin,
+                        destination,
+                        fromCity),
                 null);
+    }
+
+    /**
+     * The route with its stops by name: the customer's two places and, for a flight, the airport terminal at each end.
+     * A flight also gets the local road runs either side of it (US-F3-22): from the stable to the cargo terminal when
+     * the horses are picked up in the city it leaves from, and from the terminal to the stable when they go to the city
+     * it lands in; the journey drafted for the job runs them as trips of their own.
+     */
+    private RouteResponse withPlaces(
+            RouteResponse route, Corridor corridor, Place origin, Place destination, String fromCity) {
+        RouteResponse.RouteResponseBuilder named =
+                route.toBuilder().fromPlace(origin.getName()).toPlace(destination.getName());
+        if (corridor.isRoad()) return named.build();
+        String toCity = otherEnd(corridor, fromCity);
+        return named.departureTerminal(terminalIn(fromCity).map(Place::getName).orElse(null))
+                .arrivalTerminal(terminalIn(toCity).map(Place::getName).orElse(null))
+                .toTerminal(
+                        fromCity.equalsIgnoreCase(origin.getCity())
+                                ? terminalRun(origin, true).orElse(null)
+                                : null)
+                .fromTerminal(
+                        toCity.equalsIgnoreCase(destination.getCity())
+                                ? terminalRun(destination, false).orElse(null)
+                                : null)
+                .build();
+    }
+
+    /** The local run between {@code stable} and its city's cargo terminal, in the direction {@code out} says. */
+    private Optional<RouteTerminalRunResponse> terminalRun(Place stable, boolean out) {
+        if (stable.isTerminal()) return Optional.empty();
+        Optional<Place> terminal = terminalIn(stable.getCity());
+        if (terminal.isEmpty()) return Optional.empty();
+        return corridors
+                .findLocalRun(stable.getCity())
+                .map(run -> RouteTerminalRunResponse.builder()
+                        .corridorId(run.getId())
+                        .code(run.getCode())
+                        .city(stable.getCity())
+                        .fromPlace(out ? stable.getName() : terminal.get().getName())
+                        .toPlace(out ? terminal.get().getName() : stable.getName())
+                        .distanceKm(run.getDistanceKm())
+                        .build());
+    }
+
+    /** Where flights meet the trailers in {@code city}: its cargo terminal, else its airport. */
+    private Optional<Place> terminalIn(String city) {
+        return places.findByCityIgnoreCase(city).stream()
+                .filter(Place::isTerminal)
+                .min(Comparator.comparing((Place p) -> p.getKind() == PlaceKind.CARGO_TERMINAL ? 0 : 1)
+                        .thenComparing(Place::getName));
     }
 
     private static boolean isReversed(Corridor corridor, String fromCity) {

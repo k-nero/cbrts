@@ -222,6 +222,12 @@ public class TripSharingService {
         if (!from.getCorridor().getId().equals(trip.getCorridor().getId())) {
             throw new BusinessException(joining.getCode() + " travels on another corridor than trip " + trip.getCode());
         }
+        // A trip runs its corridor one way (US-F3-21): RD HCM → HAN driven from Hanoi doesn't take a job to Hanoi.
+        if (from.isReversed() != trip.isReversed()) {
+            throw new BusinessException(
+                    "Trip " + trip.getCode() + " runs " + trip.getCorridor().getCode() + " from " + trip.startCity()
+                            + "; " + joining.getCode() + " goes from " + from.startCity());
+        }
 
         // One departure day inside every job's allowed days on these trips.
         Days joiningDays = daysOn(joining, from);
@@ -476,7 +482,7 @@ public class TripSharingService {
                 .toList();
         loadPlans.unload(trip, horses);
         // On the trip's corridor: one trip of the leaving job's chain keeps its own (US-F3-16).
-        Trip own = jobTrips.newTrip(trip.getCorridor(), currentUser, clock.instant());
+        Trip own = jobTrips.newTrip(trip.getCorridor(), trip.isReversed(), currentUser, clock.instant());
         jobTrips.moveJob(leaving, trip, own);
         leaveBehind(trip, leaving, leaving.getCode() + " taken off the trip");
         leaving.setSignedOffAt(null);

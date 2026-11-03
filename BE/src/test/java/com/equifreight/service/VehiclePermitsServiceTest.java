@@ -24,6 +24,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.VehicleKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ConflictException;
 import com.equifreight.model.fleet.CreateVehicleRequest;
 import com.equifreight.model.fleet.UpdateVehicleRequest;
 import com.equifreight.model.fleet.VehicleCorridorResponse;
@@ -65,6 +66,7 @@ class VehiclePermitsServiceTest {
     private final JobTripService jobTrips = mock(JobTripService.class);
     private final VehicleAvailability availability = mock(VehicleAvailability.class);
     private final AuditService audit = mock(AuditService.class);
+    private final CatalogUsage usage = mock(CatalogUsage.class);
     private final PlaceRepository places = mock(PlaceRepository.class);
     private final User khoi = new User();
     private VehicleService service;
@@ -82,7 +84,8 @@ class VehiclePermitsServiceTest {
                 tripVehicles,
                 availability,
                 audit,
-                places);
+                places,
+                usage);
         Map<UUID, Country> countryById = byId(List.of(vn, kh, th), Country::getId);
         Map<UUID, Corridor> corridorById = byId(List.of(hcmPnh, hcmHan), Corridor::getId);
         when(countries.findById(any())).thenAnswer(i -> Optional.ofNullable(countryById.get(i.<UUID>getArgument(0))));
@@ -292,6 +295,54 @@ class VehiclePermitsServiceTest {
         assertThat(listed).extracting(VehicleResponse::code).containsExactly("TX-447", "TK-102");
         assertThat(listed.get(0).available()).isTrue();
         assertThat(listed.get(1).unavailableReason()).isEqualTo("TK-102 is booked until 11 Oct 10:00.");
+    }
+
+    @Test
+    @DisplayName("the code and kind change; another vehicle's code is refused")
+    void editsCodeAndKind() {
+        Vehicle v = vehicle("TX-447", vn, List.of(kh), List.of(hcmPnh));
+        when(vehicles.findById(v.getId())).thenReturn(Optional.of(v));
+        when(vehicles.save(any(Vehicle.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.update(
+                khoi,
+                v.getId(),
+                UpdateVehicleRequest.builder()
+                        .code("TX-448")
+                        .kind(VehicleKind.TRUCK)
+                        .build());
+
+        assertThat(v.getCode()).isEqualTo("TX-448");
+        assertThat(v.getKind()).isEqualTo(VehicleKind.TRUCK);
+
+        Vehicle other = vehicle("TX-550", vn, List.of(), List.of());
+        when(vehicles.findByCode("TX-550")).thenReturn(Optional.of(other));
+        assertThatThrownBy(() -> service.update(
+                        khoi,
+                        v.getId(),
+                        UpdateVehicleRequest.builder().code("TX-550").build()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("TX-550 already exists");
+        assertThat(v.getCode()).isEqualTo("TX-448");
+    }
+
+    @Test
+    @DisplayName("a vehicle nothing has used is deleted; one with trips is kept")
+    void deletesOnlyAnUnusedVehicle() {
+        Vehicle fresh = vehicle("TX-600", vn, List.of(), List.of());
+        Vehicle used = vehicle("TX-447", vn, List.of(), List.of());
+        when(vehicles.findById(fresh.getId())).thenReturn(Optional.of(fresh));
+        when(vehicles.findById(used.getId())).thenReturn(Optional.of(used));
+        when(usage.vehicleInUse(fresh)).thenReturn(Optional.empty());
+        when(usage.vehicleInUse(used)).thenReturn(Optional.of("TX-447 has been on trips, so it stays on record."));
+
+        service.delete(khoi, fresh.getId());
+        verify(vehicles).delete(fresh);
+
+        assertThatThrownBy(() -> service.delete(khoi, used.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("TX-447 has been on trips, so it stays on record.");
+        verify(vehicles, never()).delete(used);
     }
 
     private static <T> Map<UUID, T> byId(List<T> items, Function<T, UUID> id) {

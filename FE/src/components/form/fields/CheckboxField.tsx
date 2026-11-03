@@ -36,7 +36,7 @@ const CheckboxField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, value, ...field } }) => {
+      render={({ field: { onChange, onBlur, value, ...field }, inputId }) => {
         if (readOnly) {
           return (
             <div
@@ -78,6 +78,7 @@ const CheckboxField = <TFieldValues extends FieldValues = FieldValues>({
         }
         return (
           <Checkbox
+            id={inputId}
             disabled={disabled}
             {...props}
             {...field}

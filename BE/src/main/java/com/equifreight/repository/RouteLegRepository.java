@@ -9,4 +9,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RouteLegRepository extends JpaRepository<RouteLeg, UUID> {
     List<RouteLeg> findByRoutePlanIdOrderBySeq(UUID routePlanId);
+
+    boolean existsByVehicleId(UUID vehicleId);
 }

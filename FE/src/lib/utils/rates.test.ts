@@ -32,6 +32,7 @@ const line = (over: Partial<RateLine>): RateLine => ({
   certainty: 'FIXED',
   estimateNote: null,
   everyCorridor: true,
+  coveredByRoadLeg: false,
   ...over,
 });
 
@@ -50,6 +51,12 @@ describe('basisWords', () => {
 
   test('the flight vet names its thresholds', () => {
     expect(basisWords(line({ basis: 'FLIGHT_VET' }), policies)).toBe('8+ horses or > $250,000.00');
+  });
+
+  test('a transfer a road leg covers says so (US-F3-21)', () => {
+    expect(
+      basisWords(line({ group: 'A', basis: 'PER_SHIPMENT', coveredByRoadLeg: true }), policies),
+    ).toBe('per shipment · not where a road leg covers this end');
   });
 
   test('a road vet escort is priced when the customer asks', () => {
@@ -172,6 +179,9 @@ describe('policyRows', () => {
         STALL_PAYLOAD_KG: 5504,
         AIR_SHIPMENT_MAX_KG: 20000,
         TURNAROUND_HOURS: 24,
+        LOCAL_TURNAROUND_HOURS: 3,
+        PLAN_START_HOUR: 5,
+        PLAN_SPEED_KMH: 55,
       },
       [
         { kind: 'CANCELLATION', minDays: 0, maxDays: 6, value: 100 },
@@ -190,7 +200,22 @@ describe('policyRows', () => {
       { key: 'FLIGHT_VET_MIN_HORSES', label: 'Flight vet', value: '8+ horses or > $250,000.00' },
       { key: 'STALL_PAYLOAD_KG', label: 'Stall payload', value: '5,504 kg per stall' },
       { key: 'AIR_SHIPMENT_MAX_KG', label: 'Air shipment', value: '20,000 kg of horses' },
-      { key: 'TURNAROUND_HOURS', label: 'Turnaround', value: '24 h after each trip' },
+      {
+        key: 'TURNAROUND_HOURS',
+        label: 'Turnaround',
+        value: '24 h after each trip · 3 h after a local run',
+      },
+      { key: 'PLAN_START_HOUR', label: 'Drafted trips', value: 'Start 05:00 · 55 km/h' },
+      {
+        key: 'PLAN_WELFARE_STOP_MIN',
+        label: 'Drafted stops',
+        value: 'Welfare 45 min · border 90 min',
+      },
+      {
+        key: 'PLAN_AIRPORT_BEFORE_HOURS',
+        label: 'Drafted flights',
+        value: '4 h at the terminal before · 3 h release after landing',
+      },
       { key: 'SHORT_NOTICE', label: 'Short notice', value: '0–13 d × 1.25' },
       { key: 'CANCELLATION', label: 'Cancellation', value: '0–6 d 100% · 30+ d 10%' },
       {
@@ -212,6 +237,13 @@ describe('policyRows', () => {
     expect(policyRows({}, []).find((r) => r.key === 'STALL_PAYLOAD_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'AIR_SHIPMENT_MAX_KG')?.value).toBe('—');
     expect(policyRows({}, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value).toBe('—');
+    expect(
+      policyRows({ TURNAROUND_HOURS: 24 }, []).find((r) => r.key === 'TURNAROUND_HOURS')?.value,
+    ).toBe('24 h after each trip · 4 h after a local run (default)');
+    // The planning settings fall back to their defaults (US-F3-22).
+    expect(policyRows({}, []).find((r) => r.key === 'PLAN_START_HOUR')?.value).toBe(
+      'Start 06:00 · 60 km/h (defaults)',
+    );
   });
 });
 

@@ -69,7 +69,16 @@ public class RateCatalogSeeder {
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "5504"),
             Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "20000"),
             // Cleaning, disinfection and crew rest after a trip before its vehicle drives again (US-F7-02).
-            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "24"));
+            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "24"),
+            // A local run to or from the cargo terminal: a wash-down and the crew's break.
+            Map.entry(RatePolicyKey.LOCAL_TURNAROUND_HOURS, "4"),
+            // How a journey drafted from its quote is timed (US-F3-22).
+            Map.entry(RatePolicyKey.PLAN_START_HOUR, "6"),
+            Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "60"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "45"),
+            Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "90"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "4"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_AFTER_HOURS, "3"));
 
     private final RateCatalogVersionRepository versions;
     private final RateLineRepository lines;
@@ -179,26 +188,32 @@ public class RateCatalogSeeder {
 
     private static List<RateLine> airLines(RateCatalogVersion v, Corridor c) {
         return List.of(
-                line(
+                coveredByRoadLeg(line(
                         v,
                         c,
                         "TRANSFER_ORIGIN",
                         "A",
                         "Road transfer to the cargo terminal",
                         RateBasis.PER_SHIPMENT,
-                        "250"),
+                        "250")),
                 line(v, c, "HANDLING", "C", "Airline handling and stall build-up", RateBasis.PER_SHIPMENT, "950"),
                 line(v, c, "GROOM", "D", "Flying groom", RateBasis.PER_THREE_HORSES, "1450"),
                 line(v, c, "FLIGHT_VET", "D", "Flight veterinarian", RateBasis.FLIGHT_VET, "2200"),
                 line(v, c, "IMPORT_PERMIT", "E", "Import permit handling", RateBasis.PER_SHIPMENT, "380"),
-                line(
+                coveredByRoadLeg(line(
                         v,
                         c,
                         "TRANSFER_DEST",
                         "G",
                         "Road transfer from the cargo terminal",
                         RateBasis.PER_SHIPMENT,
-                        "300"));
+                        "300")));
+    }
+
+    /** A flat transfer at an end of the move, not charged where a domestic road leg covers it (US-F3-21). */
+    private static RateLine coveredByRoadLeg(RateLine l) {
+        l.setCoveredByRoadLeg(true);
+        return l;
     }
 
     /**

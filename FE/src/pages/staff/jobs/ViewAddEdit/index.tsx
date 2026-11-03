@@ -1,32 +1,30 @@
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Flex, Skeleton, Tabs, type TabsProps } from 'antd';
 
 import PageHeader from '@/components/PageHeader.tsx';
-import { Callout, ClearanceGate, StageMark } from '@/components/ui';
+import { Callout, StageMark } from '@/components/ui';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { JobTripContext, useJobDetail } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
+import { useRouterNavigation } from '@/router/route.hook';
 
 import { AuthoritiesTab } from './AuthoritiesTab';
 import { ClearanceTab } from './ClearanceTab';
-import { JourneyRail } from './JourneyRail';
-import { LoadPlanTab } from './LoadPlanTab';
-import { RouteTab } from './RouteTab';
+import { JobGate } from './JobGate';
+import { routeCarriesGate, TripTab } from './TripTab';
 
-/** A job's tabs, in the order the job moves, each with the role that owns it (DESIGN.md, job page). */
+/**
+ * A job's tabs, each with the role that owns it (DESIGN.md, job page): the Trip tab plans the trip
+ * chosen on its journey rail (US-F3-21); Clearance and Authorities cover the whole job.
+ */
 const TABS: { key: string; label: string; owner: string; render: (job: JobDetail) => ReactNode }[] =
   [
     {
-      key: 'load-plan',
-      label: 'Load plan',
+      key: 'trip',
+      label: 'Trip',
       owner: 'Fleet & route coordinator',
-      render: (job) => <LoadPlanTab job={job} />,
-    },
-    {
-      key: 'route',
-      label: 'Route',
-      owner: 'Fleet & route coordinator',
-      render: (job) => <RouteTab job={job} />,
+      render: (job) => <TripTab job={job} />,
     },
     {
       key: 'clearance',
@@ -41,6 +39,12 @@ const TABS: { key: string; label: string; owner: string; render: (job: JobDetail
       render: (job) => <AuthoritiesTab job={job} />,
     },
   ];
+
+/** Links from before the Trip tab (notifications, emails) open it on the view they named. */
+const OLD_TABS: Record<string, 'load-plan' | 'route'> = {
+  'load-plan': 'load-plan',
+  route: 'route',
+};
 
 const STAGE_MAP: Record<
   string,
@@ -70,19 +74,48 @@ function JobWorkspace() {
   const { id } = useParams<{ id: string }>();
   // The open tab lives in the URL (?tab=route), so a refresh or a shared link opens the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
-  // The Trip tab's incidents and closing moved to the Route tab; older links (notifications) still say ?tab=trip.
-  const tabKey = searchParams.get('tab') === 'trip' ? 'route' : searchParams.get('tab');
-  const activeTab = TABS.find((tab) => tab.key === tabKey) ?? TABS[0];
-  const showTrip = (trip: string) =>
-    setSearchParams({ tab: activeTab.key, trip }, { replace: true });
+  const { navigateWithConfirmation } = useRouterNavigation();
+  const asked = searchParams.get('tab');
+  const oldView = asked ? OLD_TABS[asked] : undefined;
+  useEffect(() => {
+    if (!oldView) return;
+    const trip = searchParams.get('trip');
+    setSearchParams({ tab: 'trip', view: oldView, ...(trip ? { trip } : {}) }, { replace: true });
+  }, [oldView, searchParams, setSearchParams]);
+  const activeTab = TABS.find((tab) => tab.key === (oldView ? 'trip' : asked)) ?? TABS[0];
 
   // A failed load (404 included) goes to the error boundary; until the job arrives, the page is a skeleton.
   const { data: job } = useJobDetail(id || '');
+  useBreadcrumb({ id, label: job?.code, tab: activeTab.label });
 
+  // The gate says what holds it, first under the tabs (DESIGN.md, Clearance Gate), and leads to the items from the
+  // Trip and Authorities tabs. A road trip with a route carries it as a chip in its summary strip instead.
   const items = useMemo<TabsProps['items']>(
     () =>
-      job ? TABS.map(({ key, label, render }) => ({ key, label, children: render(job) })) : [],
-    [job],
+      job
+        ? TABS.map(({ key, label, render }) => ({
+            key,
+            label,
+            children: (
+              <Flex vertical gap={24}>
+                {!(key === 'trip' && routeCarriesGate(job)) && (
+                  <JobGate
+                    job={job}
+                    // Clearance and Authorities cover the whole job: the dossier's gate, whichever trip is chosen.
+                    dossier={key !== 'trip'}
+                    onOpenClearance={
+                      key === 'clearance'
+                        ? null
+                        : () => setSearchParams({ tab: 'clearance' }, { replace: true })
+                    }
+                  />
+                )}
+                {render(job)}
+              </Flex>
+            ),
+          }))
+        : [],
+    [job, setSearchParams],
   );
 
   if (!job) {
@@ -100,22 +133,32 @@ function JobWorkspace() {
     : 'Not scheduled';
 
   const trailerCodes = job.loadPlan?.vehicles.map((v) => v.vehicleCode) ?? [];
+  const flown = job.parts.find((p) => p.current)?.mode === 'AIR';
   const trailerCode =
     trailerCodes.length === 0
-      ? 'vehicle'
+      ? flown
+        ? 'flown'
+        : 'no trailer yet'
       : `${trailerCodes.length === 1 ? 'trailer' : 'trailers'} ${trailerCodes.join(', ')}`;
-  const metaText = `${job.horses?.length || 0} horses · ${trailerCode} · departs ${departureDateStr}`;
+  const horseCount = job.horses?.length ?? 0;
+  const metaText = `${horseCount} ${horseCount === 1 ? 'horse' : 'horses'} · ${trailerCode} · departs ${departureDateStr}`;
   // The job keeps its own price and invoices; the trip's other jobs are one click away (US-F3-14).
   const othersOnTrip = (job.tripJobs?.length ?? 1) - 1;
-  // Every job lists its trips in the rail beside the tabs, which plan the one chosen there (US-F3-16).
-  const journey = job.parts.length > 0;
 
   const tabsView = (
     <Tabs
       activeKey={activeTab.key}
       onChange={(key) => {
+        // The chosen trip and view stay in the URL, so coming back to the Trip tab opens them again.
         const trip = searchParams.get('trip');
-        setSearchParams(trip ? { tab: key, trip } : { tab: key }, { replace: true });
+        const view = searchParams.get('view');
+        // Leaving the Trip tab drops a route being edited, so it asks first when the editor has changes.
+        navigateWithConfirmation(() =>
+          setSearchParams(
+            { tab: key, ...(trip ? { trip } : {}), ...(view ? { view } : {}) },
+            { replace: true },
+          ),
+        );
       }}
       items={items}
       // Unmount a tab when it's left, as before, so its forms start fresh on return.
@@ -149,7 +192,7 @@ function JobWorkspace() {
                 <p className="type-body-m text-ink-2">{metaText}</p>
                 {othersOnTrip > 0 && (
                   <Link
-                    to="?tab=load-plan"
+                    to="?tab=trip&view=load-plan"
                     replace
                     className="type-body-m whitespace-nowrap text-ink! underline underline-offset-2"
                   >
@@ -172,23 +215,13 @@ function JobWorkspace() {
                     ].join(', ')}`,
                 )
                 .join(' · ')}
-              . The tabs below plan {job.parts.find((p) => p.current)?.tripCode ?? job.tripCode};
-              the other part goes on as planned.
+              . The Trip tab plans {job.parts.find((p) => p.current)?.tripCode ?? job.tripCode}; the
+              other part goes on as planned.
             </Callout>
           )}
-          <ClearanceGate
-            state={job.clearanceGateState === 'Clear' ? 'clear' : 'locked'}
-          ></ClearanceGate>
         </Flex>
 
-        {journey ? (
-          <Flex gap={24} align="start">
-            <JourneyRail parts={job.parts} onShow={showTrip} />
-            <div className="min-w-0 flex-1">{tabsView}</div>
-          </Flex>
-        ) : (
-          tabsView
-        )}
+        {tabsView}
       </Flex>
     </div>
   );

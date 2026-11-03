@@ -1,6 +1,7 @@
 import { type FC, useRef, useState } from 'react';
 import type { UploadFile } from 'antd';
-import { App, Col, Flex, Input, Row, Select, Upload } from 'antd';
+import { App, Col, DatePicker, Flex, Input, Row, Select, Upload } from 'antd';
+import dayjs from 'dayjs';
 
 import { sentence } from './tripFormat';
 
@@ -13,28 +14,23 @@ import { apiErrorMessage, formatTime as hhmm } from '@/lib/utils';
 
 type HorseState = { condition: HorseCondition | null; note: string; photos: UploadFile[] };
 
-const localNow = () => {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
-};
-
-type Props = { trip: TripView; audience: 'escort' | 'staff'; code: string; tripId?: string };
+type Props = { trip: TripView; code: string; tripId?: string };
 
 /**
  * The handover at the destination (US-F6-01, DESIGN.md "Handover (escort)"): each horse's condition on arrival with
  * photos, what was handed over, and the receiver's name with their confirmation. It is recorded once and never
- * changed; the gold action names the time it records.
+ * changed; the gold action names the time it records. The office records it here for the escort;
+ * the cab has its own (cab/HandoverTask).
  */
-export const HandoverPanel: FC<Props> = ({ trip, audience, code, tripId }) => {
+export const HandoverPanel: FC<Props> = ({ trip, code, tripId }) => {
   const { message } = App.useApp();
-  const record = useTripRecord(audience, code, tripId);
+  const record = useTripRecord('staff', code, tripId);
   const horses = trip.horses.filter((h) => h.jobCode === trip.jobCode);
   const [byHorse, setByHorse] = useState<Record<string, HorseState>>({});
   const [items, setItems] = useState('');
   const [receiver, setReceiver] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [at, setAt] = useState(localNow);
+  const [at, setAt] = useState(dayjs);
   const clientRef = useRef<string | null>(null);
   const uploaded = useRef(new Map<string, string>());
 
@@ -73,7 +69,7 @@ export const HandoverPanel: FC<Props> = ({ trip, audience, code, tripId }) => {
       await record.mutateAsync({
         routeStopId: null,
         kind: TripRecordKindEnum.HANDED_OVER,
-        occurredAt: new Date(at).toISOString(),
+        occurredAt: at.toISOString(),
         clientRef: clientRef.current,
         text: items.trim() || undefined,
         receiverName: receiver.trim(),
@@ -167,11 +163,13 @@ export const HandoverPanel: FC<Props> = ({ trip, audience, code, tripId }) => {
           <Col xs={24} md={6}>
             <Flex component="label" vertical gap={8} className="type-body-s">
               Handed over at
-              <input
-                type="datetime-local"
+              <DatePicker
+                showTime={{ format: 'HH:mm' }}
+                format="D MMM YYYY, HH:mm"
+                allowClear={false}
                 value={at}
-                onChange={(e) => setAt(e.target.value)}
-                className="h-8 rounded-md border border-line-strong bg-input px-2"
+                disabledDate={(day) => day.isAfter(dayjs(), 'day')}
+                onChange={(value) => value && setAt(value)}
               />
             </Flex>
           </Col>
@@ -190,9 +188,7 @@ export const HandoverPanel: FC<Props> = ({ trip, audience, code, tripId }) => {
         )}
         <Flex justify="end">
           <Button variant="primary" disabled={!ready || record.isPending} onClick={save}>
-            {record.isPending
-              ? 'Saving…'
-              : `Record the handover at ${hhmm(new Date(at).toISOString())}`}
+            {record.isPending ? 'Saving…' : `Record the handover at ${hhmm(at.toISOString())}`}
           </Button>
         </Flex>
       </Flex>

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.endsWith;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
@@ -32,6 +33,7 @@ import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -138,8 +140,95 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     }
 
     @Test
+    void acceptingDiscardsTheNextVersionStillBeingDrafted() {
+        // The manager revised v1 while the club still had it open; v2 can't be issued once v1 is accepted.
+        Quotation v2 = new Quotation();
+        v2.setId(UUID.randomUUID());
+        v2.setCode(q.getCode());
+        v2.setRequest(request);
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        stored = Optional.of(v2);
+
+        customer().accept(bookings, request.getId());
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+        verify(quotations).delete(v2);
+        verify(audit)
+                .recordSystem(
+                        "QUOTATION_DRAFT_DISCARDED",
+                        "Quotation Q-2026-0189 v2 draft discarded: the club accepted v1",
+                        "TRANSPORT_REQUEST",
+                        request.getId(),
+                        "REQ-2026-0199",
+                        null,
+                        null);
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.staff(yen)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        endsWith(" The v2 draft is discarded."));
+    }
+
+    @Test
+    void theManagerDraftingTheDiscardedVersionIsToldToo() {
+        User other = new User();
+        other.setId(UUID.randomUUID());
+        Quotation v2 = new Quotation();
+        v2.setId(UUID.randomUUID());
+        v2.setCode(q.getCode());
+        v2.setRequest(request);
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        v2.setPreparedBy(other);
+        stored = Optional.of(v2);
+
+        customer().accept(bookings, request.getId());
+
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.staff(yen, other)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        endsWith(" The v2 draft is discarded."));
+    }
+
+    @Test
+    void acceptingWithNoVersionBeingDraftedDiscardsNothing() {
+        customer().accept(bookings, request.getId());
+
+        verify(quotations, never()).delete(any());
+    }
+
+    @Test
     void theLastValidDayStillAccepts() {
         at(AFTER_EXPIRY.minusSeconds(3_600)).accept(bookings, request.getId());
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+    }
+
+    @Test
+    void aQuotationCantBeAcceptedOnceTheDepartureHasCome() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        assertThatThrownBy(() -> at(Instant.parse("2026-10-22T05:00:00Z")).accept(bookings, request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("The departure on 22 Oct 2026 has come, so this quotation can't be accepted. Start a new"
+                        + " request for a later date.")
+                .extracting("code")
+                .isEqualTo("DEPARTURE_PASSED");
+        assertNothingWritten();
+    }
+
+    @Test
+    void theEveningBeforeTheDepartureStillAccepts() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 22));
+
+        // 21 Oct, 23:00 in Vietnam.
+        at(Instant.parse("2026-10-21T16:00:00Z")).accept(bookings, request.getId());
 
         assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
     }

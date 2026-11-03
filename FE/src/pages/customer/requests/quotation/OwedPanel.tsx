@@ -14,6 +14,7 @@ import {
   cancellationToday,
   cancelledText,
   deadlineText,
+  departedSentence,
   expiredSentence,
   formatDate,
   holdsReason,
@@ -93,6 +94,13 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
               ? `You accepted version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}. Next, ${manager} approves the job, which locks the price and the horse list.`
               : `You declined version ${quotation.versionNo}${on ? ` on ${formatDate(on)}` : ''}, so ${quotation.request.code} is closed.`}
         </p>
+      </Panel>
+    );
+  }
+  if (kind === 'departed') {
+    return (
+      <Panel title="Nothing to answer" extra={<Chip dot={false}>Departure passed</Chip>}>
+        <p className="type-body-m m-0 text-ink-2">{departedSentence(quotation)}</p>
       </Panel>
     );
   }

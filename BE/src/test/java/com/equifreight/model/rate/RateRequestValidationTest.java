@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 /** US-Q-10 (#31): money and quantities in the rate catalog are stored with two decimals, so more is refused. */
 class RateRequestValidationTest {
@@ -34,6 +35,17 @@ class RateRequestValidationTest {
         assertThat(violations).hasSize(1);
         ConstraintViolation<T> v = violations.iterator().next();
         return v.getPropertyPath() + ": " + v.getMessage();
+    }
+
+    @Test
+    void aLineBodyWithoutTheRoadLegFlagIsChargedEverywhere() {
+        // A client that predates US-F3-21 leaves the flag out: the line is read, not refused, and is charged as before.
+        RateLineRequest r = JsonMapper.builder().build().readValue("""
+                        {"code": "TRANSFER_ORIGIN", "group": "A", "description": "Road transfer",
+                         "basis": "PER_SHIPMENT", "rate": 250}
+                        """, RateLineRequest.class);
+
+        assertThat(r.coveredByRoadLeg()).isFalse();
     }
 
     @Test

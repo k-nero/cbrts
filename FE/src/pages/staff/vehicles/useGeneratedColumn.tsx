@@ -16,11 +16,13 @@ import { formatDate } from '@/lib/utils';
  */
 export const useGeneratedVehicleColumn = ({
   onBook,
-  onEditPermits,
+  onEdit,
+  onDelete,
   onSetAvailableOn,
 }: {
   onBook: (v: Vehicle) => void;
-  onEditPermits: (v: Vehicle) => void;
+  onEdit: (v: Vehicle) => void;
+  onDelete: (v: Vehicle) => void;
   onSetAvailableOn: (v: Vehicle) => void;
 }) => {
   const { message } = App.useApp();
@@ -135,7 +137,7 @@ export const useGeneratedVehicleColumn = ({
         title: 'Status',
         key: 'status',
         dataIndex: 'status',
-        width: 160,
+        width: 180,
         sorter: true,
         render: (_, v) => {
           const chip = STATUS_CHIP[v.status];
@@ -144,15 +146,23 @@ export const useGeneratedVehicleColumn = ({
       },
       {
         key: 'actions',
-        width: 480,
+        // Wide enough for the longest row (Set maintenance), so no row overflows and Delete's right edge lines up.
+        width: 520,
+        // Delete sits at the cell's right edge, so it lines up in one column whatever the status button says.
         render: (_, v) =>
-          v.status === VehicleStatusEnum.RETIRED ? null : (
-            <Flex gap={8}>
+          v.status === VehicleStatusEnum.RETIRED ? (
+            <Flex justify="end">
+              <Button variant="danger" size="sm" onClick={() => onDelete(v)}>
+                Delete
+              </Button>
+            </Flex>
+          ) : (
+            <Flex gap={8} align="center">
               <Button variant="secondary" size="sm" onClick={() => onBook(v)}>
                 Book slot
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => onEditPermits(v)}>
-                Countries and corridors
+              <Button variant="ghost" size="sm" onClick={() => onEdit(v)}>
+                Edit
               </Button>
               <Button variant="ghost" size="sm" onClick={() => onSetAvailableOn(v)}>
                 Expected back
@@ -165,9 +175,12 @@ export const useGeneratedVehicleColumn = ({
               >
                 {v.status === VehicleStatusEnum.ACTIVE ? 'Set maintenance' : 'Set active'}
               </Button>
+              <Button variant="danger" size="sm" className="ml-auto" onClick={() => onDelete(v)}>
+                Delete
+              </Button>
             </Flex>
           ),
       },
     ];
-  }, [message, onBook, onEditPermits, onSetAvailableOn, update]);
+  }, [message, onBook, onDelete, onEdit, onSetAvailableOn, update]);
 };

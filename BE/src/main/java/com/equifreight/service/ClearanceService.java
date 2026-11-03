@@ -107,6 +107,7 @@ public class ClearanceService {
         TransportJob job = findJobOrThrow(jobId);
         assertClubOwnsJob(job, customer);
         return checklistItemRepository.findByJobId(jobId).stream()
+                .filter(i -> i.getDroppedAt() == null)
                 .map(ClearanceMapper::toItemResponse)
                 .toList();
     }
@@ -121,7 +122,9 @@ public class ClearanceService {
                 .findByRequestId(requestId)
                 .map(job -> {
                     assertClubOwnsJob(job, customer);
+                    // A document a newer catalog version dropped is nothing the customer owes.
                     return checklistItemRepository.findByJobId(job.getId()).stream()
+                            .filter(i -> i.getDroppedAt() == null)
                             .map(ClearanceMapper::toItemResponse)
                             .toList();
                 })
@@ -209,6 +212,10 @@ public class ClearanceService {
         }
         if (frozen(item.getJob())) {
             throw new ConflictException("JOB_DEPARTED", "The horses have left, so this document can't change.");
+        }
+        if (item.getDroppedAt() != null) {
+            throw new ConflictException(
+                    "DOCUMENT_NO_LONGER_REQUIRED", "The regulation catalog no longer asks for this document.");
         }
         if (item.getStatus() == ChecklistStatus.CLEARED && item.getValidity() == Validity.GREEN) {
             throw new ConflictException("DOCUMENT_CLEARED", "This document is cleared; nothing more is needed.");
@@ -610,8 +617,9 @@ public class ClearanceService {
         int totalMandatory = 0;
         int clearedMandatory = 0;
         for (ChecklistItem item : items) {
-            boolean isMandatory =
-                    item.getRegulationRule() == null || item.getRegulationRule().isMandatory();
+            boolean isMandatory = item.getDroppedAt() == null
+                    && (item.getRegulationRule() == null
+                            || item.getRegulationRule().isMandatory());
             if (!isMandatory) {
                 continue;
             }
@@ -717,7 +725,7 @@ public class ClearanceService {
     /** The destination regulation version the job was pinned to at approval, if it has been. */
     @Transactional(readOnly = true)
     public Optional<RegulationVersion> destinationVersion(UUID jobId) {
-        return jobRegulationPinRepository.findByJobId(jobId).stream()
+        return jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(jobId).stream()
                 .filter(pin -> pin.getRole() == RegulationRole.DESTINATION)
                 .map(JobRegulationPin::getRegulationVersion)
                 .findFirst();
@@ -774,7 +782,8 @@ public class ClearanceService {
                 : request.getOriginPlace().getCountry();
 
         // Validate, then write: the destination must have a published catalog before anything is pinned.
-        List<JobRegulationPin> pins = new ArrayList<>(jobRegulationPinRepository.findByJobId(jobId));
+        List<JobRegulationPin> pins =
+                new ArrayList<>(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(jobId));
         List<JobRegulationPin> newPins = new ArrayList<>();
         if (!isPinned(pins, RegulationRole.DESTINATION)) {
             RegulationVersion version = publishedVersion(destination)
@@ -789,37 +798,7 @@ public class ClearanceService {
         }
         pins.addAll(jobRegulationPinRepository.saveAll(newPins));
 
-        Map<UUID, RegulationVersion> versionById = new HashMap<>();
-        pins.forEach(p -> versionById.put(p.getRegulationVersion().getId(), p.getRegulationVersion()));
-        List<RegulationRule> rules = regulationRuleRepository.findByVersionIdIn(versionById.keySet());
-
-        Set<String> existing = new HashSet<>();
-        checklistItemRepository
-                .findByJobId(jobId)
-                .forEach(i -> existing.add(itemKey(
-                        i.getDocumentType().getId(),
-                        i.getHorse() == null ? null : i.getHorse().getId(),
-                        i.getBorderCrossing() == null
-                                ? null
-                                : i.getBorderCrossing().getId())));
-        List<Horse> horses =
-                request.getHorses().stream().map(RequestHorse::getHorse).toList();
-        List<BorderCrossing> crossings = request.getCorridor() == null
-                ? List.of()
-                : request.getCorridor().getCrossings().stream()
-                        .map(CorridorCrossing::getBorderCrossing)
-                        .toList();
-
-        List<ChecklistItem> created = new ArrayList<>();
-        for (RegulationRule rule : rules) {
-            DocumentType type = rule.getDocumentType();
-            LocalDate due = dueDate(job, versionById.get(rule.getVersion().getId()));
-            switch (type.getScope()) {
-                case PER_HORSE -> horses.forEach(h -> addItem(created, existing, job, rule, due, h, null));
-                case PER_SHIPMENT -> addItem(created, existing, job, rule, due, null, null);
-                case PER_CROSSING -> crossings.forEach(c -> addItem(created, existing, job, rule, due, null, c));
-            }
-        }
+        List<ChecklistItem> created = missingItems(job, governingRules(pins), false);
         checklistItemRepository.saveAll(created);
 
         if (!created.isEmpty() || !newPins.isEmpty()) {
@@ -840,6 +819,59 @@ public class ClearanceService {
         return checklistItemRepository.findByJobId(jobId).stream()
                 .map(ClearanceMapper::toItemResponse)
                 .toList();
+    }
+
+    /** The rule that governs each document under the job's pins in force (see the static overload). */
+    List<RegulationRule> governingRules(List<JobRegulationPin> pins) {
+        Map<UUID, RegulationRole> roleByVersion = new HashMap<>();
+        pins.forEach(p -> roleByVersion.put(p.getRegulationVersion().getId(), p.getRole()));
+        return governingRules(regulationRuleRepository.findByVersionIdIn(roleByVersion.keySet()), roleByVersion);
+    }
+
+    /**
+     * The items the rules call for that the job doesn't have yet, one per document, horse and crossing, unsaved. A
+     * dropped item still counts as had: moving it back under a rule is the caller's job.
+     */
+    List<ChecklistItem> missingItems(TransportJob job, List<RegulationRule> rules, boolean addedByUpdate) {
+        TransportRequest request = job.getRequest();
+        Set<String> existing = new HashSet<>();
+        checklistItemRepository.findByJobId(job.getId()).forEach(i -> existing.add(itemKey(i)));
+        List<Horse> horses =
+                request.getHorses().stream().map(RequestHorse::getHorse).toList();
+        List<BorderCrossing> crossings = request.getCorridor() == null
+                ? List.of()
+                : request.getCorridor().getCrossings().stream()
+                        .map(CorridorCrossing::getBorderCrossing)
+                        .toList();
+
+        List<ChecklistItem> created = new ArrayList<>();
+        for (RegulationRule rule : rules) {
+            DocumentType type = rule.getDocumentType();
+            LocalDate due = dueDate(job, rule.getVersion());
+            switch (type.getScope()) {
+                case PER_HORSE -> horses.forEach(h -> addItem(created, existing, job, rule, due, h, null));
+                case PER_SHIPMENT -> addItem(created, existing, job, rule, due, null, null);
+                case PER_CROSSING -> crossings.forEach(c -> addItem(created, existing, job, rule, due, null, c));
+            }
+        }
+        created.forEach(i -> i.setAddedByUpdate(addedByUpdate));
+        return created;
+    }
+
+    /**
+     * One rule per document type, when the origin's and the destination's catalogs both list it: the stricter, a
+     * mandatory rule over an optional one, and on a tie the destination's, the country the horses are imported into.
+     * The pick never depends on the order the rules are read in.
+     */
+    static List<RegulationRule> governingRules(List<RegulationRule> rules, Map<UUID, RegulationRole> roleByVersion) {
+        Comparator<RegulationRule> stricterFirst = Comparator.comparing((RegulationRule r) -> !r.isMandatory())
+                .thenComparing(r -> roleByVersion.get(r.getVersion().getId()) != RegulationRole.DESTINATION)
+                .thenComparing(r -> r.getId() == null ? "" : r.getId().toString());
+        Map<UUID, RegulationRule> byType = new LinkedHashMap<>();
+        rules.stream()
+                .sorted(stricterFirst)
+                .forEach(r -> byType.putIfAbsent(r.getDocumentType().getId(), r));
+        return List.copyOf(byType.values());
     }
 
     /** audit_log.reason holds 500 characters. */
@@ -897,6 +929,15 @@ public class ClearanceService {
 
     private static String itemKey(UUID documentTypeId, UUID horseId, UUID crossingId) {
         return documentTypeId + "|" + horseId + "|" + crossingId;
+    }
+
+    private static String itemKey(ChecklistItem item) {
+        return itemKey(
+                item.getDocumentType().getId(),
+                item.getHorse() == null ? null : item.getHorse().getId(),
+                item.getBorderCrossing() == null
+                        ? null
+                        : item.getBorderCrossing().getId());
     }
 
     /** Adds the item unless the job already has one for this document, horse and crossing. */
@@ -964,7 +1005,7 @@ public class ClearanceService {
      * Whether the job's documents are settled: its horses have left and no part of it waits to leave. A job that an
      * incident split keeps its documents open for the part still to depart (US-F5-06).
      */
-    private boolean frozen(TransportJob job) {
+    boolean frozen(TransportJob job) {
         return job.getDepartedAt() != null && !jobTrips.hasPartToLeave(job);
     }
 }

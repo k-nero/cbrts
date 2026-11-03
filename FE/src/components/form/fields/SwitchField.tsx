@@ -40,7 +40,7 @@ const SwitchField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, ...field } }) => {
+      render={({ field: { onChange, ...field }, inputId }) => {
         if (readOnly) {
           return (
             <div
@@ -81,6 +81,7 @@ const SwitchField = <TFieldValues extends FieldValues = FieldValues>({
         }
         return (
           <Switch
+            id={inputId}
             disabled={disabled}
             {...props}
             {...field}

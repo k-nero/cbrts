@@ -86,7 +86,14 @@ public class RateCatalogService {
             Map.entry(RatePolicyKey.LATE_PENALTY_CAP_PCT, "Late penalty cap"),
             Map.entry(RatePolicyKey.STALL_PAYLOAD_KG, "The stall payload"),
             Map.entry(RatePolicyKey.AIR_SHIPMENT_MAX_KG, "The air shipment limit"),
-            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"));
+            Map.entry(RatePolicyKey.TURNAROUND_HOURS, "The turnaround"),
+            Map.entry(RatePolicyKey.LOCAL_TURNAROUND_HOURS, "The local turnaround"),
+            Map.entry(RatePolicyKey.PLAN_START_HOUR, "The start hour"),
+            Map.entry(RatePolicyKey.PLAN_SPEED_KMH, "The average speed"),
+            Map.entry(RatePolicyKey.PLAN_WELFARE_STOP_MIN, "The welfare stop"),
+            Map.entry(RatePolicyKey.PLAN_BORDER_STOP_MIN, "The border stop"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_BEFORE_HOURS, "The time before a flight"),
+            Map.entry(RatePolicyKey.PLAN_AIRPORT_AFTER_HOURS, "The release after landing"));
 
     private final RateCatalogVersionRepository versions;
     private final RateSetLoader loader;
@@ -430,6 +437,10 @@ public class RateCatalogService {
                 && (r.estimateNote() == null || r.estimateNote().isBlank())) {
             throw new BusinessException("ESTIMATE_NOTE", "Say why an estimated line may vary.");
         }
+        if (r.coveredByRoadLeg() && !"A".equals(r.group()) && !"G".equals(r.group())) {
+            throw new BusinessException(
+                    "COVERED_BY_ROAD_LEG", "Only a group A or G line is at an end of the move a road leg can cover.");
+        }
     }
 
     private void refuseDuplicate(RateCatalogVersion draft, RateLineRequest r, UUID exceptLineId) {
@@ -462,6 +473,7 @@ public class RateCatalogService {
                 r.estimateNote() == null || r.estimateNote().isBlank()
                         ? null
                         : r.estimateNote().strip());
+        line.setCoveredByRoadLeg(r.coveredByRoadLeg());
     }
 
     private static void checkBands(List<VolumeBreakRequest> bands) {
@@ -521,6 +533,12 @@ public class RateCatalogService {
     }
 
     private static void checkPolicy(RatePolicyKey key, BigDecimal value) {
+        // Retired: each road route sets its own welfare stops now (V39).
+        if (key == RatePolicyKey.PLAN_WELFARE_EVERY_HOURS) {
+            throw new BusinessException(
+                    key.name(),
+                    "The welfare interval is retired. Set each road route's welfare stops on Routes instead.");
+        }
         String label = POLICY_LABELS.get(key);
         if (value == null) {
             throw new BusinessException(key.name(), label + " needs a value.");
@@ -552,12 +570,27 @@ public class RateCatalogService {
                             key.name(), label + " must be a whole number of kilograms from 1 to 99,999.");
                 }
             }
-            case TURNAROUND_HOURS -> {
+            case TURNAROUND_HOURS, LOCAL_TURNAROUND_HOURS -> {
                 if (value.signum() < 0
                         || value.compareTo(BigDecimal.valueOf(240)) > 0
                         || value.stripTrailingZeros().scale() > 0) {
+                    throw new BusinessException(key.name(), label + " must be a whole number of hours from 0 to 240.");
+                }
+            }
+            case PLAN_START_HOUR,
+                    PLAN_SPEED_KMH,
+                    PLAN_WELFARE_STOP_MIN,
+                    PLAN_BORDER_STOP_MIN,
+                    PLAN_AIRPORT_BEFORE_HOURS,
+                    PLAN_AIRPORT_AFTER_HOURS -> {
+                PlanningDefaults.Bounds b = PlanningDefaults.BOUNDS.get(key);
+                if (value.compareTo(BigDecimal.valueOf(b.min())) < 0
+                        || value.compareTo(BigDecimal.valueOf(b.max())) > 0
+                        || value.stripTrailingZeros().scale() > 0) {
                     throw new BusinessException(
-                            key.name(), "The turnaround must be a whole number of hours from 0 to 240.");
+                            key.name(),
+                            label + " must be a whole number from " + b.min() + " to " + b.max() + " " + b.unit()
+                                    + ".");
                 }
             }
             case ARRIVAL_WINDOW_MIN_HOURS -> {
@@ -602,6 +635,7 @@ public class RateCatalogService {
                     copy.setDefaultQuantity(l.getDefaultQuantity());
                     copy.setCertainty(l.getCertainty());
                     copy.setEstimateNote(l.getEstimateNote());
+                    copy.setCoveredByRoadLeg(l.isCoveredByRoadLeg());
                     return copy;
                 })
                 .toList());

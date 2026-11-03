@@ -11,6 +11,7 @@ import PageHeader from '@/components/PageHeader';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
 import { Chip, Panel } from '@/components/ui';
 import { useIncident } from '@/hooks/incident';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import type { Incident } from '@/interfaces';
 import { IncidentStatusEnum, RoleNameEnum } from '@/interfaces';
 import { useAuthStore } from '@/stores/authStore';
@@ -41,6 +42,8 @@ export default function IncidentDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   // A failed load (404 included) goes to the error boundary; until it arrives, the page is a skeleton.
   const { data: incident } = useIncident(id);
+  // An incident has no code of its own; the job it happened on names it.
+  useBreadcrumb({ id, label: incident && `${incident.kindLabel} · ${incident.jobCode}` });
   // Only the logistics manager decides (US-F5-03); the coordinator sees the proposal waiting.
   const isManager = (useAuthStore((state) => state.roles) as string[]).includes(
     RoleNameEnum.LOGISTICS_MANAGER,
@@ -115,7 +118,7 @@ export default function IncidentDetailPage() {
               <Flex vertical gap={12}>
                 <Fact label="Job">
                   <Link
-                    to={`/staff/jobs/${incident.jobId}?tab=route`}
+                    to={`/staff/jobs/${incident.jobId}?tab=trip&view=route`}
                     className="text-ink! underline"
                   >
                     {incident.jobCode}

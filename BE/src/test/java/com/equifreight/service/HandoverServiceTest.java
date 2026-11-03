@@ -29,6 +29,7 @@ import com.equifreight.model.trip.HandoverResponse;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.IncidentRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import java.time.Clock;
 import java.time.Duration;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.LazyInitializationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,7 @@ class HandoverServiceTest {
     private final HandoverRepository handovers = mock(HandoverRepository.class);
     private final TransportJobRepository jobs = mock(TransportJobRepository.class);
     private final IncidentRepository incidents = mock(IncidentRepository.class);
+    private final UserRepository users = mock(UserRepository.class);
     private final IncidentService incidentService = mock(IncidentService.class);
     private final AuditService audit = mock(AuditService.class);
     private final NotificationService notifications = mock(NotificationService.class);
@@ -69,7 +72,14 @@ class HandoverServiceTest {
     @BeforeEach
     void setUp() {
         service = new HandoverService(
-                handovers, jobs, incidents, incidentService, audit, notifications, Clock.fixed(NOW, BusinessTime.ZONE));
+                handovers,
+                jobs,
+                incidents,
+                users,
+                incidentService,
+                audit,
+                notifications,
+                Clock.fixed(NOW, BusinessTime.ZONE));
         Club club = new Club();
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
@@ -90,6 +100,7 @@ class HandoverServiceTest {
         handover.setJob(job);
         handover.setHandedOverAt(NOW.minus(Duration.ofHours(5)));
         handover.setConfirmDueAt(NOW.minus(Duration.ofHours(5)).plus(Duration.ofDays(2)));
+        when(users.findById(customer.getId())).thenReturn(Optional.of(customer));
         when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
         when(handovers.findByJob_Id(job.getId())).thenReturn(Optional.of(handover));
         when(handovers.findById(handover.getId())).thenReturn(Optional.of(handover));
@@ -124,6 +135,41 @@ class HandoverServiceTest {
                         any(),
                         eq("Handover accepted: CBRT-2026-041"),
                         anyString());
+    }
+
+    /**
+     * The principal comes from the token filter's closed session: its club answers its id but can't load its name, as
+     * a Hibernate proxy does. Both answers name the customer by the club, so they use the customer's own row.
+     */
+    private User signedIn() {
+        Club detached = mock(Club.class);
+        when(detached.getId()).thenReturn(customer.getClub().getId());
+        when(detached.getName()).thenThrow(new LazyInitializationException("Could not initialize proxy - no session"));
+        User principal = user("Club", "Saigon Turf");
+        principal.setId(customer.getId());
+        principal.setClub(detached);
+        return principal;
+    }
+
+    @Test
+    @DisplayName("Accepting works for the signed-in customer, whose club can't be loaded from the request")
+    void acceptingAsTheSignedInCustomer() {
+        HandoverResponse r = service.accept(job.getCode(), signedIn());
+
+        assertEquals(customer, handover.getConfirmedBy());
+        assertEquals("Saigon Turf Club", r.confirmedByName());
+    }
+
+    @Test
+    @DisplayName("Raising a discrepancy works for the signed-in customer too")
+    void raisingADiscrepancyAsTheSignedInCustomer() {
+        when(incidentService.raiseFromCustomer(eq(job), eq(customer), anyString()))
+                .thenReturn(new Incident());
+
+        HandoverResponse r = service.reportDiscrepancy(job.getCode(), signedIn(), "Left fore swollen");
+
+        assertEquals(customer, handover.getConfirmedBy());
+        assertEquals("Saigon Turf Club", r.confirmedByName());
     }
 
     @Test

@@ -13,6 +13,7 @@ import type {
   RequestDraftInput,
   RequestHorse,
   RequestStatus,
+  RequestSummary,
   RevisionSummary,
   Route,
   ServiceClass,
@@ -353,10 +354,17 @@ export const routeSentence = (r: Route): string => {
       : r.crossings.length > 0
         ? `by road with ${plural(r.crossings.length, 'border crossing')}`
         : `by road within ${COUNTRY_NAME[country] ?? (country || 'one country')}`;
-  const total = (r.distanceKm ?? 0) + (r.firstLeg?.distanceKm ?? 0) + (r.lastLeg?.distanceKm ?? 0);
+  const total =
+    (r.distanceKm ?? 0) +
+    (r.firstLeg?.distanceKm ?? 0) +
+    (r.lastLeg?.distanceKm ?? 0) +
+    (r.toTerminal?.distanceKm ?? 0) +
+    (r.fromTerminal?.distanceKm ?? 0);
   const legs = [
     r.firstLeg && `by road to ${r.firstLeg.toCity} first`,
+    r.toTerminal && 'by road to the cargo terminal first',
     r.lastLeg && `by road from ${r.lastLeg.fromCity} after`,
+    r.fromTerminal && 'by road from the cargo terminal after',
   ].filter(Boolean);
   const hubs = legs.length ? `, ${legs.join(' and ')}` : '';
   return `About ${km(r.distanceKm === null ? null : total)} km ${how}${hubs}, worked out from your route.`;
@@ -380,46 +388,45 @@ export const routeEnds = (r: Route): { from: string; to: string } => ({
 });
 
 /**
- * The route strip: pickup, the hub a road leg brings the horses to (US-F1-09), each border, the hub
- * they arrive in, then the destination.
+ * The route strip, each stop by place name where the route knows it (else its city): the pickup,
+ * the hub a road leg brings the horses to (US-F1-09) or the cargo terminal a local run brings them
+ * to before a flight (US-F3-22), each border, the hub or terminal they arrive in, then the
+ * delivery place.
  */
 export const routeStops = (
   r: Route,
-): { name: string; kind: string; time: string; state: 'upcoming' }[] => [
-  ...(r.firstLeg
-    ? [
-        { name: r.firstLeg.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const },
-        {
-          name: r.fromCity,
-          kind: `Hub · ~${km(r.firstLeg.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
-      ]
-    : [{ name: r.fromCity, kind: 'Pickup', time: '', state: 'upcoming' as const }]),
-  ...r.crossings.map((c, i) => ({
-    name: c.name,
-    kind: `Border ${i + 1}`,
+): { name: string; kind: string; time: string; state: 'upcoming' }[] => {
+  const stop = (name: string, kind: string) => ({
+    name,
+    kind,
     time: '',
     state: 'upcoming' as const,
-  })),
-  ...(r.lastLeg
+  });
+  // A flight's two ends are airport terminals, whatever road trip meets them; a road route's are hubs.
+  const hub = r.mode === 'AIR' ? 'Terminal' : 'Hub';
+  const leaving = r.departureTerminal ?? r.toTerminal?.toPlace ?? r.fromCity;
+  const arriving = r.arrivalTerminal ?? r.fromTerminal?.fromPlace ?? r.toCity;
+  const pickup = r.fromPlace ?? r.toTerminal?.fromPlace ?? r.firstLeg?.fromCity ?? r.fromCity;
+  const start = r.firstLeg
+    ? [stop(pickup, 'Pickup'), stop(leaving, `${hub} · ~${km(r.firstLeg.distanceKm)} km`)]
+    : r.toTerminal
+      ? [stop(pickup, 'Pickup'), stop(leaving, `Terminal · ~${km(r.toTerminal.distanceKm)} km`)]
+      : [stop(pickup, 'Pickup')];
+  const borders = r.crossings.map((c, i) => stop(c.name, `Border ${i + 1}`));
+  const delivery = r.toPlace ?? r.fromTerminal?.toPlace ?? r.lastLeg?.toCity ?? r.toCity;
+  const end = r.lastLeg
     ? [
-        {
-          name: r.toCity,
-          kind: `Hub · ~${km(r.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
-        {
-          name: r.lastLeg.toCity,
-          kind: `~${km(r.lastLeg.distanceKm)} km`,
-          time: '',
-          state: 'upcoming' as const,
-        },
+        stop(arriving, `${hub} · ~${km(r.distanceKm)} km`),
+        stop(delivery, `~${km(r.lastLeg.distanceKm)} km`),
       ]
-    : [{ name: r.toCity, kind: `~${km(r.distanceKm)} km`, time: '', state: 'upcoming' as const }]),
-];
+    : r.fromTerminal
+      ? [
+          stop(arriving, `Terminal · ~${km(r.distanceKm)} km`),
+          stop(delivery, `~${km(r.fromTerminal.distanceKm)} km`),
+        ]
+      : [stop(delivery, `~${km(r.distanceKm)} km`)];
+  return [...start, ...borders, ...end];
+};
 
 const shortCrossing = (name: string): string => name.split(' – ')[0];
 
@@ -755,3 +762,17 @@ export const nextStepDeadline = (
   }
   return null;
 };
+
+/** How a move names its request: the code once submitted; a draft has none yet. */
+export const moveRef = (m: { requestCode: string | null }): string => m.requestCode ?? 'Draft';
+
+/**
+ * A row's quotation button on My requests: Primary only while the club owes its answer, which the row's
+ * `holds` says (Warn, as Your moves words it); one whose departure has come, or that is answered, only opens.
+ */
+export const quotationButton = (
+  r: Pick<RequestSummary, 'status' | 'holds'>,
+): { label: string; primary: boolean } =>
+  r.status === 'QUOTED' && (r.holds?.tone === 'warn' || r.holds?.tone === 'bad')
+    ? { label: 'Review quotation', primary: true }
+    : { label: 'Open quotation', primary: false };

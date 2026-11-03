@@ -62,6 +62,7 @@ public final class FleetMapper {
                 .vehicleId(booking.getVehicle().getId())
                 .vehicleCode(booking.getVehicle().getCode())
                 .vehicleKind(booking.getVehicle().getKind())
+                .tripId(trip != null ? trip.getId() : null)
                 .tripCode(trip != null ? trip.getCode() : null)
                 .jobId(jobs.size() == 1 ? jobs.getFirst().getId() : null)
                 .jobCode(
@@ -70,6 +71,7 @@ public final class FleetMapper {
                                 : String.join(
                                         ", ",
                                         jobs.stream().map(TransportJob::getCode).toList()))
+                .jobIds(jobs.stream().map(TransportJob::getId).toList())
                 .requestCode(booking.getRequest() != null ? booking.getRequest().getCode() : null)
                 .kind(booking.getKind() != null ? booking.getKind().name() : "JOB")
                 .startsAt(booking.getStartsAt())

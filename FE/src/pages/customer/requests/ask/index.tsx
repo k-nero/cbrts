@@ -30,7 +30,7 @@ const RequestAskPage: FC = () => {
         back={{
           label: 'Back to the request',
           onClick: () =>
-            router.push(router.paths.get('request-submitted', { pathParams: [request.data!.id] })),
+            router.push(router.paths.get('request', { pathParams: [request.data!.id] })),
         }}
         title="Ask a question"
         summary={<span className="type-data text-ink-2">{request.data.code}</span>}

@@ -97,6 +97,8 @@ export interface Corridor {
   dateFlexDays: number;
   /** Days to drive it one way: a trip's length before its route is planned, and an empty drive back (US-F7-02). */
   drivingDays: number;
+  /** The welfare stops a road route plans for; null when none are set, and on an air route. */
+  welfareStops: number | null;
   /** The border crossings it takes, in order from the origin. */
   crossings: string[];
   /** The countries it passes through, in order: ['VN', 'KH', 'TH'] (US-F7-01). */
@@ -188,6 +190,14 @@ export interface CrewMember {
   vehicleCode: string | null;
   /** True for the trip's flight crew: flying grooms and the flight vet (US-F3-15). */
   onFlight: boolean;
+}
+
+export interface CrewCandidate {
+  userId: string;
+  name: string;
+  staffCode?: string | null;
+  email: string;
+  escortKind?: 'DRIVER' | 'GROOM' | null;
 }
 
 export interface LoadPlanConflict {
@@ -345,6 +355,10 @@ export interface RoutePlan {
   changeReason?: string | null;
   stops: RouteStop[];
   legs: RouteLeg[];
+  /** The road corridor's distance, which the legs are checked against; null for a flight or when unknown. */
+  corridorDistanceKm?: number | null;
+  /** The welfare stops the road corridor plans for, which the route is checked against; null when none are set. */
+  corridorWelfareStops?: number | null;
 }
 
 export interface JobSummary extends BaseEntity {
@@ -389,8 +403,12 @@ export interface JobDetail extends BaseEntity {
   /** The team chosen at approval (US-F1-07); null on jobs approved before teams were kept. */
   transportSpecialist?: string | null;
   coordinator?: string | null;
+  /** The gate of the trip shown: a domestic leg before the border is clear early (US-F2-13). */
   clearanceGateState: 'Locked' | 'Clear';
   clearanceGateSummary: string;
+  /** The dossier's own gate, the same whichever trip is shown: what the Clearance and Authorities tabs show. */
+  dossierGateState: 'Locked' | 'Clear';
+  dossierGateSummary: string;
   horses: JobHorse[];
   loadPlan: TripLoad | null;
   routePlan?: RoutePlan | null;
@@ -399,6 +417,42 @@ export interface JobDetail extends BaseEntity {
   tripJobs: TripJob[];
   /** The job's trips in journey order, one while it travels on one trip (US-F5-06, US-F3-16). */
   parts: TripPart[];
+  /** The city the journey has reached, where the next trip starts; the origin's with no trip (US-F3-21). */
+  journeyEndCity: string | null;
+  /** True once the last trip ends in the destination city: no trip can be added after it. */
+  journeyComplete: boolean;
+  /** Warn lines: the journey ends short of the destination, or leaves the quoted route. */
+  journeyWarnings: string[];
+  /** Which trips the clearance gate holds back, in words; null with no trip. */
+  clearanceJourneyNote: string | null;
+  /** When the manager signed off the plan of the trip shown, and who; null until then (US-F3-08). */
+  tripSignedOffAt?: string | null;
+  tripSignedOffBy?: string | null;
+}
+
+/** A corridor the next trip of a job's journey can run, read from the city it has reached (US-F3-21). */
+export interface JourneyCorridor {
+  corridorId: string;
+  corridorCode: string;
+  mode: TransportMode;
+  /** Run from the corridor's destination city to its origin city. */
+  reversed: boolean;
+  fromCity: string;
+  toCity: string;
+  /** The trip would end in the city the horses are going to. */
+  reachesDestination: boolean;
+  /** On the route the customer was quoted. */
+  quoted: boolean;
+}
+
+/** The airline's flight for a journey's flight trip (US-F3-21); its times become the airport stops'. */
+export interface FlightInput {
+  airline: string;
+  flightNo: string;
+  aircraftType: string | null;
+  stallCapacity: number | null;
+  scheduledDepartureAt: string | null;
+  scheduledArrivalAt: string | null;
 }
 
 /** Whether a job can be closed, what holds it, or how it was closed (US-F6-04). */

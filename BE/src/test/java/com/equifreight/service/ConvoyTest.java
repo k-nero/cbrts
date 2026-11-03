@@ -234,7 +234,9 @@ class ConvoyTest {
                 audit,
                 mock(NotificationService.class),
                 mock(CodeService.class),
-                jobTrips);
+                jobTrips,
+                mock(JourneyService.class),
+                mock(com.equifreight.repository.FlightRepository.class));
     }
 
     @Test
@@ -546,5 +548,30 @@ class ConvoyTest {
                 assertThrows(BusinessException.class, () -> jobService.signOffTripPlan(job.getId(), user("Yen", "X")));
 
         assertThat(ex.getMessage()).contains("DRIVER").contains("TK-102");
+    }
+
+    @Test
+    @DisplayName("Active escorts are returned as candidates with their escort kind")
+    void crewCandidates() {
+        User minh = user("Minh", RoleName.ESCORT);
+        minh.setStaffCode("EF-001");
+        minh.setEmail("minh.tran@equifreight.vn");
+        minh.setEscortKind(com.equifreight.entity.enums.EscortKind.DRIVER);
+
+        User hoa = user("Hoa", RoleName.ESCORT);
+        hoa.setStaffCode("EF-002");
+        hoa.setEmail("hoa.le@equifreight.vn");
+        hoa.setEscortKind(com.equifreight.entity.enums.EscortKind.GROOM);
+
+        when(users.findByRoleAndStatus(RoleName.ESCORT, com.equifreight.entity.enums.UserStatus.ACTIVE))
+                .thenReturn(List.of(minh, hoa));
+
+        var candidates = crewService.getCandidates();
+
+        assertThat(candidates).hasSize(2);
+        assertThat(candidates.get(0).name()).isEqualTo(minh.displayName());
+        assertThat(candidates.get(0).escortKind()).isEqualTo(com.equifreight.entity.enums.EscortKind.DRIVER);
+        assertThat(candidates.get(1).name()).isEqualTo(hoa.displayName());
+        assertThat(candidates.get(1).escortKind()).isEqualTo(com.equifreight.entity.enums.EscortKind.GROOM);
     }
 }

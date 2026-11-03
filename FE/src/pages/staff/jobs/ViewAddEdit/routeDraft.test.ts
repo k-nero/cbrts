@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-import { emptyLeg, emptyStop, routeDraftSchema, toForm, toInput, totals } from './routeDraft';
+import {
+  emptyLeg,
+  emptyStop,
+  recalculatedTimes,
+  routeChecks,
+  routeDraftSchema,
+  toForm,
+  toInput,
+  totals,
+} from './routeDraft';
 
 import type { JobDetail, RoutePlan } from '@/interfaces';
 
@@ -8,6 +17,7 @@ const job = {
   id: 'job-41',
   originPlace: { id: 'hcm', name: 'Phú Thọ training centre' },
   destinationPlace: { id: 'pnh', name: 'Phnom Penh Equestrian Centre' },
+  parts: [{ current: true, corridorCode: 'RD HCM → PNH' }],
 } as unknown as JobDetail;
 
 const plan = {
@@ -107,6 +117,137 @@ describe('routeDraftSchema', () => {
     expect(issues).toEqual(
       expect.arrayContaining(['stops.1.crossing', 'legs.1.airline', 'legs.1.flightNo']),
     );
+  });
+
+  test('a stop planned before the horses leave the stop before it is refused; untimed stops are skipped', () => {
+    const form = toForm(null, job);
+    form.stops.splice(1, 0, { ...emptyStop('WELFARE'), place: { value: 'w', label: 'W' } });
+    form.stops.splice(2, 0, { ...emptyStop('WELFARE'), place: { value: 'w2', label: 'W2' } });
+    form.legs.push(emptyLeg(), emptyLeg());
+    form.stops[0].plannedAt = '2026-11-02T08:00';
+    form.stops[1].plannedAt = '2026-11-02T12:00';
+    form.stops[1].stayMin = 45;
+    form.stops[3].plannedAt = '2026-11-02T12:30';
+    const issues = routeDraftSchema.safeParse(form).error?.issues;
+    expect(issues?.map((i) => i.path.join('.'))).toEqual(['stops.3.plannedAt']);
+    expect(issues?.[0].message).toBe(
+      'Before the horses leave stop 2 at 2 Nov, 12:45. Plan it later, or recalculate the times.',
+    );
+    form.stops[3].plannedAt = '2026-11-02T12:45';
+    expect(routeDraftSchema.safeParse(form).success).toBe(true);
+  });
+});
+
+describe('recalculatedTimes', () => {
+  test('each stop is the one before plus its stay and the leg time, up to the first leg with no time', () => {
+    const form = toForm(null, job);
+    form.stops.splice(1, 0, emptyStop('BORDER'), emptyStop('WELFARE'));
+    form.legs.push(emptyLeg(), emptyLeg());
+    expect(recalculatedTimes(form)).toBeNull();
+
+    form.stops[0].plannedAt = '2026-11-02T22:00';
+    form.stops[1].stayMin = 90;
+    form.legs[0].plannedMin = 120;
+    form.legs[1].plannedMin = 60;
+    form.stops[3].plannedAt = '2026-11-01T09:00';
+    expect(recalculatedTimes(form)).toEqual({
+      times: ['2026-11-02T22:00', '2026-11-03T00:00', '2026-11-03T02:30', '2026-11-01T09:00'],
+      missingLeg: 3,
+    });
+    form.legs[2].plannedMin = 30;
+    expect(recalculatedTimes(form)?.times.at(-1)).toBe('2026-11-03T03:00');
+  });
+});
+
+describe('routeChecks', () => {
+  const stop = (seq: number, kind: string, plannedAt: string | null, plannedStayMin?: number) => ({
+    id: `s${seq}`,
+    seq,
+    kind,
+    plannedAt,
+    plannedStayMin,
+  });
+  const routed = (stops: ReturnType<typeof stop>[], corridorWelfareStops: number | null) =>
+    ({ stops, legs: [], corridorWelfareStops }) as unknown as RoutePlan;
+
+  test('times running backwards hold the route back; a missing welfare stop is a warning', () => {
+    const checks = routeChecks(
+      routed(
+        [
+          stop(1, 'PICKUP', '2026-11-02T01:00:00Z'),
+          stop(2, 'BORDER', '2026-11-02T05:00:00Z', 90),
+          stop(3, 'WELFARE', '2026-11-02T03:00:00Z', 45),
+          stop(4, 'DELIVERY', null),
+        ],
+        2,
+      ),
+      job,
+    );
+    expect(checks.map((c) => [c.key, c.ok, c.blocks])).toEqual([
+      ['order', false, true],
+      ['untimed', false, false],
+      ['welfare', false, false],
+    ]);
+    expect(checks[0].label).toBe(
+      'Stop 3 is planned at 2 Nov, 10:00, before the horses leave stop 2 at 2 Nov, 13:30.',
+    );
+    expect(checks[2].label).toBe('1 of the 2 welfare stops RD HCM → PNH plans for.');
+  });
+
+  test('a corridor that plans for no welfare stops has no welfare check', () => {
+    const route = [stop(1, 'PICKUP', null), stop(2, 'DELIVERY', null)];
+    expect(routeChecks(routed(route, null), job).map((c) => c.key)).not.toContain('welfare');
+    expect(routeChecks(routed(route, 0), job).map((c) => c.key)).not.toContain('welfare');
+  });
+
+  test('a delivery after the arrival window is a failing check', () => {
+    const late = { ...job, windowEnd: '2026-11-02T07:00:00Z' } as JobDetail;
+    const checks = routeChecks(
+      routed(
+        [stop(1, 'PICKUP', '2026-11-02T01:00:00Z'), stop(2, 'DELIVERY', '2026-11-02T08:00:00Z')],
+        0,
+      ),
+      late,
+    );
+    expect(checks.every((c) => c.key === 'window' || c.ok)).toBe(true);
+    expect(checks.find((c) => c.key === 'window')).toMatchObject({
+      ok: false,
+      label: 'The delivery at 2 Nov, 15:00 is after the arrival window closes at 2 Nov, 14:00.',
+    });
+  });
+});
+
+describe('routeChecks · corridor distance', () => {
+  const leg = (distanceKm: number | null, mode = 'ROAD') => ({ mode, distanceKm });
+  const plan = (legs: ReturnType<typeof leg>[], corridorDistanceKm: number | null) =>
+    ({ stops: [], legs, corridorDistanceKm }) as unknown as RoutePlan;
+  const onCorridor = {
+    ...job,
+    parts: [{ current: true, corridorCode: 'RD HKG → Sha Tin' }],
+  } as unknown as JobDetail;
+  const distance = (p: RoutePlan) => routeChecks(p, onCorridor).find((c) => c.key === 'distance');
+
+  test('legs far from the corridor are a warning that names both', () => {
+    expect(distance(plan([leg(90)], 40))).toEqual({
+      key: 'distance',
+      ok: false,
+      blocks: false,
+      label: 'The legs add up to 90 km; RD HKG → Sha Tin is 40 km.',
+    });
+  });
+
+  test('legs within a tenth of the corridor pass; split legs are added up', () => {
+    expect(distance(plan([leg(320), leg(320), leg(321)], 960))?.ok).toBe(true);
+    expect(distance(plan([leg(44)], 40))?.ok).toBe(true);
+  });
+
+  test('a leg with no distance is a warning; a flight or an unknown corridor is not checked', () => {
+    expect(distance(plan([leg(null)], 960))).toMatchObject({
+      ok: false,
+      label: 'A leg has no distance yet; RD HKG → Sha Tin is 960 km.',
+    });
+    expect(distance(plan([leg(1500, 'AIR')], 1500))).toBeUndefined();
+    expect(distance(plan([leg(90)], null))).toBeUndefined();
   });
 });
 

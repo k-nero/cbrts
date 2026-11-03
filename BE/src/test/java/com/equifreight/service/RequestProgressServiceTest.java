@@ -193,6 +193,16 @@ class RequestProgressServiceTest {
     }
 
     @Test
+    @DisplayName("A quoted request whose departure has come leaves the customer nothing to answer")
+    void quotedWithTheDepartureComeHasNoNextStep() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 18));
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(quotation(QuotationStatus.ISSUED)));
+
+        assertThat(next(RequestStatus.QUOTED)).isNull();
+    }
+
+    @Test
     @DisplayName("Accepted, the logistics manager approves it into a job")
     void acceptedWaitsOnApproval() {
         when(quotations.findFirstByRequestIdOrderByVersionNoDesc(request.getId()))

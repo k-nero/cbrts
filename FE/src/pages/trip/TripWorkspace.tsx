@@ -1,23 +1,21 @@
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { UploadFile } from 'antd';
-import { Col, Flex, Input, Row, message, Select, Spin, Upload } from 'antd';
+import { Col, DatePicker, Flex, Input, Row, message, Select, Spin } from 'antd';
+import dayjs from 'dayjs';
 
 import { HandoverAnswer } from './HandoverAnswer';
 import { HandoverPanel } from './HandoverPanel';
 import { HandoverRecord } from './HandoverRecord';
-import { ReportEmergency } from './ReportEmergency';
 import { TripBoard } from './TripBoard';
 import { TripDetails } from './TripDetails';
 import { eventLabels, formatTime, sentence } from './tripFormat';
 
-import { fileApi } from '@/apis/file';
 import PageHeader from '@/components/PageHeader';
-import { Button, Callout, Checkbox, Chip, Panel } from '@/components/ui';
+import { Button, Callout, Chip, Panel } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/utils';
 import { useTrip, useTripRecord, useTrips } from '@/hooks/trip';
-import type { HorseCondition, TripRecordKind, TripSummary } from '@/interfaces';
-import { HorseConditionEnum, TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
+import type { TripRecordKind, TripSummary } from '@/interfaces';
+import { TripRecordKindEnum, TripStatusEnum } from '@/interfaces';
 
 const eventKinds = Object.values(TripRecordKindEnum);
 
@@ -26,37 +24,11 @@ const checkpointKinds = eventKinds.filter(
   (kind) => kind !== TripRecordKindEnum.CONDITION_CHECK && kind !== TripRecordKindEnum.HANDED_OVER,
 );
 
-const conditions = Object.values(HorseConditionEnum);
-
-const datetimeLocal = () => {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
-};
-
 const errorMessage = (error: unknown) =>
   apiErrorMessage(error, 'The trip update could not be saved.');
 
 const statusTone = (status: string) =>
   status === TripStatusEnum.DELIVERED ? 'ok' : status === TripStatusEnum.HELD ? 'warn' : 'info';
-
-type Observation = {
-  checked: boolean;
-  condition: HorseCondition | null;
-  drinking: boolean | null;
-  eating: boolean | null;
-  note: string;
-  photos: UploadFile[];
-};
-
-const emptyObservation = (): Observation => ({
-  checked: false,
-  condition: null,
-  drinking: null,
-  eating: null,
-  note: '',
-  photos: [],
-});
 
 export function TripWorkspace({
   audience,
@@ -64,7 +36,7 @@ export function TripWorkspace({
   summary,
   editable = false,
 }: {
-  audience: 'escort' | 'staff' | 'customer';
+  audience: 'staff' | 'customer';
   title: string;
   summary: string;
   editable?: boolean;
@@ -79,33 +51,18 @@ export function TripWorkspace({
     summaries.find((item) => item.jobCode === code || item.jobCodes.includes(code))?.jobCode ??
     summaries[0]?.jobCode ??
     '';
-  // One part of a job an incident split across trips (US-F5-06); the cab always shows the part its crew rides.
+  // One part of a job an incident split across trips (US-F5-06).
   const [partId, setPartId] = useState<string>();
-  const shownPart = audience === 'escort' ? undefined : partId;
+  const shownPart = partId;
   const detailQuery = useTrip(audience, selectedCode, shownPart);
   const trip = detailQuery.data;
   const [kind, setKind] = useState<TripRecordKind>(TripRecordKindEnum.ARRIVED_AT_STOP);
   const [stopId, setStopId] = useState<string>();
-  const [occurredAt, setOccurredAt] = useState(datetimeLocal);
+  const [occurredAt, setOccurredAt] = useState(dayjs);
   const [text, setText] = useState('');
-  const [conditionByHorse, setConditionByHorse] = useState<Record<string, Observation>>({});
-  const clientRefs = useRef<{ checkpoint: string | null; condition: string | null }>({
-    checkpoint: null,
-    condition: null,
-  });
-  const uploadedPhotos = useRef(new Map<string, string>());
-  const mutation = useTripRecord(
-    audience === 'staff' ? 'staff' : 'escort',
-    selectedCode,
-    audience === 'staff' ? shownPart : undefined,
-  );
+  const clientRefs = useRef<{ checkpoint: string | null }>({ checkpoint: null });
+  const mutation = useTripRecord('staff', selectedCode, shownPart);
   const [messageApi, contextHolder] = message.useMessage();
-  const updateObservation = (horseId: string, update: Partial<Observation>) => {
-    setConditionByHorse((current) => ({
-      ...current,
-      [horseId]: { ...emptyObservation(), ...current[horseId], ...update },
-    }));
-  };
 
   const saveCheckpoint = async () => {
     if (!trip) return;
@@ -115,74 +72,14 @@ export function TripWorkspace({
       await mutation.mutateAsync({
         routeStopId: stopId ?? null,
         kind,
-        occurredAt: new Date(occurredAt).toISOString(),
+        occurredAt: occurredAt.toISOString(),
         clientRef,
         text: text || undefined,
       });
       clientRefs.current.checkpoint = null;
       messageApi.success('Trip checkpoint saved.');
       setText('');
-      setOccurredAt(datetimeLocal());
-    } catch (error) {
-      messageApi.error(errorMessage(error));
-    }
-  };
-
-  const saveConditions = async () => {
-    if (!trip) return;
-    const checked = trip.horses.flatMap((horse) => {
-      const observation = conditionByHorse[horse.id];
-      return observation?.checked ? [{ horse, observation }] : [];
-    });
-    if (checked.length === 0) {
-      messageApi.error('Select each horse you actually checked before saving.');
-      return;
-    }
-    if (checked.some(({ observation }) => observation.condition === null)) {
-      messageApi.error('Choose an observed condition for every selected horse.');
-      return;
-    }
-    const clientRef = clientRefs.current.condition ?? crypto.randomUUID();
-    clientRefs.current.condition = clientRef;
-    try {
-      const conditions = await Promise.all(
-        checked.map(async ({ horse, observation }) => {
-          const photoFileIds: string[] = [];
-          for (const upload of observation.photos) {
-            if (!upload.originFileObj) continue;
-            const existingId = uploadedPhotos.current.get(upload.uid);
-            if (existingId) {
-              photoFileIds.push(existingId);
-              continue;
-            }
-            const id = (await fileApi.upload(upload.originFileObj)).id;
-            uploadedPhotos.current.set(upload.uid, id);
-            photoFileIds.push(id);
-          }
-          return {
-            horseId: horse.id,
-            condition: observation.condition!,
-            drinking: observation.drinking,
-            eating: observation.eating,
-            note: observation.note || undefined,
-            photoFileIds,
-          };
-        }),
-      );
-      await mutation.mutateAsync({
-        routeStopId: stopId ?? null,
-        kind: TripRecordKindEnum.CONDITION_CHECK,
-        occurredAt: new Date(occurredAt).toISOString(),
-        clientRef,
-        text: text || undefined,
-        conditions,
-      });
-      clientRefs.current.condition = null;
-      uploadedPhotos.current.clear();
-      setConditionByHorse({});
-      messageApi.success('Horse condition log saved.');
-      setText('');
-      setOccurredAt(datetimeLocal());
+      setOccurredAt(dayjs());
     } catch (error) {
       messageApi.error(errorMessage(error));
     }
@@ -309,29 +206,17 @@ export function TripWorkspace({
               refreshes on its own.
             </Callout>
           )}
-          {audience === 'escort' && trip && <ReportEmergency trip={trip} />}
           {editable &&
-            audience !== 'customer' &&
+            audience === 'staff' &&
             trip &&
             trip.tripStatus === TripStatusEnum.DELIVERED &&
             !trip.handover?.handedOverAt && (
-              <HandoverPanel
-                trip={trip}
-                audience={audience}
-                code={selectedCode}
-                tripId={audience === 'staff' ? shownPart : undefined}
-              />
+              <HandoverPanel trip={trip} code={selectedCode} tripId={shownPart} />
             )}
           {audience === 'customer' && trip && <HandoverAnswer trip={trip} />}
           {trip && <HandoverRecord trip={trip} />}
           {editable && trip && (
-            <Panel
-              title={
-                audience === 'escort'
-                  ? 'Report checkpoint and horse condition'
-                  : 'Update progress by checkpoint'
-              }
-            >
+            <Panel title="Update progress by checkpoint">
               {!trip.clearanceReady && (
                 <Callout className="mb-4" tone="bad" title="Departure locked">
                   Departure can be recorded once the transport specialist clears the dossier.
@@ -369,11 +254,13 @@ export function TripWorkspace({
                 <Col xs={24} md={12}>
                   <Flex component="label" vertical gap={8} className="type-body-s">
                     Recorded time
-                    <input
-                      type="datetime-local"
+                    <DatePicker
+                      showTime={{ format: 'HH:mm' }}
+                      format="D MMM YYYY, HH:mm"
+                      allowClear={false}
                       value={occurredAt}
-                      onChange={(event) => setOccurredAt(event.target.value)}
-                      className="h-8 rounded-md border border-line-strong bg-input px-2"
+                      disabledDate={(day) => day.isAfter(dayjs(), 'day')}
+                      onChange={(value) => value && setOccurredAt(value)}
                     />
                   </Flex>
                 </Col>
@@ -389,110 +276,7 @@ export function TripWorkspace({
                   </Flex>
                 </Col>
               </Row>
-              {audience === 'escort' && (
-                <div className="mt-5 divide-y divide-line">
-                  {trip.horses.map((horse) => {
-                    const observation = conditionByHorse[horse.id] ?? emptyObservation();
-                    return (
-                      <section key={horse.id} className="py-4">
-                        <Row gutter={[12, 12]}>
-                          <Col xs={24} md={12}>
-                            <div>
-                              <strong className="type-h4">{horse.name}</strong>
-                              <p className="type-body-s m-0 text-ink-3">
-                                {horse.stall ?? 'Stall not assigned'}
-                              </p>
-                            </div>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Checkbox
-                              label="I checked this horse"
-                              checked={observation.checked}
-                              onChange={(event) =>
-                                updateObservation(horse.id, { checked: event.target.checked })
-                              }
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Select
-                              aria-label={`${horse.name} condition`}
-                              className="w-full"
-                              allowClear
-                              placeholder="Observed condition"
-                              value={observation.condition ?? undefined}
-                              onChange={(condition?: HorseCondition) =>
-                                updateObservation(horse.id, { condition: condition ?? null })
-                              }
-                              options={conditions.map((condition) => ({
-                                value: condition,
-                                label: sentence(condition),
-                              }))}
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Row gutter={[12, 12]}>
-                              {(['drinking', 'eating'] as const).map((field) => (
-                                <Col key={field} span={12}>
-                                  <Flex component="label" vertical gap={4} className="type-body-s">
-                                    {field === 'drinking' ? 'Drinking' : 'Eating'}
-                                    <Select
-                                      allowClear
-                                      placeholder="Not recorded"
-                                      value={
-                                        observation[field] === null
-                                          ? undefined
-                                          : observation[field]
-                                            ? 'YES'
-                                            : 'NO'
-                                      }
-                                      onChange={(value?: 'YES' | 'NO') =>
-                                        updateObservation(horse.id, {
-                                          [field]: value === undefined ? null : value === 'YES',
-                                        })
-                                      }
-                                      options={[
-                                        { value: 'YES', label: 'Yes' },
-                                        { value: 'NO', label: 'No' },
-                                      ]}
-                                    />
-                                  </Flex>
-                                </Col>
-                              ))}
-                            </Row>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Input
-                              value={observation.note}
-                              onChange={(event) =>
-                                updateObservation(horse.id, { note: event.target.value })
-                              }
-                              maxLength={500}
-                              placeholder="Condition note (optional)"
-                            />
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Upload
-                              accept="image/jpeg,image/png,image/heic,image/heif"
-                              multiple
-                              maxCount={8}
-                              fileList={observation.photos}
-                              beforeUpload={() => false}
-                              onChange={({ fileList }) =>
-                                updateObservation(horse.id, { photos: fileList })
-                              }
-                            >
-                              <Button type="button" size="sm" leadingIcon="upload">
-                                Attach photos
-                              </Button>
-                            </Upload>
-                          </Col>
-                        </Row>
-                      </section>
-                    );
-                  })}
-                </div>
-              )}
-              {/* One gold action on the cab (the condition log); the office view has none, it only records (DESIGN.md, Trip tab). */}
+              {/* The office view has no gold action; it only records (DESIGN.md, Trip tab). */}
               <div className="mt-4">
                 <Flex wrap justify="end" gap={8}>
                   <Button
@@ -506,18 +290,6 @@ export function TripWorkspace({
                   >
                     {mutation.isPending ? 'Saving…' : 'Save checkpoint'}
                   </Button>
-                  {audience === 'escort' && (
-                    <Button
-                      variant="primary"
-                      disabled={
-                        mutation.isPending ||
-                        !trip.horses.some((horse) => conditionByHorse[horse.id]?.checked)
-                      }
-                      onClick={saveConditions}
-                    >
-                      Save checked horse conditions
-                    </Button>
-                  )}
                 </Flex>
               </div>
             </Panel>

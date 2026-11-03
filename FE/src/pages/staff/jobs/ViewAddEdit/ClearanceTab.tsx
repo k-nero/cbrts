@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { App } from 'antd';
+import { App, Flex } from 'antd';
 
 import { fileApi } from '@/apis/file';
 import { Callout } from '@/components/ui';
@@ -19,12 +19,20 @@ export function ClearanceTab({ job }: Props) {
   const roles = useAuthStore((state) => state.roles);
   const [uploadingTo, setUploadingTo] = useState<ChecklistItem | null>(null);
 
+  // The gate covers the whole job; this says which trips of the journey it holds back (US-F3-21).
+  const journeyNote = job.clearanceJourneyNote ? (
+    <Callout tone="info" title={job.clearanceJourneyNote} />
+  ) : null;
+
   if (!roles.includes(RoleNameEnum.TRANSPORT_SPECIALIST))
     return (
-      <Callout tone="info" title="The clearance checklist is kept by the transport specialist">
-        The transport specialist checks each document against the regulation catalogs and clears the
-        gate. {job.clearanceGateSummary}
-      </Callout>
+      <Flex vertical gap={16}>
+        {journeyNote}
+        <Callout tone="info" title="The clearance checklist is kept by the transport specialist">
+          The transport specialist checks each document against the regulation catalogs and clears
+          the gate. {job.clearanceGateSummary}
+        </Callout>
+      </Flex>
     );
 
   const viewFile = (fileId: string) => {
@@ -34,7 +42,8 @@ export function ClearanceTab({ job }: Props) {
   };
 
   return (
-    <>
+    <Flex vertical gap={16}>
+      {journeyNote}
       <ClearanceChecklist
         jobId={job.id}
         withGate={false}
@@ -42,6 +51,6 @@ export function ClearanceTab({ job }: Props) {
         onUpload={setUploadingTo}
       />
       <UploadVersionModal item={uploadingTo} jobId={job.id} onClose={() => setUploadingTo(null)} />
-    </>
+    </Flex>
   );
 }

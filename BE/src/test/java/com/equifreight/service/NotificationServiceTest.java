@@ -99,7 +99,7 @@ class NotificationServiceTest {
                             "TRANSPORT_REQUEST",
                             request.getId(),
                             "REQ-2026-0031",
-                            "/requests/" + request.getId() + "/submitted",
+                            "/requests/" + request.getId(),
                             null);
         }
         verify(stream).changedAfterCommit(List.of(bookings.getId(), trainer.getId()));
@@ -148,8 +148,7 @@ class NotificationServiceTest {
                 .isEqualTo("/requests/" + request.getId() + "/quotation");
         assertThat(NotificationService.linkFor(Subject.quotation(q), staff))
                 .isEqualTo("/staff/requests/" + request.getId());
-        assertThat(NotificationService.linkFor(Subject.job(job), club))
-                .isEqualTo("/requests/" + request.getId() + "/submitted");
+        assertThat(NotificationService.linkFor(Subject.job(job), club)).isEqualTo("/requests/" + request.getId());
         assertThat(NotificationService.linkFor(Subject.job(job), staff)).isEqualTo("/staff/jobs/" + job.getId());
         assertThat(NotificationService.linkFor(Subject.job(job), escorts)).isEqualTo("/escort");
         assertThat(NotificationService.linkFor(Subject.job(job), Audience.role(RoleName.ESCORT)))
@@ -157,7 +156,7 @@ class NotificationServiceTest {
         assertThat(NotificationService.linkFor(Subject.authoritySubmission(submission), staff))
                 .isEqualTo("/staff/jobs/" + job.getId() + "?tab=authorities");
         assertThat(NotificationService.linkFor(Subject.authoritySubmission(submission), club))
-                .isEqualTo("/requests/" + request.getId() + "/submitted");
+                .isEqualTo("/requests/" + request.getId());
         assertThat(NotificationService.linkFor(Subject.documents(job), club))
                 .isEqualTo("/requests/" + request.getId() + "/documents");
         assertThat(NotificationService.linkFor(Subject.documents(job), staff))

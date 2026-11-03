@@ -19,6 +19,7 @@ import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.DepositResponse;
 import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.service.CustomerQuotationService;
+import com.equifreight.service.MoveProgressService;
 import com.equifreight.service.RequestService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -41,7 +42,8 @@ class RequestControllerTest {
     void setUp() {
         service = mock(RequestService.class);
         quotations = mock(CustomerQuotationService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new RequestController(service, quotations))
+        mvc = MockMvcBuilders.standaloneSetup(
+                        new RequestController(service, quotations, mock(MoveProgressService.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new ControllerAdvise())
                 .build();

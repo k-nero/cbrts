@@ -27,4 +27,9 @@ public class Place extends BaseEntity {
 
     @Column(length = 300)
     private String address;
+
+    /** An airport or its cargo terminal: where a flight takes the horses on and hands them over. */
+    public boolean isTerminal() {
+        return kind == PlaceKind.AIRPORT || kind == PlaceKind.CARGO_TERMINAL;
+    }
 }

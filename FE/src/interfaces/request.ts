@@ -1,3 +1,5 @@
+import type { Tone } from '@/components/ui';
+
 import type { HorseSex } from './horse';
 import type { QuotationIssuedRef } from './quotation';
 import type { TransportMode } from './job';
@@ -44,6 +46,8 @@ export interface Place {
   city: string;
   countryCode: string;
   countryName: string;
+  /** Null when none was given. */
+  address?: string | null;
 }
 
 /** One end of a request: a catalog place, or the city the customer typed (`text`). */
@@ -72,6 +76,19 @@ export interface HubLeg {
 }
 
 /**
+ * A local road run within one city, between the stable and the airport's cargo terminal, before or after a flight
+ * (US-F3-22): "Đại Nam Racecourse → TCS cargo terminal, Tân Sơn Nhất (SGN)".
+ */
+export interface TerminalRun {
+  corridorId: string;
+  code: string;
+  city: string;
+  fromPlace: string;
+  toPlace: string;
+  distanceKm: number | null;
+}
+
+/**
  * A corridor we run, read in the direction of travel (GET /customer/routes). Without a destination
  * (the alternatives on a route we don't run) the countries, crossBorder and lead time are null.
  */
@@ -94,6 +111,16 @@ export interface Route {
   firstLeg?: HubLeg | null;
   /** The road leg from the hub this corridor arrives in to the destination's city; null when none. */
   lastLeg?: HubLeg | null;
+  /** Before a flight from a stable, the local run to the cargo terminal; null when none. */
+  toTerminal?: TerminalRun | null;
+  /** After a flight that lands in the stable's city, the local run from the cargo terminal; null when none. */
+  fromTerminal?: TerminalRun | null;
+  /** The customer's pickup and delivery places by name; null without a destination. */
+  fromPlace?: string | null;
+  toPlace?: string | null;
+  /** A flight's airport terminal at each end, by name; null by road or when none is in the catalog. */
+  departureTerminal?: string | null;
+  arrivalTerminal?: string | null;
 }
 
 export interface LeadTime {
@@ -155,6 +182,8 @@ export interface TransportRequest {
   history?: HistoryEntry[];
   /** What happens next, on the customer's read; null when nothing more happens. */
   nextStep?: NextStep | null;
+  /** The approved request's job code (BR-F1-05), on the customer's read; its trip is tracked here. */
+  jobCode?: string | null;
   /** Null until submitted. */
   code: string | null;
   status: RequestStatus;
@@ -211,6 +240,19 @@ export interface RequestSummary {
   submittedAt: string | null;
   /** The latest issued quotation; null until one is issued. */
   quotation: QuotationIssuedRef | null;
+  /** Where an approved request's move stands, read from its job: the request itself stays Approved. */
+  move?: MoveProgress | null;
+  /** What holds it, in words and a tone ("Quotation waiting for you"); null once nothing does. */
+  holds?: { text: string; tone: Tone } | null;
+  /** YYYY-MM-DD, the day the club's step is due by; null when it has none or isn't theirs. */
+  dueOn?: string | null;
+}
+
+/** An approved request's move in a word and a tone, and whether its page tracks the trip yet. */
+export interface MoveProgress {
+  label: string;
+  tone: 'ok' | 'info' | 'warn' | 'neutral';
+  tracking: boolean;
 }
 
 /** The body of POST and PUT /customer/requests, sent whole: a field left out is cleared. */

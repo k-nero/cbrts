@@ -31,4 +31,16 @@ public record RouteResponse(
         /** The domestic road leg from the origin's city to the hub this corridor leaves from (US-F1-09); else null. */
         RouteLegResponse firstLeg,
         /** The domestic road leg from the hub this corridor arrives in to the destination's city; else null. */
-        RouteLegResponse lastLeg) {}
+        RouteLegResponse lastLeg,
+        /** Before a flight from a stable, the local run to the cargo terminal (US-F3-22); else null. */
+        RouteTerminalRunResponse toTerminal,
+        /** After a flight that lands in the stable's city, the local run from the cargo terminal; else null. */
+        RouteTerminalRunResponse fromTerminal,
+        /** The customer's pickup place by name; null without a destination. */
+        String fromPlace,
+        /** The customer's delivery place by name; null without a destination. */
+        String toPlace,
+        /** A flight's airport terminal at the city it leaves from, by name; null by road or when none is in the catalog. */
+        String departureTerminal,
+        /** A flight's airport terminal at the city it lands in, by name; null by road or when none is in the catalog. */
+        String arrivalTerminal) {}

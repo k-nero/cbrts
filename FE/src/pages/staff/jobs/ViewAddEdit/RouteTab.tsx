@@ -1,101 +1,144 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { App, Flex } from 'antd';
-import { ContinueTripModal } from './ContinueTripModal';
+import { Flex } from 'antd';
+
+import { ConfirmRouteModal } from './ConfirmRouteModal';
+import { DepartureReadiness } from './DepartureReadiness';
 import { FlightPanel } from './FlightPanel';
 import { JoinableTrips } from './JoinableTrips';
 import { OnTheRoad } from './OnTheRoad';
+import { departureReadiness } from './readiness';
+import { legLine, span, stopTimes } from './timeline';
+import { TripConnections } from './TripConnections';
+import { RouteChecks } from './RouteChecks';
+import { routeChecks } from './routeDraft';
 import { RouteEditor } from './RouteEditor';
+import { RouteSummary } from './RouteSummary';
 import { ShareSuggestions } from './ShareSuggestions';
 
-import { Button, Callout, Chip, Panel, TimelineStop } from '@/components/ui';
-import {
-  useCanPlanTrips,
-  useConfirmRoutePlan,
-  useRemoveChainedTrip,
-  useRoutePlans,
-} from '@/hooks/useJob';
-import type { JobDetail, RouteStop, RouteStopKind } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
+import { Button, Callout, Chip, cx, Panel, TimelineStop } from '@/components/ui';
+import { useCanPlanTrips, useRoutePlans } from '@/hooks/useJob';
+import type { JobDetail } from '@/interfaces';
+import { formatTime, ict } from '@/lib/utils';
 
 interface Props {
   job: JobDetail;
 }
 
-/** Where a journey continues on another trip: the places horses wait between carriers (US-F3-16). */
-const SPLITS: RouteStopKind[] = ['AIRPORT_OUT', 'AIRPORT_IN', 'QUARANTINE'];
+/** How much of the arrival window the delivery leaves spare (DESIGN.md, arrival window on the Route plan). */
+function windowSpare(plannedAt: string, windowEnd: string) {
+  const minutes = ict(windowEnd).diff(ict(plannedAt), 'minute');
+  const closes = formatTime(windowEnd);
+  if (minutes === 0) return `Planned as the window closes at ${closes}.`;
+  return minutes > 0
+    ? `Planned ${span(minutes)} before the window closes at ${closes}.`
+    : `Planned ${span(minutes)} after the window closes at ${closes}.`;
+}
 
 export function RouteTab({ job }: Props) {
   const routePlan = job.routePlan;
   const { data: allVersions } = useRoutePlans(job.id);
-  const { message, modal } = App.useApp();
-  const [, setSearchParams] = useSearchParams();
-  const [splitAt, setSplitAt] = useState<RouteStop | null>(null);
-  const removeTrip = useRemoveChainedTrip(job.id);
-  const confirmRoute = useConfirmRoutePlan(job.id);
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [, setSearchParams] = useSearchParams();
+  // Editing takes over the Route view (DESIGN.md, Route editor). It opens at the top of the view; Cancel returns to
+  // where the coordinator was, and Save to the top, where the new draft waits to be confirmed.
+  const root = useRef<HTMLDivElement>(null);
+  const scrollBack = useRef<number | null>(null);
+  const startEditing = () => {
+    scrollBack.current = window.scrollY;
+    setEditing(true);
+  };
+  const stopEditing = (saved: boolean) => {
+    if (saved) scrollBack.current = null;
+    setEditing(false);
+  };
+  const wasEditing = useRef(editing);
+  useLayoutEffect(() => {
+    if (wasEditing.current === editing) return;
+    wasEditing.current = editing;
+    if (!editing && scrollBack.current !== null) {
+      window.scrollTo({ top: scrollBack.current });
+      scrollBack.current = null;
+      return;
+    }
+    const top = root.current?.getBoundingClientRect().top;
+    if (top !== undefined && top < 0) root.current?.scrollIntoView({ block: 'start' });
+  }, [editing]);
 
   // The trip of the journey this tab plans, and the one that hands the horses on to it (US-F3-16).
   const index = job.parts.findIndex((part) => part.current);
   const part = index < 0 ? null : job.parts[index];
   const before = index > 0 && job.parts[index - 1].handsOn ? job.parts[index - 1] : null;
   const departed = (part?.status ?? job.tripStatus) !== 'NOT_STARTED';
-  // Splitting the journey, taking a trip out, sharing and editing the route are the trip planners' (US-F3-16,
-  // US-F3-11, US-F3-17).
+  // Sharing and editing the route are the trip planners' (US-F3-11, US-F3-17); the journey's trips are added and
+  // taken off on the Trip tab's rail (US-F3-21).
   const planning = useCanPlanTrips() && !departed;
 
-  const takeOut = () =>
-    modal.confirm({
-      title: 'Take this trip out of the journey?',
-      content: `${job.code} travels on ${before?.corridorCode ?? 'the trip before'} again to the end of this trip's stops. This trip's plan for ${job.code} is dropped; a trip nobody else rides releases its trailers and crew.`,
-      okText: 'Take it out',
-      onOk: () =>
-        removeTrip.mutateAsync(part!.tripId).then(
-          () => {
-            message.success(`${job.code} travels on the trip before again.`);
-            setSearchParams({ tab: 'route', trip: before!.tripId }, { replace: true });
-          },
-          (error) => message.error(apiErrorMessage(error, 'The trip was not taken out.')),
-        ),
-    });
-
-  // A later trip of the journey says where it continues from, and can be taken out before it leaves.
+  // A later trip of the journey says where it collects the horses (US-F3-16, US-F3-21).
   const chainPanel =
     before && part ? (
       <Callout
         tone="info"
-        title={`Continues the journey after ${before.corridorCode ?? 'the trip before'}`}
+        title={`Collects the horses from ${before.tripCode} in ${part.startCity ?? 'the city it starts from'}`}
       >
-        <Flex vertical gap={12}>
-          <span>
-            The horses join this trip when the trip before hands them on at its transfer stop; it
-            can’t depart before then.
-          </span>
-          {planning && (
-            <div>
-              <Button variant="secondary" size="sm" onClick={takeOut}>
-                Take this trip out of the journey
-              </Button>
-            </div>
-          )}
-        </Flex>
+        The horses join this trip when {before.tripCode} hands them on at its transfer stop; it
+        can’t depart before then.
       </Callout>
     ) : null;
 
   // The trip's draft, newer than its confirmed route if it has one: edited and confirmed here (US-F3-17).
   const draft = allVersions?.find((v) => v.status === 'DRAFT') ?? null;
   const confirmed = allVersions?.find((v) => v.status === 'CONFIRMED') ?? null;
-  const editor =
-    editing && planning ? (
-      <RouteEditor
-        job={job}
-        from={draft ?? confirmed}
-        supersedes={confirmed !== null}
-        onClose={() => setEditing(false)}
-      />
-    ) : null;
+  const formatWindow = () => {
+    if (job.windowStart && job.windowEnd) {
+      return `${ict(job.windowEnd).format('D MMM')}, ${formatTime(job.windowStart)}–${formatTime(job.windowEnd)}`;
+    }
+    return 'Any time';
+  };
+
+  // While the route is edited the editor is the whole view: the timeline, the strip and the panels around it come
+  // back on save or cancel, so the route is never on screen twice.
+  const corridorKm = (draft ?? confirmed)?.corridorDistanceKm;
+  const welfarePlanned = (draft ?? confirmed)?.corridorWelfareStops;
+  const corridorFacts = [
+    corridorKm ? `is ${corridorKm} km` : null,
+    welfarePlanned
+      ? `plans for ${welfarePlanned} welfare ${welfarePlanned === 1 ? 'stop' : 'stops'}`
+      : null,
+  ].filter(Boolean);
+  const corridorLine = corridorFacts.length
+    ? `${part?.corridorCode ?? 'The corridor'} ${corridorFacts.join(' and ')}.`
+    : null;
+  if (editing && planning) {
+    return (
+      <Flex ref={root} vertical gap={24} className="scroll-mt-6">
+        {chainPanel}
+        <RouteEditor
+          job={job}
+          from={draft ?? confirmed}
+          supersedes={confirmed !== null}
+          note={[
+            part?.handsOn
+              ? 'The route ends where it hands the horses on to the next trip.'
+              : job.windowStart && job.windowEnd
+                ? `Arrival window: ${formatWindow()}.`
+                : 'No arrival window is set for this job.',
+            // What the legs and welfare stops are checked against.
+            corridorLine,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClose={stopEditing}
+        />
+      </Flex>
+    );
+  }
+  // The checks the server runs on confirmation, shown before Confirm; a failing one holds it back.
+  const checks = draft ? routeChecks(draft, job) : [];
+  const blocked = checks.some((c) => c.blocks && !c.ok);
   const draftPanel =
-    draft && planning && !editing ? (
+    draft && planning ? (
       <Callout tone="warn" title={`Draft v${draft.versionNo} isn’t confirmed yet`}>
         <Flex vertical gap={12}>
           <span>
@@ -104,28 +147,31 @@ export function RouteTab({ job }: Props) {
               : 'Confirm it to set the trip’s dates; the load plan and sign-off follow.'}
             {draft.changeReason ? ` Reason: ${draft.changeReason}` : ''}
           </span>
-          <Flex gap={8}>
+          <RouteChecks checks={checks} />
+          <Flex gap={8} align="center" wrap>
             <Button
               variant="primary"
               size="sm"
-              disabled={confirmRoute.isPending}
-              onClick={() =>
-                confirmRoute.mutate(
-                  { planId: draft.id },
-                  {
-                    onSuccess: () => message.success(`Route v${draft.versionNo} confirmed.`),
-                    onError: (error) =>
-                      message.error(apiErrorMessage(error, 'The route was not confirmed.')),
-                  },
-                )
-              }
+              disabled={blocked}
+              onClick={() => setConfirming(true)}
             >
-              {confirmRoute.isPending ? 'Confirming...' : `Confirm draft v${draft.versionNo}`}
+              {`Confirm draft v${draft.versionNo}`}
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            <Button variant="secondary" size="sm" onClick={startEditing}>
               Edit draft
             </Button>
+            {blocked && (
+              <span className="type-body-s text-ink-3">Fix the checks marked Fix to confirm.</span>
+            )}
           </Flex>
+          <ConfirmRouteModal
+            job={job}
+            draft={draft}
+            confirmed={confirmed}
+            checks={checks}
+            open={confirming}
+            onClose={() => setConfirming(false)}
+          />
         </Flex>
       </Callout>
     ) : null;
@@ -147,117 +193,55 @@ export function RouteTab({ job }: Props) {
 
   if (!routePlan) {
     return (
-      <Flex vertical gap={24}>
+      <Flex ref={root} vertical gap={24} className="scroll-mt-6">
         {chainPanel}
-        {editor ?? (
-          <div className="p-8 text-center">
-            <Flex vertical gap={12} align="center">
-              <p className="type-body-s m-0 text-ink-3">This trip has no route yet.</p>
-              {planning && (
-                <Button variant="primary" size="md" onClick={() => setEditing(true)}>
-                  Plan the route
-                </Button>
-              )}
-            </Flex>
-          </div>
-        )}
+        <div className="p-8 text-center">
+          <Flex vertical gap={12} align="center">
+            <p className="type-body-s m-0 text-ink-3">This trip has no route yet.</p>
+            {planning && (
+              <Button variant="primary" size="md" onClick={startEditing}>
+                Plan the route
+              </Button>
+            )}
+          </Flex>
+        </div>
         {sharePanel}
         <OnTheRoad job={job} />
       </Flex>
     );
   }
 
-  const isGateClear = job.clearanceGateState === 'Clear';
-
-  const formatWindow = () => {
-    if (job.windowStart && job.windowEnd) {
-      const s = new Date(job.windowStart).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const e = new Date(job.windowEnd).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const d = new Date(job.windowEnd).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-      });
-      return `${d}, ${s}–${e}`;
-    }
-    return 'Any time';
-  };
+  // What the trip still needs before it leaves; the one gold action is the first open step's.
+  const readiness = departureReadiness(
+    job,
+    part,
+    before,
+    // A draft waiting to be confirmed holds the route open, and the gold with it.
+    (confirmed !== null || routePlan.status === 'CONFIRMED') && !draft,
+  );
 
   const stops = routePlan.stops ?? [];
-  // One trip of a journey starts and ends where its own route does (US-F3-16).
-  const journey = job.parts.some((p) => p.handsOn);
-  const origin = journey ? (stops[0]?.placeName ?? job.originCity) : job.originCity;
-  const destination = journey
-    ? (stops.at(-1)?.placeName ?? job.destinationCity)
-    : job.destinationCity;
-  const welfareCount = stops.filter((s) => s.kind === 'WELFARE').length;
-  const borderCrossing = stops.find((s) => s.kind === 'BORDER')?.borderCrossingName || 'None';
+  const times = stopTimes(stops);
 
   return (
-    <Flex vertical gap={32}>
+    <Flex ref={root} vertical gap={24} className="scroll-mt-6">
+      {/* Always first, above every callout; it carries the trip's clearance gate as a chip. */}
+      <RouteSummary job={job} routePlan={routePlan} />
+
       {chainPanel}
       {draftPanel}
-      {editor}
-      {sharePanel}
-      <ContinueTripModal job={job} stop={splitAt} onClose={() => setSplitAt(null)} />
-
-      {/* Summary Strip (matching Figma scrRoute) */}
-      <div className="p-6 rounded-xl border border-line bg-card shadow-xs">
-        <Flex wrap gap={32} align="center" justify="space-between">
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Origin</span>
-            <span className="type-label-m text-ink">{origin}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Destination</span>
-            <span className="type-label-m text-ink">{destination}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Distance</span>
-            <span className="type-label-m text-ink">{routePlan.distanceKm || 0} km</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Duration</span>
-            <span className="type-label-m text-ink">
-              {routePlan.durationMin ? `${(routePlan.durationMin / 60).toFixed(1)} h` : '—'}
-            </span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Border crossing</span>
-            <span className="type-label-m text-ink">{borderCrossing}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Welfare stops</span>
-            <span className="type-label-m text-ink">{welfareCount}</span>
-          </Flex>
-          <Flex vertical gap={4}>
-            <span className="type-body-s text-ink-3">Arrival window</span>
-            <span className="type-label-m text-ink">
-              {part?.handsOn ? 'Hands on to the next trip' : formatWindow()}
-            </span>
-          </Flex>
-        </Flex>
-      </div>
 
       <FlightPanel job={job} />
+
+      <TripConnections job={job} />
 
       {/* Timeline of Stops */}
       <Flex vertical gap={16}>
         <Flex align="center" justify="space-between">
           <h3 className="type-h3 text-ink">Timeline</h3>
           <Flex gap={8} align="center">
-            {planning && !draft && !editing && (
-              <Button
-                variant="secondary"
-                size="sm"
-
-                onClick={() => setEditing(true)}
-              >
+            {planning && !draft && (
+              <Button variant="secondary" size="sm" onClick={startEditing}>
                 Edit route
               </Button>
             )}
@@ -265,14 +249,13 @@ export function RouteTab({ job }: Props) {
           </Flex>
         </Flex>
 
-        <Flex vertical gap={16}>
-          {stops.map((stop) => {
-            const timeStr = stop.plannedAt
-              ? new Date(stop.plannedAt).toLocaleTimeString('en-GB', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '—';
+        <div className="flex flex-col">
+          {stops.map((stop, i) => {
+            const timeStr = times[i];
+            // The leg to the next stop, under a 2 px rule beneath the marker (DESIGN.md, Route editor).
+            const leg =
+              i < stops.length - 1 ? routePlan.legs?.find((l) => l.fromStopId === stop.id) : null;
+            const line = leg ? legLine(leg) : null;
 
             // On a shared trip each pickup and delivery names its job (US-F3-11).
             const shared = new Set(stops.map((s) => s.jobCode).filter(Boolean)).size > 1;
@@ -281,64 +264,66 @@ export function RouteTab({ job }: Props) {
                 ? stop.borderCrossingName || 'Border'
                 : stop.placeName || 'Stop';
             const stopName = shared && stop.jobCode ? `${placeName} · ${stop.jobCode}` : placeName;
+            // The delivery says how much of the arrival window the plan leaves spare.
+            const spare =
+              stop.kind === 'DELIVERY' &&
+              (!stop.jobCode || stop.jobCode === job.code) &&
+              !part?.handsOn &&
+              job.windowStart &&
+              job.windowEnd &&
+              stop.plannedAt
+                ? windowSpare(stop.plannedAt, job.windowEnd)
+                : null;
+            const details = [stop.details, spare].filter(Boolean).join(' ');
 
-            // Before departure, the journey can continue on another trip from an airport or quarantine stop.
-            const canSplit = planning && SPLITS.includes(stop.kind);
             return (
-              <TimelineStop
-                key={stop.id}
-                kind={stop.kind}
-                stop={stopName}
-                time={timeStr}
-                details={stop.details || undefined}
-                status={
-                  canSplit ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      trailingIcon="arrow-right"
-                      onClick={() => setSplitAt(stop)}
-                    >
-                      Continue on another trip
-                    </Button>
-                  ) : undefined
-                }
-              />
+              <div key={stop.id} className="flex flex-col">
+                <TimelineStop
+                  kind={stop.kind}
+                  stop={stopName}
+                  time={timeStr}
+                  details={details || undefined}
+                />
+                {i < stops.length - 1 && (
+                  <div className="ml-[17px] min-h-4 border-l-2 border-line py-2.5 pl-[33px]">
+                    {line && (
+                      <span
+                        className={cx(
+                          'type-caption',
+                          line.missingTime ? 'text-warn' : 'text-ink-3',
+                        )}
+                      >
+                        {line.text}
+                        {line.missingTime &&
+                          ' · the welfare stops this drive needs can’t be checked'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
-        </Flex>
+        </div>
       </Flex>
 
-      {/* Departure Gate / Action */}
-      <div className="p-6 rounded-xl border border-line bg-card">
-        <Flex vertical gap={16}>
-          {!isGateClear ? (
-            <>
-              <Callout tone="bad" title="Departure can’t be recorded yet">
-                {job.clearanceGateSummary ||
-                  'The clearance gate is locked. All document requirements, permits, and approvals must be completed before recording departure.'}
-              </Callout>
-              <div>
-                <Button variant="primary" size="md" disabled leadingIcon="lock">
-                  Record departure
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Callout tone="ok" title="Clear to depart">
-                {job.clearanceGateSummary ||
-                  'The dossier is cleared. The driver may record departure.'}
-              </Callout>
-              <div>
-                <Button variant="primary" size="md" leadingIcon="arrow-right">
-                  Record departure
-                </Button>
-              </div>
-            </>
-          )}
-        </Flex>
-      </div>
+      {/* Ready to depart, until the trip leaves and On the road takes over; */}
+      {!departed && (
+        <DepartureReadiness
+          job={job}
+          part={part}
+          steps={readiness}
+          onOpenLoadPlan={() =>
+            setSearchParams(
+              { tab: 'trip', ...(part ? { trip: part.tripId } : {}), view: 'load-plan' },
+              { replace: true },
+            )
+          }
+          onOpenClearance={() => setSearchParams({ tab: 'clearance' }, { replace: true })}
+        />
+      )}
+
+      {/* Not in the Route plan frame, so after its blocks: sharing and joining (US-F3-13, US-F3-18). */}
+      {sharePanel}
 
       {/* Version History */}
       {allVersions && allVersions.length > 1 && (

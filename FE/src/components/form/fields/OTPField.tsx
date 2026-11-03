@@ -33,9 +33,10 @@ const OTPField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, ...field } }) => {
+      render={({ field: { onChange, onBlur, ...field }, labelId }) => {
         return (
           <Input.OTP
+            aria-labelledby={labelId}
             disabled={disabled}
             {...props}
             {...field}

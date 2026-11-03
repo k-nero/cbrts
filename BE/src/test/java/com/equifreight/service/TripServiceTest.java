@@ -1176,6 +1176,28 @@ class TripServiceTest {
     }
 
     @Test
+    @DisplayName("Escort opens the trip they name by its code, and not one they don't crew")
+    void escortTrip_byTripCode() {
+        job.setSignedOffAt(NOW.minus(Duration.ofHours(1)));
+        job.setTripStatus(TripStatus.NOT_STARTED);
+        when(jobs.findByCode(job.getCode())).thenReturn(Optional.of(job));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(loads.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId()))
+                .thenReturn(List.of());
+        when(crew.findByTrip_Id(trip.getId())).thenReturn(List.of());
+
+        assertEquals(
+                "TRP-2026-001",
+                service.escortTrip(job.getCode(), escort, "TRP-2026-001").tripCode());
+        assertThrows(ResourceNotFoundException.class, () -> service.escortTrip(job.getCode(), escort, "TRP-2026-999"));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.addEscortRecord(
+                        job.getCode(), escort, request(TripRecordKind.NOTE, NOW, null), "TRP-2026-999"));
+    }
+
+    @Test
     @DisplayName("Escort retains access mid-trip even if a plan change cleared signedOffAt")
     void escortAccess_allowedMidTripEvenIfSignedOffAtNull() {
         job.setSignedOffAt(null);

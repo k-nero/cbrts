@@ -121,8 +121,9 @@ var STATS = { components: 0, variants: 0 };
 
 function flush() { var p = PENDING.splice(0); return Promise.all(p); }
 /* queue a text style; a node removed before the style lands (e.g. a table dropped for an error state) is not an error */
-function styleLater(t, id) {
-  PENDING.push(t.setTextStyleIdAsync(id).catch(function (e) { if (!t.removed) throw e; }));
+/* a text style carries its own decoration, so an underline goes back on once the style lands */
+function styleLater(t, id, deco) {
+  PENDING.push(t.setTextStyleIdAsync(id).then(function () { if (deco) t.textDecoration = deco; }).catch(function (e) { if (!t.removed) throw e; }));
 }
 
 /* ---------------------------------------------------------------------
@@ -278,12 +279,13 @@ function Tx(str, style, color, o) {
   t.letterSpacing = { unit: 'PERCENT', value: s.ls };
   if (s.upper) t.textCase = 'UPPER';
   t.characters = String(str);
-  if (!o.noStyle) styleLater(t, s.id);
+  if (!o.noStyle) styleLater(t, s.id, o.underline ? 'UNDERLINE' : null);
   t.fills = [P(color || 'text/primary')];
   if (o.align) t.textAlignHorizontal = o.align;
   if (o.w) { t.textAutoResize = 'HEIGHT'; t.resize(o.w, t.height); } else t.textAutoResize = 'WIDTH_AND_HEIGHT';
   if (o.fill) { t.textAutoResize = 'HEIGHT'; fillW(t); }
   if (o.strike) t.textDecoration = 'STRIKETHROUGH';
+  if (o.underline) t.textDecoration = 'UNDERLINE';
   if (o.opacity != null) t.opacity = o.opacity;
   return t;
 }

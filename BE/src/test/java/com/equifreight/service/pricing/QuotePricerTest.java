@@ -973,9 +973,75 @@ class QuotePricerTest {
         assertThat(leg.description()).contains("private trailer");
         assertThat(leg.amount()).isEqualByComparingTo("3456.00");
         assertThat(leg.basisText()).isEqualTo("per km · 960 km · RD DAD → HCM");
-        assertThat(group(quote, "A")).isEqualByComparingTo(group(without, "A").add(d("3456.00")));
+        // The leg replaces the flat transfer to the cargo terminal (250.00).
+        assertThat(group(quote, "A"))
+                .isEqualByComparingTo(group(without, "A").subtract(d("250.00")).add(d("3456.00")));
         assertThat(quote.missing()).isEmpty();
         assertThat(quote.totals().total()).isGreaterThan(without.totals().total());
+    }
+
+    private static RoadLeg fromTheHub(Integer km, RateRow... freight) {
+        return new RoadLeg("G", "RD HKG → STN", "Hong Kong", "Sha Tin", km, List.of(freight));
+    }
+
+    private static boolean has(PricedQuote quote, String lineKey) {
+        return quote.lines().stream().anyMatch(l -> l.lineKey().equals(lineKey));
+    }
+
+    @Test
+    @DisplayName("A leg to the hub drops the flat transfer to the cargo terminal, and only it (US-F3-21)")
+    void aLegToTheHubDropsTheFlatTransferAtOrigin() {
+        RateRow privateRoad =
+                kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400");
+
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960, privateRoad)), pnhHkgRates());
+
+        assertThat(has(quote, "TRANSFER_ORIGIN")).isFalse();
+        // Loading is in group A too, but charged per horse whoever brings them: it stays.
+        assertThat(has(quote, "LOADING")).isTrue();
+        // The other end has no road leg: its flat transfer stays.
+        assertThat(has(quote, "TRANSFER_DEST")).isTrue();
+    }
+
+    @Test
+    @DisplayName("A leg from the hub drops the flat transfer from the cargo terminal (US-F3-21)")
+    void aLegFromTheHubDropsTheFlatTransferAtDestination() {
+        RateRow privateRoad =
+                kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400");
+
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), fromTheHub(30, privateRoad)), pnhHkgRates());
+
+        assertThat(has(quote, "TRANSFER_DEST")).isFalse();
+        assertThat(has(quote, "TRANSFER_ORIGIN")).isTrue();
+        assertThat(find(quote, "Road freight Hong Kong → Sha Tin").group()).isEqualTo("G");
+    }
+
+    @Test
+    @DisplayName("A leg with no road rate still covers its end: the quotation waits for the rate, not the flat line")
+    void aLegWithNoRoadRateStillDropsTheFlatTransfer() {
+        PricedQuote quote = QuotePricer.price(withLeg(pnhHkgBusiness(), toTheHub(960)), pnhHkgRates());
+
+        assertThat(has(quote, "TRANSFER_ORIGIN")).isFalse();
+        assertThat(quote.missing()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("An unflagged line at an end with a road leg is still charged")
+    void anUnflaggedTransferIsKept() {
+        RateRow privateRoad =
+                kmLine("ROAD_PRIVATE", "Road freight, private trailer", TrailerType.PRIVATE, "3.60", "400");
+        RateSet rates = pnhHkgRates();
+        List<RateRow> unflagged = rates.lines().stream()
+                .map(r -> r.code().equals("TRANSFER_ORIGIN")
+                        ? line(r.code(), r.group(), r.description(), r.basis(), "250")
+                        : r)
+                .toList();
+
+        PricedQuote quote = QuotePricer.price(
+                withLeg(pnhHkgBusiness(), toTheHub(960, privateRoad)),
+                new RateSet(rates.versionNo(), rates.classes(), unflagged, rates.breaks(), rates.policies()));
+
+        assertThat(has(quote, "TRANSFER_ORIGIN")).isTrue();
     }
 
     @Test

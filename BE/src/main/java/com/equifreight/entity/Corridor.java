@@ -46,6 +46,13 @@ public class Corridor extends BaseEntity {
     @Column(nullable = false)
     private short drivingDays = 1;
 
+    /**
+     * The welfare stops a road route plans for, 0 to 20, set by the fleet & route coordinator: a road may have fewer
+     * welfare stations open than its length would want. Null until set, when none are planned or checked; always null
+     * on an air route. A route short of it is a warning, not a refusal.
+     */
+    private Short welfareStops;
+
     /** The country the route starts in: the first crossing's, or its origin city's places'. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_country_id", nullable = false)
@@ -68,6 +75,14 @@ public class Corridor extends BaseEntity {
 
     public boolean isRoad() {
         return mode == TransportMode.ROAD;
+    }
+
+    /**
+     * A road route within one city, such as "RD HCM local": the run between a stable and the cargo terminal, a trip of
+     * its own with a vehicle and crew, before or after a flight.
+     */
+    public boolean isLocal() {
+        return isRoad() && originCity != null && originCity.equalsIgnoreCase(destinationCity);
     }
 
     /** Whether the route leaves the country it starts in: "RD HCM → BKK" and "AIR SGN → HKG" do, "RD DAD → HCM" doesn't. */

@@ -37,6 +37,8 @@ import {
   toDraftInput,
   windowLength,
   type WizardValues,
+  moveRef,
+  quotationButton,
 } from './request';
 
 import {
@@ -442,11 +444,83 @@ describe('route words', () => {
     );
     expect(routeStops(viaHub).map((s) => [s.name, s.kind])).toEqual([
       ['Da Nang', 'Pickup'],
-      ['Ho Chi Minh City', 'Hub · ~960 km'],
+      ['Ho Chi Minh City', 'Terminal · ~960 km'],
       ['Hong Kong', '~1,500 km'],
     ]);
+    // By road, the city the leg brings the horses to stays a hub.
+    expect(routeStops({ ...hcmPnh, firstLeg: viaHub.firstLeg })[1].kind).toBe('Hub · ~960 km');
     expect(routeEnds(viaHub)).toEqual({ from: 'Da Nang', to: 'Hong Kong' });
     expect(routeEnds(sgnHkg)).toEqual({ from: 'Ho Chi Minh City', to: 'Hong Kong' });
+  });
+
+  test('a flight from a stable (US-F3-22): the local run to the cargo terminal, then the flight', () => {
+    const fromStable = {
+      ...sgnHkg,
+      toTerminal: {
+        corridorId: 'c-hcm',
+        code: 'RD HCM local',
+        city: 'Ho Chi Minh City',
+        fromPlace: 'Đại Nam Racecourse',
+        toPlace: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+        distanceKm: 40,
+      },
+      lastLeg: {
+        corridorId: 'c-hkg',
+        code: 'RD HKG → Sha Tin',
+        fromCity: 'Hong Kong',
+        toCity: 'Sha Tin',
+        distanceKm: 40,
+      },
+    };
+    expect(routeStops(fromStable).map((s) => [s.name, s.kind])).toEqual([
+      ['Đại Nam Racecourse', 'Pickup'],
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
+      ['Hong Kong', 'Terminal · ~1,500 km'],
+      ['Sha Tin', '~40 km'],
+    ]);
+    // With the places and terminals named, every stop reads by name.
+    const named = {
+      ...fromStable,
+      fromPlace: 'Đại Nam Racecourse',
+      toPlace: 'Sha Tin Racecourse stables (HKJC)',
+      departureTerminal: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      arrivalTerminal: 'Cathay Cargo Terminal (HKG)',
+    };
+    expect(routeStops(named).map((s) => [s.name, s.kind])).toEqual([
+      ['Đại Nam Racecourse', 'Pickup'],
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Terminal · ~40 km'],
+      ['Cathay Cargo Terminal (HKG)', 'Terminal · ~1,500 km'],
+      ['Sha Tin Racecourse stables (HKJC)', '~40 km'],
+    ]);
+    expect(routeSentence(fromStable)).toBe(
+      'About 1,580 km by air, by road to the cargo terminal first and by road from Hong Kong after, worked out from your route.',
+    );
+  });
+
+  test('a flight to a stable in the city it lands in: the local run from the cargo terminal', () => {
+    const toStable = {
+      ...sgnHkg,
+      fromTerminal: {
+        corridorId: 'c-hkg',
+        code: 'RD HKG local',
+        city: 'Hong Kong',
+        fromPlace: 'Cathay Cargo Terminal (HKG)',
+        toPlace: 'Sha Tin stables',
+        distanceKm: 35,
+      },
+    };
+    const named = {
+      ...toStable,
+      fromPlace: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      toPlace: 'Hong Kong stables',
+      departureTerminal: 'TCS cargo terminal, Tân Sơn Nhất (SGN)',
+      arrivalTerminal: 'Cathay Cargo Terminal (HKG)',
+    };
+    expect(routeStops(named).map((s) => [s.name, s.kind])).toEqual([
+      ['TCS cargo terminal, Tân Sơn Nhất (SGN)', 'Pickup'],
+      ['Cathay Cargo Terminal (HKG)', 'Terminal · ~1,500 km'],
+      ['Hong Kong stables', '~35 km'],
+    ]);
   });
 
   test('borders summary', () => {
@@ -838,5 +912,36 @@ describe("the route's flexible dates (#115)", () => {
     expect(departureHint(route({ earliestDeparture: '2026-11-29', dateFlexDays: 3 }), true)).toBe(
       'Earliest departure 2 Dec 2026 · 21 days’ notice, plus 3 for dates that can move',
     );
+  });
+});
+
+describe('moveRef', () => {
+  test('a submitted request shows its code; a draft, which has none yet, says Draft', () => {
+    expect(moveRef({ requestCode: 'REQ-2026-0193' })).toBe('REQ-2026-0193');
+    expect(moveRef({ requestCode: null })).toBe('Draft');
+  });
+});
+
+describe('quotationButton', () => {
+  test('a quotation waiting for the club is the row’s one primary step', () => {
+    expect(
+      quotationButton({
+        status: 'QUOTED',
+        holds: { text: 'Quotation waiting for you', tone: 'warn' },
+      }),
+    ).toEqual({ label: 'Review quotation', primary: true });
+  });
+
+  test('one whose departure has come asks nothing, so it only opens', () => {
+    expect(
+      quotationButton({
+        status: 'QUOTED',
+        holds: { text: 'Departure passed · nothing to answer', tone: 'neutral' },
+      }),
+    ).toEqual({ label: 'Open quotation', primary: false });
+    expect(quotationButton({ status: 'EXPIRED', holds: null })).toEqual({
+      label: 'Open quotation',
+      primary: false,
+    });
   });
 });

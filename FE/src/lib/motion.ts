@@ -65,9 +65,14 @@ export const fade: Variants = {
 
 /**
  * A page or a list row settling into place: a shorter, quicker rise than `rise`, so moving between
- * pages and scanning a list never feels slow. A list hands each row its turn with `stagger`.
+ * pages and scanning a list never feels slow. A list hands each row its turn with `stagger`, or a row
+ * that watches the view itself takes its turn through `custom`.
  */
 export const settle: Variants = {
   hidden: { opacity: 0, y: 8 },
-  shown: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE_OUT } },
+  shown: (delay?: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: EASE_OUT, ...at(delay) },
+  }),
 };

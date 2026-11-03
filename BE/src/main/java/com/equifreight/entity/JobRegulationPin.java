@@ -2,11 +2,12 @@ package com.equifreight.entity;
 
 import com.equifreight.entity.enums.RegulationRole;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * The regulation versions a job's checklist was built from (BR-F2-01).
+ * The regulation versions a job's checklist was built from (BR-F2-01), and the ones it moved off.
  */
 @Setter
 @Getter
@@ -30,4 +31,9 @@ public class JobRegulationPin extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private RegulationRole role;
+
+    /**
+     * When the job moved onto a newer version of the same catalog; the pin stays as history. Null while in force.
+     */
+    private Instant supersededAt;
 }

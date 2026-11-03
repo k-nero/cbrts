@@ -9,4 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RouteStopRepository extends JpaRepository<RouteStop, UUID> {
     List<RouteStop> findByRoutePlanIdOrderBySeq(UUID routePlanId);
+
+    boolean existsByPlaceId(UUID placeId);
+
+    boolean existsByBorderCrossingId(UUID borderCrossingId);
 }

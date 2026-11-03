@@ -18,6 +18,12 @@ export const apiErrorCode = (error: unknown): string | null =>
   (error as AxiosError<Partial<ApiError>> | undefined)?.response?.data?.error ?? null;
 
 /**
+ * A job's trip asked for before the coordinator has added its first one (US-F3-21): the API answers
+ * NO_TRIP, which means "not on the road yet", not a failed load.
+ */
+export const noTripYet = (error: unknown): boolean => apiErrorCode(error) === 'NO_TRIP';
+
+/**
  * Where a refusal goes on a form. A 400 "Validation Failed" maps each `details` line ("heightHh: must
  * not be null") onto its field; a code listed in `fieldsByCode` (HORSE_NAME_TAKEN → name) puts the
  * server's sentence on that field; everything else is one sentence for the form, the server's own,

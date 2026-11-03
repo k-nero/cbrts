@@ -19,7 +19,7 @@ PR 1 (backend core) follows §3 and §5, adjusted to the conventions that change
 - **Every existing caller moved to `notify(...)`**: 11 call sites, not 2. The authority's request for more information is `AUTHORITY_INFO_REQUIRED` and goes to the club's accounts. `DOSSIER_LATE` uses the dedupe key `DOSSIER_LATE:{submissionId}`, so the daily repeat stays one unread row.
 - **API:** `GET /api/v1/me/notifications?unread=true|false`, `GET /unread-count`, `POST /{id}/read` (404 for anyone else's id), `POST /read-all`. The mapper is a static `NotificationMapper`, as AGENTS.md asks, not MapStruct.
 - **§7 note:** AGENTS.md now forbids a native `<button>` in a page; the bell belongs in `components/ui` (where a native button is allowed) or uses the `ui` Button.
-- **Customer links** open `/requests/{id}/submitted` (or `/quotation`): the portal has no `/requests/{id}` route.
+- **Customer links** open `/requests/{id}` (or `/quotation`), the request page. Links stored before it moved say `/requests/{id}/submitted`, which redirects there.
 
 ### Live updates and the frontend (23 Oct 2026)
 

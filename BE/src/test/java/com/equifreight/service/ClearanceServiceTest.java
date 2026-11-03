@@ -336,7 +336,8 @@ class ClearanceServiceTest {
         when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(quarantinePeriodRepository.findByJobId(job.getId())).thenReturn(List.of());
         when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
-        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+        when(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(job.getId()))
+                .thenReturn(List.of(pin));
 
         ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
 
@@ -580,7 +581,8 @@ class ClearanceServiceTest {
         JobRegulationPin pin = new JobRegulationPin();
         pin.setRole(RegulationRole.DESTINATION);
         pin.setRegulationVersion(version);
-        when(jobRegulationPinRepository.findByJobId(job.getId())).thenReturn(List.of(pin));
+        when(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(job.getId()))
+                .thenReturn(List.of(pin));
         when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(regulationRuleRepository.findByVersionIdIn(Set.of(version.getId())))
                 .thenReturn(List.of(passport));
@@ -827,5 +829,51 @@ class ClearanceServiceTest {
         assertThrows(
                 ResourceNotFoundException.class,
                 () -> clearanceService.getCustomerVersions(checklistItem.getId(), customerOf(other)));
+    }
+
+    @Test
+    @DisplayName("Both catalogs list a document: the mandatory rule wins, and on a tie the destination's, in any order")
+    void theStricterRuleGovernsADocumentBothCatalogsList() {
+        RegulationVersion vn = version();
+        RegulationVersion hk = version();
+        java.util.Map<UUID, RegulationRole> roles =
+                java.util.Map.of(vn.getId(), RegulationRole.ORIGIN, hk.getId(), RegulationRole.DESTINATION);
+        DocumentType exportCert = documentType();
+        DocumentType passport = documentType();
+        RegulationRule vnExport = rule(vn, exportCert, true);
+        RegulationRule hkExport = rule(hk, exportCert, false);
+        RegulationRule vnPassport = rule(vn, passport, true);
+        RegulationRule hkPassport = rule(hk, passport, true);
+
+        List<RegulationRule> picked =
+                ClearanceService.governingRules(List.of(hkExport, vnExport, vnPassport, hkPassport), roles);
+        List<RegulationRule> reversed =
+                ClearanceService.governingRules(List.of(hkPassport, vnPassport, vnExport, hkExport), roles);
+
+        assertEquals(2, picked.size());
+        assertTrue(picked.contains(vnExport), "the mandatory rule wins over the optional one");
+        assertTrue(picked.contains(hkPassport), "on a tie the destination's rule wins");
+        assertEquals(Set.copyOf(picked), Set.copyOf(reversed));
+    }
+
+    private static RegulationVersion version() {
+        RegulationVersion v = new RegulationVersion();
+        v.setId(UUID.randomUUID());
+        return v;
+    }
+
+    private static DocumentType documentType() {
+        DocumentType t = new DocumentType();
+        t.setId(UUID.randomUUID());
+        return t;
+    }
+
+    private static RegulationRule rule(RegulationVersion version, DocumentType type, boolean mandatory) {
+        RegulationRule r = new RegulationRule();
+        r.setId(UUID.randomUUID());
+        r.setVersion(version);
+        r.setDocumentType(type);
+        r.setMandatory(mandatory);
+        return r;
     }
 }

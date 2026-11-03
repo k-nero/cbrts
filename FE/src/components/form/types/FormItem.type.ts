@@ -11,6 +11,10 @@ export type FormItemProps<
     render: (props: {
       field: Omit<ControllerRenderProps<TFieldValues, TName>, 'ref'>;
       formState: UseFormStateReturn<TFieldValues>;
+      /** The id the field puts on its focusable element, so the label names it. */
+      inputId: string;
+      /** The label's id, for a field whose control is a group rather than one input. */
+      labelId: string;
     }) => ReactNode;
   };
 

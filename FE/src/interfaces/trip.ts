@@ -118,6 +118,9 @@ export interface TripPart {
   mode: 'ROAD' | 'AIR' | null;
   /** True when this part hands its horses on to the next trip of the journey. */
   handsOn: boolean;
+  /** The cities the trip runs from and to, its corridor read in the trip's direction (US-F3-21). */
+  startCity: string | null;
+  endCity: string | null;
 }
 export interface TripSummary {
   /** The job the trip's page opens with. */
@@ -132,6 +135,8 @@ export interface TripSummary {
   jobCodes: string[];
   /** Where the trip stands, on the office board only (US-F4-04); null elsewhere. */
   progress: TripProgress | null;
+  /** The request the job came from, on the customer's list only: its page tracks the trip. */
+  requestId?: string | null;
 }
 /** The leg a trip is on and its last checkpoint, from recorded checkpoints only (BE TripSummaryResponse.Progress). */
 export interface TripProgress {

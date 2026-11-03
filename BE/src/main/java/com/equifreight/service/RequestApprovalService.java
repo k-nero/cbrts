@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -25,6 +26,7 @@ import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -123,6 +125,15 @@ public class RequestApprovalService {
         }
         if (jobs.existsByRequestId(request.getId())) {
             throw new ConflictException("JOB_EXISTS", request.getCode() + " already has its job.");
+        }
+        // A job can't be made for a day already come; rejecting voids the deposit and frees the customer.
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.now(clock.withZone(BusinessTime.ZONE)))) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(departure) + " has come, so " + request.getCode()
+                            + " can't be approved. Reject it with a reason; the customer can start a new request for"
+                            + " a later date.");
         }
         Quotation accepted = quotations
                 .findFirstByRequestIdAndStatusOrderByVersionNoDesc(request.getId(), QuotationStatus.ACCEPTED)

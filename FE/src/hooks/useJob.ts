@@ -1,11 +1,13 @@
 import { createContext, useContext, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { corridorApi, jobApi, jobsListApi, routeStopApi } from '@/apis/job';
 import { useCrudResource } from '@/hooks/crud';
+import { canSignOffTripPlan } from '@/lib/utils/rbac';
 import { useAuthStore } from '@/stores/authStore';
 import {
   type FlightAllocationInput,
+  type FlightInput,
   type JobDetail,
   type JobFilter,
   JobFilterEnum,
@@ -43,6 +45,19 @@ export const useJobDetail = (jobId: string, options?: { refetchInterval?: number
     refetchInterval: options?.refetchInterval,
   });
 };
+
+/**
+ * The job's page for every trip of its journey, so the journey rail and band can say where each trip stands. Each
+ * shares its cache with the trip's own page; a job of one trip asks for nothing extra.
+ */
+export const useJourneyDetails = (jobId: string, tripIds: string[]) =>
+  useQueries({
+    queries: (tripIds.length > 1 ? tripIds : []).map((trip) => ({
+      queryKey: jobKey(jobId, trip),
+      queryFn: () => jobApi.getDetail(jobId, trip),
+      enabled: Boolean(jobId),
+    })),
+  });
 
 export const useLoadPlan = (jobId: string) => {
   const trip = useJobTrip();
@@ -217,15 +232,24 @@ export const useAssignCrew = (jobId: string) => {
     mutationFn: ({
       crew,
       tripVehicleId,
+      flight = false,
     }: {
       crew: { userId: string; crewRole: string }[];
       tripVehicleId?: string;
-    }) => jobApi.assignCrew(jobId, crew, tripVehicleId, false, trip),
+      /** The trip's flight crew (flying grooms, the flight vet) instead of a trailer's (US-F3-15). */
+      flight?: boolean;
+    }) => jobApi.assignCrew(jobId, crew, tripVehicleId, flight, trip),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },
   });
 };
+
+export const useCrewCandidates = () =>
+  useQuery({
+    queryKey: ['staff', 'crew', 'candidates'],
+    queryFn: jobApi.crewCandidates,
+  });
 
 export const useSignOffTripPlan = (jobId: string) => {
   const queryClient = useQueryClient();
@@ -260,6 +284,12 @@ export const useCanPlanTrips = () => {
   return (
     roles.includes(RoleNameEnum.FLEET_COORDINATOR) || roles.includes(RoleNameEnum.LOGISTICS_MANAGER)
   );
+};
+
+/** Whether the signed-in staff member signs off trip plans: the logistics manager only (US-F3-08). */
+export const useCanSignOffTripPlan = () => {
+  const roles = useAuthStore((state) => state.roles) as string[];
+  return canSignOffTripPlan(roles);
 };
 
 /** Puts another job on this job's trip; both jobs' plans reopen. */
@@ -341,16 +371,19 @@ export const useCorridors = (enabled: boolean) =>
     staleTime: 5 * 60 * 1000,
   });
 
-/**
- * Continues the job's journey on a new trip from an airport or quarantine stop (US-F3-16). The
- * trip before reopens, so every view of the job refetches.
- */
-export const useContinueOnTrip = (jobId: string) => {
+/** The corridors the next trip of the job's journey can run (US-F3-21). */
+export const useJourneyCorridors = (jobId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ['job', jobId, 'journey-corridors'],
+    queryFn: () => jobApi.journeyCorridors(jobId),
+    enabled: Boolean(jobId) && enabled,
+  });
+
+/** Drafts the job's journey from its quote (US-F3-22); every view of the job refetches. */
+export const useDraftJourney = (jobId: string) => {
   const queryClient = useQueryClient();
-  const trip = useJobTrip();
   return useMutation({
-    mutationFn: ({ stopSeq, corridorId }: { stopSeq: number; corridorId: string }) =>
-      jobApi.continueOnTrip(jobId, stopSeq, corridorId, trip),
+    mutationFn: () => jobApi.draftJourney(jobId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
@@ -358,11 +391,23 @@ export const useContinueOnTrip = (jobId: string) => {
   });
 };
 
-/** Takes a later trip out of the job's journey (US-F3-16); it travels on the trip before again. */
-export const useRemoveChainedTrip = (jobId: string) => {
+/** Adds a trip to the end of the job's journey (US-F3-21); every view of the job refetches. */
+export const useAddTrip = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (trip: string) => jobApi.removeChainedTrip(jobId, trip),
+    mutationFn: (corridorId: string) => jobApi.addTrip(jobId, corridorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Takes the journey's last trip off before it departs (US-F3-21). */
+export const useRemoveTrip = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (trip: string) => jobApi.removeTrip(jobId, trip),
     onSuccess: (_parts, trip) => {
       // The trip is no longer the job's: drop its views rather than refetch them.
       queryClient.removeQueries({ queryKey: jobKey(jobId, trip) });
@@ -371,6 +416,18 @@ export const useRemoveChainedTrip = (jobId: string) => {
         predicate: (query) => !query.queryKey.includes(trip),
       });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Sets the flight of a flight trip of the journey (US-F3-21). */
+export const useSetFlight = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ trip, flight }: { trip: string; flight: FlightInput }) =>
+      jobApi.setFlight(jobId, trip, flight),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
     },
   });
 };

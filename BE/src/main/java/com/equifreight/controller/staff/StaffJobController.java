@@ -6,10 +6,11 @@ import com.equifreight.model.job.*;
 import com.equifreight.model.trip.TripPartResponse;
 import com.equifreight.service.CrewAssignmentService;
 import com.equifreight.service.FlightService;
+import com.equifreight.service.JourneyDrafter;
+import com.equifreight.service.JourneyService;
 import com.equifreight.service.LoadPlanService;
 import com.equifreight.service.RoutePlanService;
 import com.equifreight.service.TransportJobService;
-import com.equifreight.service.TripChainService;
 import com.equifreight.service.TripSharingService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -32,7 +33,8 @@ public class StaffJobController {
     private final CrewAssignmentService crewAssignmentService;
     private final TripSharingService tripSharingService;
     private final FlightService flightService;
-    private final TripChainService tripChainService;
+    private final JourneyService journeyService;
+    private final JourneyDrafter journeyDrafter;
 
     public StaffJobController(
             TransportJobService transportJobService,
@@ -41,14 +43,16 @@ public class StaffJobController {
             CrewAssignmentService crewAssignmentService,
             TripSharingService tripSharingService,
             FlightService flightService,
-            TripChainService tripChainService) {
+            JourneyService journeyService,
+            JourneyDrafter journeyDrafter) {
         this.transportJobService = transportJobService;
         this.loadPlanService = loadPlanService;
         this.routePlanService = routePlanService;
         this.crewAssignmentService = crewAssignmentService;
         this.tripSharingService = tripSharingService;
         this.flightService = flightService;
-        this.tripChainService = tripChainService;
+        this.journeyService = journeyService;
+        this.journeyDrafter = journeyDrafter;
     }
 
     /**
@@ -259,27 +263,55 @@ public class StaffJobController {
     }
 
     /**
-     * US-F3-16: Chain of trips - continue the job's journey on a new trip of another corridor, from an airport or
-     * quarantine stop of its trip's route, before that trip departs.
+     * US-F3-21: The corridors the next trip of the job's journey can run, read from the city the journey has reached.
      */
-    @PostMapping("/{jobId}/trip/chain")
-    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public List<TripPartResponse> continueOnTrip(
-            @PathVariable UUID jobId,
-            @Valid @RequestBody ContinueTripRequest request,
-            @AuthenticationPrincipal User user) {
-        return tripChainService.continueOn(jobId, request.tripId(), request.stopSeq(), request.corridorId(), user);
+    @GetMapping("/{jobId}/journey/corridors")
+    public List<JourneyCorridorResponse> nextCorridors(@PathVariable UUID jobId) {
+        return journeyService.nextCorridors(jobId);
     }
 
     /**
-     * US-F3-16: Chain of trips - take a later trip out of the job's journey before it or the trip before departs; the
-     * job travels on the trip before again.
+     * US-F3-22: Draft the job's journey from its quoted route for the coordinator to review: a trip per corridor, and
+     * each road route drafted and timed. Refused once the job has a trip.
      */
-    @DeleteMapping("/{jobId}/trip/chain/{tripId}")
+    @PostMapping("/{jobId}/journey/draft")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
-    public List<TripPartResponse> removeChainedTrip(
+    public List<TripPartResponse> draftJourney(@PathVariable UUID jobId, @AuthenticationPrincipal User user) {
+        return journeyDrafter.draft(jobId, user);
+    }
+
+    /**
+     * US-F3-21: Add a trip on a catalog corridor to the end of the job's journey; approval makes none.
+     */
+    @PostMapping("/{jobId}/journey/trips")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripPartResponse> addTrip(
+            @PathVariable UUID jobId, @Valid @RequestBody AddTripRequest request, @AuthenticationPrincipal User user) {
+        return journeyService.addTrip(jobId, request.corridorId(), user);
+    }
+
+    /**
+     * US-F3-21: Take the last trip off the job's journey before it departs; the only trip leaves the job with none.
+     */
+    @DeleteMapping("/{jobId}/journey/trips/{tripId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripPartResponse> removeTrip(
             @PathVariable UUID jobId, @PathVariable UUID tripId, @AuthenticationPrincipal User user) {
-        return tripChainService.remove(jobId, tripId, user);
+        return journeyService.removeTrip(jobId, tripId, user);
+    }
+
+    /**
+     * US-F3-21: Set the flight of a flight trip of the journey; its times become the airport stops' times.
+     */
+    @PutMapping("/{jobId}/journey/trips/{tripId}/flight")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public JobDetailResponse setFlight(
+            @PathVariable UUID jobId,
+            @PathVariable UUID tripId,
+            @Valid @RequestBody SetFlightRequest request,
+            @AuthenticationPrincipal User user) {
+        journeyService.setFlight(jobId, tripId, request, user);
+        return transportJobService.getJobDetail(jobId, tripId);
     }
 
     /**
@@ -325,6 +357,15 @@ public class StaffJobController {
     public List<CrewMemberResponse> getCrew(
             @PathVariable UUID jobId, @RequestParam(value = "trip", required = false) UUID trip) {
         return crewAssignmentService.getCrew(jobId, trip);
+    }
+
+    /**
+     * US-F3-06: Crew assignment - available escorts for drivers and grooms, for the roles that assign them.
+     */
+    @GetMapping("/crew/candidates")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<CrewCandidateResponse> crewCandidates() {
+        return crewAssignmentService.getCandidates();
     }
 
     /**

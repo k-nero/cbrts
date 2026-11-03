@@ -16,10 +16,14 @@ import { App, Col, Divider, Flex, Row, Select, Skeleton } from 'antd';
 import { horseMeta, QUEUE_DROP_ID, temperamentChip } from './loadPlan';
 import { QueueColumn } from './QueueColumn';
 import { QueueHorse } from './QueueHorse';
+import { RouteSummary } from './RouteSummary';
+import { FlightCrew } from './FlightCrew';
+import { SignOffButton } from './SignOffButton';
 import { BiosecurityWarnings } from './BiosecurityWarnings';
 import { StallLegend } from './StallLegend';
 import { TrailerDiagram } from './TrailerDiagram';
 import { TripJobsPanel } from './TripJobsPanel';
+import { AssignCrewModal } from './AssignCrewModal';
 
 import { Button, Callout, Chip, Icon, LoadItem, Panel, Progress, StatTile } from '@/components/ui';
 import {
@@ -32,7 +36,6 @@ import {
   useJobTrip,
   useMoveHorse,
   useRemoveTrailer,
-  useSignOffTripPlan,
 } from '@/hooks/useJob';
 import { useActiveVehicles } from '@/hooks/useVehicle';
 import { type JobDetail, type JobHorse, type LoadPlanStall, RoleNameEnum, type Vehicle } from '@/interfaces';
@@ -87,6 +90,8 @@ export function LoadPlanTab({ job }: Props) {
   const [dragging, setDragging] = useState<Picked | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [trailerToAdd, setTrailerToAdd] = useState<string>();
+  const [assigningTrailerId, setAssigningTrailerId] = useState<string | null>(null);
+  const canPlanTrips = useCanPlanTrips();
 
   // The vehicles for this trip, each saying whether it may join it and why not (US-F7-01).
   const tripId = useJobTrip();
@@ -98,7 +103,6 @@ export function LoadPlanTab({ job }: Props) {
   const moveMutation = useMoveHorse(job.id);
   const autoArrangeMutation = useAutoArrange(job.id);
   const confirmMutation = useConfirmLoadPlan(job.id);
-  const signOffMutation = useSignOffTripPlan(job.id);
   const addTrailerMutation = useAddTrailer(job.id);
   const removeTrailerMutation = useRemoveTrailer(job.id);
 
@@ -118,12 +122,11 @@ export function LoadPlanTab({ job }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   // A trip of the journey that only flies (US-F3-16) has its flight as its carrier: no trailer to
-  // load. Each job's stall positions are its consignment on the flight, on the Route tab.
+  // load. Each job's stall positions are its consignment on the flight, shown above (US-F3-21).
   const legs = job.routePlan?.legs ?? [];
   const onlyFlies = legs.length > 0 && legs.every((leg) => leg.mode === 'AIR');
   if (onlyFlies) {
     const flights = legs.flatMap((leg) => (leg.flight ? [leg.flight] : []));
-    const flightCrew = job.crew.filter((c) => c.onFlight);
     return (
       <Flex vertical gap={24}>
         <TripJobsPanel job={job} />
@@ -132,37 +135,18 @@ export function LoadPlanTab({ job }: Props) {
             <p className="type-body-m m-0 text-ink-2">
               The flight is this trip’s carrier, so it has no trailer to load:{' '}
               {flights.map((f) => `${f.airline} ${f.flightNo}`).join(', ') || 'flight not set yet'}.
-              Each job’s stall positions and air waybill are its consignment, on the Route tab.
+              Each job’s stall positions and air waybill are its consignment, above.
             </p>
-            <span className="type-body-s text-ink-3">
-              Flight crew:{' '}
-              {flightCrew.length > 0
-                ? flightCrew
-                    .map((c) => `${c.name} (${c.crewRole.toLowerCase().replace('_', ' ')})`)
-                    .join(', ')
-                : 'none assigned yet'}
-            </span>
-            {isLogisticsManager && (
-              <div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  disabled={signOffMutation.isPending}
-                  onClick={() =>
-                    signOffMutation.mutate(undefined, {
-                      onError: reportRefusal('The trip plan couldn’t be signed off. Try again.'),
-                    })
-                  }
-                >
-                  {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-                </Button>
-              </div>
-            )}
+            {/* Sign-off is Ready to depart's, below, as on a road trip. */}
+            <FlightCrew job={job} />
           </Flex>
         </Panel>
       </Flex>
     );
   }
+
+  // The route's summary strip leads the Load plan view as it leads the Route view, and carries the trip's gate.
+  const routeSummary = job.routePlan ? <RouteSummary job={job} routePlan={job.routePlan} /> : null;
 
   if (!loadPlan) {
     const defaultVehicle = activeVehicles?.find((v) => v.available !== false);
@@ -170,6 +154,7 @@ export function LoadPlanTab({ job }: Props) {
 
     return (
       <Flex vertical gap={24}>
+        {routeSummary}
         <TripJobsPanel job={job} />
         <div className="p-12">
           <Flex vertical align="center" justify="center">
@@ -256,7 +241,9 @@ export function LoadPlanTab({ job }: Props) {
   const occupiedStalls = stalls.filter((s) => s.horse !== null && s.horse !== undefined).length;
   const editable = !isConfirmed && !busy && canPlan;
   // Trailers are added or taken out before departure only; after it, only through an incident.
-  const canChangeTrailers = job.tripStatus === 'NOT_STARTED' && canPlan;
+  const canChangeTrailers = job.tripStatus === 'NOT_STARTED';
+  // The coordinator or the manager assigns the crew, until the trip leaves (US-F3-06).
+  const canAssignCrew = canPlanTrips && job.tripStatus === 'NOT_STARTED';
   const onTrip = new Set(trailers.map((t) => t.vehicleId));
   const spareVehicles = (activeVehicles ?? []).filter((v) => !onTrip.has(v.id));
   const trailerOf = (stallId: string) =>
@@ -349,6 +336,7 @@ export function LoadPlanTab({ job }: Props) {
       onDragCancel={() => setDragging(null)}
     >
       <Flex vertical gap={24}>
+        {routeSummary}
         {/* The jobs sharing this trip (US-F3-11) */}
         <TripJobsPanel job={job} />
 
@@ -588,46 +576,40 @@ export function LoadPlanTab({ job }: Props) {
                             ? `${job.crew.filter((c) => c.crewRole === 'GROOM').length} grooms`
                             : 'Not assigned'}
                         </span>
-                        {job.crew.length === 0 ? (
-                          <span className="type-body-s text-ink-2 truncate">
-                            {convoy
-                              ? 'Assign a driver and grooms to each trailer'
-                              : 'Assign driver and grooms'}
-                          </span>
-                        ) : (
-                          <>
-                            {trailers.map((t) => {
-                              const onTrailer = job.crew.filter(
-                                (c) => c.tripVehicleId === t.tripVehicleId,
-                              );
-                              return (
-                                <span
-                                  key={t.tripVehicleId}
-                                  className="type-body-s text-ink-2 truncate"
-                                >
-                                  {convoy && `${t.vehicleCode}: `}
-                                  {onTrailer.length > 0
-                                    ? onTrailer
-                                        .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
-                                        .join(', ')
-                                    : 'No crew yet'}
-                                </span>
-                              );
-                            })}
-                            {job.crew.some((c) => c.onFlight) && (
-                              <span className="type-body-s text-ink-2 truncate">
-                                Flight:{' '}
-                                {job.crew
-                                  .filter((c) => c.onFlight)
-                                  .map(
-                                    (c) =>
-                                      `${c.name} (${c.crewRole.toLowerCase().replace('_', ' ')})`,
-                                  )
-                                  .join(', ')}
+                        {/* Each trailer has its own driver and grooms; the crew can change until departure,
+                              and a change after sign-off needs a new one (US-F3-06, US-F3-10). */}
+                        {trailers.map((t) => {
+                          const onTrailer = job.crew.filter(
+                            (c) => c.tripVehicleId === t.tripVehicleId,
+                          );
+                          return (
+                            <Flex key={t.tripVehicleId} vertical gap={4} className="min-w-0">
+                              <span
+                                className="type-body-s text-ink-2 truncate"
+                                title={onTrailer.map((c) => c.name).join(', ') || undefined}
+                              >
+                                {convoy && `${t.vehicleCode}: `}
+                                {onTrailer.length > 0
+                                  ? onTrailer
+                                      .map((c) => `${c.name} (${c.crewRole.toLowerCase()})`)
+                                      .join(', ')
+                                  : 'Assign a driver and grooms'}
                               </span>
-                            )}
-                          </>
-                        )}
+                              {canAssignCrew && (
+                                <div>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setAssigningTrailerId(t.tripVehicleId)}
+                                  >
+                                    {onTrailer.length > 0 ? 'Change' : 'Assign'}
+                                  </Button>
+                                </div>
+                              )}
+                            </Flex>
+                          );
+                        })}
+                        {legs.some((leg) => leg.mode === 'AIR') && <FlightCrew job={job} />}
                       </Flex>
                     </Col>
 
@@ -639,9 +621,11 @@ export function LoadPlanTab({ job }: Props) {
                           {job.clearanceGateState === 'Clear' ? 'Clear to depart' : 'Locked'}
                         </Chip>
                         <span className="type-body-s text-ink-3">
+                          {/* Clear: the gate's own sentence, which on a domestic leg says why it may leave. Locked:
+                              the band above names the items. */}
                           {job.clearanceGateState === 'Clear'
-                            ? 'Dossier complete.'
-                            : 'Departure stays locked until clearance is ready.'}
+                            ? job.clearanceGateSummary || 'Clear to depart.'
+                            : 'Departure stays locked until the outstanding items clear.'}
                         </span>
                       </Flex>
                     </Col>
@@ -700,22 +684,7 @@ export function LoadPlanTab({ job }: Props) {
                           </Button>
                         </>
                       )}
-                      {isConfirmed && isLogisticsManager && (
-                        <Button
-                          variant="primary"
-                          size="md"
-                          disabled={signOffMutation.isPending}
-                          onClick={() =>
-                            signOffMutation.mutate(undefined, {
-                              onError: reportRefusal(
-                                'The trip plan couldn’t be signed off. Try again.',
-                              ),
-                            })
-                          }
-                        >
-                          {signOffMutation.isPending ? 'Signing off...' : 'Sign off trip plan'}
-                        </Button>
-                      )}
+                      {isConfirmed && <SignOffButton job={job} />}
                     </Flex>
                   </Flex>
                 </Flex>
@@ -727,6 +696,14 @@ export function LoadPlanTab({ job }: Props) {
 
       {/* What follows the pointer: a compact card beside the cursor, so the stall under it
           keeps showing its drop hint. */}
+      {assigningTrailerId !== null && (
+        <AssignCrewModal
+          job={job}
+          tripVehicleId={assigningTrailerId}
+          open={assigningTrailerId !== null}
+          onClose={() => setAssigningTrailerId(null)}
+        />
+      )}
       <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
         {dragging && (
           <div className="w-64">

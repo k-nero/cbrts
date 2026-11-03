@@ -24,6 +24,8 @@ public record ChecklistItemResponse(
         Short minDays,
         Short maxDays,
         String ruleDescription,
+        /** The catalog the rule comes from: "Hong Kong v2", the origin's or the destination's pinned version. */
+        String ruleCatalog,
         // Scope targets
         UUID horseId,
         String horseName,
@@ -37,6 +39,10 @@ public record ChecklistItemResponse(
         Instant evaluatedAt,
         ChecklistHolder holder,
         LocalDate dueDate,
+        /** The job moved onto a catalog version that no longer lists this document; it no longer counts. */
+        Instant droppedAt,
+        /** The item came from a catalog version the job moved onto later ("Added in Hong Kong v5"). */
+        boolean addedByUpdate,
         // Latest version uploaded
         DocumentVersionResponse currentVersion,
         Instant createdAt,

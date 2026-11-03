@@ -5,6 +5,7 @@ import com.equifreight.model.route.CorridorResponse;
 import com.equifreight.model.route.CreateCorridorRequest;
 import com.equifreight.model.route.DateFlexRequest;
 import com.equifreight.model.route.DrivingDaysRequest;
+import com.equifreight.model.route.UpdateCorridorRequest;
 import com.equifreight.service.CorridorService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,6 +55,24 @@ public class CorridorController {
     public CorridorResponse create(
             @AuthenticationPrincipal User user, @Valid @RequestBody CreateCorridorRequest request) {
         return corridorService.create(user, request);
+    }
+
+    /** Edits a route: its code, distance, flexible and driving days, and a road route's border crossings. */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('FLEET_COORDINATOR')")
+    public CorridorResponse update(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateCorridorRequest request) {
+        return corridorService.update(user, id, request);
+    }
+
+    /** Deletes a route nothing has used yet; one with history is refused, saying what uses it. */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('FLEET_COORDINATOR')")
+    public void delete(@AuthenticationPrincipal User user, @PathVariable UUID id) {
+        corridorService.delete(user, id);
     }
 
     @PutMapping("/{id}/date-flex")

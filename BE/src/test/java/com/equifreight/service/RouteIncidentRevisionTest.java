@@ -82,7 +82,8 @@ class RouteIncidentRevisionTest {
                 mock(ClearanceService.class),
                 jobTrips,
                 audit,
-                mock(TripNotices.class));
+                mock(TripNotices.class),
+                PlanningStub.planningDefaults());
     }
 
     @Test

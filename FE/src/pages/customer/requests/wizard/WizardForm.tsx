@@ -192,7 +192,7 @@ export const WizardForm: FC<{ saved: TransportRequest | undefined; step: WizardS
       return response;
     } catch (error) {
       if (errorCode(error) === 'REQUEST_NOT_DRAFT' && saved) {
-        router.replace(router.paths.get('request-submitted', { pathParams: [saved.id] }), {
+        router.replace(router.paths.get('request', { pathParams: [saved.id] }), {
           force: true,
         });
         return null;

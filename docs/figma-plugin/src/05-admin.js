@@ -572,6 +572,7 @@ function scrRates() {
   addAll(pair, [fillW(titled('Volume breaks', 'Applied to air and ground lines.', breaks)), fillW(policy)]);
   var cert = function (c) { return chip(c === 'Fixed' ? 'Neutral' : 'Warn', c, { noDot: true }); };
   var lines = tbl('Catalog lines', [['Line', null], ['Basis', 200, null, 'Mono/Caption', 'text/secondary'], ['Rate', 110, 'RIGHT', 'Mono/Data'], ['', 110, 'RIGHT']], [
+    { cells: ['Road transfer to the cargo terminal', 'per shipment · not where a road leg covers this end', '$250', cert('Fixed')] },
     { cells: ['Pre-export isolation · stallion', 'per day', '$140', cert('Fixed')] },
     { cells: ['Pre-export isolation · mare', 'per day', '$85', cert('Fixed')] },
     { cells: ['Pre-export isolation · gelding', 'per day', '$70', cert('Fixed')] },
@@ -579,6 +580,7 @@ function scrRates() {
     { cells: ['Flight veterinarian', '8+ horses or > $250,000', '$2,200', cert('Fixed')] },
     { cells: ['Export health certificate', 'per horse', '$180', cert('Fixed')] },
     { cells: ['Customs and border documentation', 'per crossing', '$420', cert('Fixed')] },
+    { cells: ['Road transfer from the cargo terminal', 'per shipment · not where a road leg covers this end', '$300', cert('Fixed')] },
     { cells: ['Waiting time at terminal', 'per hour', '$95', cert('Estimated')] }
   ]);
   var mainCol = VV({ name: 'Catalog', gap: 24 });
@@ -928,8 +930,10 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Users & roles · Error': ['yen', 'Users & roles', ['Users & roles']],
   'Logistics manager · Users & roles · Pending invites': ['yen', 'Users & roles', ['Users & roles', 'Pending invites']],
   'Transport specialist · Clearance checklist': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Clearance']],
-  'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Load plan']],
-  'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Route']],
+  'Fleet & route coordinator · Load plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
+  'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
+  'Fleet & route coordinator · Trip · Flight': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
+  'Fleet & route coordinator · Trip · Journey': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
   'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],

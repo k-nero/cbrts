@@ -19,6 +19,7 @@ public final class RouteMapper {
                 .city(place.getCity())
                 .countryCode(place.getCountry().getCode())
                 .countryName(place.getCountry().getName())
+                .address(place.getAddress())
                 .build();
     }
 
@@ -38,6 +39,10 @@ public final class RouteMapper {
                 .distanceKm(corridor.getDistanceKm())
                 .dateFlexDays(corridor.getDateFlexDays())
                 .drivingDays(corridor.getDrivingDays())
+                .welfareStops(
+                        corridor.getWelfareStops() == null
+                                ? null
+                                : corridor.getWelfareStops().intValue())
                 .crossings(crossings)
                 .countries(
                         corridor.getOriginCountry() == null

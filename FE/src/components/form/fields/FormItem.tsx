@@ -1,4 +1,4 @@
-import { CSSProperties, useMemo } from 'react';
+import { CSSProperties, useId, useMemo } from 'react';
 import { Controller, FieldPath, FieldValues, useFormContext } from 'react-hook-form';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { Flex, Form, Tooltip } from 'antd';
@@ -30,6 +30,9 @@ const FormItem = <
   ...rest
 }: FormItemProps<TFieldValues, TName>) => {
   const { control, getFieldState } = useFormContext<TFieldValues>();
+  // The label names its input: each field puts `inputId` on its focusable element.
+  const inputId = useId();
+  const labelId = `${inputId}-label`;
 
   const shouldShowLabel = useMemo(
     () => (typeof showLabel === 'boolean' ? showLabel : !!label),
@@ -73,10 +76,10 @@ const FormItem = <
     >
       {!!shouldShowLabel && (
         <Flex gap={6} style={_styleLabel}>
-          <span>
+          <label id={labelId} htmlFor={inputId}>
             {label ?? 'empty'}
             {isRequired && <StarRed />}
-          </span>
+          </label>
           {questionMark && (
             <Tooltip title={questionMark}>
               <QuestionCircleOutlined />
@@ -103,7 +106,7 @@ const FormItem = <
               validateStatus={status}
               help={errorMessage}
             >
-              {render({ field, formState })}
+              {render({ field, formState, inputId, labelId })}
               {instruction && (
                 <p style={{ fontSize: 12, color: 'var(--neutral-500)' }}>{instruction}</p>
               )}

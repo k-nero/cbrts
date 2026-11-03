@@ -1,5 +1,7 @@
 import client from '@/config/axios';
 import type {
+  CatalogMoveRequest,
+  CatalogUpdate,
   AddRegulationRuleRequest,
   Authority,
   AuthorityKind,
@@ -39,6 +41,12 @@ export const clearanceApi = {
 
   generateChecklist: (jobId: string) =>
     client.post<ChecklistItem[]>(`/staff/clearance/jobs/${jobId}/generate-checklist`),
+
+  getCatalogUpdates: (jobId: string) =>
+    client.get<CatalogUpdate[]>(`/staff/clearance/jobs/${jobId}/catalog-updates`),
+
+  moveToCatalogVersion: (jobId: string, data: CatalogMoveRequest) =>
+    client.post<ChecklistItem[]>(`/staff/clearance/jobs/${jobId}/catalog-updates`, data),
 
   getClearanceStatus: (jobId: string) =>
     client.get<ClearanceStatus>(`/staff/clearance/jobs/${jobId}/status`),

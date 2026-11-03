@@ -23,5 +23,24 @@ public enum RatePolicyKey {
     /** The most kilograms of horses one air shipment may carry (BR-Q-16). */
     AIR_SHIPMENT_MAX_KG,
     /** Hours after a trip ends before its vehicle can drive again: cleaning, disinfection, crew rest (US-F7-02). */
-    TURNAROUND_HOURS
+    TURNAROUND_HOURS,
+    /** Hours after a local run within a city, to or from the cargo terminal, before its vehicle can drive again. */
+    LOCAL_TURNAROUND_HOURS,
+    /** US-F3-22, drafting a journey from its quote: the hour a drafted first trip starts on the departure date. */
+    PLAN_START_HOUR,
+    /** The average road speed, km/h, a drafted route's driving time is worked out at. */
+    PLAN_SPEED_KMH,
+    /**
+     * Retired: hours of driving between two welfare stops. Each road corridor sets its welfare stops now (V39); kept
+     * so versions that set it still load, refused when a draft tries to set it, and read by nothing.
+     */
+    PLAN_WELFARE_EVERY_HOURS,
+    /** Minutes a drafted route stays at a welfare stop. */
+    PLAN_WELFARE_STOP_MIN,
+    /** Minutes a drafted route stays at a border crossing. */
+    PLAN_BORDER_STOP_MIN,
+    /** Hours the horses wait at the cargo terminal before a flight: export checks and loading. */
+    PLAN_AIRPORT_BEFORE_HOURS,
+    /** Hours after a flight lands before the next road trip collects the horses: release by the airline and customs. */
+    PLAN_AIRPORT_AFTER_HOURS
 }

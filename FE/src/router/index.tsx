@@ -1,4 +1,10 @@
-import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  ScrollRestoration,
+  useParams,
+} from 'react-router-dom';
 
 import AuthenticateLayout from '@/components/AuthenticateLayout';
 import RouteErrorPage from '@/components/RouteErrorPage';
@@ -47,6 +53,12 @@ import OverviewPage from '@/pages/staff/overview';
 import InvoiceDetailPage from '@/pages/staff/invoices/InvoiceDetail';
 import IncidentDetailPage from '@/pages/staff/incidents/IncidentDetail';
 
+/** `/requests/:id/submitted` was the request page's old address; it now lives at `/requests/:id`. */
+function ToRequestPage() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/requests/${id}`} replace />;
+}
+
 /**
  * The page tree. Who may open each path lives in route.config.ts and is enforced once, by
  * RoutesGuardWrapper at the root; the paths here must match that config.
@@ -86,7 +98,9 @@ export const router = createBrowserRouter([
           { path: '/requests', element: <MyRequestsPage /> },
           { path: '/requests/new', element: <RequestWizardPage /> },
           { path: '/requests/:id/edit', element: <RequestWizardPage /> },
-          { path: '/requests/:id/submitted', element: <RequestSubmittedPage /> },
+          { path: '/requests/:id', element: <RequestSubmittedPage /> },
+          // Older links (stored notifications, emails) still say /submitted.
+          { path: '/requests/:id/submitted', element: <ToRequestPage /> },
           { path: '/requests/:id/quotation', element: <RequestQuotationPage /> },
           { path: '/requests/:id/documents', element: <RequestDocumentsPage /> },
           { path: '/requests/:id/ask', element: <RequestAskPage /> },

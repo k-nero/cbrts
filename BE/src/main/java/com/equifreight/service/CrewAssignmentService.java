@@ -122,6 +122,23 @@ public class CrewAssignmentService {
         return getCrew(jobId, null);
     }
 
+    /** Active escorts available for assignment as drivers or grooms (US-F3-06). */
+    @Transactional(readOnly = true)
+    public List<com.equifreight.model.job.CrewCandidateResponse> getCandidates() {
+        return userRepository
+                .findByRoleAndStatus(
+                        com.equifreight.entity.enums.RoleName.ESCORT, com.equifreight.entity.enums.UserStatus.ACTIVE)
+                .stream()
+                .map(u -> com.equifreight.model.job.CrewCandidateResponse.builder()
+                        .userId(u.getId())
+                        .name(u.displayName())
+                        .staffCode(u.getStaffCode())
+                        .email(u.getEmail())
+                        .escortKind(u.getEscortKind())
+                        .build())
+                .toList();
+    }
+
     /** As above, for {@code tripId}, one trip of the job's chain (US-F3-16); its current trip when null. */
     @Transactional(readOnly = true)
     public List<CrewMemberResponse> getCrew(UUID jobId, UUID tripId) {

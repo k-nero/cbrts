@@ -11,6 +11,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentType;
+import com.equifreight.entity.Handover;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
@@ -19,6 +20,7 @@ import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.InvoiceKind;
@@ -27,8 +29,11 @@ import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.TrailerType;
 import com.equifreight.entity.enums.TransportMode;
+import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.model.home.CustomerHomeResponse;
+import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.repository.ChecklistItemRepository;
+import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
@@ -39,6 +44,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +65,7 @@ class CustomerHomeServiceTest {
     private final ChecklistItemRepository checklist = mock(ChecklistItemRepository.class);
     private final HorseRepository horses = mock(HorseRepository.class);
     private final InvoiceRepository invoices = mock(InvoiceRepository.class);
+    private final HandoverRepository handovers = mock(HandoverRepository.class);
     private final User customer = new User();
     private final Club club = new Club();
     private CustomerHomeService service;
@@ -66,7 +73,15 @@ class CustomerHomeServiceTest {
     @BeforeEach
     void setUp() {
         service = new CustomerHomeService(
-                clubs, requests, quotations, jobs, checklist, horses, invoices, Clock.fixed(NOW, BusinessTime.ZONE));
+                clubs,
+                requests,
+                quotations,
+                jobs,
+                checklist,
+                horses,
+                invoices,
+                handovers,
+                Clock.fixed(NOW, BusinessTime.ZONE));
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
         when(clubs.requireClub(customer)).thenReturn(club);
@@ -171,6 +186,57 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("an issued quotation is no longer owed once its departure has come")
+    void quotedRequestPastItsDepartureIsNotOwed() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a quoted move whose departure has come asks nothing: the quotation can't be accepted")
+    void quotedMovePastItsDepartureAsksNothing() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves())
+                .singleElement()
+                .satisfies(m -> assertThat(m.holds())
+                        .isEqualTo(new TonedTextResponse("Departure passed · nothing to answer", "neutral")));
+    }
+
+    @Test
+    @DisplayName("My requests gives a quoted request whose departure has come no step and no due day")
+    void attentionOfAQuotedRequestPastItsDeparture() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        Map<UUID, CustomerHomeService.Attention> attention = service.attentionOf(club.getId(), List.of(r));
+
+        assertThat(attention.get(r.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("Departure passed · nothing to answer", "neutral"), null));
+    }
+
+    @Test
     @DisplayName("an issued quotation is owed until it is answered, due when it stops holding its price")
     void quotedRequestIsOwed() {
         TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
@@ -194,6 +260,37 @@ class CustomerHomeServiceTest {
             assertThat(m.stage()).isEqualTo("Quotation");
             assertThat(m.holds().text()).isEqualTo("Quotation waiting for you");
         });
+    }
+
+    @Test
+    @DisplayName("My requests reads what holds each request and when the club's step is due, as Your moves words it")
+    void attentionOfEachRequest() {
+        TransportRequest quoted = request("REQ-2026-0179", RequestStatus.QUOTED);
+        TransportRequest submitted = request("REQ-2026-0193", RequestStatus.SUBMITTED);
+        TransportRequest approved = request("REQ-2026-0162", RequestStatus.APPROVED);
+        TransportRequest rejected = request("REQ-2026-0150", RequestStatus.REJECTED);
+        Quotation q = quotation(quoted, QuotationStatus.ISSUED);
+        TransportJob j = job(approved);
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        when(checklist.findOnUndepartedJobsOfClub(club.getId()))
+                .thenReturn(List.of(
+                        owedDocument(j, horse("Nightfall"), LocalDate.of(2026, 10, 25)),
+                        owedDocument(j, horse("Copper King"), LocalDate.of(2026, 10, 18))));
+
+        Map<UUID, CustomerHomeService.Attention> attention =
+                service.attentionOf(club.getId(), List.of(quoted, submitted, approved, rejected));
+
+        assertThat(attention.get(quoted.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("Quotation waiting for you", "warn"), LocalDate.of(2026, 10, 21)));
+        assertThat(attention.get(submitted.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("In review · nothing needed", "neutral"), null));
+        assertThat(attention.get(approved.getId()).holds().text()).isEqualTo("Departure locked · you owe 2");
+        assertThat(attention.get(approved.getId()).due()).isEqualTo(LocalDate.of(2026, 10, 18));
+        assertThat(attention).doesNotContainKey(rejected.getId());
     }
 
     @Test
@@ -308,6 +405,50 @@ class CustomerHomeServiceTest {
             assertThat(h.documents()).isEqualTo("0 of 1 cleared");
             assertThat(h.note().text()).isEqualTo("Equine passport overdue");
             assertThat(h.note().tone()).isEqualTo("bad");
+        });
+    }
+
+    private Handover handedOver(TransportJob j, HandoverOutcome outcome) {
+        j.setTripStatus(TripStatus.DELIVERED);
+        Handover h = new Handover();
+        h.setJob(j);
+        h.setHandedOverAt(NOW.minusSeconds(3600));
+        h.setCustomerOutcome(outcome);
+        when(handovers.findByJob_IdIn(any())).thenReturn(List.of(h));
+        return h;
+    }
+
+    @Test
+    @DisplayName("a move whose handover the club accepted is finished: no move, no next departure (US-F6-02)")
+    void acceptedHandoverFinishesTheMove() {
+        TransportRequest r = request("REQ-2026-0001", RequestStatus.APPROVED);
+        TransportJob j = job(r);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        handedOver(j, HandoverOutcome.CONFIRMED_SOUND);
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves()).isEmpty();
+        assertThat(home.nextEvent()).isNull();
+    }
+
+    @Test
+    @DisplayName("a delivered move waits on the club to confirm the handover once it is recorded")
+    void handedOverWaitsOnTheClub() {
+        TransportRequest r = request("REQ-2026-0001", RequestStatus.APPROVED);
+        TransportJob j = job(r);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(jobs.findByRequestIdIn(any())).thenReturn(List.of(j));
+        handedOver(j, null);
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves()).singleElement().satisfies(m -> {
+            assertThat(m.holds().text()).isEqualTo("Delivered · confirm the handover");
+            assertThat(m.holds().tone()).isEqualTo("warn");
         });
     }
 

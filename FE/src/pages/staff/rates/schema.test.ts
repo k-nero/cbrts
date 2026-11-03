@@ -25,6 +25,7 @@ const LINE: LineForm = {
   defaultQuantity: null,
   certainty: o('FIXED'),
   estimateNote: '',
+  coveredByRoadLeg: false,
 };
 
 /** The first message zod gives for each path, "path: message". */
@@ -34,10 +35,20 @@ const issues = (result: {
 }) => (result.success ? [] : result.error!.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
 
 describe('policySchema', () => {
-  const valid = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, 1]));
+  const valid = Object.fromEntries(POLICY_FIELDS.map((f) => [f.key, f.fallback ?? 1]));
   const stall = (value: number) =>
     policySchema.safeParse({ ...valid, STALL_PAYLOAD_KG: value, AIR_SHIPMENT_MAX_KG: 20000 })
       .success;
+
+  test('the planning settings are whole numbers within their bounds (US-F3-22)', () => {
+    const plan = (over: Record<string, number>) =>
+      policySchema.safeParse({ ...valid, ...over }).success;
+    expect(plan({ PLAN_START_HOUR: 23, PLAN_SPEED_KMH: 10 })).toBe(true);
+    expect(plan({ PLAN_START_HOUR: 24 })).toBe(false);
+    expect(plan({ PLAN_SPEED_KMH: 5 })).toBe(false);
+    expect(plan({ PLAN_WELFARE_STOP_MIN: 601 })).toBe(false);
+    expect(plan({ PLAN_BORDER_STOP_MIN: 1441 })).toBe(false);
+  });
 
   test('the weight limits are whole kilograms from 1 to 99,999 (BR-Q-16)', () => {
     expect(stall(5504)).toBe(true);
@@ -68,6 +79,15 @@ describe('lineSchema', () => {
     expect(issues(lineSchema.safeParse({ ...LINE, basis: o('PER_HORSE') }))).toEqual([]);
   });
 
+  test('only a group A or G line can be left to a road leg', () => {
+    expect(issues(lineSchema.safeParse({ ...LINE, coveredByRoadLeg: true }))).toEqual([
+      'coveredByRoadLeg: Only a group A or G line is at an end of the move a road leg can cover.',
+    ]);
+    expect(
+      issues(lineSchema.safeParse({ ...LINE, group: o('G'), coveredByRoadLeg: true })),
+    ).toEqual([]);
+  });
+
   test('money and hours have at most 2 decimals', () => {
     expect(issues(lineSchema.safeParse({ ...LINE, rate: 3.605 }))).toEqual([
       'rate: Use at most 2 decimals.',
@@ -80,6 +100,7 @@ describe('LINE_FIELDS', () => {
   test('the description and sex refusals land on their fields', () => {
     expect(LINE_FIELDS.DESCRIPTION).toBe('description');
     expect(LINE_FIELDS.APPLIES_TO_SEX).toBe('appliesToSex');
+    expect(LINE_FIELDS.COVERED_BY_ROAD_LEG).toBe('coveredByRoadLeg');
   });
 });
 

@@ -16,6 +16,7 @@ import com.equifreight.model.trip.TripMapper;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.IncidentRepository;
 import com.equifreight.repository.TransportJobRepository;
+import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import java.time.Clock;
@@ -46,6 +47,7 @@ public class HandoverService {
     private final HandoverRepository handovers;
     private final TransportJobRepository jobs;
     private final IncidentRepository incidents;
+    private final UserRepository users;
     private final IncidentService incidentService;
     private final AuditService audit;
     private final NotificationService notifications;
@@ -55,6 +57,7 @@ public class HandoverService {
             HandoverRepository handovers,
             TransportJobRepository jobs,
             IncidentRepository incidents,
+            UserRepository users,
             IncidentService incidentService,
             AuditService audit,
             NotificationService notifications,
@@ -62,6 +65,7 @@ public class HandoverService {
         this.handovers = handovers;
         this.jobs = jobs;
         this.incidents = incidents;
+        this.users = users;
         this.incidentService = incidentService;
         this.audit = audit;
         this.notifications = notifications;
@@ -70,7 +74,8 @@ public class HandoverService {
 
     /** The customer accepts the delivery: the job is done as far as they are concerned. */
     @Transactional
-    public HandoverResponse accept(String jobCode, User customer) {
+    public HandoverResponse accept(String jobCode, User principal) {
+        User customer = managed(principal);
         Handover handover = awaitingAnswer(jobCode, customer);
         TransportJob job = handover.getJob();
         Instant now = clock.instant();
@@ -97,9 +102,10 @@ public class HandoverService {
      * owns the job's incidents is alerted through the incident it opens.
      */
     @Transactional
-    public HandoverResponse reportDiscrepancy(String jobCode, User customer, String description) {
+    public HandoverResponse reportDiscrepancy(String jobCode, User principal, String description) {
         String text = description == null ? "" : description.strip();
         if (text.isEmpty()) throw new BusinessException("Describe what went wrong, so the right person can act on it");
+        User customer = managed(principal);
         Handover handover = awaitingAnswer(jobCode, customer);
         TransportJob job = handover.getJob();
         Incident incident = incidentService.raiseFromCustomer(job, customer, text);
@@ -152,6 +158,15 @@ public class HandoverService {
                 "Handover accepted: " + job.getCode(),
                 "The customer didn't answer by the due time, so the handover is taken as accepted.");
         log.info("Handover of {} taken as accepted", job.getCode());
+    }
+
+    /**
+     * The signed-in customer as a row of this transaction. The principal was loaded by the token filter, whose session
+     * is closed, so its club is a proxy nobody can load; the answer names the customer by that club.
+     */
+    private User managed(User principal) {
+        return users.findById(principal.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("User", principal.getId()));
     }
 
     /** The club's job, handed over and still waiting for its answer; anything else is refused with what holds it. */

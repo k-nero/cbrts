@@ -4,6 +4,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.ChecklistItem;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.DocumentVersion;
+import com.equifreight.entity.Handover;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Place;
@@ -14,6 +15,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
 import com.equifreight.entity.enums.DossierStatus;
+import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.JobStage;
@@ -30,6 +32,7 @@ import com.equifreight.model.home.NextEventResponse;
 import com.equifreight.model.home.OwedEntryResponse;
 import com.equifreight.model.home.TonedTextResponse;
 import com.equifreight.repository.ChecklistItemRepository;
+import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.QuotationRepository;
@@ -42,6 +45,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -88,6 +92,7 @@ public class CustomerHomeService {
     private final ChecklistItemRepository checklist;
     private final HorseRepository horses;
     private final InvoiceRepository invoices;
+    private final HandoverRepository handovers;
     private final Clock clock;
 
     public CustomerHomeService(
@@ -98,6 +103,7 @@ public class CustomerHomeService {
             ChecklistItemRepository checklist,
             HorseRepository horses,
             InvoiceRepository invoices,
+            HandoverRepository handovers,
             Clock clock) {
         this.clubs = clubs;
         this.requests = requests;
@@ -106,6 +112,7 @@ public class CustomerHomeService {
         this.checklist = checklist;
         this.horses = horses;
         this.invoices = invoices;
+        this.handovers = handovers;
         this.clock = clock;
     }
 
@@ -118,26 +125,16 @@ public class CustomerHomeService {
         List<TransportRequest> all = requests.findByClubIdAndStatusNotIn(club.getId(), ENDED);
         List<UUID> ids = all.stream().map(TransportRequest::getId).toList();
         Map<UUID, Long> horseCounts = new HashMap<>();
-        Map<UUID, Quotation> latestIssued = new HashMap<>();
-        Map<UUID, TransportJob> jobOf = new HashMap<>();
-        Set<UUID> requoting = new HashSet<>();
-        if (!ids.isEmpty()) {
-            requests.countHorses(ids).forEach(c -> horseCounts.put(c.getRequestId(), c.getHorses()));
-            quotations
-                    .findByRequestIdInAndStatusNot(ids, QuotationStatus.DRAFT)
-                    .forEach(q -> latestIssued.merge(
-                            q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
-            jobs.findByRequestIdIn(ids).forEach(j -> jobOf.put(j.getRequest().getId(), j));
-            // A draft version after an issued one is a re-quote being priced (A4).
-            quotations.findByRequestIdInAndStatus(ids, QuotationStatus.DRAFT).forEach(q -> {
-                Quotation issued = latestIssued.get(q.getRequest().getId());
-                if (issued != null && q.getVersionNo() > issued.getVersionNo())
-                    requoting.add(q.getRequest().getId());
-            });
-        }
+        if (!ids.isEmpty()) requests.countHorses(ids).forEach(c -> horseCounts.put(c.getRequestId(), c.getHorses()));
+        Facts facts = facts(ids);
+        Map<UUID, Quotation> latestIssued = facts.latestIssued();
+        Map<UUID, TransportJob> jobOf = facts.jobOf();
+        Set<UUID> requoting = facts.requoting();
+        Map<UUID, Handover> handoverOf = facts.handoverOf();
         List<TransportRequest> live = all.stream()
                 .filter(r -> inProgress(
                         r, latestIssued.get(r.getId()), jobOf.get(r.getId()), requoting.contains(r.getId()), today))
+                .filter(r -> !accepted(jobOf.get(r.getId()), handoverOf))
                 .toList();
 
         // One query for every document of the club's jobs that haven't left: the owed ones and each horse's count.
@@ -151,7 +148,12 @@ public class CustomerHomeService {
         owedItems.forEach(ci -> owed.add(documentOwed(ci, today)));
         for (TransportRequest r : live) {
             Quotation q = latestIssued.get(r.getId());
-            if (r.getStatus() == RequestStatus.QUOTED && q != null && q.getStatus() == QuotationStatus.ISSUED) {
+            // Once the departure has come an issued quotation can't be accepted, so nothing is owed on it.
+            boolean ahead = r.getDepartureDate() == null || r.getDepartureDate().isAfter(today);
+            if (r.getStatus() == RequestStatus.QUOTED
+                    && q != null
+                    && q.getStatus() == QuotationStatus.ISSUED
+                    && ahead) {
                 owed.add(quotationOwed(r, q, today));
             } else if (r.getStatus() == RequestStatus.EXPIRED && q != null && !requoting.contains(r.getId())) {
                 owed.add(requoteOwed(r, q, today));
@@ -182,6 +184,7 @@ public class CustomerHomeService {
                         jobOf.get(r.getId()),
                         requoting.contains(r.getId()),
                         owedByJob,
+                        handoverOf,
                         today))
                 .sorted(Comparator.comparingInt((MoveEntryResponse m) -> needsYou(m.holds()))
                         .thenComparing(MoveEntryResponse::departsAt, Comparator.nullsLast(Comparator.naturalOrder())))
@@ -203,6 +206,97 @@ public class CustomerHomeService {
                 .horses(horses(herd, next.orElse(null), items, owedItems, today))
                 .horsesNote(horsesNote(next.orElse(null)))
                 .build();
+    }
+
+    /** What holds a request, in the words and tone of Your moves, and the day the club's step is due by, if dated. */
+    public record Attention(TonedTextResponse holds, LocalDate due) {}
+
+    /**
+     * Each request's attention, keyed by id, for the rows of My requests (US-F1-08). A request that has ended, or whose
+     * move the club has finished by accepting the handover, has none: nothing holds it any more.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Attention> attentionOf(UUID clubId, Collection<TransportRequest> rs) {
+        Map<UUID, Attention> out = new HashMap<>();
+        if (rs.isEmpty()) return out;
+        LocalDate today = LocalDate.ofInstant(clock.instant(), BusinessTime.ZONE);
+        Facts facts = facts(rs.stream().map(TransportRequest::getId).toList());
+        Map<UUID, List<ChecklistItem>> owedByJob = facts.jobOf().isEmpty()
+                ? Map.of()
+                : checklist.findOnUndepartedJobsOfClub(clubId).stream()
+                        .filter(CustomerHomeService::owedByCustomer)
+                        .collect(Collectors.groupingBy(ci -> ci.getJob().getId()));
+        for (TransportRequest r : rs) {
+            Quotation q = facts.latestIssued().get(r.getId());
+            TransportJob job = facts.jobOf().get(r.getId());
+            boolean requoting = facts.requoting().contains(r.getId());
+            if (ENDED.contains(r.getStatus())
+                    || !inProgress(r, q, job, requoting, today)
+                    || accepted(job, facts.handoverOf())) continue;
+            List<ChecklistItem> owed = job == null ? List.of() : owedByJob.getOrDefault(job.getId(), List.of());
+            TonedTextResponse holds = holds(
+                    r,
+                    job,
+                    requoting,
+                    owed,
+                    today,
+                    job == null ? null : facts.handoverOf().get(job.getId()));
+            out.put(r.getId(), new Attention(holds, needsYou(holds) < 2 ? due(r, q, job, owed, today) : null));
+        }
+        return out;
+    }
+
+    /**
+     * The day the club's step is due by: its soonest owed document, the issued quotation's last day, or the last day a
+     * re-quote can be asked for (A4). A draft or an answer to the manager's note has no fixed day.
+     */
+    private static LocalDate due(
+            TransportRequest r, Quotation q, TransportJob job, List<ChecklistItem> owed, LocalDate today) {
+        if (job != null)
+            return owed.stream()
+                    .map(ChecklistItem::getDueDate)
+                    .filter(Objects::nonNull)
+                    .min(Comparator.naturalOrder())
+                    .orElse(null);
+        if (r.getStatus() == RequestStatus.QUOTED && q != null && q.getValidUntil() != null)
+            return LocalDate.ofInstant(q.getValidUntil(), BusinessTime.ZONE);
+        if (r.getStatus() == RequestStatus.EXPIRED && r.getDepartureDate() != null && !departureCome(r, today))
+            return r.getDepartureDate().minusDays(1);
+        return null;
+    }
+
+    /** What the home and My requests read of each request beyond itself: its quotation, its job and its handover. */
+    private record Facts(
+            Map<UUID, Quotation> latestIssued,
+            Map<UUID, TransportJob> jobOf,
+            Set<UUID> requoting,
+            Map<UUID, Handover> handoverOf) {}
+
+    private Facts facts(List<UUID> ids) {
+        Map<UUID, Quotation> latestIssued = new HashMap<>();
+        Map<UUID, TransportJob> jobOf = new HashMap<>();
+        Set<UUID> requoting = new HashSet<>();
+        if (!ids.isEmpty()) {
+            quotations
+                    .findByRequestIdInAndStatusNot(ids, QuotationStatus.DRAFT)
+                    .forEach(q -> latestIssued.merge(
+                            q.getRequest().getId(), q, (a, b) -> a.getVersionNo() >= b.getVersionNo() ? a : b));
+            jobs.findByRequestIdIn(ids).forEach(j -> jobOf.put(j.getRequest().getId(), j));
+            // A draft version after an issued one is a re-quote being priced (A4).
+            quotations.findByRequestIdInAndStatus(ids, QuotationStatus.DRAFT).forEach(q -> {
+                Quotation issued = latestIssued.get(q.getRequest().getId());
+                if (issued != null && q.getVersionNo() > issued.getVersionNo())
+                    requoting.add(q.getRequest().getId());
+            });
+        }
+        // The customer's answer to each handover: an accepted one finishes the move for them (US-F6-02).
+        Map<UUID, Handover> handoverOf = new HashMap<>();
+        if (!jobOf.isEmpty())
+            handovers
+                    .findByJob_IdIn(
+                            jobOf.values().stream().map(TransportJob::getId).toList())
+                    .forEach(h -> handoverOf.put(h.getJob().getId(), h));
+        return new Facts(latestIssued, jobOf, requoting, handoverOf);
     }
 
     /* ---------- what is in progress ---------- */
@@ -353,6 +447,7 @@ public class CustomerHomeService {
             TransportJob job,
             boolean requoting,
             Map<UUID, List<ChecklistItem>> owedByJob,
+            Map<UUID, Handover> handoverOf,
             LocalDate today) {
         List<String> parts = new ArrayList<>();
         if (job != null) parts.add("job " + job.getCode());
@@ -373,7 +468,9 @@ public class CustomerHomeService {
                 route(r),
                 String.join(" · ", parts),
                 stage(r, job),
-                holds(r, job, requoting, owed, today),
+                job == null
+                        ? holds(r, null, requoting, owed, today)
+                        : holds(r, job, requoting, owed, today, handoverOf.get(job.getId())),
                 departsAt,
                 arrivesAt);
     }
@@ -395,10 +492,37 @@ public class CustomerHomeService {
         };
     }
 
-    /** What holds the move, in words and a tone: Bad or Warn when it waits on the club, Neutral when it doesn't. */
+    /** A move the customer accepted the handover of is finished for them, whether or not the office has closed it. */
+    private static boolean accepted(TransportJob job, Map<UUID, Handover> handoverOf) {
+        Handover h = job == null ? null : handoverOf.get(job.getId());
+        return h != null && h.getCustomerOutcome() == HandoverOutcome.CONFIRMED_SOUND;
+    }
+
     static TonedTextResponse holds(
             TransportRequest r, TransportJob job, boolean requoting, List<ChecklistItem> owed, LocalDate today) {
+        return holds(r, job, requoting, owed, today, null);
+    }
+
+    /**
+     * What holds the move, in words and a tone: Bad or Warn when it waits on the club, Neutral when it doesn't. A
+     * delivered move waits on the handover: the escort recording it, then the customer's answer.
+     */
+    static TonedTextResponse holds(
+            TransportRequest r,
+            TransportJob job,
+            boolean requoting,
+            List<ChecklistItem> owed,
+            LocalDate today,
+            Handover handover) {
         if (job != null) {
+            boolean delivered =
+                    job.getTripStatus() == TripStatus.ARRIVED || job.getTripStatus() == TripStatus.DELIVERED;
+            if (delivered && handover != null && handover.getCustomerOutcome() == HandoverOutcome.PROBLEM_REPORTED)
+                return new TonedTextResponse("Problem reported · with the logistics manager", "neutral");
+            if (delivered && handover != null && handover.getCustomerOutcome() != null)
+                return new TonedTextResponse("Handover accepted · nothing needed", "ok");
+            if (delivered && handover != null && handover.getHandedOverAt() != null)
+                return new TonedTextResponse("Delivered · confirm the handover", "warn");
             if (job.getTripStatus() == TripStatus.HELD) return new TonedTextResponse("On the road · held", "warn");
             if (job.getTripStatus() == TripStatus.DEPARTED) return new TonedTextResponse("On the road", "info");
             if (job.getTripStatus() == TripStatus.ARRIVED || job.getTripStatus() == TripStatus.DELIVERED)
@@ -414,7 +538,11 @@ public class CustomerHomeService {
         return switch (r.getStatus()) {
             case DRAFT -> new TonedTextResponse("Draft · finish and submit it", "warn");
             case INFO_REQUIRED -> new TonedTextResponse("Needs your answer", "warn");
-            case QUOTED -> new TonedTextResponse("Quotation waiting for you", "warn");
+            // Accepting is refused once the departure has come (CustomerQuotationService.accept).
+            case QUOTED ->
+                departureCome(r, today)
+                        ? new TonedTextResponse("Departure passed · nothing to answer", "neutral")
+                        : new TonedTextResponse("Quotation waiting for you", "warn");
             case CUSTOMER_ACCEPTED -> new TonedTextResponse("With the logistics manager for approval", "neutral");
             case EXPIRED ->
                 requoting
@@ -425,7 +553,7 @@ public class CustomerHomeService {
     }
 
     /** Bad first, then Warn, then the rest. */
-    private static int needsYou(TonedTextResponse holds) {
+    static int needsYou(TonedTextResponse holds) {
         return switch (holds.tone()) {
             case "bad" -> 0;
             case "warn" -> 1;

@@ -67,8 +67,13 @@ export const DocumentRow: FC<Props> = ({
         {result && <span className={cx('type-body-s', s.result)}>{result}</span>}
       </span>
       {holder && <span className="type-label-s w-[140px] shrink-0 text-ink-2">{holder}</span>}
-      {/* Always present, so the actions line up down the table. */}
-      <span className="type-caption w-[150px] shrink-0 text-ink-3">{version}</span>
+      {/* Always present, so the actions line up down the table. A long file name is cut to one line, whole on hover. */}
+      <span
+        className="type-caption w-[150px] shrink-0 truncate text-ink-3"
+        title={typeof version === 'string' ? version : undefined}
+      >
+        {version}
+      </span>
       {actions !== undefined && (
         <span className="flex w-[250px] shrink-0 items-center justify-end gap-2">{actions}</span>
       )}

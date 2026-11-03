@@ -31,8 +31,8 @@ export interface OwedEntry {
 export interface MoveEntry {
   requestId: string;
   status: RequestStatus;
-  /** The customer's reference; it never changes. */
-  requestCode: string;
+  /** The customer's reference; it never changes once given. Null for a draft, which gets one when submitted. */
+  requestCode: string | null;
   /** "Ho Chi Minh City → Phnom Penh". */
   route: string;
   /** "job CBRT-2026-041 · 4 horses · road, private trailer". */

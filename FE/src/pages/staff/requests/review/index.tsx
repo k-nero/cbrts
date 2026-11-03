@@ -15,6 +15,7 @@ import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui';
 import { useStaffRequestInvoices } from '@/hooks/invoice';
 import { useRequestReview } from '@/hooks/staffRequest';
+import { useBreadcrumb } from '@/hooks/useBreadcrumb';
 import { inReview, queueWords, reviewSubject, reviewSummary, routeEnds } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -27,6 +28,7 @@ const RequestReviewPage: FC = () => {
   const router = useCustomRouter();
   const query = useRequestReview(id);
   const review = query.data;
+  useBreadcrumb({ id, label: review?.request.code });
   const invoices = useStaffRequestInvoices(review?.request.id);
   const toList = () => router.push(router.paths.get('requests'));
   const open = (target: string) =>

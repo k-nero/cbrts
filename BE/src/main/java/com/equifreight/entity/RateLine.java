@@ -83,4 +83,11 @@ public class RateLine extends BaseEntity {
      */
     @Column(length = 300)
     private String estimateNote;
+
+    /**
+     * Not charged at an end of the move a domestic road leg covers (US-F3-21): a flat transfer to or from the cargo
+     * terminal, group A or G.
+     */
+    @Column(nullable = false)
+    private boolean coveredByRoadLeg;
 }

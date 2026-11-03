@@ -1,0 +1,35 @@
+[[data-source]]
+id = "c4bf5bc5-28a0-46ef-837a-fdbfd6b6b5b3"
+name = "postgres@localhost"
+driver = "postgres"
+host = "localhost"
+port = 5432
+database = ""
+user = "postgres"
+ssl = "prefer"
+savePassword = true
+readOnly = false
+vendor = ""
+comment = ""
+urlOnly = false
+url = ""
+sslCaFile = ""
+sslCertFile = ""
+sslKeyFile = ""
+properties = []
+
+[data-source.options]
+transaction = "auto"
+defaultSchema = ""
+timeZone = ""
+startupScript = ""
+singleDatabase = false
+
+[data-source.introspection]
+allDatabases = true
+databases = []
+allSchemas = true
+schemas = []
+showSystem = false
+showTemplates = false
+objectFilter = ""

@@ -41,7 +41,7 @@ const DatePickerField = <TFieldValues extends FieldValues = FieldValues>({
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, ...field } }) => {
+      render={({ field: { onChange, onBlur, ...field }, inputId }) => {
         if (readOnly) {
           const getDisplayDate = () => {
             if (!field.value) return '';
@@ -68,6 +68,7 @@ const DatePickerField = <TFieldValues extends FieldValues = FieldValues>({
         }
         return (
           <DatePicker
+            id={inputId}
             {...props}
             {...field}
             value={field.value ? dayjs(field.value) : null}

@@ -123,4 +123,10 @@ public interface TransportRequestRepository extends JpaRepository<TransportReque
 
         long getHorses();
     }
+
+    /** A request runs on {@code corridorId}, as its route or as a domestic leg at either end. */
+    boolean existsByCorridorIdOrFirstLegCorridorIdOrLastLegCorridorId(UUID corridorId, UUID firstLeg, UUID lastLeg);
+
+    /** A request starts or ends at the place. */
+    boolean existsByOriginPlaceIdOrDestinationPlaceId(UUID originPlaceId, UUID destinationPlaceId);
 }

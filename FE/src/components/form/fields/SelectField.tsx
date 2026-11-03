@@ -77,7 +77,7 @@ const SelectField = <
       instruction={instruction}
       disabled={disabled}
       questionMark={questionMark}
-      render={({ field: { onChange, onBlur, value } }) => {
+      render={({ field: { onChange, onBlur, value }, inputId }) => {
         if (readOnly) {
           const getDisplayText = () => {
             if (!value) return '';
@@ -100,6 +100,7 @@ const SelectField = <
         }
         return (
           <Select<SelectOption<SelectValueType, Option>, IsMulti, Group>
+            inputId={inputId}
             options={options}
             isMulti={isMulti}
             value={resolveValue(value)}

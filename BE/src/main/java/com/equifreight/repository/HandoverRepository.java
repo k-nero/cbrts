@@ -2,6 +2,7 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.Handover;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface HandoverRepository extends JpaRepository<Handover, UUID> {
     Optional<Handover> findByJob_Id(UUID jobId);
+
+    List<Handover> findByJob_IdIn(Collection<UUID> jobIds);
 
     /**
      * Jobs ready for their final invoice (US-F6-03): the customer answered the handover (or it was taken as accepted),

@@ -1,127 +1,149 @@
-import { type FC, useState } from 'react';
-import { Col, Flex, Input, Row } from 'antd';
-import { fileApi } from '@/apis/file';
-import { Button, Callout } from '@/components/ui';
-import { useUploadDocumentVersion } from '@/hooks/clearance';
-import type { ChecklistItem } from '@/interfaces';
-import { apiErrorMessage } from '@/lib/utils';
+import { type FC, useRef } from 'react';
+import { useFormState, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Col, Flex, Row } from 'antd';
+import dayjs from 'dayjs';
 
+import { fileApi } from '@/apis/file';
+import { CancelButton } from '@/components/form/CancelButton';
+import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
+import { SubmitButton } from '@/components/form/SubmitButton';
+import { useUploadDocumentVersion } from '@/hooks/clearance';
+import { type ChecklistItem, RegulationRuleKindEnum } from '@/interfaces';
+import { apiErrorMessage, DOCUMENT_ACCEPT } from '@/lib/utils';
+import { FileCard } from '@/pages/customer/requests/document/FileCard';
+import {
+  type DocumentUploadForm,
+  documentUploadSchema,
+  EMPTY_UPLOAD,
+} from '@/pages/customer/requests/document/schema';
+
+/**
+ * A new version of a checklist document, uploaded by staff: the same file card, dates and checks
+ * as the customer's upload (US-F2-03). The file is stored first, then attached as the item's next
+ * version, which checks its validity; nothing earlier is overwritten.
+ */
 export const UploadForm: FC<{ item: ChecklistItem; jobId: string | null; onClose: () => void }> = ({
   item,
   jobId,
   onClose,
 }) => {
+  const picker = useRef<HTMLInputElement>(null);
   const upload = useUploadDocumentVersion(jobId);
-  const [file, setFile] = useState<File | null>(null);
-  const [issuedOn, setIssuedOn] = useState('');
-  const [validUntil, setValidUntil] = useState('');
-  const [issuer, setIssuer] = useState('');
-  const [sendingFile, setSendingFile] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const busy = sendingFile || upload.isPending;
+  const methods = useFormCustom<DocumentUploadForm>({
+    resolver: zodResolver(documentUploadSchema),
+    defaultValues: EMPTY_UPLOAD,
+  });
+  const { errors, isSubmitting } = useFormState({ control: methods.control });
+  const file = useWatch({ control: methods.control, name: 'file' });
+  // A test counts from the day it was sampled (a window before departure).
+  const sampled = item.ruleKind === RegulationRuleKindEnum.WINDOW_BEFORE_DEPARTURE;
 
-  const submit = async () => {
-    if (!file) {
-      setError('Choose the document file to upload.');
-      return;
-    }
-    if (!issuedOn.trim() || !validUntil.trim()) {
-      setError('Enter the issue date and the valid-until date printed on the document.');
-      return;
-    }
-    setError(null);
-    setSendingFile(true);
+  const choose = (f: File | null) =>
+    methods.setValue('file', f, { shouldValidate: true, shouldDirty: true });
+
+  const onSubmit = methods.handleSubmit(async (v) => {
     try {
-      // Store the file first, then attach it as the item's new version, which checks its validity.
-      const stored = await fileApi.upload(file);
+      const stored = await fileApi.upload(v.file!);
       await upload.mutateAsync({
         checklistItemId: item.id,
         data: {
           fileId: stored.id,
-          issuedOn: issuedOn.trim(),
-          validUntil: validUntil.trim(),
-          issuer: issuer.trim() || undefined,
+          issuedOn: v.issuedOn,
+          sampledOn: v.sampledOn || undefined,
+          validUntil: v.validUntil,
+          issuer: v.issuer.trim() || undefined,
         },
       });
       onClose();
     } catch (err: unknown) {
-      setError(apiErrorMessage(err, 'The document could not be uploaded.'));
-    } finally {
-      setSendingFile(false);
+      methods.setError('form_error', {
+        message: apiErrorMessage(err, 'The document couldn’t be uploaded. Try again.'),
+      });
     }
-  };
+  });
 
   return (
-    <Flex vertical gap={16}>
-      {error && <Callout tone="bad" title={error} />}
-
-      <Flex vertical gap={6}>
-        <label className="type-label-s text-ink">
-          File (PDF, JPEG, PNG or HEIC, up to 25 MB) <span className="text-bad">*</span>
-        </label>
-        <input
-          type="file"
-          onChange={(event) => {
-            const chosen = event.target.files?.[0];
-            if (chosen) setFile(chosen);
-          }}
-          accept=".pdf,.png,.jpg,.jpeg,.heic,.heif"
-          className="type-body-s rounded border border-line p-2"
-        />
-        {file && (
-          <span className="type-caption text-ink-3">
-            Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-          </span>
-        )}
-      </Flex>
-
-      <Row gutter={[12, 12]}>
-        <Col span={12}>
-          <Flex vertical gap={6}>
-            <label className="type-label-s text-ink">
-              Issued on <span className="text-bad">*</span>
-            </label>
-            <Input
-              type="date"
-              required
-              value={issuedOn}
-              onChange={(event) => setIssuedOn(event.target.value)}
-            />
+    <FormWrapper
+      methods={methods}
+      isSubmitting={isSubmitting || upload.isPending}
+      mode="add"
+      onCancel={onClose}
+      onFinish={onSubmit}
+      layout="vertical"
+    >
+      {({ FormField }) => (
+        <Flex vertical gap={16}>
+          <input
+            ref={picker}
+            type="file"
+            hidden
+            accept={DOCUMENT_ACCEPT}
+            aria-label="Choose the file to upload"
+            onChange={(e) => {
+              choose(e.target.files?.[0] ?? null);
+              e.target.value = '';
+            }}
+          />
+          <FileCard
+            file={file}
+            refused={false}
+            error={errors.file?.message}
+            onChoose={() => picker.current?.click()}
+            onRemove={() => choose(null)}
+          />
+          <Row gutter={16}>
+            <Col span={12}>
+              <FormField
+                name="issuedOn"
+                label="Issue date"
+                component="datepicker"
+                componentProps={{
+                  isRequired: true,
+                  maxDate: dayjs().endOf('day'),
+                  instruction: 'As printed on the document.',
+                }}
+              />
+            </Col>
+            <Col span={12}>
+              <FormField
+                name="validUntil"
+                label="Valid until"
+                component="datepicker"
+                componentProps={{
+                  isRequired: true,
+                  instruction: 'The expiry date printed on it, or the last day it covers.',
+                }}
+              />
+            </Col>
+            {sampled && (
+              <Col span={12}>
+                <FormField
+                  name="sampledOn"
+                  label="Sample date"
+                  component="datepicker"
+                  componentProps={{
+                    maxDate: dayjs().endOf('day'),
+                    instruction: 'For a test: the rule counts from the day it was sampled.',
+                  }}
+                />
+              </Col>
+            )}
+            <Col span={sampled ? 12 : 24}>
+              <FormField
+                name="issuer"
+                label="Issued by"
+                component="text"
+                componentProps={{ placeholder: 'e.g. DAH Vietnam, USDA APHIS' }}
+              />
+            </Col>
+          </Row>
+          <Flex justify="end" gap={8}>
+            <CancelButton label="Cancel" />
+            <SubmitButton type="primary" label="Upload and check" />
           </Flex>
-        </Col>
-
-        <Col span={12}>
-          <Flex vertical gap={6}>
-            <label className="type-label-s text-ink">
-              Valid until <span className="text-bad">*</span>
-            </label>
-            <Input
-              type="date"
-              required
-              value={validUntil}
-              onChange={(event) => setValidUntil(event.target.value)}
-            />
-          </Flex>
-        </Col>
-      </Row>
-
-      <Flex vertical gap={6}>
-        <label className="type-label-s text-ink">Issuer (authority or laboratory)</label>
-        <Input
-          placeholder="e.g. DAH Vietnam, USDA APHIS"
-          value={issuer}
-          onChange={(event) => setIssuer(event.target.value)}
-        />
-      </Flex>
-
-      <Flex justify="end" gap={8}>
-        <Button variant="secondary" size="sm" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button variant="primary" size="sm" disabled={busy} onClick={submit}>
-          {busy ? 'Uploading…' : 'Upload and check'}
-        </Button>
-      </Flex>
-    </Flex>
+        </Flex>
+      )}
+    </FormWrapper>
   );
 };

@@ -5,11 +5,12 @@ import { Button, Col, Flex, Row } from 'antd';
 import AddVehicleModal from './ViewAddEdit/AddVehicleModal';
 import BookVehicleModal from './ViewAddEdit/BookVehicleModal';
 import AvailableOnModal from './ViewAddEdit/AvailableOnModal';
-import EditPermitsModal from './ViewAddEdit/EditPermitsModal';
+import EditVehicleModal from './ViewAddEdit/EditVehicleModal';
 import VehicleList from './VehicleList';
 
 import PageHeader from '@/components/PageHeader';
 import { StatTile } from '@/components/ui';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useActiveVehicles, useVehicleList } from '@/hooks/useVehicle';
 import type { Vehicle } from '@/interfaces';
 
@@ -32,7 +33,21 @@ const VehiclesPage = () => {
   const activeCount = active.data?.length;
   const sort = pageState.sort;
   const onBook = useCallback((v: Vehicle) => setBooking(v), []);
-  const onEditPermits = useCallback((v: Vehicle) => setEditing(v), []);
+  const onEdit = useCallback((v: Vehicle) => setEditing(v), []);
+  const confirmDelete = useConfirmDelete();
+  const { deleteMutation } = crud;
+  const onDelete = useCallback(
+    (v: Vehicle) =>
+      confirmDelete({
+        title: `Delete ${v.code}?`,
+        content:
+          'It leaves the fleet and the trailer pickers. A vehicle that has been on trips or booked stays on record.',
+        run: () => deleteMutation.mutateAsync(v.id),
+        done: `${v.code} deleted.`,
+        failed: `${v.code} wasn’t deleted.`,
+      }),
+    [confirmDelete, deleteMutation],
+  );
   const onSetAvailableOn = useCallback((v: Vehicle) => setExpected(v), []);
 
   return (
@@ -104,13 +119,14 @@ const VehiclesPage = () => {
       <VehicleList
         crud={crud}
         onBook={onBook}
-        onEditPermits={onEditPermits}
+        onEdit={onEdit}
+        onDelete={onDelete}
         onSetAvailableOn={onSetAvailableOn}
       />
 
       <AddVehicleModal open={adding} crud={crud} onClose={() => setAdding(false)} />
       <BookVehicleModal vehicle={booking} onClose={() => setBooking(null)} />
-      <EditPermitsModal vehicle={editing} onClose={() => setEditing(null)} />
+      <EditVehicleModal vehicle={editing} onClose={() => setEditing(null)} />
       <AvailableOnModal vehicle={expected} onClose={() => setExpected(null)} />
     </Flex>
   );

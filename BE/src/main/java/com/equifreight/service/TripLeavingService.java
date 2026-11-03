@@ -152,7 +152,8 @@ public class TripLeavingService {
             jobTrips.summarize(job);
             return new Departure(null, noneLeftOn(trip, job), names);
         }
-        Trip newTrip = jobTrips.newTripFor(job, by, at);
+        // The new trip runs the moving trip's corridor the same way: a road leg of a journey, say (US-F3-21).
+        Trip newTrip = jobTrips.newTrip(trip.getCorridor(), trip.isReversed(), by, at);
         for (LoadPlan plan : loadPlanRows.findByTripVehicle_Trip_IdOrderByTripVehicle_Seq(trip.getId())) {
             Set<UUID> aboard = plan.getStalls().stream()
                     .map(LoadPlanStall::getHorse)

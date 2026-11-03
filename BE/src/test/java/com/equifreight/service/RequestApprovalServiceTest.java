@@ -186,6 +186,19 @@ class RequestApprovalServiceTest {
     }
 
     @Test
+    void aRequestWhoseDepartureHasComeIsNotApproved() {
+        request.setDepartureDate(java.time.LocalDate.of(2026, 10, 23));
+
+        assertThatThrownBy(() -> service.approve(yen, request.getId(), team(lan, khoi)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("The departure on 23 Oct 2026 has come, so REQ-2026-0194 can't be approved. Reject it"
+                        + " with a reason; the customer can start a new request for a later date.")
+                .extracting("code")
+                .isEqualTo("DEPARTURE_PASSED");
+        assertNothingWritten(RequestStatus.CUSTOMER_ACCEPTED);
+    }
+
+    @Test
     void onlyAnAcceptedRequestIsApproved() {
         request.setStatus(RequestStatus.QUOTED);
 

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
@@ -21,6 +22,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.JobStage;
+import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
@@ -70,7 +72,7 @@ class JobTripServiceTest {
     }
 
     @Test
-    @DisplayName("An approved job gets a trip of its own on its corridor, with every horse of the request on it")
+    @DisplayName("The first trip the coordinator adds carries every horse of the request, run the way chosen")
     void anApprovedJobGetsItsOwnTrip() {
         Corridor corridor = new Corridor();
         TransportRequest request = new TransportRequest();
@@ -88,10 +90,12 @@ class JobTripServiceTest {
         // 31 Dec 2026, 17:30 UTC is 1 Jan 2027 in Ho Chi Minh City.
         when(codes.next(CodePrefix.TRP, 2027)).thenReturn("TRP-2027-001");
 
-        Trip trip = service.createForJob(job, yen, Instant.parse("2026-12-31T17:30:00Z"));
+        Trip trip = service.startJourney(job, corridor, true, yen, Instant.parse("2026-12-31T17:30:00Z"));
 
         assertThat(trip.getCode()).isEqualTo("TRP-2027-001");
         assertThat(trip.getCorridor()).isSameAs(corridor);
+        // Run the way the coordinator chose: from the corridor's destination city (US-F3-21).
+        assertThat(trip.isReversed()).isTrue();
         assertThat(trip.getStatus()).isEqualTo(TripStatus.NOT_STARTED);
         assertThat(trip.getCreatedBy()).isSameAs(yen);
         ArgumentCaptor<TripHorse> onTrip = ArgumentCaptor.forClass(TripHorse.class);
@@ -100,37 +104,6 @@ class JobTripServiceTest {
                 .allMatch(th -> th.getTrip() == trip && th.getJob() == job && th.getStatus() == TripHorseStatus.ON_TRIP)
                 .extracting(TripHorse::getHorse)
                 .containsExactly(shadowfax, nightfall);
-    }
-
-    @Test
-    @DisplayName("A request by way of hubs is approved onto a chain: the leg to the hub, the flight, the leg from it")
-    void aRequestByWayOfHubsIsApprovedOntoAChain() {
-        Corridor toHub = new Corridor();
-        Corridor flight = new Corridor();
-        Corridor fromHub = new Corridor();
-        TransportRequest request = new TransportRequest();
-        request.setCorridor(flight);
-        request.setFirstLegCorridor(toHub);
-        request.setLastLegCorridor(fromHub);
-        RequestHorse rh = new RequestHorse();
-        rh.setHorse(horse("Shadowfax"));
-        request.getHorses().add(rh);
-        TransportJob job = new TransportJob();
-        job.setRequest(request);
-        when(codes.next(CodePrefix.TRP, 2026)).thenReturn("TRP-2026-001", "TRP-2026-002", "TRP-2026-003");
-        JobTripService spy = org.mockito.Mockito.spy(service);
-        org.mockito.Mockito.doReturn(null).when(spy).planNext(any(), any(), any());
-
-        Trip first = spy.createForJob(job, new User(), Instant.parse("2026-10-27T03:00:00Z"));
-
-        assertThat(first.getCorridor()).isSameAs(toHub);
-        ArgumentCaptor<Trip> from = ArgumentCaptor.forClass(Trip.class);
-        ArgumentCaptor<Trip> to = ArgumentCaptor.forClass(Trip.class);
-        verify(spy, org.mockito.Mockito.times(2)).planNext(eq(job), from.capture(), to.capture());
-        assertThat(from.getAllValues().get(0)).isSameAs(first);
-        assertThat(to.getAllValues().get(0).getCorridor()).isSameAs(flight);
-        assertThat(from.getAllValues().get(1)).isSameAs(to.getAllValues().get(0));
-        assertThat(to.getAllValues().get(1).getCorridor()).isSameAs(fromHub);
     }
 
     @Test
@@ -408,6 +381,38 @@ class JobTripServiceTest {
         assertThat(service.beforeBorder(flight, job)).isFalse();
         assertThat(service.beforeBorder(toStables, job)).isFalse();
         assertThat(service.documentsDepartureOf(job)).isEqualTo(FLIGHT_SGN);
+    }
+
+    @Test
+    @DisplayName("Đại Nam → Sha Tin: the local run to the cargo terminal waits for the gate, unlike a leg to the hub")
+    void theLocalRunWaitsForTheGate() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toTerminal = tripOn("RD HCM local", TransportMode.ROAD, VN, VN, PICKUP_DA_NANG);
+        toTerminal.getCorridor().setOriginCity("Ho Chi Minh City");
+        toTerminal.getCorridor().setDestinationCity("Ho Chi Minh City");
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        journey(job, toTerminal, flight);
+
+        assertThat(service.beforeBorder(toTerminal, job)).isFalse();
+    }
+
+    @Test
+    @DisplayName("A flight delivers only to an airport; a stable in the city it lands in needs the road trip after it")
+    void aFlightDeliversOnlyToTheAirport() {
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        flight.getCorridor().setOriginCity("Ho Chi Minh City");
+        flight.getCorridor().setDestinationCity("Hong Kong");
+        TransportJob job = job(FLIGHT_SGN);
+        TransportRequest request = new TransportRequest();
+        Place stables = new Place();
+        stables.setKind(PlaceKind.TRAINING_CENTRE);
+        stables.setCity("Hong Kong");
+        request.setDestinationPlace(stables);
+        job.setRequest(request);
+
+        assertThat(JobTripService.reachesDestination(flight, job)).isFalse();
+        stables.setKind(PlaceKind.CARGO_TERMINAL);
+        assertThat(JobTripService.reachesDestination(flight, job)).isTrue();
     }
 
     @Test

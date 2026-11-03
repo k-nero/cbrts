@@ -29,6 +29,13 @@ public class Trip extends BaseEntity {
     @JoinColumn(name = "corridor_id", nullable = false)
     private Corridor corridor;
 
+    /**
+     * The trip runs its corridor from the destination city to the origin city (US-F3-21): a road corridor is driven
+     * either way, and a trip shared by several jobs runs one way only, so its direction is the trip's, not a job's.
+     */
+    @Column(nullable = false)
+    private boolean reversed;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 12)
     private TripStatus status = TripStatus.NOT_STARTED;
@@ -48,6 +55,16 @@ public class Trip extends BaseEntity {
 
     @OneToMany(mappedBy = "trip")
     private List<TripHorse> horses = new ArrayList<>();
+
+    /** The city the trip leaves from, its corridor read in the trip's direction (US-F3-21). */
+    public String startCity() {
+        return reversed ? corridor.getDestinationCity() : corridor.getOriginCity();
+    }
+
+    /** The city the trip ends in, its corridor read in the trip's direction (US-F3-21). */
+    public String endCity() {
+        return reversed ? corridor.getOriginCity() : corridor.getDestinationCity();
+    }
 
     /** The jobs with horses on this trip, in the order their horses joined it. */
     public List<TransportJob> getJobs() {

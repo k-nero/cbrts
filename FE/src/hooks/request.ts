@@ -26,11 +26,14 @@ import { useCrudResource } from './crud';
 import { useDebouncedValue } from './useDebouncedValue';
 
 /** One page of the club's requests, newest first, 20 per page. */
+/** My requests' own order (RequestService.NEEDS_YOU): what the club owes first, the soonest due on top. */
+export const NEEDS_YOU_FIRST = { field: 'needsYou', order: 'ascend' } as const;
+
 export const useRequests = () =>
   useCrudResource<RequestSummary, RequestDraftInput>('requests', requestListApi, {
     number: 0,
     size: 20,
-    sort: { field: 'createdAt', order: 'descend' },
+    sort: NEEDS_YOU_FIRST,
   });
 
 export const useRequest = (id: string | undefined) =>

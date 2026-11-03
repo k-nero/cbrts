@@ -23,9 +23,7 @@ const RequestWizardPage: FC = () => {
 
   if (id && !saved) return <RequestLoadState query={query} />;
   if (saved && !editable(saved.status))
-    return (
-      <Navigate to={router.paths.get('request-submitted', { pathParams: [saved.id] })} replace />
-    );
+    return <Navigate to={router.paths.get('request', { pathParams: [saved.id] })} replace />;
 
   const asked = params.get('step') as WizardStep | null;
   const step: WizardStep = !saved

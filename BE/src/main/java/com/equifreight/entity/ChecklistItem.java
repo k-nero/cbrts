@@ -76,4 +76,16 @@ public class ChecklistItem extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_version_id")
     private DocumentVersion currentVersion;
+
+    /**
+     * Set when the job moved onto a catalog version that no longer lists the document: the item stays, with its
+     * files, but no longer counts toward the gate.
+     */
+    private Instant droppedAt;
+
+    /**
+     * The item came from a catalog version the job moved onto after its checklist was made.
+     */
+    @Column(nullable = false)
+    private boolean addedByUpdate;
 }

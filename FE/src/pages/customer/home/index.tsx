@@ -54,7 +54,7 @@ const CustomerHomePage: FC = () => {
           ? 'request-edit'
           : m.status === 'QUOTED'
             ? 'request-quotation'
-            : 'request-submitted',
+            : 'request',
         { pathParams: [m.requestId] },
       ),
     );
@@ -64,7 +64,7 @@ const CustomerHomePage: FC = () => {
         ? router.paths.get('request-document', { pathParams: [o.requestId, o.itemId] })
         : o.kind === 'INVOICE' && o.invoiceId
           ? router.paths.get('request-invoice', { pathParams: [o.requestId, o.invoiceId] })
-          : router.paths.get(o.kind === 'QUOTATION' ? 'request-quotation' : 'request-submitted', {
+          : router.paths.get(o.kind === 'QUOTATION' ? 'request-quotation' : 'request', {
               pathParams: [o.requestId],
             }),
     );

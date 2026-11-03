@@ -143,6 +143,7 @@ public final class RateMapper {
                 .certainty(l.getCertainty())
                 .estimateNote(l.getEstimateNote())
                 .everyCorridor(l.getCorridor() == null)
+                .coveredByRoadLeg(l.isCoveredByRoadLeg())
                 .build();
     }
 

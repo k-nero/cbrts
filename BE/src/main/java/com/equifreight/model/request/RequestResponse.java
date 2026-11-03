@@ -65,4 +65,6 @@ public record RequestResponse(
         /** Every status change, newest first (US-F1-08, BR-F1-08); set on the customer's read of the request. */
         List<HistoryEntryResponse> history,
         /** What happens next and who does it (US-F1-08); null when nothing more happens, and on other reads. */
-        NextStepResponse nextStep) {}
+        NextStepResponse nextStep,
+        /** The approved request's job code (BR-F1-05), which opens its trip; set on the customer's read only. */
+        String jobCode) {}

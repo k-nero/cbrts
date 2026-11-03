@@ -38,9 +38,7 @@ const RequestQuotationPage: FC = () => {
     return (
       <RequestLoadState
         query={query}
-        notFound={
-          <Navigate to={router.paths.get('request-submitted', { pathParams: [id] })} replace />
-        }
+        notFound={<Navigate to={router.paths.get('request', { pathParams: [id] })} replace />}
       />
     );
 
