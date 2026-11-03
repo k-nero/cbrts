@@ -18,6 +18,8 @@ import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.repository.QuarantinePeriodRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TripHorseRepository;
 import com.equifreight.repository.TripJobRepository;
 import com.equifreight.repository.TripRepository;
@@ -39,6 +41,8 @@ class TripChainTest {
     private final TripVehicleRepository tripVehicles = mock(TripVehicleRepository.class);
     private final TripHorseRepository tripHorses = mock(TripHorseRepository.class);
     private final TripJobRepository parts = mock(TripJobRepository.class);
+    private final RoutePlanRepository routePlans = mock(RoutePlanRepository.class);
+    private final QuarantinePeriodRepository quarantines = mock(QuarantinePeriodRepository.class);
     private final CodeService codes = mock(CodeService.class);
     private JobTripService service;
 
@@ -82,7 +86,7 @@ class TripChainTest {
 
     @BeforeEach
     void setUp() {
-        service = new JobTripService(trips, tripVehicles, tripHorses, parts, codes);
+        service = new JobTripService(trips, tripVehicles, tripHorses, parts, codes, routePlans, quarantines);
         job.setId(UUID.randomUUID());
         job.setCode("CBRT-2026-041");
         job.setStage(JobStage.TRIP);
