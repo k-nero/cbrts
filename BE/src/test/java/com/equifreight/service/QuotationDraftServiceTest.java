@@ -290,6 +290,21 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void getOfADraftWhoseRequestNoLongerHasARouteSaysWhy() {
+        service.start(yen, request.getId());
+        // Returned for information, then edited by the club onto a route we don't run: it has no corridor.
+        request.setStatus(RequestStatus.INFO_REQUIRED);
+        request.setCorridor(null);
+
+        assertThatThrownBy(() -> service.get(request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("REQ-2026-0199 is back with Saigon Turf Club, who changed it to a route we don't run, so"
+                        + " its quotation can't be priced. It opens again once they send the request back.")
+                .extracting("code")
+                .isEqualTo("REQUEST_HAS_NO_ROUTE");
+    }
+
+    @Test
     void getWithoutAQuotationIsNotFound() {
         assertThatThrownBy(() -> service.get(request.getId())).isInstanceOf(ResourceNotFoundException.class);
         verifyNoInteractions(audit);

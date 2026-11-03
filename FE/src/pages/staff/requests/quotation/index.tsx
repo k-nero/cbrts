@@ -1,6 +1,7 @@
 import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Flex, Skeleton } from 'antd';
+import type { AxiosError } from 'axios';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import type { RunWrite } from './editorOptions';
@@ -103,6 +104,19 @@ const QuotationBuilderPage: FC = () => {
         <Panel>
           <Skeleton active title={false} paragraph={{ rows: 8 }} />
         </Panel>
+      </Flex>
+    );
+  }
+
+  // A 409 says why the draft can't be priced now (useQuotation): the request is back with the club.
+  if (!query.data && (query.error as AxiosError | null)?.response?.status === 409) {
+    return (
+      <Flex vertical gap={28}>
+        <PageHeader back={back} title="Quotation" />
+        <Callout
+          tone="info"
+          title={apiErrorMessage(query.error, "The quotation can't be shown now.")}
+        />
       </Flex>
     );
   }

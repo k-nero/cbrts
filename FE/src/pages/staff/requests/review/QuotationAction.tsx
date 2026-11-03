@@ -26,7 +26,11 @@ export const QuotationAction: FC<{ review: RequestReview; primary?: boolean }> =
   const id = review.request.id;
   const open = () => router.push(router.paths.get('quotation-builder', { pathParams: [id] }));
 
-  const action = quotationAction(review.request.status, review.quotation);
+  const action = quotationAction(
+    review.request.status,
+    review.quotation,
+    review.request.route != null,
+  );
   if (action === null) return null;
   if (action === 'open' && review.quotation) {
     return (
