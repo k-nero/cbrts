@@ -43,6 +43,7 @@ public class AuthoritySubmissionService {
     private final ClearanceService clearanceService;
     private final NotificationService notificationService;
     private final QuarantineRules quarantineRules;
+    private final QuarantineNotices quarantineNotices;
 
     public AuthoritySubmissionService(
             AuthorityRepository authorityRepository,
@@ -56,7 +57,8 @@ public class AuthoritySubmissionService {
             AuditService auditService,
             ClearanceService clearanceService,
             NotificationService notificationService,
-            QuarantineRules quarantineRules) {
+            QuarantineRules quarantineRules,
+            QuarantineNotices quarantineNotices) {
         this.authorityRepository = authorityRepository;
         this.submissionRepository = submissionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -69,6 +71,7 @@ public class AuthoritySubmissionService {
         this.clearanceService = clearanceService;
         this.notificationService = notificationService;
         this.quarantineRules = quarantineRules;
+        this.quarantineNotices = quarantineNotices;
     }
 
     /**
@@ -310,6 +313,7 @@ public class AuthoritySubmissionService {
                 "SCHEDULED");
 
         clearanceService.evaluateClearanceGate(job.getId());
+        quarantineNotices.scheduled(saved);
         return ClearanceMapper.toQuarantineResponse(saved);
     }
 
@@ -360,6 +364,7 @@ public class AuthoritySubmissionService {
         }
         requireValidPeriod(job.getId(), place, quarantine.getKind(), request.startsOn(), request.endsOn());
 
+        String was = QuarantineNotices.where(quarantine);
         String before = "%s, %s to %s"
                 .formatted(
                         quarantine.getPlace().getName(),
@@ -388,6 +393,7 @@ public class AuthoritySubmissionService {
                 after);
 
         clearanceService.evaluateClearanceGate(job.getId());
+        quarantineNotices.changed(saved, was);
         return ClearanceMapper.toQuarantineResponse(saved);
     }
 
@@ -434,6 +440,7 @@ public class AuthoritySubmissionService {
                 "COMPLETED");
 
         clearanceService.evaluateClearanceGate(quarantine.getJob().getId());
+        quarantineNotices.completed(updated);
         return ClearanceMapper.toQuarantineResponse(updated);
     }
 

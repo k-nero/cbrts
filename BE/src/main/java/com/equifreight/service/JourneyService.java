@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.QuarantinePeriod;
@@ -33,6 +34,8 @@ import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -69,6 +72,7 @@ public class JourneyService {
     private final CrewAssignmentRepository crew;
     private final PlanningDefaults defaults;
     private final QuarantineRules quarantineRules;
+    private final ClearanceService clearance;
     private final AuditService audit;
     private final Clock clock;
 
@@ -86,6 +90,7 @@ public class JourneyService {
             CrewAssignmentRepository crew,
             PlanningDefaults defaults,
             QuarantineRules quarantineRules,
+            ClearanceService clearance,
             AuditService audit,
             Clock clock) {
         this.jobs = jobs;
@@ -101,6 +106,7 @@ public class JourneyService {
         this.crew = crew;
         this.defaults = defaults;
         this.quarantineRules = quarantineRules;
+        this.clearance = clearance;
         this.audit = audit;
         this.clock = clock;
     }
@@ -461,13 +467,18 @@ public class JourneyService {
 
     /**
      * What the job page warns about its journey (US-F3-21): where it ends short of the destination city, where it
-     * differs from the route the customer was quoted, since the price was worked out on that route, and each scheduled
-     * quarantine no trip takes the horses to yet (US-F3-22).
+     * differs from the route the customer was quoted, since the price was worked out on that route, each scheduled
+     * quarantine no trip takes the horses to yet, each one the trips plan too short a stay at, and each trip that brings
+     * the horses after a quarantine starts or collects them before it ends (US-F3-22).
      */
     @Transactional(readOnly = true)
     public List<String> warnings(TransportJob job) {
         List<TripJob> journey = jobTrips.journey(job);
         List<String> out = new ArrayList<>(unreachedQuarantines(job, journey));
+        for (QuarantinePeriod q : quarantineRules.heldFor(job)) {
+            shortStay(job, journey, q).ifPresent(out::add);
+            out.addAll(clashes(job, journey, q));
+        }
         if (journey.isEmpty()) return out;
         String destination = destinationCity(job);
         Trip last = journey.getLast().getTrip();
@@ -526,6 +537,92 @@ public class JourneyService {
                 .map(s -> "Quarantine at " + s.placeName() + ", " + QuarantineRules.period(s.startsOn(), s.endsOn())
                         + ": no trip takes the horses there yet.")
                 .toList();
+    }
+
+    /**
+     * Each trip of {@code job}'s journey whose planned times clash with {@code quarantine} (US-F3-22): one that brings
+     * the horses to the station after the quarantine's first day, or collects them there before its last day. Route
+     * confirmation refuses both; a quarantine scheduled or changed after confirmation can still make them.
+     */
+    @Transactional(readOnly = true)
+    public List<String> clashes(TransportJob job, QuarantinePeriod quarantine) {
+        return clashes(job, jobTrips.journey(job), quarantine);
+    }
+
+    private List<String> clashes(TransportJob job, List<TripJob> journey, QuarantinePeriod q) {
+        Place station = q.getPlace();
+        List<String> out = new ArrayList<>();
+        for (StationStop s : stopsAt(job, journey, station, RouteStopKind.TRANSFER)) {
+            if (LocalDate.ofInstant(s.at(), BusinessTime.ZONE).isAfter(q.getStartsOn())) {
+                out.add(s.trip().getCode() + " brings the horses to " + station.getName() + " at "
+                        + QuarantineRules.at(s.at()) + ", after their quarantine there starts on "
+                        + BusinessTime.SHORT_DAY.format(q.getStartsOn()) + ".");
+            }
+        }
+        for (StationStop s : stopsAt(job, journey, station, RouteStopKind.PICKUP)) {
+            if (LocalDate.ofInstant(s.at(), BusinessTime.ZONE).isBefore(q.getEndsOn())) {
+                out.add(s.trip().getCode() + " collects the horses at " + station.getName() + " at "
+                        + QuarantineRules.at(s.at()) + ", before their quarantine there ends on "
+                        + BusinessTime.SHORT_DAY.format(q.getEndsOn()) + ".");
+            }
+        }
+        return out;
+    }
+
+    /**
+     * "Quarantine at Phú Thọ, 20–27 Nov: the trips plan 5 days there; Hong Kong import asks for at least 7." when the
+     * trip into the station and the trip out of it are both planned, and the days between them are fewer than the
+     * minimum {@link QuarantineRules#minimumDays} gives for the quarantine's kind.
+     */
+    private Optional<String> shortStay(TransportJob job, List<TripJob> journey, QuarantinePeriod q) {
+        Place station = q.getPlace();
+        Optional<Instant> in = stopsAt(job, journey, station, RouteStopKind.TRANSFER).stream()
+                .map(StationStop::at)
+                .min(Comparator.naturalOrder());
+        Optional<Instant> out = stopsAt(job, journey, station, RouteStopKind.PICKUP).stream()
+                .map(StationStop::at)
+                .max(Comparator.naturalOrder());
+        if (in.isEmpty() || out.isEmpty()) return Optional.empty();
+        long days = ChronoUnit.DAYS.between(
+                LocalDate.ofInstant(in.get(), BusinessTime.ZONE), LocalDate.ofInstant(out.get(), BusinessTime.ZONE));
+        return clearance.destinationVersion(job.getId()).flatMap(destination -> {
+            int minimum = quarantineRules.minimumDays(q.getKind(), destination);
+            return days >= minimum
+                    ? Optional.<String>empty()
+                    : Optional.of("Quarantine at " + station.getName() + ", "
+                            + QuarantineRules.period(q.getStartsOn(), q.getEndsOn()) + ": the trips plan " + days
+                            + (days == 1 ? " day" : " days") + " there; "
+                            + destination.getCatalog().getName()
+                            + " asks for at least " + minimum + ".");
+        });
+    }
+
+    /** A planned stop of {@code job}'s at a station, on one trip of its journey. */
+    private record StationStop(Trip trip, Instant at) {}
+
+    /** The planned stops of {@code kind} for {@code job} at {@code place}, on each trip's current route. */
+    private List<StationStop> stopsAt(TransportJob job, List<TripJob> journey, Place place, RouteStopKind kind) {
+        List<StationStop> out = new ArrayList<>();
+        for (TripJob part : journey) {
+            Trip trip = part.getTrip();
+            currentRoute(trip)
+                    .ifPresent(plan -> plan.getStops().stream()
+                            .filter(st -> st.getKind() == kind
+                                    && st.getPlannedAt() != null
+                                    && st.getJob() != null
+                                    && st.getJob().getId().equals(job.getId())
+                                    && st.getPlace() != null
+                                    && st.getPlace().getId().equals(place.getId()))
+                            .forEach(st -> out.add(new StationStop(trip, st.getPlannedAt()))));
+        }
+        return out;
+    }
+
+    /** The trip's route as the coordinator is working on it: its draft, else its confirmed one. */
+    private Optional<RoutePlan> currentRoute(Trip trip) {
+        return routePlanRows
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .or(() -> routePlanRows.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED));
     }
 
     /**
@@ -612,9 +709,7 @@ public class JourneyService {
 
     /** Where {@code trip}'s route hands {@code job}'s horses on: the place of its TRANSFER stop for the job. */
     private Optional<Place> handoverOf(Trip trip, TransportJob job) {
-        return routePlanRows
-                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
-                .or(() -> routePlanRows.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+        return currentRoute(trip)
                 .flatMap(plan -> plan.getStops().stream()
                         .filter(st -> st.getKind() == RouteStopKind.TRANSFER
                                 && st.getJob() != null

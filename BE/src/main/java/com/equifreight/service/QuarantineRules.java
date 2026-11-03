@@ -65,6 +65,11 @@ public class QuarantineRules {
         return quarantines.findByJobIdAndCompletedAtIsNullOrderByStartsOn(job.getId());
     }
 
+    /** "08:00 on 26 Nov", in business time. */
+    public static String at(Instant instant) {
+        return AT.format(instant);
+    }
+
     /** A quarantine's days in a sentence: "20–27 Nov", or "28 Nov–3 Dec" across a month. */
     public static String period(LocalDate startsOn, LocalDate endsOn) {
         if (startsOn.getMonth() == endsOn.getMonth() && startsOn.getYear() == endsOn.getYear()) {

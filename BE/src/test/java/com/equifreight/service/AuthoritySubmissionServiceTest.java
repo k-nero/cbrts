@@ -72,6 +72,9 @@ class AuthoritySubmissionServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private QuarantineNotices quarantineNotices;
+
     // Only its rules on a quarantine's kind are used here, never its repository.
     @Spy
     private QuarantineRules quarantineRules = new QuarantineRules(null);
