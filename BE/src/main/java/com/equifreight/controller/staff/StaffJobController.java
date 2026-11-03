@@ -292,6 +292,17 @@ public class StaffJobController {
     }
 
     /**
+     * US-F3-22: Route the journey by way of a quarantine station no trip takes the horses to yet: the road trip ending
+     * in its city hands them on there, and a new local run takes them on.
+     */
+    @PostMapping("/{jobId}/journey/quarantines/{placeId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripPartResponse> routeViaQuarantine(
+            @PathVariable UUID jobId, @PathVariable UUID placeId, @AuthenticationPrincipal User user) {
+        return journeyService.routeViaQuarantine(jobId, placeId, user);
+    }
+
+    /**
      * US-F3-21: Take the last trip off the job's journey before it departs; the only trip leaves the job with none.
      */
     @DeleteMapping("/{jobId}/journey/trips/{tripId}")

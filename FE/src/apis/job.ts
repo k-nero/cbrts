@@ -164,6 +164,15 @@ export const jobApi = {
       .post<TripPart[]>(`/staff/jobs/${jobId}/journey/trips`, { corridorId, quarantinePlaceId })
       .then((r) => r.data),
 
+  /**
+   * US-F3-22: routes the journey by way of the quarantine station `placeId`: the road trip ending in its city hands
+   * the horses on there, and a new local run takes them on.
+   */
+  routeViaQuarantine: (jobId: string, placeId: string) =>
+    client
+      .post<TripPart[]>(`/staff/jobs/${jobId}/journey/quarantines/${placeId}`)
+      .then((r) => r.data),
+
   /** US-F3-21: takes the journey's last trip off before it departs. */
   removeTrip: (jobId: string, tripId: string) =>
     client.delete<TripPart[]>(`/staff/jobs/${jobId}/journey/trips/${tripId}`).then((r) => r.data),

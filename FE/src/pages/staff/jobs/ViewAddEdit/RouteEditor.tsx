@@ -11,7 +11,7 @@ import {
   recalculatedTimes,
   type RouteDraftForm,
   routeDraftSchema,
-  STOP_KINDS,
+  EDITOR_STOP_KINDS,
   toForm,
   toInput,
 } from './routeDraft';
@@ -183,7 +183,7 @@ export const RouteEditor: FC<{
                         name={`stops.${i}.kind`}
                         label="Stop"
                         component="select"
-                        componentProps={{ isRequired: true, options: STOP_KINDS }}
+                        componentProps={{ isRequired: true, options: EDITOR_STOP_KINDS }}
                       />
                     </div>
                     <div className="min-w-64 flex-1">

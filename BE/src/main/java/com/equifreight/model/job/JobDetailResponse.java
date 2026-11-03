@@ -49,6 +49,8 @@ public record JobDetailResponse(
         boolean journeyComplete,
         /** What to warn about the journey: it ends short of the destination, or leaves the quoted route (US-F3-21). */
         List<String> journeyWarnings,
+        /** The quarantine stations no trip takes the horses to yet that a trip can be routed by way of (US-F3-22). */
+        List<QuarantineDetourResponse> quarantineDetours,
         /** Which trips of the journey the clearance gate holds back, in words; null with no trip (US-F3-21). */
         String clearanceJourneyNote,
         /**

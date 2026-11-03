@@ -409,6 +409,18 @@ export const useAddTrip = (jobId: string) => {
   });
 };
 
+/** Routes the journey by way of a quarantine station no trip reaches yet (US-F3-22); every view of the job refetches. */
+export const useRouteViaQuarantine = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (placeId: string) => jobApi.routeViaQuarantine(jobId, placeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
 /** Takes the journey's last trip off before it departs (US-F3-21). */
 export const useRemoveTrip = (jobId: string) => {
   const queryClient = useQueryClient();

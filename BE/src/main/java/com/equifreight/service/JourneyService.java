@@ -22,6 +22,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.CreateRoutePlanRequest;
 import com.equifreight.model.job.JourneyCorridorResponse;
 import com.equifreight.model.job.JourneyCorridorResponse.QuarantineStation;
+import com.equifreight.model.job.QuarantineDetourResponse;
 import com.equifreight.model.job.SetFlightRequest;
 import com.equifreight.model.trip.TripPartResponse;
 import com.equifreight.repository.CorridorRepository;
@@ -237,6 +238,143 @@ public class JourneyService {
                 trip.getCode());
         log.info("{} added trip {} on {}", job.getCode(), trip.getCode(), corridor.getCode());
         return jobTrips.describeParts(job, trip.getId());
+    }
+
+    /**
+     * Routes {@code jobId}'s journey by way of the quarantine station {@code quarantinePlaceId} when no trip takes the
+     * horses there yet, as when the quarantine was scheduled after the journey was planned (US-F3-22). The road trip
+     * that ends in the station's city ({@link #detourOf}) now hands the horses on at the station, and a new local run
+     * collects them there and goes on to where that trip ended, with the trips after it unchanged. Each trip is booked
+     * for its own hours, so its trailer and crew are free while the horses wait. Both routes are drafts to plan and
+     * confirm, which holds them to the quarantine's dates.
+     */
+    @Transactional
+    public List<TripPartResponse> routeViaQuarantine(UUID jobId, UUID quarantinePlaceId, User user) {
+        TransportJob job = job(jobId);
+        Place station = quarantineRules.heldFor(job).stream()
+                .map(QuarantinePeriod::getPlace)
+                .filter(p -> p.getId().equals(quarantinePlaceId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        "NO_QUARANTINE_THERE",
+                        job.getCode() + " has no quarantine scheduled at that station. Schedule it on the Authorities"
+                                + " tab first."));
+        List<TripJob> journey = jobTrips.journey(job);
+        if (journey.stream()
+                .anyMatch(part -> handoverOf(part.getTrip(), job)
+                        .map(p -> p.getId().equals(station.getId()))
+                        .orElse(false))) {
+            throw new BusinessException(
+                    "QUARANTINE_REACHED",
+                    job.getCode() + "'s journey already takes the horses to " + station.getName());
+        }
+        TripJob part = detourOf(job, journey, station)
+                .orElseThrow(() -> new BusinessException(
+                        "QUARANTINE_NOT_ON_WAY",
+                        "No road trip of " + job.getCode() + "'s journey ends in " + station.getCity()
+                                + " before it departs. Take the trips after the quarantine off and add them again"
+                                + " by way of " + station.getName() + "."));
+        Trip before = part.getTrip();
+        Corridor local = localRun(station.getCity())
+                .orElseThrow(() -> new BusinessException(
+                        "NO_LOCAL_RUN",
+                        "The route catalog has no local road run in " + station.getCity()
+                                + " to collect the horses from " + station.getName() + ". Add one first."));
+        RouteStop end = endOf(before, job)
+                .orElseThrow(() -> new BusinessException(
+                        "NO_PLACE",
+                        "Trip " + before.getCode() + " has no stop where it leaves " + job.getCode() + "'s horses."));
+
+        String reason = job.getCode() + " goes to quarantine at " + station.getName();
+        routePlans.reopen(before, reason);
+        routePlans.handOnAt(before, job, station);
+        Instant at = clock.instant();
+        Trip after = jobTrips.newTrip(local, false, user, at);
+        jobTrips.planNext(job, before, after);
+        routePlans.startRoute(after, job, station, end.getKind(), end.getPlace(), user, reason);
+        job.setSignedOffAt(null);
+        job.setSignedOffBy(null);
+        jobs.save(job);
+
+        audit.recordDecision(
+                user,
+                "ADD_TRIP",
+                AuditText.fit(job.getCode() + " goes to quarantine at " + station.getName() + ": trip "
+                        + before.getCode() + " hands the horses on there, and trip " + after.getCode() + " ("
+                        + local.getCode() + ") takes them on to "
+                        + end.getPlace().getName()),
+                "TRIP",
+                after.getId(),
+                after.getCode(),
+                null,
+                null,
+                after.getCode());
+        log.info("{} routed via quarantine at {} on trip {}", job.getCode(), station.getName(), after.getCode());
+        return jobTrips.describeParts(job, after.getId());
+    }
+
+    /**
+     * The quarantine stations no trip of {@code job}'s journey takes the horses to yet, each with the trip that can be
+     * routed by way of it ({@link #routeViaQuarantine}); a station no trip can reach that way isn't listed.
+     */
+    @Transactional(readOnly = true)
+    public List<QuarantineDetourResponse> quarantineDetours(TransportJob job) {
+        List<QuarantinePeriod> held = quarantineRules.heldFor(job);
+        if (held.isEmpty()) return List.of();
+        List<TripJob> journey = jobTrips.journey(job);
+        List<UUID> reached = journey.stream()
+                .map(part -> handoverOf(part.getTrip(), job))
+                .flatMap(Optional::stream)
+                .map(Place::getId)
+                .toList();
+        List<QuarantineDetourResponse> out = new ArrayList<>();
+        for (QuarantineStation s : stations(held)) {
+            if (reached.contains(s.placeId())) continue;
+            Place station = held.stream()
+                    .map(QuarantinePeriod::getPlace)
+                    .filter(p -> p.getId().equals(s.placeId()))
+                    .findFirst()
+                    .orElseThrow();
+            if (localRun(station.getCity()).isEmpty()) continue;
+            detourOf(job, journey, station)
+                    .ifPresent(part -> out.add(new QuarantineDetourResponse(
+                            s.placeId(),
+                            s.placeName(),
+                            s.startsOn(),
+                            s.endsOn(),
+                            part.getTrip().getId(),
+                            part.getTrip().getCode())));
+        }
+        return out;
+    }
+
+    /**
+     * The part of {@code job}'s journey to route by way of {@code station}: the first road trip, not yet departed, that
+     * ends in the station's city somewhere else.
+     */
+    private Optional<TripJob> detourOf(TransportJob job, List<TripJob> journey, Place station) {
+        if (station.getCity() == null) return Optional.empty();
+        return journey.stream()
+                .filter(part -> !part.departed())
+                .filter(part -> part.getTrip().getCorridor() != null
+                        && part.getTrip().getCorridor().isRoad())
+                .filter(part ->
+                        station.getCity().equalsIgnoreCase(part.getTrip().endCity()))
+                .filter(part -> endOf(part.getTrip(), job)
+                        .map(st -> !station.getId().equals(st.getPlace().getId()))
+                        .orElse(false))
+                .findFirst();
+    }
+
+    /** Where {@code trip}'s route leaves {@code job}'s horses: its TRANSFER or DELIVERY stop for the job. */
+    private Optional<RouteStop> endOf(Trip trip, TransportJob job) {
+        return currentRoute(trip)
+                .flatMap(plan -> plan.getStops().stream()
+                        .filter(st -> (st.getKind() == RouteStopKind.TRANSFER || st.getKind() == RouteStopKind.DELIVERY)
+                                && st.getJob() != null
+                                && st.getJob().getId().equals(job.getId())
+                                && st.getPlace() != null)
+                        .findFirst());
     }
 
     /**

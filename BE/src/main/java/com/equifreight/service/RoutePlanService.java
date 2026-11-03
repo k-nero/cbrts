@@ -999,6 +999,24 @@ public class RoutePlanService {
     }
 
     /**
+     * Ends {@code job}'s part of the trip's draft route at {@code place} as a TRANSFER, where its delivery or transfer
+     * was (US-F3-22): the next trip collects the horses there. The leg into it is new, for the coordinator to plan.
+     */
+    @Transactional
+    public void handOnAt(Trip trip, TransportJob job, Place place) {
+        Optional<RoutePlan> draft = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
+        if (draft.isEmpty()) return;
+        List<StopCopy> stops = draft.get().getStops().stream()
+                .map(st -> st.getJob() != null
+                                && st.getJob().getId().equals(job.getId())
+                                && (st.getKind() == RouteStopKind.TRANSFER || st.getKind() == RouteStopKind.DELIVERY)
+                        ? new StopCopy(null, job, RouteStopKind.TRANSFER, place, null)
+                        : copy(st))
+                .toList();
+        rebuild(draft.get(), stops);
+    }
+
+    /**
      * Replaces the draft's stops with {@code stops}, in order. A leg between two stops that were already consecutive
      * keeps its mode, vehicle, distance, time and flight; a new pair gets a road leg for the coordinator to plan.
      */
