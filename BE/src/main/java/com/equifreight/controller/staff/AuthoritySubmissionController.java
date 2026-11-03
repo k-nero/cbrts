@@ -99,6 +99,18 @@ public class AuthoritySubmissionController {
     }
 
     /**
+     * Change a scheduled quarantine's station, dates or horse. Transport Specialist only.
+     */
+    @PutMapping("/quarantines/{quarantineId}")
+    @PreAuthorize("hasRole('TRANSPORT_SPECIALIST')")
+    public QuarantinePeriodResponse updateQuarantine(
+            @PathVariable UUID quarantineId,
+            @Valid @RequestBody CreateQuarantinePeriodRequest request,
+            @AuthenticationPrincipal User user) {
+        return submissionService.updateQuarantine(quarantineId, request, user);
+    }
+
+    /**
      * Confirm completion of a quarantine period. Transport Specialist only.
      */
     @PostMapping("/quarantines/{quarantineId}/complete")

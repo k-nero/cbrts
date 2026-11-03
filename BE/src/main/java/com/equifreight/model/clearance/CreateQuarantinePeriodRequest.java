@@ -1,5 +1,6 @@
 package com.equifreight.model.clearance;
 
+import com.equifreight.entity.enums.QuarantineKind;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -15,4 +16,9 @@ public record CreateQuarantinePeriodRequest(
         @NotNull(message = "Place ID is required") UUID placeId,
 
         @NotNull(message = "Starts on date is required") LocalDate startsOn,
-        @NotNull(message = "Ends on date is required") LocalDate endsOn) {}
+        @NotNull(message = "Ends on date is required") LocalDate endsOn,
+
+        /*
+         * Before export or after arrival. Null schedules a PRE_EXPORT quarantine, and on a change keeps the kind it has.
+         */
+        QuarantineKind kind) {}

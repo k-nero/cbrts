@@ -1,5 +1,6 @@
 package com.equifreight.entity;
 
+import com.equifreight.entity.enums.QuarantineKind;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,6 +30,13 @@ public class QuarantinePeriod extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = false)
     private Place place;
+
+    /**
+     * Pre-export unless set; the form doesn't ask yet.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private QuarantineKind kind = QuarantineKind.PRE_EXPORT;
 
     @Column(nullable = false)
     private LocalDate startsOn;

@@ -1,7 +1,9 @@
 package com.equifreight.service;
 
+import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.QuarantinePeriod;
 import com.equifreight.entity.RouteLeg;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.RouteStop;
@@ -19,6 +21,7 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.job.CreateRoutePlanRequest;
 import com.equifreight.model.job.JourneyCorridorResponse;
+import com.equifreight.model.job.JourneyCorridorResponse.QuarantineStation;
 import com.equifreight.model.job.SetFlightRequest;
 import com.equifreight.model.trip.TripPartResponse;
 import com.equifreight.repository.CorridorRepository;
@@ -31,9 +34,13 @@ import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,6 +71,8 @@ public class JourneyService {
     private final VehicleBookingRepository bookings;
     private final CrewAssignmentRepository crew;
     private final PlanningDefaults defaults;
+    private final QuarantineRules quarantineRules;
+    private final ClearanceService clearance;
     private final AuditService audit;
     private final Clock clock;
 
@@ -80,6 +89,8 @@ public class JourneyService {
             VehicleBookingRepository bookings,
             CrewAssignmentRepository crew,
             PlanningDefaults defaults,
+            QuarantineRules quarantineRules,
+            ClearanceService clearance,
             AuditService audit,
             Clock clock) {
         this.jobs = jobs;
@@ -94,6 +105,8 @@ public class JourneyService {
         this.bookings = bookings;
         this.crew = crew;
         this.defaults = defaults;
+        this.quarantineRules = quarantineRules;
+        this.clearance = clearance;
         this.audit = audit;
         this.clock = clock;
     }
@@ -101,7 +114,8 @@ public class JourneyService {
     /**
      * The corridors the next trip of {@code jobId}'s journey can run (US-F3-21): every catalog corridor touching the
      * city the journey has reached, read from that city. Those on the quoted route come first. None once the journey
-     * reaches the destination city.
+     * reaches the destination city. A trip that doesn't deliver offers the quarantine stations in the city it ends in,
+     * where the job has a quarantine scheduled, to end at (US-F3-22).
      */
     @Transactional(readOnly = true)
     public List<JourneyCorridorResponse> nextCorridors(UUID jobId) {
@@ -111,10 +125,16 @@ public class JourneyService {
         if (city == null) return List.of();
         List<Corridor> quoted = quoted(job.getRequest());
         String destination = destinationCity(job);
+        List<QuarantinePeriod> held = quarantineRules.heldFor(job);
+        List<TripJob> journey = held.isEmpty() ? List.of() : jobTrips.journey(job);
+        Place from = journey.isEmpty()
+                ? null
+                : handoverOf(journey.getLast().getTrip(), job).orElse(null);
         return corridors.findTouchingCity(city).stream()
                 .map(c -> {
                     boolean reversed = !c.getOriginCity().equalsIgnoreCase(city);
                     String to = reversed ? c.getOriginCity() : c.getDestinationCity();
+                    boolean delivers = JobTripService.reachesDestination(probe(c, reversed), job);
                     return new JourneyCorridorResponse(
                             c.getId(),
                             c.getCode(),
@@ -123,7 +143,8 @@ public class JourneyService {
                             city,
                             to,
                             destination != null && destination.equalsIgnoreCase(to),
-                            quoted.stream().anyMatch(q -> q.getId().equals(c.getId())));
+                            quoted.stream().anyMatch(q -> q.getId().equals(c.getId())),
+                            delivers || !c.isRoad() ? List.of() : stationsIn(held, to, from));
                 })
                 .sorted(Comparator.comparing((JourneyCorridorResponse r) -> !r.quoted())
                         .thenComparing(r -> !r.reachesDestination())
@@ -141,6 +162,17 @@ public class JourneyService {
      */
     @Transactional
     public List<TripPartResponse> addTrip(UUID jobId, UUID corridorId, User user) {
+        return addTrip(jobId, corridorId, null, user);
+    }
+
+    /**
+     * Adds a trip as {@link #addTrip(UUID, UUID, User)} does; with {@code quarantinePlaceId}, a road trip that doesn't
+     * deliver ends at that quarantine station instead, where the job has a quarantine scheduled in the city the trip
+     * ends in, and the next trip collects the horses there (US-F3-22). Route confirmation then holds both trips to the
+     * quarantine's dates.
+     */
+    @Transactional
+    public List<TripPartResponse> addTrip(UUID jobId, UUID corridorId, UUID quarantinePlaceId, User user) {
         TransportJob job = job(jobId);
         TransportRequest request = job.getRequest();
         if (complete(job)) {
@@ -159,6 +191,7 @@ public class JourneyService {
                     corridor.getCode() + " doesn't run from " + city + ", where " + job.getCode()
                             + "'s journey has reached.");
         }
+        Place station = quarantinePlaceId == null ? null : stationFor(job, corridor, !forward, quarantinePlaceId);
         Instant at = clock.instant();
         List<TripJob> journey = jobTrips.journey(job);
         Trip trip;
@@ -170,18 +203,20 @@ public class JourneyService {
             Trip last = journey.getLast().getTrip();
             trip = jobTrips.newTrip(corridor, !forward, user, at);
             jobTrips.planNext(job, last, trip);
-            from = handoverOf(last, job).orElseGet(() -> handoverPlace(city, corridor.getMode(), request));
+            from = handoverOf(last, job).orElseGet(() -> handoverPlace(city, request, null));
         }
         boolean delivers = JobTripService.reachesDestination(trip, job);
-        Place to =
-                delivers ? request.getDestinationPlace() : handoverPlace(trip.endCity(), corridor.getMode(), request);
+        Place to = delivers
+                ? request.getDestinationPlace()
+                : station != null ? station : handoverPlace(trip.endCity(), request, from);
         if (from == null || to == null) {
             throw new BusinessException(
                     "NO_PLACE",
                     "No place in " + (from == null ? city : trip.endCity())
                             + " to hand the horses over at. Add one to the route catalog first.");
         }
-        String reason = job.getCode() + " travels on trip " + trip.getCode();
+        String reason = job.getCode() + " travels on trip " + trip.getCode()
+                + (station == null ? "" : " to quarantine at " + station.getName());
         routePlans.startRoute(
                 trip, job, from, delivers ? RouteStopKind.DELIVERY : RouteStopKind.TRANSFER, to, user, reason);
         job.setSignedOffAt(null);
@@ -192,7 +227,8 @@ public class JourneyService {
                 user,
                 "ADD_TRIP",
                 AuditText.fit(job.getCode() + " travels " + trip.startCity() + " → " + trip.endCity() + " on trip "
-                        + trip.getCode() + " (" + corridor.getCode() + ")"),
+                        + trip.getCode() + " (" + corridor.getCode() + ")"
+                        + (station == null ? "" : ", to quarantine at " + station.getName())),
                 "TRIP",
                 trip.getId(),
                 trip.getCode(),
@@ -430,14 +466,20 @@ public class JourneyService {
     }
 
     /**
-     * What the job page warns about its journey (US-F3-21): where it ends short of the destination city, and where it
-     * differs from the route the customer was quoted, since the price was worked out on that route.
+     * What the job page warns about its journey (US-F3-21): where it ends short of the destination city, where it
+     * differs from the route the customer was quoted, since the price was worked out on that route, each scheduled
+     * quarantine no trip takes the horses to yet, each one the trips plan too short a stay at, and each trip that brings
+     * the horses after a quarantine starts or collects them before it ends (US-F3-22).
      */
     @Transactional(readOnly = true)
     public List<String> warnings(TransportJob job) {
         List<TripJob> journey = jobTrips.journey(job);
-        if (journey.isEmpty()) return List.of();
-        List<String> out = new ArrayList<>();
+        List<String> out = new ArrayList<>(unreachedQuarantines(job, journey));
+        for (QuarantinePeriod q : quarantineRules.heldFor(job)) {
+            shortStay(job, journey, q).ifPresent(out::add);
+            out.addAll(clashes(job, journey, q));
+        }
+        if (journey.isEmpty()) return out;
         String destination = destinationCity(job);
         Trip last = journey.getLast().getTrip();
         if (destination != null && !JobTripService.reachesDestination(last, job)) {
@@ -478,6 +520,173 @@ public class JourneyService {
                 && JobTripService.reachesDestination(journey.getLast().getTrip(), job);
     }
 
+    /**
+     * "Quarantine at Phú Thọ, 20–27 Nov: no trip takes the horses there yet." for each station where the job has a
+     * quarantine scheduled and no trip of its journey hands the horses on.
+     */
+    private List<String> unreachedQuarantines(TransportJob job, List<TripJob> journey) {
+        List<QuarantinePeriod> held = quarantineRules.heldFor(job);
+        if (held.isEmpty()) return List.of();
+        List<UUID> reached = journey.stream()
+                .map(part -> handoverOf(part.getTrip(), job))
+                .flatMap(Optional::stream)
+                .map(Place::getId)
+                .toList();
+        return stations(held).stream()
+                .filter(s -> !reached.contains(s.placeId()))
+                .map(s -> "Quarantine at " + s.placeName() + ", " + QuarantineRules.period(s.startsOn(), s.endsOn())
+                        + ": no trip takes the horses there yet.")
+                .toList();
+    }
+
+    /**
+     * Each trip of {@code job}'s journey whose planned times clash with {@code quarantine} (US-F3-22): one that brings
+     * the horses to the station after the quarantine's first day, or collects them there before its last day. Route
+     * confirmation refuses both; a quarantine scheduled or changed after confirmation can still make them.
+     */
+    @Transactional(readOnly = true)
+    public List<String> clashes(TransportJob job, QuarantinePeriod quarantine) {
+        return clashes(job, jobTrips.journey(job), quarantine);
+    }
+
+    private List<String> clashes(TransportJob job, List<TripJob> journey, QuarantinePeriod q) {
+        Place station = q.getPlace();
+        List<String> out = new ArrayList<>();
+        for (StationStop s : stopsAt(job, journey, station, RouteStopKind.TRANSFER)) {
+            if (LocalDate.ofInstant(s.at(), BusinessTime.ZONE).isAfter(q.getStartsOn())) {
+                out.add(s.trip().getCode() + " brings the horses to " + station.getName() + " at "
+                        + QuarantineRules.at(s.at()) + ", after their quarantine there starts on "
+                        + BusinessTime.SHORT_DAY.format(q.getStartsOn()) + ".");
+            }
+        }
+        for (StationStop s : stopsAt(job, journey, station, RouteStopKind.PICKUP)) {
+            if (LocalDate.ofInstant(s.at(), BusinessTime.ZONE).isBefore(q.getEndsOn())) {
+                out.add(s.trip().getCode() + " collects the horses at " + station.getName() + " at "
+                        + QuarantineRules.at(s.at()) + ", before their quarantine there ends on "
+                        + BusinessTime.SHORT_DAY.format(q.getEndsOn()) + ".");
+            }
+        }
+        return out;
+    }
+
+    /**
+     * "Quarantine at Phú Thọ, 20–27 Nov: the trips plan 5 days there; Hong Kong import asks for at least 7." when the
+     * trip into the station and the trip out of it are both planned, and the days between them are fewer than the
+     * minimum {@link QuarantineRules#minimumDays} gives for the quarantine's kind.
+     */
+    private Optional<String> shortStay(TransportJob job, List<TripJob> journey, QuarantinePeriod q) {
+        Place station = q.getPlace();
+        Optional<Instant> in = stopsAt(job, journey, station, RouteStopKind.TRANSFER).stream()
+                .map(StationStop::at)
+                .min(Comparator.naturalOrder());
+        Optional<Instant> out = stopsAt(job, journey, station, RouteStopKind.PICKUP).stream()
+                .map(StationStop::at)
+                .max(Comparator.naturalOrder());
+        if (in.isEmpty() || out.isEmpty()) return Optional.empty();
+        long days = ChronoUnit.DAYS.between(
+                LocalDate.ofInstant(in.get(), BusinessTime.ZONE), LocalDate.ofInstant(out.get(), BusinessTime.ZONE));
+        return clearance.destinationVersion(job.getId()).flatMap(destination -> {
+            int minimum = quarantineRules.minimumDays(q.getKind(), destination);
+            return days >= minimum
+                    ? Optional.<String>empty()
+                    : Optional.of("Quarantine at " + station.getName() + ", "
+                            + QuarantineRules.period(q.getStartsOn(), q.getEndsOn()) + ": the trips plan " + days
+                            + (days == 1 ? " day" : " days") + " there; "
+                            + destination.getCatalog().getName()
+                            + " asks for at least " + minimum + ".");
+        });
+    }
+
+    /** A planned stop of {@code job}'s at a station, on one trip of its journey. */
+    private record StationStop(Trip trip, Instant at) {}
+
+    /** The planned stops of {@code kind} for {@code job} at {@code place}, on each trip's current route. */
+    private List<StationStop> stopsAt(TransportJob job, List<TripJob> journey, Place place, RouteStopKind kind) {
+        List<StationStop> out = new ArrayList<>();
+        for (TripJob part : journey) {
+            Trip trip = part.getTrip();
+            currentRoute(trip)
+                    .ifPresent(plan -> plan.getStops().stream()
+                            .filter(st -> st.getKind() == kind
+                                    && st.getPlannedAt() != null
+                                    && st.getJob() != null
+                                    && st.getJob().getId().equals(job.getId())
+                                    && st.getPlace() != null
+                                    && st.getPlace().getId().equals(place.getId()))
+                            .forEach(st -> out.add(new StationStop(trip, st.getPlannedAt()))));
+        }
+        return out;
+    }
+
+    /** The trip's route as the coordinator is working on it: its draft, else its confirmed one. */
+    private Optional<RoutePlan> currentRoute(Trip trip) {
+        return routePlanRows
+                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                .or(() -> routePlanRows.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED));
+    }
+
+    /**
+     * The station of {@code quarantinePlaceId} for a trip on {@code corridor} to end at: refused unless the job has a
+     * quarantine scheduled there, in the city the trip ends in, and the trip doesn't deliver.
+     */
+    private Place stationFor(TransportJob job, Corridor corridor, boolean reversed, UUID quarantinePlaceId) {
+        Trip probe = probe(corridor, reversed);
+        if (!corridor.isRoad()) {
+            throw new BusinessException(
+                    "QUARANTINE_NOT_ON_WAY",
+                    corridor.getCode() + " flies; a flight hands the horses on at the airport, and a road trip takes"
+                            + " them on to the quarantine station.");
+        }
+        if (JobTripService.reachesDestination(probe, job)) {
+            throw new BusinessException(
+                    "QUARANTINE_NOT_ON_WAY",
+                    corridor.getCode() + " delivers " + job.getCode() + "'s horses in " + probe.endCity()
+                            + "; only a trip that hands them on can end at a quarantine station.");
+        }
+        return quarantineRules.heldFor(job).stream()
+                .map(QuarantinePeriod::getPlace)
+                .filter(p -> p.getId().equals(quarantinePlaceId))
+                .findFirst()
+                .filter(p -> p.getCity() != null && p.getCity().equalsIgnoreCase(probe.endCity()))
+                .orElseThrow(() -> new BusinessException(
+                        "NO_QUARANTINE_THERE",
+                        job.getCode() + " has no quarantine scheduled at that station in " + probe.endCity()
+                                + ". Schedule it on the Authorities tab first."));
+    }
+
+    /** The stations of {@code held} in {@code city}, but {@code except}, where the trip starts. */
+    private static List<QuarantineStation> stationsIn(List<QuarantinePeriod> held, String city, Place except) {
+        return stations(held.stream()
+                .filter(q -> city.equalsIgnoreCase(q.getPlace().getCity()))
+                .filter(q -> except == null || !q.getPlace().getId().equals(except.getId()))
+                .toList());
+    }
+
+    /** One entry per station of {@code held}, from its earliest first day to its latest last day. */
+    private static List<QuarantineStation> stations(List<QuarantinePeriod> held) {
+        Map<UUID, QuarantineStation> out = new LinkedHashMap<>();
+        for (QuarantinePeriod q : held) {
+            Place p = q.getPlace();
+            out.merge(
+                    p.getId(),
+                    new QuarantineStation(p.getId(), p.getName(), q.getStartsOn(), q.getEndsOn()),
+                    (a, b) -> new QuarantineStation(
+                            a.placeId(),
+                            a.placeName(),
+                            a.startsOn().isBefore(b.startsOn()) ? a.startsOn() : b.startsOn(),
+                            a.endsOn().isAfter(b.endsOn()) ? a.endsOn() : b.endsOn()));
+        }
+        return List.copyOf(out.values());
+    }
+
+    /** An unsaved trip on {@code corridor}, to ask where it would end before it is made. */
+    private static Trip probe(Corridor corridor, boolean reversed) {
+        Trip probe = new Trip();
+        probe.setCorridor(corridor);
+        probe.setReversed(reversed);
+        return probe;
+    }
+
     /** The local road run within {@code city}, between its stables and its cargo terminal, if the catalog has one. */
     @Transactional(readOnly = true)
     public Optional<Corridor> localRun(String city) {
@@ -500,9 +709,7 @@ public class JourneyService {
 
     /** Where {@code trip}'s route hands {@code job}'s horses on: the place of its TRANSFER stop for the job. */
     private Optional<Place> handoverOf(Trip trip, TransportJob job) {
-        return routePlanRows
-                .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
-                .or(() -> routePlanRows.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+        return currentRoute(trip)
                 .flatMap(plan -> plan.getStops().stream()
                         .filter(st -> st.getKind() == RouteStopKind.TRANSFER
                                 && st.getJob() != null
@@ -515,12 +722,13 @@ public class JourneyService {
     /**
      * Where horses change trips in {@code city}: its airport or cargo terminal, where a flight meets the trailers, else
      * a quarantine station, else the request's own place when it is in that city, else any place there but a welfare
-     * stop. The coordinator can move a road trip's stop on its route.
+     * stop, and never {@code except}, where the trip starts. The coordinator can move a road trip's stop on its route.
      */
-    private Place handoverPlace(String city, TransportMode mode, TransportRequest request) {
+    private Place handoverPlace(String city, TransportRequest request, Place except) {
         if (city == null) return null;
         List<Place> inCity = places.findByCityIgnoreCase(city).stream()
                 .filter(p -> p.getKind() != PlaceKind.WELFARE_STOP)
+                .filter(p -> except == null || !p.getId().equals(except.getId()))
                 .toList();
         for (PlaceKind kind : List.of(PlaceKind.CARGO_TERMINAL, PlaceKind.AIRPORT, PlaceKind.QUARANTINE)) {
             Optional<Place> found =
@@ -528,7 +736,9 @@ public class JourneyService {
             if (found.isPresent()) return found.get();
         }
         for (Place own : new Place[] {request.getOriginPlace(), request.getDestinationPlace()}) {
-            if (own != null && city.equalsIgnoreCase(own.getCity())) return own;
+            if (own != null
+                    && (except == null || !own.getId().equals(except.getId()))
+                    && city.equalsIgnoreCase(own.getCity())) return own;
         }
         return inCity.stream().min(Comparator.comparing(Place::getName)).orElse(null);
     }

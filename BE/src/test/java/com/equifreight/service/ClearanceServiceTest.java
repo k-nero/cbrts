@@ -83,6 +83,10 @@ class ClearanceServiceTest {
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-23T03:00:00Z"), BusinessTime.ZONE);
 
+    // Only its rules on a quarantine's kind are used here, never its repository.
+    @Spy
+    private QuarantineRules quarantineRules = new QuarantineRules(null);
+
     @InjectMocks
     private ClearanceService clearanceService;
 
@@ -320,6 +324,50 @@ class ClearanceServiceTest {
                         isNull(),
                         eq("OPEN"),
                         eq("CLEARANCE_READY"));
+    }
+
+    private QuarantinePeriod openQuarantine(QuarantineKind kind) {
+        QuarantinePeriod quarantine = new QuarantinePeriod();
+        quarantine.setId(UUID.randomUUID());
+        quarantine.setJob(job);
+        quarantine.setKind(kind);
+        quarantine.setStartsOn(LocalDate.of(2026, 11, 11));
+        quarantine.setEndsOn(LocalDate.of(2026, 11, 25));
+        return quarantine;
+    }
+
+    @Test
+    @DisplayName("US-F3-22: an open pre-export quarantine holds the gate, and the gate says so")
+    void anOpenPreExportQuarantineHoldsTheGate() {
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
+        when(quarantinePeriodRepository.findByJobId(job.getId()))
+                .thenReturn(List.of(openQuarantine(QuarantineKind.PRE_EXPORT)));
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertFalse(resp.clearanceReady());
+        assertTrue(resp.outstandingIssues().stream().anyMatch(i -> i.startsWith("Quarantine from")));
+    }
+
+    @Test
+    @DisplayName("US-F3-22: an open post-arrival quarantine doesn't hold departure")
+    void anOpenPostArrivalQuarantineDoesNotHoldTheGate() {
+        checklistItem.setStatus(ChecklistStatus.CLEARED);
+        checklistItem.setValidity(Validity.GREEN);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(checklistItemRepository.findByJobId(job.getId())).thenReturn(List.of(checklistItem));
+        when(quarantinePeriodRepository.findByJobId(job.getId()))
+                .thenReturn(List.of(openQuarantine(QuarantineKind.POST_ARRIVAL)));
+        when(authoritySubmissionRepository.findByJobId(job.getId())).thenReturn(List.of());
+
+        ClearanceStatusResponse resp = clearanceService.evaluateClearanceGate(job.getId());
+
+        assertTrue(resp.clearanceReady());
+        assertEquals(DossierStatus.CLEARANCE_READY, resp.dossierStatus());
     }
 
     @Test

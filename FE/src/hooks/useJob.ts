@@ -395,7 +395,13 @@ export const useDraftJourney = (jobId: string) => {
 export const useAddTrip = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (corridorId: string) => jobApi.addTrip(jobId, corridorId),
+    mutationFn: ({
+      corridorId,
+      quarantinePlaceId,
+    }: {
+      corridorId: string;
+      quarantinePlaceId?: string;
+    }) => jobApi.addTrip(jobId, corridorId, quarantinePlaceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });

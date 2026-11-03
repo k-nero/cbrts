@@ -707,7 +707,8 @@ public class LoadPlanService {
         biosecurity.requireAccepted(trip, state.warnings(), acceptedWarnings, currentUser);
 
         // Every trailer is booked for the trip's planned dates, which the confirmed route sets: from the departure
-        // until the last job on it arrives. A local run to or from the cargo terminal books its own route's hours.
+        // until the last job on it arrives. A local run, or a trip that hands the horses on (to a flight or a
+        // quarantine station), books its own route's hours, so the trailer is free while they wait (US-F3-22).
         List<TransportJob> jobsOnTrip = jobTrips.jobsOn(trip);
         if (jobsOnTrip.isEmpty()) jobsOnTrip = List.of(job);
         Instant startsAt =
@@ -718,12 +719,10 @@ public class LoadPlanService {
                         .map(TransportJob::getPlannedArrivalAt)
                         .max(Comparator.naturalOrder())
                         .orElse(null);
-        if (trip.getCorridor() != null && trip.getCorridor().isLocal()) {
-            Optional<VehicleAvailability.Span> own = availability.routeSpanOf(trip);
-            if (own.isPresent()) {
-                startsAt = own.get().startsAt();
-                endsAt = own.get().endsAt();
-            }
+        Optional<VehicleAvailability.Span> own = availability.ownHoursOf(trip);
+        if (own.isPresent()) {
+            startsAt = own.get().startsAt();
+            endsAt = own.get().endsAt();
         }
         if (startsAt == null || endsAt == null) {
             throw new BusinessException(

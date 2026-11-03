@@ -37,6 +37,7 @@ public class ClearanceService {
     private final RegulationVersionRepository regulationVersionRepository;
     private final RegulationRuleRepository regulationRuleRepository;
     private final JobTripService jobTrips;
+    private final QuarantineRules quarantineRules;
     private final Clock clock;
 
     public ClearanceService(
@@ -53,6 +54,7 @@ public class ClearanceService {
             RegulationVersionRepository regulationVersionRepository,
             RegulationRuleRepository regulationRuleRepository,
             JobTripService jobTrips,
+            QuarantineRules quarantineRules,
             Clock clock) {
         this.checklistItemRepository = checklistItemRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -67,6 +69,7 @@ public class ClearanceService {
         this.regulationVersionRepository = regulationVersionRepository;
         this.regulationRuleRepository = regulationRuleRepository;
         this.jobTrips = jobTrips;
+        this.quarantineRules = quarantineRules;
         this.clock = clock;
     }
 
@@ -470,7 +473,7 @@ public class ClearanceService {
      * Evaluates and updates the Clearance Gate status for a job (BR-F2-03, US-F2-08).
      * Gate is CLEARANCE_READY only if:
      * 1. All mandatory items are CLEARED with GREEN validity.
-     * 2. All required quarantine periods are completed.
+     * 2. Every quarantine that holds departure ({@link QuarantineRules#holdsDeparture}) is completed.
      * 3. The latest submission to each authority for each kind is ISSUED. A refusal that was
      * re-filed and then issued no longer blocks; an earlier issue that was later refused does.
      * The dossier status is derived here and nowhere else, so filing, info requests and reviews
@@ -609,7 +612,9 @@ public class ClearanceService {
      */
     private GateAssessment assess(TransportJob job) {
         List<ChecklistItem> items = checklistItemRepository.findByJobId(job.getId());
-        List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(job.getId());
+        List<QuarantinePeriod> quarantines = quarantinePeriodRepository.findByJobId(job.getId()).stream()
+                .filter(quarantineRules::holdsDeparture)
+                .toList();
         List<AuthoritySubmission> submissions =
                 latestPerAuthorityAndKind(authoritySubmissionRepository.findByJobId(job.getId()));
 

@@ -3,7 +3,7 @@ import { App, Flex } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { Button, Callout } from '@/components/ui';
 import { useClearanceStatus, useJobQuarantines, useJobSubmissions } from '@/hooks/clearance';
-import { type AuthoritySubmission, RoleNameEnum } from '@/interfaces';
+import { type AuthoritySubmission, type QuarantinePeriod, RoleNameEnum } from '@/interfaces';
 import { useAuthStore } from '@/stores/authStore';
 import AuthorityGate from './AuthorityGate';
 import QuarantineList from './QuarantineList';
@@ -38,6 +38,7 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
   const [recording, setRecording] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [updating, setUpdating] = useState<AuthoritySubmission | null>(null);
+  const [changing, setChanging] = useState<QuarantinePeriod | null>(null);
 
   if (!canRead)
     return (
@@ -105,6 +106,7 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
         quarantines={quarantines.data ?? []}
         loading={quarantines.isLoading}
         onSchedule={canEdit ? () => setScheduling(true) : undefined}
+        onChange={canEdit ? setChanging : undefined}
         minDays={status.data?.quarantineMinDays ?? undefined}
         destination={status.data?.destination ?? undefined}
       />
@@ -122,11 +124,15 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
             onClose={() => setUpdating(null)}
           />
           <ScheduleQuarantineModal
-            open={scheduling}
+            open={scheduling || changing !== null}
             jobId={jobId}
             minDays={status.data?.quarantineMinDays ?? undefined}
             destination={status.data?.destination ?? undefined}
-            onClose={() => setScheduling(false)}
+            editing={changing}
+            onClose={() => {
+              setScheduling(false);
+              setChanging(null);
+            }}
           />
         </>
       )}
