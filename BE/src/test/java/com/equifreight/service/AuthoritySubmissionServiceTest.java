@@ -182,7 +182,7 @@ class AuthoritySubmissionServiceTest {
                 BusinessException.class,
                 () -> service.createQuarantine(
                         job.getId(),
-                        new CreateQuarantinePeriodRequest(null, station.getId(), start, start.plusDays(5)),
+                        new CreateQuarantinePeriodRequest(null, station.getId(), start, start.plusDays(5), null),
                         specialist));
         assertEquals("QUARANTINE_TOO_SHORT", ex.getCode());
         verify(quarantineRules).minimumDays(QuarantineKind.PRE_EXPORT, destination);
@@ -284,7 +284,7 @@ class AuthoritySubmissionServiceTest {
         service.updateQuarantine(
                 quarantine.getId(),
                 new CreateQuarantinePeriodRequest(
-                        null, other.getId(), LocalDate.of(2026, 11, 21), LocalDate.of(2026, 11, 28)),
+                        null, other.getId(), LocalDate.of(2026, 11, 21), LocalDate.of(2026, 11, 28), null),
                 specialist);
 
         assertEquals(other, quarantine.getPlace());
@@ -309,7 +309,7 @@ class AuthoritySubmissionServiceTest {
         QuarantinePeriod done = scheduled(station());
         done.setCompletedAt(Instant.parse("2026-11-27T02:00:00Z"));
         CreateQuarantinePeriodRequest request = new CreateQuarantinePeriodRequest(
-                null, done.getPlace().getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27));
+                null, done.getPlace().getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27), null);
         assertThrows(BusinessException.class, () -> service.updateQuarantine(done.getId(), request, specialist));
 
         Place stables = station();
@@ -322,9 +322,140 @@ class AuthoritySubmissionServiceTest {
                 () -> service.createQuarantine(
                         job.getId(),
                         new CreateQuarantinePeriodRequest(
-                                null, stables.getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27)),
+                                null, stables.getId(), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 27), null),
                         specialist));
         assertEquals("Sha Tin Racecourse stables (HKJC) is not a quarantine station.", ex.getMessage());
         verify(quarantinePeriodRepository, never()).save(any());
+    }
+
+    // ---------- a quarantine before export or after arrival ----------
+
+    private static Country country(String code, String name) {
+        Country c = new Country();
+        c.setId(UUID.randomUUID());
+        c.setCode(code);
+        c.setName(name);
+        return c;
+    }
+
+    private static final Country HONG_KONG = country("HK", "Hong Kong");
+    private static final Country AUSTRALIA = country("AU", "Australia");
+
+    /** The job moves horses from Sha Tin to Werribee, Australia. */
+    private void hongKongToAustralia() {
+        Place werribee = new Place();
+        werribee.setCountry(AUSTRALIA);
+        TransportRequest request = new TransportRequest();
+        request.setDestinationPlace(werribee);
+        job.setRequest(request);
+    }
+
+    private static Place stationIn(Country country, String name) {
+        Place station = station();
+        station.setName(name);
+        station.setCountry(country);
+        return station;
+    }
+
+    @Test
+    @DisplayName("Australia's second quarantine is scheduled after arrival, at a station there, and doesn't hold"
+            + " departure")
+    void aQuarantineAfterArrivalIsScheduledWithItsKind() {
+        hongKongToAustralia();
+        Place mickleham = stationIn(AUSTRALIA, "Mickleham post-entry quarantine");
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(mickleham.getId())).thenReturn(Optional.of(mickleham));
+        when(quarantinePeriodRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var saved = service.createQuarantine(
+                job.getId(),
+                new CreateQuarantinePeriodRequest(
+                        null,
+                        mickleham.getId(),
+                        LocalDate.of(2026, 12, 2),
+                        LocalDate.of(2026, 12, 16),
+                        QuarantineKind.POST_ARRIVAL),
+                specialist);
+
+        assertEquals(QuarantineKind.POST_ARRIVAL, saved.kind());
+        verify(quarantinePeriodRepository)
+                .save(argThat(q -> q.getKind() == QuarantineKind.POST_ARRIVAL && !quarantineRules.holdsDeparture(q)));
+        verify(clearanceService).evaluateClearanceGate(job.getId());
+    }
+
+    @Test
+    @DisplayName("Without a kind, a quarantine is scheduled before export, as before")
+    void aQuarantineIsBeforeExportByDefault() {
+        hongKongToAustralia();
+        Place shaTin = stationIn(HONG_KONG, "Sha Tin isolation stables");
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(shaTin.getId())).thenReturn(Optional.of(shaTin));
+        when(quarantinePeriodRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var saved = service.createQuarantine(
+                job.getId(),
+                new CreateQuarantinePeriodRequest(
+                        null, shaTin.getId(), LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 30), null),
+                specialist);
+
+        assertEquals(QuarantineKind.PRE_EXPORT, saved.kind());
+    }
+
+    @Test
+    @DisplayName("A quarantine after arrival is held where the horses arrive, and one before export isn't")
+    void aQuarantineIsHeldInTheCountryItsKindSays() {
+        hongKongToAustralia();
+        Place shaTin = stationIn(HONG_KONG, "Sha Tin isolation stables");
+        Place mickleham = stationIn(AUSTRALIA, "Mickleham post-entry quarantine");
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(placeRepository.findById(shaTin.getId())).thenReturn(Optional.of(shaTin));
+        when(placeRepository.findById(mickleham.getId())).thenReturn(Optional.of(mickleham));
+        LocalDate start = LocalDate.of(2026, 12, 2);
+
+        BusinessException afterArrival = assertThrows(
+                BusinessException.class,
+                () -> service.createQuarantine(
+                        job.getId(),
+                        new CreateQuarantinePeriodRequest(
+                                null, shaTin.getId(), start, start.plusDays(14), QuarantineKind.POST_ARRIVAL),
+                        specialist));
+        assertEquals("QUARANTINE_WRONG_COUNTRY", afterArrival.getCode());
+        assertEquals(
+                "A quarantine after arrival is held in Australia, where the horses arrive; Sha Tin isolation stables"
+                        + " is in Hong Kong.",
+                afterArrival.getMessage());
+
+        BusinessException beforeExport = assertThrows(
+                BusinessException.class,
+                () -> service.createQuarantine(
+                        job.getId(),
+                        new CreateQuarantinePeriodRequest(
+                                null, mickleham.getId(), start, start.plusDays(14), QuarantineKind.PRE_EXPORT),
+                        specialist));
+        assertEquals("QUARANTINE_WRONG_COUNTRY", beforeExport.getCode());
+        assertEquals(
+                "A quarantine before export is held before the horses leave for Australia; Mickleham post-entry"
+                        + " quarantine is in Australia. Schedule it as a quarantine after arrival.",
+                beforeExport.getMessage());
+        verify(quarantinePeriodRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Changing a quarantine keeps its kind unless the change names one")
+    void aChangeKeepsTheKind() {
+        hongKongToAustralia();
+        Place mickleham = stationIn(AUSTRALIA, "Mickleham post-entry quarantine");
+        QuarantinePeriod quarantine = scheduled(mickleham);
+        quarantine.setKind(QuarantineKind.POST_ARRIVAL);
+        when(placeRepository.findById(mickleham.getId())).thenReturn(Optional.of(mickleham));
+        when(quarantinePeriodRepository.save(quarantine)).thenReturn(quarantine);
+
+        service.updateQuarantine(
+                quarantine.getId(),
+                new CreateQuarantinePeriodRequest(
+                        null, mickleham.getId(), LocalDate.of(2026, 11, 21), LocalDate.of(2026, 12, 5), null),
+                specialist);
+
+        assertEquals(QuarantineKind.POST_ARRIVAL, quarantine.getKind());
     }
 }
