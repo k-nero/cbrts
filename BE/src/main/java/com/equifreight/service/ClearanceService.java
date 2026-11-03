@@ -796,6 +796,11 @@ public class ClearanceService {
         if (origin != null && !origin.getId().equals(destination.getId()) && !isPinned(pins, RegulationRole.ORIGIN)) {
             publishedVersion(origin).ifPresent(v -> newPins.add(pin(job, v, RegulationRole.ORIGIN)));
         }
+        // Every country the route passes through on the way has its say too, as the lead time already counts it.
+        for (Country transit : transitCountries(request, origin, destination)) {
+            if (isPinnedFor(pins, RegulationRole.TRANSIT, transit)) continue;
+            publishedVersion(transit).ifPresent(v -> newPins.add(pin(job, v, RegulationRole.TRANSIT)));
+        }
         pins.addAll(jobRegulationPinRepository.saveAll(newPins));
 
         List<ChecklistItem> created = missingItems(job, governingRules(pins), false);
@@ -859,8 +864,9 @@ public class ClearanceService {
     }
 
     /**
-     * One rule per document type, when the origin's and the destination's catalogs both list it: the stricter, a
-     * mandatory rule over an optional one, and on a tie the destination's, the country the horses are imported into.
+     * One rule per document type, when more than one pinned catalog (origin, transit or destination) lists it: the
+     * stricter, a mandatory rule over an optional one, and on a tie the destination's, the country the horses are
+     * imported into.
      * The pick never depends on the order the rules are read in.
      */
     static List<RegulationRule> governingRules(List<RegulationRule> rules, Map<UUID, RegulationRole> roleByVersion) {
@@ -907,6 +913,35 @@ public class ClearanceService {
         }
         List<CorridorCrossing> crossings = request.getCorridor().getCrossings();
         return crossings.getLast().getBorderCrossing().getToCountry();
+    }
+
+    /**
+     * The countries the request's route crosses into or out of, other than where it starts and ends: Cambodia on
+     * "RD HCM → BKK". None on a domestic or direct route, or before a route is chosen.
+     */
+    static List<Country> transitCountries(TransportRequest request, Country origin, Country destination) {
+        if (request.getCorridor() == null) return List.of();
+        Map<UUID, Country> byId = new LinkedHashMap<>();
+        for (CorridorCrossing cc : request.getCorridor().getCrossings()) {
+            BorderCrossing b = cc.getBorderCrossing();
+            if (b == null) continue;
+            for (Country c : new Country[] {b.getFromCountry(), b.getToCountry()}) {
+                if (c != null) byId.putIfAbsent(c.getId(), c);
+            }
+        }
+        if (origin != null) byId.remove(origin.getId());
+        if (destination != null) byId.remove(destination.getId());
+        return List.copyOf(byId.values());
+    }
+
+    private static boolean isPinnedFor(List<JobRegulationPin> pins, RegulationRole role, Country country) {
+        return pins.stream()
+                .anyMatch(p -> p.getRole() == role
+                        && p.getRegulationVersion()
+                                .getCatalog()
+                                .getCountry()
+                                .getId()
+                                .equals(country.getId()));
     }
 
     private static boolean isPinned(List<JobRegulationPin> pins, RegulationRole role) {
