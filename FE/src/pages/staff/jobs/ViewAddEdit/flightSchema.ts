@@ -12,9 +12,13 @@ export const consignmentSchema = z.object({
 });
 export type ConsignmentForm = z.infer<typeof consignmentSchema>;
 
-/** The next trip of a job's journey (US-F3-21): the catalog corridor it runs from where the journey stands. */
+/**
+ * The next trip of a job's journey (US-F3-21): the catalog corridor it runs from where the journey
+ * stands, and where it ends: the city's cargo terminal (no `end`) or a quarantine station (US-F3-22).
+ */
 export const addTripSchema = z.object({
   corridor: z.object({ label: z.string(), value: z.string() }, { error: 'Choose the corridor.' }),
+  end: z.object({ label: z.string(), value: z.string() }).nullish(),
 });
 export type AddTripForm = z.infer<typeof addTripSchema>;
 

@@ -26,6 +26,7 @@ import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.PlaceKind;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RoutePlanStatus;
+import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
@@ -429,6 +430,40 @@ class VehicleAvailabilityTest {
         assertThat(availability.refusalFor(tx447, trip(hcmBkk, at(10).plus(Duration.ofHours(6)))))
                 .contains(
                         "TX-447 is ready in Ho Chi Minh City on 10 Oct after its last trip; this trip starts 10 Oct.");
+    }
+
+    @Test
+    @DisplayName("a trip that hands the horses on lasts its own route's hours, not until the job arrives (US-F3-22)")
+    void aHandingOnTripLastsItsOwnHours() {
+        // Drives to the quarantine station on 10 Oct; the job reaches its destination on 20 Oct.
+        Trip toStation = trip(hcmHan, at(10), at(20));
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(stop(1, at(10), null));
+        RouteStop transfer = stop(2, at(10).plus(Duration.ofHours(8)), null);
+        transfer.setKind(RouteStopKind.TRANSFER);
+        plan.getStops().add(transfer);
+        when(routePlans.findByTrip_IdAndStatus(toStation.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+
+        VehicleAvailability.Span span = availability.spanOf(toStation);
+
+        assertThat(span.startsAt()).isEqualTo(at(10));
+        assertThat(span.endsAt()).isEqualTo(at(10).plus(Duration.ofHours(8)));
+    }
+
+    @Test
+    @DisplayName("a trip that delivers every job on it lasts until the last job arrives")
+    void aDeliveringTripLastsUntilArrival() {
+        Trip delivering = trip(hcmHan, at(10), at(12));
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(stop(1, at(10), null));
+        RouteStop delivery = stop(2, at(11), null);
+        delivery.setKind(RouteStopKind.DELIVERY);
+        plan.getStops().add(delivery);
+        when(routePlans.findByTrip_IdAndStatus(delivering.getId(), RoutePlanStatus.CONFIRMED))
+                .thenReturn(Optional.of(plan));
+
+        assertThat(availability.spanOf(delivering).endsAt()).isEqualTo(at(12));
     }
 
     // --- Fixtures

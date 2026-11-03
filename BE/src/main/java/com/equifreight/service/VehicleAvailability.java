@@ -13,6 +13,7 @@ import com.equifreight.entity.enums.BookingKind;
 import com.equifreight.entity.enums.CatalogStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
 import com.equifreight.entity.enums.RoutePlanStatus;
+import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.VehicleStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.repository.CorridorRepository;
@@ -96,8 +97,8 @@ public class VehicleAvailability {
     /**
      * When the trip runs: from its planned departure (or its jobs' earliest, or their requests' earliest departure
      * date) to its jobs' latest planned arrival, or the start plus its corridor's driving days while the route isn't
-     * planned. A local run lasts its own route's hours instead, so its vehicle is free again for the rest of the day.
-     * The start is null while no date is known.
+     * planned. A local run, or a trip that hands its horses on to the next trip of a journey, lasts its own route's
+     * hours instead ({@link #ownHoursOf}). The start is null while no date is known.
      */
     public record Span(Instant startsAt, Instant endsAt) {}
 
@@ -112,10 +113,8 @@ public class VehicleAvailability {
 
     @Transactional(readOnly = true)
     public Span spanOf(Trip trip) {
-        if (trip.getCorridor() != null && trip.getCorridor().isLocal()) {
-            Optional<Span> own = routeSpanOf(trip);
-            if (own.isPresent()) return own.get();
-        }
+        Optional<Span> own = ownHoursOf(trip);
+        if (own.isPresent()) return own.get();
         List<TransportJob> jobs = jobTrips.jobsOn(trip);
         Instant startsAt = trip.getPlannedDepartureAt();
         if (startsAt == null) {
@@ -146,15 +145,21 @@ public class VehicleAvailability {
     }
 
     /**
-     * The hours {@code trip}'s own route takes: from its first timed stop to its last, with the stay there (the wait
-     * at the cargo terminal before a flight); empty while fewer than two stops are timed.
+     * The hours {@code trip}'s own route takes, when its vehicles are booked for those rather than until its jobs
+     * arrive: a local run, or a trip whose route hands horses on at a {@code TRANSFER} stop (US-F3-22), so the trailer
+     * and crew are free while the horses fly or wait in quarantine. From its first timed stop to its last, with the
+     * stay there (the wait at the cargo terminal before a flight); empty while fewer than two stops are timed, or for a
+     * trip that delivers every job on it.
      */
     @Transactional(readOnly = true)
-    public Optional<Span> routeSpanOf(Trip trip) {
+    public Optional<Span> ownHoursOf(Trip trip) {
         if (trip.getId() == null) return Optional.empty();
+        boolean local = trip.getCorridor() != null && trip.getCorridor().isLocal();
         return routePlans
                 .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED)
                 .or(() -> routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT))
+                .filter(plan ->
+                        local || plan.getStops().stream().anyMatch(st -> st.getKind() == RouteStopKind.TRANSFER))
                 .flatMap(plan -> {
                     List<RouteStop> timed = plan.getStops().stream()
                             .filter(st -> st.getPlannedAt() != null)

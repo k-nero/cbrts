@@ -443,6 +443,19 @@ export interface JourneyCorridor {
   reachesDestination: boolean;
   /** On the route the customer was quoted. */
   quoted: boolean;
+  /**
+   * Quarantine stations in `toCity` where the job has a quarantine scheduled: the trip can end at
+   * one instead of the city's cargo terminal (US-F3-22). Empty when the trip delivers.
+   */
+  quarantineStations: QuarantineStation[];
+}
+
+/** A station where the job's horses wait in quarantine, and the days they wait there (dates). */
+export interface QuarantineStation {
+  placeId: string;
+  placeName: string;
+  startsOn: string;
+  endsOn: string;
 }
 
 /** The airline's flight for a journey's flight trip (US-F3-21); its times become the airport stops'. */
