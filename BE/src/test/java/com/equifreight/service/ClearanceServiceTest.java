@@ -24,6 +24,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -628,6 +629,150 @@ class ClearanceServiceTest {
 
         assertEquals("CHECKLIST_NO_CATALOG", e.getCode());
         verify(jobRegulationPinRepository, never()).saveAll(anyList());
+    }
+
+    // ---------- a route through a transit country ----------
+
+    private static Country country(String code, String name) {
+        Country c = new Country();
+        c.setId(UUID.randomUUID());
+        c.setCode(code);
+        c.setName(name);
+        return c;
+    }
+
+    private static Place placeIn(Country country) {
+        Place p = new Place();
+        p.setCountry(country);
+        return p;
+    }
+
+    /** "RD HCM → BKK": Vietnam into Cambodia at Mộc Bài – Bavet, Cambodia into Thailand at Poipet – Aranyaprathet. */
+    private static Corridor roadThroughCambodia(Country vietnam, Country cambodia, Country thailand) {
+        Corridor corridor = new Corridor();
+        for (Country[] leg : new Country[][] {{vietnam, cambodia}, {cambodia, thailand}}) {
+            BorderCrossing b = new BorderCrossing();
+            b.setFromCountry(leg[0]);
+            b.setToCountry(leg[1]);
+            CorridorCrossing cc = new CorridorCrossing();
+            cc.setBorderCrossing(b);
+            corridor.getCrossings().add(cc);
+        }
+        return corridor;
+    }
+
+    /** A published version of {@code country}'s catalog. */
+    private RegulationVersion published(Country country) {
+        RegulationCatalog catalog = new RegulationCatalog();
+        catalog.setId(UUID.randomUUID());
+        catalog.setName(country.getName());
+        catalog.setCountry(country);
+        RegulationVersion version = new RegulationVersion();
+        version.setId(UUID.randomUUID());
+        version.setCatalog(catalog);
+        version.setLeadTimeDays((short) 21);
+        when(regulationCatalogRepository.findByCountryCode(country.getCode())).thenReturn(Optional.of(catalog));
+        when(regulationVersionRepository.findByCatalogIdAndStatus(catalog.getId(), CatalogStatus.PUBLISHED))
+                .thenReturn(Optional.of(version));
+        return version;
+    }
+
+    @Test
+    @DisplayName("Ho Chi Minh City → Bangkok by road: Cambodia's catalog is pinned as transit and its rules reach the"
+            + " checklist")
+    void aTransitCountrysRulesReachTheChecklist() {
+        Country vietnam = country("VN", "Vietnam");
+        Country cambodia = country("KH", "Cambodia");
+        Country thailand = country("TH", "Thailand");
+        TransportRequest request = new TransportRequest();
+        request.setOriginPlace(placeIn(vietnam));
+        request.setDestinationPlace(placeIn(thailand));
+        request.setCorridor(roadThroughCambodia(vietnam, cambodia, thailand));
+        job.setRequest(request);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        RegulationVersion thai = published(thailand);
+        RegulationVersion khmer = published(cambodia);
+        // Vietnam has no published catalog: the origin is skipped, as before.
+        when(regulationCatalogRepository.findByCountryCode("VN")).thenReturn(Optional.empty());
+        RegulationRule importPermit = rule(thai, DocumentScope.PER_SHIPMENT, DocumentProvider.AUTHORITY);
+        RegulationRule transitPermit = rule(khmer, DocumentScope.PER_SHIPMENT, DocumentProvider.AUTHORITY);
+        when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(regulationRuleRepository.findByVersionIdIn(Set.of(thai.getId(), khmer.getId())))
+                .thenReturn(List.of(importPermit, transitPermit));
+
+        clearanceService.generateChecklist(job.getId(), specialistUser);
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<JobRegulationPin>> pins = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(jobRegulationPinRepository).saveAll(pins.capture());
+        assertEquals(
+                Map.of(RegulationRole.DESTINATION, thai, RegulationRole.TRANSIT, khmer),
+                pins.getValue().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                JobRegulationPin::getRole, JobRegulationPin::getRegulationVersion)));
+        assertEquals(
+                Set.of(importPermit, transitPermit),
+                savedItems().stream()
+                        .map(ChecklistItem::getRegulationRule)
+                        .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    @DisplayName("A transit country already pinned isn't pinned again")
+    void aPinnedTransitCountryIsNotPinnedAgain() {
+        Country vietnam = country("VN", "Vietnam");
+        Country cambodia = country("KH", "Cambodia");
+        Country thailand = country("TH", "Thailand");
+        TransportRequest request = new TransportRequest();
+        request.setOriginPlace(placeIn(vietnam));
+        request.setDestinationPlace(placeIn(thailand));
+        request.setCorridor(roadThroughCambodia(vietnam, cambodia, thailand));
+        job.setRequest(request);
+        when(transportJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        List<JobRegulationPin> existing = new java.util.ArrayList<>();
+        for (Object[] p : new Object[][] {{thailand, RegulationRole.DESTINATION}, {cambodia, RegulationRole.TRANSIT}}) {
+            RegulationCatalog catalog = new RegulationCatalog();
+            catalog.setCountry((Country) p[0]);
+            RegulationVersion version = new RegulationVersion();
+            version.setId(UUID.randomUUID());
+            version.setCatalog(catalog);
+            JobRegulationPin pin = new JobRegulationPin();
+            pin.setRole((RegulationRole) p[1]);
+            pin.setRegulationVersion(version);
+            existing.add(pin);
+        }
+        when(jobRegulationPinRepository.findByJobIdAndSupersededAtIsNull(job.getId()))
+                .thenReturn(existing);
+        when(jobRegulationPinRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        clearanceService.generateChecklist(job.getId(), specialistUser);
+
+        verify(jobRegulationPinRepository).saveAll(List.of());
+        verify(regulationCatalogRepository, never()).findByCountryCode("KH");
+    }
+
+    @Test
+    @DisplayName("Transit countries are the ones crossed between origin and destination; none on a direct route")
+    void transitCountriesAreTheOnesBetween() {
+        Country vietnam = country("VN", "Vietnam");
+        Country cambodia = country("KH", "Cambodia");
+        Country thailand = country("TH", "Thailand");
+        TransportRequest throughCambodia = new TransportRequest();
+        throughCambodia.setCorridor(roadThroughCambodia(vietnam, cambodia, thailand));
+        assertEquals(List.of(cambodia), ClearanceService.transitCountries(throughCambodia, vietnam, thailand));
+        // The same road run the other way, Bangkok → Ho Chi Minh City.
+        assertEquals(List.of(cambodia), ClearanceService.transitCountries(throughCambodia, thailand, vietnam));
+        // "RD HCM → PNH" crosses once, Vietnam into Cambodia: no country in between.
+        BorderCrossing mocBai = new BorderCrossing();
+        mocBai.setFromCountry(vietnam);
+        mocBai.setToCountry(cambodia);
+        CorridorCrossing once = new CorridorCrossing();
+        once.setBorderCrossing(mocBai);
+        TransportRequest direct = new TransportRequest();
+        direct.setCorridor(new Corridor());
+        direct.getCorridor().getCrossings().add(once);
+        assertEquals(List.of(), ClearanceService.transitCountries(direct, vietnam, cambodia));
+        assertEquals(List.of(), ClearanceService.transitCountries(new TransportRequest(), vietnam, thailand));
     }
 
     @Test
