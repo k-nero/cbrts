@@ -30,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,6 +116,10 @@ public class CustomerQuotationService {
                     "The departure on " + BusinessTime.DAY.format(departure)
                             + " has come, so this quotation can't be accepted. Start a new request for a later date.");
         }
+        // The next version the manager may be drafting meanwhile can't be issued once this one is accepted.
+        Optional<Quotation> drafting = quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                .filter(d -> d.getStatus() == QuotationStatus.DRAFT && d.getVersionNo() > q.getVersionNo());
 
         q.setStatus(QuotationStatus.ACCEPTED);
         q.setAcceptedAt(now);
@@ -139,13 +144,30 @@ public class CustomerQuotationService {
                 null,
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + RequestStatus.CUSTOMER_ACCEPTED + "\"}");
+        drafting.ifPresent(d -> discard(d, request, q));
         tellManagers(
                 q,
                 request,
                 NotificationKind.QUOTATION_ACCEPTED,
                 club.getName() + " accepted " + label,
-                request.getCode() + " is waiting for your approval. " + label + ", " + money(q.getTotal()) + ".");
+                request.getCode() + " is waiting for your approval. " + label + ", " + money(q.getTotal()) + "."
+                        + drafting.map(d -> " The v" + d.getVersionNo() + " draft is discarded.")
+                                .orElse(""));
         return toResponse(request, saved);
+    }
+
+    /** Deletes the next version's draft, which the acceptance leaves nothing to do with, and writes why. */
+    private void discard(Quotation draft, TransportRequest request, Quotation accepted) {
+        quotations.delete(draft);
+        audit.recordSystem(
+                "QUOTATION_DRAFT_DISCARDED",
+                "Quotation " + draft.getCode() + " v" + draft.getVersionNo() + " draft discarded: the club accepted v"
+                        + accepted.getVersionNo(),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                null,
+                null);
     }
 
     /**

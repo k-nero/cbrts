@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.endsWith;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
@@ -136,6 +137,46 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                         eq("Phnom Penh Royal Turf Club accepted Quotation Q-2026-0189 v1"),
                         anyString()); // The deposit invoice comes with the acceptance (US-F6-03).
         verify(invoices).issueDeposit(q, bookings);
+    }
+
+    @Test
+    void acceptingDiscardsTheNextVersionStillBeingDrafted() {
+        // The manager revised v1 while the club still had it open; v2 can't be issued once v1 is accepted.
+        Quotation v2 = new Quotation();
+        v2.setId(UUID.randomUUID());
+        v2.setCode(q.getCode());
+        v2.setRequest(request);
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        stored = Optional.of(v2);
+
+        customer().accept(bookings, request.getId());
+
+        assertThat(q.getStatus()).isEqualTo(QuotationStatus.ACCEPTED);
+        verify(quotations).delete(v2);
+        verify(audit)
+                .recordSystem(
+                        "QUOTATION_DRAFT_DISCARDED",
+                        "Quotation Q-2026-0189 v2 draft discarded: the club accepted v1",
+                        "TRANSPORT_REQUEST",
+                        request.getId(),
+                        "REQ-2026-0199",
+                        null,
+                        null);
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.staff(yen)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        endsWith(" The v2 draft is discarded."));
+    }
+
+    @Test
+    void acceptingWithNoVersionBeingDraftedDiscardsNothing() {
+        customer().accept(bookings, request.getId());
+
+        verify(quotations, never()).delete(any());
     }
 
     @Test
