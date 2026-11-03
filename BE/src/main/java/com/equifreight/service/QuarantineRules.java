@@ -3,8 +3,10 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.QuarantinePeriod;
+import com.equifreight.entity.RegulationVersion;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
+import com.equifreight.entity.enums.QuarantineKind;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.repository.QuarantinePeriodRepository;
 import java.time.Instant;
@@ -19,6 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
  * How a scheduled quarantine binds the journey (US-F3-22): the trip into the station brings the horses by the
  * quarantine's first day, and the trip after it collects them from its last day, in business time. A quarantine for one
  * horse holds the whole shipment, so every open period of the job at the station counts.
+ *
+ * <p>It is also where a quarantine's kind is read: which quarantines hold departure, and how short one may be. Both
+ * are the same for every origin today; a later story resolves them per origin here, without touching the clearance
+ * gate or the scheduling form.
  */
 @Service
 public class QuarantineRules {
@@ -30,6 +36,19 @@ public class QuarantineRules {
 
     public QuarantineRules(QuarantinePeriodRepository quarantines) {
         this.quarantines = quarantines;
+    }
+
+    /** Whether the quarantine holds the clearance gate, and so departure, until it is completed: a pre-export one. */
+    public boolean holdsDeparture(QuarantinePeriod quarantine) {
+        return quarantine.getKind() != QuarantineKind.POST_ARRIVAL;
+    }
+
+    /**
+     * The fewest days a quarantine of this kind may last: the pinned destination catalog's {@code
+     * quarantine_min_days}, for either kind for now.
+     */
+    public int minimumDays(QuarantineKind kind, RegulationVersion destination) {
+        return destination.getQuarantineMinDays();
     }
 
     /** The job's quarantines at {@code place} that are not completed yet. */

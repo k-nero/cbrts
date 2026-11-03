@@ -5,6 +5,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.*;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuarantineKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
@@ -41,6 +42,7 @@ public class AuthoritySubmissionService {
     private final AuditService auditService;
     private final ClearanceService clearanceService;
     private final NotificationService notificationService;
+    private final QuarantineRules quarantineRules;
 
     public AuthoritySubmissionService(
             AuthorityRepository authorityRepository,
@@ -53,7 +55,8 @@ public class AuthoritySubmissionService {
             FileService fileService,
             AuditService auditService,
             ClearanceService clearanceService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            QuarantineRules quarantineRules) {
         this.authorityRepository = authorityRepository;
         this.submissionRepository = submissionRepository;
         this.transportJobRepository = transportJobRepository;
@@ -65,6 +68,7 @@ public class AuthoritySubmissionService {
         this.auditService = auditService;
         this.clearanceService = clearanceService;
         this.notificationService = notificationService;
+        this.quarantineRules = quarantineRules;
     }
 
     /**
@@ -283,7 +287,7 @@ public class AuthoritySubmissionService {
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
 
-        requireValidPeriod(jobId, place, request.startsOn(), request.endsOn());
+        requireValidPeriod(jobId, place, QuarantineKind.PRE_EXPORT, request.startsOn(), request.endsOn());
 
         QuarantinePeriod quarantine = new QuarantinePeriod();
         quarantine.setJob(job);
@@ -310,10 +314,11 @@ public class AuthoritySubmissionService {
     }
 
     /**
-     * A quarantine is held at a quarantine station, ends on or after it starts, and lasts at least the pinned
-     * destination catalog's minimum: a shorter one is refused, not warned about.
+     * A quarantine is held at a quarantine station, ends on or after it starts, and lasts at least the minimum
+     * {@link QuarantineRules#minimumDays} gives for its kind: a shorter one is refused, not warned about.
      */
-    private void requireValidPeriod(UUID jobId, Place place, LocalDate startsOn, LocalDate endsOn) {
+    private void requireValidPeriod(
+            UUID jobId, Place place, QuarantineKind kind, LocalDate startsOn, LocalDate endsOn) {
         if (place.getKind() != PlaceKind.QUARANTINE) {
             throw new BusinessException("%s is not a quarantine station.".formatted(place.getName()));
         }
@@ -322,12 +327,12 @@ public class AuthoritySubmissionService {
         }
         clearanceService.destinationVersion(jobId).ifPresent(destination -> {
             long days = ChronoUnit.DAYS.between(startsOn, endsOn);
-            if (days < destination.getQuarantineMinDays())
+            int minimum = quarantineRules.minimumDays(kind, destination);
+            if (days < minimum)
                 throw new BusinessException(
                         "QUARANTINE_TOO_SHORT",
                         "%s requires at least %d days of quarantine; this period is %d."
-                                .formatted(
-                                        destination.getCatalog().getName(), destination.getQuarantineMinDays(), days));
+                                .formatted(destination.getCatalog().getName(), minimum, days));
         });
     }
 
@@ -353,7 +358,7 @@ public class AuthoritySubmissionService {
                     .findById(request.horseId())
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
-        requireValidPeriod(job.getId(), place, request.startsOn(), request.endsOn());
+        requireValidPeriod(job.getId(), place, quarantine.getKind(), request.startsOn(), request.endsOn());
 
         String before = "%s, %s to %s"
                 .formatted(

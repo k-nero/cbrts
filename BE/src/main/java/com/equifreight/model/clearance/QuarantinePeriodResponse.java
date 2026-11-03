@@ -1,5 +1,6 @@
 package com.equifreight.model.clearance;
 
+import com.equifreight.entity.enums.QuarantineKind;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -13,6 +14,7 @@ public record QuarantinePeriodResponse(
         String horseName,
         UUID placeId,
         String placeName,
+        QuarantineKind kind,
         LocalDate startsOn,
         LocalDate endsOn,
         Instant completedAt,
