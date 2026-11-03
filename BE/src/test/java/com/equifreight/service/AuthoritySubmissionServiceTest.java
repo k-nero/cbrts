@@ -11,6 +11,7 @@ import com.equifreight.entity.*;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuarantineKind;
 import com.equifreight.entity.enums.SubmissionKind;
 import com.equifreight.entity.enums.SubmissionStatus;
 import com.equifreight.exception.BusinessException;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +71,10 @@ class AuthoritySubmissionServiceTest {
 
     @Mock
     private NotificationService notificationService;
+
+    // Only its rules on a quarantine's kind are used here, never its repository.
+    @Spy
+    private QuarantineRules quarantineRules = new QuarantineRules(null);
 
     @InjectMocks
     private AuthoritySubmissionService service;
@@ -176,6 +182,7 @@ class AuthoritySubmissionServiceTest {
                         new CreateQuarantinePeriodRequest(null, station.getId(), start, start.plusDays(5)),
                         specialist));
         assertEquals("QUARANTINE_TOO_SHORT", ex.getCode());
+        verify(quarantineRules).minimumDays(QuarantineKind.PRE_EXPORT, destination);
         verify(quarantinePeriodRepository, never()).save(any());
     }
 

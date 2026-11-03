@@ -345,6 +345,7 @@ public final class ClearanceMapper {
                 .horseName(q.getHorse() != null ? q.getHorse().getName() : "Toàn bộ lô ngựa")
                 .placeId(q.getPlace() != null ? q.getPlace().getId() : null)
                 .placeName(q.getPlace() != null ? q.getPlace().getName() : null)
+                .kind(q.getKind())
                 .startsOn(q.getStartsOn())
                 .endsOn(q.getEndsOn())
                 .completedAt(q.getCompletedAt())
