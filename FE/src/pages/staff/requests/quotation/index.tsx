@@ -107,17 +107,6 @@ const QuotationBuilderPage: FC = () => {
     );
   }
 
-  // A 409 says why the draft can't be priced (useQuotation): its request has no route we run.
-  const unpriceable = query.data ? null : conflictMessage(query.error);
-  if (unpriceable) {
-    return (
-      <Flex vertical gap={28}>
-        <PageHeader back={back} title="Quotation" />
-        <Callout tone="info" title={unpriceable} />
-      </Flex>
-    );
-  }
-
   // Any other failure went to the error boundary (useQuotation): no data here means none was started, or
   // the version in the address doesn't exist.
   if (!query.data && version) {

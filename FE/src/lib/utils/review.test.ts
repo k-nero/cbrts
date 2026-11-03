@@ -216,11 +216,6 @@ describe('quotationAction', () => {
   test('a request out of review with no quotation has no quotation action', () => {
     expect(quotationAction('INFO_REQUIRED', null)).toBeNull();
   });
-
-  test('a draft whose request the club moved onto a route we don’t run has nothing to open', () => {
-    expect(quotationAction('INFO_REQUIRED', ref, false)).toBeNull();
-    expect(quotationAction('INFO_REQUIRED', ref, true)).toBe('open');
-  });
 });
 
 describe('teamOption', () => {

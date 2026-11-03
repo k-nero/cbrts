@@ -104,10 +104,8 @@ export const useQuotation = (requestId: string | undefined, version?: number) =>
     queryFn: () => getQuotation(requestId as string, version),
     enabled: Boolean(requestId),
     retry: false,
-    // 404: none started yet. 409: the request is back with the club on a route we don't run, said in words.
     throwOnError: (error, query) =>
-      query.state.data === undefined &&
-      ![404, 409].includes((error as AxiosError).response?.status ?? 0),
+      query.state.data === undefined && (error as AxiosError).response?.status !== 404,
   });
 
 /**

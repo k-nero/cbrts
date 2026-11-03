@@ -146,16 +146,13 @@ export const reviewSubject = (review: RequestReview): RequestReview['request'] =
 
 /**
  * The quotation button on the decision panel: start one while the request is in review, open the one
- * started whatever the request's status (the builder reads it in any status), else none. A draft is priced
- * on the request's route, so one whose request the club moved onto a route we don't run (`routed` false,
- * while it is back with them) has nothing to open.
+ * started whatever the request's status (the builder reads it in any status), else none.
  */
 export const quotationAction = (
   status: RequestStatus,
   quotation: QuotationRef | null,
-  routed = true,
 ): 'start' | 'open' | null => {
-  if (quotation) return quotation.status === 'DRAFT' && !routed ? null : 'open';
+  if (quotation) return 'open';
   return status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'start' : null;
 };
 
