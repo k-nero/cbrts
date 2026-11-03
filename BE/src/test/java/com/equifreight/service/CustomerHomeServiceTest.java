@@ -202,6 +202,41 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("a quoted move whose departure has come asks nothing: the quotation can't be accepted")
+    void quotedMovePastItsDepartureAsksNothing() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves())
+                .singleElement()
+                .satisfies(m -> assertThat(m.holds())
+                        .isEqualTo(new TonedTextResponse("Departure passed · nothing to answer", "neutral")));
+    }
+
+    @Test
+    @DisplayName("My requests gives a quoted request whose departure has come no step and no due day")
+    void attentionOfAQuotedRequestPastItsDeparture() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+
+        Map<UUID, CustomerHomeService.Attention> attention = service.attentionOf(club.getId(), List.of(r));
+
+        assertThat(attention.get(r.getId()))
+                .isEqualTo(new CustomerHomeService.Attention(
+                        new TonedTextResponse("Departure passed · nothing to answer", "neutral"), null));
+    }
+
+    @Test
     @DisplayName("an issued quotation is owed until it is answered, due when it stops holding its price")
     void quotedRequestIsOwed() {
         TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);

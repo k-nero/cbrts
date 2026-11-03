@@ -38,6 +38,7 @@ import {
   windowLength,
   type WizardValues,
   moveRef,
+  quotationButton,
 } from './request';
 
 import {
@@ -918,5 +919,29 @@ describe('moveRef', () => {
   test('a submitted request shows its code; a draft, which has none yet, says Draft', () => {
     expect(moveRef({ requestCode: 'REQ-2026-0193' })).toBe('REQ-2026-0193');
     expect(moveRef({ requestCode: null })).toBe('Draft');
+  });
+});
+
+describe('quotationButton', () => {
+  test('a quotation waiting for the club is the row’s one primary step', () => {
+    expect(
+      quotationButton({
+        status: 'QUOTED',
+        holds: { text: 'Quotation waiting for you', tone: 'warn' },
+      }),
+    ).toEqual({ label: 'Review quotation', primary: true });
+  });
+
+  test('one whose departure has come asks nothing, so it only opens', () => {
+    expect(
+      quotationButton({
+        status: 'QUOTED',
+        holds: { text: 'Departure passed · nothing to answer', tone: 'neutral' },
+      }),
+    ).toEqual({ label: 'Open quotation', primary: false });
+    expect(quotationButton({ status: 'EXPIRED', holds: null })).toEqual({
+      label: 'Open quotation',
+      primary: false,
+    });
   });
 });

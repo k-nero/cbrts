@@ -13,6 +13,7 @@ import type {
   RequestDraftInput,
   RequestHorse,
   RequestStatus,
+  RequestSummary,
   RevisionSummary,
   Route,
   ServiceClass,
@@ -764,3 +765,14 @@ export const nextStepDeadline = (
 
 /** How a move names its request: the code once submitted; a draft has none yet. */
 export const moveRef = (m: { requestCode: string | null }): string => m.requestCode ?? 'Draft';
+
+/**
+ * A row's quotation button on My requests: Primary only while the club owes its answer, which the row's
+ * `holds` says (Warn, as Your moves words it); one whose departure has come, or that is answered, only opens.
+ */
+export const quotationButton = (
+  r: Pick<RequestSummary, 'status' | 'holds'>,
+): { label: string; primary: boolean } =>
+  r.status === 'QUOTED' && (r.holds?.tone === 'warn' || r.holds?.tone === 'bad')
+    ? { label: 'Review quotation', primary: true }
+    : { label: 'Open quotation', primary: false };

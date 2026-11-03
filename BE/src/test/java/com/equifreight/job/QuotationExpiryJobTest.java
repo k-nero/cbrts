@@ -30,6 +30,7 @@ import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -162,6 +163,36 @@ class QuotationExpiryJobTest {
                         Subject.quotation(q),
                         "Quotation Q-2026-0189 v1 expires within a day",
                         "It holds its price until 28 Oct 2026.");
+    }
+
+    @Test
+    void aQuotationWhoseDepartureHasComeIsNotReminded() {
+        // 28 Oct 2026 in Vietnam: accepting is refused from the departure day on.
+        request.setDepartureDate(LocalDate.of(2026, 10, 28));
+        Quotation q = issuedUntil(NOW.plus(Duration.ofHours(20)));
+
+        job.run();
+
+        assertThat(q.getReminderSentAt()).isNull();
+        verifyNoInteractions(notifications);
+    }
+
+    @Test
+    void aQuotationExpiringOnceItsDepartureHasComeDoesNotOfferAReQuote() {
+        request.setDepartureDate(LocalDate.of(2026, 10, 28));
+        Quotation q = issuedUntil(Instant.parse("2026-10-27T16:59:59.999Z"));
+
+        job.run();
+
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.EXPIRED);
+        verify(notifications)
+                .notify(
+                        NotificationKind.QUOTATION_EXPIRED,
+                        Audience.club(request.getClub().getId()),
+                        Subject.quotation(q),
+                        "Quotation Q-2026-0189 has expired",
+                        "The departure on 28 Oct 2026 has come, so it can't be re-quoted. Start a new request for a"
+                                + " later date.");
     }
 
     @Test
