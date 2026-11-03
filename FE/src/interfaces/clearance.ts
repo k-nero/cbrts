@@ -279,7 +279,11 @@ export interface UpdateAuthoritySubmissionRequest {
 }
 
 /** Before the horses leave the origin country, or after they arrive at the destination. */
-export type QuarantineKind = 'PRE_EXPORT' | 'POST_ARRIVAL';
+export const QuarantineKindEnum = {
+  PRE_EXPORT: 'PRE_EXPORT',
+  POST_ARRIVAL: 'POST_ARRIVAL',
+} as const;
+export type QuarantineKind = (typeof QuarantineKindEnum)[keyof typeof QuarantineKindEnum];
 
 export interface QuarantinePeriod {
   id: string;
@@ -288,7 +292,7 @@ export interface QuarantinePeriod {
   horseName?: string;
   placeId: string;
   placeName?: string;
-  /** Pre-export unless set; the form doesn't ask yet (US-F3-22). */
+  /** A quarantine after arrival doesn't hold departure (US-F3-22). */
   kind: QuarantineKind;
   startsOn: string;
   endsOn: string;
@@ -301,6 +305,8 @@ export interface CreateQuarantinePeriodRequest {
   placeId: string;
   startsOn: string;
   endsOn: string;
+  /** Before export when left out; on a change, the kind it has. */
+  kind?: QuarantineKind;
 }
 
 export interface DocumentType {

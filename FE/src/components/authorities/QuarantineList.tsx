@@ -6,7 +6,8 @@ import { Button, Chip, Panel } from '@/components/ui';
 import { useCompleteQuarantine } from '@/hooks/clearance';
 import type { QuarantinePeriod } from '@/interfaces';
 import { apiErrorMessage, ict } from '@/lib/utils';
-import { quarantineRule } from './labels';
+import { QuarantineKindEnum } from '@/interfaces';
+import { QUARANTINE_KIND_LABELS, quarantineRule } from './labels';
 
 type Props = {
   jobId: string | null;
@@ -21,7 +22,7 @@ type Props = {
   destination?: string;
 };
 
-/** The pre-export quarantine section: each period, its length against the minimum, and sign-off. */
+/** The quarantine section: each period, when in the move it falls, its length against the minimum, and sign-off. */
 const QuarantineList: FC<Props> = ({
   jobId,
   quarantines,
@@ -50,10 +51,10 @@ const QuarantineList: FC<Props> = ({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="type-h4 m-0 text-ink">Pre-export Quarantine & Veterinary Inspection</h2>
+          <h2 className="type-h4 m-0 text-ink">Quarantine & Veterinary Inspection</h2>
           <p className="type-body-s m-0 text-ink-2">
             {rule
-              ? `Pre-export quarantine is checked against the destination's minimum: ${rule}.`
+              ? `Quarantine is checked against the destination's minimum: ${rule}.`
               : 'The destination’s minimum stay applies once the job is pinned to its regulation catalog.'}
           </p>
         </div>
@@ -88,6 +89,7 @@ const QuarantineList: FC<Props> = ({
             const durationDays = end.diff(start, 'day');
             const meetsMinimum = minDays === undefined || durationDays >= minDays;
             const ended = q.endsOn <= today;
+            const afterArrival = q.kind === QuarantineKindEnum.POST_ARRIVAL;
 
             return (
               <Panel
@@ -96,6 +98,9 @@ const QuarantineList: FC<Props> = ({
                   <div className="flex items-center gap-2">
                     <ExperimentOutlined className="text-primary" />
                     <span>{q.placeName || 'Animal Quarantine Facility'}</span>
+                    <span className="type-body-s text-ink-3">
+                      · {QUARANTINE_KIND_LABELS[q.kind]}
+                    </span>
                   </div>
                 }
                 extra={
@@ -110,9 +115,13 @@ const QuarantineList: FC<Props> = ({
                 footer={
                   <div className="flex items-center justify-between">
                     <span className="type-body-s text-ink-3">
-                      {q.isCompleted || ended
-                        ? 'The station veterinarian signs off before the horses leave.'
-                        : `The station veterinarian signs off from ${end.format('D MMM')}, the quarantine’s last day.`}
+                      {afterArrival
+                        ? q.isCompleted || ended
+                          ? 'Held after arrival; it doesn’t hold departure.'
+                          : `Held after arrival; it doesn’t hold departure. The station veterinarian signs off from ${end.format('D MMM')}.`
+                        : q.isCompleted || ended
+                          ? 'The station veterinarian signs off before the horses leave.'
+                          : `The station veterinarian signs off from ${end.format('D MMM')}, the quarantine’s last day.`}
                     </span>
                     <span className="flex items-center gap-2">
                       {!q.isCompleted && onChange && (
