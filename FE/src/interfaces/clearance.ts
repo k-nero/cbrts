@@ -389,7 +389,7 @@ export interface ClearanceJobSummary {
 
 /** A newer published version of a catalog the job is pinned to, and what moving onto it changes. */
 export interface CatalogUpdate {
-  role: 'ORIGIN' | 'DESTINATION';
+  role: 'ORIGIN' | 'TRANSIT' | 'DESTINATION';
   country: string;
   pinnedVersionId: string;
   pinnedVersionNo: number;
