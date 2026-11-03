@@ -715,11 +715,43 @@ class RequestServiceTest {
     @Test
     void anInfoRequiredRequestCanBeSaved() {
         TransportRequest r = infoRequired();
+        Corridor hcmBkk = new Corridor();
+        hcmBkk.setCode("RD HCM → BKK");
+        when(routes.resolve(phuTho, null, chaoPhraya, null, TransportMode.ROAD))
+                .thenReturn(new RouteResolution(hcmBkk, route(21), Set.of(TransportMode.ROAD), null, false, false));
 
-        RequestResponse response = service.update(user, r.getId(), body(shadowfax));
+        RequestResponse response = service.update(
+                user,
+                r.getId(),
+                body(shadowfax).toBuilder()
+                        .originPlaceId(phuTho.getId())
+                        .destinationPlaceId(chaoPhraya.getId())
+                        .mode(TransportMode.ROAD)
+                        .build());
 
         verify(requests).saveAndFlush(r);
         assertThat(response.status()).isEqualTo(RequestStatus.INFO_REQUIRED);
+    }
+
+    @Test
+    void anInfoRequiredRequestKeepsARouteWeRun() {
+        // transport_requests_route_check: a request once sent always has its corridor.
+        TransportRequest r = infoRequired();
+
+        assertThatThrownBy(() -> service.update(
+                        user,
+                        r.getId(),
+                        body(shadowfax).toBuilder()
+                                .originPlaceId(phuTho.getId())
+                                .destinationText("Yangon")
+                                .mode(TransportMode.ROAD)
+                                .build()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("REQ-2026-0195 was sent to us, so it has to stay on a route we run. We don't run Ho Chi"
+                        + " Minh City → Yangon.")
+                .extracting("code")
+                .isEqualTo("ROUTE_REQUIRED");
+        verify(requests, never()).saveAndFlush(any());
     }
 
     @Test

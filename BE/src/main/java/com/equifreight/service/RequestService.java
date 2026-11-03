@@ -108,6 +108,10 @@ public class RequestService {
             RequestStatus.CUSTOMER_ACCEPTED,
             RequestStatus.EXPIRED);
 
+    /** The blockers that leave a request without a route we run. */
+    private static final Set<String> ROUTE_BLOCKERS =
+            Set.of("ORIGIN_MISSING", "DESTINATION_MISSING", "PLACE_NOT_CHOSEN", "ROUTE_NOT_RUN", "MODE_MISSING");
+
     private final TransportRequestRepository requests;
     private final HorseRepository horses;
     private final PlaceRepository places;
@@ -277,7 +281,27 @@ public class RequestService {
                 request.getHorses().stream().map(rh -> rh.getHorse().getId()).collect(Collectors.toSet());
         Draft draft = validate(club, body, alreadyOn);
         RouteResolution resolution = write(request, draft);
+        requireRouteOnceSent(request, resolution);
         return toResponse(requests.saveAndFlush(request), resolution);
+    }
+
+    /**
+     * A request once sent keeps a route we run (transport_requests_route_check). Back with the club for information, an
+     * edit that leaves it without one is refused with the reason the submit check gives, before the database does.
+     */
+    private void requireRouteOnceSent(TransportRequest request, RouteResolution resolution) {
+        if (request.getSubmittedAt() == null || request.getCorridor() != null) {
+            return;
+        }
+        List<String> why = SubmissionCheck.blockers(request, resolution, LocalDate.now(clock)).stream()
+                .filter(b -> ROUTE_BLOCKERS.contains(b.code()))
+                .map(Blocker::message)
+                .toList();
+        throw new ConflictException(
+                "ROUTE_REQUIRED",
+                request.getCode() + " was sent to us, so it has to stay on a route we run. "
+                        + (why.isEmpty() ? "Choose where the horses are collected and delivered." : why.getFirst()),
+                why);
     }
 
     /**

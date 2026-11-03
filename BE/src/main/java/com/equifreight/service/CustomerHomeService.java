@@ -538,7 +538,11 @@ public class CustomerHomeService {
         return switch (r.getStatus()) {
             case DRAFT -> new TonedTextResponse("Draft · finish and submit it", "warn");
             case INFO_REQUIRED -> new TonedTextResponse("Needs your answer", "warn");
-            case QUOTED -> new TonedTextResponse("Quotation waiting for you", "warn");
+            // Accepting is refused once the departure has come (CustomerQuotationService.accept).
+            case QUOTED ->
+                departureCome(r, today)
+                        ? new TonedTextResponse("Departure passed · nothing to answer", "neutral")
+                        : new TonedTextResponse("Quotation waiting for you", "warn");
             case CUSTOMER_ACCEPTED -> new TonedTextResponse("With the logistics manager for approval", "neutral");
             case EXPIRED ->
                 requoting
