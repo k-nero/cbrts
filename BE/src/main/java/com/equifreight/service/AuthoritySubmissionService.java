@@ -290,10 +290,12 @@ public class AuthoritySubmissionService {
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
 
-        requireValidPeriod(jobId, place, QuarantineKind.PRE_EXPORT, request.startsOn(), request.endsOn());
+        QuarantineKind kind = request.kind() == null ? QuarantineKind.PRE_EXPORT : request.kind();
+        requireValidPeriod(job, place, kind, request.startsOn(), request.endsOn());
 
         QuarantinePeriod quarantine = new QuarantinePeriod();
         quarantine.setJob(job);
+        quarantine.setKind(kind);
         quarantine.setHorse(horse);
         quarantine.setPlace(place);
         quarantine.setStartsOn(request.startsOn());
@@ -319,12 +321,34 @@ public class AuthoritySubmissionService {
 
     /**
      * A quarantine is held at a quarantine station, ends on or after it starts, and lasts at least the minimum
-     * {@link QuarantineRules#minimumDays} gives for its kind: a shorter one is refused, not warned about.
+     * {@link QuarantineRules#minimumDays} gives for its kind: a shorter one is refused, not warned about. A quarantine
+     * after arrival is held in the destination country; one before export anywhere else, so a hub on the way counts.
      */
     private void requireValidPeriod(
-            UUID jobId, Place place, QuarantineKind kind, LocalDate startsOn, LocalDate endsOn) {
+            TransportJob job, Place place, QuarantineKind kind, LocalDate startsOn, LocalDate endsOn) {
+        UUID jobId = job.getId();
         if (place.getKind() != PlaceKind.QUARANTINE) {
             throw new BusinessException("%s is not a quarantine station.".formatted(place.getName()));
+        }
+        Country arrives = job.getRequest() == null || job.getRequest().getDestinationPlace() == null
+                ? null
+                : job.getRequest().getDestinationPlace().getCountry();
+        if (arrives != null && place.getCountry() != null) {
+            boolean inDestination = arrives.getId().equals(place.getCountry().getId());
+            if (kind == QuarantineKind.POST_ARRIVAL && !inDestination)
+                throw new BusinessException(
+                        "QUARANTINE_WRONG_COUNTRY",
+                        "A quarantine after arrival is held in %s, where the horses arrive; %s is in %s."
+                                .formatted(
+                                        arrives.getName(),
+                                        place.getName(),
+                                        place.getCountry().getName()));
+            if (kind == QuarantineKind.PRE_EXPORT && inDestination)
+                throw new BusinessException(
+                        "QUARANTINE_WRONG_COUNTRY",
+                        ("A quarantine before export is held before the horses leave for %s; %s is in %s. Schedule it"
+                                        + " as a quarantine after arrival.")
+                                .formatted(arrives.getName(), place.getName(), arrives.getName()));
         }
         if (endsOn.isBefore(startsOn)) {
             throw new BusinessException("Quarantine end date cannot precede start date.");
@@ -362,7 +386,8 @@ public class AuthoritySubmissionService {
                     .findById(request.horseId())
                     .orElseThrow(() -> ResourceNotFoundException.of("Horse", request.horseId()));
         }
-        requireValidPeriod(job.getId(), place, quarantine.getKind(), request.startsOn(), request.endsOn());
+        QuarantineKind kind = request.kind() == null ? quarantine.getKind() : request.kind();
+        requireValidPeriod(job, place, kind, request.startsOn(), request.endsOn());
 
         String was = QuarantineNotices.where(quarantine);
         String before = "%s, %s to %s"
@@ -379,6 +404,7 @@ public class AuthoritySubmissionService {
         quarantine.setPlace(place);
         quarantine.setStartsOn(request.startsOn());
         quarantine.setEndsOn(request.endsOn());
+        quarantine.setKind(kind);
         QuarantinePeriod saved = quarantinePeriodRepository.save(quarantine);
 
         auditService.recordDecision(

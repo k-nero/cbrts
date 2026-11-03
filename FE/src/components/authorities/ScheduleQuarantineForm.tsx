@@ -7,11 +7,13 @@ import {
   useQuarantineFacilities,
   useUpdateQuarantine,
 } from '@/hooks/clearance';
+import { type QuarantineKind, QuarantineKindEnum } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 import { quarantineRule } from './labels';
+import { QuarantineKindChoice } from './QuarantineKindChoice';
 import type { Props } from './ScheduleQuarantineModal';
 
-type Values = { placeId: string; dates: [Dayjs, Dayjs] };
+type Values = { kind: QuarantineKind; placeId: string; dates: [Dayjs, Dayjs] };
 
 export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
   jobId,
@@ -27,6 +29,7 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
   const update = useUpdateQuarantine(jobId);
   const saving = create.isPending || update.isPending;
   const rule = quarantineRule(minDays, destination);
+  const afterArrival = Form.useWatch('kind', form) === QuarantineKindEnum.POST_ARRIVAL;
 
   // Default to the first station, also when the list arrives after the dialog opened.
   const firstStationId = stations[0]?.id;
@@ -35,12 +38,13 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
       form.setFieldsValue({ placeId: firstStationId });
   }, [firstStationId, form]);
 
-  const submit = async ({ placeId, dates: [start, end] }: Values) => {
+  const submit = async ({ kind, placeId, dates: [start, end] }: Values) => {
     if (minDays !== undefined && end.diff(start, 'day') < minDays) {
       message.error(`The quarantine must last at least ${rule}.`);
       return;
     }
     const period = {
+      kind,
       placeId,
       startsOn: start.format('YYYY-MM-DD'),
       endsOn: end.format('YYYY-MM-DD'),
@@ -73,11 +77,30 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
       className="mt-4"
       initialValues={
         editing
-          ? { placeId: editing.placeId, dates: [dayjs(editing.startsOn), dayjs(editing.endsOn)] }
-          : { dates: [dayjs(), dayjs().add(minDays ?? 7, 'day')] }
+          ? {
+              kind: editing.kind,
+              placeId: editing.placeId,
+              dates: [dayjs(editing.startsOn), dayjs(editing.endsOn)],
+            }
+          : {
+              kind: QuarantineKindEnum.PRE_EXPORT,
+              dates: [dayjs(), dayjs().add(minDays ?? 7, 'day')],
+            }
       }
       onFinish={submit}
     >
+      <Form.Item
+        name="kind"
+        label="When"
+        extra={
+          afterArrival
+            ? 'Held at a station where the horses arrive. It doesn’t hold departure.'
+            : 'Held before the horses leave for the destination. Departure waits until it is signed off.'
+        }
+      >
+        <QuarantineKindChoice />
+      </Form.Item>
+
       <Form.Item
         name="placeId"
         label="Quarantine facility"
@@ -103,7 +126,7 @@ export const ScheduleQuarantineForm: FC<Omit<Props, 'open'>> = ({
       {rule ? (
         <Callout tone="info" title="Destination minimum">
           The job is pinned to {destination ?? 'its destination catalog'}, which requires at least{' '}
-          {minDays} days of certified pre-export quarantine.
+          {minDays} days of certified quarantine {afterArrival ? 'after arrival' : 'before export'}.
         </Callout>
       ) : (
         <Callout tone="warn" title="No destination catalog pinned yet">
