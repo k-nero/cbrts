@@ -298,8 +298,23 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
 
         assertThatThrownBy(() -> service.get(request.getId()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("REQ-2026-0199 is back with Saigon Turf Club, who changed it to a route we don't run, so"
-                        + " its quotation can't be priced. It opens again once they send the request back.")
+                .hasMessage("REQ-2026-0199 is back with Saigon Turf Club and has no route we run now, so its"
+                        + " quotation can't be priced. It opens again once they send the request back.")
+                .extracting("code")
+                .isEqualTo("REQUEST_HAS_NO_ROUTE");
+    }
+
+    @Test
+    void getOfADraftWhoseRequestWasCancelledWithNoRouteSaysItWontOpen() {
+        service.start(yen, request.getId());
+        // Cancelled while back with the club, after they moved it off our routes: nothing will send it back.
+        request.setStatus(RequestStatus.CANCELLED);
+        request.setCorridor(null);
+
+        assertThatThrownBy(() -> service.get(request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("REQ-2026-0199 was cancelled while it had no route we run, so its draft quotation can't"
+                        + " be priced.")
                 .extracting("code")
                 .isEqualTo("REQUEST_HAS_NO_ROUTE");
     }

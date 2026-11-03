@@ -30,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -97,7 +98,8 @@ public class CustomerQuotationService {
      * version becomes ACCEPTED, binding its price and lines, and the request CUSTOMER_ACCEPTED for the logistics
      * manager's approval. The request row is locked first, so a double click or a manager issuing the next version at
      * the same moment is refused rather than accepted twice; a {@code versionNo} the customer read that is no longer
-     * the latest is refused too, so the customer never accepts a price they didn't see (US-Q-07).
+     * the latest is refused too, so the customer never accepts a price they didn't see (US-Q-07). A next version the
+     * manager was still drafting is discarded: it can't be issued once this one is accepted.
      */
     @Transactional
     public CustomerQuotationResponse accept(User customer, UUID requestId, AcceptRequest body) {
@@ -152,7 +154,8 @@ public class CustomerQuotationService {
                 club.getName() + " accepted " + label,
                 request.getCode() + " is waiting for your approval. " + label + ", " + money(q.getTotal()) + "."
                         + drafting.map(d -> " The v" + d.getVersionNo() + " draft is discarded.")
-                                .orElse(""));
+                                .orElse(""),
+                drafting.map(Quotation::getPreparedBy).orElse(null));
         return toResponse(request, saved);
     }
 
@@ -361,9 +364,18 @@ public class CustomerQuotationService {
 
     /** The manager who prepared it, or every active logistics manager when nobody is named. */
     private void tellManagers(Quotation q, TransportRequest request, NotificationKind kind, String title, String body) {
-        Audience to = q.getPreparedBy() != null
-                ? Audience.staff(q.getPreparedBy())
-                : Audience.role(RoleName.LOGISTICS_MANAGER);
+        tellManagers(q, request, kind, title, body, null);
+    }
+
+    /** As above, and {@code also} (the manager drafting a discarded version) when that is someone else. */
+    private void tellManagers(
+            Quotation q, TransportRequest request, NotificationKind kind, String title, String body, User also) {
+        User by = q.getPreparedBy();
+        Audience to = by == null
+                ? Audience.role(RoleName.LOGISTICS_MANAGER)
+                : also != null && !Objects.equals(also.getId(), by.getId())
+                        ? Audience.staff(by, also)
+                        : Audience.staff(by);
         notifications.notify(kind, to, Subject.request(request), title, body);
     }
 

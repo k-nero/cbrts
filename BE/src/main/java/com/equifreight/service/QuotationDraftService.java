@@ -149,13 +149,19 @@ public class QuotationDraftService {
                         ? quotations.findFirstByRequestIdOrderByVersionNoDesc(requestId)
                         : quotations.findByRequestIdAndVersionNo(requestId, version))
                 .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
-        // Back with the club, a request can be edited onto a route we don't run; a draft is priced on its route.
+        // Back with the club, a request can be edited onto a route we don't run (and cancelled so); a draft is priced
+        // on its route.
         if (q.getStatus() == QuotationStatus.DRAFT && request.getCorridor() == null) {
             throw new ConflictException(
                     "REQUEST_HAS_NO_ROUTE",
-                    request.getCode() + " is back with " + request.getClub().getName()
-                            + ", who changed it to a route we don't run, so its quotation can't be priced. It opens"
-                            + " again once they send the request back.");
+                    request.getStatus() == RequestStatus.CANCELLED
+                            ? request.getCode()
+                                    + " was cancelled while it had no route we run, so its draft quotation can't be"
+                                    + " priced."
+                            : request.getCode() + " is back with "
+                                    + request.getClub().getName()
+                                    + " and has no route we run now, so its quotation can't be priced. It opens again"
+                                    + " once they send the request back.");
         }
         return pricing.toResponse(q, request, List.of());
     }

@@ -71,11 +71,12 @@ public class QuotationExpiryJob {
         Instant soon = now.plus(Duration.ofHours(24));
         for (Quotation q :
                 quotations.findByStatusAndReminderSentAtIsNullAndValidUntilBefore(QuotationStatus.ISSUED, soon)) {
-            // From the departure day on it can't be accepted, so there is nothing to remind the club of.
-            if (stillIssuedBefore(q, soon)
+            // From the departure day on it can't be accepted, so there is nothing to remind the club of. A quoted
+            // request can't change its departure, so that is checked before the row is locked.
+            if (!departureCome(q.getRequest(), now)
+                    && stillIssuedBefore(q, soon)
                     && q.getReminderSentAt() == null
-                    && q.getRequest().getStatus() == RequestStatus.QUOTED
-                    && !departureCome(q.getRequest(), now)) {
+                    && q.getRequest().getStatus() == RequestStatus.QUOTED) {
                 remind(q, now);
             }
         }

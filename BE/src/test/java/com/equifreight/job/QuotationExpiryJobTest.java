@@ -175,6 +175,8 @@ class QuotationExpiryJobTest {
 
         assertThat(q.getReminderSentAt()).isNull();
         verifyNoInteractions(notifications);
+        // Its departure can't move while it is quoted, so the request row isn't locked hour after hour for it.
+        verify(entities, never()).refresh(request, LockModeType.PESSIMISTIC_WRITE);
     }
 
     @Test

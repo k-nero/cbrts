@@ -173,6 +173,30 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
     }
 
     @Test
+    void theManagerDraftingTheDiscardedVersionIsToldToo() {
+        User other = new User();
+        other.setId(UUID.randomUUID());
+        Quotation v2 = new Quotation();
+        v2.setId(UUID.randomUUID());
+        v2.setCode(q.getCode());
+        v2.setRequest(request);
+        v2.setVersionNo((short) 2);
+        v2.setStatus(QuotationStatus.DRAFT);
+        v2.setPreparedBy(other);
+        stored = Optional.of(v2);
+
+        customer().accept(bookings, request.getId());
+
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_ACCEPTED),
+                        eq(Audience.staff(yen, other)),
+                        eq(Subject.request(request)),
+                        anyString(),
+                        endsWith(" The v2 draft is discarded."));
+    }
+
+    @Test
     void acceptingWithNoVersionBeingDraftedDiscardsNothing() {
         customer().accept(bookings, request.getId());
 

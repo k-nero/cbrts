@@ -1,7 +1,6 @@
 import { type FC, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { App, Flex, Skeleton } from 'antd';
-import type { AxiosError } from 'axios';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import type { RunWrite } from './editorOptions';
@@ -108,15 +107,13 @@ const QuotationBuilderPage: FC = () => {
     );
   }
 
-  // A 409 says why the draft can't be priced now (useQuotation): the request is back with the club.
-  if (!query.data && (query.error as AxiosError | null)?.response?.status === 409) {
+  // A 409 says why the draft can't be priced (useQuotation): its request has no route we run.
+  const unpriceable = query.data ? null : conflictMessage(query.error);
+  if (unpriceable) {
     return (
       <Flex vertical gap={28}>
         <PageHeader back={back} title="Quotation" />
-        <Callout
-          tone="info"
-          title={apiErrorMessage(query.error, "The quotation can't be shown now.")}
-        />
+        <Callout tone="info" title={unpriceable} />
       </Flex>
     );
   }
