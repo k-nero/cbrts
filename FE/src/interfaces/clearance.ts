@@ -278,6 +278,9 @@ export interface UpdateAuthoritySubmissionRequest {
   resultFileId?: string;
 }
 
+/** Before the horses leave the origin country, or after they arrive at the destination. */
+export type QuarantineKind = 'PRE_EXPORT' | 'POST_ARRIVAL';
+
 export interface QuarantinePeriod {
   id: string;
   jobId: string;
@@ -285,6 +288,8 @@ export interface QuarantinePeriod {
   horseName?: string;
   placeId: string;
   placeName?: string;
+  /** Pre-export unless set; the form doesn't ask yet (US-F3-22). */
+  kind: QuarantineKind;
   startsOn: string;
   endsOn: string;
   completedAt?: string;
