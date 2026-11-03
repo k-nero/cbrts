@@ -1,0 +1,25 @@
+[[configurations]]
+id = "application:BE:com.equifreight.EquiFreightApplication"
+name = "EquiFreightApplication"
+kind = "spring-boot"
+command = "java"
+args = ["-cp", "${classpath}", "com.equifreight.EquiFreightApplication", "--spring.profiles.active=dev"]
+module = "BE"
+cwd = "BE"
+debug-adapter = "java-debug"
+params = { activeProfiles = "dev", classpath = "${classpath}", mainClass = "com.equifreight.EquiFreightApplication", programArgs = "", vmOptions = "" }
+
+[[configurations]]
+id = "gradle:task:::bootRun"
+name = "equifreight [bootRun]"
+kind = "gradle"
+command = "/Users/thanh.nguyen/Documents/dev/cbrts/BE/gradlew"
+args = ["bootRun"]
+cwd = "BE"
+
+[[configurations]]
+id = "docker:compose:docker-compose.yml:db"
+name = "docker-compose.yml: db"
+kind = "docker-compose"
+command = "docker compose -f docker-compose.yml up -d db"
+params = { connection = "default", detach = "true", files = "docker-compose.yml", services = "db" }
