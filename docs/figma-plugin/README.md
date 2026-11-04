@@ -6,7 +6,7 @@ A Figma plugin that builds the polished EquiFreight / CBRTS design system and sc
 
 1. Open **Figma desktop** (development plugins don't run in the browser) and create a new Design file.
 2. Menu → **Plugins → Development → Import plugin from manifest…** → choose `manifest.json` in this folder.
-3. Run **Plugins → Development → EquiFreight Design System**. It takes about 30–60 s and closes with a summary.
+3. Run **Plugins → Development → EquiFreight Design System**. It runs the same 41 steps as the MCP route below, in order, showing each one as a toast, and closes with a summary. Build `code.js` first with `./build.sh`.
 
 Re-running replaces what it made before: its variable collections, its text and effect styles, and its four `◆` pages. Delete the empty default `Page 1` by hand.
 
