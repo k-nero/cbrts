@@ -17,6 +17,7 @@ import { RouteSummary } from './RouteSummary';
 import { ShareSuggestions } from './ShareSuggestions';
 
 import { Button, Callout, Chip, cx, Panel, TimelineStop } from '@/components/ui';
+import { features } from '@/constant/features';
 import { useCanPlanTrips, useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 import { formatTime, ict } from '@/lib/utils';
@@ -178,18 +179,19 @@ export function RouteTab({ job }: Props) {
 
   // Jobs that could share this trailer, proposed where the route is planned too (US-F3-13), and the confirmed
   // trips this one could join instead (US-F3-18).
-  const sharePanel = planning ? (
-    <Flex vertical gap={24}>
-      {job.tripStatus === 'NOT_STARTED' && (
-        <Panel title="Could share this trailer" className="p-4">
-          <ShareSuggestions job={job} />
+  const sharePanel =
+    planning && features.tripSharing ? (
+      <Flex vertical gap={24}>
+        {job.tripStatus === 'NOT_STARTED' && (
+          <Panel title="Could share this trailer" className="p-4">
+            <ShareSuggestions job={job} />
+          </Panel>
+        )}
+        <Panel title="Join a confirmed trip" className="p-4">
+          <JoinableTrips job={job} enabled={planning} />
         </Panel>
-      )}
-      <Panel title="Join a confirmed trip" className="p-4">
-        <JoinableTrips job={job} enabled={planning} />
-      </Panel>
-    </Flex>
-  ) : null;
+      </Flex>
+    ) : null;
 
   if (!routePlan) {
     return (
