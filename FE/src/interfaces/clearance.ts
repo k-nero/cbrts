@@ -278,6 +278,13 @@ export interface UpdateAuthoritySubmissionRequest {
   resultFileId?: string;
 }
 
+/** Before the horses leave the origin country, or after they arrive at the destination. */
+export const QuarantineKindEnum = {
+  PRE_EXPORT: 'PRE_EXPORT',
+  POST_ARRIVAL: 'POST_ARRIVAL',
+} as const;
+export type QuarantineKind = (typeof QuarantineKindEnum)[keyof typeof QuarantineKindEnum];
+
 export interface QuarantinePeriod {
   id: string;
   jobId: string;
@@ -285,6 +292,8 @@ export interface QuarantinePeriod {
   horseName?: string;
   placeId: string;
   placeName?: string;
+  /** A quarantine after arrival doesn't hold departure (US-F3-22). */
+  kind: QuarantineKind;
   startsOn: string;
   endsOn: string;
   completedAt?: string;
@@ -296,6 +305,8 @@ export interface CreateQuarantinePeriodRequest {
   placeId: string;
   startsOn: string;
   endsOn: string;
+  /** Before export when left out; on a change, the kind it has. */
+  kind?: QuarantineKind;
 }
 
 export interface DocumentType {

@@ -85,11 +85,13 @@ function submissionForm() {
   return e;
 }
 /* rows: [label, value, mono] */
-function quarantinePanel(tone, word, rows, extra) {
+/* o: { station, note, foot } for another job's quarantine; foot is the scheduled one's footer */
+function quarantinePanel(tone, word, rows, extra, o) {
+  o = o || {};
   var p = panel('Pre-export quarantine', { gap: 14 });
   var h = H({ name: 'Head', gap: 16, main: 'SPACE_BETWEEN', cross: 'CENTER' });
   var t = VV({ name: 'Text', gap: 2 });
-  addAll(t, [Tx('Pre-export quarantine', 'Heading/H4'), Tx('Củ Chi pre-export quarantine station · inspected by the station veterinarian', 'Body/S', 'text/tertiary')]);
+  addAll(t, [Tx('Pre-export quarantine', 'Heading/H4'), Tx((o.station || 'Củ Chi pre-export quarantine station') + ' · inspected by the station veterinarian', 'Body/S', 'text/tertiary')]);
   addAll(h, [t, chip(tone, word)]);
   add(p, fillW(h));
   var grid = H({ name: 'Facts', gap: 40 });
@@ -100,7 +102,8 @@ function quarantinePanel(tone, word, rows, extra) {
   });
   add(p, fillW(grid));
   (extra || []).forEach(function (n) { add(p, fillW(n)); });
-  add(p, Tx('Cambodia requires at least 7 days. A shorter period can’t be saved.', 'Body/S', 'text/tertiary', { fill: true }));
+  add(p, Tx(o.note || 'Cambodia requires at least 7 days. A shorter period can’t be saved.', 'Body/S', 'text/tertiary', { fill: true }));
+  if (o.foot) add(p, fillW(o.foot));
   return p;
 }
 
@@ -149,4 +152,23 @@ function scrAuthoritiesOverdue() {
   return jobScreen('Transport specialist · Authorities · Overdue', 'Authorities', STAFF.lan, [gdahp, dah, customs, q, hist],
     { today: 'Mon 12 Oct 2026', stage: 'Clearance', gate: '3 things must clear first: the Cambodia import permit (overdue), 4 export health certificates (with the Dept. of Animal Health, expected ' + CLEARANCE_041 + ') and quarantine (ends 17 Oct).' });
 }
-async function eAuthorities() { return insertChainCall([scrAuthorities, scrAuthoritiesOverdue], 'Transport specialist · Clearance checklist'); }
+/* ---------- Fri 13 Nov: a scheduled quarantine, day 2 of 14 (US-F3-22) ----------
+   Before its last day the sign-off is a locked Secondary and the footer says from when; "Change dates" opens
+   "Change Quarantine Period", prefilled. The coordinator plans the trips either side of it on the Trip tab. */
+function scrAuthoritiesQuarantine() {
+  var afcd = dossierCard({ name: 'Hong Kong AFCD', what: 'Agriculture, Fisheries and Conservation Department · import permit', tone: 'Ok', word: 'Approved', due: 'Done', date: '6 Nov', dueTone: 'status/ok/fg',
+    facts: [['Reference', 'AFCD-IP-2026-0712', true], ['Filed', '28 Oct 2026', true], ['Contains', 'Import application · 4 equine passports', false, true]] });
+  var foot = H({ name: 'Footer', gap: 16, pad: [14, 0, 0, 0], main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  borderSide(foot, 'border/default', 'top');
+  var acts = H({ name: 'Actions', gap: 8, cross: 'CENTER' });
+  addAll(acts, [btn('Secondary', 'SM', 'Change dates'), btn('Secondary', 'SM', 'Confirm veterinary inspection', { state: 'Disabled', lead: 'lock' })]);
+  addAll(foot, [Tx('The station veterinarian signs off from ' + Q051.last + ', the quarantine’s last day.', 'Body/S', 'text/tertiary', { fill: true }), acts]);
+  var q = quarantinePanel('Info', 'In progress', [['Booked', '11–25 Nov 2026', true], ['Length', Q051.min + ' days', true], ['Hong Kong’s minimum', Q051.min + ' days', true], ['Inspection', 'Due ' + Q051.last + ' from the station vet']], null,
+    { station: Q051.station, note: 'Hong Kong requires at least ' + Q051.min + ' days. A shorter period can’t be saved.', foot: foot });
+  var hist = historyPanel([
+    ['11 Nov · 08:05', 'Quarantine started at ' + Q051.station + ' with 4 horses.', 'Lan, transport specialist'],
+    ['2 Nov · 10:20', 'Quarantine scheduled at ' + Q051.station + ', ' + Q051.days + ' (14 days; Hong Kong requires 14).', 'Lan, transport specialist']], 'Show all 6 events');
+  return jobScreen('Transport specialist · Authorities · Quarantine scheduled', 'Authorities', STAFF.lan, [afcd, q, hist],
+    { job: Q_JOB, today: 'Fri 13 Nov 2026', stage: 'Clearance', gate: '1 thing must clear first: the pre-export quarantine at ' + Q051.station + ' (ends ' + Q051.last + ').' });
+}
+async function eAuthorities() { return insertChainCall([scrAuthorities, scrAuthoritiesOverdue, scrAuthoritiesQuarantine], 'Transport specialist · Clearance checklist'); }

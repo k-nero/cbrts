@@ -96,7 +96,8 @@ class RouteJobStopsTest {
                 mock(JobTripService.class),
                 mock(AuditService.class),
                 mock(TripNotices.class),
-                PlanningStub.planningDefaults());
+                PlanningStub.planningDefaults(),
+                mock(QuarantineRules.class));
     }
 
     @Test

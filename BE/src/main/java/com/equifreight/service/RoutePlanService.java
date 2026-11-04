@@ -34,6 +34,7 @@ public class RoutePlanService {
     private final AuditService auditService;
     private final TripNotices notices;
     private final PlanningDefaults planningDefaults;
+    private final QuarantineRules quarantineRules;
 
     public RoutePlanService(
             RoutePlanRepository routePlanRepository,
@@ -48,7 +49,8 @@ public class RoutePlanService {
             JobTripService jobTrips,
             AuditService auditService,
             TripNotices notices,
-            PlanningDefaults planningDefaults) {
+            PlanningDefaults planningDefaults,
+            QuarantineRules quarantineRules) {
         this.routePlanRepository = routePlanRepository;
         this.routeStopRepository = routeStopRepository;
         this.routeLegRepository = routeLegRepository;
@@ -62,6 +64,7 @@ public class RoutePlanService {
         this.auditService = auditService;
         this.notices = notices;
         this.planningDefaults = planningDefaults;
+        this.quarantineRules = quarantineRules;
     }
 
     @Transactional(readOnly = true)
@@ -708,6 +711,11 @@ public class RoutePlanService {
      * no planned time isn't checked; the other trip's draft is read before its confirmed route.
      */
     private void requireInOrder(Trip trip, List<RouteStop> stops, TransportJob onTrip, TransportJob confirming) {
+        // A scheduled quarantine binds the stops at its station: in by its first day, out from its last (US-F3-22).
+        ownStop(stops, onTrip, confirming, RouteStopKind.TRANSFER)
+                .ifPresent(st -> quarantineRules.requireArrivesBy(trip, onTrip, st.getPlace(), st.getPlannedAt()));
+        ownStop(stops, onTrip, confirming, RouteStopKind.PICKUP)
+                .ifPresent(st -> quarantineRules.requireCollectsAfter(trip, onTrip, st.getPlace(), st.getPlannedAt()));
         Optional<Instant> pickup =
                 ownStop(stops, onTrip, confirming, RouteStopKind.PICKUP).map(RouteStop::getPlannedAt);
         for (TripJob before : jobTrips.partsBefore(trip, onTrip)) {
@@ -986,6 +994,24 @@ public class RoutePlanService {
         List<StopCopy> stops = draft.get().getStops().stream()
                 .filter(st -> st.getJob() == null || !st.getJob().getId().equals(job.getId()))
                 .map(st -> new StopCopy(st, st.getJob(), st.getKind(), st.getPlace(), st.getPlannedAt()))
+                .toList();
+        rebuild(draft.get(), stops);
+    }
+
+    /**
+     * Ends {@code job}'s part of the trip's draft route at {@code place} as a TRANSFER, where its delivery or transfer
+     * was (US-F3-22): the next trip collects the horses there. The leg into it is new, for the coordinator to plan.
+     */
+    @Transactional
+    public void handOnAt(Trip trip, TransportJob job, Place place) {
+        Optional<RoutePlan> draft = routePlanRepository.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT);
+        if (draft.isEmpty()) return;
+        List<StopCopy> stops = draft.get().getStops().stream()
+                .map(st -> st.getJob() != null
+                                && st.getJob().getId().equals(job.getId())
+                                && (st.getKind() == RouteStopKind.TRANSFER || st.getKind() == RouteStopKind.DELIVERY)
+                        ? new StopCopy(null, job, RouteStopKind.TRANSFER, place, null)
+                        : copy(st))
                 .toList();
         rebuild(draft.get(), stops);
     }

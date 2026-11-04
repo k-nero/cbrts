@@ -17,8 +17,9 @@ import {
   useDraftJourney,
   useJourneyDetails,
   useRemoveTrip,
+  useRouteViaQuarantine,
 } from '@/hooks/useJob';
-import type { JobDetail, TripPart } from '@/interfaces';
+import type { JobDetail, QuarantineDetour, TripPart } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils';
 import { useRouterNavigation } from '@/router/route.hook';
 
@@ -53,6 +54,7 @@ export function TripTab({ job }: { job: JobDetail }) {
   const [adding, setAdding] = useState(false);
   const planner = useCanPlanTrips();
   const remove = useRemoveTrip(job.id);
+  const routeVia = useRouteViaQuarantine(job.id);
   const drafting = useDraftJourney(job.id);
   const canSignOff = useCanSignOffTripPlan();
   const { navigateWithConfirmation } = useRouterNavigation();
@@ -115,7 +117,54 @@ export function TripTab({ job }: { job: JobDetail }) {
         ),
     });
 
-  const warnings = job.journeyWarnings.map((w) => <Callout key={w} tone="warn" title={w} />);
+  // A quarantine scheduled after the journey was planned: the trip into its city can be routed by way of the station.
+  const viaStation = (detour: QuarantineDetour) =>
+    modal.confirm({
+      title: `Route ${job.code} by way of ${detour.placeName}?`,
+      content: `${detour.tripCode} hands the horses on at ${detour.placeName}, and a new local run collects them there after the quarantine and takes them on where ${detour.tripCode} ended. The trailer and crew are free while the horses wait. Plan and confirm both routes.`,
+      okText: 'Route via the station',
+      onOk: () =>
+        routeVia.mutateAsync(detour.placeId).then(
+          (parts) => {
+            message.success(`${job.code} now goes to quarantine at ${detour.placeName}.`);
+            const added = parts.find((p) => p.current);
+            if (added) show(added.tripId, 'route');
+          },
+          (error) =>
+            message.error(
+              apiErrorMessage(error, 'The journey wasn’t routed by way of the station.'),
+            ),
+        ),
+    });
+  const warnings = job.journeyWarnings.map((w) => {
+    const detour = planner
+      ? job.quarantineDetours.find(
+          (d) =>
+            w.startsWith(`Quarantine at ${d.placeName}, `) &&
+            w.endsWith('no trip takes the horses there yet.'),
+        )
+      : undefined;
+    return (
+      <Callout
+        key={w}
+        tone="warn"
+        title={w}
+        action={
+          detour && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon="route"
+              disabled={routeVia.isPending}
+              onClick={() => viaStation(detour)}
+            >
+              Route {detour.tripCode} via {detour.placeName}
+            </Button>
+          )
+        }
+      />
+    );
+  });
 
   const addModal = (
     <AddTripModal

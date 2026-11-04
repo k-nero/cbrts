@@ -11,7 +11,10 @@ import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Country;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.QuarantinePeriod;
 import com.equifreight.entity.RequestHorse;
+import com.equifreight.entity.RoutePlan;
+import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.Trip;
@@ -23,9 +26,13 @@ import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.JobStage;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.RoutePlanStatus;
+import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
+import com.equifreight.repository.QuarantinePeriodRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TripHorseRepository;
 import com.equifreight.repository.TripJobRepository;
 import com.equifreight.repository.TripRepository;
@@ -47,6 +54,8 @@ class JobTripServiceTest {
     private final TripHorseRepository tripHorses = mock(TripHorseRepository.class);
     private final CodeService codes = mock(CodeService.class);
     private final TripJobRepository parts = mock(TripJobRepository.class);
+    private final RoutePlanRepository routePlans = mock(RoutePlanRepository.class);
+    private final QuarantinePeriodRepository quarantines = mock(QuarantinePeriodRepository.class);
     private JobTripService service;
 
     private static Horse horse(String name) {
@@ -65,7 +74,7 @@ class JobTripServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new JobTripService(trips, tripVehicles, tripHorses, parts, codes);
+        service = new JobTripService(trips, tripVehicles, tripHorses, parts, codes, routePlans, quarantines);
         when(parts.save(any())).thenAnswer(i -> i.getArgument(0));
         when(trips.save(any())).thenAnswer(i -> i.getArgument(0));
         when(tripVehicles.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -394,6 +403,85 @@ class JobTripServiceTest {
         journey(job, toTerminal, flight);
 
         assertThat(service.beforeBorder(toTerminal, job)).isFalse();
+    }
+
+    /** A quarantine of {@code job} at {@code station}, and {@code trip}'s draft route handing the job on there. */
+    private void quarantineAt(TransportJob job, Place station, Trip trip) {
+        QuarantinePeriod q = new QuarantinePeriod();
+        q.setJob(job);
+        q.setPlace(station);
+        when(quarantines.findByJobId(job.getId())).thenReturn(List.of(q));
+        RouteStop transfer = new RouteStop();
+        transfer.setKind(RouteStopKind.TRANSFER);
+        transfer.setJob(job);
+        transfer.setPlace(station);
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(transfer);
+        when(routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT))
+                .thenReturn(Optional.of(plan));
+    }
+
+    private static Place station(String name) {
+        Place p = new Place();
+        p.setId(UUID.randomUUID());
+        p.setName(name);
+        p.setKind(PlaceKind.QUARANTINE);
+        p.setCity("Ho Chi Minh City");
+        return p;
+    }
+
+    private static Trip localRun(String code, Instant departs) {
+        Trip t = tripOn(code, TransportMode.ROAD, VN, VN, departs);
+        t.getCorridor().setOriginCity("Ho Chi Minh City");
+        t.getCorridor().setDestinationCity("Ho Chi Minh City");
+        return t;
+    }
+
+    @Test
+    @DisplayName(
+            "Phú Thọ → Sha Tin through a quarantine: the local run into the station leaves before the gate, the run"
+                    + " out of it waits for it")
+    void theLocalRunIntoTheStationComesBeforeTheBorder() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toStation = localRun("RD HCM local", PICKUP_DA_NANG);
+        Trip toTerminal = localRun("RD HCM local", FLIGHT_SGN);
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        journey(job, toStation, toTerminal, flight);
+        quarantineAt(job, station("Phú Thọ isolation barn"), toStation);
+
+        assertThat(service.beforeBorder(toStation, job)).isTrue();
+        assertThat(service.beforeBorder(toTerminal, job)).isFalse();
+        assertThat(service.beforeBorder(flight, job)).isFalse();
+        assertThat(service.borderTripOf(job)).contains(flight);
+    }
+
+    @Test
+    @DisplayName("A local run to a station where the job has no quarantine still waits for the gate")
+    void aLocalRunToAnotherStationWaits() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip toStation = localRun("RD HCM local", PICKUP_DA_NANG);
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        journey(job, toStation, flight);
+        quarantineAt(job, station("Phú Thọ isolation barn"), toStation);
+        QuarantinePeriod elsewhere = new QuarantinePeriod();
+        elsewhere.setPlace(station("Đại Nam isolation barn"));
+        when(quarantines.findByJobId(job.getId())).thenReturn(List.of(elsewhere));
+
+        assertThat(service.beforeBorder(toStation, job)).isFalse();
+    }
+
+    @Test
+    @DisplayName("A post-arrival quarantine changes nothing: the local run into the station comes after the border")
+    void aRunIntoAPostArrivalStationIsAfterTheBorder() {
+        TransportJob job = job(PICKUP_DA_NANG);
+        Trip flight = tripOn("AIR SGN → HKG", TransportMode.AIR, VN, HK, FLIGHT_SGN);
+        Trip toStation = tripOn("RD HKG local", TransportMode.ROAD, HK, HK, null);
+        toStation.getCorridor().setOriginCity("Hong Kong");
+        toStation.getCorridor().setDestinationCity("Hong Kong");
+        journey(job, flight, toStation);
+        quarantineAt(job, station("Sha Tin quarantine stables"), toStation);
+
+        assertThat(service.beforeBorder(toStation, job)).isFalse();
     }
 
     @Test

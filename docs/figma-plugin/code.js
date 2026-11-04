@@ -880,7 +880,14 @@ function buildDataDisplay(parent) {
 }
 function stat(tone, value, label) { var s = inst(C.stat, { Tone: tone }); setP(s, { Value: value, Label: label }); s.name = 'Stat · ' + label; return s; }
 function progress(tone, value) { var p = inst(C.progress, { Tone: tone, Value: String(value) }); p.name = 'Progress'; return fillW(p); }
-function callout(tone, title, body) { var c = inst(C.callout, { Tone: tone }); setP(c, { Title: title, Body: body }); c.name = 'Callout · ' + title; return fillW(c); }
+/* body null: a title-only callout, as the journey's warnings are */
+function callout(tone, title, body) {
+  var c = inst(C.callout, { Tone: tone });
+  setP(c, body == null ? { Title: title } : { Title: title, Body: body });
+  if (body == null) c.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Body'; }).visible = false;
+  c.name = 'Callout · ' + title;
+  return fillW(c);
+}
 
 /* ---------- Brass nameplate ---------- */
 function buildNameplate(parent) {
@@ -2542,6 +2549,9 @@ function jobScreen(name, tab, user, blocks, o) {
 /* the job's trips in journey order (US-F3-16, US-F3-21): the chosen one is the Nav item's active pill */
 var ONE_TRIP = [{ mode: 'Road', icon: 'truck', route: 'Ho Chi Minh City → Phnom Penh', code: 'TRP-2026-014 · 18 Oct, 06:00', leaves: 'Leaves 18 Oct, 06:00', tone: 'Bad', step: 'Locked' }];
 var CHAIN_JOB = { code: 'CBRT-2026-042', title: 'Da Nang → Sha Tin', meta: '2 horses · road, flight, road · departs 16 Oct 2026, 06:00' };
+/* a journey through a pre-export quarantine (US-F3-22): one quarantine, the same station and days on every frame */
+var Q_JOB = { code: 'CBRT-2026-051', title: 'Ho Chi Minh City → Sha Tin', meta: '4 horses · road, flight, road · quarantine 11–25 Nov 2026' };
+var Q051 = { station: 'Đại Nam Racecourse isolation barn', days: '11–25 Nov', first: '11 Nov', last: '25 Nov', min: 14, catalog: 'Hong Kong import' };
 function journeyRail(parts, active, addFrom) {
   var r = VV({ name: 'Journey rail', gap: 8, w: 240 });
   add(r, Tx('Journey · ' + parts.length + (parts.length === 1 ? ' trip' : ' trips'), 'Mono/Caption', 'text/tertiary'));
@@ -2588,9 +2598,10 @@ function tripHead(part, view) {
   }
   return h;
 }
-/* the Trip tab's body: the rail, then the chosen trip */
-function tripBody(parts, active, addFrom, head, blocks) {
+/* the Trip tab's body: the rail, then the chosen trip; the journey's Warn callouts (warns) come above its head */
+function tripBody(parts, active, addFrom, head, blocks, warns) {
   var c = VV({ name: 'Chosen trip', gap: 24 });
+  (warns || []).forEach(function (w) { add(c, callout('Warn', w)); });
   add(c, fillW(head));
   blocks.forEach(function (b) { add(c, fillW(b)); });
   var row = H({ name: 'Trip tab', gap: 24 });
@@ -2669,7 +2680,7 @@ function readyPanel(steps, waiting, action) {
 /* A trip's summary strip, first on a road trip's Load plan and Route views and on a flight, above every callout: the
    route's facts (by road its crossing and welfare stops, on a flight the airline's flight), then its clearance gate as
    a chip (the Trip tab shows no gate panel). */
-function routeSummary(cells) {
+function routeSummary(cells, gate) {
   /* the cells wrap to a second line rather than run past the page, as the shipped strip does */
   var strip = H({ name: 'Summary', gap: 40, rowGap: 16, wrap: true, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
   (cells || [['Origin', 'Ho Chi Minh City, VN'], ['Destination', 'Phnom Penh, KH'], ['Distance', '240 km'], ['Duration', '6.5 h'], ['Border crossing', 'Mộc Bài – Bavet'], ['Welfare stops', '1'], ['Arrival window', JOB_WINDOW.text]]).forEach(function (s) {
@@ -2679,7 +2690,7 @@ function routeSummary(cells) {
   });
   /* what is outstanding is Ready to depart's Clearance row */
   var gateCell = VV({ name: 'Clearance', gap: 4 });
-  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip('Bad', 'Departure locked')]);
+  addAll(gateCell, [Tx('Clearance', 'Body/S', 'text/tertiary'), chip.apply(null, gate || ['Bad', 'Departure locked'])]);
   add(strip, gateCell);
   return strip;
 }
@@ -2725,9 +2736,9 @@ var JOURNEY = [
   { mode: 'Road', icon: 'truck', status: 'not started', route: 'Da Nang → Ho Chi Minh City', code: 'TRP-2026-002 · 16 Oct, 06:00', leaves: 'Leaves 16 Oct, 06:00', tone: 'Warn', step: 'Crew', who: 'Waiting on crew · Đỗ Minh Khôi', link: ['18 h 40 min to connect', 'text/tertiary'] },
   { mode: 'Flight', icon: 'plane', status: 'not started', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-003 · 17 Oct, 23:40', leaves: 'Leaves 17 Oct, 23:40', tone: 'Bad', step: 'Locked', who: 'Waiting on clearance · Nguyễn Thị Lan', link: ['Connection not planned', 'text/tertiary'] },
   { mode: 'Road', icon: 'truck', status: 'not started', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-004 · Not planned', leaves: 'Not planned', tone: 'Warn', step: 'Route', who: 'Waiting on route · Đỗ Minh Khôi' }];
-function journeySummary() {
+function journeySummary(cells) {
   var strip = H({ name: 'Journey summary', gap: 40, rowGap: 16, wrap: true, pad: [18, 24, 18, 24], radius: 12, fill: 'surface/card', stroke: 'border/default' });
-  [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']].forEach(function (c) {
+  (cells || [['Trips', '3', 'text/primary'], ['Leaves', '16 Oct, 06:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '2 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '18 h 40 min in Ho Chi Minh City', 'text/primary']]).forEach(function (c) {
     var cell = VV({ name: c[0], gap: 4 });
     addAll(cell, [Tx(c[0], 'Body/S', 'text/tertiary'), Tx(c[1], 'Label/M', c[2])]);
     add(strip, cell);
@@ -3713,6 +3724,8 @@ var SIDEBAR_FRAMES = {
   'Fleet & route coordinator · Route plan': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Fleet & route coordinator · Trip · Flight': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
   'Fleet & route coordinator · Trip · Journey': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
+  'Fleet & route coordinator · Trip · Quarantine': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-051', 'Trip']],
+  'Fleet & route coordinator · Trip · Add trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-051', 'Trip']],
   'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
@@ -3723,6 +3736,7 @@ var SIDEBAR_FRAMES = {
   'Logistics manager · Quotation builder · Blocked': ['yen', 'Requests', ['Requests', 'REQ-2026-0190', 'Quotation']],
   'Transport specialist · Authorities': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Authorities']],
   'Transport specialist · Authorities · Overdue': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Authorities']],
+  'Transport specialist · Authorities · Quarantine scheduled': ['lan', 'Jobs', ['Jobs', 'CBRT-2026-051', 'Authorities']],
   'Logistics manager · Incident · Held': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-040'], [['Jobs', 'Incidents']]],
   'Logistics manager · Incident · Customer report': ['yen', 'Incidents', ['Incidents', 'CBRT-2026-036'], [['Jobs', 'Incidents']]],
   'Transport specialist · Customer notes': ['lan', 'Customer notes', ['Customer notes']],
@@ -5070,11 +5084,13 @@ function submissionForm() {
   return e;
 }
 /* rows: [label, value, mono] */
-function quarantinePanel(tone, word, rows, extra) {
+/* o: { station, note, foot } for another job's quarantine; foot is the scheduled one's footer */
+function quarantinePanel(tone, word, rows, extra, o) {
+  o = o || {};
   var p = panel('Pre-export quarantine', { gap: 14 });
   var h = H({ name: 'Head', gap: 16, main: 'SPACE_BETWEEN', cross: 'CENTER' });
   var t = VV({ name: 'Text', gap: 2 });
-  addAll(t, [Tx('Pre-export quarantine', 'Heading/H4'), Tx('Củ Chi pre-export quarantine station · inspected by the station veterinarian', 'Body/S', 'text/tertiary')]);
+  addAll(t, [Tx('Pre-export quarantine', 'Heading/H4'), Tx((o.station || 'Củ Chi pre-export quarantine station') + ' · inspected by the station veterinarian', 'Body/S', 'text/tertiary')]);
   addAll(h, [t, chip(tone, word)]);
   add(p, fillW(h));
   var grid = H({ name: 'Facts', gap: 40 });
@@ -5085,7 +5101,8 @@ function quarantinePanel(tone, word, rows, extra) {
   });
   add(p, fillW(grid));
   (extra || []).forEach(function (n) { add(p, fillW(n)); });
-  add(p, Tx('Cambodia requires at least 7 days. A shorter period can’t be saved.', 'Body/S', 'text/tertiary', { fill: true }));
+  add(p, Tx(o.note || 'Cambodia requires at least 7 days. A shorter period can’t be saved.', 'Body/S', 'text/tertiary', { fill: true }));
+  if (o.foot) add(p, fillW(o.foot));
   return p;
 }
 
@@ -5134,7 +5151,26 @@ function scrAuthoritiesOverdue() {
   return jobScreen('Transport specialist · Authorities · Overdue', 'Authorities', STAFF.lan, [gdahp, dah, customs, q, hist],
     { today: 'Mon 12 Oct 2026', stage: 'Clearance', gate: '3 things must clear first: the Cambodia import permit (overdue), 4 export health certificates (with the Dept. of Animal Health, expected ' + CLEARANCE_041 + ') and quarantine (ends 17 Oct).' });
 }
-async function eAuthorities() { return insertChainCall([scrAuthorities, scrAuthoritiesOverdue], 'Transport specialist · Clearance checklist'); }
+/* ---------- Fri 13 Nov: a scheduled quarantine, day 2 of 14 (US-F3-22) ----------
+   Before its last day the sign-off is a locked Secondary and the footer says from when; "Change dates" opens
+   "Change Quarantine Period", prefilled. The coordinator plans the trips either side of it on the Trip tab. */
+function scrAuthoritiesQuarantine() {
+  var afcd = dossierCard({ name: 'Hong Kong AFCD', what: 'Agriculture, Fisheries and Conservation Department · import permit', tone: 'Ok', word: 'Approved', due: 'Done', date: '6 Nov', dueTone: 'status/ok/fg',
+    facts: [['Reference', 'AFCD-IP-2026-0712', true], ['Filed', '28 Oct 2026', true], ['Contains', 'Import application · 4 equine passports', false, true]] });
+  var foot = H({ name: 'Footer', gap: 16, pad: [14, 0, 0, 0], main: 'SPACE_BETWEEN', cross: 'CENTER' });
+  borderSide(foot, 'border/default', 'top');
+  var acts = H({ name: 'Actions', gap: 8, cross: 'CENTER' });
+  addAll(acts, [btn('Secondary', 'SM', 'Change dates'), btn('Secondary', 'SM', 'Confirm veterinary inspection', { state: 'Disabled', lead: 'lock' })]);
+  addAll(foot, [Tx('The station veterinarian signs off from ' + Q051.last + ', the quarantine’s last day.', 'Body/S', 'text/tertiary', { fill: true }), acts]);
+  var q = quarantinePanel('Info', 'In progress', [['Booked', '11–25 Nov 2026', true], ['Length', Q051.min + ' days', true], ['Hong Kong’s minimum', Q051.min + ' days', true], ['Inspection', 'Due ' + Q051.last + ' from the station vet']], null,
+    { station: Q051.station, note: 'Hong Kong requires at least ' + Q051.min + ' days. A shorter period can’t be saved.', foot: foot });
+  var hist = historyPanel([
+    ['11 Nov · 08:05', 'Quarantine started at ' + Q051.station + ' with 4 horses.', 'Lan, transport specialist'],
+    ['2 Nov · 10:20', 'Quarantine scheduled at ' + Q051.station + ', ' + Q051.days + ' (14 days; Hong Kong requires 14).', 'Lan, transport specialist']], 'Show all 6 events');
+  return jobScreen('Transport specialist · Authorities · Quarantine scheduled', 'Authorities', STAFF.lan, [afcd, q, hist],
+    { job: Q_JOB, today: 'Fri 13 Nov 2026', stage: 'Clearance', gate: '1 thing must clear first: the pre-export quarantine at ' + Q051.station + ' (ends ' + Q051.last + ').' });
+}
+async function eAuthorities() { return insertChainCall([scrAuthorities, scrAuthoritiesOverdue, scrAuthoritiesQuarantine], 'Transport specialist · Clearance checklist'); }
 /* =====================================================================
    Trip: the escort's cab surface (Flow 4, on the road). Not the office
    job page with bigger buttons: a tablet in a sunlit cab, used with
@@ -5531,6 +5567,77 @@ function scrTripCoordinator() {
   });
 }
 async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
+
+/* =====================================================================
+   A journey through a quarantine (US-F3-22, Trip tab). Trip 1 ends with a
+   Transfer at the isolation barn, trip 2 collects the horses there after
+   the quarantine and takes them to the cargo terminal, then the flight and
+   the road to Sha Tin. The quarantine speaks only through the journey's
+   Warn callouts above the trip; confirming the route refuses the clash.
+   ===================================================================== */
+var Q_JOURNEY = [
+  { mode: 'Road', icon: 'truck', route: 'Ho Chi Minh City → Ho Chi Minh City', code: 'TRP-2026-021 · 11 Nov, 07:00', leaves: 'Leaves 11 Nov, 07:00', tone: 'Warn', step: 'Crew' },
+  { mode: 'Road', icon: 'truck', route: 'Ho Chi Minh City → Ho Chi Minh City', code: 'TRP-2026-022 · 24 Nov, 08:00', leaves: 'Leaves 24 Nov, 08:00', tone: 'Warn', step: 'Route' },
+  { mode: 'Flight', icon: 'plane', route: 'Ho Chi Minh City → Hong Kong', code: 'TRP-2026-023 · 25 Nov, 14:00', leaves: 'Leaves 25 Nov, 14:00', tone: 'Bad', step: 'Locked' },
+  { mode: 'Road', icon: 'truck', route: 'Hong Kong → Sha Tin', code: 'TRP-2026-024 · Not planned', leaves: 'Not planned', tone: 'Warn', step: 'Route' }];
+/* the stays the trips plan: in at 08:00 on 11 Nov, out at 08:00 on 24 Nov, a day short of Hong Kong's 14 */
+var Q_WARNINGS = [
+  'Quarantine at ' + Q051.station + ', ' + Q051.days + ': the trips plan 13 days there; ' + Q051.catalog + ' asks for at least ' + Q051.min + '.',
+  'TRP-2026-022 collects the horses at ' + Q051.station + ' at 08:00 on 24 Nov, before their quarantine there ends on ' + Q051.last + '.'];
+function stopAt(kind, place, time, details, word) {
+  var st = inst(C.stop, { Kind: kind });
+  setP(st, { Stop: place, Time: time, Details: details });
+  /* the timeline has no Transfer marker: a hand-on reads as the delivery kind, named for what it is */
+  if (word) st.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Kind'; }).characters = word;
+  st.name = 'Stop · ' + place;
+  return fillW(st);
+}
+function scrTripQuarantine() {
+  var part = { route: 'Ho Chi Minh City → Ho Chi Minh City', code: 'TRP-2026-022', corridor: 'RD HCM local · hands on to the next trip' };
+  var strip = routeSummary([['Origin', Q051.station], ['Destination', 'TCS cargo terminal, Tân Sơn Nhất (SGN)'], ['Distance', '40 km'], ['Duration', '1.5 h'], ['Border crossing', 'None'], ['Welfare stops', '0'], ['Arrival window', 'Hands on to the next trip']], ['Ok', 'Clear to depart']);
+  var draft = callout('Warn', 'Draft v1 isn’t confirmed yet', 'Confirm it to set the trip’s dates; the load plan and sign-off follow. Reason: ' + Q_JOB.code + ' travels on trip TRP-2026-022');
+  var tl = VV({ name: 'Timeline', gap: 0 });
+  var leg = H({ name: 'Leg · 1', pad: [10, 0, 10, 33] });
+  leg.strokes = [P('border/default')]; leg.strokeAlign = 'INSIDE';
+  leg.strokeTopWeight = 0; leg.strokeBottomWeight = 0; leg.strokeRightWeight = 0; leg.strokeLeftWeight = 2;
+  add(leg, Tx('Road · 40 km · 1 h 30 min', 'Mono/Caption', 'text/tertiary'));
+  var legRow = H({ name: 'Leg row', pad: [0, 0, 0, 17] });
+  add(legRow, leg);
+  addAll(tl, [stopAt('Pickup', Q051.station, '24 Nov, 08:00', 'Loading and condition check, logged with photos.'), fillW(legRow),
+    stopAt('Delivery', 'TCS cargo terminal, Tân Sơn Nhất (SGN)', '09:30', 'Handed on to the next trip, the flight to Hong Kong.', 'Transfer')]);
+  var sum = journeySummary([['Trips', '4', 'text/primary'], ['Leaves', '11 Nov, 07:00', 'text/primary'], ['Arrives', 'Not planned', 'text/primary'], ['Wait on you', '3 trips', 'status/warn/fg'], ['Locked', '1 trip', 'status/bad/fg'], ['Tightest connection', '4 h 30 min in Ho Chi Minh City', 'text/primary']]);
+  return jobScreen('Fleet & route coordinator · Trip · Quarantine', 'Trip', STAFF.khoi, [sum, tripBody(Q_JOURNEY, 1, null, tripHead(part, 'Route'), [strip, draft, tl], Q_WARNINGS)],
+    { job: Q_JOB, today: 'Mon 9 Nov 2026', stage: 'Clearance', noGate: true });
+}
+/* Add trip on a job with no trip yet: the corridor ends in a city where the job has a quarantine, so "Ends at" offers
+   the station; choosing it says both dates. The modal sits over the Trip tab's empty state. */
+function scrTripAddTrip() {
+  var empty = VV({ name: 'No trips yet', gap: 16, pad: 48, radius: 12, fill: 'surface/card', stroke: 'border/default', cross: 'CENTER' });
+  var ic = H({ name: 'Icon', w: 56, h: 56, radius: 999, fill: 'surface/muted', main: 'CENTER', cross: 'CENTER' });
+  add(ic, Ic('route', 24, 'text/secondary'));
+  var acts = H({ name: 'Actions', gap: 8 });
+  addAll(acts, [btn('Primary', 'MD', 'Draft the journey from the quote', { lead: 'route' }), btn('Secondary', 'MD', 'Add the first trip by hand', { lead: 'plus' })]);
+  addAll(empty, [ic, Tx('No trips yet', 'Heading/H3'), Tx('Draft ' + Q_JOB.code + '’s journey from its quoted route, from Ho Chi Minh City to Sha Tin, then review each trip and confirm its route. Or build it one trip at a time.', 'Body/M', 'text/secondary', { w: 448, align: 'CENTER' }), acts]);
+  var s = jobScreen('Fleet & route coordinator · Trip · Add trip', 'Trip', STAFF.khoi, [empty],
+    { job: Q_JOB, today: 'Mon 2 Nov 2026', stage: 'Clearance', gate: 'No trip planned yet. The fleet coordinator adds the journey’s first trip.' });
+  var m = panel('Add trip modal', { gap: 16, w: 560 });
+  effect(m, 'Elevation/2 Overlay');
+  addAll(m, [Tx('Add a trip from Ho Chi Minh City', 'Heading/H4'),
+    Tx('The first trip collects the horses at Đại Nam Racecourse. A trip that ends short of Sha Tin hands them on there for the next one.', 'Body/M', 'text/secondary', { fill: true }),
+    input('Select', 'Default', 'Corridor', 'Road · Ho Chi Minh City → Ho Chi Minh City · RD HCM local', 'Driven or flown from the city the journey has reached.', { fill: true }),
+    input('Select', 'Focus', 'Ends at', Q051.station + ' · quarantine ' + Q051.days, Q_JOB.code + ' has a quarantine scheduled in Ho Chi Minh City. End the trip at the station to take the horses there.', { fill: true }),
+    callout('Info', 'The horses wait at ' + Q051.station + ', ' + Q051.days, 'Plan this trip to arrive by ' + Q051.first + '. The next trip collects them there from ' + Q051.last + ', when the quarantine ends.')]);
+  var foot = H({ name: 'Actions', gap: 8, main: 'MAX' });
+  addAll(foot, [btn('Secondary', 'MD', 'Cancel'), btn('Primary', 'MD', 'Add trip')]);
+  add(m, fillW(foot));
+  /* the scrim and the dialog sit over the page, outside its layout */
+  var scrim = rect(SCREEN_W, 900, 'overlay/scrim', 'Scrim', 0);
+  s.appendChild(scrim); s.appendChild(m);
+  [scrim, m].forEach(function (n) { n.layoutPositioning = 'ABSOLUTE'; });
+  scrim.x = 0; scrim.y = 0; scrim.resize(s.width, s.height); scrim.constraints = { horizontal: 'STRETCH', vertical: 'STRETCH' };
+  m.x = Math.round((SCREEN_W - 560) / 2); m.y = 160;
+  return s;
+}
 async function eTripB() { return insertChainCall([scrTripDelivery, scrTripHeld, scrTripHandedOn], 'Escort · Welfare stop'); }
 /* =====================================================================
    Handover and closing. The escort records delivery once: condition on
@@ -7139,7 +7246,7 @@ async function main() {
 
   await figma.setCurrentPageAsync(screens);
   var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest2Window(), scrRequest2NotRun(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
-  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrRoute(), scrFlightTrip(), scrJourney(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld(), scrTripHandedOn()];
+  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrAuthoritiesQuarantine(), scrRoute(), scrFlightTrip(), scrJourney(), scrTripQuarantine(), scrTripAddTrip(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld(), scrTripHandedOn()];
   row1.concat(row2).forEach(primaryTheme);
   await flush();
   var lbl1 = Tx('Owner portal', 'Display/M');

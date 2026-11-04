@@ -281,13 +281,25 @@ public class StaffJobController {
     }
 
     /**
-     * US-F3-21: Add a trip on a catalog corridor to the end of the job's journey; approval makes none.
+     * US-F3-21: Add a trip on a catalog corridor to the end of the job's journey; approval makes none. US-F3-22: a road
+     * trip can end at a quarantine station where the job has a quarantine scheduled.
      */
     @PostMapping("/{jobId}/journey/trips")
     @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
     public List<TripPartResponse> addTrip(
             @PathVariable UUID jobId, @Valid @RequestBody AddTripRequest request, @AuthenticationPrincipal User user) {
-        return journeyService.addTrip(jobId, request.corridorId(), user);
+        return journeyService.addTrip(jobId, request.corridorId(), request.quarantinePlaceId(), user);
+    }
+
+    /**
+     * US-F3-22: Route the journey by way of a quarantine station no trip takes the horses to yet: the road trip ending
+     * in its city hands them on there, and a new local run takes them on.
+     */
+    @PostMapping("/{jobId}/journey/quarantines/{placeId}")
+    @PreAuthorize("hasAnyRole('FLEET_COORDINATOR', 'LOGISTICS_MANAGER')")
+    public List<TripPartResponse> routeViaQuarantine(
+            @PathVariable UUID jobId, @PathVariable UUID placeId, @AuthenticationPrincipal User user) {
+        return journeyService.routeViaQuarantine(jobId, placeId, user);
     }
 
     /**

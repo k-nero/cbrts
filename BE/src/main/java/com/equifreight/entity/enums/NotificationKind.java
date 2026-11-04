@@ -23,6 +23,14 @@ public enum NotificationKind {
     DOSSIER_REFUSED(NotificationTone.BAD),
     DOSSIER_LATE(NotificationTone.WARN),
     DOCUMENTS_DUE(NotificationTone.WARN),
+    /** A quarantine was scheduled for the job: its coordinator plans around it, its club hears where the horses wait. */
+    QUARANTINE_SCHEDULED(NotificationTone.INFO),
+    /** A scheduled quarantine's station or dates changed (US-F3-22). */
+    QUARANTINE_CHANGED(NotificationTone.WARN),
+    /** A quarantine was signed off; the trip that collects the horses can go ahead (US-F3-22). */
+    QUARANTINE_COMPLETED(NotificationTone.OK),
+    /** A quarantine scheduled or changed clashes with the job's planned trips; the approving manager hears (US-F3-22). */
+    QUARANTINE_CONFLICT(NotificationTone.WARN),
     TRIP_RELEASED(NotificationTone.INFO),
     TRIP_HELD(NotificationTone.BAD),
     TRIP_SHARED(NotificationTone.INFO),

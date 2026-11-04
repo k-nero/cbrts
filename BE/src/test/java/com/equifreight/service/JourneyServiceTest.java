@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,6 +13,9 @@ import static org.mockito.Mockito.when;
 
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.QuarantinePeriod;
+import com.equifreight.entity.RegulationCatalog;
+import com.equifreight.entity.RegulationVersion;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.RouteStop;
 import com.equifreight.entity.TransportJob;
@@ -20,6 +24,7 @@ import com.equifreight.entity.Trip;
 import com.equifreight.entity.TripJob;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.PlaceKind;
+import com.equifreight.entity.enums.QuarantineKind;
 import com.equifreight.entity.enums.RoutePlanStatus;
 import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TransportMode;
@@ -34,6 +39,7 @@ import com.equifreight.repository.TripRepository;
 import com.equifreight.repository.VehicleBookingRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +59,8 @@ class JourneyServiceTest {
     private final JobTripService jobTrips = mock(JobTripService.class);
     private final RoutePlanService routePlans = mock(RoutePlanService.class);
     private final AuditService audit = mock(AuditService.class);
+    private final QuarantineRules quarantines = mock(QuarantineRules.class);
+    private final ClearanceService clearance = mock(ClearanceService.class);
     private JourneyService service;
 
     private final Corridor dadHcm = corridor("RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City");
@@ -63,6 +71,9 @@ class JourneyServiceTest {
     private final Place shaTin = place("Sha Tin stables", PlaceKind.STABLE, "Sha Tin");
     private final Place sgn = place("Tân Sơn Nhất cargo terminal (SGN)", PlaceKind.CARGO_TERMINAL, "Ho Chi Minh City");
     private final Place hkg = place("HKG cargo terminal", PlaceKind.CARGO_TERMINAL, "Hong Kong");
+    private final Place phuTho = place("Phú Thọ isolation barn", PlaceKind.QUARANTINE, "Ho Chi Minh City");
+    private final Corridor hcmLocal =
+            corridor("RD HCM local", TransportMode.ROAD, "Ho Chi Minh City", "Ho Chi Minh City");
     private final User khoi = new User();
     private TransportJob job;
 
@@ -81,6 +92,8 @@ class JourneyServiceTest {
                 mock(VehicleBookingRepository.class),
                 mock(CrewAssignmentRepository.class),
                 mock(PlanningDefaults.class),
+                quarantines,
+                clearance,
                 audit,
                 Clock.fixed(Instant.parse("2026-10-27T03:00:00Z"), ZoneOffset.UTC));
         TransportRequest request = new TransportRequest();
@@ -98,7 +111,7 @@ class JourneyServiceTest {
         when(jobTrips.journeyEndCity(job)).thenReturn("Da Nang");
         when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(sgn));
         when(places.findByCityIgnoreCase("Hong Kong")).thenReturn(List.of(hkg));
-        for (Corridor c : List.of(dadHcm, sgnHkg, hkgShaTin, pnhHkg)) {
+        for (Corridor c : List.of(dadHcm, sgnHkg, hkgShaTin, pnhHkg, hcmLocal)) {
             when(corridors.findById(c.getId())).thenReturn(Optional.of(c));
         }
         when(jobTrips.startJourney(eq(job), any(), anyBoolean(), any(), any()))
@@ -125,7 +138,8 @@ class JourneyServiceTest {
         Corridor hcmDad = corridor("RD DAD → HCM", TransportMode.ROAD, "Da Nang", "Ho Chi Minh City");
         when(corridors.findById(hcmDad.getId())).thenReturn(Optional.of(hcmDad));
         job.getRequest().getOriginPlace().setCity("Ho Chi Minh City");
-        when(places.findByCityIgnoreCase("Da Nang")).thenReturn(List.of(hoaXuan));
+        when(places.findByCityIgnoreCase("Da Nang"))
+                .thenReturn(List.of(place("Đà Nẵng cargo terminal", PlaceKind.CARGO_TERMINAL, "Da Nang")));
 
         service.addTrip(job.getId(), hcmDad.getId(), khoi);
 
@@ -199,6 +213,238 @@ class JourneyServiceTest {
     }
 
     @Test
+    @DisplayName("A road trip that hands on offers the quarantine stations in the city it ends in (US-F3-22)")
+    void aRoadTripOffersTheQuarantineStation() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        when(corridors.findTouchingCity("Da Nang")).thenReturn(List.of(dadHcm));
+
+        List<JourneyCorridorResponse> next = service.nextCorridors(job.getId());
+
+        assertThat(next.getFirst().quarantineStations()).singleElement().satisfies(s -> {
+            assertThat(s.placeName()).isEqualTo("Phú Thọ isolation barn");
+            assertThat(s.startsOn()).isEqualTo(LocalDate.parse("2026-11-20"));
+            assertThat(s.endsOn()).isEqualTo(LocalDate.parse("2026-11-27"));
+        });
+    }
+
+    @Test
+    @DisplayName("A flight offers no quarantine station to end at")
+    void aFlightOffersNoStation() {
+        quarantine(place("HKG quarantine", PlaceKind.QUARANTINE, "Hong Kong"), "2026-11-20", "2026-11-27");
+        when(jobTrips.journeyEndCity(job)).thenReturn("Ho Chi Minh City");
+        when(corridors.findTouchingCity("Ho Chi Minh City")).thenReturn(List.of(sgnHkg));
+
+        assertThat(service.nextCorridors(job.getId()).getFirst().quarantineStations())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("A trip added to the quarantine station ends there with a transfer (US-F3-22)")
+    void aTripEndsAtTheQuarantineStation() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+
+        service.addTrip(job.getId(), dadHcm.getId(), phuTho.getId(), khoi);
+
+        verify(routePlans)
+                .startRoute(any(), eq(job), eq(hoaXuan), eq(RouteStopKind.TRANSFER), eq(phuTho), eq(khoi), any());
+    }
+
+    @Test
+    @DisplayName("The trip after the station collects the horses there and takes them to the cargo terminal")
+    void theTripAfterTheStationCollectsThere() {
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, phuTho);
+        when(jobTrips.journeyEndCity(job)).thenReturn("Ho Chi Minh City");
+        when(places.findByCityIgnoreCase("Ho Chi Minh City")).thenReturn(List.of(phuTho, sgn));
+
+        service.addTrip(job.getId(), hcmLocal.getId(), khoi);
+
+        verify(routePlans).startRoute(any(), eq(job), eq(phuTho), eq(RouteStopKind.TRANSFER), eq(sgn), eq(khoi), any());
+    }
+
+    @Test
+    @DisplayName("Ending a trip at a station where the job has no quarantine is refused")
+    void aStationWithoutQuarantineIsRefused() {
+        when(quarantines.heldFor(job)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.addTrip(job.getId(), dadHcm.getId(), phuTho.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("CBRT-2026-042 has no quarantine scheduled at that station in Ho Chi Minh City."
+                        + " Schedule it on the Authorities tab first.");
+        verify(jobTrips, never()).startJourney(any(), any(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A trip that delivers can't end at a quarantine station")
+    void aDeliveringTripCantEndAtAStation() {
+        Place hkgQuarantine = place("HKG quarantine", PlaceKind.QUARANTINE, "Sha Tin");
+        quarantine(hkgQuarantine, "2026-11-20", "2026-11-27");
+        journey(trip("TRP-2026-003", sgnHkg, false));
+        when(jobTrips.journeyEndCity(job)).thenReturn("Hong Kong");
+
+        assertThatThrownBy(() -> service.addTrip(job.getId(), hkgShaTin.getId(), hkgQuarantine.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("only a trip that hands them on can end at a quarantine station");
+    }
+
+    @Test
+    @DisplayName("The journey warns while no trip takes the horses to a scheduled quarantine (US-F3-22)")
+    void theJourneyWarnsOfAnUnreachedQuarantine() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, sgn);
+
+        assertThat(service.warnings(job))
+                .contains("Quarantine at Phú Thọ isolation barn, 20–27 Nov: no trip takes the horses there yet.");
+
+        handsOnAt(road, phuTho);
+        assertThat(service.warnings(job)).noneMatch(w -> w.startsWith("Quarantine at"));
+    }
+
+    @Test
+    @DisplayName("A quarantine scheduled after the journey is planned is reached by splitting the trip into its city")
+    void aLateQuarantineSplitsTheTripIntoItsCity() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, sgn);
+        when(corridors.findLocalRun("Ho Chi Minh City")).thenReturn(Optional.of(hcmLocal));
+
+        assertThat(service.quarantineDetours(job)).singleElement().satisfies(d -> {
+            assertThat(d.placeId()).isEqualTo(phuTho.getId());
+            assertThat(d.tripCode()).isEqualTo("TRP-2026-002");
+        });
+
+        service.routeViaQuarantine(job.getId(), phuTho.getId(), khoi);
+
+        verify(routePlans).reopen(eq(road), any());
+        verify(routePlans).handOnAt(road, job, phuTho);
+        verify(jobTrips).newTrip(eq(hcmLocal), eq(false), eq(khoi), any());
+        verify(jobTrips).planNext(eq(job), eq(road), argThat(t -> t.getCorridor() == hcmLocal));
+        verify(routePlans)
+                .startRoute(
+                        argThat(t -> t.getCorridor() == hcmLocal),
+                        eq(job),
+                        eq(phuTho),
+                        eq(RouteStopKind.TRANSFER),
+                        eq(sgn),
+                        eq(khoi),
+                        any());
+    }
+
+    @Test
+    @DisplayName("A delivering trip split at a station leaves the delivery to the new local run")
+    void aSplitDeliveryMovesToTheLocalRun() {
+        Place shaTinQuarantine = place("Sha Tin isolation barn", PlaceKind.QUARANTINE, "Sha Tin");
+        quarantine(shaTinQuarantine, "2026-11-20", "2026-11-27");
+        Trip road = trip("TRP-2026-004", hkgShaTin, false);
+        journey(road);
+        RouteStop delivery = new RouteStop();
+        delivery.setKind(RouteStopKind.DELIVERY);
+        delivery.setJob(job);
+        delivery.setPlace(shaTin);
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(delivery);
+        when(routes.findByTrip_IdAndStatus(road.getId(), RoutePlanStatus.DRAFT)).thenReturn(Optional.of(plan));
+        Corridor shaTinLocal = corridor("RD Sha Tin local", TransportMode.ROAD, "Sha Tin", "Sha Tin");
+        when(corridors.findLocalRun("Sha Tin")).thenReturn(Optional.of(shaTinLocal));
+
+        service.routeViaQuarantine(job.getId(), shaTinQuarantine.getId(), khoi);
+
+        verify(routePlans).handOnAt(road, job, shaTinQuarantine);
+        verify(routePlans)
+                .startRoute(
+                        any(), eq(job), eq(shaTinQuarantine), eq(RouteStopKind.DELIVERY), eq(shaTin), eq(khoi), any());
+    }
+
+    @Test
+    @DisplayName("A station only a flight reaches, or with no local run, offers no split")
+    void aStationNoRoadTripEndsNearIsntSplit() {
+        Place hkgQuarantine = place("HKG quarantine", PlaceKind.QUARANTINE, "Hong Kong");
+        quarantine(hkgQuarantine, "2026-11-20", "2026-11-27");
+        Trip flight = trip("TRP-2026-003", sgnHkg, false);
+        journey(flight);
+        handsOnAt(flight, hkg);
+        when(corridors.findLocalRun("Hong Kong")).thenReturn(Optional.of(hcmLocal));
+
+        assertThat(service.quarantineDetours(job)).isEmpty();
+        assertThatThrownBy(() -> service.routeViaQuarantine(job.getId(), hkgQuarantine.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageStartingWith("No road trip of CBRT-2026-042's journey ends in Hong Kong");
+
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip road = trip("TRP-2026-002", dadHcm, false);
+        journey(road);
+        handsOnAt(road, sgn);
+        assertThat(service.quarantineDetours(job)).isEmpty();
+        assertThatThrownBy(() -> service.routeViaQuarantine(job.getId(), phuTho.getId(), khoi))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageStartingWith("The route catalog has no local road run in Ho Chi Minh City");
+        verify(jobTrips, never()).newTrip(any(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    @DisplayName(
+            "The journey warns when a trip brings the horses after a quarantine starts or collects them before it ends")
+    void theJourneyWarnsOfTripsThatClashWithAQuarantine() {
+        QuarantinePeriod q = quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip in = trip("TRP-2026-002", dadHcm, false);
+        Trip out = trip("TRP-2026-003", hcmLocal, false);
+        journey(in, out);
+        // 08:00 on 21 Nov and 08:00 on 26 Nov in Ho Chi Minh City.
+        plans(in, stop(RouteStopKind.TRANSFER, phuTho, "2026-11-21T01:00:00Z"));
+        plans(out, stop(RouteStopKind.PICKUP, phuTho, "2026-11-26T01:00:00Z"));
+
+        List<String> clashes = List.of(
+                "TRP-2026-002 brings the horses to Phú Thọ isolation barn at 08:00 on 21 Nov, after their quarantine"
+                        + " there starts on 20 Nov.",
+                "TRP-2026-003 collects the horses at Phú Thọ isolation barn at 08:00 on 26 Nov, before their"
+                        + " quarantine there ends on 27 Nov.");
+        assertThat(service.warnings(job)).containsAll(clashes);
+        assertThat(service.clashes(job, q)).containsExactlyElementsOf(clashes);
+    }
+
+    @Test
+    @DisplayName("Trips that bring the horses by the first day and collect them from the last don't clash")
+    void tripsAroundTheQuarantineDontClash() {
+        QuarantinePeriod q = quarantine(phuTho, "2026-11-20", "2026-11-27");
+        Trip in = trip("TRP-2026-002", dadHcm, false);
+        Trip out = trip("TRP-2026-003", hcmLocal, false);
+        journey(in, out);
+        plans(in, stop(RouteStopKind.TRANSFER, phuTho, "2026-11-20T01:00:00Z"));
+        plans(out, stop(RouteStopKind.PICKUP, phuTho, "2026-11-26T17:00:00Z")); // 00:00 on 27 Nov
+
+        assertThat(service.clashes(job, q)).isEmpty();
+        assertThat(service.warnings(job)).noneMatch(w -> w.contains("Phú Thọ"));
+    }
+
+    @Test
+    @DisplayName("The journey warns when the trips plan a shorter stay at the station than the catalog minimum")
+    void theJourneyWarnsOfAShortStay() {
+        quarantine(phuTho, "2026-11-20", "2026-11-27");
+        RegulationCatalog catalog = new RegulationCatalog();
+        catalog.setName("Hong Kong import");
+        RegulationVersion destination = new RegulationVersion();
+        destination.setCatalog(catalog);
+        when(clearance.destinationVersion(job.getId())).thenReturn(Optional.of(destination));
+        when(quarantines.minimumDays(QuarantineKind.PRE_EXPORT, destination)).thenReturn(14);
+        Trip in = trip("TRP-2026-002", dadHcm, false);
+        Trip out = trip("TRP-2026-003", hcmLocal, false);
+        journey(in, out);
+        plans(in, stop(RouteStopKind.TRANSFER, phuTho, "2026-11-20T01:00:00Z"));
+        plans(out, stop(RouteStopKind.PICKUP, phuTho, "2026-11-27T01:00:00Z"));
+
+        assertThat(service.warnings(job))
+                .contains("Quarantine at Phú Thọ isolation barn, 20–27 Nov: the trips plan 7 days there; Hong Kong"
+                        + " import asks for at least 14.");
+
+        when(quarantines.minimumDays(QuarantineKind.PRE_EXPORT, destination)).thenReturn(7);
+        assertThat(service.warnings(job)).noneMatch(w -> w.contains("asks for at least"));
+    }
+
+    @Test
     @DisplayName("Only the last trip of the journey is taken off")
     void onlyTheLastTripIsTakenOff() {
         Trip road = trip("TRP-2026-002", dadHcm, false);
@@ -260,6 +506,41 @@ class JourneyServiceTest {
                         "Ends in Phnom Penh; the horses go to Sha Tin. Add a trip from Phnom Penh.",
                         "Quoted by way of RD DAD → HCM, AIR SGN → HKG, RD HKG → Sha Tin; this journey runs AIR PNH → HKG."
                                 + " The price was worked out on the quoted route.");
+    }
+
+    private QuarantinePeriod quarantine(Place station, String startsOn, String endsOn) {
+        QuarantinePeriod q = new QuarantinePeriod();
+        q.setJob(job);
+        q.setPlace(station);
+        q.setStartsOn(LocalDate.parse(startsOn));
+        q.setEndsOn(LocalDate.parse(endsOn));
+        when(quarantines.heldFor(job)).thenReturn(List.of(q));
+        return q;
+    }
+
+    private RouteStop stop(RouteStopKind kind, Place place, String plannedAt) {
+        RouteStop stop = new RouteStop();
+        stop.setKind(kind);
+        stop.setJob(job);
+        stop.setPlace(place);
+        stop.setPlannedAt(Instant.parse(plannedAt));
+        return stop;
+    }
+
+    private void plans(Trip trip, RouteStop... stops) {
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().addAll(List.of(stops));
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)).thenReturn(Optional.of(plan));
+    }
+
+    private void handsOnAt(Trip trip, Place place) {
+        RouteStop transfer = new RouteStop();
+        transfer.setKind(RouteStopKind.TRANSFER);
+        transfer.setJob(job);
+        transfer.setPlace(place);
+        RoutePlan plan = new RoutePlan();
+        plan.getStops().add(transfer);
+        when(routes.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)).thenReturn(Optional.of(plan));
     }
 
     private void journey(Trip... legs) {

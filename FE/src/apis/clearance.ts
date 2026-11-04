@@ -91,6 +91,9 @@ export const clearanceApi = {
   createQuarantine: (jobId: string, data: CreateQuarantinePeriodRequest) =>
     client.post<QuarantinePeriod>(`/staff/clearance/jobs/${jobId}/quarantines`, data),
 
+  updateQuarantine: (quarantineId: string, data: CreateQuarantinePeriodRequest) =>
+    client.put<QuarantinePeriod>(`/staff/clearance/quarantines/${quarantineId}`, data),
+
   completeQuarantine: (quarantineId: string) =>
     client.post<QuarantinePeriod>(`/staff/clearance/quarantines/${quarantineId}/complete`),
 

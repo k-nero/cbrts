@@ -1,6 +1,6 @@
 # One job, several trips: road, air, road
 
-Status: built (US-F3-16, #206), 25 Oct 2026; reworked by US-F3-21 (#269), 27 Oct 2026: the coordinator builds the journey one trip at a time (see [Coordinator-built journeys](#coordinator-built-journeys-us-f3-21)). See [As built](#as-built) for where the build differs from the plan below. Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
+Status: built (US-F3-16, #206), 25 Oct 2026; reworked by US-F3-21 (#269), 27 Oct 2026: the coordinator builds the journey one trip at a time (see [Coordinator-built journeys](#coordinator-built-journeys-us-f3-21)). US-F3-22 (#277) makes a scheduled quarantine part of the journey (see [A journey through a quarantine](#a-journey-through-a-quarantine-us-f3-22)). See [As built](#as-built) for where the build differs from the plan below. Builds on `docs/shared-trips-design.md`, which already lets a job span trips after an incident (US-F5-06, `trip_jobs`).
 
 ## Why
 
@@ -116,6 +116,45 @@ The coordinator can still build a journey by hand, but the empty Trip tab's main
 - **Planning settings** (`PLAN_*` rate policies, V36, versioned with the catalog): start hour 6, 60 km/h, a welfare stop every 4 h for 45 min, 90 min at a border, 4 h at the terminal before a flight, 3 h release after landing. A version that doesn't set one uses that default (`PlanningDefaults`).
 - **Nothing is confirmed.** The coordinator reviews each draft and confirms it, and the checks between trips run then. Changing an earlier trip doesn't move the later ones; confirming refuses a conflict.
 
+## A journey through a quarantine (US-F3-22)
+
+A quarantine the transport specialist schedules on the Authorities tab is part of the journey: one trip takes the horses to the station, they wait there, and the next trip collects them after it. An example, four horses from Đại Nam Racecourse (Ho Chi Minh City) to Sha Tin, with a 14-day pre-export quarantine at the racecourse's isolation barn, 11–25 Nov (Hong Kong asks for at least 14):
+
+| Trip | Corridor | From → to | Ends with |
+| --- | --- | --- | --- |
+| TRP-2026-021 | RD HCM local | Đại Nam Racecourse → Đại Nam Racecourse isolation barn | `TRANSFER` at the station, by 11 Nov |
+| TRP-2026-022 | RD HCM local | Đại Nam Racecourse isolation barn → TCS cargo terminal, Tân Sơn Nhất (SGN) | `TRANSFER` at the cargo terminal, from 25 Nov |
+| TRP-2026-023 | AIR SGN → HKG | Tân Sơn Nhất → Hong Kong | `TRANSFER` at Cathay Cargo Terminal (HKG) |
+| TRP-2026-024 | RD HKG → Sha Tin | Hong Kong → Sha Tin Racecourse stables | `DELIVERY` |
+
+- **Local corridors.** The catalog has a same-city road corridor for each city horses change carrier in ("RD HCM local", "RD PNH local", "RD HKG local"), with a flat per-shipment rate. Add trip offers it like any corridor touching the city, so a stable → station or station → airport move is a trip of its own, with a corridor, a price line and a vehicle check.
+- **Ending a trip at the station.** While the job has a quarantine scheduled in the city a road trip ends in, and the trip doesn't deliver, Add trip offers ending it at that quarantine station (`quarantinePlaceId` on `POST /staff/jobs/{id}/journey/trips`; the corridors list carries each corridor's `quarantineStations`). The trip ends with a `TRANSFER` at the station, and the next trip starts with a `PICKUP` there; from there it ends where horses change trips, as any trip short of the destination city does. Left empty, the trip ends where horses change trips. The server refuses a station on a trip that delivers (`QUARANTINE_NOT_ON_WAY`) or one where the job has no quarantine in that city (`NO_QUARANTINE_THERE`).
+- **A quarantine scheduled after the journey is planned.** Once the journey reaches the destination city no trip can be added after it, so a station no trip reaches is routed into the journey instead. Beside the "no trip takes the horses there yet" warning, the Trip tab offers "Route TRP-… via <station>" (`POST /staff/jobs/{id}/journey/quarantines/{placeId}`; the job detail's `quarantineDetours` lists the stations it can be offered for). The first road trip of the journey, not yet departed, that ends in the station's city gets a new draft route version that hands the horses on at the station (`TRANSFER`), and a new local run (`findLocalRun`) is inserted after it, from the station to where that trip used to leave the horses, with the same kind (`TRANSFER`, or `DELIVERY` when it delivered). The trips after it don't change. Both routes are drafts to plan and confirm. It is refused when no road trip ends in that city (a flight lands there, or the trip only passes through: `QUARANTINE_NOT_ON_WAY`), or the city has no local run (`NO_LOCAL_RUN`); then the trips after the quarantine are taken off and added again by way of the station.
+- **No `QUARANTINE` stop in the route editor.** The stop kind stays for routes saved with it, but the editor no longer offers it: a stay at a stop keeps the trailer and crew booked for the whole quarantine, and the quarantine's checks and warnings only see a `TRANSFER` into the station and a `PICKUP` out of it.
+- **The dates bind the trips either side.** Route confirmation (`QuarantineRules`) checks each trip of the job against every quarantine not yet completed at a station on its route, by calendar day in Indochina Time:
+  - A `TRANSFER` into the station after the quarantine's first day is refused, `QUARANTINE_ARRIVES_LATE`: "TRP-2026-021 brings the horses to Đại Nam Racecourse isolation barn at 09:00 on 12 Nov; their quarantine there starts on 11 Nov. Plan the transfer on or before then."
+  - A `PICKUP` at the station before the quarantine's last day is refused, `QUARANTINE_NOT_ENDED`: "TRP-2026-022 collects the horses at 08:00 on 24 Nov; their quarantine at Đại Nam Racecourse isolation barn ends on 25 Nov. Plan the pickup on or after then."
+- **The trailer and crew are free while the horses wait.** A trip that hands the horses on at a `TRANSFER`, and every local run, books its trailer for its own route's hours only (`VehicleAvailability.ownHoursOf`), not the job's span, so the fleet calendar shows the trailer free during the quarantine. Crew are already booked per trip (see As built).
+- **Warnings on the Trip tab** (`JourneyService.warnings`, Warn callouts above the trip; they don't block, since the refusals above do at confirmation):
+  - "Quarantine at Đại Nam Racecourse isolation barn, 11–25 Nov: no trip takes the horses there yet." while no trip of the journey hands the horses on at the station.
+  - "Quarantine at Đại Nam Racecourse isolation barn, 11–25 Nov: the trips plan 12 days there; Hong Kong import asks for at least 14." when the trip into the station and the trip out of it are both timed and the days between them are fewer than the minimum (`QuarantineRules.minimumDays`; the catalog is the pinned destination one).
+  - "TRP-2026-021 brings the horses to Đại Nam Racecourse isolation barn at 09:00 on 12 Nov, after their quarantine there starts on 11 Nov." and "TRP-2026-022 collects the horses at Đại Nam Racecourse isolation barn at 08:00 on 24 Nov, before their quarantine there ends on 25 Nov." for a planned time that clashes with the dates. These read each trip's draft route, else its confirmed one, so they show while the coordinator plans, before confirmation refuses.
+- **Completing a quarantine** is refused before its last day: "The quarantine at Đại Nam Racecourse isolation barn ends on 25 Nov; it can be completed from then." (`QUARANTINE_NOT_ENDED`).
+- **Notifications.** Scheduling, changing and completing a quarantine tell the job's coordinator and the club (`QUARANTINE_SCHEDULED`, `QUARANTINE_CHANGED`, `QUARANTINE_COMPLETED`), and the manager who approved the job hears when the change clashes with the planned trips (`QUARANTINE_CONFLICT`). See `docs/notification-centre.md`, §6.
+- **A quarantine has a kind.** `quarantine_periods.kind` is `PRE_EXPORT` (the default; the form doesn't ask yet) or `POST_ARRIVAL`. `QuarantineRules` is where the kind is read:
+  - `holdsDeparture`: the clearance gate holds departure only on pre-export quarantines.
+  - `minimumDays`: the shortest stay, read today from the pinned destination catalog's `quarantine_min_days` for either kind.
+  - A later story can resolve both per origin there, without touching the gate or the scheduling form. Nothing behaves differently today.
+
+### Decisions (US-F3-22)
+
+| Question | Decision |
+| --- | --- |
+| A quarantine for one horse | **It holds the whole shipment.** The horses travel together, so every quarantine of the job at a station binds every trip that brings the horses there or collects them. Splitting one horse's path is not built. |
+| When the last day counts | **From 00:00 Indochina Time on the end date.** A pickup at the station and the veterinarian's sign-off are both allowed from the start of the quarantine's last day, compared by calendar day in business time. |
+| The Hong Kong station | **Stays in Sha Tin.** Imported horses serve post-arrival quarantine at the Jockey Club's stables in Sha Tin, the destination city, so the trip that delivers there doesn't end at it, and no trip is added for it. |
+| Post-arrival quarantine on the way | **A follow-up story.** Ending a trip at a station after the border (in the destination country, short of the destination city) uses the same `TRANSFER` and `PICKUP`, but the kind isn't asked yet, and its rules per origin come with that story. |
+
 ## Not in scope
 
 - Automatic chains at approval (US-F3-21 removed even the hub route's chain).
@@ -124,6 +163,6 @@ The coordinator can still build a journey by hand, but the empty Trip tab's main
 
 ## Open questions
 
-1. Local moves such as "HKG airport → Sha Tin" need small road corridors in the catalog. Who adds them? The demo seed has the SGN, PNH and HKG airport cargo terminals and "RD HKG → Sha Tin", so the demo can split a journey HCM → PNH → HKG → Sha Tin.
+1. Local moves such as "HKG airport → Sha Tin" need small road corridors in the catalog. Who adds them? Settled by US-F3-22: the catalog carries a local corridor per city horses change carrier in ("RD HCM local", "RD PNH local", "RD HKG local"), and the seed adds them. The demo seed has the SGN, PNH and HKG airport cargo terminals and "RD HKG → Sha Tin", so the demo can split a journey HCM → PNH → HKG → Sha Tin.
 2. Long-haul chains (Hong Kong → New York: road, air, road to the USDA quarantine at Newburgh, road) fit the model once the country is in the catalog (PRODUCT.md, Region). The code works in one business time zone (`BusinessTime.ZONE`); planned times and deadlines across 12+ hours of offset need each place's own zone. Not checked yet.
 3. Does the departure airport's export inspection (the horses waiting at the airport before loading) belong to the road trip's `TRANSFER` stop stay or to the air trip's first stop?

@@ -423,6 +423,8 @@ export interface JobDetail extends BaseEntity {
   journeyComplete: boolean;
   /** Warn lines: the journey ends short of the destination, or leaves the quoted route. */
   journeyWarnings: string[];
+  /** Quarantine stations no trip takes the horses to yet that a trip can be routed by way of (US-F3-22). */
+  quarantineDetours: QuarantineDetour[];
   /** Which trips the clearance gate holds back, in words; null with no trip. */
   clearanceJourneyNote: string | null;
   /** When the manager signed off the plan of the trip shown, and who; null until then (US-F3-08). */
@@ -443,6 +445,32 @@ export interface JourneyCorridor {
   reachesDestination: boolean;
   /** On the route the customer was quoted. */
   quoted: boolean;
+  /**
+   * Quarantine stations in `toCity` where the job has a quarantine scheduled: the trip can end at
+   * one instead of the city's cargo terminal (US-F3-22). Empty when the trip delivers.
+   */
+  quarantineStations: QuarantineStation[];
+}
+
+/**
+ * A quarantine station no trip takes the horses to yet, and the road trip `tripCode` that can be routed by way of it:
+ * that trip hands the horses on at the station, and a new local run takes them on (US-F3-22).
+ */
+export interface QuarantineDetour {
+  placeId: string;
+  placeName: string;
+  startsOn: string;
+  endsOn: string;
+  tripId: string;
+  tripCode: string;
+}
+
+/** A station where the job's horses wait in quarantine, and the days they wait there (dates). */
+export interface QuarantineStation {
+  placeId: string;
+  placeName: string;
+  startsOn: string;
+  endsOn: string;
 }
 
 /** The airline's flight for a journey's flight trip (US-F3-21); its times become the airport stops'. */

@@ -395,7 +395,25 @@ export const useDraftJourney = (jobId: string) => {
 export const useAddTrip = (jobId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (corridorId: string) => jobApi.addTrip(jobId, corridorId),
+    mutationFn: ({
+      corridorId,
+      quarantinePlaceId,
+    }: {
+      corridorId: string;
+      quarantinePlaceId?: string;
+    }) => jobApi.addTrip(jobId, corridorId, quarantinePlaceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+};
+
+/** Routes the journey by way of a quarantine station no trip reaches yet (US-F3-22); every view of the job refetches. */
+export const useRouteViaQuarantine = (jobId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (placeId: string) => jobApi.routeViaQuarantine(jobId, placeId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', jobId] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });

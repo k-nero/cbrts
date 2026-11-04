@@ -2,6 +2,8 @@ import type { Tone } from '@/components/ui';
 import {
   type AuthorityKind,
   AuthorityKindEnum,
+  type QuarantineKind,
+  QuarantineKindEnum,
   type SubmissionKind,
   SubmissionKindEnum,
   type SubmissionStatus,
@@ -12,6 +14,11 @@ export const SUBMISSION_KIND_LABELS: Record<SubmissionKind, string> = {
   [SubmissionKindEnum.EXPORT_HEALTH_CERTS]: 'Export Health Certificates (DAH / RAHO)',
   [SubmissionKindEnum.CUSTOMS_DOSSIER]: 'Border Customs Export/Import Dossier',
   [SubmissionKindEnum.IMPORT_PERMIT]: 'Live Equine Import Permit (GDAHP)',
+};
+
+export const QUARANTINE_KIND_LABELS: Record<QuarantineKind, string> = {
+  [QuarantineKindEnum.PRE_EXPORT]: 'Before export',
+  [QuarantineKindEnum.POST_ARRIVAL]: 'After arrival',
 };
 
 export const AUTHORITY_KIND_LABELS: Record<AuthorityKind, string> = {

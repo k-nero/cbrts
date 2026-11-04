@@ -3,6 +3,7 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
+import com.equifreight.entity.QuarantinePeriod;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.Trip;
@@ -13,10 +14,14 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.Vehicle;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.JobStage;
+import com.equifreight.entity.enums.RoutePlanStatus;
+import com.equifreight.entity.enums.RouteStopKind;
 import com.equifreight.entity.enums.TripHorseStatus;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.repository.QuarantinePeriodRepository;
+import com.equifreight.repository.RoutePlanRepository;
 import com.equifreight.repository.TripHorseRepository;
 import com.equifreight.repository.TripJobRepository;
 import com.equifreight.repository.TripRepository;
@@ -53,18 +58,24 @@ public class JobTripService {
     private final TripHorseRepository tripHorses;
     private final TripJobRepository parts;
     private final CodeService codeService;
+    private final RoutePlanRepository routePlans;
+    private final QuarantinePeriodRepository quarantines;
 
     public JobTripService(
             TripRepository trips,
             TripVehicleRepository tripVehicles,
             TripHorseRepository tripHorses,
             TripJobRepository parts,
-            CodeService codeService) {
+            CodeService codeService,
+            RoutePlanRepository routePlans,
+            QuarantinePeriodRepository quarantines) {
         this.trips = trips;
         this.tripVehicles = tripVehicles;
         this.tripHorses = tripHorses;
         this.parts = parts;
         this.codeService = codeService;
+        this.routePlans = routePlans;
+        this.quarantines = quarantines;
     }
 
     /**
@@ -480,28 +491,60 @@ public class JobTripService {
     /**
      * Whether the job's part on {@code trip} comes before the border (US-F2-13): the trip stays in one country and a
      * later trip of its chain crosses a border. Such a trip departs before the dossier is cleared. A local run to the
-     * cargo terminal doesn't: the horses leave the stable for the flight only once cleared.
+     * cargo terminal doesn't: the horses leave the stable for the flight only once cleared. A local run into a
+     * quarantine station of the job does (US-F3-22): the dossier clears only once the quarantine is done, so the trip
+     * that brings the horses there can't wait for it.
      */
     @Transactional(readOnly = true)
     public boolean beforeBorder(Trip trip, TransportJob job) {
-        if (trip.getCorridor() == null
-                || trip.getCorridor().crossesBorder()
-                || trip.getCorridor().isLocal()) return false;
-        return beforeBorderTrips(parts.findByJob_IdOrderByCreatedAt(job.getId()))
-                .contains(trip.getId());
+        if (trip.getCorridor() == null || trip.getCorridor().crossesBorder()) return false;
+        List<TripJob> all = parts.findByJob_IdOrderByCreatedAt(job.getId());
+        Set<UUID> intoQuarantine = trip.getCorridor().isLocal() ? intoQuarantine(all, job) : Set.of();
+        if (trip.getCorridor().isLocal() && !intoQuarantine.contains(trip.getId())) return false;
+        return beforeBorderTrips(all, intoQuarantine).contains(trip.getId());
+    }
+
+    /**
+     * The local trips among a job's parts whose route hands the job's horses on at a station where the job has a
+     * quarantine, completed or not. Empty without a quarantine, so most jobs read no route.
+     */
+    private Set<UUID> intoQuarantine(List<TripJob> all, TransportJob job) {
+        Set<UUID> stations = quarantines.findByJobId(job.getId()).stream()
+                .map(QuarantinePeriod::getPlace)
+                .filter(Objects::nonNull)
+                .map(Place::getId)
+                .collect(Collectors.toSet());
+        if (stations.isEmpty()) return Set.of();
+        Set<UUID> into = new HashSet<>();
+        for (TripJob part : all) {
+            if (!local(part)) continue;
+            Trip trip = part.getTrip();
+            routePlans
+                    .findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.DRAFT)
+                    .or(() -> routePlans.findByTrip_IdAndStatus(trip.getId(), RoutePlanStatus.CONFIRMED))
+                    .filter(plan -> plan.getStops().stream()
+                            .anyMatch(st -> st.getKind() == RouteStopKind.TRANSFER
+                                    && st.getJob() != null
+                                    && st.getJob().getId().equals(job.getId())
+                                    && st.getPlace() != null
+                                    && stations.contains(st.getPlace().getId())))
+                    .ifPresent(plan -> into.add(trip.getId()));
+        }
+        return into;
     }
 
     /**
      * The trips among a job's parts that stay in one country and hand on, somewhere down the chain, to one that doesn't,
-     * other than a local run to the cargo terminal.
+     * other than a local run to the cargo terminal; a local run in {@code intoQuarantine} counts.
      */
-    private static Set<UUID> beforeBorderTrips(List<TripJob> all) {
+    private static Set<UUID> beforeBorderTrips(List<TripJob> all, Set<UUID> intoQuarantine) {
         if (all.stream().noneMatch(JobTripService::crosses)) return Set.of();
         Map<UUID, TripJob> byId =
                 all.stream().filter(p -> p.getId() != null).collect(Collectors.toMap(TripJob::getId, p -> p));
         Set<UUID> trips = new HashSet<>();
         for (TripJob part : all) {
-            if (crosses(part) || local(part)) continue;
+            if (crosses(part)
+                    || (local(part) && !intoQuarantine.contains(part.getTrip().getId()))) continue;
             int hops = 0;
             for (TripJob p = nextOf(part, byId); p != null && hops++ < all.size(); p = nextOf(p, byId)) {
                 if (crosses(p)) {
@@ -828,8 +871,9 @@ public class JobTripService {
                 .filter(th -> th.getStatus() != TripHorseStatus.MOVED && th.getStatus() != TripHorseStatus.HANDED_ON)
                 .toList();
         List<TripJob> all = parts.findByJob_IdOrderByCreatedAt(job.getId());
-        // A domestic leg before the border doesn't depart the job (US-F2-13).
-        Set<UUID> domesticLegs = beforeBorderTrips(all);
+        // A domestic leg before the border doesn't depart the job (US-F2-13), nor does the run into a quarantine
+        // station.
+        Set<UUID> domesticLegs = beforeBorderTrips(all, intoQuarantine(all, job));
         all.stream()
                 .filter(p -> !domesticLegs.contains(p.getTrip().getId()))
                 .map(TripJob::getDepartedAt)

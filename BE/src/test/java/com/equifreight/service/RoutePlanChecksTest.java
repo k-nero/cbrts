@@ -13,6 +13,7 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.model.job.CreateRoutePlanRequest;
 import com.equifreight.repository.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,7 @@ class RoutePlanChecksTest {
     private final RoutePlanRepository plans = mock(RoutePlanRepository.class);
     private final TransportJobRepository jobs = mock(TransportJobRepository.class);
     private final JobTripService jobTrips = mock(JobTripService.class);
+    private final QuarantinePeriodRepository quarantines = mock(QuarantinePeriodRepository.class);
     private final RouteStopRepository stopRows = mock(RouteStopRepository.class);
     private final RouteLegRepository legRows = mock(RouteLegRepository.class);
     private RoutePlanService service;
@@ -58,7 +60,8 @@ class RoutePlanChecksTest {
                 jobTrips,
                 mock(AuditService.class),
                 mock(TripNotices.class),
-                PlanningStub.planningDefaults());
+                PlanningStub.planningDefaults(),
+                new QuarantineRules(quarantines));
     }
 
     private static RouteStop stop(RouteStopKind kind, String at, Integer stayMin) {
@@ -178,6 +181,87 @@ class RoutePlanChecksTest {
         assertThat(refused.getMessage())
                 .isEqualTo("CBRT-2026-041's delivery is planned at 2 Dec 15:00, after its arrival window closes at"
                         + " 2 Dec 14:00. Plan the delivery earlier, or agree a later window with the customer.");
+    }
+
+    private Place stationWithQuarantine(String startsOn, String endsOn) {
+        Place station = new Place();
+        station.setId(UUID.randomUUID());
+        station.setName("Đại Nam isolation barn");
+        QuarantinePeriod quarantine = new QuarantinePeriod();
+        quarantine.setJob(job);
+        quarantine.setPlace(station);
+        quarantine.setStartsOn(LocalDate.parse(startsOn));
+        quarantine.setEndsOn(LocalDate.parse(endsOn));
+        when(quarantines.findByJobIdAndPlaceIdAndCompletedAtIsNull(job.getId(), station.getId()))
+                .thenReturn(List.of(quarantine));
+        return station;
+    }
+
+    private static RouteStop at(RouteStop stop, Place place) {
+        stop.setPlace(place);
+        return stop;
+    }
+
+    @Test
+    @DisplayName("A pickup at the station before the quarantine ends is refused, naming both times (US-F3-22)")
+    void aPickupBeforeTheQuarantineEndsIsRefused() {
+        Place station = stationWithQuarantine("2026-11-20", "2026-11-27");
+        RoutePlan plan = planOf(
+                at(stop(RouteStopKind.PICKUP, "2026-11-26T01:00:00Z", null), station),
+                stop(RouteStopKind.DELIVERY, "2026-11-26T03:00:00Z", null));
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> service.confirmRoutePlan(job.getId(), plan.getId(), null, new User()));
+
+        assertThat(refused.getMessage())
+                .isEqualTo("TRP-2026-001 collects the horses at 08:00 on 26 Nov; their quarantine at Đại Nam isolation"
+                        + " barn ends on 27 Nov. Plan the pickup on or after then.");
+        assertThat(plan.getStatus()).isEqualTo(RoutePlanStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("A pickup on the quarantine's last day, in business time, is confirmed")
+    void aPickupOnTheLastDayIsConfirmed() {
+        Place station = stationWithQuarantine("2026-11-20", "2026-11-27");
+        // 00:30 on 27 Nov in Ho Chi Minh City is still 26 Nov in UTC.
+        RoutePlan plan = planOf(
+                at(stop(RouteStopKind.PICKUP, "2026-11-26T17:30:00Z", null), station),
+                stop(RouteStopKind.DELIVERY, "2026-11-26T20:00:00Z", null));
+
+        service.confirmRoutePlan(job.getId(), plan.getId(), null, new User());
+
+        assertThat(plan.getStatus()).isEqualTo(RoutePlanStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("A transfer into the station after the quarantine starts is refused (US-F3-22)")
+    void aTransferAfterTheQuarantineStartsIsRefused() {
+        Place station = stationWithQuarantine("2026-11-20", "2026-11-27");
+        when(jobTrips.handsOn(trip, job)).thenReturn(true);
+        RoutePlan plan = planOf(
+                stop(RouteStopKind.PICKUP, "2026-11-21T00:00:00Z", null),
+                at(stop(RouteStopKind.TRANSFER, "2026-11-21T07:00:00Z", null), station));
+
+        BusinessException refused = assertThrows(
+                BusinessException.class, () -> service.confirmRoutePlan(job.getId(), plan.getId(), null, new User()));
+
+        assertThat(refused.getMessage())
+                .isEqualTo("TRP-2026-001 brings the horses to Đại Nam isolation barn at 14:00 on 21 Nov; their"
+                        + " quarantine there starts on 20 Nov. Plan the transfer on or before then.");
+    }
+
+    @Test
+    @DisplayName("A transfer on the quarantine's first day is confirmed")
+    void aTransferOnTheFirstDayIsConfirmed() {
+        Place station = stationWithQuarantine("2026-11-20", "2026-11-27");
+        when(jobTrips.handsOn(trip, job)).thenReturn(true);
+        RoutePlan plan = planOf(
+                stop(RouteStopKind.PICKUP, "2026-11-20T00:00:00Z", null),
+                at(stop(RouteStopKind.TRANSFER, "2026-11-20T07:00:00Z", null), station));
+
+        service.confirmRoutePlan(job.getId(), plan.getId(), null, new User());
+
+        assertThat(plan.getStatus()).isEqualTo(RoutePlanStatus.CONFIRMED);
     }
 
     @Test
