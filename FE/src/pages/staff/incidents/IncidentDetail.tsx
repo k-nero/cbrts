@@ -19,6 +19,9 @@ import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/pages/trip/tripFormat';
 import { Photo } from '@/pages/trip/Photo';
 
+/** The response options (add, propose, decide; US-F5-02..03) are left out of the demo for now: flip to bring them back. */
+const SHOW_OPTIONS = false;
+
 const sourceLabel: Record<Incident['source'], string> = {
   CAB: 'from the cab',
   CUSTOMER: 'by the customer',
@@ -111,7 +114,7 @@ export default function IncidentDetailPage() {
               )
             )}
             <InsuranceClaimPanel incident={incident} isManager={isManager} />
-            <IncidentOptions incident={incident} />
+            {SHOW_OPTIONS && <IncidentOptions incident={incident} />}
           </Flex>
         </Col>
         <Col xs={24} lg={8}>
