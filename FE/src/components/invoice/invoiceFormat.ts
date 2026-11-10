@@ -31,6 +31,7 @@ export const LINE_TAG: Record<InvoiceLineKind, { tone: Tone; label: string }> = 
   DEPOSIT: { tone: 'neutral', label: 'Deposit' },
   DEPOSIT_DEDUCTION: { tone: 'neutral', label: 'Deposit' },
   LATE_PENALTY_CREDIT: { tone: 'ok', label: 'Credit' },
+  COMPENSATION_CREDIT: { tone: 'ok', label: 'Credit' },
   ADJUSTMENT: { tone: 'warn', label: 'Incident' },
 };
 

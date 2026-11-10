@@ -1,4 +1,4 @@
-import type { HistoryEntry } from './request';
+import type { HistoryEntry, InsuranceOption } from './request';
 import type { TripPhoto, TripStatus } from './trip';
 
 /** What happened (BE IncidentKind). The cab reports the last four; HELD and CUSTOMER_REPORT come from elsewhere. */
@@ -92,8 +92,52 @@ export interface Incident {
   closingNote: string | null;
   resolvedAt: string | null;
   resolvedByName: string | null;
+  /** What EquiFreight gives back for it, credited on the final invoice (US-F5-07). */
+  compensationAmount: number | null;
+  compensationReason: string | null;
+  /** The job's insurance: only EquiFreight's takes a claim (US-F5-08). */
+  insurance: InsuranceOption | null;
+  insuranceClaim: InsuranceClaim | null;
   /** What happened to the incident, from the audit trail, oldest first. */
   timeline: HistoryEntry[];
+}
+
+/** BE InsuranceClaimStatus: filed, then settled or declined; both are final. */
+export const InsuranceClaimStatusEnum = {
+  FILED: 'FILED',
+  SETTLED: 'SETTLED',
+  DECLINED: 'DECLINED',
+} as const;
+export type InsuranceClaimStatus =
+  (typeof InsuranceClaimStatusEnum)[keyof typeof InsuranceClaimStatusEnum];
+
+/** The insurance claim on an incident (US-F5-08), in the job's quotation currency. */
+export interface InsuranceClaim {
+  id: string;
+  insurer: string;
+  reference: string;
+  claimedAmount: number;
+  note: string | null;
+  status: InsuranceClaimStatus;
+  settledAmount: number | null;
+  declineReason: string | null;
+  filedByName: string | null;
+  filedAt: string;
+  closedByName: string | null;
+  closedAt: string | null;
+}
+
+export interface FileInsuranceClaimInput {
+  insurer: string;
+  reference: string;
+  claimedAmount: number;
+  note?: string;
+}
+
+export interface InsuranceClaimOutcomeInput {
+  outcome: 'SETTLED' | 'DECLINED';
+  settledAmount?: number;
+  declineReason?: string;
 }
 
 /** One incident on a job's trip record, with its timeline (GET /staff/jobs/{id}/incidents, US-F5-05). */
@@ -110,6 +154,8 @@ export interface JobIncident {
   closingNote: string | null;
   resolvedAt: string | null;
   resolvedByName: string | null;
+  compensationAmount: number | null;
+  compensationReason: string | null;
   timeline: HistoryEntry[];
 }
 
@@ -120,10 +166,11 @@ export interface DelayAlertInput {
   note?: string;
 }
 
-/** Closing an incident (US-F5-05): both are required. */
+/** Closing an incident (US-F5-05): both are required; compensation (US-F5-07) is optional. */
 export interface ResolveIncidentInput {
   resolution: string;
   closingNote: string;
+  compensation?: { amount: number; reason: string };
 }
 
 /** How horses leave a moving trip (BE LeavingKind, US-F5-06). */

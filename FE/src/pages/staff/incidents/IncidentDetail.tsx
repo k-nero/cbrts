@@ -6,6 +6,7 @@ import { IncidentDecided, IncidentDecision } from './IncidentDecision';
 import { IncidentResolved } from './IncidentResolved';
 import { INCIDENT_STATUS, openFor } from './incidentFormat';
 import { IncidentOptions } from './IncidentOptions';
+import { InsuranceClaimPanel } from './InsuranceClaimPanel';
 
 import PageHeader from '@/components/PageHeader';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
@@ -109,6 +110,7 @@ export default function IncidentDetailPage() {
                 <CloseIncident incident={incident} />
               )
             )}
+            <InsuranceClaimPanel incident={incident} isManager={isManager} />
             <IncidentOptions incident={incident} />
           </Flex>
         </Col>

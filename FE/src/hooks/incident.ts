@@ -12,6 +12,8 @@ import type {
   IncidentSummary,
   RaiseIncidentInput,
   ResolveIncidentInput,
+  FileInsuranceClaimInput,
+  InsuranceClaimOutcomeInput,
 } from '@/interfaces';
 
 export const useIncidentList = (status?: IncidentStatus) => {
@@ -65,6 +67,12 @@ export const useReturnIncidentProposal = (id: string) =>
 
 export const useResolveIncident = (id: string) =>
   useIncidentChange(id, (input: ResolveIncidentInput) => incidentApi.resolve(id, input));
+
+export const useFileInsuranceClaim = (id: string) =>
+  useIncidentChange(id, (input: FileInsuranceClaimInput) => incidentApi.fileClaim(id, input));
+
+export const useInsuranceClaimOutcome = (id: string) =>
+  useIncidentChange(id, (input: InsuranceClaimOutcomeInput) => incidentApi.claimOutcome(id, input));
 
 /** A job's incidents with their timelines, on its Trip tab (US-F5-05). */
 export const useJobIncidents = (jobId: string) =>
