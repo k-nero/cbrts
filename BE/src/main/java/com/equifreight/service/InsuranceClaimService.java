@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import com.equifreight.entity.Club;
 import com.equifreight.entity.Incident;
 import com.equifreight.entity.InsuranceClaim;
 import com.equifreight.entity.User;
@@ -7,14 +8,18 @@ import com.equifreight.entity.enums.InsuranceClaimStatus;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.incident.CustomerInsuranceClaimResponse;
 import com.equifreight.model.incident.FileInsuranceClaimRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.InsuranceClaimOutcomeRequest;
 import com.equifreight.repository.InsuranceClaimRepository;
+import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
@@ -34,6 +39,8 @@ public class InsuranceClaimService {
     private final InsuranceClaimRepository claims;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final ClubService clubs;
+    private final TransportRequestRepository requests;
     private final Clock clock;
 
     public InsuranceClaimService(
@@ -41,11 +48,15 @@ public class InsuranceClaimService {
             InsuranceClaimRepository claims,
             AuditService audit,
             NotificationService notifications,
+            ClubService clubs,
+            TransportRequestRepository requests,
             Clock clock) {
         this.incidents = incidents;
         this.claims = claims;
         this.audit = audit;
         this.notifications = notifications;
+        this.clubs = clubs;
+        this.requests = requests;
         this.clock = clock;
     }
 
@@ -153,6 +164,29 @@ public class InsuranceClaimService {
                 request.outcome().name());
         tellClub(incident, "Insurance claim " + request.outcome().name().toLowerCase() + " for " + code, body);
         return incidents.toResponse(incident);
+    }
+
+    /** The claims on one of the club's requests, for its request page (US-F5-08); anyone else's request is not found. */
+    @Transactional(readOnly = true)
+    public List<CustomerInsuranceClaimResponse> ofRequest(User customer, UUID requestId) {
+        Club club = clubs.requireClub(customer);
+        requests.findByIdAndClubId(requestId, club.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        return claims.findByRequestId(requestId).stream()
+                .map(c -> new CustomerInsuranceClaimResponse(
+                        c.getId(),
+                        c.getIncident().getJob().getCode(),
+                        c.getIncident().getKind().label(),
+                        c.getInsurer(),
+                        c.getReference(),
+                        IncidentService.currencyOf(c.getIncident()),
+                        c.getClaimedAmount(),
+                        c.getStatus(),
+                        c.getSettledAmount(),
+                        c.getDeclineReason(),
+                        c.getFiledAt(),
+                        c.getClosedAt()))
+                .toList();
     }
 
     private void tellClub(Incident incident, String title, String body) {

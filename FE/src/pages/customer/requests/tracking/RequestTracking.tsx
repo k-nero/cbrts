@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 
 import { ArrivalCondition } from './ArrivalCondition';
 import { ConditionLog } from './ConditionLog';
+import { InsuranceClaims } from './InsuranceClaims';
 import { RouteRecord } from './RouteRecord';
 import { TrackingLead } from './TrackingLead';
 import { TrackingPass } from './TrackingPass';
@@ -90,6 +91,9 @@ export const RequestTracking: FC<Props> = ({ request, trip, horses, onBack }) =>
           </motion.div>
         </>
       )}
+      <motion.div variants={settle}>
+        <InsuranceClaims requestId={request.id} />
+      </motion.div>
       <TripHistory trip={trip} request={request} />
     </motion.div>
   );

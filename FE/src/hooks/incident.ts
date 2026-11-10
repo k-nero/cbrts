@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { incidentApi, incidentsListApi } from '@/apis/incident';
+import { queryKeys } from '@/constant/query';
 import { useCrudResource } from '@/hooks/crud';
 import type {
   DecideIncidentInput,
@@ -96,3 +97,11 @@ export const useSendDelayAlert = (jobId: string) => {
     },
   });
 };
+
+/** The insurance claims EquiFreight filed on a request's jobs, on the customer's request page (US-F5-08). */
+export const useRequestInsuranceClaims = (requestId: string) =>
+  useQuery({
+    queryKey: queryKeys.customerClaims(requestId),
+    queryFn: () => incidentApi.customerClaims(requestId),
+    enabled: Boolean(requestId),
+  });

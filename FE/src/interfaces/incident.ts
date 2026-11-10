@@ -127,6 +127,22 @@ export interface InsuranceClaim {
   closedAt: string | null;
 }
 
+/** A claim as the customer reads it on their request (US-F5-08): no staff note, no filer. */
+export interface CustomerInsuranceClaim {
+  id: string;
+  jobCode: string;
+  incidentLabel: string;
+  insurer: string;
+  reference: string;
+  currency: string;
+  claimedAmount: number;
+  status: InsuranceClaimStatus;
+  settledAmount: number | null;
+  declineReason: string | null;
+  filedAt: string;
+  closedAt: string | null;
+}
+
 export interface FileInsuranceClaimInput {
   insurer: string;
   reference: string;

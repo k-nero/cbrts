@@ -35,12 +35,14 @@ Status: built (V42). Two small additions to an incident, kept to the minimum for
 - `POST /api/v1/staff/incidents/{id}/resolution`: the request takes an optional `compensation { amount, reason }`.
 - `POST /api/v1/staff/incidents/{id}/insurance-claim`: file. `POST /api/v1/staff/incidents/{id}/insurance-claim/outcome`: settle or decline. Both are for `LOGISTICS_MANAGER` only.
 - `IncidentResponse` and `JobIncidentResponse` carry the compensation and the claim.
+- `GET /api/v1/customer/requests/{id}/insurance-claims`: the claims on the club's request, for the customer.
 
 ## Screens
 
 - **Close the incident:** a "Compensate the customer" switch that reveals the amount and the reason.
 - **Incident page:** an "Insurance claim" panel under the decision. Without a claim it offers "File a claim" (a modal); once filed it shows the claim with its status chip (Filed, Settled, Declined), and Settled / Declined buttons open the outcome modal. With the customer's own policy it says so and takes nothing.
 - **Final invoice** (staff and customer): the compensation line, tagged Credit, with its reason.
+- **The customer's request page** (both the submitted view and tracking, where `/tracking?job=…` notifications land): an "Insurance claims" panel listing each claim on the request's jobs with the incident, insurer, reference, amount claimed and what came of it (`GET /api/v1/customer/requests/{id}/insurance-claims`, the club's own requests only). The staff note and who filed it stay with staff. Hidden when there is no claim.
 
 ## Not in this version
 

@@ -23,14 +23,18 @@ import com.equifreight.entity.enums.InsuranceClaimStatus;
 import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.incident.CustomerInsuranceClaimResponse;
 import com.equifreight.model.incident.FileInsuranceClaimRequest;
 import com.equifreight.model.incident.InsuranceClaimOutcomeRequest;
 import com.equifreight.repository.InsuranceClaimRepository;
+import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.notification.Audience;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +50,8 @@ class InsuranceClaimServiceTest {
     private final InsuranceClaimRepository claims = mock(InsuranceClaimRepository.class);
     private final AuditService audit = mock(AuditService.class);
     private final NotificationService notifications = mock(NotificationService.class);
+    private final ClubService clubs = mock(ClubService.class);
+    private final TransportRequestRepository requests = mock(TransportRequestRepository.class);
 
     private InsuranceClaimService service;
     private Incident incident;
@@ -53,7 +59,8 @@ class InsuranceClaimServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new InsuranceClaimService(incidents, claims, audit, notifications, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new InsuranceClaimService(
+                incidents, claims, audit, notifications, clubs, requests, Clock.fixed(NOW, ZoneOffset.UTC));
         yen = new User();
         yen.setId(UUID.randomUUID());
         yen.setFirstName("Hải Yến");
@@ -216,5 +223,34 @@ class InsuranceClaimServiceTest {
                         anyString(),
                         eq("FILED"),
                         eq("DECLINED"));
+    }
+
+    @Test
+    @DisplayName(
+            "The customer reads the claims on their own request, without the staff note; another club's is not found")
+    void theCustomerReadsTheirClaims() {
+        InsuranceClaim claim = filed();
+        claim.setNote("Vet report attached to the file");
+        TransportRequest request = incident.getJob().getRequest();
+        request.setId(UUID.randomUUID());
+        User customer = new User();
+        customer.setClub(request.getClub());
+        when(clubs.requireClub(customer)).thenReturn(request.getClub());
+        when(requests.findByIdAndClubId(request.getId(), request.getClub().getId()))
+                .thenReturn(Optional.of(request));
+        when(claims.findByRequestId(request.getId())).thenReturn(List.of(claim));
+
+        List<CustomerInsuranceClaimResponse> shown = service.ofRequest(customer, request.getId());
+
+        assertEquals(1, shown.size());
+        CustomerInsuranceClaimResponse c = shown.getFirst();
+        assertEquals("CBRT-2026-041", c.jobCode());
+        assertEquals("Horse medical incident", c.incidentLabel());
+        assertEquals("PVI Insurance", c.insurer());
+        assertEquals("USD", c.currency());
+        assertEquals(InsuranceClaimStatus.FILED, c.status());
+
+        UUID someoneElses = UUID.randomUUID();
+        assertThrows(ResourceNotFoundException.class, () -> service.ofRequest(customer, someoneElses));
     }
 }

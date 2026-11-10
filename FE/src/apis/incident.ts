@@ -2,6 +2,7 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
+  CustomerInsuranceClaim,
   DecideIncidentInput,
   DelayAlertInput,
   FileInsuranceClaimInput,
@@ -57,6 +58,12 @@ export const incidentApi = {
   claimOutcome: (id: string, input: InsuranceClaimOutcomeInput) =>
     client
       .post<Incident>(`/staff/incidents/${id}/insurance-claim/outcome`, input)
+      .then((r) => r.data),
+
+  /** US-F5-08: the claims filed on a request's jobs, as the customer reads them. */
+  customerClaims: (requestId: string) =>
+    client
+      .get<CustomerInsuranceClaim[]>(`/customer/requests/${requestId}/insurance-claims`)
       .then((r) => r.data),
 
   /** US-F5-05: the job's incidents with their timelines, oldest first. */
