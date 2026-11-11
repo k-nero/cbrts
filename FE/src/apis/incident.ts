@@ -2,11 +2,14 @@ import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
 import type {
+  CustomerInsuranceClaim,
   DecideIncidentInput,
   DelayAlertInput,
+  FileInsuranceClaimInput,
   Incident,
   IncidentOptionInput,
   IncidentSummary,
+  InsuranceClaimOutcomeInput,
   JobIncident,
   RaiseIncidentInput,
   ResolveIncidentInput,
@@ -46,6 +49,22 @@ export const incidentApi = {
   /** US-F5-05: the logistics manager closes the incident with its resolution and a closing note. */
   resolve: (id: string, input: ResolveIncidentInput) =>
     client.post<Incident>(`/staff/incidents/${id}/resolution`, input).then((r) => r.data),
+
+  /** US-F5-08: file the insurance claim on an incident of a job insured with EquiFreight. */
+  fileClaim: (id: string, input: FileInsuranceClaimInput) =>
+    client.post<Incident>(`/staff/incidents/${id}/insurance-claim`, input).then((r) => r.data),
+
+  /** US-F5-08: the insurer's answer, settled or declined. */
+  claimOutcome: (id: string, input: InsuranceClaimOutcomeInput) =>
+    client
+      .post<Incident>(`/staff/incidents/${id}/insurance-claim/outcome`, input)
+      .then((r) => r.data),
+
+  /** US-F5-08: the claims filed on a request's jobs, as the customer reads them. */
+  customerClaims: (requestId: string) =>
+    client
+      .get<CustomerInsuranceClaim[]>(`/customer/requests/${requestId}/insurance-claims`)
+      .then((r) => r.data),
 
   /** US-F5-05: the job's incidents with their timelines, oldest first. */
   ofJob: (jobId: string) =>

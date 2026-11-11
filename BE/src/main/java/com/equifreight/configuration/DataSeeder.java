@@ -518,7 +518,7 @@ public class DataSeeder implements ApplicationRunner {
                     (short) 60,
                     true,
                     "Sampled within 60 days of departure");
-            createRule(current, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+            createRule(current, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, false, null);
             createRule(current, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
             createRule(current, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
             createRule(current, insurance, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
@@ -538,7 +538,7 @@ public class DataSeeder implements ApplicationRunner {
                         (short) 45,
                         true,
                         "Sampled within 45 days of departure (GDAHP notice 14/2026)");
-                createRule(draft, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, true, null);
+                createRule(draft, health, RegulationRuleKind.WINDOW_BEFORE_DEPARTURE, null, (short) 10, false, null);
                 createRule(draft, ownership, RegulationRuleKind.PRESENCE_ONLY, null, null, true, null);
                 createRule(draft, permit, RegulationRuleKind.VALID_THROUGH_ARRIVAL_PLUS, null, (short) 2, true, null);
                 createRule(

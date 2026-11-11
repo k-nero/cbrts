@@ -32,25 +32,32 @@ public interface DocumentVersionRepository
     Optional<Short> findMaxVersionNoByChecklistItemId(@Param("checklistItemId") UUID checklistItemId);
 
     /**
-     * Pending reviews for the Transport Specialist inbox with pagination.
+     * Pending reviews for the Transport Specialist inbox with pagination: only each checklist item's current version,
+     * so a version superseded by a newer upload before it was reviewed leaves the inbox (it can't be reviewed anyway).
      */
     @Query(value = """
             SELECT dv FROM DocumentVersion dv
             JOIN FETCH dv.checklistItem ci
             JOIN FETCH ci.job j
             WHERE dv.review = :review
+              AND ci.currentVersion = dv
             ORDER BY dv.uploadedAt ASC
-            """, countQuery = "SELECT count(dv) FROM DocumentVersion dv WHERE dv.review = :review")
+            """, countQuery = """
+            SELECT count(dv) FROM DocumentVersion dv JOIN dv.checklistItem ci
+            WHERE dv.review = :review
+              AND ci.currentVersion = dv
+            """)
     Page<DocumentVersion> findAllByReview(@Param("review") DocumentReview review, Pageable pageable);
 
     /**
-     * Unpaginated pending reviews list.
+     * Unpaginated pending reviews list, also the queue a version's place is counted in: current versions only.
      */
     @Query("""
             SELECT dv FROM DocumentVersion dv
             JOIN FETCH dv.checklistItem ci
             JOIN FETCH ci.job j
             WHERE dv.review = :review
+              AND ci.currentVersion = dv
             ORDER BY dv.uploadedAt ASC
             """)
     List<DocumentVersion> findAllByReview(@Param("review") DocumentReview review);

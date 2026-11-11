@@ -4,6 +4,7 @@ import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -144,6 +145,17 @@ public class Incident extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by")
     private User resolvedBy;
+
+    /**
+     * What EquiFreight gives back for the incident, granted when closing it (US-F5-07): credited on the job's final
+     * invoice. Both set or both null.
+     */
+    @Column(precision = 14, scale = 2)
+    private BigDecimal compensationAmount;
+
+    /** Why, as the customer reads it on the invoice. */
+    @Column(length = 300)
+    private String compensationReason;
 
     @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position")
