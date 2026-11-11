@@ -18,13 +18,16 @@ public interface HandoverRepository extends JpaRepository<Handover, UUID> {
 
     /**
      * Jobs ready for their final invoice (US-F6-03): the customer answered the handover (or it was taken as accepted),
-     * any discrepancy's incident is resolved, and no final invoice that isn't void exists yet.
+     * every incident on the job is resolved, so its compensation is known (US-F5-07), and no final invoice that isn't
+     * void exists yet.
      */
     @Query("""
             select h from Handover h join fetch h.job j join fetch j.request r join fetch r.club
             left join h.discrepancyIncident d
             where h.customerOutcome is not null
               and (d is null or d.status = com.equifreight.entity.enums.IncidentStatus.RESOLVED)
+              and not exists (select 1 from Incident x where x.job = j
+                              and x.status <> com.equifreight.entity.enums.IncidentStatus.RESOLVED)
               and not exists (select 1 from Invoice i where i.job = j
                               and i.kind = com.equifreight.entity.enums.InvoiceKind.FINAL
                               and i.status <> com.equifreight.entity.enums.InvoiceStatus.VOID)

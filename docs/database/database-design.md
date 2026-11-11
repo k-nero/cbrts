@@ -37,7 +37,7 @@ This is the logical and physical design for PostgreSQL. It is not yet a migratio
 | G | Jobs and clearance | `transport_jobs`, `job_regulation_pins`, `checklist_items`, `document_versions`, `files`, `authorities`, `authority_submissions`, `authority_submission_items`, `quarantine_periods` | Clearance checklist, Document review, Authorities, All documents, Document upload |
 | H | Fleet and routes | `trips`, `trip_vehicles`, `trip_horses`, `vehicles`, `vehicle_stalls`, `vehicle_bookings`, `crew_assignments`, `load_plans`, `load_plan_stalls`, `route_plans`, `route_stops`, `route_legs`, `flights` | Load plan, Route plan, Fleet calendar, Vehicles |
 | I | Trip and handover | `trip_records`, `condition_logs`, `handovers` | Escort cab screens, Coordinator · Trip, In transit, Delivered, Closed |
-| J | Incidents | `incidents`, `incident_options`, `incident_files` | Incident · Held, Incident · Customer report, Report a problem |
+| J | Incidents | `incidents`, `incident_options`, `incident_files`, `insurance_claims` | Incident · Held, Incident · Customer report, Report a problem |
 | K | Notes and notifications | `notes`, `note_replies`, `notifications` | Ask a question, Customer notes |
 | M | Invoices and payments | `invoices`, `invoice_lines`, `payments` | Quotation (deposit), Delivered, Closed, Tracking · Invoice, Invoices, Invoices · Record payment |
 | L | Audit and codes | `audit_log`, `code_counters` | Audit log |
@@ -629,6 +629,10 @@ erDiagram
 
 **`job_charges`**: `job_id`, `incident_id null` (unique when set), `description`, `amount numeric(14,2) > 0` in the job's quotation currency, `created_by`. A cost the final invoice adds beyond the quotation, such as an approved incident option the customer pays (US-F5-03); the final invoice turns each into an `ADJUSTMENT` line.
 
+**`incidents`, compensation (US-F5-07)**: `compensation_amount numeric(14,2) null` and `compensation_reason varchar(300) null`, both or neither, the amount > 0 (`incidents_compensation_check`). Granted when closing the incident, at most the quotation total and only before the job's final invoice exists; the final invoice credits each as a `COMPENSATION_CREDIT` line.
+
+**`insurance_claims`** (US-F5-08): `incident_id` (unique), `insurer`, `reference`, `claimed_amount numeric(14,2) > 0`, `note`, `status InsuranceClaimStatus` (`FILED`, `SETTLED`, `DECLINED`), `settled_amount` (> 0 and ≤ `claimed_amount` when settled), `decline_reason` (required when declined), `filed_by`, `filed_at`, `closed_by`, `closed_at` (both set once settled or declined; `insurance_claims_outcome_check`). Only for a job whose request chose `EQUIFREIGHT` insurance. The insurer pays the owner directly, so a claim never touches the invoices.
+
 ---
 
 ## 13. Domain K: notes and notifications
@@ -680,7 +684,7 @@ Two invoices per job, both generated, never typed:
 
 Partial unique index: one non-void `DEPOSIT` and one non-void `FINAL` invoice per quotation.
 
-**`invoice_lines`**: `invoice_id`, `position`, `quotation_line_id null`, `kind` (`QUOTED`, `ACTUALISED`, `DEPOSIT`, `DEPOSIT_DEDUCTION`, `LATE_PENALTY_CREDIT`, `ADJUSTMENT`), `description`, `quantity`, `unit_rate`, `amount` (negative for credits and deductions), `note` (required for `ACTUALISED` and `ADJUSTMENT`: "Flight delayed: waited 3 h, quoted 2 h").
+**`invoice_lines`**: `invoice_id`, `position`, `quotation_line_id null`, `kind` (`QUOTED`, `ACTUALISED`, `DEPOSIT`, `DEPOSIT_DEDUCTION`, `LATE_PENALTY_CREDIT`, `COMPENSATION_CREDIT`, `ADJUSTMENT`), `description`, `quantity`, `unit_rate`, `amount` (negative for credits and deductions), `note` (required for `ACTUALISED` and `ADJUSTMENT`: "Flight delayed: waited 3 h, quoted 2 h").
 
 **`payments`**: `invoice_id` not null, `amount`, `method` (`BANK_TRANSFER`, `CARD`), `reference`, `received_at`, `recorded_by`, `status` (`PENDING`, `CONFIRMED`, `REFUNDED`). Recording a confirmed payment updates `invoices.amount_paid` and the status in the same transaction. Online card payment is not designed; staff record bank transfers by hand, like authority steps.
 

@@ -55,13 +55,74 @@ export const returnSchema = z.object({
 });
 export type ReturnForm = z.infer<typeof returnSchema>;
 
-/** Closing an incident (US-F5-05): how it ended and a closing note, both required. */
-export const resolveSchema = z.object({
-  resolution: z.string().trim().min(1, 'Say how it ended.').max(300, 'At most 300 characters.'),
-  closingNote: z
+/**
+ * Closing an incident (US-F5-05): how it ended and a closing note, both required. Compensating the customer
+ * (US-F5-07) needs an amount above 0 and the reason they read on the invoice.
+ */
+export const resolveSchema = z
+  .object({
+    resolution: z.string().trim().min(1, 'Say how it ended.').max(300, 'At most 300 characters.'),
+    closingNote: z
+      .string()
+      .trim()
+      .min(1, 'Write a closing note for the record.')
+      .max(1000, 'At most 1000 characters.'),
+    compensate: z.boolean(),
+    compensationAmount: z.number().nullable(),
+    compensationReason: z.string().trim().max(300, 'At most 300 characters.'),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.compensate) return;
+    if (v.compensationAmount == null || v.compensationAmount <= 0)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['compensationAmount'],
+        message: 'Enter an amount above 0.',
+      });
+    if (!v.compensationReason)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['compensationReason'],
+        message: 'Say why; the customer reads it on the invoice.',
+      });
+  });
+export type ResolveForm = z.infer<typeof resolveSchema>;
+
+/** Filing an insurance claim (US-F5-08): with whom, their reference and the amount claimed. */
+export const claimSchema = z.object({
+  insurer: z.string().trim().min(1, 'Name the insurer.').max(120, 'At most 120 characters.'),
+  reference: z
     .string()
     .trim()
-    .min(1, 'Write a closing note for the record.')
-    .max(1000, 'At most 1000 characters.'),
+    .min(1, "Enter the insurer's claim reference.")
+    .max(60, 'At most 60 characters.'),
+  claimedAmount: z
+    .number({ error: 'Enter the amount claimed.' })
+    .positive('Enter an amount above 0.')
+    .max(999_999_999_999, 'That is more than the job could cost.'),
+  note: z.string().trim().max(500, 'At most 500 characters.'),
 });
-export type ResolveForm = z.infer<typeof resolveSchema>;
+export type ClaimForm = z.infer<typeof claimSchema>;
+
+/** The insurer's answer (US-F5-08): settled with what they paid, or declined with the reason. */
+export const claimOutcomeSchema = z
+  .object({
+    outcome: z.enum(['SETTLED', 'DECLINED']),
+    settledAmount: z.number().nullable(),
+    declineReason: z.string().trim().max(300, 'At most 300 characters.'),
+  })
+  .superRefine((v, ctx) => {
+    if (v.outcome === 'SETTLED' && (v.settledAmount == null || v.settledAmount <= 0))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['settledAmount'],
+        message: 'Enter what the insurer paid.',
+      });
+    if (v.outcome === 'DECLINED' && !v.declineReason)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['declineReason'],
+        message: 'Say why it was declined.',
+      });
+  });
+export type ClaimOutcomeForm = z.infer<typeof claimOutcomeSchema>;

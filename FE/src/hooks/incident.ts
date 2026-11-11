@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { incidentApi, incidentsListApi } from '@/apis/incident';
+import { queryKeys } from '@/constant/query';
 import { useCrudResource } from '@/hooks/crud';
 import type {
   DecideIncidentInput,
@@ -12,6 +13,8 @@ import type {
   IncidentSummary,
   RaiseIncidentInput,
   ResolveIncidentInput,
+  FileInsuranceClaimInput,
+  InsuranceClaimOutcomeInput,
 } from '@/interfaces';
 
 export const useIncidentList = (status?: IncidentStatus) => {
@@ -66,6 +69,12 @@ export const useReturnIncidentProposal = (id: string) =>
 export const useResolveIncident = (id: string) =>
   useIncidentChange(id, (input: ResolveIncidentInput) => incidentApi.resolve(id, input));
 
+export const useFileInsuranceClaim = (id: string) =>
+  useIncidentChange(id, (input: FileInsuranceClaimInput) => incidentApi.fileClaim(id, input));
+
+export const useInsuranceClaimOutcome = (id: string) =>
+  useIncidentChange(id, (input: InsuranceClaimOutcomeInput) => incidentApi.claimOutcome(id, input));
+
 /** A job's incidents with their timelines, on its Trip tab (US-F5-05). */
 export const useJobIncidents = (jobId: string) =>
   useQuery({
@@ -88,3 +97,11 @@ export const useSendDelayAlert = (jobId: string) => {
     },
   });
 };
+
+/** The insurance claims EquiFreight filed on a request's jobs, on the customer's request page (US-F5-08). */
+export const useRequestInsuranceClaims = (requestId: string) =>
+  useQuery({
+    queryKey: queryKeys.customerClaims(requestId),
+    queryFn: () => incidentApi.customerClaims(requestId),
+    enabled: Boolean(requestId),
+  });

@@ -1,6 +1,7 @@
 package com.equifreight.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -30,6 +31,8 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
+import com.equifreight.entity.enums.InvoiceKind;
+import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.LeavingKind;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RoleName;
@@ -49,6 +52,8 @@ import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
+import com.equifreight.repository.InsuranceClaimRepository;
+import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.JobChargeRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TripRecordRepository;
@@ -129,6 +134,12 @@ class IncidentServiceTest {
     @Mock
     private AuditLogRepository auditLogs;
 
+    @Mock
+    private InvoiceRepository invoices;
+
+    @Mock
+    private InsuranceClaimRepository claims;
+
     private IncidentService service;
     private User minh;
     private User yen;
@@ -187,6 +198,8 @@ class IncidentServiceTest {
                 flights,
                 notices,
                 auditLogs,
+                invoices,
+                claims,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         minh = user("Minh", "Trần");
         yen = user("Hải Yến", "Vũ");
@@ -887,6 +900,86 @@ class IncidentServiceTest {
         BusinessException twice =
                 assertThrows(BusinessException.class, () -> service.resolve(i.getId(), closing(), yen));
         assertEquals("The incident was already closed on 18 Oct 14:05", twice.getMessage());
+    }
+
+    // ---------- compensation (US-F5-07) ----------
+
+    private static ResolveIncidentRequest compensating(String amount) {
+        return new ResolveIncidentRequest(
+                "Second trailer delivered both horses at 17:40",
+                "Tyre supplier on QL22 to be reviewed.",
+                new ResolveIncidentRequest.Compensation(new BigDecimal(amount), "Two days' delay after the breakdown"));
+    }
+
+    @Test
+    @DisplayName("Closing with compensation keeps it for the final invoice and tells the club the amount and why")
+    void closingWithCompensation() {
+        Incident i = proposed();
+        job.getQuotation().setTotal(new BigDecimal("12000.00"));
+        service.decide(i.getId(), approve(i, false), yen);
+
+        IncidentResponse r = service.resolve(i.getId(), compensating("250.00"), yen);
+
+        assertEquals(new BigDecimal("250.00"), r.compensationAmount());
+        assertEquals("Two days' delay after the breakdown", r.compensationReason());
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("RESOLVE_INCIDENT"),
+                        eq("Closed the incident on CBRT-2026-041: Second trailer delivered both horses at 17:40,"
+                                + " compensated USD 250.00"),
+                        eq("INCIDENT"),
+                        eq(i.getId()),
+                        eq("CBRT-2026-041"),
+                        anyString(),
+                        eq("DECIDED"),
+                        eq("RESOLVED"));
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.INCIDENT_UPDATE),
+                        eq(Audience.club(job.getRequest().getClub().getId())),
+                        any(),
+                        eq("Compensation for CBRT-2026-041"),
+                        eq("We will credit USD 250.00 on your final invoice: Two days' delay after the breakdown"),
+                        eq("INCIDENT_COMPENSATION:" + i.getId()));
+    }
+
+    @Test
+    @DisplayName("Compensation is at most the quotation total, and only before the job's final invoice")
+    void compensationRefusals() {
+        Incident i = proposed();
+        job.getQuotation().setTotal(new BigDecimal("12000.00"));
+        service.decide(i.getId(), approve(i, false), yen);
+
+        BusinessException tooMuch =
+                assertThrows(BusinessException.class, () -> service.resolve(i.getId(), compensating("12000.01"), yen));
+        assertEquals("Compensation can't be more than the quotation total, USD 12,000.00", tooMuch.getMessage());
+
+        when(invoices.existsByJob_IdAndKindAndStatusNot(job.getId(), InvoiceKind.FINAL, InvoiceStatus.VOID))
+                .thenReturn(true);
+        BusinessException invoiced =
+                assertThrows(BusinessException.class, () -> service.resolve(i.getId(), compensating("250.00"), yen));
+        assertEquals(
+                "CBRT-2026-041 already has its final invoice: settle compensation with the club by hand",
+                invoiced.getMessage());
+        assertEquals(IncidentStatus.DECIDED, i.getStatus());
+        assertNull(i.getCompensationAmount());
+    }
+
+    @Test
+    @DisplayName("Compensation needs an amount above 0 and a reason")
+    void compensationIsValidated() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            assertEquals(0, validator.validate(compensating("250.00")).size());
+            assertEquals(1, validator.validate(compensating("0")).size());
+            assertEquals(
+                    1,
+                    validator
+                            .validate(new ResolveIncidentRequest(
+                                    "Resolved", "Note", new ResolveIncidentRequest.Compensation(BigDecimal.TEN, " ")))
+                            .size());
+        }
     }
 
     @Test

@@ -21,6 +21,8 @@ export const InvoiceLineKindEnum = {
   DEPOSIT: 'DEPOSIT',
   DEPOSIT_DEDUCTION: 'DEPOSIT_DEDUCTION',
   LATE_PENALTY_CREDIT: 'LATE_PENALTY_CREDIT',
+  /** What EquiFreight gave back for an incident (US-F5-07). */
+  COMPENSATION_CREDIT: 'COMPENSATION_CREDIT',
   ADJUSTMENT: 'ADJUSTMENT',
 } as const;
 export type InvoiceLineKind = (typeof InvoiceLineKindEnum)[keyof typeof InvoiceLineKindEnum];

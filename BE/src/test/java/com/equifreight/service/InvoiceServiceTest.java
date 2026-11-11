@@ -25,6 +25,7 @@ import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CodePrefix;
 import com.equifreight.entity.enums.HandoverOutcome;
+import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceLineKind;
@@ -342,6 +343,37 @@ class InvoiceServiceTest {
         assertEquals("Late arrival credit: 1 h 10 min after the window closed", credit.description());
         assertEquals(70, handover.getLateMinutes());
         assertEquals(new BigDecimal("656.00"), handover.getPenaltyAmount());
+    }
+
+    @Test
+    @DisplayName("Compensation granted on the job's incidents is credited, after the late credit, with its reason")
+    void theCompensationCredit() {
+        Incident breakdown = new Incident();
+        breakdown.setKind(IncidentKind.VEHICLE);
+        breakdown.setCompensationAmount(new BigDecimal("250.00"));
+        breakdown.setCompensationReason("Two days' delay after the breakdown");
+        when(incidents.findByJob_IdAndCompensationAmountIsNotNullOrderByResolvedAtAsc(job.getId()))
+                .thenReturn(List.of(breakdown));
+
+        InvoiceResponse draft = drafted();
+
+        InvoiceLineResponse credit = lineOf(draft, InvoiceLineKind.COMPENSATION_CREDIT);
+        assertEquals(new BigDecimal("-250.00"), credit.amount());
+        assertEquals("Compensation: Vehicle breakdown", credit.description());
+        assertEquals("Two days' delay after the breakdown", credit.note());
+        assertEquals(InvoiceLineKind.DEPOSIT_DEDUCTION, draft.lines().getLast().kind());
+    }
+
+    @Test
+    @DisplayName("The final invoice waits while any incident on the job is still open or decided")
+    void theFinalInvoiceWaitsForIncidents() {
+        when(incidents.existsByJob_IdAndStatusIn(eq(job.getId()), any())).thenReturn(true);
+
+        BusinessException open = assertThrows(BusinessException.class, () -> service.prepareFinal(job.getId(), yen));
+        assertEquals(
+                job.getCode() + " has an incident still open: close it first, so the final invoice carries any"
+                        + " compensation",
+                open.getMessage());
     }
 
     @Test

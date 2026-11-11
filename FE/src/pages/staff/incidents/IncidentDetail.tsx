@@ -6,6 +6,7 @@ import { IncidentDecided, IncidentDecision } from './IncidentDecision';
 import { IncidentResolved } from './IncidentResolved';
 import { INCIDENT_STATUS, openFor } from './incidentFormat';
 import { IncidentOptions } from './IncidentOptions';
+import { InsuranceClaimPanel } from './InsuranceClaimPanel';
 
 import PageHeader from '@/components/PageHeader';
 import { HistoryPanel } from '@/components/request/HistoryPanel';
@@ -17,6 +18,9 @@ import { IncidentStatusEnum, RoleNameEnum } from '@/interfaces';
 import { useAuthStore } from '@/stores/authStore';
 import { formatTime } from '@/pages/trip/tripFormat';
 import { Photo } from '@/pages/trip/Photo';
+
+/** The response options (add, propose, decide; US-F5-02..03) are left out of the demo for now: flip to bring them back. */
+const SHOW_OPTIONS = false;
 
 const sourceLabel: Record<Incident['source'], string> = {
   CAB: 'from the cab',
@@ -109,7 +113,8 @@ export default function IncidentDetailPage() {
                 <CloseIncident incident={incident} />
               )
             )}
-            <IncidentOptions incident={incident} />
+            <InsuranceClaimPanel incident={incident} isManager={isManager} />
+            {SHOW_OPTIONS && <IncidentOptions incident={incident} />}
           </Flex>
         </Col>
         <Col xs={24} lg={8}>

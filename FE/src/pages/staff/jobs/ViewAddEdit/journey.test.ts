@@ -74,6 +74,20 @@ describe('journeyStandings', () => {
     ]);
   });
 
+  test('a trip ready but for the hand-over awaits the horses, not "handed on"', () => {
+    const signedOff = detail({ tripSignedOffAt: '2026-12-01T00:00:00Z' });
+    const s = journeyStandings(
+      [road('TRP-1', { handsOn: true }), road('TRP-2', { handsOn: true }), road('TRP-3')],
+      [signedOff, signedOff, signedOff],
+      coordinator,
+    );
+    expect(s.map((t) => [t.tone, t.word, t.line, t.yours])).toEqual([
+      ['ok', 'Ready', 'Every step is done', false],
+      ['neutral', 'Awaiting horses', 'Waits for TRP-1 to hand the horses on · The escort', false],
+      ['neutral', 'Awaiting horses', 'Waits for TRP-2 to hand the horses on · The escort', false],
+    ]);
+  });
+
   test('a trip under way says so, and a trip still loading waits', () => {
     const s = journeyStandings(
       [road('TRP-1', { status: 'DEPARTED' }), road('TRP-2')],
