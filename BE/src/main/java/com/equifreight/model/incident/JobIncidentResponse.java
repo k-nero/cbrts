@@ -3,6 +3,7 @@ package com.equifreight.model.incident;
 import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.model.review.HistoryEntryResponse;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,4 +25,7 @@ public record JobIncidentResponse(
         String closingNote,
         Instant resolvedAt,
         String resolvedByName,
+        /** What EquiFreight gives back for it (US-F5-07), or null. */
+        BigDecimal compensationAmount,
+        String compensationReason,
         List<HistoryEntryResponse> timeline) {}

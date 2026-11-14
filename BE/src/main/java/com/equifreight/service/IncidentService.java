@@ -4,6 +4,7 @@ import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.CrewAssignment;
 import com.equifreight.entity.Incident;
 import com.equifreight.entity.IncidentOption;
+import com.equifreight.entity.InsuranceClaim;
 import com.equifreight.entity.JobCharge;
 import com.equifreight.entity.RoutePlan;
 import com.equifreight.entity.TransportJob;
@@ -15,6 +16,8 @@ import com.equifreight.entity.enums.Channel;
 import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
+import com.equifreight.entity.enums.InvoiceKind;
+import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.RoleName;
 import com.equifreight.entity.enums.TripStatus;
@@ -27,6 +30,7 @@ import com.equifreight.model.incident.DelayAlertRequest;
 import com.equifreight.model.incident.IncidentOptionResponse;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
+import com.equifreight.model.incident.InsuranceClaimResponse;
 import com.equifreight.model.incident.JobIncidentResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
@@ -37,12 +41,15 @@ import com.equifreight.model.trip.TripMapper;
 import com.equifreight.repository.AuditLogRepository;
 import com.equifreight.repository.CrewAssignmentRepository;
 import com.equifreight.repository.IncidentRepository;
+import com.equifreight.repository.InsuranceClaimRepository;
+import com.equifreight.repository.InvoiceRepository;
 import com.equifreight.repository.JobChargeRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TripRecordRepository;
 import com.equifreight.repository.UserRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -107,6 +114,8 @@ public class IncidentService {
     private final FlightService flights;
     private final TripNotices notices;
     private final AuditLogRepository auditLogs;
+    private final InvoiceRepository invoices;
+    private final InsuranceClaimRepository claims;
     private final Clock clock;
 
     public IncidentService(
@@ -126,6 +135,8 @@ public class IncidentService {
             FlightService flights,
             TripNotices notices,
             AuditLogRepository auditLogs,
+            InvoiceRepository invoices,
+            InsuranceClaimRepository claims,
             Clock clock) {
         this.incidents = incidents;
         this.jobs = jobs;
@@ -143,6 +154,8 @@ public class IncidentService {
         this.flights = flights;
         this.notices = notices;
         this.auditLogs = auditLogs;
+        this.invoices = invoices;
+        this.claims = claims;
         this.clock = clock;
     }
 
@@ -639,9 +652,15 @@ public class IncidentService {
             throw new BusinessException("\"" + incident.getProposedOption().getTitle()
                     + "\" waits for a decision: approve it or send it back before closing the incident");
         }
+        ResolveIncidentRequest.Compensation compensation = request.compensation();
+        if (compensation != null) requireCompensable(incident, compensation.amount());
         IncidentStatus before = incident.getStatus();
         Instant now = clock.instant();
         incident.setStatus(IncidentStatus.RESOLVED);
+        if (compensation != null) {
+            incident.setCompensationAmount(compensation.amount());
+            incident.setCompensationReason(compensation.reason().strip());
+        }
         incident.setResolvedAt(now);
         incident.setResolvedBy(manager);
         incident.setResolution(request.resolution().strip());
@@ -656,7 +675,10 @@ public class IncidentService {
         audit.recordDecision(
                 manager,
                 "RESOLVE_INCIDENT",
-                AuditText.fit("Closed the incident on " + code + ": " + saved.getResolution()),
+                AuditText.fit("Closed the incident on " + code + ": " + saved.getResolution()
+                        + (saved.getCompensationAmount() == null
+                                ? ""
+                                : ", compensated " + money(currencyOf(saved), saved.getCompensationAmount()))),
                 ENTITY_TYPE,
                 saved.getId(),
                 code,
@@ -690,6 +712,16 @@ public class IncidentService {
                     title,
                     nameOf(manager) + " closed the incident you reported: " + saved.getResolution());
         }
+        if (saved.getCompensationAmount() != null) {
+            notifications.notify(
+                    NotificationKind.INCIDENT_UPDATE,
+                    Audience.club(saved.getJob().getRequest().getClub().getId()),
+                    Subject.incident(saved),
+                    "Compensation for " + code,
+                    "We will credit " + money(currencyOf(saved), saved.getCompensationAmount())
+                            + " on your final invoice: " + saved.getCompensationReason(),
+                    "INCIDENT_COMPENSATION:" + saved.getId());
+        }
         return toResponse(saved);
     }
 
@@ -714,6 +746,8 @@ public class IncidentService {
                         .closingNote(i.getClosingNote())
                         .resolvedAt(i.getResolvedAt())
                         .resolvedByName(nameOf(i.getResolvedBy()))
+                        .compensationAmount(i.getCompensationAmount())
+                        .compensationReason(i.getCompensationReason())
                         .timeline(timelines.getOrDefault(i.getId(), List.of()))
                         .build())
                 .toList();
@@ -809,6 +843,31 @@ public class IncidentService {
                     "The new arrival after the incident makes these no longer valid: " + String.join(", ", red) + ".");
         }
         return new Retimed(plan, moved);
+    }
+
+    /**
+     * Compensation is a credit on the final invoice (US-F5-07): at most the quotation total, and only while the job
+     * has no final invoice yet, since an issued invoice is never edited and a draft was drafted without it.
+     */
+    private void requireCompensable(Incident incident, BigDecimal amount) {
+        TransportJob job = incident.getJob();
+        var quotation = job.getQuotation();
+        if (quotation == null || quotation.getTotal() == null) {
+            throw new BusinessException(job.getCode() + " has no quotation to credit the compensation against");
+        }
+        if (amount.compareTo(quotation.getTotal()) > 0) {
+            throw new BusinessException("Compensation can't be more than the quotation total, "
+                    + money(quotation.getCurrency(), quotation.getTotal()));
+        }
+        if (invoices.existsByJob_IdAndKindAndStatusNot(job.getId(), InvoiceKind.FINAL, InvoiceStatus.VOID)) {
+            throw new BusinessException(
+                    job.getCode() + " already has its final invoice: settle compensation with the club by hand");
+        }
+    }
+
+    /** "USD 1,250.00". */
+    static String money(String currency, BigDecimal amount) {
+        return currency + " " + String.format(Locale.ENGLISH, "%,.2f", amount);
     }
 
     private static String at(Instant instant) {
@@ -1008,7 +1067,31 @@ public class IncidentService {
                 i.getClosingNote(),
                 i.getResolvedAt(),
                 nameOf(i.getResolvedBy()),
+                i.getCompensationAmount(),
+                i.getCompensationReason(),
+                request.getInsurance(),
+                i.getId() == null
+                        ? null
+                        : claims.findByIncident_Id(i.getId())
+                                .map(IncidentService::toClaimResponse)
+                                .orElse(null),
                 i.getId() == null ? List.of() : timelines(List.of(i.getId())).getOrDefault(i.getId(), List.of()));
+    }
+
+    static InsuranceClaimResponse toClaimResponse(InsuranceClaim c) {
+        return new InsuranceClaimResponse(
+                c.getId(),
+                c.getInsurer(),
+                c.getReference(),
+                c.getClaimedAmount(),
+                c.getNote(),
+                c.getStatus(),
+                c.getSettledAmount(),
+                c.getDeclineReason(),
+                nameOf(c.getFiledBy()),
+                c.getFiledAt(),
+                nameOf(c.getClosedBy()),
+                c.getClosedAt());
     }
 
     static String nameOf(User user) {

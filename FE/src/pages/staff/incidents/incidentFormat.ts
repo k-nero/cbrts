@@ -1,5 +1,5 @@
 import type { Tone } from '@/components/ui';
-import type { IncidentStatus } from '@/interfaces';
+import type { IncidentStatus, InsuranceClaimStatus } from '@/interfaces';
 import { IncidentStatusEnum } from '@/interfaces';
 
 /** An incident's state as a tone plus a word (DESIGN.md, Status): open is Bad until decided. */
@@ -7,6 +7,13 @@ export const INCIDENT_STATUS: Record<IncidentStatus, { tone: Tone; label: string
   [IncidentStatusEnum.OPEN]: { tone: 'bad', label: 'Open' },
   [IncidentStatusEnum.DECIDED]: { tone: 'warn', label: 'Decided' },
   [IncidentStatusEnum.RESOLVED]: { tone: 'ok', label: 'Resolved' },
+};
+
+/** An insurance claim's state (US-F5-08): waiting on the insurer, paid, or refused. */
+export const CLAIM_STATUS: Record<InsuranceClaimStatus, { tone: Tone; label: string }> = {
+  FILED: { tone: 'warn', label: 'Filed' },
+  SETTLED: { tone: 'ok', label: 'Settled' },
+  DECLINED: { tone: 'bad', label: 'Declined' },
 };
 
 /** "1 h 20 min", "35 min": how long an incident has been open. */

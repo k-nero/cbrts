@@ -15,6 +15,8 @@ export const queryKeys = {
   customerHome: () => ['customer', 'home'] as const,
   /** A request's invoices as the club reads them (the deposit invoice comes with acceptance). */
   customerInvoices: (requestId: string) => ['customer-invoices', requestId] as const,
+  /** The insurance claims EquiFreight filed on a request's jobs (US-F5-08). */
+  customerClaims: (requestId: string) => ['customer-claims', requestId] as const,
   horses: {
     all: () => ['horses'] as const,
     one: (id: string) => ['horses', id] as const,

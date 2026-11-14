@@ -5,14 +5,17 @@ import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.model.incident.AddIncidentOptionRequest;
 import com.equifreight.model.incident.DecideIncidentRequest;
 import com.equifreight.model.incident.DelayAlertRequest;
+import com.equifreight.model.incident.FileInsuranceClaimRequest;
 import com.equifreight.model.incident.IncidentResponse;
 import com.equifreight.model.incident.IncidentSummaryResponse;
+import com.equifreight.model.incident.InsuranceClaimOutcomeRequest;
 import com.equifreight.model.incident.JobIncidentResponse;
 import com.equifreight.model.incident.ProposeOptionRequest;
 import com.equifreight.model.incident.RaiseIncidentRequest;
 import com.equifreight.model.incident.ResolveIncidentRequest;
 import com.equifreight.model.incident.ReturnProposalRequest;
 import com.equifreight.service.IncidentService;
+import com.equifreight.service.InsuranceClaimService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -30,9 +33,11 @@ import org.springframework.web.bind.annotation.*;
 public class IncidentController {
 
     private final IncidentService incidents;
+    private final InsuranceClaimService claims;
 
-    public IncidentController(IncidentService incidents) {
+    public IncidentController(IncidentService incidents, InsuranceClaimService claims) {
         this.incidents = incidents;
+        this.claims = claims;
     }
 
     /** US-F5-01: the escort reports an emergency on the trip they crew. */
@@ -122,6 +127,26 @@ public class IncidentController {
             @Valid @RequestBody ResolveIncidentRequest request,
             @AuthenticationPrincipal User user) {
         return incidents.resolve(id, request, user);
+    }
+
+    /** US-F5-08: the logistics manager files the insurance claim on an incident of a job insured with EquiFreight. */
+    @PostMapping("/api/v1/staff/incidents/{id}/insurance-claim")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public IncidentResponse fileClaim(
+            @PathVariable UUID id,
+            @Valid @RequestBody FileInsuranceClaimRequest request,
+            @AuthenticationPrincipal User user) {
+        return claims.file(id, request, user);
+    }
+
+    /** US-F5-08: the insurer's answer, settled with the amount paid or declined with the reason. */
+    @PostMapping("/api/v1/staff/incidents/{id}/insurance-claim/outcome")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public IncidentResponse claimOutcome(
+            @PathVariable UUID id,
+            @Valid @RequestBody InsuranceClaimOutcomeRequest request,
+            @AuthenticationPrincipal User user) {
+        return claims.recordOutcome(id, request, user);
     }
 
     /** US-F5-05: the job's incidents with their timelines, on its Trip tab. */

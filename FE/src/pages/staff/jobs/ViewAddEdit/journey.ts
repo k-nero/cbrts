@@ -64,6 +64,15 @@ export function journeyStandings(
     );
     const step = nextStep(steps);
     if (!step) return { ...base, tone: 'ok', word: 'Ready', line: 'Every step is done' };
+    // The hand-over step is named for its outcome; while it waits, say what the trip waits for.
+    if (step.key === 'handed-on' && previous)
+      return {
+        ...base,
+        next: step,
+        tone: 'neutral',
+        word: 'Awaiting horses',
+        line: `Waits for ${previous.tripCode ?? 'the trip before'} to hand the horses on · ${stepOwner(detail, step)}`,
+      };
     const yours =
       step.state === 'todo' &&
       ((isPlannerStep(step) && viewer.canPlan) || (step.key === 'sign-off' && viewer.canSignOff));

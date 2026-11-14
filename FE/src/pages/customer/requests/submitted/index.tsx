@@ -7,6 +7,7 @@ import DocumentsCallout from './DocumentsCallout';
 import { WhereItStands } from './WhereItStands';
 import { RequestPass } from '../components/RequestPass';
 import { VersionsPanel } from '../components/VersionsPanel';
+import { InsuranceClaims } from '../tracking/InsuranceClaims';
 import { RequestTracking } from '../tracking/RequestTracking';
 import { isTracking } from '../tracking/tracking';
 
@@ -248,6 +249,7 @@ const RequestSubmittedPage: FC = () => {
               router.push(router.paths.get('request-invoice', { pathParams: [request.id, inv.id] }))
             }
           />
+          <InsuranceClaims requestId={request.id} />
           {history}
           <p className="type-body-s m-0 text-ink-3">
             Your request number stays the same from submission to handover.

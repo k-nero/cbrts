@@ -3,6 +3,7 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Handover;
+import com.equifreight.entity.Incident;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.InvoiceLine;
 import com.equifreight.entity.JobCharge;
@@ -550,6 +551,17 @@ public class InvoiceService {
             line.setNote(penaltyBasis(q, handover.getLateMinutes()));
             invoice.getLines().add(line);
         }
+        // What EquiFreight gave back for the job's incidents when closing them (US-F5-07).
+        for (Incident incident :
+                incidents.findByJob_IdAndCompensationAmountIsNotNullOrderByResolvedAtAsc(job.getId())) {
+            InvoiceLine line = line(
+                    invoice,
+                    InvoiceLineKind.COMPENSATION_CREDIT,
+                    "Compensation: " + incident.getKind().label(),
+                    incident.getCompensationAmount().negate());
+            line.setNote(incident.getCompensationReason());
+            invoice.getLines().add(line);
+        }
         invoices.findFirstByQuotation_IdAndKindAndStatusNot(q.getId(), InvoiceKind.DEPOSIT, InvoiceStatus.VOID)
                 .ifPresent(deposit -> invoice.getLines()
                         .add(line(
@@ -632,6 +644,10 @@ public class InvoiceService {
                 && handover.getDiscrepancyIncident().getStatus() != IncidentStatus.RESOLVED) {
             throw new BusinessException("The customer reported a problem with the handover of " + job.getCode()
                     + ": close that incident first, then the final invoice follows");
+        }
+        if (incidents.existsByJob_IdAndStatusIn(job.getId(), EnumSet.of(IncidentStatus.OPEN, IncidentStatus.DECIDED))) {
+            throw new BusinessException(job.getCode()
+                    + " has an incident still open: close it first, so the final invoice carries any compensation");
         }
     }
 

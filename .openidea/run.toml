@@ -25,3 +25,10 @@ name = "docker-compose.yml: db"
 kind = "docker-compose"
 command = "docker compose -f docker-compose.yml up -d db"
 params = { connection = "default", detach = "true", files = "docker-compose.yml", services = "db" }
+
+[[configurations]]
+id = "docker:compose:docker-compose.yml:storage"
+name = "docker-compose.yml: storage"
+kind = "docker-compose"
+command = "docker compose -f docker-compose.yml up -d storage"
+params = { connection = "default", detach = "true", files = "docker-compose.yml", services = "storage" }

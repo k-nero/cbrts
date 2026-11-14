@@ -3,6 +3,7 @@ package com.equifreight.model.incident;
 import com.equifreight.entity.enums.IncidentKind;
 import com.equifreight.entity.enums.IncidentSource;
 import com.equifreight.entity.enums.IncidentStatus;
+import com.equifreight.entity.enums.InsuranceOption;
 import com.equifreight.entity.enums.TripStatus;
 import com.equifreight.model.review.HistoryEntryResponse;
 import com.equifreight.model.trip.TripPhotoResponse;
@@ -67,6 +68,13 @@ public record IncidentResponse(
         String closingNote,
         Instant resolvedAt,
         String resolvedByName,
+        /** What EquiFreight gives back for it, credited on the final invoice (US-F5-07), or null. */
+        BigDecimal compensationAmount,
+        String compensationReason,
+        /** The job's insurance: only EquiFreight's takes a claim (US-F5-08). */
+        InsuranceOption insurance,
+        /** The insurance claim on the incident, or null. */
+        InsuranceClaimResponse insuranceClaim,
         /** What happened to the incident, from the audit trail, oldest first. */
         List<HistoryEntryResponse> timeline) {
 
