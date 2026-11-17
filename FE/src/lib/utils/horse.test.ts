@@ -12,8 +12,10 @@ import {
   heightProblem,
   pronouns,
   sizeClassFor,
+  sizeBasis,
   stallChip,
   stallFor,
+  boxStallNote,
   temperamentChip,
 } from './horse';
 
@@ -27,20 +29,40 @@ const BANDS: SizeClass[] = [
 ];
 
 describe('stallFor', () => {
-  test('an aggressive horse always travels in a box stall, whatever was ticked', () => {
+  test('anAggressiveHorseAlwaysTravelsInABoxStall', () => {
     expect(stallFor('AGGRESSIVE', 'STANDARD')).toBe('BOX');
     expect(stallFor('AGGRESSIVE', 'CLIMATE')).toBe('BOX');
     expect(stallFor('AGGRESSIVE', null)).toBe('BOX');
   });
 
-  test('any other horse travels in the stall ticked, standard when none is', () => {
+  test('anyOtherHorseTravelsInTheStallTickedStandardWhenNone', () => {
     expect(stallFor('NERVOUS', 'CLIMATE')).toBe('CLIMATE');
     expect(stallFor('CALM', 'BOX')).toBe('BOX');
     expect(stallFor(null, null)).toBe('STANDARD');
   });
 });
 
+describe('box stall line', () => {
+  test('boxStallNoteSaysWhyTheStallIsSet', () => {
+    expect(boxStallNote('STANDARD')).toBe(
+      'Aggressive horses always travel in a box stall, so it is set for this horse.',
+    );
+  });
+
+  test('boxStallNoteKeepsAClimateNeedFromBeingLost', () => {
+    expect(boxStallNote('CLIMATE')).toBe(
+      'Aggressive horses always travel in a box stall, so it is set for this horse. A box stall isn’t climate-controlled: if the horse needs that, say so in the handling notes.',
+    );
+  });
+});
+
 describe('size class (H-03)', () => {
+  test('sizeBasisNamesTheBoxStallWhenItRaisesTheClass', () => {
+    expect(sizeBasis(15.3, 'BOX', BANDS)).toBe('Worked out from 15.3 hh and the box stall.');
+    expect(sizeBasis(15.3, 'STANDARD', BANDS)).toBe('Worked out from 15.3 hh.');
+    expect(sizeBasis(17.3, 'BOX', BANDS)).toBe('Worked out from 17.3 hh.');
+  });
+
   test('sizeClassForFollowsTheBands', () => {
     expect(sizeClassFor(14.2, 'STANDARD', BANDS)?.code).toBe('S');
     expect(sizeClassFor(14.3, 'STANDARD', BANDS)?.code).toBe('M');

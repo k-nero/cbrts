@@ -123,6 +123,24 @@ export const sizeClassFor = (
   return chosen;
 };
 
+/** The size line's rule in words: from the height, and from the box stall when that raises the class (H-03a). */
+export const sizeBasis = (heightHh: number, stall: StallType, classes: SizeClass[]): string => {
+  const raised =
+    sizeClassFor(heightHh, stall, classes)?.code !==
+    sizeClassFor(heightHh, 'STANDARD', classes)?.code;
+  return `Worked out from ${formatHeight(heightHh)}${raised ? ' and the box stall' : ''}.`;
+};
+
+/**
+ * The add-horse form's line for an aggressive horse, whose box stall is set rather than chosen. A climate stall the
+ * horse had ticked can't go with it (one stall per horse), so the line says where that need goes instead.
+ */
+export const boxStallNote = (ticked: StallType | null | undefined): string =>
+  'Aggressive horses always travel in a box stall, so it is set for this horse.' +
+  (ticked === 'CLIMATE'
+    ? ' A box stall isn’t climate-controlled: if the horse needs that, say so in the handling notes.'
+    : '');
+
 /** The coat band; OTHER or no coat is the neutral band. */
 export const coatOf = (coat: HorseCoat | null | undefined): Coat =>
   coat && coat !== 'OTHER' ? (coat.toLowerCase() as Coat) : 'other';

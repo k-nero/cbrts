@@ -2,9 +2,11 @@ import { type FC } from 'react';
 import { useController, useWatch } from 'react-hook-form';
 import { Flex } from 'antd';
 
+import { DerivedLine } from './DerivedLine';
 import type { HorseFormShape } from './HorseForm';
 
 import { Checkbox, Chip } from '@/components/ui';
+import { boxStallNote, stallChip } from '@/lib/utils';
 
 /**
  * Climate-controlled and box stall: one value in the API, so ticking one unticks the other. An aggressive horse always
@@ -13,17 +15,15 @@ import { Checkbox, Chip } from '@/components/ui';
 export const StallTicks: FC = () => {
   const { field } = useController<HorseFormShape, 'requiredStall'>({ name: 'requiredStall' });
   const temperament = useWatch<HorseFormShape, 'temperament'>({ name: 'temperament' });
-  if (temperament === 'AGGRESSIVE')
+  if (temperament === 'AGGRESSIVE') {
+    const box = stallChip('BOX');
     return (
-      <div className="rounded-sm bg-sunken px-4 py-3">
-        <Flex align="center" gap={12}>
-          <Chip tone="neutral">Box stall</Chip>
-          <span className="type-body-s text-ink-2">
-            Aggressive horses always travel alone in a box stall, so it is set for this horse.
-          </span>
-        </Flex>
-      </div>
+      <DerivedLine>
+        {box && <Chip tone={box.tone}>{box.label}</Chip>}
+        <span className="type-body-s text-ink-2">{boxStallNote(field.value)}</span>
+      </DerivedLine>
     );
+  }
   return (
     <Flex gap={24}>
       <Checkbox

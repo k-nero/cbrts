@@ -454,6 +454,27 @@ class HorseServiceTest {
     }
 
     @Test
+    void anAggressiveHorseSavedWithAStandardStallBecomesABoxWhenUpdated() {
+        // Saved before the rule, and on a submitted request: its identity is locked, its stall isn't.
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        nightfall.setHeightHh(new BigDecimal("15.3"));
+        nightfall.setTemperament(Temperament.AGGRESSIVE);
+        nightfall.setRequiredStall(StallType.STANDARD);
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+
+        service.update(
+                user,
+                nightfall.getId(),
+                requestFrom(nightfall).toBuilder()
+                        .temperament(Temperament.AGGRESSIVE)
+                        .build());
+
+        Horse saved = savedHorse();
+        assertThat(saved.getRequiredStall()).isEqualTo(StallType.BOX);
+        assertThat(saved.getSizeClass().getCode()).isEqualTo("L");
+    }
+
+    @Test
     void archiveIsRefusedWhileTheHorseIsOnARequestInReview() {
         Horse nightfall = owned(horse("Nightfall", "250259600223311"));
         when(requestHorses.findActiveUses(eq(nightfall.getId()), any()))
