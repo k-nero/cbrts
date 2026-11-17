@@ -13,6 +13,7 @@ import {
   pronouns,
   sizeClassFor,
   stallChip,
+  stallFor,
   temperamentChip,
 } from './horse';
 
@@ -24,6 +25,20 @@ const BANDS: SizeClass[] = [
   { code: 'L', widthIn: 48, minHeightHh: 16.3 },
   { code: 'XL', widthIn: 96, minHeightHh: 17.3 },
 ];
+
+describe('stallFor', () => {
+  test('an aggressive horse always travels in a box stall, whatever was ticked', () => {
+    expect(stallFor('AGGRESSIVE', 'STANDARD')).toBe('BOX');
+    expect(stallFor('AGGRESSIVE', 'CLIMATE')).toBe('BOX');
+    expect(stallFor('AGGRESSIVE', null)).toBe('BOX');
+  });
+
+  test('any other horse travels in the stall ticked, standard when none is', () => {
+    expect(stallFor('NERVOUS', 'CLIMATE')).toBe('CLIMATE');
+    expect(stallFor('CALM', 'BOX')).toBe('BOX');
+    expect(stallFor(null, null)).toBe('STANDARD');
+  });
+});
 
 describe('size class (H-03)', () => {
   test('sizeClassForFollowsTheBands', () => {

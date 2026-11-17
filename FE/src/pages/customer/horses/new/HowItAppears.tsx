@@ -7,7 +7,7 @@ import { horseCardProps } from '../components/horseCardProps';
 import { HorseCard } from '@/components/ui';
 import { useSizeClasses } from '@/hooks/horse';
 import type { HorseCoat, HorseSex } from '@/interfaces';
-import { ict, pronouns, sizeClassFor } from '@/lib/utils';
+import { ict, pronouns, sizeClassFor, stallFor } from '@/lib/utils';
 
 const today = () => ict(new Date().toISOString()).format('YYYY-MM-DD');
 
@@ -18,6 +18,8 @@ export const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
   const { subject } = pronouns(sex);
   const heading =
     subject === 'the horse' ? 'How the horse will appear' : `How ${subject}’ll appear`;
+  // As the server saves it: an aggressive horse travels in a box stall and is sized for one.
+  const stall = stallFor(values.temperament, values.requiredStall);
   const card = horseCardProps(
     {
       name: values.name ?? '',
@@ -27,12 +29,12 @@ export const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
       dateOfBirth: values.dateOfBirth ?? null,
       heightHh: values.heightHh,
       weightKg: values.weightKg,
-      sizeClass: sizeClassFor(values.heightHh, values.requiredStall ?? 'STANDARD', classes ?? []),
+      sizeClass: sizeClassFor(values.heightHh, stall, classes ?? []),
       microchip: values.microchip ?? null,
       declaredValue: values.declaredValue,
       valueCurrency: 'USD',
       temperament: values.temperament,
-      requiredStall: values.requiredStall ?? 'STANDARD',
+      requiredStall: stall,
       handlingNotes: values.handlingNotes ?? null,
     },
     today(),

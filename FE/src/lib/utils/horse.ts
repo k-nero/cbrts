@@ -97,6 +97,15 @@ export const heightProblem = (heightHh: number): string | null => {
   return `${(tenths / 10).toFixed(1)} hh isn't a height: a hand is 4 inches, so ${hands}.3 hh is followed by ${hands + 1}.0 hh.`;
 };
 
+/**
+ * The stall a horse travels in, as the server saves it (HorseSizing.stallFor): an aggressive horse always travels in a
+ * box stall, whatever was ticked; any other horse in the stall ticked, standard when none is.
+ */
+export const stallFor = (
+  temperament: Temperament | null | undefined,
+  requested: StallType | null | undefined,
+): StallType => (temperament === 'AGGRESSIVE' ? 'BOX' : (requested ?? 'STANDARD'));
+
 /** The size class the server will derive (H-03): the highest band at or below the height, a box stall at least L. */
 export const sizeClassFor = (
   heightHh: number | null | undefined,

@@ -6,14 +6,16 @@ import type { HorseFormShape } from './HorseForm';
 
 import { Chip } from '@/components/ui';
 import { useSizeClasses } from '@/hooks/horse';
-import { formatHeight, sizeClassFor } from '@/lib/utils';
+import { formatHeight, sizeClassFor, stallFor } from '@/lib/utils';
 
 /** "Size M · 32 in. Worked out from 16.0 hh." */
 export const SizeLine: FC = () => {
   const heightHh = useWatch<HorseFormShape, 'heightHh'>({ name: 'heightHh' });
   const requiredStall = useWatch<HorseFormShape, 'requiredStall'>({ name: 'requiredStall' });
   const { data: classes } = useSizeClasses();
-  const size = sizeClassFor(heightHh, requiredStall ?? 'STANDARD', classes ?? []);
+  const temperament = useWatch<HorseFormShape, 'temperament'>({ name: 'temperament' });
+  // An aggressive horse is sized as the box stall it always travels in.
+  const size = sizeClassFor(heightHh, stallFor(temperament, requiredStall), classes ?? []);
   return (
     <div className="rounded-sm bg-sunken px-4 py-3">
       <Flex align="center" gap={12}>

@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import com.equifreight.entity.HorseSizeClass;
 import com.equifreight.entity.enums.StallType;
+import com.equifreight.entity.enums.Temperament;
 import com.equifreight.exception.BusinessException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,6 +27,17 @@ public final class HorseSizing {
     private static final String INVALID_HEIGHT = "INVALID_HEIGHT";
 
     private HorseSizing() {}
+
+    /**
+     * The stall a horse travels in: the one asked for, or a standard stall; an aggressive horse always travels in a box
+     * stall, so it is sized as one and can't take a climate stall instead (one stall per horse).
+     */
+    public static StallType stallFor(Temperament temperament, StallType requested) {
+        if (temperament == Temperament.AGGRESSIVE) {
+            return StallType.BOX;
+        }
+        return requested == null ? StallType.STANDARD : requested;
+    }
 
     /**
      * The height at scale 1; null stays null so Bean Validation reports a missing height.
