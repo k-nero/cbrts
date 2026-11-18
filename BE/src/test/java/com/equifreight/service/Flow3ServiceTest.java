@@ -1821,4 +1821,30 @@ class Flow3ServiceTest {
                 assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
         assertThat(ex.getMessage()).contains("At least 3 groom(s) required for 7 horses");
     }
+
+    @Test
+    @DisplayName("Fleet calendar filters vehicles by TRUCK kind (US-F3-08)")
+    void fleetCalendar_filterByKindTruck() {
+        Vehicle truck = new Vehicle();
+        truck.setCode("TK-02");
+        truck.setKind(VehicleKind.TRUCK);
+
+        Vehicle trailer = new Vehicle();
+        trailer.setCode("TR-02");
+        trailer.setKind(VehicleKind.TRAILER);
+
+        VehicleBooking b1 = new VehicleBooking();
+        b1.setVehicle(truck);
+        VehicleBooking b2 = new VehicleBooking();
+        b2.setVehicle(trailer);
+
+        Instant from = Instant.now().minusSeconds(300);
+        Instant to = Instant.now().plusSeconds(3600);
+
+        when(vehicleBookingRepository.findInDateRange(from, to)).thenReturn(List.of(b1, b2));
+
+        List<VehicleBookingResponse> trucksOnly = vehicleService.getFleetCalendar(from, to, VehicleKind.TRUCK);
+        assertThat(trucksOnly).hasSize(1);
+        assertThat(trucksOnly.getFirst().vehicleCode()).isEqualTo("TK-02");
+    }
 }
