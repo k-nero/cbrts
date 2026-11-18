@@ -8,7 +8,7 @@ import {
   StallTypeEnum,
   TemperamentEnum,
 } from '@/interfaces';
-import { formatDay, heightProblem } from '@/lib/utils';
+import { formatDay, heightProblem, stallFor } from '@/lib/utils';
 
 const MICROCHIP_DIGITS = 15;
 
@@ -109,7 +109,7 @@ export const toHorseInput = (values: HorseFormValues): HorseInput => ({
   heightHh: values.heightHh,
   weightKg: values.weightKg ?? null,
   temperament: values.temperament ?? null,
-  requiredStall: values.requiredStall ?? 'STANDARD',
+  requiredStall: stallFor(values.temperament, values.requiredStall),
   handlingNotes: blankToNull(values.handlingNotes),
   declaredValue: values.declaredValue,
 });

@@ -38,7 +38,7 @@ public record HorseRequest(
 
         Temperament temperament,
         /**
-         * Defaults to STANDARD.
+         * Defaults to STANDARD. An aggressive horse is always saved with BOX, whatever is sent (HorseSizing.stallFor).
          */
         StallType requiredStall,
         @Size(max = 2000) String handlingNotes) {}

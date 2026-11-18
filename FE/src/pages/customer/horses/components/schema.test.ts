@@ -86,6 +86,16 @@ describe('horseSchema', () => {
     );
   });
 
+  test('anAggressiveHorseIsSentWithABoxStall', () => {
+    expect(
+      toHorseInput({ ...NIGHTFALL, temperament: 'AGGRESSIVE', requiredStall: 'CLIMATE' })
+        .requiredStall,
+    ).toBe('BOX');
+    expect(
+      toHorseInput({ ...NIGHTFALL, temperament: 'CALM', requiredStall: 'CLIMATE' }).requiredStall,
+    ).toBe('CLIMATE');
+  });
+
   test('dateOfBirthTodayPasses', () => {
     expect(messageOn({ dateOfBirth: TODAY }, 'dateOfBirth')).toBeUndefined();
   });
