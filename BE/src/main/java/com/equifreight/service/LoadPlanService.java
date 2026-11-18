@@ -1017,6 +1017,24 @@ public class LoadPlanService {
                 || Objects.equals(a.getVehicle().getId(), b.getVehicle().getId());
     }
 
+    /**
+     * Recursively explores candidate stall allocations for the horse at the given index.
+     *
+     * <p>At each step of the recursive tree:
+     * <ol>
+     *   <li>Filters out already occupied stalls.</li>
+     *   <li>Prunes branches that fail basic stall capacity and temperament compatibility checks.</li>
+     *   <li>Prunes branches where a stallion and a mare would share adjacent rows on the same trailer.</li>
+     *   <li>Backtracks and rolls back the assignment if subsequent horses cannot find valid placements.</li>
+     * </ol>
+     *
+     * @param index current index in the horse list being placed
+     * @param horses full ordered list of horses to place
+     * @param stalls pool of available stalls across convoy vehicles
+     * @param current current accumulator map of horse-to-stall placements
+     * @param maresWithFoal set of mare IDs with foals requiring wide stalls
+     * @return {@code true} if a complete valid assignment was found, {@code false} to trigger backtracking
+     */
     private boolean solveRecursive(
             int index,
             List<Horse> horses,
