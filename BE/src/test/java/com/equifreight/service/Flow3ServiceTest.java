@@ -1539,4 +1539,351 @@ class Flow3ServiceTest {
         List<VehicleBookingResponse> allVehicles = vehicleService.getFleetCalendar(from, to, null);
         assertThat(allVehicles).hasSize(2);
     }
+
+    @Test
+    @DisplayName("Auto-arranging places nervous horse away from trailer ramp (US-F3-05)")
+    void loadPlan_autoArrange_nervousHorseAvoidsRampStall() {
+        TransportJob job = readyJob();
+        Horse nervousHorse = job.getRequest().getHorses().getFirst().getHorse();
+        nervousHorse.setTemperament(Temperament.NERVOUS);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall rampStall = new VehicleStall();
+        rampStall.setId(UUID.randomUUID());
+        rampStall.setStallType(StallType.STANDARD);
+        rampStall.setPositionNo((short) 1);
+        rampStall.setRowNo((short) 1);
+        rampStall.setNearRamp(true);
+        rampStall.setVehicle(plan.getVehicle());
+
+        VehicleStall interiorStall = new VehicleStall();
+        interiorStall.setId(UUID.randomUUID());
+        interiorStall.setStallType(StallType.STANDARD);
+        interiorStall.setPositionNo((short) 2);
+        interiorStall.setRowNo((short) 2);
+        interiorStall.setNearRamp(false);
+        interiorStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(rampStall, interiorStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(nervousHorse.getId())
+                        && !lps.getVehicleStall().isNearRamp()));
+    }
+
+    @Test
+    @DisplayName("Auto-arranging places stallion in box stall (US-F3-05)")
+    void loadPlan_autoArrange_stallionGetsBoxStall() {
+        TransportJob job = readyJob();
+        Horse stallion = job.getRequest().getHorses().getFirst().getHorse();
+        stallion.setSex(HorseSex.STALLION);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
+        standardStall.setVehicle(plan.getVehicle());
+
+        VehicleStall boxStall = new VehicleStall();
+        boxStall.setId(UUID.randomUUID());
+        boxStall.setStallType(StallType.BOX);
+        boxStall.setPositionNo((short) 2);
+        boxStall.setRowNo((short) 2);
+        boxStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, boxStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(stallion.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.BOX));
+    }
+
+    @Test
+    @DisplayName("Auto-arranging places aggressive horse in box stall isolation (US-F3-05)")
+    void loadPlan_autoArrange_aggressiveHorseGetsBoxStall() {
+        TransportJob job = readyJob();
+        Horse aggressiveHorse = job.getRequest().getHorses().getFirst().getHorse();
+        aggressiveHorse.setTemperament(Temperament.AGGRESSIVE);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
+        standardStall.setVehicle(plan.getVehicle());
+
+        VehicleStall boxStall = new VehicleStall();
+        boxStall.setId(UUID.randomUUID());
+        boxStall.setStallType(StallType.BOX);
+        boxStall.setPositionNo((short) 2);
+        boxStall.setRowNo((short) 2);
+        boxStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, boxStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(aggressiveHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.BOX));
+    }
+
+    @Test
+    @DisplayName("Auto-arranging places climate-sensitive horse in climate-controlled stall (US-F3-05)")
+    void loadPlan_autoArrange_climateSensitiveHorseGetsClimateStall() {
+        TransportJob job = readyJob();
+        Horse climateHorse = job.getRequest().getHorses().getFirst().getHorse();
+        climateHorse.setRequiredStall(StallType.CLIMATE);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
+        standardStall.setVehicle(plan.getVehicle());
+
+        VehicleStall climateStall = new VehicleStall();
+        climateStall.setId(UUID.randomUUID());
+        climateStall.setStallType(StallType.CLIMATE);
+        climateStall.setPositionNo((short) 2);
+        climateStall.setRowNo((short) 2);
+        climateStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, climateStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(climateHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.CLIMATE));
+    }
+
+    @Test
+    @DisplayName("Auto-arrange fails when horse count exceeds available vehicle stalls (US-F3-05)")
+    void loadPlan_autoArrange_failsWhenHorsesExceedStalls() {
+        TransportJob job = readyJob();
+        Horse horse2 = new Horse();
+        horse2.setId(UUID.randomUUID());
+        horse2.setName("Second Horse");
+        RequestHorse rh2 = new RequestHorse();
+        rh2.setHorse(horse2);
+        job.getRequest()
+                .setHorses(new ArrayList<>(List.of(job.getRequest().getHorses().getFirst(), rh2)));
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall onlyOneStall = new VehicleStall();
+        onlyOneStall.setId(UUID.randomUUID());
+        onlyOneStall.setStallType(StallType.STANDARD);
+        onlyOneStall.setPositionNo((short) 1);
+        onlyOneStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(onlyOneStall));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
+        assertThat(ex.getMessage()).contains("cannot accommodate");
+    }
+
+    @Test
+    @DisplayName("Auto-arrange is rejected on confirmed load plan (US-F3-05)")
+    void loadPlan_autoArrange_failsOnConfirmedPlan() {
+        TransportJob job = readyJob();
+        LoadPlan plan = loadPlan(job);
+        plan.setStatus(LoadPlanStatus.CONFIRMED);
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
+        assertThat(ex.getMessage()).contains("Cannot auto-arrange a CONFIRMED load plan");
+    }
+
+    @Test
+    @DisplayName("Crew assignment requires at least 2 grooms for 5 horses (US-F3-06)")
+    void crewAssignment_requiresTwoGroomsForFiveHorses() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = new TransportJob();
+        job.setCode("CBRT-2026-042");
+
+        TransportRequest req = new TransportRequest();
+        List<RequestHorse> horses = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            horses.add(new RequestHorse());
+        }
+        req.setHorses(horses);
+        job.setRequest(req);
+
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobTrips.horsesOn(trip))
+                .thenReturn(
+                        List.of(new TripHorse(), new TripHorse(), new TripHorse(), new TripHorse(), new TripHorse()));
+
+        AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.DRIVER)
+                .build();
+
+        AssignCrewRequest.CrewItem groom = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(driver, groom)).build();
+
+        User user = new User();
+        user.setEmail("coordinator@equifreight.vn");
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
+        assertThat(ex.getMessage()).contains("At least 2 groom(s) required for 5 horses");
+    }
+
+    @Test
+    @DisplayName("Crew assignment requires at least 3 grooms for 7 horses (US-F3-06)")
+    void crewAssignment_requiresThreeGroomsForSevenHorses() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = new TransportJob();
+        job.setCode("CBRT-2026-043");
+
+        TransportRequest req = new TransportRequest();
+        List<RequestHorse> horses = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            horses.add(new RequestHorse());
+        }
+        req.setHorses(horses);
+        job.setRequest(req);
+
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobTrips.horsesOn(trip))
+                .thenReturn(List.of(
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse()));
+
+        AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.DRIVER)
+                .build();
+
+        AssignCrewRequest.CrewItem groom1 = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest.CrewItem groom2 = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest crewReq = AssignCrewRequest.builder()
+                .crew(List.of(driver, groom1, groom2))
+                .build();
+
+        User user = new User();
+        user.setEmail("coordinator@equifreight.vn");
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
+        assertThat(ex.getMessage()).contains("At least 3 groom(s) required for 7 horses");
+    }
+
+    @Test
+    @DisplayName("Fleet calendar filters vehicles by TRUCK kind (US-F3-08)")
+    void fleetCalendar_filterByKindTruck() {
+        Vehicle truck = new Vehicle();
+        truck.setCode("TK-02");
+        truck.setKind(VehicleKind.TRUCK);
+
+        Vehicle trailer = new Vehicle();
+        trailer.setCode("TR-02");
+        trailer.setKind(VehicleKind.TRAILER);
+
+        VehicleBooking b1 = new VehicleBooking();
+        b1.setVehicle(truck);
+        VehicleBooking b2 = new VehicleBooking();
+        b2.setVehicle(trailer);
+
+        Instant from = Instant.now().minusSeconds(300);
+        Instant to = Instant.now().plusSeconds(3600);
+
+        when(vehicleBookingRepository.findInDateRange(from, to)).thenReturn(List.of(b1, b2));
+
+        List<VehicleBookingResponse> trucksOnly = vehicleService.getFleetCalendar(from, to, VehicleKind.TRUCK);
+        assertThat(trucksOnly).hasSize(1);
+        assertThat(trucksOnly.getFirst().vehicleCode()).isEqualTo("TK-02");
+    }
+
+    @Test
+    @DisplayName("Auto-arranging places large horse into wide stall accommodating its width (US-F3-05)")
+    void loadPlan_autoArrange_largeHorseFitsWideStall() {
+        TransportJob job = readyJob();
+        Horse largeHorse = job.getRequest().getHorses().getFirst().getHorse();
+        HorseSizeClass sizeL = new HorseSizeClass();
+        sizeL.setCode("L");
+        sizeL.setWidthIn((short) 48);
+        largeHorse.setSizeClass(sizeL);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall narrowStall = new VehicleStall();
+        narrowStall.setId(UUID.randomUUID());
+        narrowStall.setStallType(StallType.STANDARD);
+        narrowStall.setPositionNo((short) 1);
+        narrowStall.setRowNo((short) 1);
+        narrowStall.setVehicle(plan.getVehicle());
+
+        VehicleStall wideStall = new VehicleStall();
+        wideStall.setId(UUID.randomUUID());
+        wideStall.setStallType(StallType.CLIMATE);
+        wideStall.setPositionNo((short) 2);
+        wideStall.setRowNo((short) 2);
+        wideStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(narrowStall, wideStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(largeHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.CLIMATE));
+    }
 }
