@@ -97,6 +97,15 @@ export const heightProblem = (heightHh: number): string | null => {
   return `${(tenths / 10).toFixed(1)} hh isn't a height: a hand is 4 inches, so ${hands}.3 hh is followed by ${hands + 1}.0 hh.`;
 };
 
+/**
+ * The stall a horse travels in, as the server saves it (HorseSizing.stallFor): an aggressive horse always travels in a
+ * box stall, whatever was ticked; any other horse in the stall ticked, standard when none is.
+ */
+export const stallFor = (
+  temperament: Temperament | null | undefined,
+  requested: StallType | null | undefined,
+): StallType => (temperament === 'AGGRESSIVE' ? 'BOX' : (requested ?? 'STANDARD'));
+
 /** The size class the server will derive (H-03): the highest band at or below the height, a box stall at least L. */
 export const sizeClassFor = (
   heightHh: number | null | undefined,
@@ -113,6 +122,24 @@ export const sizeClassFor = (
   }
   return chosen;
 };
+
+/** The size line's rule in words: from the height, and from the box stall when that raises the class (H-03a). */
+export const sizeBasis = (heightHh: number, stall: StallType, classes: SizeClass[]): string => {
+  const raised =
+    sizeClassFor(heightHh, stall, classes)?.code !==
+    sizeClassFor(heightHh, 'STANDARD', classes)?.code;
+  return `Worked out from ${formatHeight(heightHh)}${raised ? ' and the box stall' : ''}.`;
+};
+
+/**
+ * The add-horse form's line for an aggressive horse, whose box stall is set rather than chosen. A climate stall the
+ * horse had ticked can't go with it (one stall per horse), so the line says where that need goes instead.
+ */
+export const boxStallNote = (ticked: StallType | null | undefined): string =>
+  'Aggressive horses always travel in a box stall, so it is set for this horse.' +
+  (ticked === 'CLIMATE'
+    ? ' A box stall isn’t climate-controlled: if the horse needs that, say so in the handling notes.'
+    : '');
 
 /** The coat band; OTHER or no coat is the neutral band. */
 export const coatOf = (coat: HorseCoat | null | undefined): Coat =>

@@ -134,7 +134,7 @@ erDiagram
 | `declared_value` | numeric(14,2) not null | Insurance base. Taken as stated (out of scope to verify). |
 | `value_currency` | char(3) not null default 'USD' | |
 | `temperament` | varchar(20) | `CALM`, `NERVOUS`, `AGGRESSIVE`. |
-| `required_stall` | varchar(20) not null default 'STANDARD' | `STANDARD`, `BOX`, `CLIMATE`. A stallion or aggressive horse needs `BOX` (application rule, shown as a load-plan conflict). |
+| `required_stall` | varchar(20) not null default 'STANDARD' | `STANDARD`, `BOX`, `CLIMATE`. An aggressive horse is always saved with `BOX`, and so sized at least L (application rule, `HorseSizing.stallFor`; V43 moved the horses saved before it). A stallion also needs a box in the load plan (shown as a load-plan conflict), without changing the stall saved. |
 | `handling_notes` | text | |
 | `archived_at` | timestamptz | A horse is archived, never deleted, because past jobs refer to it. |
 
