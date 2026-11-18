@@ -1727,4 +1727,45 @@ class Flow3ServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
         assertThat(ex.getMessage()).contains("Cannot auto-arrange a CONFIRMED load plan");
     }
+
+    @Test
+    @DisplayName("Crew assignment requires at least 2 grooms for 5 horses (US-F3-06)")
+    void crewAssignment_requiresTwoGroomsForFiveHorses() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = new TransportJob();
+        job.setCode("CBRT-2026-042");
+
+        TransportRequest req = new TransportRequest();
+        List<RequestHorse> horses = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            horses.add(new RequestHorse());
+        }
+        req.setHorses(horses);
+        job.setRequest(req);
+
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobTrips.horsesOn(trip))
+                .thenReturn(
+                        List.of(new TripHorse(), new TripHorse(), new TripHorse(), new TripHorse(), new TripHorse()));
+
+        AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.DRIVER)
+                .build();
+
+        AssignCrewRequest.CrewItem groom = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest crewReq =
+                AssignCrewRequest.builder().crew(List.of(driver, groom)).build();
+
+        User user = new User();
+        user.setEmail("coordinator@equifreight.vn");
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
+        assertThat(ex.getMessage()).contains("At least 2 groom(s) required for 5 horses");
+    }
 }
