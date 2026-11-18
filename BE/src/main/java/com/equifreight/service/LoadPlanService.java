@@ -983,6 +983,24 @@ public class LoadPlanService {
         return true;
     }
 
+    /**
+     * Finds a zero-conflict stall arrangement for horses across all convoy trailers using a backtracking search.
+     *
+     * <p>Enforces the equine welfare and safety rules defined in US-F3-05:
+     * <ul>
+     *   <li>Stall width requirements (Standard 32", Climate 48", Box 96") based on horse sizing and temperament.</li>
+     *   <li>Box stalls dedicated to stallions or aggressive horses requiring full physical isolation.</li>
+     *   <li>Climate-controlled stall assignment for horses with specific temperature sensitivities.</li>
+     *   <li>Nervous horses placed away from trailer entrance/exit ramps to minimize transport stress.</li>
+     *   <li>Proximity separation between stallions/colts and mares/fillies on the same trailer.</li>
+     *   <li>Weight payload restrictions to avoid exceeding vehicle capacity bounds.</li>
+     * </ul>
+     *
+     * @param horses the list of horses to be accommodated on the trip
+     * @param stalls all available vehicle stalls across the trip's trailers
+     * @param maresWithFoal set of mare horse IDs requiring foal-accommodating stall dimensions
+     * @return a map of horse-to-stall assignments with zero conflicts, or {@code null} if no valid placement exists
+     */
     private Map<Horse, VehicleStall> solveArrangement(
             List<Horse> horses, List<VehicleStall> stalls, Set<UUID> maresWithFoal) {
         // Backtracking solver to find a 0-conflict placement
