@@ -2789,6 +2789,342 @@ function buildCover(page) {
 }
 
 /* =====================================================================
+   MCP (use_figma) entries. Each call runs in a fresh context with no
+   state, so every entry after the first rehydrates the registries from
+   the file: variables, styles, fonts and components by name.
+   Build with ./build-mcp.sh → mcp/NN-name.js (one use_figma call each).
+   ===================================================================== */
+var CNAMES = {
+  button: 'Button', chip: 'Chip', input: 'Input field', checkbox: 'Checkbox', option: 'Option card', nav: 'Nav item',
+  tab: 'Tab', step: 'Step', stat: 'Stat tile', progress: 'Progress', callout: 'Callout', toast: 'Toast',
+  nameplate: 'Nameplate', horse: 'Horse card', loadItem: 'Load item', stall: 'Stall tile', docRow: 'Document row',
+  gate: 'Clearance gate', quoteLine: 'Quote line', estimate: 'Estimate card', stop: 'Timeline stop',
+  header: 'App header / Desktop', headerM: 'App header / Mobile', footer: 'Footer',
+  sideNav: 'Side nav item', adminSide: 'Staff sidebar',
+  owed: 'Owed item', stageRow: 'Stage row', stop2: 'Route stop', colHead: 'Column header', pageNum: 'Page number'
+};
+function pageNamed(name) { return figma.root.children.filter(function (p) { return p.name === name; })[0]; }
+
+async function rehydrate(pageName) {
+  await loadFonts();
+  var cols = await figma.variables.getLocalVariableCollectionsAsync();
+  var color = cols.filter(function (c) { return c.name === DS + ' / Color'; })[0];
+  var dim = cols.filter(function (c) { return c.name === DS + ' / Dimension'; })[0];
+  if (!color || !dim) throw new Error('Variables missing: run 01-tokens first');
+  COLL = { color: color, dark: color.modes[0].modeId, light: color.modes.length > 1 ? color.modes[1].modeId : null, dim: dim };
+  var vars = await figma.variables.getLocalVariablesAsync();
+  vars.forEach(function (v) { if (v.variableCollectionId === color.id || v.variableCollectionId === dim.id) V[v.name] = v; });
+  RADII.forEach(function (r) { if (V[r[0]]) RADV[r[1]] = V[r[0]]; });
+  var ts = await figma.getLocalTextStylesAsync();
+  ts.forEach(function (s) {
+    if (s.name.indexOf(DS + '/') !== 0) return;
+    STY[s.name.slice(DS.length + 1)] = { id: s.id, font: s.fontName, size: s.fontSize, lh: s.lineHeight.value, ls: s.letterSpacing.value, upper: s.textCase === 'UPPER' };
+  });
+  await Promise.all(Object.keys(STY).map(function (k) { return figma.loadFontAsync(STY[k].font); }));
+  var es = await figma.getLocalEffectStylesAsync();
+  es.forEach(function (s) { if (s.name.indexOf(DS + '/') === 0) EFX[s.name.slice(DS.length + 1)] = s.id; });
+
+  var page = pageNamed(pageName);
+  if (!page) throw new Error('Page missing: ' + pageName);
+  await figma.setCurrentPageAsync(page);
+  var cp = pageNamed(PAGE_NAMES[2]);
+  if (cp !== page) await cp.loadAsync();
+  var byName = {};
+  cp.findAllWithCriteria({ types: ['COMPONENT', 'COMPONENT_SET'] }).forEach(function (n) {
+    if (n.type === 'COMPONENT_SET' || n.parent.type !== 'COMPONENT_SET') byName[n.name] = n;
+    if (n.type === 'COMPONENT' && n.name.indexOf('Icon/') === 0) ICON[n.name.slice(5)] = n;
+  });
+  for (var k in CNAMES) if (byName[CNAMES[k]]) C[k] = byName[CNAMES[k]];
+  STATS.components = Object.keys(byName).length;
+  STATS.variants = cp.findAllWithCriteria({ types: ['COMPONENT_SET'] }).reduce(function (a, s) { return a + s.children.length; }, 0);
+  return page;
+}
+function rightOf(page) {
+  var x = 0;
+  page.children.forEach(function (n) { x = Math.max(x, n.x + n.width + 160); });
+  return x;
+}
+function report(extra) {
+  var o = { components: STATS.components, variants: STATS.variants, fallbacks: FALLBACKS };
+  for (var k in extra) o[k] = extra[k];
+  return o;
+}
+
+async function eTokens() {
+  await cleanup();
+  await loadFonts();
+  buildVariables();
+  buildStyles();
+  var old = figma.root.children.filter(function (p) { return PAGE_NAMES.indexOf(p.name) >= 0; });
+  var pages = PAGE_NAMES.map(function (n) { var p = figma.createPage(); p.name = n; return p; });
+  await figma.setCurrentPageAsync(pages[0]);
+  old.forEach(function (p) { p.remove(); });
+  pages.forEach(function (p) { p.backgrounds = [{ type: 'SOLID', color: { r: 0.035, g: 0.055, b: 0.08 } }]; });
+  var p1 = pageNamed('Page 1');
+  if (p1) { await p1.loadAsync(); if (!p1.children.length) p1.remove(); }
+  return { pages: pages.map(function (p) { return p.name + ' ' + p.id; }), colorVars: COLORS.length, modes: COLL.color.modes.map(function (m) { return m.name; }), textStyles: TYPE.length, effectStyles: EFFECTS.length, fonts: FONT, fallbacks: FALLBACKS };
+}
+
+async function eComponentsA() {
+  var page = await rehydrate(PAGE_NAMES[2]);
+  page.children.slice().forEach(function (n) { n.remove(); });
+  var board = primaryTheme(H({ name: 'Components', gap: 40, wrap: true, rowGap: 40, pad: 80, w: DOC_W * 2 + 40 + 160, fill: 'bg/canvas' }));
+  page.appendChild(board);
+  var icons = docBlock(board, 'Icons', Object.keys(ICONS).length + ' line icons on a 24 px grid, 1.75 stroke, round caps and joins. Each is its own component (Icon/…) so Button, Option card and Service card can swap them. Colour them with a stroke override from a text, accent or status token.');
+  var grid = H({ name: 'Icon grid', gap: 12, wrap: true, rowGap: 12 });
+  add(icons, fillW(grid));
+  buildIcons(grid);
+  buildButton(board);
+  buildChip(board);
+  buildInput(board);
+  buildCheckbox(board);
+  buildOptionCard(board);
+  buildNavigation(board);
+  buildDataDisplay(board);
+  buildNameplate(board);
+  await flush();
+  return report({ board: board.id, icons: Object.keys(ICON).length });
+}
+
+async function eComponentsB() {
+  var page = await rehydrate(PAGE_NAMES[2]);
+  var board = page.children.filter(function (n) { return n.name === 'Components'; })[0];
+  buildHorseCard(board);
+  buildLoadItem(board);
+  buildStall(board);
+  buildDocRow(board);
+  buildGate(board);
+  buildQuoteLine(board);
+  buildEstimate(board);
+  buildTimeline(board);
+  buildChrome(board);
+  var toastRow = docBlock(board, 'In use', 'Toasts confirm what just happened in words that match the button that caused it.');
+  var tr = H({ name: 'Toasts', gap: 16 });
+  var t1 = inst(C.toast, { Tone: 'Ok' }); setP(t1, { Message: 'Load plan confirmed for CBRT-2026-041' });
+  var t2 = inst(C.toast, { Tone: 'Bad' }); setP(t2, { Message: 'Departure refused: 9 items outstanding' });
+  addAll(tr, [t1, t2]);
+  add(toastRow, tr);
+  await flush();
+  return report({ board: board.id, boardSize: [board.width, board.height] });
+}
+
+async function eFoundations() {
+  var page = await rehydrate(PAGE_NAMES[1]);
+  page.children.slice().forEach(function (n) { n.remove(); });
+  var b = buildFoundations(page);
+  await flush();
+  return report({ foundations: b.id, size: [b.width, b.height] });
+}
+
+async function screensCall(builders) {
+  var page = await rehydrate(PAGE_NAMES[3]);
+  var made = [];
+  for (var i = 0; i < builders.length; i++) {
+    var s = primaryTheme(await builders[i]());
+    await flush();
+    var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
+    old.forEach(function (n) { n.remove(); });
+    s.x = rightOf(page); s.y = 0;
+    made.push(s.name + ' ' + s.id + ' ' + Math.round(s.width) + '×' + Math.round(s.height));
+  }
+  return report({ screens: made });
+}
+/* new frames: replace a same-named frame in place, otherwise park below everything; eCanvas files them into their row */
+async function newScreensCall(builders) {
+  var page = await rehydrate(PAGE_NAMES[3]);
+  var made = [];
+  for (var i = 0; i < builders.length; i++) {
+    var s = primaryTheme(builders[i]());
+    await flush();
+    var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
+    if (old.length) { s.x = old[0].x; s.y = old[0].y; old.forEach(function (n) { n.remove(); }); }
+    else { var bottom = 0; page.children.forEach(function (n) { if (n !== s) bottom = Math.max(bottom, n.y + n.height); }); s.x = 0; s.y = bottom + 360; }
+    made.push(s.name + ' ' + s.id + ' ' + Math.round(s.width) + '×' + Math.round(s.height));
+  }
+  return report({ screens: made });
+}
+/* the Footer component (Full, Compact) replaces the single-variant one: a fresh instance per screen,
+   keeping each screen's size and date. A fresh instance, not a swap, because a swap would carry the old
+   whole-sentence Note override onto the new Note layer. */
+async function eFooter() {
+  var page = await rehydrate(PAGE_NAMES[2]);
+  var old = C.footer;
+  var block = old.parent;
+  var set = buildFooter(block);
+  block.insertChild(block.children.indexOf(old), set);
+  await flush();
+  C.footer = set;
+  var screens = pageNamed(PAGE_NAMES[3]);
+  await screens.loadAsync();
+  var done = [];
+  var olds = [];
+  for (var fi = 0; fi < screens.children.length; fi++) {
+    var fr = screens.children[fi];
+    if (fr.type !== 'FRAME') continue;
+    for (var ci = 0; ci < fr.children.length; ci++) {
+      var n = fr.children[ci];
+      if (n.type !== 'INSTANCE') continue;
+      var mc = await n.getMainComponentAsync();
+      var isFooter = mc && (mc.name === 'Footer' || (mc.parent && mc.parent.name === 'Footer'));
+      if (isFooter && mc.parent !== set) olds.push(n); // any footer not on the new set, including orphans of a removed one
+    }
+  }
+  olds.forEach(function (o) {
+    var f = o.parent;
+    var size = (o.componentProperties && o.componentProperties.Size && o.componentProperties.Size.value) || 'Full';
+    var d = o.findOne(function (n) { return n.type === 'TEXT' && n.name === 'As of'; });
+    var nt = o.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Note'; });
+    var asOf = d ? d.characters : (nt && /as of (.+)$/.exec(nt.characters) || [])[1];
+    var ni = footer(size, asOf);
+    f.insertChild(f.children.indexOf(o), ni);
+    ni.layoutSizingHorizontal = 'FILL';
+    ni.name = 'Footer';
+    o.remove();
+    done.push(f.name + ' · ' + size + ' · ' + (asOf || '26 Sep 2026'));
+  });
+  await flush();
+  old.remove();
+  return report({ footer: set.id, screens: done });
+}
+async function eAccess() { return newScreensCall(ACCESS_SCREENS); }
+async function eAudit() { return newScreensCall(AUDIT_SCREENS); }
+async function eScreensOwnerA() { return screensCall([scrLanding, scrHorses]); }
+/* the signed-in Home needs the owed item and route stop, built by eTrackComponents, so it comes after them;
+   it makes its own Dark copies because eArrange has already run */
+async function eHomeScreens() {
+  var out = await screensCall([scrHome, scrHomeClear, scrHomeRoad]);
+  var page = pageNamed(PAGE_NAMES[3]);
+  if (COLL.light) ['Home', 'Home · Nothing owed', 'Home · On the road'].forEach(function (nm) {
+    var src = page.children.filter(function (n) { return n.name === nm; })[0];
+    if (!src) return;
+    page.children.filter(function (n) { return n.name === nm + ALT_SUFFIX; }).forEach(function (n) { n.remove(); });
+    altCopy(src);
+  });
+  await flush();
+  return out;
+}
+async function eScreensOwnerB() { return screensCall([scrRequest1, scrRequest2, scrRequest4]); }
+/* The quotation (tracking page model) and the staff job tabs need components
+   built later in the sequence, so they come after them: eQuoteScreen, eStaffScreens*. */
+
+var ROWS = [
+  ['Owner portal', ['Landing · Signed out', 'Home', 'My horses', 'Request · 1 Horses', 'Request · 2 Route & dates (error)', 'Request · 4 Review']],
+  ['Operations', ['Quotation', 'Fleet & route coordinator · Load plan', 'Transport specialist · Clearance checklist', 'Fleet & route coordinator · Route plan', 'Fleet & route coordinator · Trip · Flight']],
+  ['Dark mode & mobile', ['Landing · Signed out · Dark', 'Home · Dark', 'Transport specialist · Clearance checklist · Dark', 'Quotation · Dark', 'My horses · Mobile', 'My horses · Mobile · Dark']]
+];
+async function eArrange() {
+  var page = await rehydrate(PAGE_NAMES[3]);
+  page.children.filter(function (n) { return / · (Light|Dark)$|Mobile|^Row label/.test(n.name); }).forEach(function (n) { n.remove(); });
+  var byName = {};
+  page.children.forEach(function (n) { byName[n.name] = n; });
+  if (COLL.light) {
+    ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'Transport specialist · Clearance checklist', 'Quotation'].forEach(function (nm) {
+      if (!byName[nm]) return;
+      var c = altCopy(byName[nm]);
+      byName[c.name] = c;
+    });
+  }
+  var mob = primaryTheme(scrHorsesMobile()); byName[mob.name] = mob;
+  if (COLL.light) {
+    var ml = altCopy(mob);
+    byName[ml.name] = ml;
+  }
+  await flush();
+  var y = 0, placed = [];
+  ROWS.forEach(function (row) {
+    var lbl = Tx(row[0], 'Display/M', 'text/primary', { name: 'Row label · ' + row[0] });
+    page.appendChild(lbl);
+    lbl.x = 0; lbl.y = y;
+    y += 120;
+    var nodes = row[1].map(function (n) { return byName[n]; }).filter(Boolean);
+    place(nodes, 0, y, 120);
+    placed = placed.concat(nodes.map(function (n) { return n.name; }));
+    y += Math.max.apply(null, nodes.map(function (n) { return n.height; }).concat([0])) + 240;
+  });
+  await flush();
+  return report({ placed: placed, lightMode: !!COLL.light });
+}
+
+async function eCover() {
+  var page = await rehydrate(PAGE_NAMES[0]);
+  page.children.slice().forEach(function (n) { n.remove(); });
+  var f = buildCover(page);
+  await flush();
+  figma.viewport.scrollAndZoomIntoView([f]);
+  return report({ cover: f.id });
+}
+
+/* Staff workspace: the job tabs replace the old operations frames in place
+   (same name, same position); new frames go at the end of the staff row. */
+var LIGHT_COPIES = ['Transport specialist · Clearance checklist', 'Quotation'];
+async function staffScreensCall(builders) {
+  var page = await rehydrate(PAGE_NAMES[3]);
+  var made = [];
+  for (var i = 0; i < builders.length; i++) {
+    var s = primaryTheme(builders[i]());
+    await flush();
+    var old = page.children.filter(function (n) { return n.name === s.name && n !== s; });
+    if (old.length) { s.x = old[0].x; s.y = old[0].y; old.forEach(function (n) { n.remove(); }); }
+    else {
+      var label = adminRowLabel(page), y = label.y + 120, x = 0;
+      page.children.forEach(function (n) { if (n !== s && n.type === 'FRAME' && Math.abs(n.y - y) < 1) x = Math.max(x, n.x + n.width + 120); });
+      s.x = x; s.y = y;
+    }
+    var light = page.children.filter(function (n) { return n.name === s.name + ALT_SUFFIX; });
+    if (COLL.light && (light.length || LIGHT_COPIES.indexOf(s.name) >= 0)) {
+      var c = altCopy(s);
+      if (light.length) { c.x = light[0].x; c.y = light[0].y; } else { c.x = s.x + s.width + 120; c.y = s.y; }
+      light.forEach(function (n) { n.remove(); });
+      made.push(c.name + ' ' + c.id);
+    }
+    made.push(s.name + ' ' + s.id + ' ' + Math.round(s.width) + '×' + Math.round(s.height));
+  }
+  return report({ screens: made });
+}
+async function eQuoteScreen() { return staffScreensCall([scrQuote]); }
+/* the journey through a quarantine (US-F3-22) is drawn here, where the job page's helpers already are; eCanvas files it after Trip · Journey */
+async function eStaffScreensA() { return staffScreensCall([scrJobs, scrJobsSorted, scrClearance, scrTripQuarantine, scrTripAddTrip]); }
+async function eStaffScreensB() { return staffScreensCall([scrLoadPlan, scrRoute, scrFlightTrip, scrJourney]); }
+
+/* ---------- MCP: the canvas, one row per surface, every row from x 0 with 120 gutters ---------- */
+/* one staff row per role, so who is signed in is clear from the canvas alone */
+var STAFF_ROWS = ['Logistics manager · Vũ Hải Yến', 'Transport specialist · Nguyễn Thị Lan', 'Fleet & route coordinator · Đỗ Minh Khôi'];
+/* [label text, existing label names it may carry, frames in reading order] */
+var CANVAS = [
+  ['Access', ['Row label · Access', 'Row label · Access · Dark'], ['Access · Sign in', 'Access · Sign in · Wrong password', 'Access · Sign in · Locked', 'Access · Create account', 'Access · Create account · Check your email', 'Access · Staff invite', 'Access · Staff invite · Expired', 'Access · Reset password', 'Access · Reset password · Link sent', 'Access · Reset password · New password', 'Access · Reset password · Link expired']],
+  ['Owner portal', ['Row label · Owner portal', 'Row label · Owner portal · Dark'], ['Landing · Signed out', 'Home', 'Home · Nothing owed', 'Home · On the road', 'My horses', 'My horses · Nightfall', 'My horses · Nightfall · Edit', 'Request · 1 Horses', 'Request · 2 Route & dates (error)', 'Request · 2 Route & dates · Arrival window', 'Request · 2 Route & dates · Not run', 'Request · 3 Service', 'Request · 4 Review', 'First run · My requests', 'First run · Add a horse']],
+  ['Owner · Request tracking', ['Row label · Owner · Request tracking'], ['Tracking · My requests', 'Tracking · In review', 'Tracking · Info required', 'Quotation', 'Tracking · Documents needed', 'Tracking · All documents', 'Tracking · Ask a question', 'Tracking · Document upload · Refused', 'Tracking · Document upload', 'Tracking · In transit', 'Tracking · Re-routed', 'Tracking · Delivered', 'Tracking · Closed', 'Tracking · Invoice', 'Tracking · Report a problem']],
+  [STAFF_ROWS[0], ['Row label · ' + STAFF_ROWS[0], 'Row label · Staff workspace · Dark', 'Row label · Staff workspace'], ['Logistics manager · Overview', 'Logistics manager · Jobs', 'Logistics manager · Jobs · Sorted', 'Logistics manager · Request review', 'Logistics manager · Request review · Override', 'Logistics manager · Quotation builder', 'Logistics manager · Quotation builder · Blocked', 'Logistics manager · Incident · Held', 'Logistics manager · Incident · Customer report', 'Logistics manager · Invoices', 'Logistics manager · Invoices · Record payment', 'Logistics manager · Users & roles', 'Logistics manager · Users & roles · Error', 'Logistics manager · Users & roles · Pending invites', 'Logistics manager · Audit log', 'Logistics manager · Audit log · Entry', 'Logistics manager · Audit log · No results']],
+  [STAFF_ROWS[1], ['Row label · ' + STAFF_ROWS[1]], ['Transport specialist · Clearance checklist', 'Transport specialist · Authorities', 'Transport specialist · Authorities · Overdue', 'Transport specialist · Authorities · Quarantine scheduled', 'Transport specialist · Document review', 'Transport specialist · Document review · Not sent', 'Transport specialist · Document review · Reject', 'Transport specialist · Customer notes', 'Transport specialist · Regulation catalog', 'Transport specialist · Rate catalog', 'Transport specialist · Audit log · Not allowed']],
+  [STAFF_ROWS[2], ['Row label · ' + STAFF_ROWS[2]], ['Fleet & route coordinator · Load plan', 'Fleet & route coordinator · Route plan', 'Fleet & route coordinator · Trip · Flight', 'Fleet & route coordinator · Trip · Journey', 'Fleet & route coordinator · Trip · Quarantine', 'Fleet & route coordinator · Trip · Add trip']],
+  ['Escort cab surface', ['Row label · Escort cab surface', 'Row label · Escort cab surface · Light', 'Row label · Operations · Dark', 'Row label · Operations'], ['Escort · Checkpoint', 'Escort · Welfare stop', 'Escort · Delivery', 'Escort · Held', 'Escort · Handed on']],
+  ['Dark mode · Mobile not maintained', ['Row label · Dark mode · Mobile not maintained', 'Row label · Light mode · Mobile not maintained', 'Row label · Dark mode & mobile', 'Row label · Light mode & mobile'], ['Landing · Signed out · Dark', 'Home · Dark', 'Home · Nothing owed · Dark', 'Home · On the road · Dark', 'Quotation · Dark', 'Transport specialist · Clearance checklist · Dark', 'My horses · Mobile', 'My horses · Mobile · Dark']]
+];
+async function eCanvas() {
+  var page = await rehydrate(PAGE_NAMES[3]);
+  var byName = {}, placed = {};
+  page.children.forEach(function (n) { byName[n.name] = n; });
+  var y = 0, rows = [];
+  CANVAS.forEach(function (row) {
+    var lbl = null;
+    row[1].forEach(function (nm) { if (!lbl && byName[nm]) lbl = byName[nm]; });
+    if (!lbl) { lbl = Tx(row[0], 'Display/M', 'text/primary'); page.appendChild(lbl); }
+    lbl.characters = row[0]; lbl.name = 'Row label · ' + row[0];
+    lbl.x = 0; lbl.y = y;
+    var x = 0, tall = 0;
+    row[2].forEach(function (nm) {
+      var f = byName[nm];
+      if (!f) return;
+      f.x = x; f.y = y + 120; x += f.width + 120; tall = Math.max(tall, f.height);
+      placed[nm] = true;
+    });
+    rows.push(row[0] + ' @' + y);
+    y += 120 + tall + 240;
+  });
+  var loose = page.children.filter(function (n) { return n.type === 'FRAME' && !placed[n.name]; }).map(function (n) { return n.name; });
+  return report({ rows: rows, loose: loose });
+}
+/* =====================================================================
    Staff workspace: sidebar shell, jobs, catalogs, overview dashboard,
    users. One shell for every staff role; the sidebar shows only the
    sections the signed-in role owns. Desktop only (1440).
@@ -3726,7 +4062,6 @@ var SIDEBAR_FRAMES = {
   'Fleet & route coordinator · Trip · Journey': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-042', 'Trip']],
   'Fleet & route coordinator · Trip · Quarantine': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-051', 'Trip']],
   'Fleet & route coordinator · Trip · Add trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-051', 'Trip']],
-  'Fleet & route coordinator · Trip': ['khoi', 'Jobs', ['Jobs', 'CBRT-2026-041', 'Trip']],
   'Transport specialist · Document review': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Not sent': ['lan', 'Documents', ['Documents', 'Nightfall · EIA test'], [['Clearance checklist', 'Documents']]],
   'Transport specialist · Document review · Reject': ['lan', 'Documents', ['Documents', 'Silver Bell · Proof of ownership'], [['Clearance checklist', 'Documents']]],
@@ -5485,88 +5820,7 @@ function scrTripHandedOn() {
     cabStrip([['Done', 'Da Nang', 'Pickup', '06:05', 'Departed'], ['Done', 'Quy Nhơn', 'Welfare stop', '11:20', 'Left checkpoint'], ['Done', 'Nha Trang', 'Welfare stop', '17:05', 'Left checkpoint'], ['Done', 'Tân Sơn Nhất cargo terminal', 'Hand on to the next trip', '00:40', 'Handed on to the next trip']]),
     task, null, null);
 }
-/* ---------- The office side of the same trip: Khôi at 08:41 on 18 Oct ----------
-   The coordinator watches what the cab records against the route he planned. Positions come
-   only from recorded checkpoints, as on the customer's page, so nothing here is a guess.
-   There is no gold: while the trip runs to plan the office has nothing to move forward. */
-var NOW041 = '08:41';
-/* [stop, kind, planned, recorded, what was recorded, chip tone, chip word] */
-var TRIP_PLAN = [
-  ['Phú Thọ training centre', 'Pickup · Ho Chi Minh City', '06:00', '06:05', 'Departed · Minh, driver', 'Ok', 'Departed'],
-  ['Mộc Bài – Bavet', 'Border · Vietnam exit, Cambodia entry', '08:30', '08:34', 'Arrived 07:58, cleared both sides · Minh, driver', 'Ok', 'Cleared'],
-  ['Svay Rieng welfare stop', 'Welfare stop · 45 min rest', '09:30', null, 'Expected in ' + durText(toMin('09:30') - toMin(NOW041)), 'Info', 'Next'],
-  ['Phnom Penh Equestrian Centre', 'Delivery · handover to the receiving groom', '12:30', null, 'Window ' + JOB_WINDOW.from + '–' + JOB_WINDOW.until + ', ' + durText(toMin(JOB_WINDOW.until) - toMin('12:30')) + ' to spare at plan', 'Neutral', 'Upcoming']
-];
-function againstPlan(planned, recorded) {
-  if (!recorded) return '—';
-  var d = toMin(recorded) - toMin(planned);
-  return d === 0 ? 'On time' : (d > 0 ? '+' : '−') + durText(Math.abs(d));
-}
-function scrTripCoordinator() {
-  var last = TRIP_PLAN.filter(function (r) { return r[3]; }).pop();
-  var log = tripLogUntil(NOW041);
-  var tiles = H({ name: 'Tiles', gap: 16 });
-  addAll(tiles, [
-    fillW(stat('Neutral', againstPlan(last[2], last[3]), 'Against plan at ' + last[0])),
-    fillW(stat('Neutral', JOB_WINDOW.from + '–' + JOB_WINDOW.until, 'Arrival window · plan arrives ' + TRIP_PLAN[3][2])),
-    fillW(stat('Info', TRIP_PLAN[2][2], 'Next checkpoint · Svay Rieng')),
-    fillW(stat('Ok', '4 of 4', 'Horses sound at the last check, ' + log[log.length - 1][0]))
-  ]);
-
-  var stops = tbl('Checkpoints', [['Checkpoint', null], ['Planned', 90, null, 'Mono/Data'], ['Recorded', 280], ['Against plan', 110, 'RIGHT', 'Mono/Data'], ['Status', 110, 'RIGHT']], TRIP_PLAN.map(function (r) {
-    var name = VV({ name: r[0], gap: 2 });
-    addAll(name, [Tx(r[0], 'Label/M'), Tx(r[1], 'Body/S', 'text/tertiary', { fill: true })]);
-    var rec = VV({ name: 'Recorded', gap: 2 });
-    if (r[3]) add(rec, Tx(r[3], 'Mono/Data', 'text/primary'));
-    add(rec, Tx(r[4], 'Body/S', r[3] ? 'text/tertiary' : (r[5] === 'Info' ? 'status/info/fg' : 'text/tertiary'), { fill: true }));
-    return { cells: [fillW(name), r[2], fillW(rec), againstPlan(r[2], r[3]), chip(r[5], r[6], r[5] === 'Neutral' ? { noDot: true } : null)], hl: r[6] === 'Next' };
-  }));
-
-  var lp = panel('Escort’s log', { gap: 0, pad: [20, 24, 12, 24] });
-  var lh = VV({ name: 'Title', gap: 2, pad: [0, 0, 12, 0] });
-  addAll(lh, [Tx('Escort’s log', 'Heading/H4'), Tx(tripLogSummary(NOW041) + '. Every record also reaches the customer’s page.', 'Body/S', 'text/tertiary')]);
-  add(lp, fillW(lh));
-  log.slice().reverse().forEach(function (r) {
-    var row = H({ name: r[0], gap: 20, pad: [10, 0, 10, 0], cross: 'CENTER' });
-    borderSide(row, 'border/default', 'top');
-    addAll(row, [Tx(r[0], 'Mono/Caption', 'text/tertiary', { w: 56 }), Tx(r[1], 'Body/S', 'text/primary', { fill: true }), Tx(r[2], 'Body/S', 'text/tertiary', { w: 120, align: 'RIGHT' })]);
-    add(lp, fillW(row));
-  });
-  var plan = titled('Checkpoints, planned against recorded', 'From the route plan you confirmed on 16 Oct; recorded times come from the cab.', stops, Tx('Updated ' + NOW041, 'Mono/Caption', 'text/tertiary'));
-
-  /* each horse's word from the last condition check, the same Sound / Watch / Concern the groom picks */
-  var board = panel('On board', { gap: 0, pad: [20, 24, 12, 24] });
-  var bh = VV({ name: 'Title', gap: 2, pad: [0, 0, 10, 0] });
-  addAll(bh, [Tx('On board', 'Heading/H4'), Tx('Last condition check ' + log[log.length - 1][0] + ' by ' + log[log.length - 1][2] + '. Next at the welfare stop.', 'Body/S', 'text/tertiary', { fill: true })]);
-  add(board, fillW(bh));
-  var notes = { Nightfall: 'Sweated at loading; calm since the border.' };
-  TRIP_LOAD.forEach(function (h) {
-    var r = H({ name: h[0], gap: 12, pad: [10, 0, 10, 0], cross: 'CENTER' });
-    borderSide(r, 'border/default', 'top');
-    var t = VV({ name: 'Text', gap: 2 });
-    add(t, Tx(h[0], 'Label/M'));
-    add(t, Tx(notes[h[0]] ? h[1] + ' · ' + notes[h[0]] : h[1], 'Body/S', 'text/tertiary', { fill: true }));
-    addAll(r, [fillW(t), chip('Ok', 'Sound')]);
-    add(board, fillW(r));
-  });
-  var crew = panel('Crew and vehicle', { gap: 12 });
-  add(crew, Tx('Crew and vehicle', 'Heading/H4'));
-  [['Vehicle', 'Trailer TX-447', true], ['Driver', STAFF.minh[0]], ['Grooms', 'Lê Thị Hoa, Phạm Quốc Tuấn'], ['Records', 'All sent · last ' + log[log.length - 1][0]]].forEach(function (f) { add(crew, factRow(f)); });
-  add(crew, btn('Secondary', 'MD', 'Call the cab', { fill: true }));
-  var stop = panel('If the trip stops', { gap: 10 });
-  addAll(stop, [Tx('If the trip stops', 'Heading/H4'),
-    Tx('A hold recorded in the cab opens an incident for Yến, logistics manager, and tells the customer. Raise one yourself for anything the cab can’t record.', 'Body/S', 'text/secondary', { fill: true }),
-    btn('Secondary', 'MD', 'Raise an incident', { lead: 'alert' })]);
-  /* the table takes the full width; below it, what was recorded and what the customer reads, beside the horses and the crew */
-  var left = column([lp, customerSees('Your horses cleared the Mộc Bài – Bavet border at 08:34. Next checkpoint: the Svay Rieng welfare stop, expected 09:30.')]);
-  var right = column([board, crew, stop]);
-
-  return jobScreen('Fleet & route coordinator · Trip', 'Trip', STAFF.khoi, [tiles, plan, split(left, right, SIDE.narrow)], {
-    stage: 'Trip', gateState: 'Clear', today: 'Sun 18 Oct 2026',
-    gate: 'Cleared 17 Oct, 16:20 by Lan, transport specialist. Departure recorded 06:05 by Minh, driver.'
-  });
-}
-async function eTripA() { return insertChainCall([scrTripCoordinator, scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
+async function eTripA() { return insertChainCall([scrTripCheckpoint, scrTripWelfare], 'Fleet & route coordinator · Route plan'); }
 
 /* =====================================================================
    A journey through a quarantine (US-F3-22, Trip tab). Trip 1 ends with a
@@ -7208,104 +7462,26 @@ function scrInvoicePay() {
   ], INV_TODAY);
 }
 async function eStaffInvoices() { return insertChainCall([scrInvoices, scrInvoicePay], 'Logistics manager · Incident · Customer report'); }
+var PLUGIN_ENTRIES = [eTokens,eComponentsA,eComponentsB,eFoundations,eScreensOwnerA,eScreensOwnerB,eArrange,eCover,eAdminComponents,eTableComponents,eAdminCatalogs,eAdminOverview,eTrackComponents,eHomeScreens,eTrackScreensA,eTrackScreensA2,eTrackScreensB,eQuoteScreen,eStaffScreensA,eStaffScreensB,eReviewScreens,eReviewCustomer,eBuilderScreens,eDocScreens,eDocReview,eAuthorities,eTripA,eTripB,eHandover,eIncidents,eService,eHorse,eContact,eFirstRun,eInvoice,eStaffInvoices,eSidebar,eFooter,eAccess,eAudit,eCanvas];
 /* ---------------------------------------------------------------------
-   Main
+   Main: the plugin runs the same entries as the MCP route (04-mcp.js),
+   in the same order, in one go. build.sh lists them in PLUGIN_ENTRIES
+   from build-mcp.sh, so both routes build the same file. Each entry
+   rehydrates its registries from the file, as it does in a fresh
+   use_figma call.
    --------------------------------------------------------------------- */
 async function main() {
-  figma.notify('Building EquiFreight design system…', { timeout: 4000 });
-  await cleanup();
-  await loadFonts();
-  buildVariables();
-  buildStyles();
-
-  var old = figma.root.children.filter(function (p) { return PAGE_NAMES.indexOf(p.name) >= 0; });
-  var pages = PAGE_NAMES.map(function (n) { var p = figma.createPage(); p.name = n; return p; });
-  var cover = pages[0], foundations = pages[1], components = pages[2], screens = pages[3];
-  await figma.setCurrentPageAsync(components);
-  pages.forEach(function (p) { p.backgrounds = [{ type: 'SOLID', color: { r: 0.035, g: 0.055, b: 0.08 } }]; });
-  for (var i = 0; i < old.length; i++) { try { old[i].remove(); } catch (e) { console.warn('Could not remove old page ' + old[i].name); } }
-
-  var board = H({ name: 'Components', gap: 40, wrap: true, rowGap: 40, pad: 80, w: DOC_W * 2 + 40 + 160, fill: 'bg/canvas' });
-  buildComponents(board);
-  addChartVariables();
-  addAdminIcons(board.findOne(function (n) { return n.name === 'Icon grid'; }));
-  buildAdminComponents(board);
-  buildTableComponents(board);
-  buildTrackingComponents(board);
-  var toastRow = docBlock(board, 'In use', 'Toasts confirm what just happened in words that match the button that caused it.');
-  var tr = H({ name: 'Toasts', gap: 16 });
-  var t1 = inst(C.toast, { Tone: 'Ok' }); setP(t1, { Message: 'Load plan confirmed for CBRT-2026-041' });
-  var t2 = inst(C.toast, { Tone: 'Bad' }); setP(t2, { Message: 'Departure refused: 9 items outstanding' });
-  addAll(tr, [t1, t2]);
-  add(toastRow, tr);
-  await flush();
-
-  await figma.setCurrentPageAsync(foundations);
-  buildFoundations(foundations);
-  await flush();
-
-  await figma.setCurrentPageAsync(screens);
-  var row1 = [await scrLanding(), scrHome(), scrHorses(), scrHorseProfile(), scrHorseEdit(), scrRequest1(), scrRequest2(), scrRequest2Window(), scrRequest2NotRun(), scrRequest3(), scrRequest4(), scrFirstRequests(), scrAddHorse()];
-  var row2 = [scrQuote(), scrLoadPlan(), scrClearance(), scrAuthorities(), scrAuthoritiesOverdue(), scrAuthoritiesQuarantine(), scrRoute(), scrFlightTrip(), scrJourney(), scrTripQuarantine(), scrTripAddTrip(), scrTripCheckpoint(), scrTripWelfare(), scrTripDelivery(), scrTripHeld(), scrTripHandedOn()];
-  row1.concat(row2).forEach(primaryTheme);
-  await flush();
-  var lbl1 = Tx('Owner portal', 'Display/M');
-  var lbl2 = Tx('Operations', 'Display/M');
-  var lbl3 = Tx('Dark mode & mobile', 'Display/M');
-  [lbl1, lbl2, lbl3].forEach(function (l) { screens.appendChild(l); });
-  lbl1.x = 0; lbl1.y = -120;
-  place(row1, 0, 0, 120);
-  var y2 = Math.max.apply(null, row1.map(function (n) { return n.height; })) + 360;
-  lbl2.x = 0; lbl2.y = y2 - 120;
-  place(row2, 0, y2, 120);
-  var y3 = y2 + Math.max.apply(null, row2.map(function (n) { return n.height; })) + 360;
-  lbl3.x = 0; lbl3.y = y3 - 120;
-  var light = [altCopy(row1[0]), altCopy(row2[2]), altCopy(row2[0])];
-  light.forEach(function (n) { screens.appendChild(n); });
-  var mob = primaryTheme(scrHorsesMobile());
-  var mobL = altCopy(mob);
-  screens.appendChild(mobL);
-  place(light.concat([mob, mobL]), 0, y3, 120);
-  await flush();
-
-  var admin = [scrRegulations(), scrRates(), scrDashboard(), scrUsers(), scrUsersError(), scrJobs(), scrJobsSorted(), scrReview(), scrReviewOverride(), scrBuilder(), scrBuilderBlocked(), scrDocReview(), scrDocReject(), scrIncidentHeld(), scrIncidentReport(), scrStaffNotes()];
-  await flush();
-  var lblA = Tx('Staff workspace · Dark', 'Display/M');
-  screens.appendChild(lblA);
-  var yA = y3 + Math.max.apply(null, light.map(function (n) { return n.height; })) + 360;
-  lblA.x = 0; lblA.y = yA - 120;
-  place(admin, 0, yA, 120);
-  await flush();
-
-  var track = [scrMyRequests(), scrTrackReview(), scrTrackInfo(), scrTrackDocs(), scrAllDocs(), scrTrackAsk(), scrDocRefused(), scrDocUpload(), scrTrackTransit(), scrTrackDelivered(), scrTrackClosed(), scrTrackReport()];
-  await flush();
-  var lblT = Tx('Owner · Request tracking', 'Display/M');
-  screens.appendChild(lblT);
-  var yT = yA + Math.max.apply(null, admin.map(function (n) { return n.height; })) + 360;
-  lblT.x = 0; lblT.y = yT - 120;
-  place(track, 0, yT, 120);
-  await flush();
-
-  var access = ACCESS_SCREENS.map(function (f) { return f(); }), audit = AUDIT_SCREENS.map(function (f) { return f(); });
-  await flush();
-  var lblX = Tx('Access · Dark', 'Display/M');
-  screens.appendChild(lblX);
-  var yX = yT + Math.max.apply(null, track.map(function (n) { return n.height; })) + 360;
-  lblX.x = 0; lblX.y = yX - 120;
-  place(access, 0, yX, 120);
-  var yU = yX + AUTH_H + 360;
-  var lblU = Tx('Audit log · Dark', 'Display/M');
-  screens.appendChild(lblU);
-  lblU.x = 0; lblU.y = yU - 120;
-  place(audit, 0, yU, 120);
-  await flush();
-
-  await figma.setCurrentPageAsync(cover);
-  buildCover(cover);
-  await flush();
-  figma.viewport.scrollAndZoomIntoView(cover.children);
-
-  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants, 67 screens.';
+  var out = null;
+  for (var i = 0; i < PLUGIN_ENTRIES.length; i++) {
+    var entry = PLUGIN_ENTRIES[i];
+    figma.notify('EquiFreight ' + (i + 1) + '/' + PLUGIN_ENTRIES.length + ': ' + entry.name, { timeout: 3000 });
+    out = await entry();
+  }
+  if (out && out.loose && out.loose.length) {
+    figma.closePlugin('EquiFreight generator failed: frames that fit no canvas row: ' + out.loose.join(', '));
+    return;
+  }
+  var msg = 'EquiFreight: ' + COLORS.length + ' colour variables × 2 modes, ' + STATS.components + ' components, ' + STATS.variants + ' variants.';
   if (FALLBACKS.length) msg += ' Font fallbacks: ' + FALLBACKS.join('; ');
   figma.closePlugin(msg);
 }
