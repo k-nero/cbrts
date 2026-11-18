@@ -28,6 +28,17 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service managing crew assignments (drivers, grooms, flight vets) for road and air transport trips (US-F3-06, US-F3-15).
+ *
+ * <p>Enforces operational safety constraints:
+ * <ul>
+ *   <li>Minimum groom staffing ratio: 1 groom per 3 horses, rounded up.</li>
+ *   <li>Dedicated certified driver required per road trailer.</li>
+ *   <li>Crew member overlap prevention across active concurrent trips.</li>
+ *   <li>Automatic clearance invalidation and manager sign-off reset upon crew roster adjustments.</li>
+ * </ul>
+ */
 @Service
 @Log4j2
 public class CrewAssignmentService {
