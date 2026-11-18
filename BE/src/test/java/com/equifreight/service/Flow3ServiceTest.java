@@ -1685,4 +1685,33 @@ class Flow3ServiceTest {
                 .save(argThat(lps -> lps.getHorse().getId().equals(climateHorse.getId())
                         && lps.getVehicleStall().getStallType() == StallType.CLIMATE));
     }
+
+    @Test
+    @DisplayName("Auto-arrange fails when horse count exceeds available vehicle stalls (US-F3-05)")
+    void loadPlan_autoArrange_failsWhenHorsesExceedStalls() {
+        TransportJob job = readyJob();
+        Horse horse2 = new Horse();
+        horse2.setId(UUID.randomUUID());
+        horse2.setName("Second Horse");
+        RequestHorse rh2 = new RequestHorse();
+        rh2.setHorse(horse2);
+        job.getRequest()
+                .setHorses(new ArrayList<>(List.of(job.getRequest().getHorses().getFirst(), rh2)));
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall onlyOneStall = new VehicleStall();
+        onlyOneStall.setId(UUID.randomUUID());
+        onlyOneStall.setStallType(StallType.STANDARD);
+        onlyOneStall.setPositionNo((short) 1);
+        onlyOneStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(onlyOneStall));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
+        assertThat(ex.getMessage()).contains("cannot accommodate");
+    }
 }
