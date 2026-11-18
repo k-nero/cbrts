@@ -1649,4 +1649,40 @@ class Flow3ServiceTest {
                 .save(argThat(lps -> lps.getHorse().getId().equals(aggressiveHorse.getId())
                         && lps.getVehicleStall().getStallType() == StallType.BOX));
     }
+
+    @Test
+    @DisplayName("Auto-arranging places climate-sensitive horse in climate-controlled stall (US-F3-05)")
+    void loadPlan_autoArrange_climateSensitiveHorseGetsClimateStall() {
+        TransportJob job = readyJob();
+        Horse climateHorse = job.getRequest().getHorses().getFirst().getHorse();
+        climateHorse.setRequiredStall(StallType.CLIMATE);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
+        standardStall.setVehicle(plan.getVehicle());
+
+        VehicleStall climateStall = new VehicleStall();
+        climateStall.setId(UUID.randomUUID());
+        climateStall.setStallType(StallType.CLIMATE);
+        climateStall.setPositionNo((short) 2);
+        climateStall.setRowNo((short) 2);
+        climateStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, climateStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(climateHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.CLIMATE));
+    }
 }
