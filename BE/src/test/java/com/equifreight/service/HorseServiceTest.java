@@ -13,6 +13,7 @@ import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.StallType;
+import com.equifreight.entity.enums.Temperament;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
@@ -250,6 +251,49 @@ class HorseServiceTest {
     }
 
     @Test
+    void anAggressiveHorseTravelsInABoxStallAndIsSizedForIt() {
+        // 15.3 hh is size M; a box stall makes it at least L, as the Box stall only tick does.
+        HorseRequest request = nightfallRequest().toBuilder()
+                .heightHh(new BigDecimal("15.3"))
+                .temperament(Temperament.AGGRESSIVE)
+                .requiredStall(StallType.STANDARD)
+                .build();
+
+        service.create(user, request);
+
+        Horse saved = savedHorse();
+        assertThat(saved.getRequiredStall()).isEqualTo(StallType.BOX);
+        assertThat(saved.getSizeClass().getCode()).isEqualTo("L");
+    }
+
+    @Test
+    void anAggressiveHorseAskedForAClimateStallStillGetsABox() {
+        // One stall per horse: the box an aggressive horse needs wins over a climate stall.
+        HorseRequest request = nightfallRequest().toBuilder()
+                .temperament(Temperament.AGGRESSIVE)
+                .requiredStall(StallType.CLIMATE)
+                .build();
+
+        service.create(user, request);
+
+        assertThat(savedHorse().getRequiredStall()).isEqualTo(StallType.BOX);
+    }
+
+    @Test
+    void aNervousHorseKeepsTheStallItAskedFor() {
+        HorseRequest request = nightfallRequest().toBuilder()
+                .temperament(Temperament.NERVOUS)
+                .requiredStall(StallType.CLIMATE)
+                .build();
+
+        service.create(user, request);
+
+        Horse saved = savedHorse();
+        assertThat(saved.getRequiredStall()).isEqualTo(StallType.CLIMATE);
+        assertThat(saved.getSizeClass().getCode()).isEqualTo("M");
+    }
+
+    @Test
     void createMapsARaceOnTheUniqueIndexesToAConflict() {
         when(horses.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("horses_microchip_key"));
 
@@ -407,6 +451,27 @@ class HorseServiceTest {
         service.update(user, nightfall.getId(), requestFrom(nightfall));
 
         verify(horses).saveAndFlush(nightfall);
+    }
+
+    @Test
+    void anAggressiveHorseSavedWithAStandardStallBecomesABoxWhenUpdated() {
+        // Saved before the rule, and on a submitted request: its identity is locked, its stall isn't.
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        nightfall.setHeightHh(new BigDecimal("15.3"));
+        nightfall.setTemperament(Temperament.AGGRESSIVE);
+        nightfall.setRequiredStall(StallType.STANDARD);
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+
+        service.update(
+                user,
+                nightfall.getId(),
+                requestFrom(nightfall).toBuilder()
+                        .temperament(Temperament.AGGRESSIVE)
+                        .build());
+
+        Horse saved = savedHorse();
+        assertThat(saved.getRequiredStall()).isEqualTo(StallType.BOX);
+        assertThat(saved.getSizeClass().getCode()).isEqualTo("L");
     }
 
     @Test

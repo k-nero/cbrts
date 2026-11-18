@@ -21,7 +21,11 @@ import { useCanPlanTrips, useRoutePlans } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 import { formatTime, ict } from '@/lib/utils';
 
+/**
+ * Properties for the RouteTab component.
+ */
 interface Props {
+  /** The detailed transport job record including current route plan, stops, and departure readiness. */
   job: JobDetail;
 }
 
@@ -35,6 +39,12 @@ function windowSpare(plannedAt: string, windowEnd: string) {
     : `Planned ${span(minutes)} after the window closes at ${closes}.`;
 }
 
+/**
+ * RouteTab displays the interactive route planning and milestone timeline interface (US-F3-01 to US-F3-04).
+ *
+ * Renders planned stops (pickup, border crossings, rest and welfare stops, delivery),
+ * allows editing draft route versions, and checks departure readiness against biosecurity clearance.
+ */
 export function RouteTab({ job }: Props) {
   const routePlan = job.routePlan;
   const { data: allVersions } = useRoutePlans(job.id);

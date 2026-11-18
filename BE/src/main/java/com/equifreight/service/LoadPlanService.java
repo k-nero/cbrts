@@ -596,6 +596,13 @@ public class LoadPlanService {
         return buildResponse(trip, plans, job);
     }
 
+    /**
+     * Persists an individual horse placement into a vehicle stall within a load plan.
+     *
+     * @param plan the load plan owning this vehicle placement
+     * @param stall the physical vehicle stall assigned to the horse
+     * @param horse the horse entity occupying the stall
+     */
     private void place(LoadPlan plan, VehicleStall stall, Horse horse) {
         LoadPlanStall lps = new LoadPlanStall();
         lps.setLoadPlan(plan);
@@ -958,6 +965,17 @@ public class LoadPlanService {
                 .build();
     }
 
+    /**
+     * Determines whether a horse requires an isolated full-width box stall (96") based on equine welfare rules.
+     *
+     * <p>Box stalls are mandatory for:
+     * <ul>
+     *   <li>Mares traveling with dependent unweaned foals.</li>
+     *   <li>Stallions and colts to prevent behavioral aggression and injury risks.</li>
+     *   <li>Horses with recorded aggressive temperament.</li>
+     *   <li>Explicit customer bookings requesting full box accommodations.</li>
+     * </ul>
+     */
     private boolean requiresBox(Horse horse, Set<UUID> maresWithFoal) {
         return maresWithFoal.contains(horse.getId())
                 || horse.getSex() == HorseSex.STALLION
@@ -966,6 +984,14 @@ public class LoadPlanService {
                 || horse.getRequiredStall() == StallType.BOX;
     }
 
+    /**
+     * Evaluates hard compatibility constraints between a horse and a candidate stall.
+     *
+     * @param horse the horse to evaluate
+     * @param stall the candidate vehicle stall
+     * @param maresWithFoal set of mare IDs with foals
+     * @return {@code true} if the horse fits the stall's dimensions, climate specifications, and ramp safety bounds
+     */
     private boolean fitsStall(Horse horse, VehicleStall stall, Set<UUID> maresWithFoal) {
         if (requiresBox(horse, maresWithFoal) && stall.getStallType() != StallType.BOX) {
             return false;
@@ -983,6 +1009,24 @@ public class LoadPlanService {
         return true;
     }
 
+    /**
+     * Finds a zero-conflict stall arrangement for horses across all convoy trailers using a backtracking search.
+     *
+     * <p>Enforces the equine welfare and safety rules defined in US-F3-05:
+     * <ul>
+     *   <li>Stall width requirements (Standard 32", Climate 48", Box 96") based on horse sizing and temperament.</li>
+     *   <li>Box stalls dedicated to stallions or aggressive horses requiring full physical isolation.</li>
+     *   <li>Climate-controlled stall assignment for horses with specific temperature sensitivities.</li>
+     *   <li>Nervous horses placed away from trailer entrance/exit ramps to minimize transport stress.</li>
+     *   <li>Proximity separation between stallions/colts and mares/fillies on the same trailer.</li>
+     *   <li>Weight payload restrictions to avoid exceeding vehicle capacity bounds.</li>
+     * </ul>
+     *
+     * @param horses the list of horses to be accommodated on the trip
+     * @param stalls all available vehicle stalls across the trip's trailers
+     * @param maresWithFoal set of mare horse IDs requiring foal-accommodating stall dimensions
+     * @return a map of horse-to-stall assignments with zero conflicts, or {@code null} if no valid placement exists
+     */
     private Map<Horse, VehicleStall> solveArrangement(
             List<Horse> horses, List<VehicleStall> stalls, Set<UUID> maresWithFoal) {
         // Backtracking solver to find a 0-conflict placement
@@ -999,6 +1043,24 @@ public class LoadPlanService {
                 || Objects.equals(a.getVehicle().getId(), b.getVehicle().getId());
     }
 
+    /**
+     * Recursively explores candidate stall allocations for the horse at the given index.
+     *
+     * <p>At each step of the recursive tree:
+     * <ol>
+     *   <li>Filters out already occupied stalls.</li>
+     *   <li>Prunes branches that fail basic stall capacity and temperament compatibility checks.</li>
+     *   <li>Prunes branches where a stallion and a mare would share adjacent rows on the same trailer.</li>
+     *   <li>Backtracks and rolls back the assignment if subsequent horses cannot find valid placements.</li>
+     * </ol>
+     *
+     * @param index current index in the horse list being placed
+     * @param horses full ordered list of horses to place
+     * @param stalls pool of available stalls across convoy vehicles
+     * @param current current accumulator map of horse-to-stall placements
+     * @param maresWithFoal set of mare IDs with foals requiring wide stalls
+     * @return {@code true} if a complete valid assignment was found, {@code false} to trigger backtracking
+     */
     private boolean solveRecursive(
             int index,
             List<Horse> horses,

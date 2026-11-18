@@ -292,7 +292,7 @@ public class HorseService {
         String name = request.name().trim();
         requireNameFree(club, horse, name);
         requireMicrochipFree(horse, microchip);
-        StallType stall = request.requiredStall() == null ? StallType.STANDARD : request.requiredStall();
+        StallType stall = HorseSizing.stallFor(request.temperament(), request.requiredStall());
 
         horse.setName(name);
         horse.setSex(request.sex());
