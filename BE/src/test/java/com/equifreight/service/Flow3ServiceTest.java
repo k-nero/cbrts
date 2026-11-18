@@ -1539,4 +1539,42 @@ class Flow3ServiceTest {
         List<VehicleBookingResponse> allVehicles = vehicleService.getFleetCalendar(from, to, null);
         assertThat(allVehicles).hasSize(2);
     }
+
+    @Test
+    @DisplayName("Auto-arranging places nervous horse away from trailer ramp (US-F3-05)")
+    void loadPlan_autoArrange_nervousHorseAvoidsRampStall() {
+        TransportJob job = readyJob();
+        Horse nervousHorse = job.getRequest().getHorses().getFirst().getHorse();
+        nervousHorse.setTemperament(Temperament.NERVOUS);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall rampStall = new VehicleStall();
+        rampStall.setId(UUID.randomUUID());
+        rampStall.setStallType(StallType.STANDARD);
+        rampStall.setPositionNo((short) 1);
+        rampStall.setRowNo((short) 1);
+        rampStall.setNearRamp(true);
+        rampStall.setVehicle(plan.getVehicle());
+
+        VehicleStall interiorStall = new VehicleStall();
+        interiorStall.setId(UUID.randomUUID());
+        interiorStall.setStallType(StallType.STANDARD);
+        interiorStall.setPositionNo((short) 2);
+        interiorStall.setRowNo((short) 2);
+        interiorStall.setNearRamp(false);
+        interiorStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(rampStall, interiorStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(nervousHorse.getId())
+                        && !lps.getVehicleStall().isNearRamp()));
+    }
 }
