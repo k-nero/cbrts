@@ -1714,4 +1714,17 @@ class Flow3ServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
         assertThat(ex.getMessage()).contains("cannot accommodate");
     }
+
+    @Test
+    @DisplayName("Auto-arrange is rejected on confirmed load plan (US-F3-05)")
+    void loadPlan_autoArrange_failsOnConfirmedPlan() {
+        TransportJob job = readyJob();
+        LoadPlan plan = loadPlan(job);
+        plan.setStatus(LoadPlanStatus.CONFIRMED);
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> loadPlanService.autoArrange(job.getId()));
+        assertThat(ex.getMessage()).contains("Cannot auto-arrange a CONFIRMED load plan");
+    }
 }
