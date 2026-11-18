@@ -958,6 +958,17 @@ public class LoadPlanService {
                 .build();
     }
 
+    /**
+     * Determines whether a horse requires an isolated full-width box stall (96") based on equine welfare rules.
+     *
+     * <p>Box stalls are mandatory for:
+     * <ul>
+     *   <li>Mares traveling with dependent unweaned foals.</li>
+     *   <li>Stallions and colts to prevent behavioral aggression and injury risks.</li>
+     *   <li>Horses with recorded aggressive temperament.</li>
+     *   <li>Explicit customer bookings requesting full box accommodations.</li>
+     * </ul>
+     */
     private boolean requiresBox(Horse horse, Set<UUID> maresWithFoal) {
         return maresWithFoal.contains(horse.getId())
                 || horse.getSex() == HorseSex.STALLION
@@ -966,6 +977,14 @@ public class LoadPlanService {
                 || horse.getRequiredStall() == StallType.BOX;
     }
 
+    /**
+     * Evaluates hard compatibility constraints between a horse and a candidate stall.
+     *
+     * @param horse the horse to evaluate
+     * @param stall the candidate vehicle stall
+     * @param maresWithFoal set of mare IDs with foals
+     * @return {@code true} if the horse fits the stall's dimensions, climate specifications, and ramp safety bounds
+     */
     private boolean fitsStall(Horse horse, VehicleStall stall, Set<UUID> maresWithFoal) {
         if (requiresBox(horse, maresWithFoal) && stall.getStallType() != StallType.BOX) {
             return false;
