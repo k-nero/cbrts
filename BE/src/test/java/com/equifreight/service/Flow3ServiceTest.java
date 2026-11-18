@@ -1768,4 +1768,57 @@ class Flow3ServiceTest {
                 assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
         assertThat(ex.getMessage()).contains("At least 2 groom(s) required for 5 horses");
     }
+
+    @Test
+    @DisplayName("Crew assignment requires at least 3 grooms for 7 horses (US-F3-06)")
+    void crewAssignment_requiresThreeGroomsForSevenHorses() {
+        UUID jobId = UUID.randomUUID();
+        TransportJob job = new TransportJob();
+        job.setCode("CBRT-2026-043");
+
+        TransportRequest req = new TransportRequest();
+        List<RequestHorse> horses = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            horses.add(new RequestHorse());
+        }
+        req.setHorses(horses);
+        job.setRequest(req);
+
+        when(transportJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobTrips.horsesOn(trip))
+                .thenReturn(List.of(
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse(),
+                        new TripHorse()));
+
+        AssignCrewRequest.CrewItem driver = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.DRIVER)
+                .build();
+
+        AssignCrewRequest.CrewItem groom1 = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest.CrewItem groom2 = AssignCrewRequest.CrewItem.builder()
+                .userId(UUID.randomUUID())
+                .crewRole(CrewRole.GROOM)
+                .build();
+
+        AssignCrewRequest crewReq = AssignCrewRequest.builder()
+                .crew(List.of(driver, groom1, groom2))
+                .build();
+
+        User user = new User();
+        user.setEmail("coordinator@equifreight.vn");
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> crewAssignmentService.assignCrew(jobId, crewReq, user));
+        assertThat(ex.getMessage()).contains("At least 3 groom(s) required for 7 horses");
+    }
 }
