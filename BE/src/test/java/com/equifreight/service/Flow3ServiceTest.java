@@ -1847,4 +1847,43 @@ class Flow3ServiceTest {
         assertThat(trucksOnly).hasSize(1);
         assertThat(trucksOnly.getFirst().vehicleCode()).isEqualTo("TK-02");
     }
+
+    @Test
+    @DisplayName("Auto-arranging places large horse into wide stall accommodating its width (US-F3-05)")
+    void loadPlan_autoArrange_largeHorseFitsWideStall() {
+        TransportJob job = readyJob();
+        Horse largeHorse = job.getRequest().getHorses().getFirst().getHorse();
+        HorseSizeClass sizeL = new HorseSizeClass();
+        sizeL.setCode("L");
+        sizeL.setWidthIn((short) 48);
+        largeHorse.setSizeClass(sizeL);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall narrowStall = new VehicleStall();
+        narrowStall.setId(UUID.randomUUID());
+        narrowStall.setStallType(StallType.STANDARD);
+        narrowStall.setPositionNo((short) 1);
+        narrowStall.setRowNo((short) 1);
+        narrowStall.setVehicle(plan.getVehicle());
+
+        VehicleStall wideStall = new VehicleStall();
+        wideStall.setId(UUID.randomUUID());
+        wideStall.setStallType(StallType.CLIMATE);
+        wideStall.setPositionNo((short) 2);
+        wideStall.setRowNo((short) 2);
+        wideStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(narrowStall, wideStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(largeHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.CLIMATE));
+    }
 }
