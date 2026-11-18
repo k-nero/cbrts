@@ -5,6 +5,14 @@ import { Chip, Icon, Panel } from '@/components/ui';
 import { useFleetCalendar, useVehicles } from '@/hooks/useVehicle';
 import { type VehicleKind, VehicleKindEnum } from '@/interfaces';
 
+/**
+ * FleetCalendarPage renders the global operational fleet calendar for Coordinators (US-F3-07).
+ *
+ * Key capabilities:
+ * - Visualizes vehicle availability and scheduled bookings across 30-day time windows.
+ * - Distinguishes booking kinds: active jobs (JOB), maintenance holds (MAINTENANCE), and customer reservations (HOLD).
+ * - Displays turnaround buffer intervals between consecutive transport journeys.
+ */
 export default function FleetCalendarPage() {
   const navigate = useNavigate();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('ALL');
