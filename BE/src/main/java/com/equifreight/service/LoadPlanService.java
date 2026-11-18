@@ -596,6 +596,13 @@ public class LoadPlanService {
         return buildResponse(trip, plans, job);
     }
 
+    /**
+     * Persists an individual horse placement into a vehicle stall within a load plan.
+     *
+     * @param plan the load plan owning this vehicle placement
+     * @param stall the physical vehicle stall assigned to the horse
+     * @param horse the horse entity occupying the stall
+     */
     private void place(LoadPlan plan, VehicleStall stall, Horse horse) {
         LoadPlanStall lps = new LoadPlanStall();
         lps.setLoadPlan(plan);
