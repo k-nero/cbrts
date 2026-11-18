@@ -41,7 +41,11 @@ import { useActiveVehicles } from '@/hooks/useVehicle';
 import type { JobDetail, JobHorse, LoadPlanStall, Vehicle } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
 
+/**
+ * Properties for the LoadPlanTab component.
+ */
 interface Props {
+  /** The detailed transport job record including route legs, horses, and load plan status. */
   job: JobDetail;
 }
 
@@ -81,6 +85,12 @@ const vehicleOption = (v: Vehicle) => {
     : { value: v.id, label: v.held ? `${label} · Held for this request` : label };
 };
 
+/**
+ * LoadPlanTab provides the interactive equine load planning interface for Fleet Coordinators (US-F3-05).
+ *
+ * Enforces visual drag-and-drop stall assignment across road trailers and air cargo holds,
+ * triggers the auto-arrange backtracking solver, and reports real-time welfare and safety conflicts.
+ */
 export function LoadPlanTab({ job }: Props) {
   const loadPlan = job.loadPlan;
   const [selected, setSelected] = useState<Picked | null>(null);
