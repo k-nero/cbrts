@@ -111,6 +111,15 @@ public class VehicleAvailability {
         }
     }
 
+    /**
+     * Calculates the operational time span [startsAt, endsAt] for which a vehicle must be reserved for a trip.
+     *
+     * <p>Enforces PostgreSQL GiST range exclusion bounds: starts at the earliest departure across assigned jobs,
+     * and ends at the latest delivery arrival (or estimated arrival based on corridor driving days).
+     *
+     * @param trip the transport trip requiring vehicle booking
+     * @return the time span representation of the booking window
+     */
     @Transactional(readOnly = true)
     public Span spanOf(Trip trip) {
         Optional<Span> own = ownHoursOf(trip);

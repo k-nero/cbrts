@@ -17,6 +17,17 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service managing versioned route plans, stops, and leg scheduling for horse transport journeys (US-F3-01 to US-F3-03).
+ *
+ * <p>Key responsibilities:
+ * <ul>
+ *   <li>Constructing sequential route stops (Pickup, Border Crossings, Welfare/Rest Stops, Delivery, Transfer).</li>
+ *   <li>Enforcing mandatory rest and hydration stop intervals according to international equine welfare standards.</li>
+ *   <li>Tracking route plan versions (DRAFT, CONFIRMED, SUPERSEDED) to guarantee auditability across route modifications.</li>
+ *   <li>Re-evaluating clearance document gates whenever planned departure or arrival dates change.</li>
+ * </ul>
+ */
 @Service
 @Log4j2
 public class RoutePlanService {
