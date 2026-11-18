@@ -1613,4 +1613,40 @@ class Flow3ServiceTest {
                 .save(argThat(lps -> lps.getHorse().getId().equals(stallion.getId())
                         && lps.getVehicleStall().getStallType() == StallType.BOX));
     }
+
+    @Test
+    @DisplayName("Auto-arranging places aggressive horse in box stall isolation (US-F3-05)")
+    void loadPlan_autoArrange_aggressiveHorseGetsBoxStall() {
+        TransportJob job = readyJob();
+        Horse aggressiveHorse = job.getRequest().getHorses().getFirst().getHorse();
+        aggressiveHorse.setTemperament(Temperament.AGGRESSIVE);
+
+        LoadPlan plan = loadPlan(job);
+
+        VehicleStall standardStall = new VehicleStall();
+        standardStall.setId(UUID.randomUUID());
+        standardStall.setStallType(StallType.STANDARD);
+        standardStall.setPositionNo((short) 1);
+        standardStall.setRowNo((short) 1);
+        standardStall.setVehicle(plan.getVehicle());
+
+        VehicleStall boxStall = new VehicleStall();
+        boxStall.setId(UUID.randomUUID());
+        boxStall.setStallType(StallType.BOX);
+        boxStall.setPositionNo((short) 2);
+        boxStall.setRowNo((short) 2);
+        boxStall.setVehicle(plan.getVehicle());
+
+        when(loadPlanRepository.findByTripIdForUpdate(trip.getId())).thenReturn(List.of(plan));
+        when(vehicleStallRepository.findByVehicleIdOrderByPositionNo(
+                        plan.getVehicle().getId()))
+                .thenReturn(List.of(standardStall, boxStall));
+
+        loadPlanService.autoArrange(job.getId());
+
+        verify(loadPlanStallRepository).deleteAllForLoadPlan(plan.getId());
+        verify(loadPlanStallRepository)
+                .save(argThat(lps -> lps.getHorse().getId().equals(aggressiveHorse.getId())
+                        && lps.getVehicleStall().getStallType() == StallType.BOX));
+    }
 }
