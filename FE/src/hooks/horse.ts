@@ -6,6 +6,11 @@ import { queryKeys } from '@/constant/query';
 import type { Horse, HorseInput } from '@/interfaces';
 
 import { useCrudResource } from './crud';
+import { useFileBlobUrl } from './file';
+
+/** A blob URL of a horse's photo, or undefined without one (or while it loads). */
+export const useHorsePhotoUrl = (fileId: string | null | undefined): string | undefined =>
+  useFileBlobUrl(fileId ?? '').url;
 
 /** One page of the club's horses: active, or archived only. Sorted by name, 20 per page. */
 export const useHorses = (archived: boolean) => {

@@ -13,6 +13,8 @@ type Props = {
   name: ReactNode;
   /** On the nameplate: "Andalusian · Gelding". */
   subtitle?: ReactNode;
+  /** A blob URL of the horse's photo, laid over the coat band. */
+  photoUrl?: string;
   /** Chips: temperament, stall need. */
   tags?: ReactNode;
   facts: { age: ReactNode; height: ReactNode; weight: ReactNode; size: ReactNode };
@@ -32,6 +34,7 @@ export const HorseCard: FC<Props> = ({
   coat,
   name,
   subtitle,
+  photoUrl,
   tags,
   facts,
   microchip,
@@ -45,7 +48,7 @@ export const HorseCard: FC<Props> = ({
   <article
     className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
   >
-    <CoatBand coat={coat} name={name} subtitle={subtitle} />
+    <CoatBand coat={coat} name={name} subtitle={subtitle} photoUrl={photoUrl} />
     <div className="flex flex-col gap-4 p-5">
       {status && <div className="flex">{status}</div>}
       {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}

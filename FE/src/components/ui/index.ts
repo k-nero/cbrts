@@ -15,6 +15,7 @@ export * from './DocumentRow';
 export * from './DraftPass';
 export * from './EstimateCard';
 export * from './FactCell';
+export * from './HorseAvatar';
 export * from './HorseCard';
 export * from './Icon';
 export * from './IconButton';

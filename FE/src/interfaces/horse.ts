@@ -55,6 +55,8 @@ export interface Horse extends BaseEntity {
   archivedAt: string | null;
   /** Name, microchip, sex, breed, date of birth and coat are locked once the horse was on a submitted request. */
   identityLocked: boolean;
+  /** The owner's photo (GET /files/{id}/content), or null: the coat colour stands in. */
+  photoFileId: string | null;
 }
 
 /** The body of POST and PUT /customer/horses (HorseRequest). The size class is derived, never sent. */
