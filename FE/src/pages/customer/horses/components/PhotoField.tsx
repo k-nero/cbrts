@@ -13,7 +13,8 @@ import { apiErrorView, coatOf, horsePhotoProblem } from '@/lib/utils';
 
 /**
  * The horse's photo (optional): picking a file uploads it at once, and the form keeps the uploaded
- * file's id, which the save attaches. A refused or failed file leaves the photo as it was.
+ * file's id, which the save attaches. A refused or failed file leaves the photo as it was; the type
+ * the server detected is checked too, so a renamed PDF is refused here, not at Save.
  */
 export const PhotoField: FC = () => {
   const { field } = useController<HorseFormShape, 'photoFileId'>({ name: 'photoFileId' });
@@ -30,7 +31,15 @@ export const PhotoField: FC = () => {
     }
     setProblem(null);
     try {
-      field.onChange((await upload.mutateAsync(file)).id);
+      const uploaded = await upload.mutateAsync(file);
+      // The browser's type is only a claim: the server sniffs the bytes, and a PDF named .png comes back
+      // as application/pdf. Refuse it here, where the field can say so, rather than at Save.
+      const detected = horsePhotoProblem({ type: uploaded.contentType, size: uploaded.sizeBytes });
+      if (detected) {
+        setProblem(detected);
+        return;
+      }
+      field.onChange(uploaded.id);
     } catch (error) {
       setProblem(apiErrorView(error, {}, 'The photo didn’t upload. Try again.').form);
     }
