@@ -6,6 +6,7 @@ import com.equifreight.entity.Place;
 import com.equifreight.entity.RequestHorse;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.enums.RequestStatus;
+import com.equifreight.model.horse.HorseMapper;
 import com.equifreight.model.review.HistoryEntryResponse;
 import com.equifreight.model.route.RouteResponse;
 import com.equifreight.service.LeadTimePolicy;
@@ -125,6 +126,7 @@ public final class RequestMapper {
                 .declaredValue(rh.getDeclaredValue())
                 .withFoal(rh.isWithFoal())
                 .archived(horse.getArchivedAt() != null)
+                .photoFileId(HorseMapper.photoFileIdOf(horse))
                 .missing(SubmissionCheck.missingFields(horse))
                 .build();
     }

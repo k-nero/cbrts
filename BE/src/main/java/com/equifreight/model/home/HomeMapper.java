@@ -5,6 +5,7 @@ import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.TransportRequest;
+import com.equifreight.model.horse.HorseMapper;
 import java.time.Instant;
 import java.util.Locale;
 
@@ -118,6 +119,7 @@ public final class HomeMapper {
                 .line(line)
                 .documents(documents)
                 .note(note)
+                .photoFileId(HorseMapper.photoFileIdOf(h))
                 .build();
     }
 }

@@ -2,6 +2,7 @@ package com.equifreight.model.horse;
 
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
+import java.util.UUID;
 
 public final class HorseMapper {
     private HorseMapper() {}
@@ -26,9 +27,17 @@ public final class HorseMapper {
                 .handlingNotes(horse.getHandlingNotes())
                 .archivedAt(horse.getArchivedAt())
                 .identityLocked(identityLocked)
+                .photoFileId(photoFileIdOf(horse))
                 .createdAt(horse.getCreatedAt())
                 .updatedAt(horse.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * The photo's id without loading the file row.
+     */
+    public static UUID photoFileIdOf(Horse horse) {
+        return horse.getPhoto() == null ? null : horse.getPhoto().getId();
     }
 
     public static SizeClassResponse toResponse(HorseSizeClass sizeClass) {

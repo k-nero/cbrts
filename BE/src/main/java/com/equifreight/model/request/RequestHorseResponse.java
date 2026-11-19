@@ -18,5 +18,7 @@ public record RequestHorseResponse(
         BigDecimal declaredValue,
         boolean withFoal,
         boolean archived,
+        /** The horse's photo as it is now (not part of the priced snapshot); null without one. */
+        UUID photoFileId,
         /** passportNo, microchip, dateOfBirth, heightHh, weightKg: the profile fields still empty. */
         List<String> missing) {}
