@@ -75,6 +75,13 @@ export const makeHorseSchema = (today: string, options: { locked?: boolean } = {
     requiredStall: z.enum(StallTypeEnum).default('STANDARD'),
     handlingNotes: z.string().nullish(),
     photoFileId: z.string().nullish(),
+    /** Set by the photo field while a picked photo uploads, so Save can't send the old photo meanwhile. */
+    photoUploading: z
+      .boolean()
+      .optional()
+      .refine((uploading) => !uploading, {
+        error: 'Wait for the photo to finish uploading, then save.',
+      }),
     declaredValue: z
       .number({ error: 'Enter a declared value above $0.' })
       .gt(0, { error: 'Enter a declared value above $0.' })

@@ -159,6 +159,13 @@ describe('horseSchema', () => {
     expect(fromHorse(horse).photoFileId).toBe('01a14a00-0000-7000-8000-0000000000a2');
   });
 
+  test('aPhotoStillUploadingHoldsTheSave', () => {
+    expect(messageOn({ photoUploading: true }, 'photoUploading')).toBe(
+      'Wait for the photo to finish uploading, then save.',
+    );
+    expect(messageOn({ photoUploading: false }, 'photoUploading')).toBeUndefined();
+  });
+
   test('blanksBecomeNull', () => {
     const input = toHorseInput({ ...NIGHTFALL, breed: '  ', handlingNotes: '' });
     expect(input.breed).toBeNull();

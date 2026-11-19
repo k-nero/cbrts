@@ -17,7 +17,11 @@ import { apiErrorView, coatOf, horsePhotoProblem } from '@/lib/utils';
  * the server detected is checked too, so a renamed PDF is refused here, not at Save.
  */
 export const PhotoField: FC = () => {
-  const { field } = useController<HorseFormShape, 'photoFileId'>({ name: 'photoFileId' });
+  const { field, fieldState } = useController<HorseFormShape, 'photoFileId'>({
+    name: 'photoFileId',
+  });
+  // Save is refused while this is true (schema), and the refusal shows below like any other problem.
+  const uploading = useController<HorseFormShape, 'photoUploading'>({ name: 'photoUploading' });
   const coat = useWatch<HorseFormShape, 'coat'>({ name: 'coat' });
   const photoUrl = useHorsePhotoUrl(field.value);
   const [problem, setProblem] = useState<string | null>(null);
@@ -30,6 +34,7 @@ export const PhotoField: FC = () => {
       return;
     }
     setProblem(null);
+    uploading.field.onChange(true);
     try {
       const uploaded = await upload.mutateAsync(file);
       // The browser's type is only a claim: the server sniffs the bytes, and a PDF named .png comes back
@@ -42,8 +47,13 @@ export const PhotoField: FC = () => {
       field.onChange(uploaded.id);
     } catch (error) {
       setProblem(apiErrorView(error, {}, 'The photo didn’t upload. Try again.').form);
+    } finally {
+      uploading.field.onChange(false);
     }
   };
+
+  // A refusal from Save (the schema or the server) shows here too, not only at the top of the form.
+  const message = problem ?? uploading.fieldState.error?.message ?? fieldState.error?.message;
 
   const picker = (label: string) => (
     <Upload
@@ -93,9 +103,9 @@ export const PhotoField: FC = () => {
         </Flex>
       </Flex>
       <span className="type-body-s text-ink-3">JPEG or PNG, up to 10 MB.</span>
-      {problem && (
+      {message && (
         <span role="alert" className="type-body-s text-bad">
-          {problem}
+          {message}
         </span>
       )}
     </Flex>

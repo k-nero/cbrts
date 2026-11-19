@@ -77,6 +77,7 @@ const EMPTY: HorseFormShape = {
   handlingNotes: null,
   declaredValue: undefined as unknown as number,
   photoFileId: null,
+  photoUploading: false,
 };
 
 const toShape = (values: HorseFormValues): HorseFormShape => ({
