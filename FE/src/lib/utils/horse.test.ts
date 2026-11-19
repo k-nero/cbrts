@@ -10,6 +10,8 @@ import {
   formatValue,
   formatWeight,
   heightProblem,
+  HORSE_PHOTO_MAX_BYTES,
+  horsePhotoProblem,
   pronouns,
   sizeClassFor,
   sizeBasis,
@@ -146,5 +148,24 @@ describe('words and tones', () => {
     expect(stallChip('CLIMATE')).toEqual({ label: 'Climate stall', tone: 'info' });
     expect(stallChip('BOX')).toEqual({ label: 'Box stall', tone: 'neutral' });
     expect(stallChip('STANDARD')).toBeNull();
+  });
+});
+
+describe('horsePhotoProblem', () => {
+  const MESSAGE = 'A horse photo must be a JPEG or PNG of at most 10 MB.';
+
+  test('aJpegOrPngUpToTenMegabytesIsFine', () => {
+    expect(HORSE_PHOTO_MAX_BYTES).toBe(10 * 1024 * 1024);
+    expect(horsePhotoProblem({ type: 'image/jpeg', size: 10 * 1024 * 1024 })).toBeNull();
+    expect(horsePhotoProblem({ type: 'image/png', size: 1 })).toBeNull();
+  });
+
+  test('anotherTypeIsRefused', () => {
+    expect(horsePhotoProblem({ type: 'image/heic', size: 1024 })).toBe(MESSAGE);
+    expect(horsePhotoProblem({ type: 'application/pdf', size: 1024 })).toBe(MESSAGE);
+  });
+
+  test('overTenMegabytesIsRefused', () => {
+    expect(horsePhotoProblem({ type: 'image/png', size: 10 * 1024 * 1024 + 1 })).toBe(MESSAGE);
   });
 });

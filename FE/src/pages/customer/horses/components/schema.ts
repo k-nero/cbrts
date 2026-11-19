@@ -74,6 +74,7 @@ export const makeHorseSchema = (today: string, options: { locked?: boolean } = {
     temperament: z.enum(TemperamentEnum).nullish(),
     requiredStall: z.enum(StallTypeEnum).default('STANDARD'),
     handlingNotes: z.string().nullish(),
+    photoFileId: z.string().nullish(),
     declaredValue: z
       .number({ error: 'Enter a declared value above $0.' })
       .gt(0, { error: 'Enter a declared value above $0.' })
@@ -112,6 +113,7 @@ export const toHorseInput = (values: HorseFormValues): HorseInput => ({
   requiredStall: stallFor(values.temperament, values.requiredStall),
   handlingNotes: blankToNull(values.handlingNotes),
   declaredValue: values.declaredValue,
+  photoFileId: values.photoFileId ?? null,
 });
 
 /** A saved horse as form values; a locked horse sends these identity values back unchanged. */
@@ -129,4 +131,5 @@ export const fromHorse = (horse: Horse): HorseFormValues => ({
   requiredStall: horse.requiredStall,
   handlingNotes: horse.handlingNotes,
   declaredValue: horse.declaredValue,
+  photoFileId: horse.photoFileId,
 });

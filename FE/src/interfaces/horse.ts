@@ -74,4 +74,6 @@ export interface HorseInput {
   temperament: Temperament | null;
   requiredStall: StallType;
   handlingNotes: string | null;
+  /** An uploaded JPEG or PNG: the current id keeps the photo, a new one replaces it, null removes it. */
+  photoFileId: string | null;
 }

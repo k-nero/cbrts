@@ -3,6 +3,7 @@ import { type Resolver, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flex } from 'antd';
 
+import { PhotoField } from './PhotoField';
 import { fromHorse, type HorseFormValues, makeHorseSchema, toHorseInput } from './schema';
 import { Section } from './Section';
 import { Side } from './Side';
@@ -56,6 +57,7 @@ const OTHER_FIELDS = [
   'requiredStall',
   'handlingNotes',
   'declaredValue',
+  'photoFileId',
 ];
 
 const LOCKED_HIDDEN = new Set(['name', 'microchip', 'sex', 'breed', 'dateOfBirth', 'coat']);
@@ -74,6 +76,7 @@ const EMPTY: HorseFormShape = {
   requiredStall: 'STANDARD',
   handlingNotes: null,
   declaredValue: undefined as unknown as number,
+  photoFileId: null,
 };
 
 const toShape = (values: HorseFormValues): HorseFormShape => ({
@@ -180,9 +183,15 @@ const HorseForm: FC<Props> = ({
           <Flex vertical gap={24}>
             <div className="rounded-lg border border-line bg-card p-7">
               <Flex vertical gap={20}>
+                <Section
+                  first
+                  title="Photo"
+                  sub="So you, our staff and the crew can tell the horse apart. Optional."
+                >
+                  <PhotoField />
+                </Section>
                 {!locked && (
                   <Section
-                    first
                     title="Identity"
                     sub="As on the passport. We check these against it when you request transport."
                   >
@@ -229,7 +238,7 @@ const HorseForm: FC<Props> = ({
                     </Flex>
                   </Section>
                 )}
-                <Section first={locked} title="Size and weight">
+                <Section title="Size and weight">
                   <Flex gap={16}>
                     <FormField
                       name="heightHh"
