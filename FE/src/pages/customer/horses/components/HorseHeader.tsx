@@ -5,6 +5,7 @@ import { horseChips } from './horseCardProps';
 
 import PageHeader from '@/components/PageHeader';
 import { CoatBand } from '@/components/ui';
+import { useHorsePhotoUrl } from '@/hooks/horse';
 import type { Horse } from '@/interfaces';
 import { ageOf, coatOf, formatMicrochip, ict, sexLabel } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
@@ -28,6 +29,7 @@ const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) 
   const router = useCustomRouter();
   const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
   const chips = horseChips(horse);
+  const photoUrl = useHorsePhotoUrl(horse.photoFileId);
   return (
     <PageHeader
       back={{ label: 'My horses', onClick: () => router.push(router.paths.get('my-horses')) }}
@@ -36,6 +38,7 @@ const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) 
           coat={coatOf(horse.coat)}
           name={horse.name}
           subtitle={[horse.breed, sexLabel(horse.sex)].filter(Boolean).join(' · ')}
+          photoUrl={photoUrl}
           height={132}
           className="rounded-xl"
         />

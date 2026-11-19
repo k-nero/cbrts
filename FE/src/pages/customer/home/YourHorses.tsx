@@ -2,11 +2,17 @@ import { type FC } from 'react';
 import { Flex } from 'antd';
 import { motion } from 'motion/react';
 
-import { Button, COAT_SWATCH, cx, Panel, TONE_FG } from '@/components/ui';
+import { Button, type Coat, cx, HorseAvatar, Panel, TONE_FG } from '@/components/ui';
+import { useHorsePhotoUrl } from '@/hooks/horse';
 import type { CustomerHome } from '@/interfaces';
 import { settle, stagger } from '@/lib/motion';
 
 /* ---------- your horses ---------- */
+
+/** The horse's photo in a 32 px circle, or her coat colour without one. */
+const HorseDot: FC<{ coat: Coat; photoFileId: string | null }> = ({ coat, photoFileId }) => (
+  <HorseAvatar coat={coat} photoUrl={useHorsePhotoUrl(photoFileId)} size={32} />
+);
 
 /** Coat swatch, name and breed line, documents cleared, and the one thing a horse waits on. */
 export const YourHorses: FC<{ home: CustomerHome; onAll: () => void; onAdd: () => void }> = ({
@@ -42,13 +48,7 @@ export const YourHorses: FC<{ home: CustomerHome; onAll: () => void; onAdd: () =
       {home.horses.map((h) => (
         <motion.li key={h.id} variants={settle} className="border-t border-line py-3">
           <Flex align="center" gap={12}>
-            <span
-              aria-hidden
-              className={cx(
-                'size-3 shrink-0 rounded-full border border-line-strong',
-                COAT_SWATCH[h.coat],
-              )}
-            />
+            <HorseDot coat={h.coat} photoFileId={h.photoFileId} />
             <Flex component="span" vertical gap={2} className="min-w-0 flex-1">
               <span className="type-label-m text-ink">{h.name}</span>
               <span className="type-body-s text-ink-3">{h.line}</span>
