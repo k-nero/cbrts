@@ -184,6 +184,26 @@ class FileServiceTest {
     }
 
     @Test
+    void aCustomerCanReadAPhotoOfTheirClubsHorse() {
+        User customer = customerOf(UUID.randomUUID());
+        StoredFile photo = fileUploadedBy(customerOf(customer.getClub().getId()));
+        when(repository.isClubHorsePhoto(photo.getId(), customer.getClub().getId()))
+                .thenReturn(true);
+
+        assertThat(service.get(photo.getId(), customer).id()).isEqualTo(photo.getId());
+    }
+
+    @Test
+    void aCustomerGetsNotFoundForAnotherClubsHorsePhoto() {
+        User customer = customerOf(UUID.randomUUID());
+        StoredFile photo = fileUploadedBy(customerOf(UUID.randomUUID()));
+        when(repository.isClubHorsePhoto(photo.getId(), customer.getClub().getId()))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.get(photo.getId(), customer)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void anEscortCanReadFilesOnJobsTheyCrew() {
         User escort = user(RoleName.ESCORT);
         StoredFile file = fileUploadedBy(user(RoleName.CUSTOMER));

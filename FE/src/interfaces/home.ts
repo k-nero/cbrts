@@ -56,6 +56,8 @@ export interface HomeHorse {
   documents: string;
   /** The one thing the horse is waiting on, toned: "Bill of sale overdue". */
   note: { text: string; tone: Tone } | null;
+  /** The horse's photo, or null: the coat colour stands in. */
+  photoFileId: string | null;
 }
 
 /** When nothing is owed, the next event leads instead (DESIGN.md, Home states). */

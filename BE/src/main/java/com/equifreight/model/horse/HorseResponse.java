@@ -33,5 +33,7 @@ public record HorseResponse(
          * Name, microchip, sex, breed, date of birth and coat are locked once she was on a submitted request.
          */
         boolean identityLocked,
+        /* The horse's photo, read through /files/{id}/content; null without one. */
+        UUID photoFileId,
         Instant createdAt,
         Instant updatedAt) {}

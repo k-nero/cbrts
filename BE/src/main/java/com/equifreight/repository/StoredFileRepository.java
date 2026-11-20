@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Files reach a job through document versions, incident photos, horse condition logs and authority filing results,
- * and a customer note through its attachment. A file referenced from none of them is an orphan.
+ * a customer note through its attachment, and a horse through its photo. A file referenced from none of them is an orphan.
  */
 @Repository
 public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
@@ -44,7 +44,15 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
     boolean isOnClubJob(@Param("fileId") UUID fileId, @Param("clubId") UUID clubId);
 
     /**
-     * True when the file is attached to any job on a trip {@code userId} is crewing.
+     * True when the file is the photo of one of {@code clubId}'s horses, archived or not.
+     */
+    @Query(value = """
+            select exists (select 1 from horses where photo_file_id = :fileId and club_id = :clubId)
+            """, nativeQuery = true)
+    boolean isClubHorsePhoto(@Param("fileId") UUID fileId, @Param("clubId") UUID clubId);
+
+    /**
+     * True when the file is attached to any job on a trip {@code userId} is crewing, or is the photo of a horse on one.
      */
     @Query(value = """
             select exists (
@@ -66,7 +74,12 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                       join trip_horses th on th.trip_id = tr.trip_id and th.horse_id = cl.horse_id
                       where clf.file_id = :fileId
                       union all
-                      select s.job_id from authority_submissions s where s.result_file_id = :fileId) j
+                      select s.job_id from authority_submissions s where s.result_file_id = :fileId
+                      union all
+                      select th.job_id
+                      from horses h
+                      join trip_horses th on th.horse_id = h.id
+                      where h.photo_file_id = :fileId) j
                 join trip_horses th on th.job_id = j.job_id
                 join trip_vehicles tv on tv.trip_id = th.trip_id
                 join crew_assignments ca on ca.trip_vehicle_id = tv.id
@@ -83,6 +96,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
                 or exists (select 1 from condition_log_files where file_id = :fileId)
                 or exists (select 1 from authority_submissions where result_file_id = :fileId)
                 or exists (select 1 from notes where attached_file_id = :fileId)
+                or exists (select 1 from horses where photo_file_id = :fileId)
             """, nativeQuery = true)
     boolean isAttached(@Param("fileId") UUID fileId);
 
@@ -97,6 +111,7 @@ public interface StoredFileRepository extends JpaRepository<StoredFile, UUID> {
               and not exists (select 1 from condition_log_files clf where clf.file_id = f.id)
               and not exists (select 1 from authority_submissions s where s.result_file_id = f.id)
               and not exists (select 1 from notes n where n.attached_file_id = f.id)
+              and not exists (select 1 from horses h where h.photo_file_id = f.id)
             order by f.created_at
             limit :limit
             """, nativeQuery = true)

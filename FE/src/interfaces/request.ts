@@ -150,6 +150,8 @@ export interface RequestHorse {
   archived: boolean;
   /** passportNo, microchip, dateOfBirth, heightHh, weightKg. */
   missing: string[];
+  /** The horse's photo as it is now, or null. */
+  photoFileId: string | null;
 }
 
 /** One line of a request's history, from the audit log (BR-F1-08). */

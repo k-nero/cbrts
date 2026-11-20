@@ -5,7 +5,7 @@ import { type HorseFormShape } from '../components/HorseForm';
 import { horseCardProps } from '../components/horseCardProps';
 
 import { HorseCard } from '@/components/ui';
-import { useSizeClasses } from '@/hooks/horse';
+import { useHorsePhotoUrl, useSizeClasses } from '@/hooks/horse';
 import type { HorseCoat, HorseSex } from '@/interfaces';
 import { ict, pronouns, sizeClassFor, stallFor } from '@/lib/utils';
 
@@ -14,6 +14,7 @@ const today = () => ict(new Date().toISOString()).format('YYYY-MM-DD');
 /** "How he'll appear": the real card, built from the form as it is typed (DESIGN.md, First run). */
 export const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
   const { data: classes } = useSizeClasses();
+  const photoUrl = useHorsePhotoUrl(values.photoFileId);
   const sex = (values.sex?.value ?? null) as HorseSex | null;
   const { subject } = pronouns(sex);
   const heading =
@@ -47,7 +48,7 @@ export const HowItAppears: FC<{ values: HorseFormShape }> = ({ values }) => {
           On My horses and in every request. It updates as you type.
         </p>
       </Flex>
-      <HorseCard {...card} />
+      <HorseCard {...card} photoUrl={photoUrl} />
     </Flex>
   );
 };

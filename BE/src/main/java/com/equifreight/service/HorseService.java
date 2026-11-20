@@ -3,6 +3,7 @@ package com.equifreight.service;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
+import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.RequestStatus;
@@ -48,20 +49,33 @@ public class HorseService {
 
     private static final String DEFAULT_CURRENCY = "USD";
 
+    /**
+     * A horse photo is shown in every horse list, so it is capped well under the 25 MB upload limit.
+     */
+    static final long PHOTO_MAX_BYTES = 10L * 1024 * 1024;
+
+    /**
+     * The types browsers can show; HEIC (what iPhones save) can be uploaded elsewhere but not shown.
+     */
+    private static final Set<String> PHOTO_TYPES = Set.of("image/jpeg", "image/png");
+
     private final HorseRepository horses;
     private final HorseSizeClassRepository sizeClasses;
     private final RequestHorseRepository requestHorses;
     private final ClubService clubs;
+    private final FileService files;
 
     public HorseService(
             HorseRepository horses,
             HorseSizeClassRepository sizeClasses,
             RequestHorseRepository requestHorses,
-            ClubService clubs) {
+            ClubService clubs,
+            FileService files) {
         this.horses = horses;
         this.sizeClasses = sizeClasses;
         this.requestHorses = requestHorses;
         this.clubs = clubs;
+        this.files = files;
     }
 
     /**
@@ -213,6 +227,7 @@ public class HorseService {
         horse.setClub(club);
         horse.setValueCurrency(DEFAULT_CURRENCY);
         applyChecked(club, horse, request);
+        applyPhoto(user, horse, request.photoFileId());
         return HorseMapper.toResponse(saveChecked(horse), false);
     }
 
@@ -232,6 +247,7 @@ public class HorseService {
             requireIdentityUnchanged(horse, request, submittedOn.getFirst());
         }
         applyChecked(club, horse, request);
+        applyPhoto(user, horse, request.photoFileId());
         return HorseMapper.toResponse(saveChecked(horse), !submittedOn.isEmpty());
     }
 
@@ -308,6 +324,26 @@ public class HorseService {
         horse.setRequiredStall(stall);
         horse.setHandlingNotes(trimToNull(request.handlingNotes()));
         horse.setSizeClass(HorseSizing.sizeClassFor(height, stall, sizeClasses.findAllByOrderByMinHeightHhAsc()));
+    }
+
+    /**
+     * Null removes the photo; the current photo's id keeps it as it is; any other id must be the user's own unattached
+     * upload (FileService.requireAttachable) and a JPEG or PNG of at most 10 MB. A replaced photo is left unreferenced,
+     * for the orphan cleanup. The photo isn't identity, so a locked horse may change it.
+     */
+    void applyPhoto(User user, Horse horse, UUID photoFileId) {
+        if (photoFileId == null) {
+            horse.setPhoto(null);
+            return;
+        }
+        if (photoFileId.equals(HorseMapper.photoFileIdOf(horse))) {
+            return;
+        }
+        StoredFile photo = files.requireAttachable(photoFileId, user);
+        if (!PHOTO_TYPES.contains(photo.getContentType()) || photo.getSizeBytes() > PHOTO_MAX_BYTES) {
+            throw new BusinessException("HORSE_PHOTO_INVALID", "A horse photo must be a JPEG or PNG of at most 10 MB.");
+        }
+        horse.setPhoto(photo);
     }
 
     /**

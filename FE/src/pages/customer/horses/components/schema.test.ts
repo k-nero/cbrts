@@ -29,6 +29,31 @@ const messageOn = (values: Partial<HorseFormValues>, field: keyof HorseFormValue
   return result.success ? undefined : result.error.issues.find((i) => i.path[0] === field)?.message;
 };
 
+/** Nightfall as the API returns her: locked, with a photo. */
+const savedHorse = (): Horse => ({
+  id: '01a1459d-4eb4-7c74-b0cd-667684017a6c',
+  createdAt: '2026-10-16T00:00:00Z',
+  updatedAt: '2026-10-16T00:00:00Z',
+  name: 'Nightfall',
+  coat: 'BLACK',
+  breed: 'Thoroughbred',
+  sex: 'MARE',
+  dateOfBirth: '2022-04-14',
+  heightHh: 16.0,
+  weightKg: 478,
+  sizeClass: { code: 'M', widthIn: 32 },
+  microchip: '250259600223311',
+  passportNo: 'VN-PP-2022-0188',
+  declaredValue: 240000,
+  valueCurrency: 'USD',
+  temperament: 'NERVOUS',
+  requiredStall: 'CLIMATE',
+  handlingNotes: null,
+  archivedAt: null,
+  identityLocked: true,
+  photoFileId: '01a14a00-0000-7000-8000-0000000000a1',
+});
+
 describe('horseSchema', () => {
   test('nightfallPasses', () => {
     expect(schema.safeParse(NIGHTFALL).success).toBe(true);
@@ -101,28 +126,7 @@ describe('horseSchema', () => {
   });
 
   test('aLockedHorseRoundTripsItsIdentity', () => {
-    const nightfall: Horse = {
-      id: '01a1459d-4eb4-7c74-b0cd-667684017a6c',
-      createdAt: '2026-10-16T00:00:00Z',
-      updatedAt: '2026-10-16T00:00:00Z',
-      name: 'Nightfall',
-      coat: 'BLACK',
-      breed: 'Thoroughbred',
-      sex: 'MARE',
-      dateOfBirth: '2022-04-14',
-      heightHh: 16.0,
-      weightKg: 478,
-      sizeClass: { code: 'M', widthIn: 32 },
-      microchip: '250259600223311',
-      passportNo: 'VN-PP-2022-0188',
-      declaredValue: 240000,
-      valueCurrency: 'USD',
-      temperament: 'NERVOUS',
-      requiredStall: 'CLIMATE',
-      handlingNotes: null,
-      archivedAt: null,
-      identityLocked: true,
-    };
+    const nightfall = savedHorse();
     const input = toHorseInput(fromHorse(nightfall));
     expect([
       input.name,
@@ -139,6 +143,27 @@ describe('horseSchema', () => {
       nightfall.dateOfBirth,
       nightfall.coat,
     ]);
+  });
+
+  test('thePhotoIsSentAsChosen', () => {
+    const photoFileId = '01a14a00-0000-7000-8000-0000000000a1';
+    expect(toHorseInput({ ...NIGHTFALL, photoFileId }).photoFileId).toBe(photoFileId);
+  });
+
+  test('noPhotoIsSentAsNull', () => {
+    expect(toHorseInput({ ...NIGHTFALL, photoFileId: undefined }).photoFileId).toBeNull();
+  });
+
+  test('aSavedHorsesPhotoFillsTheForm', () => {
+    const horse = { ...savedHorse(), photoFileId: '01a14a00-0000-7000-8000-0000000000a2' };
+    expect(fromHorse(horse).photoFileId).toBe('01a14a00-0000-7000-8000-0000000000a2');
+  });
+
+  test('aPhotoStillUploadingHoldsTheSave', () => {
+    expect(messageOn({ photoUploading: true }, 'photoUploading')).toBe(
+      'Wait for the photo to finish uploading, then save.',
+    );
+    expect(messageOn({ photoUploading: false }, 'photoUploading')).toBeUndefined();
   });
 
   test('blanksBecomeNull', () => {

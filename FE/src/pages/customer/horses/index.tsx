@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { ComponentProps, FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Col, Flex, Pagination, Row, Skeleton } from 'antd';
 import { motion } from 'motion/react';
@@ -10,10 +10,16 @@ import { AddHorseCard } from './AddHorseCard';
 import PageHeader from '@/components/PageHeader';
 import { Button, Callout, HorseCard, Tabs } from '@/components/ui';
 import { useMe } from '@/hooks/auth';
-import { useHorseCount, useHorses } from '@/hooks/horse';
+import { useHorseCount, useHorsePhotoUrl, useHorses } from '@/hooks/horse';
 import { settle, stagger } from '@/lib/motion';
 import { ict } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
+
+/** A My horses card with the horse's photo over its coat band, when it has one. */
+const MyHorseCard: FC<ComponentProps<typeof HorseCard> & { photoFileId: string | null }> = ({
+  photoFileId,
+  ...card
+}) => <HorseCard {...card} photoUrl={useHorsePhotoUrl(photoFileId)} />;
 
 type Tab = 'active' | 'archived';
 
@@ -109,8 +115,9 @@ const MyHorsesPage: FC = () => {
             {page.content.map((horse) => (
               <Col key={horse.id} span={8}>
                 <motion.div variants={settle} className="h-full">
-                  <HorseCard
+                  <MyHorseCard
                     {...horseCardProps(horse, today)}
+                    photoFileId={horse.photoFileId}
                     status={horse.archivedAt ? archivedChip(horse.archivedAt) : undefined}
                     actions={
                       <>

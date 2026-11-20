@@ -35,8 +35,8 @@ import org.springframework.web.multipart.MultipartFile;
  * A file is uploaded on its own first, then attached by id (a document version, an incident, a filing).
  *
  * <p>Who can read a file: staff (manager, specialist, coordinator) any file; anyone the file they
- * uploaded; a customer the documents and filing results on their club's jobs; an escort anything
- * attached to a job they crew. Everyone else gets 404, so ids don't reveal which files exist.
+ * uploaded; a customer the documents and filing results on their club's jobs and their club's horse
+ * photos; an escort anything attached to a job they crew, horse photos included. Everyone else gets 404, so ids don't reveal which files exist.
  */
 @Log4j2
 @Service
@@ -185,7 +185,10 @@ public class FileService {
         }
         if (hasAnyRole(user, Set.of(RoleName.CUSTOMER))
                 && user.getClub() != null
-                && storedFileRepository.isOnClubJob(file.getId(), user.getClub().getId())) {
+                && (storedFileRepository.isOnClubJob(
+                                file.getId(), user.getClub().getId())
+                        || storedFileRepository.isClubHorsePhoto(
+                                file.getId(), user.getClub().getId()))) {
             return true;
         }
         return hasAnyRole(user, Set.of(RoleName.ESCORT))

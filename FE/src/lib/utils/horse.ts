@@ -97,6 +97,18 @@ export const heightProblem = (heightHh: number): string | null => {
   return `${(tenths / 10).toFixed(1)} hh isn't a height: a hand is 4 inches, so ${hands}.3 hh is followed by ${hands + 1}.0 hh.`;
 };
 
+/** A horse photo is shown in every horse list, so it is capped well under the 25 MB upload limit. */
+export const HORSE_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Why a chosen file can't be a horse photo, or null. JPEG and PNG only: browsers can't show HEIC, which
+ * iPhones save. The server checks the same again (HORSE_PHOTO_INVALID).
+ */
+export const horsePhotoProblem = (file: { type: string; size: number }): string | null =>
+  (file.type === 'image/jpeg' || file.type === 'image/png') && file.size <= HORSE_PHOTO_MAX_BYTES
+    ? null
+    : 'A horse photo must be a JPEG or PNG of at most 10 MB.';
+
 /**
  * The stall a horse travels in, as the server saves it (HorseSizing.stallFor): an aggressive horse always travels in a
  * box stall, whatever was ticked; any other horse in the stall ticked, standard when none is.

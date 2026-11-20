@@ -14,4 +14,6 @@ public record HomeHorseResponse(
         String line,
         /* "4 of 5 cleared", or "No move booked". */
         String documents,
-        TonedTextResponse note) {}
+        TonedTextResponse note,
+        /* The horse's photo; null without one, when the coat colour stands in. */
+        UUID photoFileId) {}
