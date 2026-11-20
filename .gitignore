@@ -6,3 +6,4 @@ graphify-out/
 .env
 /data/
 .taste-skill/
+.openidea/*
