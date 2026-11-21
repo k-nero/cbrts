@@ -14,7 +14,7 @@ type Props = {
   name: ReactNode;
   /** On the nameplate: "Andalusian · Gelding". */
   subtitle?: ReactNode;
-  /** A blob URL of the horse's photo, shown as a 48 px circle beside the chips. */
+  /** A blob URL of the horse's photo: a 72 px circle on the band's bottom edge, at the right. */
   photoUrl?: string;
   /** Chips: temperament, stall need. */
   tags?: ReactNode;
@@ -49,13 +49,20 @@ export const HorseCard: FC<Props> = ({
   <article
     className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
   >
-    <CoatBand coat={coat} name={name} subtitle={subtitle} />
-    <div className="flex flex-col gap-4 p-5">
-      {status && <div className="flex">{status}</div>}
-      {(photoUrl || tags) && (
-        <div className="flex items-center gap-3">
-          {photoUrl && <HorseAvatar coat={coat} photoUrl={photoUrl} size={48} />}
-          {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}
+    <div className="relative">
+      <CoatBand coat={coat} name={name} subtitle={subtitle} />
+      {photoUrl && (
+        // Half over the band, half over the card, ringed in the card colour so it reads as a profile picture.
+        <span className="absolute right-5 -bottom-9 rounded-full bg-card p-[3px]">
+          <HorseAvatar coat={coat} photoUrl={photoUrl} size={72} />
+        </span>
+      )}
+    </div>
+    <div className={cx('flex flex-col gap-4 p-5', photoUrl && !status && !tags && 'pt-11')}>
+      {status && <div className={cx('flex', photoUrl && 'pr-[84px]')}>{status}</div>}
+      {tags && (
+        <div className={cx('flex flex-wrap gap-1.5', photoUrl && !status && 'pr-[84px]')}>
+          {tags}
         </div>
       )}
       <div className="grid grid-cols-4 gap-1">
