@@ -47,7 +47,10 @@ export const HorseCard: FC<Props> = ({
   className,
 }) => (
   <article
-    className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
+    className={cx(
+      'group/horse flex flex-col overflow-hidden rounded-lg border border-line bg-card',
+      className,
+    )}
   >
     <div className="relative">
       <CoatBand coat={coat} name={name} subtitle={subtitle} />
