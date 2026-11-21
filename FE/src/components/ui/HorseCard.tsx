@@ -4,6 +4,7 @@ import { FactCell } from './FactCell';
 import { Progress } from './Progress';
 import { cx } from './tone';
 import { CoatBand } from './CoatBand';
+import { HorseAvatar } from './HorseAvatar';
 
 /** `other` is the neutral band for a coat outside the four (OTHER) or none given. */
 export type Coat = 'grey' | 'black' | 'chestnut' | 'bay' | 'other';
@@ -13,7 +14,7 @@ type Props = {
   name: ReactNode;
   /** On the nameplate: "Andalusian · Gelding". */
   subtitle?: ReactNode;
-  /** A blob URL of the horse's photo, laid over the coat band. */
+  /** A blob URL of the horse's photo, shown as a 48 px circle beside the chips. */
   photoUrl?: string;
   /** Chips: temperament, stall need. */
   tags?: ReactNode;
@@ -48,10 +49,15 @@ export const HorseCard: FC<Props> = ({
   <article
     className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
   >
-    <CoatBand coat={coat} name={name} subtitle={subtitle} photoUrl={photoUrl} />
+    <CoatBand coat={coat} name={name} subtitle={subtitle} />
     <div className="flex flex-col gap-4 p-5">
       {status && <div className="flex">{status}</div>}
-      {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}
+      {(photoUrl || tags) && (
+        <div className="flex items-center gap-3">
+          {photoUrl && <HorseAvatar coat={coat} photoUrl={photoUrl} size={48} />}
+          {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-1">
         <FactCell label="Age" value={facts.age} />
         <FactCell label="Height" value={facts.height} />
