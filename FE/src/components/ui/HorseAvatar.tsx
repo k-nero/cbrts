@@ -31,7 +31,8 @@ export const HorseAvatar: FC<{
     <span
       aria-hidden
       className={cx(
-        'shrink-0 rounded-full border border-line-strong',
+        // inline-block: the size holds outside a flex row too (the pass wraps it in a plain span).
+        'inline-block shrink-0 rounded-full border border-line-strong',
         COAT_SWATCH[coat],
         className,
       )}

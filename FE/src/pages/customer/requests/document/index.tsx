@@ -7,6 +7,7 @@ import { StatusPanel } from './StatusPanel';
 import { UploadPanel } from './UploadPanel';
 import { VersionsPanel } from './VersionsPanel';
 
+import { HorseTagFor } from '@/components/horse/HorseTagFor';
 import PageHeader from '@/components/PageHeader';
 import { RequestLoadState } from '@/components/request/RequestLoadState';
 import { Callout } from '@/components/ui';
@@ -41,14 +42,21 @@ const RequestDocumentPage: FC = () => {
         }}
         title={
           item
-            ? `${item.horseName ?? 'Shipment'} · ${item.documentTypeName || item.documentTypeCode}`
+            ? item.horseId
+              ? item.documentTypeName || item.documentTypeCode
+              : `Shipment · ${item.documentTypeName || item.documentTypeCode}`
             : 'Document'
         }
         summary={
-          <span className="type-data text-ink-2">
-            {request.data.code}
-            {item ? ` · job ${item.jobCode}` : ''}
-          </span>
+          <Flex align="center" gap={10} wrap>
+            {item?.horseId && (
+              <HorseTagFor horseId={item.horseId} name={item.horseName ?? 'Horse'} />
+            )}
+            <span className="type-data text-ink-2">
+              {request.data.code}
+              {item ? ` · job ${item.jobCode}` : ''}
+            </span>
+          </Flex>
         }
       />
 

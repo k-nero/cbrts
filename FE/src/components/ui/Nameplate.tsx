@@ -4,7 +4,19 @@ import { cx } from './tone';
 import { Screw } from './Screw';
 
 /* Polished gold is a material: the same in both themes (DESIGN.md, Domain colours). */
-const GOLD = 'linear-gradient(180deg, #FFF1A8 0%, #F2C94C 30%, #D4A017 60%, #A87A0C 100%)';
+export const PLATE_GOLD =
+  'linear-gradient(180deg, #FFF1A8 0%, #F2C94C 30%, #D4A017 60%, #A87A0C 100%)';
+
+/**
+ * The light that sweeps across a gold plate while its horse is hovered (a `group/horse` ancestor);
+ * still with reduced motion. The plate must be positioned and clip its overflow.
+ */
+export const PlateShimmer: FC = () => (
+  <span
+    aria-hidden
+    className="pointer-events-none absolute inset-y-0 -left-1/2 w-2/5 -skew-x-[15deg] bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 group-hover/horse:animate-plate-shimmer group-hover/horse:opacity-100 motion-reduce:group-hover/horse:animate-none motion-reduce:group-hover/horse:opacity-0"
+  />
+);
 
 type Props = { name: ReactNode; subtitle?: ReactNode; className?: string };
 
@@ -22,12 +34,9 @@ export const Nameplate: FC<Props> = ({ name, subtitle, className }) => (
       'flex w-fit items-center gap-3 overflow-hidden rounded-sm px-3.5 py-2.5 shadow-brass',
       className,
     )}
-    style={{ background: GOLD }}
+    style={{ background: PLATE_GOLD }}
   >
-    <span
-      aria-hidden
-      className="pointer-events-none absolute inset-y-0 -left-1/2 w-2/5 -skew-x-[15deg] bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 group-hover/horse:animate-plate-shimmer group-hover/horse:opacity-100 motion-reduce:group-hover/horse:animate-none motion-reduce:group-hover/horse:opacity-0"
-    />
+    <PlateShimmer />
     <Screw />
     <span className="flex flex-col gap-px">
       <span className="type-h3 text-brass-ink">{name}</span>
