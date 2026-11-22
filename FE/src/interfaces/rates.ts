@@ -118,6 +118,8 @@ export interface RateLine {
   everyCorridor: boolean;
   /** Not charged at an end a domestic road leg covers (US-F3-21). */
   coveredByRoadLeg: boolean;
+  /** False for a fixed fee passed on at cost, which a club can't negotiate. */
+  negotiable: boolean;
 }
 
 export interface VolumeBreak {
@@ -170,6 +172,8 @@ export interface RateLineInput {
   certainty: RateCertainty;
   estimateNote: string | null;
   coveredByRoadLeg: boolean;
+  /** False for a fixed fee passed on at cost; true when left out. */
+  negotiable?: boolean;
 }
 
 export interface ServiceClassInput {

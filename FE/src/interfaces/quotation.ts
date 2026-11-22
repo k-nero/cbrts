@@ -79,6 +79,8 @@ export interface QuoteLineRow {
   overrideReason: string | null;
   manual: boolean;
   manualReason: string | null;
+  /** False for a fixed fee passed on at cost, which a club can't negotiate. */
+  negotiable: boolean;
 }
 
 export interface QuoteGroup {
@@ -182,6 +184,8 @@ export interface QuotationDraft {
   /** Every version, newest first. */
   versions: QuotationVersion[];
   previous: PreviousVersion | null;
+  /** The club's counter-offer waiting for an answer on this request, or null. */
+  counterOffer: CounterOffer | null;
 }
 
 /* ---------- the customer's issued quotation (spec §6.1) ---------- */

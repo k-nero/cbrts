@@ -80,8 +80,13 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
         fixedGroom.lines().getFirst().setNegotiable(false);
         when(loader.load(v2.getId())).thenReturn(fixedGroom);
 
-        service.start(yen, request.getId());
+        StartResult result = service.start(yen, request.getId());
 
+        assertThat(result.quotation().groups().stream().flatMap(g -> g.lines().stream()))
+                .extracting(QuoteLineResponse::description, QuoteLineResponse::negotiable)
+                .containsExactlyInAnyOrder(
+                        tuple("Air stall position Phnom Penh → Hong Kong, business", true),
+                        tuple("Flying groom", false));
         assertThat(stored.orElseThrow().getLines())
                 .extracting(QuotationLine::getDescription, QuotationLine::isNegotiable)
                 .containsExactly(

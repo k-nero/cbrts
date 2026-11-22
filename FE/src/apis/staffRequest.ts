@@ -118,6 +118,12 @@ export const issueQuotation = (
     .post<QuotationDraft>(`${BASE}/${id}/quotation/issue`, { changeNote }, { params: { version } })
     .then((r) => r.data);
 
+/** Answer the club's open counter-offer without a new version: the version stands as the best price. */
+export const answerBestPrice = (id: string, message: string): Promise<QuotationDraft> =>
+  client
+    .post<QuotationDraft>(`${BASE}/${id}/quotation/best-price`, { message })
+    .then((r) => r.data);
+
 /** Draft the next version from the latest issued or expired one (201). */
 export const reviseQuotation = (id: string): Promise<QuotationDraft> =>
   client.post<QuotationDraft>(`${BASE}/${id}/quotation/revise`).then((r) => r.data);

@@ -303,6 +303,7 @@ public final class QuotationMapper {
                 .overrideReason(l.getOverrideReason())
                 .manual(l.getManualReason() != null)
                 .manualReason(l.getManualReason())
+                .negotiable(l.isNegotiable())
                 .build();
     }
 

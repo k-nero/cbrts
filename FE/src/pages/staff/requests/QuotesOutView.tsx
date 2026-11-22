@@ -3,7 +3,7 @@ import { Flex } from 'antd';
 import type { TableColumnsType } from 'antd';
 
 import Table from '@/components/table';
-import { Deadline, Panel } from '@/components/ui';
+import { Chip, Deadline, Panel } from '@/components/ui';
 import { useQuotesOut } from '@/hooks/overview';
 import type { QuoteOut } from '@/interfaces';
 import { daysUntil, dueLeft, formatDate, money } from '@/lib/utils';
@@ -16,9 +16,12 @@ const columns = (now: string): TableColumnsType<QuoteOut> => [
     width: 200,
     render: (_, q) => (
       <Flex vertical gap={2}>
-        <span className="type-data text-ink">
-          {q.quotationCode} v{q.versionNo}
-        </span>
+        <Flex align="center" gap={6}>
+          <span className="type-data text-ink">
+            {q.quotationCode} v{q.versionNo}
+          </span>
+          {q.counterOfferOpen && <Chip tone="info">Counter-offer</Chip>}
+        </Flex>
         <span className="type-caption text-ink-3">{q.requestCode}</span>
       </Flex>
     ),
