@@ -5,6 +5,7 @@ import com.equifreight.model.approval.ApprovalOptionsResponse;
 import com.equifreight.model.approval.ApproveRequest;
 import com.equifreight.model.approval.RejectRequest;
 import com.equifreight.model.quotation.AirClassRequest;
+import com.equifreight.model.quotation.BestPriceRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.ManualLineRequest;
 import com.equifreight.model.quotation.OverrideRequest;
@@ -216,6 +217,16 @@ public class StaffRequestController {
             @RequestParam(required = false) Integer version,
             @AuthenticationPrincipal User user) {
         return issues.issue(user, id, body, version);
+    }
+
+    @Operation(
+            summary = "Answer the club's open counter-offer without a new version: the version stands as the best"
+                    + " price, with a message the club reads")
+    @PostMapping("/{id}/quotation/best-price")
+    @PreAuthorize("hasRole('LOGISTICS_MANAGER')")
+    public QuotationDraftResponse bestPrice(
+            @PathVariable UUID id, @Valid @RequestBody BestPriceRequest body, @AuthenticationPrincipal User user) {
+        return issues.bestPrice(user, id, body);
     }
 
     @Operation(

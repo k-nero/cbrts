@@ -31,13 +31,11 @@ import com.equifreight.model.quotation.CounterOfferRequest;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.RequoteRequest;
-import com.equifreight.repository.QuotationCounterOfferRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,8 +51,6 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
 
     NotificationService notifications;
     QuotationIssueService issue;
-    QuotationCounterOfferRepository offerRows;
-    List<QuotationCounterOffer> offers;
     Club club;
     User bookings;
     Quotation v1;
@@ -70,7 +66,8 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
                 notifications,
                 audit,
                 snapshots,
-                Clock.fixed(ISSUED_AT, BusinessTime.ZONE));
+                Clock.fixed(ISSUED_AT, BusinessTime.ZONE),
+                ledger);
         club = request.getClub();
         club.setId(UUID.randomUUID());
         bookings = new User();
@@ -93,24 +90,6 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
         when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
                 .thenReturn(Optional.of(v1));
 
-        offers = new ArrayList<>();
-        offerRows = mock(QuotationCounterOfferRepository.class);
-        when(offerRows.saveAndFlush(any())).thenAnswer(i -> {
-            QuotationCounterOffer o = i.getArgument(0);
-            if (!offers.contains(o)) {
-                offers.add(o);
-            }
-            return o;
-        });
-        when(offerRows.findByQuotationId(any()))
-                .thenAnswer(i -> offers.stream()
-                        .filter(o -> o.getQuotation().getId().equals(i.getArgument(0)))
-                        .findFirst());
-        when(offerRows.findFirstByRequestIdAndStatus(any(), any()))
-                .thenAnswer(i -> offers.stream()
-                        .filter(o ->
-                                o.getRequest().getId().equals(i.getArgument(0)) && o.getStatus() == i.getArgument(1))
-                        .findFirst());
         clearInvocations(audit, notifications);
     }
 
@@ -130,7 +109,7 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
                 issue,
                 Clock.fixed(now, BusinessTime.ZONE),
                 mock(RequestFleetService.class),
-                new CounterOfferLedger(offerRows));
+                ledger);
     }
 
     void send(CounterOfferLineRequest... lines) {

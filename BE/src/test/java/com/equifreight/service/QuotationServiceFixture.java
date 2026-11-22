@@ -11,6 +11,7 @@ import com.equifreight.entity.Club;
 import com.equifreight.entity.Corridor;
 import com.equifreight.entity.Place;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.RateLine;
@@ -34,6 +35,7 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.model.quotation.ManualLineRequest;
 import com.equifreight.model.quotation.OverrideRequest;
+import com.equifreight.repository.QuotationCounterOfferRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.RateCatalogVersionRepository;
 import com.equifreight.repository.TransportRequestRepository;
@@ -72,6 +74,11 @@ abstract class QuotationServiceFixture {
     QuotationDraftService service;
     QuotationPricing pricing;
     Snapshots snapshots;
+    /** The club's counter-offers, kept in memory: saved rows, found by version or by request and status. */
+    QuotationCounterOfferRepository offerRows;
+
+    List<QuotationCounterOffer> offers;
+    CounterOfferLedger ledger;
 
     User yen;
     TransportRequest request;
@@ -92,8 +99,27 @@ abstract class QuotationServiceFixture {
         users = mock(UserRepository.class);
         audit = mock(AuditService.class);
         snapshots = new Snapshots(JsonMapper.builder().build());
+        offers = new ArrayList<>();
+        offerRows = mock(QuotationCounterOfferRepository.class);
+        when(offerRows.saveAndFlush(any())).thenAnswer(i -> {
+            QuotationCounterOffer o = i.getArgument(0);
+            if (!offers.contains(o)) {
+                offers.add(o);
+            }
+            return o;
+        });
+        when(offerRows.findByQuotationId(any()))
+                .thenAnswer(i -> offers.stream()
+                        .filter(o -> o.getQuotation().getId().equals(i.getArgument(0)))
+                        .findFirst());
+        when(offerRows.findFirstByRequestIdAndStatus(any(), any()))
+                .thenAnswer(i -> offers.stream()
+                        .filter(o ->
+                                o.getRequest().getId().equals(i.getArgument(0)) && o.getStatus() == i.getArgument(1))
+                        .findFirst());
+        ledger = new CounterOfferLedger(offerRows);
         pricing = new QuotationPricing(
-                loader, inputs, versions, users, quotations, snapshots, Clock.fixed(NOW, BusinessTime.ZONE));
+                loader, inputs, versions, users, quotations, snapshots, Clock.fixed(NOW, BusinessTime.ZONE), ledger);
         service = new QuotationDraftService(
                 requests, quotations, versions, pricing, codes, audit, Clock.fixed(NOW, BusinessTime.ZONE));
 

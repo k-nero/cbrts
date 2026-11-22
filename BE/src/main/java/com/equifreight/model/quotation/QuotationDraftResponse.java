@@ -37,4 +37,6 @@ public record QuotationDraftResponse(
         Instant validUntil,
         DepositResponse deposit,
         List<QuotationVersionResponse> versions,
-        PreviousVersionResponse previous) {}
+        PreviousVersionResponse previous,
+        /* The club's counter-offer waiting for an answer on this request, or null. */
+        CounterOfferResponse counterOffer) {}

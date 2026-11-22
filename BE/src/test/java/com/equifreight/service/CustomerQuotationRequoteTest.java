@@ -72,7 +72,8 @@ class CustomerQuotationRequoteTest extends QuotationServiceFixture {
                 notifications,
                 audit,
                 snapshots,
-                Clock.fixed(ISSUED_AT, BusinessTime.ZONE));
+                Clock.fixed(ISSUED_AT, BusinessTime.ZONE),
+                ledger);
         club = request.getClub();
         club.setId(UUID.randomUUID());
         bookings = new User();
@@ -118,7 +119,7 @@ class CustomerQuotationRequoteTest extends QuotationServiceFixture {
                 issue,
                 Clock.fixed(now, BusinessTime.ZONE),
                 mock(RequestFleetService.class),
-                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
+                ledger);
     }
 
     CustomerQuotationResponse ask(RequoteRequest body) {
