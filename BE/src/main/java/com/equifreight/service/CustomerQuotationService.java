@@ -21,6 +21,7 @@ import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.AcceptRequest;
 import com.equifreight.model.quotation.CounterOfferLineRequest;
 import com.equifreight.model.quotation.CounterOfferRequest;
+import com.equifreight.model.quotation.CounterOfferResponse;
 import com.equifreight.model.quotation.CustomerQuotationMapper;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
@@ -514,6 +515,7 @@ public class CustomerQuotationService {
 
     private CustomerQuotationResponse toResponse(TransportRequest request, Quotation q) {
         QuotationSnapshot snapshot = snapshots.of(q, request);
+        Optional<QuotationCounterOffer> counterOffer = counterOffers.on(q.getId());
         LocalDate today = LocalDate.now(clock.withZone(BusinessTime.ZONE));
         LocalDate departure = snapshot.request().departureDate();
         long days = departure == null ? 0 : ChronoUnit.DAYS.between(today, departure);
@@ -524,6 +526,18 @@ public class CustomerQuotationService {
                 feeBands.findByVersionIdAndKindOrderByMinDays(
                         q.getRateCatalogVersion().getId(), FeeBandKind.CANCELLATION),
                 days,
-                quotations.findByRequestIdOrderByVersionNoDesc(request.getId()));
+                quotations.findByRequestIdOrderByVersionNoDesc(request.getId()),
+                counterOffer.map(CounterOfferResponse::of).orElse(null),
+                counterOffer.isEmpty() && negotiable(request, q));
+    }
+
+    /** The version can still be answered, so negotiated: the same grounds as accepting, without throwing. */
+    private boolean negotiable(TransportRequest request, Quotation q) {
+        Instant now = clock.instant();
+        LocalDate departure = request.getDepartureDate();
+        return q.getStatus() == QuotationStatus.ISSUED
+                && request.getStatus() == RequestStatus.QUOTED
+                && !now.isAfter(q.getValidUntil())
+                && (departure == null || departure.isAfter(LocalDate.ofInstant(now, BusinessTime.ZONE)));
     }
 }

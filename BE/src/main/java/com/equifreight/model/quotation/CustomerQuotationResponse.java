@@ -56,7 +56,11 @@ public record CustomerQuotationResponse(
         LatePenalty latePenalty,
         PreparedBy preparedBy,
         List<Version> versions,
-        Integer nextVersion) {
+        Integer nextVersion,
+        /* The club's counter-offer on this version, whatever its status, or null. */
+        CounterOfferResponse counterOffer,
+        /* The club may send a counter-offer: the version is open and has none yet. */
+        boolean canNegotiate) {
 
     /** The request as quoted. */
     public record Request(
@@ -83,6 +87,8 @@ public record CustomerQuotationResponse(
      * what the catalog gave, shown struck through on an overridden line.
      */
     public record Line(
+            /* Names the line in a counter-offer; opaque to the client. */
+            String lineKey,
             String description,
             String basisText,
             BigDecimal quantity,
@@ -94,7 +100,9 @@ public record CustomerQuotationResponse(
             BigDecimal catalogAmount,
             String overrideReason,
             boolean manual,
-            String manualReason) {}
+            String manualReason,
+            /* False for a fixed fee passed on at cost ("At cost"), which can't be negotiated. */
+            boolean negotiable) {}
 
     public record Totals(BigDecimal subtotal, List<QuoteTotalRowResponse> rows, BigDecimal total) {}
 

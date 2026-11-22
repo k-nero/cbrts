@@ -15,11 +15,13 @@ import com.equifreight.entity.Handover;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
 import com.equifreight.entity.TransportJob;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
@@ -36,6 +38,7 @@ import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
+import com.equifreight.repository.QuotationCounterOfferRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
@@ -62,6 +65,7 @@ class CustomerHomeServiceTest {
     private final TransportRequestRepository requests = mock(TransportRequestRepository.class);
     private final QuotationRepository quotations = mock(QuotationRepository.class);
     private final TransportJobRepository jobs = mock(TransportJobRepository.class);
+    private final QuotationCounterOfferRepository counterOffers = mock(QuotationCounterOfferRepository.class);
     private final ChecklistItemRepository checklist = mock(ChecklistItemRepository.class);
     private final HorseRepository horses = mock(HorseRepository.class);
     private final InvoiceRepository invoices = mock(InvoiceRepository.class);
@@ -81,7 +85,8 @@ class CustomerHomeServiceTest {
                 horses,
                 invoices,
                 handovers,
-                Clock.fixed(NOW, BusinessTime.ZONE));
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                counterOffers);
         club.setId(UUID.randomUUID());
         club.setName("Saigon Turf Club");
         when(clubs.requireClub(customer)).thenReturn(club);
@@ -234,6 +239,30 @@ class CustomerHomeServiceTest {
         assertThat(attention.get(r.getId()))
                 .isEqualTo(new CustomerHomeService.Attention(
                         new TonedTextResponse("Departure passed · nothing to answer", "neutral"), null));
+    }
+
+    @Test
+    @DisplayName("while the club's counter-offer waits, its quotation isn't owed and the move says we're answering")
+    void homeSaysNegotiatingWhileACounterOfferIsOpen() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+        QuotationCounterOffer open = new QuotationCounterOffer();
+        open.setRequest(r);
+        open.setQuotation(q);
+        when(counterOffers.findByRequestIdInAndStatus(any(), eq(CounterOfferStatus.OPEN)))
+                .thenReturn(List.of(open));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.owed()).isEmpty();
+        assertThat(home.moves())
+                .singleElement()
+                .satisfies(m -> assertThat(m.holds())
+                        .isEqualTo(new TonedTextResponse("Negotiating · waiting for us", "neutral")));
     }
 
     @Test

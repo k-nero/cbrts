@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
@@ -39,6 +40,7 @@ public class OverviewService {
     private final QuotationRepository quotations;
     private final OnTimeReportService onTime;
     private final Clock clock;
+    private final CounterOfferLedger counterOffers;
 
     public OverviewService(
             RequestReviewService requests,
@@ -46,13 +48,15 @@ public class OverviewService {
             IncidentService incidents,
             QuotationRepository quotations,
             OnTimeReportService onTime,
-            Clock clock) {
+            Clock clock,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.jobs = jobs;
         this.incidents = incidents;
         this.quotations = quotations;
         this.onTime = onTime;
         this.clock = clock;
+        this.counterOffers = counterOffers;
     }
 
     @Transactional(readOnly = true)
@@ -93,10 +97,10 @@ public class OverviewService {
                 pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.ASC, "validUntil"));
         return quotations
                 .findByStatusAndRequest_Status(QuotationStatus.ISSUED, RequestStatus.QUOTED, bySoonest)
-                .map(OverviewService::toQuoteOut);
+                .map(this::toQuoteOut);
     }
 
-    private static QuoteOutResponse toQuoteOut(Quotation q) {
+    private QuoteOutResponse toQuoteOut(Quotation q) {
         return QuoteOutResponse.builder()
                 .requestId(q.getRequest().getId())
                 .requestCode(q.getRequest().getCode())
@@ -106,6 +110,10 @@ public class OverviewService {
                 .total(q.getTotal())
                 .currency(q.getCurrency())
                 .validUntil(q.getValidUntil())
+                .counterOfferOpen(counterOffers
+                        .on(q.getId())
+                        .filter(o -> o.getStatus() == CounterOfferStatus.OPEN)
+                        .isPresent())
                 .build();
     }
 

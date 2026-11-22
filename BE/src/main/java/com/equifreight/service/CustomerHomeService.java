@@ -14,6 +14,7 @@ import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ChecklistHolder;
 import com.equifreight.entity.enums.ChecklistStatus;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.DossierStatus;
 import com.equifreight.entity.enums.HandoverOutcome;
 import com.equifreight.entity.enums.InvoiceKind;
@@ -35,6 +36,7 @@ import com.equifreight.repository.ChecklistItemRepository;
 import com.equifreight.repository.HandoverRepository;
 import com.equifreight.repository.HorseRepository;
 import com.equifreight.repository.InvoiceRepository;
+import com.equifreight.repository.QuotationCounterOfferRepository;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
@@ -94,6 +96,10 @@ public class CustomerHomeService {
     private final InvoiceRepository invoices;
     private final HandoverRepository handovers;
     private final Clock clock;
+    private final QuotationCounterOfferRepository counterOffers;
+
+    /** While the club's counter-offer waits for the logistics manager, there is nothing for the club to do. */
+    static final TonedTextResponse NEGOTIATING = new TonedTextResponse("Negotiating · waiting for us", "neutral");
 
     public CustomerHomeService(
             ClubService clubs,
@@ -104,7 +110,8 @@ public class CustomerHomeService {
             HorseRepository horses,
             InvoiceRepository invoices,
             HandoverRepository handovers,
-            Clock clock) {
+            Clock clock,
+            QuotationCounterOfferRepository counterOffers) {
         this.clubs = clubs;
         this.requests = requests;
         this.quotations = quotations;
@@ -114,6 +121,7 @@ public class CustomerHomeService {
         this.invoices = invoices;
         this.handovers = handovers;
         this.clock = clock;
+        this.counterOffers = counterOffers;
     }
 
     @Transactional(readOnly = true)
@@ -147,6 +155,7 @@ public class CustomerHomeService {
         List<OwedEntryResponse> owed = new ArrayList<>();
         owedItems.forEach(ci -> owed.add(documentOwed(ci, today)));
         for (TransportRequest r : live) {
+            if (facts.negotiating().contains(r.getId())) continue;
             Quotation q = latestIssued.get(r.getId());
             // Once the departure has come an issued quotation can't be accepted, so nothing is owed on it.
             boolean ahead = r.getDepartureDate() == null || r.getDepartureDate().isAfter(today);
@@ -186,6 +195,9 @@ public class CustomerHomeService {
                         owedByJob,
                         handoverOf,
                         today))
+                .map(m -> facts.negotiating().contains(m.requestId())
+                        ? m.toBuilder().holds(NEGOTIATING).build()
+                        : m)
                 .sorted(Comparator.comparingInt((MoveEntryResponse m) -> needsYou(m.holds()))
                         .thenComparing(MoveEntryResponse::departsAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
@@ -234,13 +246,15 @@ public class CustomerHomeService {
                     || !inProgress(r, q, job, requoting, today)
                     || accepted(job, facts.handoverOf())) continue;
             List<ChecklistItem> owed = job == null ? List.of() : owedByJob.getOrDefault(job.getId(), List.of());
-            TonedTextResponse holds = holds(
-                    r,
-                    job,
-                    requoting,
-                    owed,
-                    today,
-                    job == null ? null : facts.handoverOf().get(job.getId()));
+            TonedTextResponse holds = facts.negotiating().contains(r.getId())
+                    ? NEGOTIATING
+                    : holds(
+                            r,
+                            job,
+                            requoting,
+                            owed,
+                            today,
+                            job == null ? null : facts.handoverOf().get(job.getId()));
             out.put(r.getId(), new Attention(holds, needsYou(holds) < 2 ? due(r, q, job, owed, today) : null));
         }
         return out;
@@ -270,7 +284,8 @@ public class CustomerHomeService {
             Map<UUID, Quotation> latestIssued,
             Map<UUID, TransportJob> jobOf,
             Set<UUID> requoting,
-            Map<UUID, Handover> handoverOf) {}
+            Map<UUID, Handover> handoverOf,
+            Set<UUID> negotiating) {}
 
     private Facts facts(List<UUID> ids) {
         Map<UUID, Quotation> latestIssued = new HashMap<>();
@@ -296,7 +311,13 @@ public class CustomerHomeService {
                     .findByJob_IdIn(
                             jobOf.values().stream().map(TransportJob::getId).toList())
                     .forEach(h -> handoverOf.put(h.getJob().getId(), h));
-        return new Facts(latestIssued, jobOf, requoting, handoverOf);
+        // A counter-offer the logistics manager hasn't answered yet (quotation negotiation).
+        Set<UUID> negotiating = new HashSet<>();
+        if (!ids.isEmpty())
+            counterOffers
+                    .findByRequestIdInAndStatus(ids, CounterOfferStatus.OPEN)
+                    .forEach(o -> negotiating.add(o.getRequest().getId()));
+        return new Facts(latestIssued, jobOf, requoting, handoverOf, negotiating);
     }
 
     /* ---------- what is in progress ---------- */

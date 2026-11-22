@@ -2,6 +2,8 @@ package com.equifreight.repository;
 
 import com.equifreight.entity.QuotationCounterOffer;
 import com.equifreight.entity.enums.CounterOfferStatus;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,4 +16,6 @@ public interface QuotationCounterOfferRepository extends JpaRepository<Quotation
     Optional<QuotationCounterOffer> findByQuotationId(UUID quotationId);
 
     Optional<QuotationCounterOffer> findFirstByRequestIdAndStatus(UUID requestId, CounterOfferStatus status);
+
+    List<QuotationCounterOffer> findByRequestIdInAndStatus(Collection<UUID> requestIds, CounterOfferStatus status);
 }

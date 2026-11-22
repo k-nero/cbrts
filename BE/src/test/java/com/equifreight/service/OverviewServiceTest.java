@@ -51,8 +51,14 @@ class OverviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        service =
-                new OverviewService(requests, jobs, incidents, quotations, onTime, Clock.fixed(NOW, BusinessTime.ZONE));
+        service = new OverviewService(
+                requests,
+                jobs,
+                incidents,
+                quotations,
+                onTime,
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
         when(onTime.report(any(), any(), any(), any()))
                 .thenReturn(com.equifreight.model.report.OnTimeReportResponse.builder()
                         .totals(new com.equifreight.model.report.OnTimeReportResponse.Totals(

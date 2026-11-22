@@ -128,6 +128,31 @@ class RequestProgressServiceTest {
     }
 
     @Test
+    @DisplayName("The club's counter-offer and the best-price answer show, though neither moves the request")
+    void theTimelineShowsTheCounterOfferAndTheBestPrice() {
+        AuditLog bestPrice = row("QUOTATION_BEST_PRICE", "Q-2026-0004 v2: best price", "Vũ Hải Yến", null, null);
+        bestPrice.setReason("Our grooms are already at cost.");
+        when(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("TRANSPORT_REQUEST", request.getId()))
+                .thenReturn(List.of(
+                        bestPrice,
+                        row(
+                                "QUOTATION_COUNTER_OFFERED",
+                                "Counter-offer on Q-2026-0004 v2: Grooms $480.00 → $400.00",
+                                "Saigon Turf Club",
+                                null,
+                                null)));
+        request.setStatus(RequestStatus.QUOTED);
+
+        List<HistoryEntryResponse> history = service.of(request, null).history();
+
+        assertThat(history)
+                .extracting(HistoryEntryResponse::getSummary)
+                .containsExactly(
+                        "Q-2026-0004 v2: best price: “Our grooms are already at cost.”",
+                        "Counter-offer on Q-2026-0004 v2: Grooms $480.00 → $400.00");
+    }
+
+    @Test
     @DisplayName("A quotation that expires on a cancelled request isn't a step of the customer's request")
     void expiryAfterCancellingIsLeftOut() {
         when(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("TRANSPORT_REQUEST", request.getId()))

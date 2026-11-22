@@ -6,7 +6,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 /** One request in progress, as a pass: its route, where it stands and what holds it. */
-@Builder
+@Builder(toBuilder = true)
 public record MoveEntryResponse(
         UUID requestId,
         String requestCode,

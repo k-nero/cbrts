@@ -28,6 +28,8 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.quotation.CounterOfferLineRequest;
 import com.equifreight.model.quotation.CounterOfferRequest;
+import com.equifreight.model.quotation.CounterOfferResponse;
+import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.RequoteRequest;
@@ -97,6 +99,7 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
         ClubService clubs = mock(ClubService.class);
         when(clubs.requireClub(bookings)).thenReturn(club);
         when(requests.findForUpdate(request.getId(), club.getId())).thenReturn(Optional.of(request));
+        when(requests.findByIdAndClubId(request.getId(), club.getId())).thenReturn(Optional.of(request));
         return new CustomerQuotationService(
                 requests,
                 quotations,
@@ -253,6 +256,37 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
         assertThatThrownBy(() -> send(ask("GROOM", "1000", "x")))
                 .extracting("code")
                 .isEqualTo("DEPARTURE_PASSED");
+    }
+
+    // --- what the club reads ----------------------------------------------------------------------------------
+
+    @Test
+    void theCustomerSeesLineKeysAndWhichLinesAreNegotiable() {
+        lineKeyed("GROOM").setNegotiable(false);
+
+        CustomerQuotationResponse r = at(OFFERED_AT).get(bookings, request.getId());
+
+        assertThat(r.groups().stream().flatMap(g -> g.lines().stream()))
+                .extracting(CustomerQuotationResponse.Line::lineKey, CustomerQuotationResponse.Line::negotiable)
+                .contains(tuple("STALL", true), tuple("GROOM", false), tuple(ferryKey(), true));
+    }
+
+    @Test
+    void canNegotiateOnlyOnAnOpenVersionWithoutACounterOffer() {
+        assertThat(at(OFFERED_AT).get(bookings, request.getId()).canNegotiate()).isTrue();
+        assertThat(at(Instant.parse("2026-10-29T04:00:00Z"))
+                        .get(bookings, request.getId())
+                        .canNegotiate())
+                .isFalse();
+
+        send(ask("GROOM", "1000", "Our own groom costs less"));
+        CustomerQuotationResponse after = at(OFFERED_AT).get(bookings, request.getId());
+
+        assertThat(after.canNegotiate()).isFalse();
+        assertThat(after.counterOffer().status()).isEqualTo(CounterOfferStatus.OPEN);
+        assertThat(after.counterOffer().lines())
+                .extracting(CounterOfferResponse.Line::lineKey)
+                .containsExactly("GROOM");
     }
 
     // --- what closes it -----------------------------------------------------------------------------------------
