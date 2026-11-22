@@ -5,6 +5,9 @@ import static com.equifreight.service.pricing.PricingText.money;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
+import com.equifreight.entity.QuotationCounterOfferLine;
+import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.FeeBandKind;
@@ -12,9 +15,12 @@ import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.entity.enums.RoleName;
+import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
 import com.equifreight.model.quotation.AcceptRequest;
+import com.equifreight.model.quotation.CounterOfferLineRequest;
+import com.equifreight.model.quotation.CounterOfferRequest;
 import com.equifreight.model.quotation.CustomerQuotationMapper;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
@@ -26,13 +32,19 @@ import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
 import com.equifreight.service.quotation.QuotationSnapshot;
 import com.equifreight.service.quotation.Snapshots;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +67,7 @@ public class CustomerQuotationService {
     private final QuotationIssueService issues;
     private final Clock clock;
     private final RequestFleetService fleet;
+    private final CounterOfferLedger counterOffers;
 
     public CustomerQuotationService(
             TransportRequestRepository requests,
@@ -67,7 +80,8 @@ public class CustomerQuotationService {
             InvoiceService invoices,
             QuotationIssueService issues,
             Clock clock,
-            RequestFleetService fleet) {
+            RequestFleetService fleet,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.quotations = quotations;
         this.feeBands = feeBands;
@@ -79,6 +93,110 @@ public class CustomerQuotationService {
         this.issues = issues;
         this.clock = clock;
         this.fleet = fleet;
+        this.counterOffers = counterOffers;
+    }
+
+    /**
+     * The club's counter-offer on the version it reads (spec 2026-11-23, quotation negotiation): for each negotiable
+     * line it would like cheaper, its price and reason. It changes no price and leaves the version open to accept; the
+     * logistics manager answers with a revised version or "best price". Refused on the same grounds as accepting, and
+     * once per version. The request row is locked first, so a double click saves one counter-offer.
+     */
+    @Transactional
+    public CustomerQuotationResponse counterOffer(User customer, UUID requestId, CounterOfferRequest body) {
+        Club club = clubs.requireClub(customer);
+        TransportRequest request = requests.findForUpdate(requestId, club.getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        Quotation q = latestIssued(requestId);
+        requireShown(body.versionNo(), q);
+        Instant now = clock.instant();
+        requireOpen(request, q, now);
+        LocalDate departure = request.getDepartureDate();
+        if (departure != null && !departure.isAfter(LocalDate.ofInstant(now, BusinessTime.ZONE))) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(departure)
+                            + " has come, so this quotation can't be negotiated. Start a new request for a later"
+                            + " date.");
+        }
+        counterOffers.on(q.getId()).ifPresent(earlier -> {
+            throw alreadyNegotiated(q, earlier.getCreatedAt());
+        });
+        if (body.lines() == null || body.lines().isEmpty()) {
+            throw new BusinessException("COUNTER_OFFER_EMPTY", "Tick at least one line you'd like cheaper.");
+        }
+
+        QuotationCounterOffer offer = new QuotationCounterOffer();
+        offer.setQuotation(q);
+        offer.setRequest(request);
+        offer.setCreatedBy(customer);
+        offer.setCreatedAt(now);
+        offer.setMessage(
+                body.message() == null || body.message().isBlank()
+                        ? null
+                        : body.message().strip());
+        List<String> asked = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (CounterOfferLineRequest ask : body.lines()) {
+            QuotationLine line = q.getLines().stream()
+                    .filter(l -> ask.lineKey().equals(l.getLineKey()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(
+                            "COUNTER_OFFER_LINE_UNKNOWN", ask.lineKey() + " isn't on this quotation."));
+            if (!keys.add(ask.lineKey())) {
+                throw new BusinessException(
+                        "COUNTER_OFFER_LINE_TWICE", line.getDescription() + " is in the counter-offer twice.");
+            }
+            if (!line.isNegotiable()) {
+                throw new BusinessException(
+                        "COUNTER_OFFER_LINE_FIXED", line.getDescription() + " is a fixed fee and can't be negotiated.");
+            }
+            BigDecimal quoted = line.getOverrideAmount() != null ? line.getOverrideAmount() : line.getCatalogAmount();
+            if (ask.askedAmount().signum() < 0 || ask.askedAmount().compareTo(quoted) >= 0) {
+                throw new BusinessException(
+                        "COUNTER_OFFER_AMOUNT",
+                        "Ask for less than " + money(quoted) + " on " + line.getDescription() + ".");
+            }
+            QuotationCounterOfferLine row = new QuotationCounterOfferLine();
+            row.setCounterOffer(offer);
+            row.setLineKey(line.getLineKey());
+            row.setDescription(line.getDescription());
+            row.setQuotedAmount(quoted);
+            row.setAskedAmount(ask.askedAmount());
+            row.setReason(ask.reason().strip());
+            offer.getLines().add(row);
+            asked.add(line.getDescription() + " " + money(quoted) + " → " + money(ask.askedAmount()));
+        }
+        try {
+            counterOffers.save(offer);
+        } catch (DataIntegrityViolationException e) {
+            throw alreadyNegotiated(q, now);
+        }
+
+        String lines = String.join("; ", asked);
+        audit.recordDecision(
+                customer,
+                "QUOTATION_COUNTER_OFFERED",
+                AuditText.fit("Counter-offer on " + q.getCode() + " v" + q.getVersionNo() + ": " + lines),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                offer.getMessage(),
+                null,
+                null);
+        tellManagers(
+                q,
+                request,
+                NotificationKind.QUOTATION_COUNTER_OFFER,
+                club.getName() + " sent a counter-offer on " + q.getCode() + " v" + q.getVersionNo(),
+                lines + (offer.getMessage() == null ? "" : " · “" + offer.getMessage() + "”"));
+        return toResponse(request, q);
+    }
+
+    private static ConflictException alreadyNegotiated(Quotation q, Instant when) {
+        return new ConflictException(
+                "COUNTER_OFFER_EXISTS",
+                "You already negotiated version " + q.getVersionNo() + " on " + day(when) + ".");
     }
 
     @Transactional(readOnly = true)

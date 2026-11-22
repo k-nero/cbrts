@@ -117,7 +117,8 @@ class CustomerQuotationRequoteTest extends QuotationServiceFixture {
                 invoices,
                 issue,
                 Clock.fixed(now, BusinessTime.ZONE),
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
     }
 
     CustomerQuotationResponse ask(RequoteRequest body) {

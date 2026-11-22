@@ -61,7 +61,8 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 mock(InvoiceService.class),
                 issue,
                 clock,
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
         Club club = request.getClub();
         club.setId(UUID.randomUUID());
         bookings = new User();
@@ -287,7 +288,8 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 mock(InvoiceService.class),
                 issue,
                 Clock.fixed(Instant.parse("2026-10-22T04:00:00Z"), BusinessTime.ZONE),
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
         CustomerQuotationResponse.Cancellation boundary =
                 twoDaysLater.get(bookings, request.getId()).cancellation();
         assertThat(boundary.daysToDeparture()).isEqualTo(29);
