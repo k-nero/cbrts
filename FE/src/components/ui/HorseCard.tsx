@@ -51,7 +51,7 @@ export const HorseCard: FC<Props> = ({
 }) => (
   <article
     className={cx(
-      'group/horse flex flex-col overflow-hidden rounded-lg border border-line bg-card',
+      'group/horse float-card flex flex-col overflow-hidden rounded-lg border border-line bg-card',
       className,
     )}
   >

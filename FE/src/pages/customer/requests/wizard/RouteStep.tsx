@@ -197,7 +197,7 @@ const RouteStep: FC<StepProps> = ({
         <>
           {route && (
             <Flex vertical gap={10}>
-              <div className="overflow-x-auto rounded-lg border border-line bg-card p-5">
+              <div className="float-card overflow-x-auto rounded-lg border border-line bg-card p-5">
                 <RouteStrip stops={routeStops(route)} />
               </div>
               <p className="type-body-s m-0 text-ink-3">

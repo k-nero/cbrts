@@ -62,7 +62,7 @@ export const YourMoves: FC<MovesProps> = ({ home, onOpen, onAll }) => (
               onClick={() => onOpen(m)}
               aria-label={`Open ${moveRef(m)}, ${m.route}`}
               className={cx(
-                'focus-ring group flex w-full cursor-pointer overflow-hidden rounded-lg border',
+                'float-card focus-ring group flex w-full cursor-pointer overflow-hidden rounded-lg border',
                 'border-line bg-card p-0 text-left transition-colors hover:border-line-strong',
               )}
             >

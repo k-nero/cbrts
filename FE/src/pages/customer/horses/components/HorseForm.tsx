@@ -182,7 +182,7 @@ const HorseForm: FC<Props> = ({
       {({ FormField }) => (
         <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-6">
           <Flex vertical gap={24}>
-            <div className="rounded-lg border border-line bg-card p-7">
+            <div className="float-card rounded-lg border border-line bg-card p-7">
               <Flex vertical gap={20}>
                 <Section
                   first

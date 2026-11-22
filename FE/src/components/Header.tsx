@@ -8,7 +8,7 @@ import NotificationBell from './notification/NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import { Button, NavItem } from './ui';
 
-import { COLOR_BG_CANVAS, COLOR_BORDER, ZINDEX_HEADER } from '@/constant/color';
+import { ZINDEX_HEADER } from '@/constant/color';
 import { useAuth, useMe } from '@/hooks/auth';
 import { type RouteName, useCustomRouter } from '@/router/route.hook';
 
@@ -44,8 +44,8 @@ const Header: React.FC = () => {
   return (
     <HeaderLayout
       style={{
-        background: COLOR_BG_CANVAS,
-        borderBottom: `1px solid ${COLOR_BORDER}`,
+        // Transparent, with no rule under it: the owner wash runs up to the top edge.
+        background: 'transparent',
         zIndex: ZINDEX_HEADER,
         padding: '0 40px',
         // AntD's Layout.Header sets line-height: 64px, which every child would inherit.

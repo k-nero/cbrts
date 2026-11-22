@@ -20,7 +20,10 @@ const NOTICE =
  */
 export const EstimateCard: FC<Props> = ({ range, drivers = [], notice = NOTICE, className }) => (
   <section
-    className={cx('flex flex-col gap-3.5 rounded-lg border border-line bg-card p-6', className)}
+    className={cx(
+      'float-card flex flex-col gap-3.5 rounded-lg border border-line bg-card p-6',
+      className,
+    )}
   >
     <span className="type-label-m text-ink-2">Indicative range</span>
     <span className="type-display-m text-ink">{range}</span>
