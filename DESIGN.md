@@ -298,7 +298,7 @@ A cold navy ground with warm off-white ink, one brass-gold accent, and four desa
 - **Gold Wash** (accent-soft) and **Gold Hairline** (accent-line): tinted fill and border for selection only: the load-plan selection bar and a stall drop target. Icon badges and avatars are Muted Navy with Mist ink; completed wizard steps are green (status ok); the estimate card has a plain hairline.
 
 ### Neutral
-- **Night Navy** (bg-canvas): page background and app header/footer.
+- **Night Navy** (bg-canvas): page background and app header/footer. The owner portal paints the Owner wash over it instead, and its header is transparent on the wash (see Elevation & Depth, The Owner Canvas Rule).
 - **Deep Well** (bg-sunken): table headers, fact cells, panel footers, staff sidebar.
 - **Field Navy** (bg-input): form control fill.
 - **Card Navy** (surface-card): panels, cards, list rows.
@@ -368,16 +368,23 @@ Spacing uses the `space/*` scale (2 to 120). Most-used steps: 8 and 12 inside co
 
 ## Elevation & Depth
 
-Flat by default. Depth is tonal: canvas, then sunken wells below it, then card, raised and muted surfaces above it, each bordered with a hairline. Shadows exist as four effect styles and appear only where something truly floats or is a physical material.
+Flat by default. Depth is tonal: canvas, then sunken wells below it, then card, raised and muted surfaces above it, each bordered with a hairline. Shadows exist as five effect styles and appear only where something truly floats or is a physical material. The owner portal is the one exception: its page-level cards float on a coloured wash (The Owner Canvas Rule).
 
 ### Shadow Vocabulary
 - **Elevation/1 Card** (`box-shadow: 0 10px 28px -14px rgba(0,0,0,0.28)`): the home hero's live job card only.
 - **Elevation/2 Overlay** (`box-shadow: 0 24px 56px -16px rgba(0,0,0,0.45)`): toasts and other overlays.
 - **Focus/Ring** (`box-shadow: 0 0 0 3px rgba(201,170,90,0.45)`): focused controls, with a 1.5 px gold border.
 - **Material/Brass** (`box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.45)`): the nameplate only.
+- **Elevation/Float** (`--owner-card-shadow`; Light `0 1px 2px rgba(40,28,10,0.05), 0 8px 22px rgba(40,28,10,0.06)`, Dark `0 0 0 1px rgba(237,233,225,0.07), 0 10px 28px rgba(0,0,0,0.4)`): page-level cards in the owner portal only.
 
 ### Named Rules
-**The Flat Panel Rule.** Panels, rows and cards carry a 1 px border and no shadow. If something needs to stand out, give it a surface step or a tone, not a drop shadow.
+**The Flat Panel Rule.** Panels, rows and cards carry a 1 px border and no shadow. If something needs to stand out, give it a surface step or a tone, not a drop shadow. Staff and escort pages follow it everywhere; the owner portal follows it inside a card.
+
+**The Owner Canvas Rule** (chosen 22 Nov 2026, after FUStation's home). The owner portal is a place to arrive, not a desk, so its background is light rather than a flat colour, and its page-level cards float on it:
+- **The wash** (`--owner-wash`), fixed to the window so it stays put while the page scrolls. Light, *Warm light*: blue-grey (#E6ECF3) from the left, apricot (#F8E2C4) from the top right, cream (#F7EEDF) low on the right, over #F8F7F4. Dark, *Dusk*: the same places at night, deep blue (rgba(56,100,170,0.40)) from the left, amber (rgba(205,140,70,0.38)) from the top right and a low gold haze (rgba(201,170,90,0.16)), over #0D1622. Dark is stronger on purpose: a faint glow disappears on navy.
+- **The header** is transparent, with no hairline, so the wash runs to the top edge. The footer keeps its top rule.
+- **Floating cards** (`float-card`): a page-level card drops its hairline and takes Elevation/Float. In Dark its fill is Card Navy at 86% (`--owner-card`), so the wash shows faintly behind it while text still sits on near-solid navy. The class is on Panel, the horse card, the estimate card and the owner pages' own page-level cards (Home's owed panel, moves, first move and nothing-owed; My requests' cards; the documents list; the horse form; the route step). It does nothing outside the owner shell, so a shared component stays flat on staff pages.
+- **What doesn't float:** rows, fields, choice cards and anything inside a card keep their hairlines, because a border there says selected or separate. Passes already carry Elevation/1 Card and keep it. A card that opens something (a move on Home) shows a Line Strong ring on hover, in place of the hairline that darkened.
 
 ## Shapes
 
@@ -402,7 +409,7 @@ Quiet and outlined, with one gold exception.
 ### Cards / Containers
 - **Corner Style:** 12 px.
 - **Background:** Card Navy on Night Navy; Deep Well for table headers, fact cells and panel footers.
-- **Shadow Strategy:** none (see Elevation).
+- **Shadow Strategy:** none (see Elevation), except a page-level card in the owner portal, which floats (The Owner Canvas Rule).
 - **Border:** 1 px Hairline; selected cards take a 1.5 px Mist (text-secondary) border on Lifted Navy, and the radio or checkbox inside is Paper Ink.
 - **Meta line:** words in Outfit Label S ("Answered by Lan", "In the estimate"); a figure such as a price delta in DM Mono. Both at text-secondary, because on the Service step the effect on the estimate is the point of the card.
 - **Internal Padding:** 24 px panels, 20 px cards, 14 to 16 px rows.

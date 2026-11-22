@@ -20,7 +20,9 @@ type Props = {
  * 24 px padding, no shadow.
  */
 export const Panel: FC<Props> = ({ title, extra, footer, flush, children, className }) => (
-  <section className={cx('overflow-hidden rounded-lg border border-line bg-card', className)}>
+  <section
+    className={cx('float-card overflow-hidden rounded-lg border border-line bg-card', className)}
+  >
     {Boolean(title || extra) && (
       <header
         className={cx(

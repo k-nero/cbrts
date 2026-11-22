@@ -46,7 +46,10 @@ export const HorseCard: FC<Props> = ({
   className,
 }) => (
   <article
-    className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
+    className={cx(
+      'float-card flex flex-col overflow-hidden rounded-lg border border-line bg-card',
+      className,
+    )}
   >
     <CoatBand coat={coat} name={name} subtitle={subtitle} photoUrl={photoUrl} />
     <div className="flex flex-col gap-4 p-5">

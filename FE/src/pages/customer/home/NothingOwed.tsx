@@ -19,7 +19,7 @@ const nextDate = (e: NextEvent, at: string) =>
  * Nothing on the page is gold.
  */
 export const NothingOwed: FC<{ event: NextEvent; asOf: string }> = ({ event, asOf }) => (
-  <section className="rounded-lg border border-line bg-card p-5">
+  <section className="float-card rounded-lg border border-line bg-card p-5">
     <Flex align="center" gap={16}>
       <Flex
         component="span"

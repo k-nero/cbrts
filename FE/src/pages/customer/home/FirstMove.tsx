@@ -14,7 +14,7 @@ type Props = {
  * the next step, adding a horse first when the club has none (a request picks from its horses).
  */
 export const FirstMove: FC<Props> = ({ hasHorses, onRequest, onAddHorse }) => (
-  <section className="rounded-lg border border-line bg-card p-5">
+  <section className="float-card rounded-lg border border-line bg-card p-5">
     <Flex align="center" gap={24}>
       <Flex vertical gap={4} className="min-w-0 flex-1">
         <h2 className="type-h3 m-0 text-ink">

@@ -18,7 +18,7 @@ export const RequestCard: FC<{
   now: string;
   onDiscard: (id: string) => void;
 }> = ({ row: r, now, onDiscard }) => (
-  <li className="rounded-lg border border-line bg-card p-4">
+  <li className="float-card rounded-lg border border-line bg-card p-4">
     <Flex vertical gap={12}>
       <RequestStatusCell row={r} now={now} />
       <RouteCell row={r} />

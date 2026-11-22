@@ -13,7 +13,13 @@ import PageMotion from './PageMotion';
 import ThemeToggle from './ThemeToggle';
 import { SideUser } from './SideUser';
 
-import { COLOR_BG_CANVAS, COLOR_BG_SUNKEN, COLOR_BORDER, ZINDEX_MENU } from '@/constant/color';
+import {
+  COLOR_BG_CANVAS,
+  COLOR_BG_SUNKEN,
+  COLOR_BORDER,
+  OWNER_WASH,
+  ZINDEX_MENU,
+} from '@/constant/color';
 import { ROLE_LABEL } from '@/interfaces';
 import { primaryRole, useAuthStore } from '@/stores/authStore';
 
@@ -42,9 +48,13 @@ const AuthenticateLayout: FC<Props> = ({
   const role = primaryRole(roles);
 
   if (!menu) {
-    // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout).
+    // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout), on the
+    // owner wash, fixed to the window so the light stays put while the page scrolls.
     return (
-      <Layout style={{ minHeight: '100vh', background: COLOR_BG_CANVAS }}>
+      <Layout
+        className="owner-canvas"
+        style={{ minHeight: '100vh', background: OWNER_WASH, backgroundAttachment: 'fixed' }}
+      >
         <Header />
         <ErrorBoundaryHandling key={pathname}>
           <Content style={{ padding: '32px 120px 96px' }}>
