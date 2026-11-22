@@ -100,8 +100,6 @@ export const PALETTE: Record<ThemeMode, Palette> = {
 
 // Surfaces
 export const COLOR_BG_CANVAS = 'var(--color-canvas)';
-/** The owner portal's background (index.css, DESIGN.md Owner canvas). */
-export const OWNER_WASH = 'var(--owner-wash)';
 export const COLOR_BG_SUNKEN = 'var(--color-sunken)';
 export const COLOR_BG_INPUT = 'var(--color-input)';
 export const COLOR_BG_CARD = 'var(--color-card)';

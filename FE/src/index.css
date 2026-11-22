@@ -154,6 +154,24 @@
 }
 
 /*
+ * The owner wash on a layer of its own, pinned to the window: the browser paints it once and
+ * scrolls the page over it, where a fixed background would be repainted on every scroll frame.
+ * isolation keeps the layer behind the shell's content but above the page's own background.
+ */
+.owner-canvas {
+  isolation: isolate;
+}
+.owner-canvas::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--owner-wash);
+  will-change: transform;
+}
+
+/*
  * Inside the owner portal a page-level card floats on the wash: no hairline, a soft shadow
  * (DESIGN.md, Owner canvas). Outside it (staff, escort) the class does nothing.
  */
