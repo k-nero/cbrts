@@ -24,6 +24,8 @@ public final class CustomerQuotationMapper {
     /**
      * @param versions the request's quotation versions, newest first; drafts are left out here
      * @param daysToDeparture days from today to the departure as quoted, in the business zone
+     * @param negotiated the versions the club negotiated that a later version answered
+     * @param answersCounterOfferOf when the club sent the counter-offer {@code q} answers, or null
      */
     public static CustomerQuotationResponse toResponse(
             Quotation q,
@@ -33,7 +35,9 @@ public final class CustomerQuotationMapper {
             long daysToDeparture,
             List<Quotation> versions,
             CounterOfferResponse counterOffer,
-            boolean canNegotiate) {
+            boolean canNegotiate,
+            java.util.Set<java.util.UUID> negotiated,
+            java.time.Instant answersCounterOfferOf) {
         QuotationSnapshot.Facts facts = snapshot.request();
         BigDecimal low = request.getEstimateLow();
         BigDecimal high = request.getEstimateHigh();
@@ -111,11 +115,13 @@ public final class CustomerQuotationMapper {
                                 v.getStatus(),
                                 v.getIssuedAt(),
                                 v.getValidUntil(),
-                                v.getSupersededReason()))
+                                v.getSupersededReason(),
+                                negotiated.contains(v.getId())))
                         .toList())
                 .nextVersion(nextVersion(q, request, versions))
                 .counterOffer(counterOffer)
                 .canNegotiate(canNegotiate)
+                .answersCounterOfferOf(answersCounterOfferOf)
                 .build();
     }
 

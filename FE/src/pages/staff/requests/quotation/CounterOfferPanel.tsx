@@ -22,7 +22,10 @@ export const CounterOfferPanel: FC<{
   const offer = q.counterOffer;
   if (!offer || offer.status !== 'OPEN') return null;
   const club = offer.createdBy ?? 'The club';
-  const canAnswer = !draft && q.status === 'ISSUED';
+  // Past its last valid day the club can't accept it, even before the hourly expiry job marks it expired.
+  const live =
+    q.status === 'ISSUED' && (!q.validUntil || new Date(q.validUntil).getTime() > Date.now());
+  const canAnswer = !draft && live;
   return (
     <Callout
       tone="info"
@@ -45,7 +48,7 @@ export const CounterOfferPanel: FC<{
         <span className="text-ink-3">
           {draft
             ? 'Use the club’s price on a line, or your own, with a reason. Issuing this version answers the counter-offer.'
-            : q.status === 'ISSUED'
+            : live
               ? 'Revise this version to answer with a new one, or answer that this is your best price.'
               : 'This version has expired: revise it to answer with a new one.'}
         </span>

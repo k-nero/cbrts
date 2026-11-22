@@ -266,6 +266,30 @@ class CustomerHomeServiceTest {
     }
 
     @Test
+    @DisplayName("once the departure day has come, an open counter-offer no longer counts as negotiating")
+    void homeStopsSayingNegotiatingOnceTheDepartureHasCome() {
+        TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);
+        r.setDepartureDate(TODAY);
+        Quotation q = quotation(r, QuotationStatus.ISSUED);
+        when(requests.findByClubIdAndStatusNotIn(eq(club.getId()), anyCollection()))
+                .thenReturn(List.of(r));
+        when(quotations.findByRequestIdInAndStatusNot(any(), eq(QuotationStatus.DRAFT)))
+                .thenReturn(List.of(q));
+        QuotationCounterOffer open = new QuotationCounterOffer();
+        open.setRequest(r);
+        open.setQuotation(q);
+        when(counterOffers.findByRequestIdInAndStatus(any(), eq(CounterOfferStatus.OPEN)))
+                .thenReturn(List.of(open));
+
+        CustomerHomeResponse home = service.get(customer);
+
+        assertThat(home.moves())
+                .singleElement()
+                .satisfies(m -> assertThat(m.holds())
+                        .isNotEqualTo(new TonedTextResponse("Negotiating · waiting for us", "neutral")));
+    }
+
+    @Test
     @DisplayName("an issued quotation is owed until it is answered, due when it stops holding its price")
     void quotedRequestIsOwed() {
         TransportRequest r = request("REQ-2026-0179", RequestStatus.QUOTED);

@@ -214,7 +214,7 @@ public class QuotationPricing {
                 .versions(all.stream().map(QuotationMapper::toVersion).toList())
                 .previous(previous == null ? null : QuotationMapper.toPrevious(previous))
                 .counterOffer(counterOffers
-                        .open(request.getId())
+                        .pending(request, clock.instant())
                         .map(CounterOfferResponse::of)
                         .orElse(null))
                 .build();

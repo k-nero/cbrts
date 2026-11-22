@@ -314,8 +314,9 @@ public class CustomerHomeService {
         // A counter-offer the logistics manager hasn't answered yet (quotation negotiation).
         Set<UUID> negotiating = new HashSet<>();
         if (!ids.isEmpty())
-            counterOffers
-                    .findByRequestIdInAndStatus(ids, CounterOfferStatus.OPEN)
+            counterOffers.findByRequestIdInAndStatus(ids, CounterOfferStatus.OPEN).stream()
+                    // Once the departure day has come, nothing more can be answered: it no longer counts.
+                    .filter(o -> !CounterOfferLedger.departureHasCome(o.getRequest(), clock.instant()))
                     .forEach(o -> negotiating.add(o.getRequest().getId()));
         return new Facts(latestIssued, jobOf, requoting, handoverOf, negotiating);
     }

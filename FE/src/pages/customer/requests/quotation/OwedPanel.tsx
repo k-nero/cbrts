@@ -166,6 +166,12 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
   return (
     <Flex vertical gap={16}>
       {changedCallout}
+      {quotation.answersCounterOfferOf && (
+        <Callout
+          tone="info"
+          title={`Version ${quotation.versionNo} answers your counter-offer of ${formatDate(quotation.answersCounterOfferOf)}`}
+        />
+      )}
       {offer?.status === 'OPEN' && (
         <Callout
           tone="info"

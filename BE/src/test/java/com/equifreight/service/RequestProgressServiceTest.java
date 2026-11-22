@@ -168,8 +168,7 @@ class RequestProgressServiceTest {
 
         assertThat(service.of(request, null).history())
                 .extracting(HistoryEntryResponse::getSummary)
-                .containsExactly(
-                        "Quotation Q-2026-0004 v2 issued: $9,041.09, valid until 29 Nov 2026; supersedes v1");
+                .containsExactly("Quotation Q-2026-0004 v2 issued: $9,041.09, valid until 29 Nov 2026; supersedes v1");
     }
 
     @Test

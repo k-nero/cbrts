@@ -107,7 +107,15 @@ public class QuotationIssueService {
                     "DRAFT_EXISTS", "Version " + latest.getVersionNo() + " is already being drafted.");
         }
         Quotation q = offer.getQuotation();
-        if (q.getStatus() != QuotationStatus.ISSUED) {
+        Instant now = clock.instant();
+        if (CounterOfferLedger.departureHasCome(request, now)) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(request.getDepartureDate())
+                            + " has come, so this counter-offer can't be answered.");
+        }
+        // Past its last valid day the club can't accept it, even before the hourly expiry job marks it EXPIRED.
+        if (q.getStatus() != QuotationStatus.ISSUED || now.isAfter(q.getValidUntil())) {
             throw new ConflictException(
                     "COUNTER_OFFER_EXPIRED",
                     "Version " + q.getVersionNo()
@@ -117,7 +125,7 @@ public class QuotationIssueService {
         offer.setStatus(CounterOfferStatus.BEST_PRICE);
         offer.setAnswerMessage(message);
         offer.setAnsweredBy(manager);
-        offer.setAnsweredAt(clock.instant());
+        offer.setAnsweredAt(now);
         counterOffers.save(offer);
 
         audit.recordDecision(

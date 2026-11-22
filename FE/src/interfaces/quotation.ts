@@ -311,6 +311,8 @@ export interface CustomerQuotation {
     issuedAt: string | null;
     validUntil: string | null;
     supersededReason: string | null;
+    /** The club negotiated this version, and a later version answered it. */
+    negotiated: boolean;
   }[];
   /** The version being drafted after this one (a re-quote, A4); null when none is. */
   nextVersion: number | null;
@@ -318,6 +320,8 @@ export interface CustomerQuotation {
   counterOffer: CounterOffer | null;
   /** The club may send a counter-offer: the version is open and has none yet. */
   canNegotiate: boolean;
+  /** When the club sent the counter-offer this version answers (a revision); null otherwise. */
+  answersCounterOfferOf: string | null;
 }
 
 /** The request's latest issued quotation, on the request and its list row. */

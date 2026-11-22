@@ -17,5 +17,8 @@ public interface QuotationCounterOfferRepository extends JpaRepository<Quotation
 
     Optional<QuotationCounterOffer> findFirstByRequestIdAndStatus(UUID requestId, CounterOfferStatus status);
 
+    /** Every counter-offer on the request, one per version at most. */
+    List<QuotationCounterOffer> findByRequestId(UUID requestId);
+
     List<QuotationCounterOffer> findByRequestIdInAndStatus(Collection<UUID> requestIds, CounterOfferStatus status);
 }

@@ -10,6 +10,7 @@ import com.equifreight.entity.QuotationCounterOfferLine;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.FeeBandKind;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
@@ -516,6 +517,7 @@ public class CustomerQuotationService {
     private CustomerQuotationResponse toResponse(TransportRequest request, Quotation q) {
         QuotationSnapshot snapshot = snapshots.of(q, request);
         Optional<QuotationCounterOffer> counterOffer = counterOffers.on(q.getId());
+        List<QuotationCounterOffer> onRequest = counterOffers.onRequest(request.getId());
         LocalDate today = LocalDate.now(clock.withZone(BusinessTime.ZONE));
         LocalDate departure = snapshot.request().departureDate();
         long days = departure == null ? 0 : ChronoUnit.DAYS.between(today, departure);
@@ -528,7 +530,22 @@ public class CustomerQuotationService {
                 days,
                 quotations.findByRequestIdOrderByVersionNoDesc(request.getId()),
                 counterOffer.map(CounterOfferResponse::of).orElse(null),
-                counterOffer.isEmpty() && negotiable(request, q));
+                counterOffer.isEmpty() && negotiable(request, q),
+                negotiatedVersions(onRequest),
+                onRequest.stream()
+                        .filter(o -> o.getAnsweredWithQuotation() != null
+                                && o.getAnsweredWithQuotation().getId().equals(q.getId()))
+                        .map(QuotationCounterOffer::getCreatedAt)
+                        .findFirst()
+                        .orElse(null));
+    }
+
+    /** The versions the club negotiated that a later version answered. */
+    private static java.util.Set<UUID> negotiatedVersions(List<QuotationCounterOffer> onRequest) {
+        return onRequest.stream()
+                .filter(o -> o.getStatus() == CounterOfferStatus.REVISED)
+                .map(o -> o.getQuotation().getId())
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     /** The version can still be answered, so negotiated: the same grounds as accepting, without throwing. */

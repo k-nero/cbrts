@@ -508,6 +508,33 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
     }
 
     @Test
+    void bestPriceAfterTheLastValidDayIsRefused() {
+        // The hourly expiry job hasn't run yet: the version is still ISSUED, but the club can no longer accept it.
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        v1.setValidUntil(ISSUE_NOW.minusSeconds(60));
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("COUNTER_OFFER_EXPIRED");
+    }
+
+    @Test
+    void onceTheDepartureHasComeTheCounterOfferIsNeitherAnsweredNorShown() {
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        request.setDepartureDate(LocalDate.of(2026, 10, 19));
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("The departure on 19 Oct 2026 has come, so this counter-offer can't be answered.")
+                .extracting("code")
+                .isEqualTo("DEPARTURE_PASSED");
+        assertThat(service.get(request.getId()).counterOffer()).isNull();
+    }
+
+    @Test
     void reviseCopiesClassOverridesAndManualLinesOnTheLatestCatalog() {
         Quotation v1 = issuedV1WithAdjustments();
         when(versions.findFirstByStatusOrderByVersionNoDesc(CatalogStatus.PUBLISHED))

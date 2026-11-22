@@ -51,6 +51,7 @@ export const TermsAndVersions: FC<{ quotation: CustomerQuotation }> = ({ quotati
                   ? `Expired ${v.validUntil ? formatDate(v.validUntil) : ''}`.trim()
                   : `Issued ${v.issuedAt ? formatDate(v.issuedAt) : ''}`.trim()}
             </span>
+            {v.negotiated && <Chip dot={false}>Negotiated</Chip>}
             {current && (
               <Chip tone="info" dot={false}>
                 Current

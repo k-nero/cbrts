@@ -2,7 +2,6 @@ package com.equifreight.service;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
-import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.IncidentStatus;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
@@ -95,12 +94,14 @@ public class OverviewService {
     public Page<QuoteOutResponse> quotesOut(Pageable pageable) {
         Pageable bySoonest = PageRequest.of(
                 pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.ASC, "validUntil"));
-        return quotations
-                .findByStatusAndRequest_Status(QuotationStatus.ISSUED, RequestStatus.QUOTED, bySoonest)
-                .map(this::toQuoteOut);
+        Page<Quotation> page =
+                quotations.findByStatusAndRequest_Status(QuotationStatus.ISSUED, RequestStatus.QUOTED, bySoonest);
+        java.util.Set<java.util.UUID> negotiating = counterOffers.pendingOn(
+                page.getContent().stream().map(q -> q.getRequest().getId()).toList(), clock.instant());
+        return page.map(q -> toQuoteOut(q, negotiating));
     }
 
-    private QuoteOutResponse toQuoteOut(Quotation q) {
+    private QuoteOutResponse toQuoteOut(Quotation q, java.util.Set<java.util.UUID> negotiating) {
         return QuoteOutResponse.builder()
                 .requestId(q.getRequest().getId())
                 .requestCode(q.getRequest().getCode())
@@ -110,10 +111,7 @@ public class OverviewService {
                 .total(q.getTotal())
                 .currency(q.getCurrency())
                 .validUntil(q.getValidUntil())
-                .counterOfferOpen(counterOffers
-                        .on(q.getId())
-                        .filter(o -> o.getStatus() == CounterOfferStatus.OPEN)
-                        .isPresent())
+                .counterOfferOpen(negotiating.contains(q.getRequest().getId()))
                 .build();
     }
 

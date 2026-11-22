@@ -60,7 +60,9 @@ public record CustomerQuotationResponse(
         /* The club's counter-offer on this version, whatever its status, or null. */
         CounterOfferResponse counterOffer,
         /* The club may send a counter-offer: the version is open and has none yet. */
-        boolean canNegotiate) {
+        boolean canNegotiate,
+        /* When the club sent the counter-offer this version answers (a revision), or null. */
+        Instant answersCounterOfferOf) {
 
     /** The request as quoted. */
     public record Request(
@@ -121,6 +123,12 @@ public record CustomerQuotationResponse(
 
     public record PreparedBy(String name, String role) {}
 
+    /** {@code negotiated}: the club negotiated this version, and a later version answered it. */
     public record Version(
-            short versionNo, QuotationStatus status, Instant issuedAt, Instant validUntil, String supersededReason) {}
+            short versionNo,
+            QuotationStatus status,
+            Instant issuedAt,
+            Instant validUntil,
+            String supersededReason,
+            boolean negotiated) {}
 }

@@ -289,6 +289,26 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
                 .containsExactly("GROOM");
     }
 
+    @Test
+    void aRevisionSaysWhichCounterOfferItAnswersAndTheVersionsMarkTheNegotiatedOne() {
+        send(ask("GROOM", "1000", "Our own groom costs less"));
+        issue.revise(yen, request.getId());
+        Quotation v2 = stored.orElseThrow();
+        v2.setId(UUID.randomUUID());
+        v2.getLines().forEach(l -> l.setId(UUID.randomUUID()));
+        issue.issue(yen, request.getId(), new IssueRequest("Groom at your price."));
+        when(quotations.findFirstByRequestIdAndStatusNotOrderByVersionNoDesc(request.getId(), QuotationStatus.DRAFT))
+                .thenReturn(Optional.of(v2));
+        when(quotations.findByRequestIdOrderByVersionNoDesc(request.getId())).thenReturn(List.of(v2, v1));
+
+        CustomerQuotationResponse r = at(OFFERED_AT).get(bookings, request.getId());
+
+        assertThat(r.answersCounterOfferOf()).isEqualTo(OFFERED_AT);
+        assertThat(r.versions())
+                .extracting(CustomerQuotationResponse.Version::versionNo, CustomerQuotationResponse.Version::negotiated)
+                .containsExactly(tuple((short) 2, false), tuple((short) 1, true));
+    }
+
     // --- what closes it -----------------------------------------------------------------------------------------
 
     @Test

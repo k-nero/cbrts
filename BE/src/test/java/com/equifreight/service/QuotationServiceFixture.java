@@ -117,6 +117,10 @@ abstract class QuotationServiceFixture {
                         .filter(o ->
                                 o.getRequest().getId().equals(i.getArgument(0)) && o.getStatus() == i.getArgument(1))
                         .findFirst());
+        when(offerRows.findByRequestId(any()))
+                .thenAnswer(i -> offers.stream()
+                        .filter(o -> o.getRequest().getId().equals(i.getArgument(0)))
+                        .toList());
         ledger = new CounterOfferLedger(offerRows);
         pricing = new QuotationPricing(
                 loader, inputs, versions, users, quotations, snapshots, Clock.fixed(NOW, BusinessTime.ZONE), ledger);

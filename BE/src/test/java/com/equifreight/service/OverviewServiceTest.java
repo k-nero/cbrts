@@ -1,5 +1,6 @@
 package com.equifreight.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -20,6 +21,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.incident.IncidentSummaryResponse;
 import com.equifreight.model.job.JobSummaryResponse;
 import com.equifreight.model.overview.OverviewResponse;
+import com.equifreight.model.overview.QuoteOutResponse;
 import com.equifreight.model.review.QueueRowResponse;
 import com.equifreight.repository.QuotationRepository;
 import java.math.BigDecimal;
@@ -47,6 +49,8 @@ class OverviewServiceTest {
     private final IncidentService incidents = mock(IncidentService.class);
     private final QuotationRepository quotations = mock(QuotationRepository.class);
     private final OnTimeReportService onTime = mock(OnTimeReportService.class);
+    private final com.equifreight.repository.QuotationCounterOfferRepository offerRows =
+            mock(com.equifreight.repository.QuotationCounterOfferRepository.class);
     private OverviewService service;
 
     @BeforeEach
@@ -58,7 +62,7 @@ class OverviewServiceTest {
                 quotations,
                 onTime,
                 Clock.fixed(NOW, BusinessTime.ZONE),
-                new CounterOfferLedger(mock(com.equifreight.repository.QuotationCounterOfferRepository.class)));
+                new CounterOfferLedger(offerRows));
         when(onTime.report(any(), any(), any(), any()))
                 .thenReturn(com.equifreight.model.report.OnTimeReportResponse.builder()
                         .totals(new com.equifreight.model.report.OnTimeReportResponse.Totals(
@@ -106,6 +110,30 @@ class OverviewServiceTest {
         q.setCurrency("USD");
         q.setValidUntil(Instant.parse("2026-10-26T16:59:59Z"));
         return q;
+    }
+
+    @Test
+    @DisplayName("Quotes out marks an open counter-offer, until the departure day has come")
+    void quotesOutMarksAnOpenCounterOfferUntilDeparture() {
+        Quotation asked = quotation();
+        asked.getRequest().setDepartureDate(java.time.LocalDate.of(2026, 11, 20));
+        Quotation departed = quotation();
+        departed.getRequest().setDepartureDate(java.time.LocalDate.of(2026, 10, 24));
+        when(quotations.findByStatusAndRequest_Status(eq(QuotationStatus.ISSUED), eq(RequestStatus.QUOTED), any()))
+                .thenReturn(page(List.of(asked, departed), 2));
+        java.util.List<com.equifreight.entity.QuotationCounterOffer> open = new java.util.ArrayList<>();
+        for (Quotation q : List.of(asked, departed)) {
+            var o = new com.equifreight.entity.QuotationCounterOffer();
+            o.setRequest(q.getRequest());
+            o.setQuotation(q);
+            open.add(o);
+        }
+        when(offerRows.findByRequestIdInAndStatus(any(), eq(com.equifreight.entity.enums.CounterOfferStatus.OPEN)))
+                .thenReturn(open);
+
+        assertThat(service.quotesOut(PageRequest.of(0, 20)).getContent())
+                .extracting(QuoteOutResponse::counterOfferOpen)
+                .containsExactly(true, false);
     }
 
     @Test
