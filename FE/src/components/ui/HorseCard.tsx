@@ -1,10 +1,13 @@
 import type { FC, ReactNode } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { FactCell } from './FactCell';
 import { Progress } from './Progress';
 import { cx } from './tone';
 import { CoatBand } from './CoatBand';
 import { HorseAvatar } from './HorseAvatar';
+
+import { PHOTO_EXIT, pin } from '@/lib/motion';
 
 /** `other` is the neutral band for a coat outside the four (OTHER) or none given. */
 export type Coat = 'grey' | 'black' | 'chestnut' | 'bay' | 'other';
@@ -54,17 +57,47 @@ export const HorseCard: FC<Props> = ({
   >
     <div className="relative">
       <CoatBand coat={coat} name={name} subtitle={subtitle} />
-      {photoUrl && (
-        // Half over the band, half over the card, ringed in the card colour so it reads as a profile picture.
-        <span className="absolute right-5 -bottom-9 rounded-full bg-card p-[3px]">
-          <HorseAvatar coat={coat} photoUrl={photoUrl} size={72} />
-        </span>
-      )}
+      {/* The photo settles onto the band's edge when it loads or is added, and leaves when removed. */}
+      <AnimatePresence initial={false}>
+        {photoUrl && (
+          // Half over the band, half over the card, ringed in the card colour so it reads as a profile picture.
+          <motion.span
+            key="photo"
+            variants={pin}
+            initial="hidden"
+            animate="shown"
+            exit={PHOTO_EXIT}
+            className="absolute right-5 -bottom-9 rounded-full bg-card p-[3px]"
+          >
+            <HorseAvatar coat={coat} photoUrl={photoUrl} size={72} />
+          </motion.span>
+        )}
+      </AnimatePresence>
     </div>
-    <div className={cx('flex flex-col gap-4 p-5', photoUrl && !status && !tags && 'pt-11')}>
-      {status && <div className={cx('flex', photoUrl && 'pr-[84px]')}>{status}</div>}
+    <div
+      className={cx(
+        // The room under the photo eases open and shut with it rather than jumping the card.
+        'flex flex-col gap-4 p-5 transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+        photoUrl && !status && !tags && 'pt-11',
+      )}
+    >
+      {status && (
+        <div
+          className={cx(
+            'flex transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+            photoUrl && 'pr-[84px]',
+          )}
+        >
+          {status}
+        </div>
+      )}
       {tags && (
-        <div className={cx('flex flex-wrap gap-1.5', photoUrl && !status && 'pr-[84px]')}>
+        <div
+          className={cx(
+            'flex flex-wrap gap-1.5 transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+            photoUrl && !status && 'pr-[84px]',
+          )}
+        >
           {tags}
         </div>
       )}

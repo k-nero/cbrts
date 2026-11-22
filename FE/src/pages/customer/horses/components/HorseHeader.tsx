@@ -1,5 +1,6 @@
 import type { FC, ReactNode } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { horseChips } from './horseCardProps';
 
@@ -7,6 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import { CoatBand, HorseAvatar } from '@/components/ui';
 import { useHorsePhotoUrl } from '@/hooks/horse';
 import type { Horse } from '@/interfaces';
+import { pin } from '@/lib/motion';
 import { ageOf, coatOf, formatMicrochip, ict, sexLabel } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -54,7 +56,12 @@ const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) 
               </Flex>
             )}
           </Flex>
-          {photoUrl && <HorseAvatar coat={coatOf(horse.coat)} photoUrl={photoUrl} size={88} />}
+          {photoUrl && (
+            // The photo is fetched after the page: it settles in beside the facts once it arrives.
+            <motion.span variants={pin} initial="hidden" animate="shown" className="flex">
+              <HorseAvatar coat={coatOf(horse.coat)} photoUrl={photoUrl} size={88} />
+            </motion.span>
+          )}
         </Flex>
       }
       right={right}
