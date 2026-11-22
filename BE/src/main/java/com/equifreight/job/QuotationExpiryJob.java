@@ -9,6 +9,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.AuditService;
+import com.equifreight.service.CounterOfferLedger;
 import com.equifreight.service.NotificationService;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
@@ -41,6 +42,7 @@ public class QuotationExpiryJob {
     private final AuditService audit;
     private final EntityManager entities;
     private final Clock clock;
+    private final CounterOfferLedger counterOffers;
 
     public QuotationExpiryJob(
             QuotationRepository quotations,
@@ -48,13 +50,15 @@ public class QuotationExpiryJob {
             NotificationService notifications,
             AuditService audit,
             EntityManager entities,
-            Clock clock) {
+            Clock clock,
+            CounterOfferLedger counterOffers) {
         this.quotations = quotations;
         this.requests = requests;
         this.notifications = notifications;
         this.audit = audit;
         this.entities = entities;
         this.clock = clock;
+        this.counterOffers = counterOffers;
     }
 
     @Scheduled(fixedDelay = ONE_HOUR_MS)
@@ -127,8 +131,12 @@ public class QuotationExpiryJob {
                 departureCome(request, now)
                         ? "The departure on " + BusinessTime.DAY.format(request.getDepartureDate())
                                 + " has come, so it can't be re-quoted. Start a new request for a later date."
-                        : "Ask " + manager
-                                + " for a re-quote to have it priced again from the rate catalog in force now.");
+                        : counterOffers.open(request.getId()).isPresent()
+                                // A re-quote is refused while the manager answers the counter-offer.
+                                ? "Your counter-offer is still with us: we'll answer with a new version."
+                                : "Ask " + manager
+                                        + " for a re-quote to have it priced again from the rate catalog in force"
+                                        + " now.");
     }
 
     /** The departure day has come, in Vietnam time; a request without a date has none to come. */

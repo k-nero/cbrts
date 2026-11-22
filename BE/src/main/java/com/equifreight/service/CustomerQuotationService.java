@@ -241,6 +241,8 @@ public class CustomerQuotationService {
                 .findFirstByRequestIdOrderByVersionNoDesc(requestId)
                 .filter(d -> d.getStatus() == QuotationStatus.DRAFT && d.getVersionNo() > q.getVersionNo());
 
+        // A counter-offer still waiting is moot once the club takes this version.
+        counterOffers.closeOpen(request.getId(), now);
         q.setStatus(QuotationStatus.ACCEPTED);
         q.setAcceptedAt(now);
         q.setAcceptedBy(customer);
@@ -308,6 +310,7 @@ public class CustomerQuotationService {
                 ? null
                 : body.reason().strip();
 
+        counterOffers.closeOpen(request.getId(), now);
         q.setStatus(QuotationStatus.DECLINED);
         q.setDeclinedAt(now);
         q.setDeclineReason(reason);
@@ -395,6 +398,10 @@ public class CustomerQuotationService {
         if (newest.getStatus() == QuotationStatus.DRAFT) {
             throw new ConflictException(
                     "REQUOTE_IN_PROGRESS", "Version " + newest.getVersionNo() + " is already being prepared.");
+        }
+        // The manager answers an open counter-offer with the next version; a re-quote would draft a second one.
+        if (counterOffers.open(request.getId()).isPresent()) {
+            throw new ConflictException("COUNTER_OFFER_OPEN", "We're answering your counter-offer.");
         }
         String v = "version " + latest.getVersionNo();
         switch (latest.getStatus()) {

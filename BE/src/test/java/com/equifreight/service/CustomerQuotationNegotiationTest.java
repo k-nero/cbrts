@@ -28,7 +28,9 @@ import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.model.quotation.CounterOfferLineRequest;
 import com.equifreight.model.quotation.CounterOfferRequest;
+import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.IssueRequest;
+import com.equifreight.model.quotation.RequoteRequest;
 import com.equifreight.repository.QuotationCounterOfferRepository;
 import com.equifreight.repository.RateFeeBandRepository;
 import java.math.BigDecimal;
@@ -272,5 +274,41 @@ class CustomerQuotationNegotiationTest extends QuotationServiceFixture {
         assertThatThrownBy(() -> send(ask("GROOM", "1000", "x")))
                 .extracting("code")
                 .isEqualTo("DEPARTURE_PASSED");
+    }
+
+    // --- what closes it -----------------------------------------------------------------------------------------
+
+    @Test
+    void acceptingClosesTheOpenCounterOffer() {
+        send(ask("GROOM", "1000", "Our own groom costs less"));
+
+        at(OFFERED_AT).accept(bookings, request.getId());
+
+        assertThat(offers.getFirst().getStatus()).isEqualTo(CounterOfferStatus.CLOSED);
+        assertThat(offers.getFirst().getAnsweredAt()).isEqualTo(OFFERED_AT);
+    }
+
+    @Test
+    void decliningClosesTheOpenCounterOffer() {
+        send(ask("GROOM", "1000", "Our own groom costs less"));
+
+        at(OFFERED_AT).decline(bookings, request.getId(), new DeclineRequest("Too dear", null));
+
+        assertThat(offers.getFirst().getStatus()).isEqualTo(CounterOfferStatus.CLOSED);
+        assertThat(offers.getFirst().getAnsweredAt()).isEqualTo(OFFERED_AT);
+    }
+
+    @Test
+    void aRequoteIsRefusedWhileACounterOfferIsOpen() {
+        send(ask("GROOM", "1000", "Our own groom costs less"));
+        v1.setStatus(QuotationStatus.EXPIRED);
+        request.setStatus(RequestStatus.EXPIRED);
+
+        assertThatThrownBy(() -> at(Instant.parse("2026-10-29T04:00:00Z"))
+                        .requote(bookings, request.getId(), new RequoteRequest(1, null)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("We're answering your counter-offer.")
+                .extracting("code")
+                .isEqualTo("COUNTER_OFFER_OPEN");
     }
 }
