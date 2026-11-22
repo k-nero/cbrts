@@ -20,6 +20,7 @@ import com.equifreight.entity.enums.InvoiceKind;
 import com.equifreight.entity.enums.InvoiceLineKind;
 import com.equifreight.entity.enums.InvoiceStatus;
 import com.equifreight.entity.enums.NotificationKind;
+import com.equifreight.entity.enums.PaymentMethod;
 import com.equifreight.entity.enums.PaymentStatus;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RequestStatus;
@@ -42,6 +43,7 @@ import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
+import com.equifreight.service.payment.CardGateway;
 import com.equifreight.service.pricing.PricedTotals;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -68,7 +70,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Invoices and payments (US-F6-03, docs/handover-design.md). Two invoices per job, both generated, never typed: the
  * deposit when the customer accepts the quotation, and the final invoice once the handover is settled, which settles
- * the accepted quotation against what happened. An issued invoice is never edited. Payments are recorded by hand.
+ * the accepted quotation against what happened. An issued invoice is never edited. Payments are recorded by hand, or
+ * come in by card through the payment gateway ({@link CardPaymentService}); both go through one writer here.
  */
 @Log4j2
 @Service
@@ -101,6 +104,7 @@ public class InvoiceService {
     private final ClubService clubs;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final CardGateway cardGateway;
     private final Clock clock;
 
     public InvoiceService(
@@ -116,6 +120,7 @@ public class InvoiceService {
             ClubService clubs,
             AuditService audit,
             NotificationService notifications,
+            CardGateway cardGateway,
             Clock clock) {
         this.invoices = invoices;
         this.payments = payments;
@@ -129,6 +134,7 @@ public class InvoiceService {
         this.clubs = clubs;
         this.audit = audit;
         this.notifications = notifications;
+        this.cardGateway = cardGateway;
         this.clock = clock;
     }
 
@@ -352,12 +358,12 @@ public class InvoiceService {
     // ---------- payments ----------
 
     /**
-     * A payment received by bank transfer or card, recorded by hand (no gateway): it is never edited, and the invoice
-     * becomes partly paid or paid in the same transaction. It can't exceed what is still owed or be dated ahead.
+     * A payment received by bank transfer or card, recorded by hand: it is never edited, and the invoice becomes partly
+     * paid or paid in the same transaction. It can't exceed what is still owed or be dated ahead.
      */
     @Transactional
     public InvoiceResponse recordPayment(UUID invoiceId, RecordPaymentRequest request, User manager) {
-        Invoice invoice = invoice(invoiceId);
+        Invoice invoice = lockedInvoice(invoiceId);
         if (!UNPAID.contains(invoice.getStatus())) {
             throw new BusinessException("Invoice " + invoice.getCode() + " is "
                     + invoice.getStatus().name().toLowerCase(Locale.ROOT).replace('_', ' ')
@@ -374,31 +380,89 @@ public class InvoiceService {
             throw new BusinessException(
                     "A payment is recorded once received; " + DAY.format(request.receivedOn()) + " hasn't come yet");
         }
+        String reference = request.reference() == null || request.reference().isBlank()
+                ? null
+                : request.reference().strip();
+        applyPayment(
+                invoice,
+                request.amount(),
+                request.method(),
+                reference,
+                request.receivedOn().atStartOfDay(BusinessTime.ZONE).toInstant(),
+                manager);
+        return view(invoice);
+    }
+
+    /**
+     * Why a card payment of {@code amount} in {@code currency} can't be taken against {@code invoice}, in the customer's
+     * words ("the invoice was already paid in full"), or null when it can. A card payment that can't be taken is
+     * refunded, never recorded.
+     */
+    public static String cardRefusal(Invoice invoice, BigDecimal amount, String currency) {
+        String invoiceCurrency = invoice.getQuotation().getCurrency();
+        if (invoice.getStatus() == InvoiceStatus.PAID) return "the invoice was already paid in full";
+        if (invoice.getStatus() == InvoiceStatus.VOID) return "the invoice was voided";
+        if (!UNPAID.contains(invoice.getStatus())) return "the invoice isn't issued";
+        if (currency == null || !currency.equalsIgnoreCase(invoiceCurrency)) {
+            return "it was charged in " + currency + ", not the invoice's " + invoiceCurrency;
+        }
+        BigDecimal due = InvoiceMapper.amountDue(invoice);
+        if (amount == null || amount.signum() <= 0) return "no amount was charged";
+        if (amount.compareTo(due) > 0) {
+            return "it was more than the " + money(invoiceCurrency, due) + " now due, after another payment came in";
+        }
+        return null;
+    }
+
+    /**
+     * A card payment the gateway confirmed (database-design.md, 13A): recorded like one entered by hand, with no staff
+     * member as its recorder and the gateway's payment id as the reference. The caller checks {@link #cardRefusal}
+     * first, under the invoice's lock.
+     */
+    @Transactional
+    public Payment recordCardPayment(UUID invoiceId, BigDecimal amount, String paymentIntent, Instant receivedAt) {
+        Invoice invoice = lockedInvoice(invoiceId);
+        String refusal = cardRefusal(invoice, amount, invoice.getQuotation().getCurrency());
+        if (refusal != null) {
+            throw new BusinessException("The card payment can't be recorded on " + invoice.getCode() + ": " + refusal);
+        }
+        return applyPayment(invoice, amount, PaymentMethod.CARD, paymentIntent, receivedAt, null);
+    }
+
+    /**
+     * The one writer of a payment and of the invoice's paid amount and status: the payment is confirmed, the invoice
+     * becomes partly paid or paid, the decision is audited and the club is told. {@code recordedBy} is null for a card
+     * payment confirmed by the gateway.
+     */
+    private Payment applyPayment(
+            Invoice invoice,
+            BigDecimal amount,
+            PaymentMethod method,
+            String reference,
+            Instant receivedAt,
+            User recordedBy) {
+        String currency = invoice.getQuotation().getCurrency();
         Payment payment = new Payment();
         payment.setInvoice(invoice);
-        payment.setAmount(request.amount());
-        payment.setMethod(request.method());
-        payment.setReference(
-                request.reference() == null || request.reference().isBlank()
-                        ? null
-                        : request.reference().strip());
-        payment.setReceivedAt(
-                request.receivedOn().atStartOfDay(BusinessTime.ZONE).toInstant());
-        payment.setRecordedBy(manager);
+        payment.setAmount(amount);
+        payment.setMethod(method);
+        payment.setReference(reference);
+        payment.setReceivedAt(receivedAt);
+        payment.setRecordedBy(recordedBy);
         payment.setStatus(PaymentStatus.CONFIRMED);
         payments.save(payment);
-        invoice.setAmountPaid(invoice.getAmountPaid().add(request.amount()));
+        invoice.setAmountPaid(invoice.getAmountPaid().add(amount));
         invoice.setStatus(
                 invoice.getAmountPaid().compareTo(invoice.getTotal()) >= 0
                         ? InvoiceStatus.PAID
                         : InvoiceStatus.PARTIALLY_PAID);
         Invoice saved = invoices.save(invoice);
+        String how = recordedBy == null ? "card, paid online" : words(method.name());
         audit.recordDecision(
-                manager,
+                recordedBy,
                 "RECORD_PAYMENT",
-                AuditText.fit(money(currency, request.amount()) + " by "
-                        + request.method().name().toLowerCase(Locale.ROOT).replace('_', ' ') + " on "
-                        + saved.getCode() + (payment.getReference() == null ? "" : ", ref " + payment.getReference())
+                AuditText.fit(money(currency, amount) + " by " + how + " on " + saved.getCode()
+                        + (reference == null ? "" : ", ref " + reference)
                         + "; "
                         + (saved.getStatus() == InvoiceStatus.PAID
                                 ? "paid in full"
@@ -414,12 +478,13 @@ public class InvoiceService {
                 Audience.club(saved.getClub().getId()),
                 Subject.invoice(saved),
                 "Payment received for " + saved.getCode(),
-                money(currency, request.amount()) + " received on " + DAY.format(request.receivedOn()) + ". "
+                money(currency, amount) + (recordedBy == null ? " paid by card on " : " received on ")
+                        + DAY.format(LocalDate.ofInstant(receivedAt, BusinessTime.ZONE)) + ". "
                         + (saved.getStatus() == InvoiceStatus.PAID
                                 ? "The invoice is paid in full."
                                 : money(currency, InvoiceMapper.amountDue(saved)) + " is still due by "
                                         + DAY.format(saved.getDueOn()) + "."));
-        return view(saved);
+        return payment;
     }
 
     // ---------- reading ----------
@@ -720,11 +785,19 @@ public class InvoiceService {
     private InvoiceResponse view(Invoice invoice) {
         List<Payment> paid =
                 invoice.getId() == null ? List.of() : payments.findByInvoice_IdOrderByReceivedAtAsc(invoice.getId());
-        return InvoiceMapper.toResponse(invoice, new ArrayList<>(paid), today());
+        boolean payableByCard = cardGateway.enabled()
+                && UNPAID.contains(invoice.getStatus())
+                && InvoiceMapper.amountDue(invoice).signum() > 0;
+        return InvoiceMapper.toResponse(invoice, new ArrayList<>(paid), today(), payableByCard);
     }
 
     private Invoice invoice(UUID id) {
         return invoices.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Invoice", id));
+    }
+
+    /** The invoice, locked so two payments can't both be checked against the same amount due. */
+    private Invoice lockedInvoice(UUID id) {
+        return invoices.findLockedById(id).orElseThrow(() -> ResourceNotFoundException.of("Invoice", id));
     }
 
     private LocalDate today() {

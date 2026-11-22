@@ -65,6 +65,19 @@ On first start, `DataSeeder` creates the five roles and one account per role. Ea
 | `khoi.do@equifreight.vn` | Fleet & route coordinator |
 | `minh.tran@equifreight.vn` | Escort |
 
+#### Card payment (Stripe, optional)
+
+Customers can pay invoices by card on Stripe Checkout. It is off until a Stripe secret key is set; invoices are then paid by bank transfer only. Use test-mode keys from the Stripe dashboard (Developers → API keys) and never commit them.
+
+1. Install the Stripe CLI and sign in: `stripe login`.
+2. Forward webhooks to the API, on the same account as your secret key (the CLI may be signed in to another one):
+   `stripe listen --api-key sk_test_... --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.expired --forward-to localhost:8080/api/v1/public/webhooks/stripe`.
+   It prints a `whsec_...` signing secret; `--print-secret` prints only that. Recent CLI versions refuse to start without `--events`.
+3. Start the backend with `APP_PAYMENT_STRIPE_SECRETKEY=sk_test_...` and `APP_PAYMENT_STRIPE_WEBHOOKSECRET=whsec_...` (in compose, put both in `.env`). `app.payment.return-url` is the web app's origin; the dev profile uses `http://localhost:5173`.
+4. Pay with Stripe's test card `4242 4242 4242 4242`, any future expiry and any CVC. The payment appears on the invoice once the webhook arrives, with a PDF receipt.
+
+In production, add a webhook endpoint in the Stripe dashboard for `checkout.session.completed`, `checkout.session.async_payment_succeeded` and `checkout.session.expired`, pointing at `https://<api host>/api/v1/public/webhooks/stripe`.
+
 #### Frontend
 
 ```bash

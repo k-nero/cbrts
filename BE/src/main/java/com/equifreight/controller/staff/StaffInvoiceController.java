@@ -8,6 +8,7 @@ import com.equifreight.model.invoice.InvoiceView;
 import com.equifreight.model.invoice.ReadyForInvoiceResponse;
 import com.equifreight.model.invoice.RecordPaymentRequest;
 import com.equifreight.service.InvoiceService;
+import com.equifreight.service.ReceiptService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -17,6 +18,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,9 +38,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class StaffInvoiceController {
 
     private final InvoiceService invoices;
+    private final ReceiptService receipts;
 
-    public StaffInvoiceController(InvoiceService invoices) {
+    public StaffInvoiceController(InvoiceService invoices, ReceiptService receipts) {
         this.invoices = invoices;
+        this.receipts = receipts;
     }
 
     @Operation(summary = "The Invoices list: All, To be paid, Overdue or Paid, soonest due first")
@@ -95,5 +102,20 @@ public class StaffInvoiceController {
             @Valid @RequestBody RecordPaymentRequest request,
             @AuthenticationPrincipal User user) {
         return invoices.recordPayment(id, request, user);
+    }
+
+    @Operation(summary = "A PDF receipt for a confirmed payment")
+    @GetMapping("/api/v1/staff/payments/{id}/receipt")
+    public ResponseEntity<byte[]> receipt(@PathVariable UUID id) {
+        ReceiptService.ReceiptFile file = receipts.ofStaff(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(file.filename())
+                                .build()
+                                .toString())
+                .body(file.content());
     }
 }

@@ -1,6 +1,8 @@
 package com.equifreight.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,6 +20,7 @@ import com.equifreight.entity.Incident;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.InvoiceLine;
 import com.equifreight.entity.JobCharge;
+import com.equifreight.entity.Payment;
 import com.equifreight.entity.Quotation;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.TransportJob;
@@ -51,6 +54,7 @@ import com.equifreight.repository.PaymentRepository;
 import com.equifreight.repository.TransportJobRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.notification.Audience;
+import com.equifreight.service.payment.CardGateway;
 import com.equifreight.service.pricing.PricedTotals;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -83,6 +87,7 @@ class InvoiceServiceTest {
     private final CodeService codes = mock(CodeService.class);
     private final AuditService audit = mock(AuditService.class);
     private final NotificationService notifications = mock(NotificationService.class);
+    private final CardGateway cardGateway = mock(CardGateway.class);
     private InvoiceService service;
     private Club club;
     private Quotation quotation;
@@ -122,6 +127,7 @@ class InvoiceServiceTest {
                 mock(ClubService.class),
                 audit,
                 notifications,
+                cardGateway,
                 Clock.fixed(NOW, BusinessTime.ZONE));
         club = new Club();
         club.setId(UUID.randomUUID());
@@ -408,7 +414,7 @@ class InvoiceServiceTest {
     @DisplayName("Payments are recorded by hand: part paid, then paid, never more than is owed or ahead of time")
     void recordingPayments() {
         Invoice d = deposited();
-        when(invoices.findById(d.getId())).thenReturn(Optional.of(d));
+        when(invoices.findLockedById(d.getId())).thenReturn(Optional.of(d));
 
         InvoiceResponse part = service.recordPayment(
                 d.getId(),
@@ -452,6 +458,81 @@ class InvoiceServiceTest {
                         new RecordPaymentRequest(
                                 new BigDecimal("1.00"), PaymentMethod.CARD, null, LocalDate.of(2026, 10, 24)),
                         yen));
+    }
+
+    @Test
+    @DisplayName("A card payment the gateway confirmed is recorded with no recorder and the gateway's reference")
+    void recordingCardPayments() {
+        Invoice d = deposited();
+        when(invoices.findLockedById(d.getId())).thenReturn(Optional.of(d));
+
+        Payment payment = service.recordCardPayment(d.getId(), new BigDecimal("1002.00"), "pi_3Q", NOW);
+
+        assertEquals(PaymentMethod.CARD, payment.getMethod());
+        assertNull(payment.getRecordedBy());
+        assertEquals("pi_3Q", payment.getReference());
+        assertEquals(InvoiceStatus.PAID, d.getStatus());
+        assertEquals(new BigDecimal("1002.00"), d.getAmountPaid());
+        verify(audit)
+                .recordDecision(
+                        eq(null),
+                        eq("RECORD_PAYMENT"),
+                        eq("USD 1,002.00 by card, paid online on INV-2026-0041, ref pi_3Q; paid in full"),
+                        eq("INVOICE"),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.PAYMENT_RECORDED),
+                        any(),
+                        any(),
+                        eq("Payment received for INV-2026-0041"),
+                        eq("USD 1,002.00 paid by card on 24 Oct 2026. The invoice is paid in full."));
+
+        BusinessException again = assertThrows(
+                BusinessException.class,
+                () -> service.recordCardPayment(d.getId(), new BigDecimal("1.00"), "pi_4R", NOW));
+        assertEquals(
+                "The card payment can't be recorded on INV-2026-0041: the invoice was already paid in full",
+                again.getMessage());
+    }
+
+    @Test
+    @DisplayName("A card payment the invoice can't take says why, in the customer's words")
+    void cardRefusals() {
+        Invoice d = deposited();
+        assertNull(InvoiceService.cardRefusal(d, new BigDecimal("1002.00"), "USD"));
+        assertNull(InvoiceService.cardRefusal(d, new BigDecimal("500.00"), "usd"));
+        assertEquals(
+                "it was more than the USD 1,002.00 now due, after another payment came in",
+                InvoiceService.cardRefusal(d, new BigDecimal("1002.01"), "USD"));
+        assertEquals(
+                "it was charged in EUR, not the invoice's USD",
+                InvoiceService.cardRefusal(d, new BigDecimal("1002.00"), "EUR"));
+        d.setStatus(InvoiceStatus.VOID);
+        assertEquals("the invoice was voided", InvoiceService.cardRefusal(d, new BigDecimal("1002.00"), "USD"));
+        d.setStatus(InvoiceStatus.PAID);
+        assertEquals(
+                "the invoice was already paid in full",
+                InvoiceService.cardRefusal(d, new BigDecimal("1002.00"), "USD"));
+    }
+
+    @Test
+    @DisplayName("An invoice is payable by card only while it is owed and card payment is set up")
+    void payableByCard() {
+        Invoice d = deposited();
+        when(invoices.findById(d.getId())).thenReturn(Optional.of(d));
+        when(invoices.findLockedById(d.getId())).thenReturn(Optional.of(d));
+
+        assertFalse(service.get(d.getId()).payableByCard());
+        when(cardGateway.enabled()).thenReturn(true);
+        assertTrue(service.get(d.getId()).payableByCard());
+
+        service.recordCardPayment(d.getId(), new BigDecimal("1002.00"), "pi_3Q", NOW);
+        assertFalse(service.get(d.getId()).payableByCard());
     }
 
     @Test
