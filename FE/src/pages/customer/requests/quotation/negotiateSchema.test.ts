@@ -28,6 +28,22 @@ describe('negotiateSchema', () => {
     ]);
   });
 
+  test('aLineNeverTickedCountsAsUnticked', () => {
+    // Each row's checkbox registers its field before it is ticked, so the form holds { ticked: undefined }.
+    const untouched = { ticked: undefined as unknown as boolean };
+    expect(messages(values({ LOADING: untouched, GROOM: untouched }))).toEqual([
+      "Tick at least one line you'd like cheaper.",
+    ]);
+    expect(
+      messages(
+        values({
+          LOADING: untouched,
+          ROAD_SHARED: { ticked: true, price: 300, reason: 'Another carrier quoted $300' },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
   test('aPriceAtOrAboveTheAmountIsRefused', () => {
     expect(
       messages(values({ ROAD_SHARED: { ticked: true, price: 400, reason: 'Cheaper elsewhere' } })),

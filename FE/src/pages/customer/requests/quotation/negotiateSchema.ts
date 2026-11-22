@@ -6,7 +6,7 @@ import { money } from '@/lib/utils/quotation';
 /** One line the club may tick: its key, its amount on this version, and whether it can be negotiated. */
 export type NegotiableLine = { lineKey: string; amount: number; negotiable: boolean };
 
-export type Ask = { ticked: boolean; price?: number | null; reason?: string };
+export type Ask = { ticked?: boolean; price?: number | null; reason?: string };
 
 export type NegotiateValues = { message: string; asks: Record<string, Ask | undefined> };
 
@@ -22,7 +22,8 @@ export const makeNegotiateSchema = (lines: NegotiableLine[]) =>
         z.string(),
         z
           .object({
-            ticked: z.boolean(),
+            // A row's checkbox registers before it is ticked: undefined means not ticked.
+            ticked: z.boolean().optional(),
             price: z.number().nullish(),
             reason: z.string().max(300, 'At most 300 characters.').optional(),
           })

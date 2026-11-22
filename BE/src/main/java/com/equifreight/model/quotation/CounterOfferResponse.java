@@ -36,7 +36,8 @@ public record CounterOfferResponse(
                 o.getStatus(),
                 o.getQuotation().getVersionNo(),
                 o.getCreatedAt(),
-                nameOf(o.getCreatedBy()),
+                // The club, read from the request (loaded): the signed-in user's club proxy may be detached.
+                o.getRequest().getClub().getName(),
                 o.getMessage(),
                 o.getLines().stream()
                         .map(l -> new Line(
