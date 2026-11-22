@@ -102,6 +102,14 @@ export interface Invoice {
   amountDue: number;
   lines: InvoiceLine[];
   payments: Payment[];
+  /** The customer can pay what is due by card online (Stripe is set up and the invoice is owed). */
+  payableByCard: boolean;
+}
+
+/** Where to send the customer to pay by card: Stripe's hosted page. */
+export interface CardCheckout {
+  url: string;
+  expiresAt: string;
 }
 
 /** A job whose handover is settled and has no final invoice yet. */

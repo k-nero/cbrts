@@ -50,6 +50,7 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   HANDOVER_ACCEPTED: 'Accepted',
   INVOICE_ISSUED: 'Invoice',
   PAYMENT_RECORDED: 'Payment',
+  CARD_PAYMENT_REFUNDED: 'Refund',
   NOTE_RECEIVED: 'Customer note',
   NOTE_ANSWERED: 'Answered',
 };
