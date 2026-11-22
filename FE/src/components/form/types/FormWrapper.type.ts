@@ -14,9 +14,9 @@ export interface FormContextType<T extends FieldValues = any> extends ExtraFormP
 }
 
 export type FormWrapperProps<T extends FieldValues = any, V = any> = {
-  methods: UseFormReturn<T & { form_error?: unknown }, V>;
+  methods: UseFormReturn<T, V>;
   children:
-    React.ReactNode | ((props: FormContextType<T & { form_error?: unknown }>) => React.ReactNode);
+    React.ReactNode | ((props: FormContextType<T>) => React.ReactNode);
   force?: boolean;
 } & ExtraFormProps &
   Omit<FormProps, 'children'>;
