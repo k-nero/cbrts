@@ -50,6 +50,8 @@ public enum NotificationKind {
     HANDOVER_ACCEPTED(NotificationTone.OK),
     INVOICE_ISSUED(NotificationTone.INFO),
     PAYMENT_RECORDED(NotificationTone.OK),
+    /** A card payment came in after its invoice stopped being owed, and was sent back (database-design.md, 13A). */
+    CARD_PAYMENT_REFUNDED(NotificationTone.WARN),
     /** A customer note routed to the role that answers it (US-00-08). */
     NOTE_RECEIVED(NotificationTone.INFO),
     /** Staff replied to the customer's note. */

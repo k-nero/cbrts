@@ -7,7 +7,10 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
 
-/** A payment recorded by hand against an invoice (US-F6-03). */
+/**
+ * A payment against an invoice (US-F6-03): recorded by hand, or paid by card online, which has no {@code recordedByName}
+ * and the gateway's payment id as its reference.
+ */
 @Builder
 public record PaymentResponse(
         UUID id,

@@ -98,6 +98,14 @@ public class ControllerAdvise {
                         "File storage is unavailable. Try again shortly."));
     }
 
+    @ExceptionHandler(PaymentGatewayException.class)
+    public ResponseEntity<ApiError> handlePaymentGateway(PaymentGatewayException ex) {
+        log.error("Payment gateway failed", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiError.of(
+                        HttpStatus.SERVICE_UNAVAILABLE.value(), "PAYMENT_GATEWAY_UNAVAILABLE", ex.getMessage()));
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

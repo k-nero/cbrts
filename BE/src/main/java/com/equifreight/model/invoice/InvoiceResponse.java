@@ -12,7 +12,7 @@ import lombok.Builder;
 /**
  * An invoice with its lines and payments (US-F6-03). A deposit invoice has one line; a final invoice the accepted
  * quotation settled against what happened: each line as quoted or actual, the costs approved on incidents, the late
- * arrival credit, then the deposit deducted.
+ * arrival credit, then the deposit deducted. {@code payableByCard} says the customer can pay what is due online.
  */
 @Builder
 public record InvoiceResponse(
@@ -40,4 +40,5 @@ public record InvoiceResponse(
         BigDecimal amountPaid,
         BigDecimal amountDue,
         List<InvoiceLineResponse> lines,
-        List<PaymentResponse> payments) {}
+        List<PaymentResponse> payments,
+        boolean payableByCard) {}

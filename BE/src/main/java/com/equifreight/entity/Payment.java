@@ -9,7 +9,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Recorded by hand by staff, like authority steps. Online card payment is not designed.
+ * Money received against an invoice, never edited: recorded by hand by staff, or confirmed by the card gateway's
+ * webhook ({@code recorded_by} null, the gateway's payment id as the reference; database-design.md, 13A).
  */
 @Setter
 @Getter
