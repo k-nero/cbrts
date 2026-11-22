@@ -42,10 +42,15 @@ export const CustomerLedger: FC<{ quotation: CustomerQuotation }> = ({ quotation
             key={`${g.code}-${i}`}
             certainty={certainty(l)}
             description={
-              l.manual ? (
+              l.manual || !l.negotiable ? (
                 <Flex component="span" align="center" gap={8}>
                   {l.description}
-                  <Chip dot={false}>Manual</Chip>
+                  {l.manual && <Chip dot={false}>Manual</Chip>}
+                  {!l.negotiable && (
+                    <span title="Set by the vet or the authority; we pass it on at cost, so it can't be negotiated">
+                      <Chip dot={false}>At cost</Chip>
+                    </span>
+                  )}
                 </Flex>
               ) : (
                 l.description

@@ -5,6 +5,7 @@ import { Flex } from 'antd';
 import CancelRequestModal from '../CancelRequestModal';
 import { AcceptQuotationModal } from './AcceptQuotationModal';
 import { DeclineQuotationModal } from './DeclineQuotationModal';
+import { NegotiateModal } from './NegotiateModal';
 import { RequoteModal } from './RequoteModal';
 
 import { Button, Callout, Chip, OwedItem, Panel } from '@/components/ui';
@@ -29,7 +30,9 @@ import {
  * with the request's cancellation beneath it until the job is approved (BR-F1-07).
  */
 export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => {
-  const [open, setOpen] = useState<'accept' | 'decline' | 'cancel' | 'requote' | null>(null);
+  const [open, setOpen] = useState<
+    'accept' | 'decline' | 'cancel' | 'requote' | 'negotiate' | null
+  >(null);
   // A newer version was issued while this page was open: the server's sentence, above what reloads.
   const [changed, setChanged] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -104,6 +107,17 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
       </Panel>
     );
   }
+  // The version expired while its counter-offer waits: the manager answers with a new version.
+  const offer = quotation.counterOffer;
+  if ((kind === 'expired' || kind === 'requote') && offer?.status === 'OPEN') {
+    return (
+      <Panel title="Nothing to answer" extra={<Chip tone="neutral">Negotiating</Chip>}>
+        <p className="type-body-m m-0 text-ink-2">
+          {`Version ${quotation.versionNo} expired while we answer your counter-offer of ${formatDate(offer.createdAt)}. ${manager} will answer with a new version.`}
+        </p>
+      </Panel>
+    );
+  }
   if (kind === 'expired') {
     return (
       <Panel title="Nothing to answer" extra={<Chip dot={false}>Expired</Chip>}>
@@ -143,9 +157,31 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
   const deadline = until
     ? deadlineText(until, new Date().toISOString())
     : { line1: '—', line2: '' };
+  const asked = offer?.lines
+    .map(
+      (l) =>
+        `${l.description} ${money(l.quotedAmount, quotation.currency)} → ${money(l.askedAmount, quotation.currency)}`,
+    )
+    .join('; ');
   return (
     <Flex vertical gap={16}>
       {changedCallout}
+      {offer?.status === 'OPEN' && (
+        <Callout
+          tone="info"
+          title={`You asked for a better price on ${formatDate(offer.createdAt)}`}
+        >
+          {`${asked}. We'll answer with a new version or our best price. Version ${quotation.versionNo} stays open: you can still accept it.`}
+        </Callout>
+      )}
+      {offer?.status === 'BEST_PRICE' && (
+        <Callout
+          tone="info"
+          title={`${offer.answeredBy ?? manager}'s answer${offer.answeredAt ? ` on ${formatDate(offer.answeredAt)}` : ''}`}
+        >
+          {`“${offer.answerMessage}” Version ${quotation.versionNo} is our best price: accept or decline it.`}
+        </Callout>
+      )}
       <Panel
         title={
           <Flex vertical gap={4}>
@@ -172,6 +208,11 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
               <Button variant="primary" leadingIcon="check" onClick={() => setOpen('accept')}>
                 Accept quotation
               </Button>
+              {quotation.canNegotiate && (
+                <Button variant="secondary" onClick={() => setOpen('negotiate')}>
+                  Negotiate
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setOpen('decline')}>
                 Decline
               </Button>
@@ -190,6 +231,7 @@ export const OwedPanel: FC<{ quotation: CustomerQuotation }> = ({ quotation }) =
           onClose={close}
           onVersionChanged={onVersionChanged}
         />
+        <NegotiateModal quotation={quotation} open={open === 'negotiate'} onClose={close} />
       </Panel>
     </Flex>
   );
