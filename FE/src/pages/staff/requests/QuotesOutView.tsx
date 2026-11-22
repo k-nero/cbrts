@@ -13,10 +13,10 @@ const columns = (now: string): TableColumnsType<QuoteOut> => [
   {
     title: 'Quotation',
     key: 'quotation',
-    width: 200,
+    width: 300,
     render: (_, q) => (
       <Flex vertical gap={2}>
-        <Flex align="center" gap={6}>
+        <Flex align="center" gap={6} wrap>
           <span className="type-data text-ink">
             {q.quotationCode} v{q.versionNo}
           </span>

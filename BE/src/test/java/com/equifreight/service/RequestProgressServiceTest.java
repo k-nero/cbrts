@@ -153,6 +153,26 @@ class RequestProgressServiceTest {
     }
 
     @Test
+    @DisplayName("A later version issued while the request stays quoted shows: it answers the club's counter-offer")
+    void aRevisionIssuedWhileQuotedShows() {
+        when(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("TRANSPORT_REQUEST", request.getId()))
+                .thenReturn(List.of(
+                        row(
+                                "QUOTATION_ISSUED",
+                                "Quotation Q-2026-0004 v2 issued: $9,041.09, valid until 29 Nov 2026; supersedes v1",
+                                "Vũ Hải Yến",
+                                "QUOTED",
+                                "QUOTED"),
+                        row("QUOTATION_REVISED", "Q-2026-0004 v2 drafted from v1", "Vũ Hải Yến", null, null)));
+        request.setStatus(RequestStatus.QUOTED);
+
+        assertThat(service.of(request, null).history())
+                .extracting(HistoryEntryResponse::getSummary)
+                .containsExactly(
+                        "Quotation Q-2026-0004 v2 issued: $9,041.09, valid until 29 Nov 2026; supersedes v1");
+    }
+
+    @Test
     @DisplayName("A quotation that expires on a cancelled request isn't a step of the customer's request")
     void expiryAfterCancellingIsLeftOut() {
         when(auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("TRANSPORT_REQUEST", request.getId()))

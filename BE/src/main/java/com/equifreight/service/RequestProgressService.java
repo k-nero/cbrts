@@ -36,9 +36,12 @@ public class RequestProgressService {
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     private static final String YOU = "You";
 
-    /** Steps the club takes or is answered on that don't move the request: its counter-offer and the answer. */
+    /**
+     * Steps the club takes or is answered on that don't move the request: its counter-offer, and either answer (a
+     * later version issued while the request stays quoted, or the best price).
+     */
     private static final java.util.Set<String> SHOWN_ACTIONS =
-            java.util.Set.of("QUOTATION_COUNTER_OFFERED", "QUOTATION_BEST_PRICE");
+            java.util.Set.of("QUOTATION_COUNTER_OFFERED", "QUOTATION_ISSUED", "QUOTATION_BEST_PRICE");
 
     private final AuditLogRepository auditLogs;
     private final QuotationRepository quotations;
