@@ -1,11 +1,12 @@
 {
     "schema_version": 2,
-    "commit": "1079cce6eea35ad63dba9d917a9f749bf2ede059",
-    "indexed_at": "2026-11-22T15:11:42Z",
+    "commit": "8d242b8c1a76018c7d9fed90b42dbee940051d2e",
+    "indexed_at": "2026-11-22T15:23:43Z",
     "project": "Users-nero-Projects-cbrts",
     "nodes": 15782,
     "edges": 102513,
     "original_size": 73269248,
-    "compressed_size": 12896828,
-    "compression_level": 3
+    "compressed_size": 12874965,
+    "compression_level": 3,
+    "reconcile_basis": "git-clean-head"
 }
