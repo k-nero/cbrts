@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 
+import { HorseTagFor } from '@/components/horse/HorseTagFor';
 import { Button, cx, Deadline, DocumentRow } from '@/components/ui';
 import { ChecklistStatusEnum } from '@/interfaces';
 import {
@@ -23,7 +24,13 @@ const ChecklistGroupTable: FC<Props> = ({ group, now, onOpen }) => (
     {/* A plain div: AntD's Flex resets padding over Tailwind's. */}
     <div className="flex items-center justify-between border-b border-line bg-sunken px-5 py-3">
       <span className="flex items-baseline gap-2.5">
-        <h3 className="type-h4 m-0 text-ink">{group.title}</h3>
+        <h3 className="type-h4 m-0 text-ink">
+          {group.key === 'shipment' ? (
+            group.title
+          ) : (
+            <HorseTagFor horseId={group.key} name={group.title} />
+          )}
+        </h3>
         {group.subtitle && <span className="type-caption text-ink-3">{group.subtitle}</span>}
       </span>
       <span className="type-caption text-ink-3">

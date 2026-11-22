@@ -2,6 +2,7 @@ import type { FC } from 'react';
 
 import { TripPhotos } from './TripPhotos';
 
+import { HorseTagFor } from '@/components/horse/HorseTagFor';
 import { Chip, cx, Panel } from '@/components/ui';
 import type { TripView } from '@/interfaces';
 import { formatTime } from '@/lib/utils';
@@ -28,7 +29,7 @@ export const ArrivalCondition: FC<{ trip: TripView }> = ({ trip }) => {
               i > 0 && 'border-t border-line',
             )}
           >
-            <span className="type-h4 text-ink">{c.horseName}</span>
+            <HorseTagFor horseId={c.horseId} name={c.horseName} />
             <span className="flex min-w-0 flex-col gap-1">
               <span className="type-body-s text-ink-2">{c.note ?? WORD[c.condition]}</span>
               <TripPhotos photos={c.photos.map((p) => ({ ...p, horseName: c.horseName }))} />

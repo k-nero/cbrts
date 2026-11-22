@@ -32,11 +32,11 @@ const subtitle = (horse: Horse, today: string) =>
 
 type Props = StepProps & { query: ReturnType<typeof useWizardHorses> };
 
-/** A pick card's 48 px horse: her photo, or her coat colour without one (DESIGN.md, Request · Horses step). */
+/** A pick card's 64 px horse: her photo, or her coat colour without one (DESIGN.md, Request · Horses step). */
 const PickPhoto: FC<{ coat: Horse['coat']; photoFileId: string | null }> = ({
   coat,
   photoFileId,
-}) => <HorseAvatar coat={coatOf(coat)} photoUrl={useHorsePhotoUrl(photoFileId)} size={48} />;
+}) => <HorseAvatar coat={coatOf(coat)} photoUrl={useHorsePhotoUrl(photoFileId)} size={64} />;
 
 /** Step 1 (spec §5.2): which horses are travelling, and a foal at foot for a mare. */
 const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue, query }) => {

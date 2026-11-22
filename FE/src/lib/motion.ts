@@ -76,3 +76,6 @@ export const settle: Variants = {
     transition: { duration: 0.35, ease: EASE_OUT, ...at(delay) },
   }),
 };
+
+/** A horse's photo circle leaving (removed on the add form): quicker than it came, no travel. */
+export const PHOTO_EXIT = { opacity: 0, scale: 0.8, transition: { duration: 0.2, ease: EASE_OUT } };

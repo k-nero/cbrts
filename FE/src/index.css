@@ -79,6 +79,18 @@
   --shadow-overlay: 0 24px 56px -16px rgba(0, 0, 0, 0.45);
   --shadow-focus: 0 0 0 3px rgba(201, 170, 90, 0.45);
   --shadow-brass: inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.45);
+
+  /* The light that sweeps across the gold nameplate while the horse is hovered (Nameplate) */
+  --animate-plate-shimmer: plate-shimmer 2.2s ease-in-out infinite;
+  @keyframes plate-shimmer {
+    0% {
+      transform: translateX(0) skewX(-15deg);
+    }
+    60%,
+    100% {
+      transform: translateX(450%) skewX(-15deg);
+    }
+  }
 }
 
 /* Referenced only from inline styles, so declared outside @theme where nothing prunes them. */
