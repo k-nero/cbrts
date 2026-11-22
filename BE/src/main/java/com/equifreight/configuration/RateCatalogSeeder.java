@@ -253,8 +253,13 @@ public class RateCatalogSeeder {
         l.setBasis(basis);
         l.setRate(new BigDecimal(rate));
         l.setCertainty(RateCertainty.FIXED);
+        l.setNegotiable(!FIXED_FEE_CODES.contains(code));
         return l;
     }
+
+    /** Third parties' charges, passed on at cost: a club can't negotiate them (V45 marks the same codes). */
+    private static final java.util.Set<String> FIXED_FEE_CODES =
+            java.util.Set.of("VET_BLOODS", "HEALTH_CERT", "CROSSING", "IMPORT_PERMIT", "POST_ISO");
 
     private static RateLine isolation(RateCatalogVersion v, String code, HorseSex sex, String rate) {
         RateLine l = line(v, null, code, "B", "Pre-export isolation", RateBasis.PER_DAY, rate);

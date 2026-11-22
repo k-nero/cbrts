@@ -474,6 +474,7 @@ public class RateCatalogService {
                         ? null
                         : r.estimateNote().strip());
         line.setCoveredByRoadLeg(r.coveredByRoadLeg());
+        line.setNegotiable(r.negotiable());
     }
 
     private static void checkBands(List<VolumeBreakRequest> bands) {
@@ -636,6 +637,7 @@ public class RateCatalogService {
                     copy.setCertainty(l.getCertainty());
                     copy.setEstimateNote(l.getEstimateNote());
                     copy.setCoveredByRoadLeg(l.isCoveredByRoadLeg());
+                    copy.setNegotiable(l.isNegotiable());
                     return copy;
                 })
                 .toList());

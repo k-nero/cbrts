@@ -124,7 +124,10 @@ public class QuotationPricing {
             line.setQuantity(p.quantity());
             line.setUnitRate(p.unitRate());
             line.setSource(p.source());
-            line.setRateLine(p.rateLineId() == null ? null : rateLines.get(p.rateLineId()));
+            RateLine rateLine = p.rateLineId() == null ? null : rateLines.get(p.rateLineId());
+            line.setRateLine(rateLine);
+            // A stall line has no rate line: it is EquiFreight's own price, so negotiable.
+            line.setNegotiable(rateLine == null || rateLine.isNegotiable());
             line.setRateServiceClass(p.rateServiceClassId() == null ? null : stalls.get(p.rateServiceClassId()));
             RequestHorse horse = p.horseId() == null ? null : horses.get(p.horseId());
             line.setHorse(horse == null ? null : horse.getHorse());

@@ -2,6 +2,7 @@ package com.equifreight.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -34,6 +35,7 @@ import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuoteGroupResponse;
 import com.equifreight.model.quotation.QuoteLineResponse;
 import com.equifreight.model.quotation.StartResult;
+import com.equifreight.service.pricing.CatalogRows;
 import com.equifreight.service.pricing.PricedLine;
 import com.equifreight.service.pricing.QuotePricer;
 import com.equifreight.service.pricing.RateSet;
@@ -70,6 +72,21 @@ class QuotationDraftServiceTest extends QuotationServiceFixture {
         assertThat(q.getSubtotal()).isEqualByComparingTo("18250.00");
         assertThat(q.getTotal()).isNotNull();
         assertThat(result.quotation().code()).isEqualTo("Q-2026-0189");
+    }
+
+    @Test
+    void aLinePricedFromAFixedRateIsNotNegotiable() {
+        CatalogRows fixedGroom = rows(v2, true);
+        fixedGroom.lines().getFirst().setNegotiable(false);
+        when(loader.load(v2.getId())).thenReturn(fixedGroom);
+
+        service.start(yen, request.getId());
+
+        assertThat(stored.orElseThrow().getLines())
+                .extracting(QuotationLine::getDescription, QuotationLine::isNegotiable)
+                .containsExactly(
+                        tuple("Air stall position Phnom Penh → Hong Kong, business", true),
+                        tuple("Flying groom", false));
     }
 
     @Test

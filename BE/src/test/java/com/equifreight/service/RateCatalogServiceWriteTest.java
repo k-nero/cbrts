@@ -179,7 +179,8 @@ class RateCatalogServiceWriteTest {
                 null,
                 RateCertainty.FIXED,
                 null,
-                false);
+                false,
+                null);
     }
 
     static RateLineRequest with(RateLineRequest r, Consumer<RateLineRequest.RateLineRequestBuilder> change) {
@@ -222,6 +223,7 @@ class RateCatalogServiceWriteTest {
         transfer.setBasis(RateBasis.PER_SHIPMENT);
         transfer.setRate(new BigDecimal("250"));
         transfer.setCoveredByRoadLeg(true);
+        transfer.setNegotiable(false);
         RateServiceClass business = new RateServiceClass();
         business.setVersion(v2);
         business.setCorridor(pnhHkg);
@@ -267,6 +269,7 @@ class RateCatalogServiceWriteTest {
                 .ignoringFields("version", "id", "createdAt", "updatedAt")
                 .isEqualTo(groom);
         assertThat(copiedLines.getValue().get(1).isCoveredByRoadLeg()).isTrue();
+        assertThat(copiedLines.getValue().get(1).isNegotiable()).isFalse();
         ArgumentCaptor<List<RateServiceClass>> copiedClasses = listCaptor();
         verify(classes).saveAll(copiedClasses.capture());
         assertThat(copiedClasses.getValue().getFirst().getPositionRate()).isEqualByComparingTo("16800");
@@ -485,6 +488,19 @@ class RateCatalogServiceWriteTest {
                 "COVERED_BY_ROAD_LEG",
                 "Only a group A or G line is at an end of the move a road leg can cover.");
         verify(lines, never()).save(any());
+    }
+
+    @Test
+    void aRateLineCanBeMarkedAsAFixedFee() {
+        service.addLine(
+                lan,
+                with(lineRequest(pnhHkg.getId(), "VET_BLOODS", RateBasis.PER_HORSE), b -> b.negotiable(false)),
+                null);
+        service.addLine(lan, lineRequest(pnhHkg.getId(), "LOADING", RateBasis.PER_HORSE), null);
+
+        ArgumentCaptor<RateLine> saved = ArgumentCaptor.forClass(RateLine.class);
+        verify(lines, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(RateLine::isNegotiable).containsExactly(false, true);
     }
 
     @Test
