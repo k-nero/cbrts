@@ -1,8 +1,11 @@
 import client from '@/config/axios';
 
 import { makeCrudApi } from './crudFactory';
+
+import { downloadBlob } from '@/lib/utils';
 import type {
   ActualQuantityInput,
+  CardCheckout,
   Invoice,
   InvoiceSummary,
   ReadyForInvoice,
@@ -39,4 +42,16 @@ export const invoiceApi = {
     client.get<InvoiceSummary[]>(`/customer/requests/${requestId}/invoices`).then((r) => r.data),
 
   customerGet: (id: string) => client.get<Invoice>(`/customer/invoices/${id}`).then((r) => r.data),
+
+  /** Stripe's hosted page for what is due; the webhook records the payment once it is made. */
+  cardCheckout: (id: string) =>
+    client.post<CardCheckout>(`/customer/invoices/${id}/card-checkout`).then((r) => r.data),
+
+  /** Saves a confirmed payment's PDF receipt; `side` picks the customer's or the staff endpoint. */
+  downloadReceipt: async (side: 'customer' | 'staff', paymentId: string, name: string) => {
+    const r = await client.get<Blob>(`/${side}/payments/${paymentId}/receipt`, {
+      responseType: 'blob',
+    });
+    downloadBlob(r.data, name);
+  },
 };

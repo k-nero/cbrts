@@ -60,7 +60,8 @@ Success means:
 - **Customer estimate.** Before a quotation exists, the customer sees an instant estimate. It is always a range, never a single number, and is never stored or acceptable.
 - **Permissions.** Only the Logistics Manager approves or rejects requests. Only the Transport Specialist approves or rejects documents; customers upload or replace.
 - **Invoicing (in scope since 2 Oct 2026).** Two generated invoices per job, never typed: a deposit invoice when the customer accepts the quotation, and a final invoice after handover that settles the accepted quotation against what actually happened (actual quantities on estimated lines, the late-arrival credit, minus the deposit). Staff record payments received by bank transfer or card; an issued invoice is never edited, only voided and replaced or corrected with a credit note.
-- **Out of scope.** Online payment collection (no payment gateway), a tax engine, dunning and accounting export.
+- **Online card payment (in scope since 22 Nov 2026).** The customer can pay what is due on an issued invoice by card on Stripe's hosted Checkout page; no card number reaches EquiFreight. Only Stripe's signed webhook records the payment. A card payment that arrives after the invoice stopped being owed (paid another way, voided, or the amount changed) is refunded in full, so an invoice is never paid more than its total. Every confirmed payment, by card or recorded by hand, has a PDF receipt the customer and the logistics manager can download; names on it are printed without accents. Without a Stripe key, card payment is off and customers pay by bank transfer.
+- **Out of scope.** A tax engine, dunning and accounting export.
 - **UI language.** English only.
 - **Undecided.** Notifications beyond in-app and email; incident handling (Flow 5) and handover (Flow 6) detail.
 

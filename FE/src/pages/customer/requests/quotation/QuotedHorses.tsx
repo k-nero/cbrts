@@ -1,27 +1,14 @@
 import type { FC } from 'react';
 import { Flex } from 'antd';
 
-import { COAT_SWATCH, cx } from '@/components/ui';
-import type { CustomerQuotation, HorseCoat } from '@/interfaces';
-import { coatOf } from '@/lib/utils';
+import { HorseTagFor } from '@/components/horse/HorseTagFor';
+import type { CustomerQuotation } from '@/interfaces';
 
-/** The horses as coat swatches with their names, as on the pass. */
+/** The quoted horses as horse tags: the coat as quoted, the photo as the horse has it now. */
 export const QuotedHorses: FC<{ quotation: CustomerQuotation }> = ({ quotation }) => (
-  <Flex component="span" align="center" justify="end" gap={8}>
-    <span className="flex -space-x-1.5">
-      {quotation.request.horses.slice(0, 6).map((h) => (
-        <span
-          key={h.id}
-          aria-hidden
-          className={cx(
-            'size-4 rounded-full border-2 border-card',
-            COAT_SWATCH[coatOf(h.coat as HorseCoat | null)],
-          )}
-        />
-      ))}
-    </span>
-    <span className="type-label-s text-ink">
-      {quotation.request.horses.map((h) => h.name).join(', ')}
-    </span>
+  <Flex component="span" wrap align="center" justify="end" gap={8}>
+    {quotation.request.horses.map((h) => (
+      <HorseTagFor key={h.id} horseId={h.id} name={h.name} coat={h.coat} />
+    ))}
   </Flex>
 );

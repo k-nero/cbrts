@@ -2,11 +2,15 @@ import type { FC } from 'react';
 import { Flex } from 'antd';
 
 import { PAYMENT_METHOD } from '@/components/invoice/invoiceFormat';
+import { ReceiptButton } from '@/components/invoice/ReceiptButton';
 import { Panel } from '@/components/ui';
 import type { Invoice } from '@/interfaces';
 import { formatDate, money } from '@/lib/utils';
 
-/** Every payment recorded against the invoice, oldest first, with its method, reference and who recorded it. */
+/**
+ * Every payment against the invoice, oldest first, with its method, reference, who recorded it (none for a card payment
+ * made online) and its receipt.
+ */
 export const PaymentsPanel: FC<{ invoice: Invoice }> = ({ invoice }) => (
   <Panel title="Payments" flush>
     {invoice.payments.length === 0 ? (
@@ -25,10 +29,17 @@ export const PaymentsPanel: FC<{ invoice: Invoice }> = ({ invoice }) => (
               </span>
               <span className="type-caption text-ink-3">
                 Received {formatDate(p.receivedAt)}
-                {p.recordedByName ? ` · recorded by ${p.recordedByName}` : ''}
+                {p.recordedByName
+                  ? ` · recorded by ${p.recordedByName}`
+                  : p.method === 'CARD'
+                    ? ' · paid online by card'
+                    : ''}
               </span>
             </Flex>
-            <span className="type-data text-ink">{money(p.amount, invoice.currency)}</span>
+            <Flex align="center" gap={8}>
+              <span className="type-data text-ink">{money(p.amount, invoice.currency)}</span>
+              <ReceiptButton side="staff" invoice={invoice} payment={p} />
+            </Flex>
           </li>
         ))}
       </ul>

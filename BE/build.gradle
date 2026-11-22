@@ -53,6 +53,10 @@ dependencies {
     }
     // File type detection from the bytes themselves (magic numbers), not the client's Content-Type.
     implementation 'org.apache.tika:tika-core:4.1.0'
+    // Online card payment of invoices through Stripe Checkout (database-design.md, 13A).
+    implementation 'com.stripe:stripe-java:34.2.0'
+    // Payment receipts as PDF, in the built-in Helvetica and Courier (names are printed without accents).
+    implementation 'org.apache.pdfbox:pdfbox:3.0.8'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'

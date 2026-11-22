@@ -1,5 +1,6 @@
 package com.equifreight.model.invoice;
 
+import com.equifreight.entity.CardCheckout;
 import com.equifreight.entity.Invoice;
 import com.equifreight.entity.InvoiceLine;
 import com.equifreight.entity.Payment;
@@ -52,7 +53,8 @@ public final class InvoiceMapper {
                 .build();
     }
 
-    public static InvoiceResponse toResponse(Invoice i, List<Payment> payments, LocalDate today) {
+    public static InvoiceResponse toResponse(
+            Invoice i, List<Payment> payments, LocalDate today, boolean payableByCard) {
         return InvoiceResponse.builder()
                 .id(i.getId())
                 .code(i.getCode())
@@ -79,6 +81,15 @@ public final class InvoiceMapper {
                 .amountDue(amountDue(i))
                 .lines(i.getLines().stream().map(InvoiceMapper::toLine).toList())
                 .payments(payments.stream().map(InvoiceMapper::toPayment).toList())
+                .payableByCard(payableByCard)
+                .build();
+    }
+
+    /** Where to send the customer to pay by card (database-design.md, 13A). */
+    public static CardCheckoutResponse toCheckoutResponse(CardCheckout c) {
+        return CardCheckoutResponse.builder()
+                .url(c.getUrl())
+                .expiresAt(c.getExpiresAt())
                 .build();
     }
 
