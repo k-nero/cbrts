@@ -257,7 +257,7 @@ public class RateCatalogSeeder {
         return l;
     }
 
-    /** Third parties' charges, passed on at cost: a club can't negotiate them (V45 marks the same codes). */
+    /** Third parties' charges, passed on at cost: a club can't negotiate them (V46 marks the same codes). */
     private static final java.util.Set<String> FIXED_FEE_CODES =
             java.util.Set.of("VET_BLOODS", "HEALTH_CERT", "CROSSING", "IMPORT_PERMIT", "POST_ISO");
 
