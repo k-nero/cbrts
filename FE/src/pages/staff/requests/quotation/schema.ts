@@ -68,3 +68,13 @@ export const issueSchema = z
       });
   });
 export type IssueForm = z.infer<typeof issueSchema>;
+
+/** Answering a club's counter-offer without a new version: the message the club reads, quoted. */
+export const bestPriceSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(1, 'Say why this is your best price.')
+    .max(500, 'At most 500 characters.'),
+});
+export type BestPriceForm = z.infer<typeof bestPriceSchema>;

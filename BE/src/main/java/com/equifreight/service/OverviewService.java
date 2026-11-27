@@ -39,6 +39,7 @@ public class OverviewService {
     private final QuotationRepository quotations;
     private final OnTimeReportService onTime;
     private final Clock clock;
+    private final CounterOfferLedger counterOffers;
 
     public OverviewService(
             RequestReviewService requests,
@@ -46,13 +47,15 @@ public class OverviewService {
             IncidentService incidents,
             QuotationRepository quotations,
             OnTimeReportService onTime,
-            Clock clock) {
+            Clock clock,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.jobs = jobs;
         this.incidents = incidents;
         this.quotations = quotations;
         this.onTime = onTime;
         this.clock = clock;
+        this.counterOffers = counterOffers;
     }
 
     @Transactional(readOnly = true)
@@ -91,12 +94,14 @@ public class OverviewService {
     public Page<QuoteOutResponse> quotesOut(Pageable pageable) {
         Pageable bySoonest = PageRequest.of(
                 pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.ASC, "validUntil"));
-        return quotations
-                .findByStatusAndRequest_Status(QuotationStatus.ISSUED, RequestStatus.QUOTED, bySoonest)
-                .map(OverviewService::toQuoteOut);
+        Page<Quotation> page =
+                quotations.findByStatusAndRequest_Status(QuotationStatus.ISSUED, RequestStatus.QUOTED, bySoonest);
+        java.util.Set<java.util.UUID> negotiating = counterOffers.pendingOn(
+                page.getContent().stream().map(q -> q.getRequest().getId()).toList(), clock.instant());
+        return page.map(q -> toQuoteOut(q, negotiating));
     }
 
-    private static QuoteOutResponse toQuoteOut(Quotation q) {
+    private QuoteOutResponse toQuoteOut(Quotation q, java.util.Set<java.util.UUID> negotiating) {
         return QuoteOutResponse.builder()
                 .requestId(q.getRequest().getId())
                 .requestCode(q.getRequest().getCode())
@@ -106,6 +111,7 @@ public class OverviewService {
                 .total(q.getTotal())
                 .currency(q.getCurrency())
                 .validUntil(q.getValidUntil())
+                .counterOfferOpen(negotiating.contains(q.getRequest().getId()))
                 .build();
     }
 

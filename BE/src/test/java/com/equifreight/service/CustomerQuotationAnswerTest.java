@@ -70,7 +70,8 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 notifications,
                 audit,
                 snapshots,
-                Clock.fixed(ISSUED_AT, BusinessTime.ZONE));
+                Clock.fixed(ISSUED_AT, BusinessTime.ZONE),
+                ledger);
         club = request.getClub();
         club.setId(UUID.randomUUID());
         club.setName("Phnom Penh Royal Turf Club");
@@ -99,7 +100,8 @@ class CustomerQuotationAnswerTest extends QuotationServiceFixture {
                 invoices,
                 issue,
                 Clock.fixed(now, BusinessTime.ZONE),
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                ledger);
     }
 
     CustomerQuotationService customer() {

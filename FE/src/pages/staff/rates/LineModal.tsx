@@ -39,6 +39,7 @@ const LINE_SHOWN = [
   'certainty',
   'estimateNote',
   'coveredByRoadLeg',
+  'fixedFee',
 ];
 
 /** Add or change a catalog line in the draft, for this corridor or for every corridor. */
@@ -71,6 +72,7 @@ export const LineModal: FC<{
       certainty: pick(CERTAINTIES, editing?.certainty ?? 'FIXED') ?? CERTAINTIES[0],
       estimateNote: editing?.estimateNote ?? '',
       coveredByRoadLeg: editing?.coveredByRoadLeg ?? false,
+      fixedFee: editing ? !editing.negotiable : false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, methods, open]);
@@ -105,6 +107,7 @@ export const LineModal: FC<{
           certainty: v.certainty.value as 'FIXED' | 'ESTIMATED',
           estimateNote: v.estimateNote.trim() || null,
           coveredByRoadLeg: v.coveredByRoadLeg,
+          negotiable: !v.fixedFee,
         },
       });
       message.success(
@@ -223,6 +226,13 @@ export const LineModal: FC<{
                   ? 'Not charged when a road leg covers this end'
                   : 'Not charged when a road leg covers this end (groups A and G only)',
                 disabled: !atAnEnd && !covered,
+              }}
+            />
+            <FormField
+              name="fixedFee"
+              component="checkbox"
+              componentProps={{
+                children: "Fixed fee (passed on at cost): clubs can't negotiate it",
               }}
             />
             <Flex justify="end" gap={8}>

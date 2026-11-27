@@ -3,8 +3,10 @@ package com.equifreight.service;
 import static com.equifreight.service.pricing.PricingText.money;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
@@ -16,9 +18,13 @@ import static org.mockito.Mockito.when;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
+import com.equifreight.entity.QuotationCounterOfferLine;
 import com.equifreight.entity.RatePolicy;
+import com.equifreight.entity.User;
 import com.equifreight.entity.enums.ArrivalMode;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.HorseSex;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
@@ -31,6 +37,8 @@ import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.BestPriceRequest;
+import com.equifreight.model.quotation.CounterOfferResponse;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationMapper;
@@ -79,7 +87,8 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
                 notifications,
                 audit,
                 snapshots,
-                Clock.fixed(now, BusinessTime.ZONE));
+                Clock.fixed(now, BusinessTime.ZONE),
+                ledger);
     }
 
     static IssueRequest note(String text) {
@@ -351,6 +360,178 @@ class QuotationIssueServiceTest extends QuotationServiceFixture {
         });
         clearInvocations(audit);
         return q;
+    }
+
+    // --- answering a counter-offer -------------------------------------------------------------------------
+
+    QuotationCounterOffer clubAsks(Quotation version, String asked) {
+        QuotationCounterOffer o = new QuotationCounterOffer();
+        o.setQuotation(version);
+        o.setRequest(request);
+        o.setCreatedBy(new User());
+        o.setCreatedAt(ISSUE_NOW);
+        o.setMessage("Regular customer");
+        QuotationCounterOfferLine line = new QuotationCounterOfferLine();
+        line.setCounterOffer(o);
+        line.setLineKey("GROOM");
+        line.setDescription("Flying groom");
+        line.setQuotedAmount(new BigDecimal("1200.00"));
+        line.setAskedAmount(new BigDecimal(asked));
+        line.setReason("Our own groom costs less");
+        o.getLines().add(line);
+        offers.add(o);
+        return o;
+    }
+
+    @Test
+    void theDraftShowsTheClubsCounterOffer() {
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+
+        StartResult result = issue.revise(yen, request.getId());
+
+        assertThat(result.quotation().counterOffer()).isNotNull();
+        assertThat(result.quotation().counterOffer().message()).isEqualTo("Regular customer");
+        assertThat(result.quotation().counterOffer().lines())
+                .extracting(
+                        CounterOfferResponse.Line::lineKey,
+                        l -> l.quotedAmount().toPlainString(),
+                        l -> l.askedAmount().toPlainString(),
+                        CounterOfferResponse.Line::reason)
+                .containsExactly(tuple("GROOM", "1200.00", "1000", "Our own groom costs less"));
+    }
+
+    @Test
+    void issuingTheRevisionAnswersTheCounterOffer() {
+        Quotation v1 = issuedV1WithAdjustments();
+        QuotationCounterOffer asked = clubAsks(v1, "1000");
+        issue.revise(yen, request.getId());
+        Quotation v2 = stored.orElseThrow();
+        v2.getLines().forEach(l -> l.setId(UUID.randomUUID()));
+        clearInvocations(notifications);
+
+        issue.issue(yen, request.getId(), note("Groom at the club's price."));
+
+        assertThat(asked.getStatus()).isEqualTo(CounterOfferStatus.REVISED);
+        assertThat(asked.getAnsweredWithQuotation()).isSameAs(v2);
+        assertThat(asked.getAnsweredBy()).isSameAs(yen);
+        assertThat(asked.getAnsweredAt()).isEqualTo(ISSUE_NOW);
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_ISSUED),
+                        any(),
+                        any(),
+                        anyString(),
+                        argThat(body -> body.endsWith(" Answer to your counter-offer.")));
+    }
+
+    @Test
+    void issuingAfterV1ExpiredStillAnswersIt() {
+        Quotation v1 = issuedV1WithAdjustments();
+        QuotationCounterOffer asked = clubAsks(v1, "1000");
+        v1.setStatus(QuotationStatus.EXPIRED);
+        request.setStatus(RequestStatus.EXPIRED);
+        issue.revise(yen, request.getId());
+        stored.orElseThrow().getLines().forEach(l -> l.setId(UUID.randomUUID()));
+
+        issue.issue(yen, request.getId(), note("Fresh validity, same prices."));
+
+        assertThat(asked.getStatus()).isEqualTo(CounterOfferStatus.REVISED);
+    }
+
+    @Test
+    void bestPriceAnswersWithAMessage() {
+        Quotation v1 = issuedV1WithAdjustments();
+        QuotationCounterOffer asked = clubAsks(v1, "1000");
+        clearInvocations(notifications);
+
+        issue.bestPrice(yen, request.getId(), new BestPriceRequest("  Our grooms are already at cost.  "));
+
+        assertThat(asked.getStatus()).isEqualTo(CounterOfferStatus.BEST_PRICE);
+        assertThat(asked.getAnswerMessage()).isEqualTo("Our grooms are already at cost.");
+        assertThat(asked.getAnsweredBy()).isSameAs(yen);
+        assertThat(asked.getAnsweredAt()).isEqualTo(ISSUE_NOW);
+        assertThat(v1.getStatus()).isEqualTo(QuotationStatus.ISSUED);
+        verify(audit)
+                .recordDecision(
+                        eq(yen),
+                        eq("QUOTATION_BEST_PRICE"),
+                        eq("Q-2026-0189 v1: best price"),
+                        eq(QuotationDraftService.ENTITY_TYPE),
+                        eq(request.getId()),
+                        eq(request.getCode()),
+                        eq("Our grooms are already at cost."),
+                        isNull(),
+                        isNull());
+        verify(notifications)
+                .notify(
+                        eq(NotificationKind.QUOTATION_BEST_PRICE),
+                        eq(Audience.club(request.getClub().getId())),
+                        any(),
+                        anyString(),
+                        argThat(body -> body.contains("Our grooms are already at cost.")));
+    }
+
+    @Test
+    void bestPriceWithoutAnOpenCounterOfferIsRefused() {
+        issuedV1WithAdjustments();
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("There's no counter-offer to answer.")
+                .extracting("code")
+                .isEqualTo("NO_COUNTER_OFFER");
+    }
+
+    @Test
+    void bestPriceWhileDraftingIsRefused() {
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        issue.revise(yen, request.getId());
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .extracting("code")
+                .isEqualTo("DRAFT_EXISTS");
+    }
+
+    @Test
+    void bestPriceOnAnExpiredVersionIsRefused() {
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        v1.setStatus(QuotationStatus.EXPIRED);
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Version 1 has expired, so the club can't accept it any more. Revise it to answer.")
+                .extracting("code")
+                .isEqualTo("COUNTER_OFFER_EXPIRED");
+    }
+
+    @Test
+    void bestPriceAfterTheLastValidDayIsRefused() {
+        // The hourly expiry job hasn't run yet: the version is still ISSUED, but the club can no longer accept it.
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        v1.setValidUntil(ISSUE_NOW.minusSeconds(60));
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code")
+                .isEqualTo("COUNTER_OFFER_EXPIRED");
+    }
+
+    @Test
+    void onceTheDepartureHasComeTheCounterOfferIsNeitherAnsweredNorShown() {
+        Quotation v1 = issuedV1WithAdjustments();
+        clubAsks(v1, "1000");
+        request.setDepartureDate(LocalDate.of(2026, 10, 19));
+
+        assertThatThrownBy(() -> issue.bestPrice(yen, request.getId(), new BestPriceRequest("No")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("The departure on 19 Oct 2026 has come, so this counter-offer can't be answered.")
+                .extracting("code")
+                .isEqualTo("DEPARTURE_PASSED");
+        assertThat(service.get(request.getId()).counterOffer()).isNull();
     }
 
     @Test

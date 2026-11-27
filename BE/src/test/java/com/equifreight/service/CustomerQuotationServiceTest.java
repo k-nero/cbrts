@@ -49,7 +49,7 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
         clubs = mock(ClubService.class);
         Clock clock = Clock.fixed(ISSUED_AT, BusinessTime.ZONE);
         issue = new QuotationIssueService(
-                requests, quotations, versions, pricing, notifications, audit, snapshots, clock);
+                requests, quotations, versions, pricing, notifications, audit, snapshots, clock, ledger);
         customer = new CustomerQuotationService(
                 requests,
                 quotations,
@@ -61,7 +61,8 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 mock(InvoiceService.class),
                 issue,
                 clock,
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                ledger);
         Club club = request.getClub();
         club.setId(UUID.randomUUID());
         bookings = new User();
@@ -287,7 +288,8 @@ class CustomerQuotationServiceTest extends QuotationServiceFixture {
                 mock(InvoiceService.class),
                 issue,
                 Clock.fixed(Instant.parse("2026-10-22T04:00:00Z"), BusinessTime.ZONE),
-                mock(RequestFleetService.class));
+                mock(RequestFleetService.class),
+                ledger);
         CustomerQuotationResponse.Cancellation boundary =
                 twoDaysLater.get(bookings, request.getId()).cancellation();
         assertThat(boundary.daysToDeparture()).isEqualTo(29);

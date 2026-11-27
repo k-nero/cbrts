@@ -111,6 +111,7 @@ class RequestServiceTest {
     RequestProgressService progress;
     InvoiceService invoices;
     CustomerHomeService home;
+    CounterOfferLedger counterOffers;
     RequestService service;
     User user;
     Club club;
@@ -139,6 +140,7 @@ class RequestServiceTest {
         progress = mock(RequestProgressService.class);
         invoices = mock(InvoiceService.class);
         home = mock(CustomerHomeService.class);
+        counterOffers = mock(CounterOfferLedger.class);
         when(progress.of(any(), any())).thenReturn(new RequestProgressService.Progress(List.of(), null));
         service = new RequestService(
                 requests,
@@ -159,7 +161,8 @@ class RequestServiceTest {
                 progress,
                 mock(RequestFleetService.class),
                 invoices,
-                home);
+                home,
+                counterOffers);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -887,6 +890,13 @@ class RequestServiceTest {
         }
 
         @Test
+        void cancellingTheRequestClosesItsCounterOffer() {
+            service.cancel(user, quoted.getId());
+
+            verify(counterOffers).closeOpen(quoted.getId(), NOW);
+        }
+
+        @Test
         void cancellingEndsTheDepositWithTheReasonTheClubReads() {
             quoted.setStatus(RequestStatus.CUSTOMER_ACCEPTED);
 
@@ -1382,7 +1392,8 @@ class RequestServiceTest {
                     progress,
                     mock(RequestFleetService.class),
                     invoices,
-                    home);
+                    home,
+                    counterOffers);
             draft.setDepartureDate(LocalDate.of(2027, 2, 15));
             when(codes.next(CodePrefix.REQ, 2027)).thenReturn("REQ-2027-0001");
 

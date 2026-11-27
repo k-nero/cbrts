@@ -12,6 +12,8 @@ export interface QuoteOut {
   total: number;
   currency: string;
   validUntil: string;
+  /** The club sent a counter-offer on this version that waits for an answer. */
+  counterOfferOpen: boolean;
 }
 
 /** The logistics manager's Overview (US-R-01, GET /staff/overview). */

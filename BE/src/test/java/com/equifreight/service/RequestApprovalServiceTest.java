@@ -58,6 +58,7 @@ class RequestApprovalServiceTest {
     AuditService audit;
     NotificationService notifications;
     InvoiceService invoices;
+    CounterOfferLedger counterOffers;
     RequestApprovalService service;
 
     User yen;
@@ -92,7 +93,8 @@ class RequestApprovalServiceTest {
                 notifications,
                 Clock.fixed(NOW, BusinessTime.ZONE),
                 mock(RequestFleetService.class),
-                invoices);
+                invoices,
+                counterOffers = mock(CounterOfferLedger.class));
 
         yen = user("Hải Yến", "Vũ");
         lan = user("Thị Lan", "Nguyễn");
@@ -292,6 +294,13 @@ class RequestApprovalServiceTest {
 
         assertThat(request.getStatus()).isEqualTo(RequestStatus.REJECTED);
         verify(invoices).voidDepositFor(request, "REQ-2026-0194 was rejected: Capacity gone", yen);
+    }
+
+    @Test
+    void rejectingTheRequestClosesItsCounterOffer() {
+        service.reject(yen, request.getId(), "Capacity gone");
+
+        verify(counterOffers).closeOpen(request.getId(), NOW);
     }
 
     @Test

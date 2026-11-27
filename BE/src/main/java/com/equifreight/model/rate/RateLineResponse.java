@@ -24,4 +24,6 @@ public record RateLineResponse(
         RateCertainty certainty,
         String estimateNote,
         boolean everyCorridor,
-        boolean coveredByRoadLeg) {}
+        boolean coveredByRoadLeg,
+        /* False for a fixed fee passed on at cost, which a club can't negotiate. */
+        boolean negotiable) {}

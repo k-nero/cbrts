@@ -76,7 +76,7 @@ class StaffRequestControllerTest {
                         || m.isAnnotationPresent(DeleteMapping.class))
                 .toList();
 
-        assertThat(handlers).hasSize(18);
+        assertThat(handlers).hasSize(19);
         assertThat(handlers)
                 .allSatisfy(m -> assertThat(m.getAnnotation(PreAuthorize.class).value())
                         .isEqualTo("hasRole('LOGISTICS_MANAGER')"));

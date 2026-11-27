@@ -26,6 +26,7 @@ const LINE: LineForm = {
   certainty: o('FIXED'),
   estimateNote: '',
   coveredByRoadLeg: false,
+  fixedFee: false,
 };
 
 /** The first message zod gives for each path, "path: message". */
@@ -58,6 +59,13 @@ describe('policySchema', () => {
 });
 
 describe('lineSchema', () => {
+  test('a line can be marked as a fixed fee passed on at cost', () => {
+    const parsed = lineSchema.safeParse({ ...LINE, fixedFee: true });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.fixedFee).toBe(true);
+    expect(lineSchema.safeParse({ ...LINE, fixedFee: undefined }).success).toBe(false);
+  });
+
   test('a valid sex line passes', () => {
     expect(issues(lineSchema.safeParse(LINE))).toEqual([]);
   });

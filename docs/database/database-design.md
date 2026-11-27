@@ -204,6 +204,7 @@ erDiagram
 | `min_charge` | numeric(14,2) | "minimum charge applies". |
 | `certainty` | varchar(10) | `FIXED`, `ESTIMATED` (waiting time). |
 | `covered_by_road_leg` | boolean not null, default false | Not charged at an end of the move a domestic road leg to or from a hub covers (US-F1-09, US-F3-21), so the stables-to-terminal move is charged once: a group `A` line at the origin, `G` at the destination. Check: only on group `A` or `G` lines. Set on the air corridors' `TRANSFER_ORIGIN` and `TRANSFER_DEST`. V34 set it on published versions too, lifting `rate_lines_guard` for that one update: the one exception to immutable versions, made because it corrects how the lines are read rather than a rate. Issued quotations keep their lines. |
+| `negotiable` | boolean not null, default true | False for a third party's charge passed on at cost (vet bloods, health certificate, crossings, import permit, post-arrival isolation; V46): a club can't negotiate it, and its quotation line shows **At cost**. Set on the Rates page with "Fixed fee (passed on at cost)". |
 
 **`rate_volume_breaks`**: `version_id`, `corridor_id null`, `min_horses`, `max_horses null`, `discount_pct numeric(5,2)`. Check `min_horses <= coalesce(max_horses, min_horses)`. The application rejects overlapping bands.
 
@@ -371,9 +372,34 @@ Indexes and checks:
 | `catalog_amount` | numeric(14,2) | `quantity × unit_rate`. |
 | `override_amount` | numeric(14,2) | |
 | `override_reason` | varchar(300) | Check: `override_amount is null or override_reason is not null` (mandatory reason). |
+| `negotiable` | boolean not null, default true | Copied from the rate line when priced; a stall or added line is always negotiable (V46). A counter-offer may name only negotiable lines. |
 | `line_total` | numeric(14,2) not null | `coalesce(override_amount, catalog_amount)`. Never entered. |
 | `line_key` | varchar(80) | The line's identity across re-prices and revisions, where catalog line ids change: the rate line's code (plus the horse for a per-day line of one horse), `STALL`, `MISSING:n` for a gap, `MANUAL:<uuid>` for an added line. Overrides and manual lines are carried by it. |
 | `manual_reason` | varchar(300) | Why the logistics manager added the line. Check: `manual_reason is null or (source = 'MANUAL' and unit_rate is not null)`. |
+
+### `quotation_counter_offers` (V46)
+
+A club's counter-offer on one issued quotation version (quotation negotiation, 23 Nov 2026). It changes no price; the logistics manager answers with the next version or "best price".
+
+| Column | Type | Notes |
+|---|---|---|
+| `quotation_id` | uuid not null unique → quotations | The version asked about; one counter-offer per version. |
+| `request_id` | uuid not null → transport_requests | Indexed: Home and the timeline find the open one by request. |
+| `created_by` | uuid not null → users | The club's account. |
+| `message` | varchar(500) | The club's note for the whole counter-offer. |
+| `status` | varchar(12) not null | `OPEN`, `REVISED` (answered by `answered_with_quotation_id`), `BEST_PRICE` (answered with `answer_message`), `CLOSED` (accepted, declined, cancelled or rejected without an answer). Check: `answered_at` is set unless OPEN, and each answer has its field. |
+| `answered_by`, `answered_at`, `answer_message`, `answered_with_quotation_id` | | The answer. |
+
+### `quotation_counter_offer_lines` (V46)
+
+| Column | Type | Notes |
+|---|---|---|
+| `counter_offer_id` | uuid not null → quotation_counter_offers, on delete cascade | |
+| `line_key` | varchar(80) not null | The quotation line's key, which also finds it on the next version. Unique per counter-offer. |
+| `description`, `quoted_amount` | | Snapshots of the line as quoted. |
+| `asked_amount` | numeric(14,2) not null | What the club would pay. Checks: `>= 0` and `< quoted_amount`. |
+| `reason` | varchar(300) not null | Why, for the logistics manager. |
+
 
 Deposits, the final invoice and payments are in section 13A.
 

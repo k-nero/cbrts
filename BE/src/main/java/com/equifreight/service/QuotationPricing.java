@@ -17,6 +17,7 @@ import com.equifreight.entity.enums.ServiceClass;
 import com.equifreight.entity.enums.TransportMode;
 import com.equifreight.entity.enums.UserStatus;
 import com.equifreight.exception.BusinessException;
+import com.equifreight.model.quotation.CounterOfferResponse;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationMapper;
 import com.equifreight.repository.QuotationRepository;
@@ -61,6 +62,7 @@ public class QuotationPricing {
 
     private final QuotationRepository quotations;
     private final Snapshots snapshots;
+    private final CounterOfferLedger counterOffers;
 
     public QuotationPricing(
             RateSetLoader loader,
@@ -69,7 +71,8 @@ public class QuotationPricing {
             UserRepository users,
             QuotationRepository quotations,
             Snapshots snapshots,
-            Clock clock) {
+            Clock clock,
+            CounterOfferLedger counterOffers) {
         this.clock = clock;
         this.loader = loader;
         this.inputs = inputs;
@@ -77,6 +80,7 @@ public class QuotationPricing {
         this.users = users;
         this.quotations = quotations;
         this.snapshots = snapshots;
+        this.counterOffers = counterOffers;
     }
 
     /**
@@ -124,7 +128,10 @@ public class QuotationPricing {
             line.setQuantity(p.quantity());
             line.setUnitRate(p.unitRate());
             line.setSource(p.source());
-            line.setRateLine(p.rateLineId() == null ? null : rateLines.get(p.rateLineId()));
+            RateLine rateLine = p.rateLineId() == null ? null : rateLines.get(p.rateLineId());
+            line.setRateLine(rateLine);
+            // A stall line has no rate line: it is EquiFreight's own price, so negotiable.
+            line.setNegotiable(rateLine == null || rateLine.isNegotiable());
             line.setRateServiceClass(p.rateServiceClassId() == null ? null : stalls.get(p.rateServiceClassId()));
             RequestHorse horse = p.horseId() == null ? null : horses.get(p.horseId());
             line.setHorse(horse == null ? null : horse.getHorse());
@@ -206,6 +213,10 @@ public class QuotationPricing {
         return answer.toBuilder()
                 .versions(all.stream().map(QuotationMapper::toVersion).toList())
                 .previous(previous == null ? null : QuotationMapper.toPrevious(previous))
+                .counterOffer(counterOffers
+                        .pending(request, clock.instant())
+                        .map(CounterOfferResponse::of)
+                        .orElse(null))
                 .build();
     }
 

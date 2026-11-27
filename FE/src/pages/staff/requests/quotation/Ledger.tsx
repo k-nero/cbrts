@@ -36,6 +36,12 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
   const removeOverride = useRemoveOverride();
   const removeLine = useRemoveLine();
   const requestId = quotation.request.id;
+  // The club's asks, by line key: on the issued version and on the revision that answers them.
+  const asks = new Map(
+    quotation.counterOffer?.status === 'OPEN'
+      ? quotation.counterOffer.lines.map((a) => [a.lineKey, a] as const)
+      : [],
+  );
   const currency = quotation.currency;
   const close = () => setOpen(null);
   const pending = removeOverride.isPending || removeLine.isPending;
@@ -58,8 +64,14 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
   const extra = (l: QuoteLineRow) => {
     const changed = changedSince(l, quotation.previous, currency);
     const actions = editable && open === null;
+    const ask = l.lineKey ? asks.get(l.lineKey) : undefined;
     return (
       <>
+        {ask && (
+          <span className="type-body-s text-info">
+            {`Club asks ${money(ask.askedAmount, currency)} · “${ask.reason}”`}
+          </span>
+        )}
         {l.manual && l.manualReason && (
           <span className="type-body-s text-ink-3">{`Added: ${l.manualReason}`}</span>
         )}
@@ -165,10 +177,11 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
               <QuoteLine
                 certainty={certainty(l)}
                 description={
-                  l.manual ? (
+                  l.manual || !l.negotiable ? (
                     <Flex component="span" gap={8} align="center">
                       {l.description}
-                      <Chip dot={false}>Manual</Chip>
+                      {l.manual && <Chip dot={false}>Manual</Chip>}
+                      {!l.negotiable && <Chip dot={false}>At cost</Chip>}
                     </Flex>
                   ) : (
                     l.description
@@ -188,6 +201,7 @@ export const Ledger: FC<{ quotation: QuotationDraft; editable: boolean; run: Run
                 <OverrideEditor
                   requestId={requestId}
                   line={l}
+                  ask={l.lineKey ? asks.get(l.lineKey) : undefined}
                   currency={currency}
                   run={run}
                   onClose={close}

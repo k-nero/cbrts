@@ -18,6 +18,7 @@ import {
   removeOverride,
   repriceQuotation,
   returnForInformation,
+  answerBestPrice,
   reviseQuotation,
   startQuotation,
 } from '@/apis/staffRequest';
@@ -172,6 +173,9 @@ export const useIssueQuotation = () =>
   useQuotationWrite<string | null, Shown>(({ requestId, value, version }) =>
     issueQuotation(requestId, value, version),
   );
+
+export const useAnswerBestPrice = () =>
+  useQuotationWrite<string>(({ requestId, value }) => answerBestPrice(requestId, value));
 
 export const useReviseQuotation = () =>
   useQuotationWrite<void>(({ requestId }) => reviseQuotation(requestId));

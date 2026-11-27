@@ -42,7 +42,9 @@ public record RateLineRequest(
         RateCertainty certainty,
         @Size(max = 300) String estimateNote,
         /** Not charged at an end a domestic road leg covers (US-F3-21); group A or G only. False when left out. */
-        Boolean coveredByRoadLeg) {
+        Boolean coveredByRoadLeg,
+        /** False for a fixed fee passed on at cost (vet, authority), which a club can't negotiate. True when left out. */
+        Boolean negotiable) {
 
     /** rate_lines keeps money and quantities as numeric(…, 2). */
     public static final String TWO_DECIMALS = "Use at most 2 decimals.";
@@ -50,5 +52,6 @@ public record RateLineRequest(
     public RateLineRequest {
         certainty = certainty == null ? RateCertainty.FIXED : certainty;
         coveredByRoadLeg = coveredByRoadLeg != null && coveredByRoadLeg;
+        negotiable = negotiable == null || negotiable;
     }
 }

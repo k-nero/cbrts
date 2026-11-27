@@ -12,10 +12,12 @@ import {
   requestApi,
   requestListApi,
   requestQuote,
+  sendCounterOffer,
   submitRequest,
 } from '@/apis/request';
 import { queryKeys } from '@/constant/query';
 import type {
+  CounterOfferRequest,
   CustomerQuotation,
   RequestDraftInput,
   RequestSummary,
@@ -202,6 +204,19 @@ export const useRequestQuote = (id: string) => {
   const refresh = useRefreshRequest();
   return useMutation<CustomerQuotation, Error, { versionNo: number; note: string | null }>({
     mutationFn: ({ versionNo, note }) => requestQuote(id, versionNo, note),
+    onSuccess: (q) => {
+      qc.setQueryData(queryKeys.requests.quotation(id), q);
+      refresh(id);
+    },
+  });
+};
+
+/** Send a counter-offer on the open quotation; the answer is the same version, with its counter-offer. */
+export const useSendCounterOffer = (id: string) => {
+  const qc = useQueryClient();
+  const refresh = useRefreshRequest();
+  return useMutation<CustomerQuotation, Error, CounterOfferRequest>({
+    mutationFn: (body) => sendCounterOffer(id, body),
     onSuccess: (q) => {
       qc.setQueryData(queryKeys.requests.quotation(id), q);
       refresh(id);

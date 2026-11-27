@@ -131,6 +131,7 @@ public class RequestService {
     private final RequestFleetService fleet;
     private final InvoiceService invoices;
     private final CustomerHomeService home;
+    private final CounterOfferLedger counterOffers;
 
     public RequestService(
             TransportRequestRepository requests,
@@ -151,7 +152,8 @@ public class RequestService {
             RequestProgressService progress,
             RequestFleetService fleet,
             InvoiceService invoices,
-            CustomerHomeService home) {
+            CustomerHomeService home,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.horses = horses;
         this.places = places;
@@ -171,6 +173,7 @@ public class RequestService {
         this.fleet = fleet;
         this.invoices = invoices;
         this.home = home;
+        this.counterOffers = counterOffers;
     }
 
     /**
@@ -502,6 +505,7 @@ public class RequestService {
                         days))
                 .orElse(BigDecimal.ZERO);
 
+        counterOffers.closeOpen(request.getId(), clock.instant());
         request.setStatus(RequestStatus.CANCELLED);
         request.setCancelledAt(clock.instant());
         request.setCancellationFeePct(feePct);
