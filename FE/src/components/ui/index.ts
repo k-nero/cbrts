@@ -17,6 +17,7 @@ export * from './EstimateCard';
 export * from './FactCell';
 export * from './HorseAvatar';
 export * from './HorseCard';
+export * from './HorseTag';
 export * from './Icon';
 export * from './IconButton';
 export * from './LoadItem';

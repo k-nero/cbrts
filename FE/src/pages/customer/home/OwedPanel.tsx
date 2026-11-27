@@ -40,7 +40,7 @@ export const OwedPanel: FC<OwedProps> = ({ home, onAct, onAllRequests }) => {
   return (
     <section
       aria-labelledby="owed-title"
-      className="overflow-hidden rounded-lg border border-line bg-card"
+      className="float-card overflow-hidden rounded-lg border border-line bg-card"
     >
       <header className="px-5 pt-5 pb-4">
         <Flex align="center" justify="space-between" gap={24}>

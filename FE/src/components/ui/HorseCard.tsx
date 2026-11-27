@@ -1,9 +1,13 @@
 import type { FC, ReactNode } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { FactCell } from './FactCell';
 import { Progress } from './Progress';
 import { cx } from './tone';
 import { CoatBand } from './CoatBand';
+import { HorseAvatar } from './HorseAvatar';
+
+import { PHOTO_EXIT, pin } from '@/lib/motion';
 
 /** `other` is the neutral band for a coat outside the four (OTHER) or none given. */
 export type Coat = 'grey' | 'black' | 'chestnut' | 'bay' | 'other';
@@ -13,7 +17,7 @@ type Props = {
   name: ReactNode;
   /** On the nameplate: "Andalusian · Gelding". */
   subtitle?: ReactNode;
-  /** A blob URL of the horse's photo, laid over the coat band. */
+  /** A blob URL of the horse's photo: a 72 px circle on the band's bottom edge, at the right. */
   photoUrl?: string;
   /** Chips: temperament, stall need. */
   tags?: ReactNode;
@@ -46,12 +50,57 @@ export const HorseCard: FC<Props> = ({
   className,
 }) => (
   <article
-    className={cx('flex flex-col overflow-hidden rounded-lg border border-line bg-card', className)}
+    className={cx(
+      'group/horse float-card flex flex-col overflow-hidden rounded-lg border border-line bg-card',
+      className,
+    )}
   >
-    <CoatBand coat={coat} name={name} subtitle={subtitle} photoUrl={photoUrl} />
-    <div className="flex flex-col gap-4 p-5">
-      {status && <div className="flex">{status}</div>}
-      {tags && <div className="flex flex-wrap gap-1.5">{tags}</div>}
+    <div className="relative">
+      <CoatBand coat={coat} name={name} subtitle={subtitle} />
+      {/* The photo settles onto the band's edge when it loads or is added, and leaves when removed. */}
+      <AnimatePresence initial={false}>
+        {photoUrl && (
+          // Half over the band, half over the card, ringed in the card colour so it reads as a profile picture.
+          <motion.span
+            key="photo"
+            variants={pin}
+            initial="hidden"
+            animate="shown"
+            exit={PHOTO_EXIT}
+            className="absolute right-5 -bottom-9 rounded-full bg-card p-[3px]"
+          >
+            <HorseAvatar coat={coat} photoUrl={photoUrl} size={72} />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+    <div
+      className={cx(
+        // The room under the photo eases open and shut with it rather than jumping the card.
+        'flex flex-col gap-4 p-5 transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+        photoUrl && !status && !tags && 'pt-11',
+      )}
+    >
+      {status && (
+        <div
+          className={cx(
+            'flex transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+            photoUrl && 'pr-[84px]',
+          )}
+        >
+          {status}
+        </div>
+      )}
+      {tags && (
+        <div
+          className={cx(
+            'flex flex-wrap gap-1.5 transition-[padding] duration-300 ease-out motion-reduce:transition-none',
+            photoUrl && !status && 'pr-[84px]',
+          )}
+        >
+          {tags}
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-1">
         <FactCell label="Age" value={facts.age} />
         <FactCell label="Height" value={facts.height} />

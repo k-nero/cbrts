@@ -79,11 +79,35 @@
   --shadow-overlay: 0 24px 56px -16px rgba(0, 0, 0, 0.45);
   --shadow-focus: 0 0 0 3px rgba(201, 170, 90, 0.45);
   --shadow-brass: inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.45);
+
+  /* The light that sweeps across the gold nameplate while the horse is hovered (Nameplate) */
+  --animate-plate-shimmer: plate-shimmer 2.2s ease-in-out infinite;
+  @keyframes plate-shimmer {
+    0% {
+      transform: translateX(0) skewX(-15deg);
+    }
+    60%,
+    100% {
+      transform: translateX(450%) skewX(-15deg);
+    }
+  }
 }
 
 /* Referenced only from inline styles, so declared outside @theme where nothing prunes them. */
 :root {
   --color-shadow: rgba(0, 0, 0, 0.4);
+  /*
+   * The owner portal's wash (DESIGN.md, Owner canvas): Dusk at night, deep blue at the left,
+   * amber at the top right and a low gold haze, over the navy canvas. Cards float on it.
+   */
+  --owner-wash:
+    radial-gradient(70% 65% at 90% 0%, rgba(205, 140, 70, 0.38) 0%, rgba(205, 140, 70, 0) 72%),
+    radial-gradient(65% 70% at 0% 15%, rgba(56, 100, 170, 0.4) 0%, rgba(56, 100, 170, 0) 70%),
+    radial-gradient(70% 55% at 60% 110%, rgba(201, 170, 90, 0.16) 0%, rgba(201, 170, 90, 0) 70%),
+    #0d1622;
+  /* A shade see-through, so the wash shows faintly behind the card; text sits on near-solid navy. */
+  --owner-card: rgba(17, 27, 44, 0.86);
+  --owner-card-shadow: 0 0 0 1px rgba(237, 233, 225, 0.07), 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
 :root[data-theme='light'] {
@@ -131,6 +155,48 @@
   --scrollbar-thumb: #c3cdd9;
   --scrollbar-thumb-hover: #a5b2c2;
   --scrollbar-thumb-active: #8a99ab;
+
+  /* Warm light by day: blue-grey at the left, apricot at the top right, cream below. */
+  --owner-wash:
+    radial-gradient(60% 55% at 85% 0%, #f8e2c4 0%, rgba(248, 226, 196, 0) 75%),
+    radial-gradient(55% 60% at 0% 10%, #e6ecf3 0%, rgba(230, 236, 243, 0) 70%),
+    radial-gradient(60% 50% at 70% 100%, #f7eedf 0%, rgba(247, 238, 223, 0) 70%), #f8f7f4;
+  --owner-card: #ffffff;
+  --owner-card-shadow: 0 1px 2px rgba(40, 28, 10, 0.05), 0 8px 22px rgba(40, 28, 10, 0.06);
+}
+
+/*
+ * The owner wash on a layer of its own, pinned to the window: the browser paints it once and
+ * scrolls the page over it, where a fixed background would be repainted on every scroll frame.
+ * isolation keeps the layer behind the shell's content but above the page's own background.
+ */
+.owner-canvas {
+  isolation: isolate;
+}
+.owner-canvas::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--owner-wash);
+  will-change: transform;
+}
+
+/*
+ * Inside the owner portal a page-level card floats on the wash: no hairline, a soft shadow
+ * (DESIGN.md, Owner canvas). Outside it (staff, escort) the class does nothing.
+ */
+.owner-canvas .float-card {
+  border-color: transparent;
+  background: var(--owner-card);
+  box-shadow: var(--owner-card-shadow);
+}
+/* A card that opens something lifts on hover, in place of the hairline that darkened. */
+.owner-canvas button.float-card:hover {
+  box-shadow:
+    0 0 0 1px var(--color-line-strong),
+    var(--owner-card-shadow);
 }
 
 /*

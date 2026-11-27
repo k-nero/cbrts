@@ -33,6 +33,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findFirstByQuotation_Request_IdAndKindAndStatusNot(
             UUID requestId, InvoiceKind kind, InvoiceStatus not);
 
+    /** One invoice, locked so a payment is checked against the amount due and recorded before another can be. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Invoice> findLockedById(UUID id);
+
     /** The Invoices list, by status. */
     @EntityGraph(attributePaths = {"club", "job", "quotation", "quotation.request"})
     Page<Invoice> findByStatusIn(Collection<InvoiceStatus> statuses, Pageable pageable);
