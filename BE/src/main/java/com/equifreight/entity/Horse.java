@@ -85,4 +85,11 @@ public class Horse extends BaseEntity {
     private String handlingNotes;
 
     private Instant archivedAt;
+
+    /**
+     * The owner's photo of the horse (JPEG or PNG), or none. Not part of her identity: it may change at any time.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "photo_file_id", unique = true)
+    private StoredFile photo;
 }

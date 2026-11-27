@@ -7,6 +7,7 @@ import com.equifreight.entity.enums.Temperament;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.Builder;
 
 /**
@@ -41,4 +42,9 @@ public record HorseRequest(
          * Defaults to STANDARD. An aggressive horse is always saved with BOX, whatever is sent (HorseSizing.stallFor).
          */
         StallType requiredStall,
-        @Size(max = 2000) String handlingNotes) {}
+        @Size(max = 2000) String handlingNotes,
+        /**
+         * An uploaded JPEG or PNG of at most 10 MB. The horse's current photo id keeps it, a new id replaces it,
+         * and null removes it. Not identity: it may change after the horse was on a submitted request.
+         */
+        UUID photoFileId) {}

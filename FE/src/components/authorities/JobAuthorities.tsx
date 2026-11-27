@@ -2,6 +2,7 @@ import { type FC, useState } from 'react';
 import { App, Flex } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { Button, Callout } from '@/components/ui';
+import { features } from '@/constant/features';
 import { useClearanceStatus, useJobQuarantines, useJobSubmissions } from '@/hooks/clearance';
 import { type AuthoritySubmission, type QuarantinePeriod, RoleNameEnum } from '@/interfaces';
 import { useAuthStore } from '@/stores/authStore';
@@ -70,14 +71,16 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
         </Button>
         {canEdit && (
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon="plus"
-              onClick={() => setScheduling(true)}
-            >
-              Schedule quarantine
-            </Button>
+            {features.quarantine && (
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon="plus"
+                onClick={() => setScheduling(true)}
+              >
+                Schedule quarantine
+              </Button>
+            )}
             <Button variant="primary" size="sm" onClick={() => setRecording(true)}>
               <SendOutlined className="mr-1" /> Record submission
             </Button>
@@ -101,15 +104,17 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
         onUpdate={canEdit ? setUpdating : undefined}
       />
 
-      <QuarantineList
-        jobId={jobId}
-        quarantines={quarantines.data ?? []}
-        loading={quarantines.isLoading}
-        onSchedule={canEdit ? () => setScheduling(true) : undefined}
-        onChange={canEdit ? setChanging : undefined}
-        minDays={status.data?.quarantineMinDays ?? undefined}
-        destination={status.data?.destination ?? undefined}
-      />
+      {features.quarantine && (
+        <QuarantineList
+          jobId={jobId}
+          quarantines={quarantines.data ?? []}
+          loading={quarantines.isLoading}
+          onSchedule={canEdit ? () => setScheduling(true) : undefined}
+          onChange={canEdit ? setChanging : undefined}
+          minDays={status.data?.quarantineMinDays ?? undefined}
+          destination={status.data?.destination ?? undefined}
+        />
+      )}
 
       {canEdit && (
         <>
@@ -124,7 +129,7 @@ const JobAuthorities: FC<Props> = ({ jobId, jobCode, withGate = false }) => {
             onClose={() => setUpdating(null)}
           />
           <ScheduleQuarantineModal
-            open={scheduling || changing !== null}
+            open={features.quarantine && (scheduling || changing !== null)}
             jobId={jobId}
             minDays={status.data?.quarantineMinDays ?? undefined}
             destination={status.data?.destination ?? undefined}

@@ -42,9 +42,10 @@ const AuthenticateLayout: FC<Props> = ({
   const role = primaryRole(roles);
 
   if (!menu) {
-    // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout).
+    // Owner shell: header, the 1200 px column, then the Full footer (DESIGN.md, Layout), over the
+    // owner wash, which index.css pins behind it as its own layer (.owner-canvas::before).
     return (
-      <Layout style={{ minHeight: '100vh', background: COLOR_BG_CANVAS }}>
+      <Layout className="owner-canvas" style={{ minHeight: '100vh', background: 'transparent' }}>
         <Header />
         <ErrorBoundaryHandling key={pathname}>
           <Content style={{ padding: '32px 120px 96px' }}>

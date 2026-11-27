@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import lombok.Builder;
 
-/** A payment received, recorded by hand (US-F6-03): no payment gateway. */
+/** A payment received, recorded by hand (US-F6-03). Card payments made online are recorded by the gateway's webhook. */
 @Builder
 public record RecordPaymentRequest(
         @NotNull @DecimalMin("0.01") @Digits(integer = 12, fraction = 2)

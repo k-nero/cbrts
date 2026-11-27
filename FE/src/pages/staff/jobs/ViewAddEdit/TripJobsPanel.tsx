@@ -4,6 +4,7 @@ import { ShareSuggestions } from './ShareSuggestions';
 import { allowedDays } from './tripJobs';
 
 import { Button, Chip, Panel } from '@/components/ui';
+import { features } from '@/constant/features';
 import { useCanPlanTrips, useTakeOffTrip } from '@/hooks/useJob';
 import type { JobDetail } from '@/interfaces';
 import { apiErrorMessage } from '@/lib/utils/error';
@@ -16,13 +17,16 @@ export function TripJobsPanel({ job }: { job: JobDetail }) {
   const { message } = App.useApp();
   // Taking a job off and sharing are the trip planners' (US-F3-11); other staff see who shares the trip.
   const canPlan = useCanPlanTrips();
-  const beforeDeparture = job.tripStatus === 'NOT_STARTED' && canPlan;
+  const beforeDeparture = features.tripSharing && job.tripStatus === 'NOT_STARTED' && canPlan;
   const takeOff = useTakeOffTrip(job.id);
   const jobs = job.tripJobs ?? [];
   const shared = jobs.length > 1;
 
   const reportRefusal = (fallback: string) => (error: unknown) =>
     message.error(apiErrorMessage(error, fallback));
+
+  // With sharing off, the panel only lists the jobs a trip already carries.
+  if (!features.tripSharing && !shared) return null;
 
   return (
     <Panel

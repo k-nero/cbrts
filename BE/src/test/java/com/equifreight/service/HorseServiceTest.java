@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Horse;
 import com.equifreight.entity.HorseSizeClass;
+import com.equifreight.entity.StoredFile;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.HorseCoat;
 import com.equifreight.entity.enums.HorseSex;
@@ -46,6 +47,7 @@ class HorseServiceTest {
 
     private HorseRepository horses;
     private RequestHorseRepository requestHorses;
+    private FileService files;
     private HorseService service;
     private User user;
     private Club club;
@@ -107,7 +109,8 @@ class HorseServiceTest {
         HorseSizeClassRepository sizeClasses = mock(HorseSizeClassRepository.class);
         requestHorses = mock(RequestHorseRepository.class);
         ClubService clubs = mock(ClubService.class);
-        service = new HorseService(horses, sizeClasses, requestHorses, clubs);
+        files = mock(FileService.class);
+        service = new HorseService(horses, sizeClasses, requestHorses, clubs, files);
 
         club = new Club();
         club.setId(CLUB_ID);
@@ -539,6 +542,140 @@ class HorseServiceTest {
 
         assertThat(response.archivedAt()).isEqualTo(archivedAt);
         verify(horses, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aNewHorseKeepsThePhotoItWasSavedWith() {
+        StoredFile photo = uploaded("image/jpeg", 2L * 1024 * 1024);
+
+        HorseResponse response = service.create(
+                user, nightfallRequest().toBuilder().photoFileId(photo.getId()).build());
+
+        assertThat(response.photoFileId()).isEqualTo(photo.getId());
+        assertThat(savedHorse().getPhoto()).isSameAs(photo);
+    }
+
+    @Test
+    void savingWithTheSamePhotoKeepsItWithoutAttachingAgain() {
+        StoredFile photo = stored("image/jpeg", 1024);
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        nightfall.setPhoto(photo);
+        owned(nightfall);
+
+        HorseResponse response = service.update(
+                user,
+                nightfall.getId(),
+                requestFrom(nightfall).toBuilder().photoFileId(photo.getId()).build());
+
+        assertThat(response.photoFileId()).isEqualTo(photo.getId());
+        verify(files, never()).requireAttachable(any(), any());
+    }
+
+    @Test
+    void aNewPhotoReplacesTheOldOne() {
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        nightfall.setPhoto(stored("image/jpeg", 1024));
+        owned(nightfall);
+        StoredFile newer = uploaded("image/png", 4096);
+
+        HorseResponse response = service.update(
+                user,
+                nightfall.getId(),
+                requestFrom(nightfall).toBuilder().photoFileId(newer.getId()).build());
+
+        assertThat(response.photoFileId()).isEqualTo(newer.getId());
+        assertThat(savedHorse().getPhoto()).isSameAs(newer);
+    }
+
+    @Test
+    void sendingNoPhotoRemovesIt() {
+        Horse nightfall = horse("Nightfall", "250259600223311");
+        nightfall.setPhoto(stored("image/jpeg", 1024));
+        owned(nightfall);
+
+        HorseResponse response = service.update(user, nightfall.getId(), requestFrom(nightfall));
+
+        assertThat(response.photoFileId()).isNull();
+        assertThat(savedHorse().getPhoto()).isNull();
+    }
+
+    @Test
+    void aHeicPhotoIsRefused() {
+        StoredFile heic = uploaded("image/heic", 1024);
+
+        assertThatThrownBy(() -> service.create(
+                        user,
+                        nightfallRequest().toBuilder().photoFileId(heic.getId()).build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("A horse photo must be a JPEG or PNG of at most 10 MB.")
+                .extracting("code")
+                .isEqualTo("HORSE_PHOTO_INVALID");
+        verify(horses, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aPdfIsRefusedAsAPhoto() {
+        StoredFile pdf = uploaded("application/pdf", 1024);
+
+        assertThatThrownBy(() -> service.create(
+                        user,
+                        nightfallRequest().toBuilder().photoFileId(pdf.getId()).build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code")
+                .isEqualTo("HORSE_PHOTO_INVALID");
+    }
+
+    @Test
+    void aPhotoOverTenMegabytesIsRefused() {
+        StoredFile justFits = uploaded("image/png", 10L * 1024 * 1024);
+        StoredFile tooBig = uploaded("image/png", 10L * 1024 * 1024 + 1);
+
+        assertThat(service.create(
+                                user,
+                                nightfallRequest().toBuilder()
+                                        .photoFileId(justFits.getId())
+                                        .build())
+                        .photoFileId())
+                .isEqualTo(justFits.getId());
+        assertThatThrownBy(() -> service.create(
+                        user,
+                        nightfallRequest().toBuilder()
+                                .name("Nightfall II")
+                                .photoFileId(tooBig.getId())
+                                .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code")
+                .isEqualTo("HORSE_PHOTO_INVALID");
+    }
+
+    @Test
+    void aLockedHorsesPhotoCanStillChange() {
+        Horse nightfall = owned(horse("Nightfall", "250259600223311"));
+        when(requestHorses.findSubmittedRequestCodes(nightfall.getId())).thenReturn(List.of("REQ-2026-0193"));
+        StoredFile photo = uploaded("image/jpeg", 1024);
+
+        HorseResponse response = service.update(
+                user,
+                nightfall.getId(),
+                requestFrom(nightfall).toBuilder().photoFileId(photo.getId()).build());
+
+        assertThat(response.photoFileId()).isEqualTo(photo.getId());
+        assertThat(response.identityLocked()).isTrue();
+    }
+
+    private StoredFile stored(String contentType, long sizeBytes) {
+        StoredFile file = new StoredFile();
+        file.setId(UUID.randomUUID());
+        file.setContentType(contentType);
+        file.setSizeBytes(sizeBytes);
+        return file;
+    }
+
+    /** An upload of the user's that requireAttachable hands back. */
+    private StoredFile uploaded(String contentType, long sizeBytes) {
+        StoredFile file = stored(contentType, sizeBytes);
+        when(files.requireAttachable(file.getId(), user)).thenReturn(file);
+        return file;
     }
 
     private Horse owned(Horse horse) {

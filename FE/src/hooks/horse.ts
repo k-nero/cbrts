@@ -6,6 +6,27 @@ import { queryKeys } from '@/constant/query';
 import type { Horse, HorseInput } from '@/interfaces';
 
 import { useCrudResource } from './crud';
+import { useFileBlobUrl } from './file';
+
+/**
+ * A blob URL of a horse's photo, or undefined without one, while it loads, or when it can't be fetched:
+ * the coat colour stands in, and a storage hiccup never takes the page down.
+ */
+export const useHorsePhotoUrl = (fileId: string | null | undefined): string | undefined =>
+  useFileBlobUrl(fileId ?? '', { quiet: true }).url;
+
+/**
+ * A horse's coat and photo for a horse tag, looked up by id. Quiet: a horse the page can't read
+ * leaves the tag with what the page already knows, instead of throwing to the error boundary.
+ */
+export const useHorseLook = (id: string | null | undefined) =>
+  useQuery({
+    queryKey: queryKeys.horses.one(id ?? ''),
+    queryFn: () => horsesApi.get(id ?? ''),
+    enabled: Boolean(id),
+    retry: false,
+    throwOnError: false,
+  });
 
 /** One page of the club's horses: active, or archived only. Sorted by name, 20 per page. */
 export const useHorses = (archived: boolean) => {

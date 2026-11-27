@@ -13,7 +13,7 @@ export const useFormWrapperCtx = <T extends FieldValues = any>() =>
   use<FormContextType<T>>(FormContext);
 
 export const useFormCustom = <T extends FieldValues, TContext = any, TTransformedValues = T>(
-  params: UseFormProps<T, TContext, TTransformedValues>,
+  params: UseFormProps<T & { form_error?: unknown }, TContext, TTransformedValues>,
 ) => {
   return useForm<T & { form_error?: unknown }, TContext, TTransformedValues>(params);
 };

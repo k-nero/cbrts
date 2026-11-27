@@ -103,7 +103,7 @@ const RequestDocumentsPage: FC = () => {
                 </p>
               </Panel>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-line bg-card">
+              <div className="float-card overflow-hidden rounded-lg border border-line bg-card">
                 {groups.map((group) => (
                   <ChecklistGroupTable
                     key={group.key}

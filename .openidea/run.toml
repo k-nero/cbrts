@@ -1,4 +1,14 @@
 [[configurations]]
+id = "gradle:bootRun:BE"
+name = "BE: gradle bootRun"
+kind = "gradle"
+command = "./gradlew"
+args = ["bootRun"]
+cwd = "BE"
+debug-adapter = "java-debug"
+params = { activeProfiles = "dev", arguments = "", executable = "./gradlew", projectDir = "BE", tasks = "bootRun", wrapper = "true" }
+
+[[configurations]]
 id = "application:BE:com.equifreight.EquiFreightApplication"
 name = "EquiFreightApplication"
 kind = "spring-boot"

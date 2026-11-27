@@ -8,7 +8,8 @@ import { StepRefusal } from './StepRefusal';
 
 import type { StepProps } from './WizardForm';
 
-import { Button, Callout, Checkbox, Chip, COAT_SWATCH, cx, OptionCard } from '@/components/ui';
+import { Button, Callout, Checkbox, Chip, HorseAvatar, OptionCard } from '@/components/ui';
+import { useHorsePhotoUrl } from '@/hooks/horse';
 import type { useWizardHorses } from '@/hooks/request';
 import type { Horse, RequestHorse } from '@/interfaces';
 import {
@@ -30,6 +31,12 @@ const subtitle = (horse: Horse, today: string) =>
     .join(' · ');
 
 type Props = StepProps & { query: ReturnType<typeof useWizardHorses> };
+
+/** A pick card's 64 px horse: her photo, or her coat colour without one (DESIGN.md, Request · Horses step). */
+const PickPhoto: FC<{ coat: Horse['coat']; photoFileId: string | null }> = ({
+  coat,
+  photoFileId,
+}) => <HorseAvatar coat={coatOf(coat)} photoUrl={useHorsePhotoUrl(photoFileId)} size={64} />;
 
 /** Step 1 (spec §5.2): which horses are travelling, and a foal at foot for a mare. */
 const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue, query }) => {
@@ -74,12 +81,9 @@ const HorsesStep: FC<Props> = ({ saved, live, saving, held, refusal, onContinue,
             onChange={() => toggle(id)}
             className="h-full"
             media={
-              <span
-                aria-hidden
-                className={cx(
-                  'size-12 rounded-full border border-line-strong',
-                  COAT_SWATCH[coatOf(horse?.coat ?? null)],
-                )}
+              <PickPhoto
+                coat={horse?.coat ?? null}
+                photoFileId={horse?.photoFileId ?? draft?.photoFileId ?? null}
               />
             }
             title={horse?.name ?? draft?.name}

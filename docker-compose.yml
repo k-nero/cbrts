@@ -2,7 +2,7 @@ name: equifreight
 
 services:
   db:
-    image: postgres:19rc1-trixie
+    image: postgres:19-trixie
     restart: unless-stopped
     environment:
       POSTGRES_DB: cbrtsdb
@@ -53,6 +53,10 @@ services:
       APP_STORAGE_S3_BUCKET: ${APP_STORAGE_S3_BUCKET:-cbrts-files}
       APP_STORAGE_S3_ACCESSKEY: ${APP_STORAGE_S3_ACCESSKEY:-cbrts}
       APP_STORAGE_S3_SECRETKEY: ${APP_STORAGE_S3_SECRETKEY}
+      # Card payment through Stripe: off while the secret key is empty.
+      APP_PAYMENT_STRIPE_SECRETKEY: ${APP_PAYMENT_STRIPE_SECRETKEY:-}
+      APP_PAYMENT_STRIPE_WEBHOOKSECRET: ${APP_PAYMENT_STRIPE_WEBHOOKSECRET:-}
+      APP_PAYMENT_RETURNURL: ${APP_PAYMENT_RETURNURL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy

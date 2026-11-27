@@ -1,11 +1,14 @@
 import type { FC, ReactNode } from 'react';
 import { Flex } from 'antd';
+import { motion } from 'motion/react';
 
 import { horseChips } from './horseCardProps';
 
 import PageHeader from '@/components/PageHeader';
-import { CoatBand } from '@/components/ui';
+import { CoatBand, HorseAvatar } from '@/components/ui';
+import { useHorsePhotoUrl } from '@/hooks/horse';
 import type { Horse } from '@/interfaces';
+import { pin } from '@/lib/motion';
 import { ageOf, coatOf, formatMicrochip, ict, sexLabel } from '@/lib/utils';
 import { useCustomRouter } from '@/router/route.hook';
 
@@ -22,12 +25,14 @@ const summaryLine = (horse: Horse, today: string): string =>
 
 /**
  * The horse's page header (frame: My horses · Nightfall): the coat band with the brass nameplate
- * stands in for the title; then the microchip, the summary line and the chips.
+ * stands in for the title; then the microchip, the summary line and the chips, with the horse's photo
+ * as an 88 px circle beside them when there is one.
  */
 const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) => {
   const router = useCustomRouter();
   const today = ict(new Date().toISOString()).format('YYYY-MM-DD');
   const chips = horseChips(horse);
+  const photoUrl = useHorsePhotoUrl(horse.photoFileId);
   return (
     <PageHeader
       back={{ label: 'My horses', onClick: () => router.push(router.paths.get('my-horses')) }}
@@ -41,13 +46,21 @@ const HorseHeader: FC<{ horse: Horse; right?: ReactNode }> = ({ horse, right }) 
         />
       }
       summary={
-        <Flex vertical gap={8}>
-          <span className="type-data text-ink">{formatMicrochip(horse.microchip)}</span>
-          <span>{summaryLine(horse, today)}</span>
-          {chips && (
-            <Flex component="span" wrap gap={6}>
-              {chips}
-            </Flex>
+        <Flex align="center" gap={32}>
+          <Flex vertical gap={8}>
+            <span className="type-data text-ink">{formatMicrochip(horse.microchip)}</span>
+            <span>{summaryLine(horse, today)}</span>
+            {chips && (
+              <Flex component="span" wrap gap={6}>
+                {chips}
+              </Flex>
+            )}
+          </Flex>
+          {photoUrl && (
+            // The photo is fetched after the page: it settles in beside the facts once it arrives.
+            <motion.span variants={pin} initial="hidden" animate="shown" className="flex">
+              <HorseAvatar coat={coatOf(horse.coat)} photoUrl={photoUrl} size={88} />
+            </motion.span>
           )}
         </Flex>
       }
