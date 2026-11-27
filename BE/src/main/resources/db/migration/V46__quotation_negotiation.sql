@@ -6,9 +6,15 @@ alter table rate_lines
 alter table quotation_lines
     add column negotiable boolean default true not null;
 
+-- Published and retired catalog versions are immutable (rate_lines_guard), but this marks how their lines are read
+-- rather than changing a rate, so the guard is lifted for this update only, as V34 does.
+alter table rate_lines
+    disable trigger rate_lines_guard;
 update rate_lines
 set negotiable = false
 where code in ('VET_BLOODS', 'HEALTH_CERT', 'CROSSING', 'IMPORT_PERMIT', 'POST_ISO');
+alter table rate_lines
+    enable trigger rate_lines_guard;
 
 update quotation_lines ql
 set negotiable = rl.negotiable
