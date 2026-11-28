@@ -16,4 +16,6 @@ public record QuoteOutResponse(
         BigDecimal total,
         String currency,
         /** The end of its last valid day. */
-        Instant validUntil) {}
+        Instant validUntil,
+        /** The club sent a counter-offer on this version that waits for an answer. */
+        boolean counterOfferOpen) {}

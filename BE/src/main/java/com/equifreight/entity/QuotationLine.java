@@ -102,6 +102,13 @@ public class QuotationLine extends BaseEntity {
     private BigDecimal overrideAmount;
 
     /**
+     * Copied from the rate line when priced; a stall or added line is always negotiable. A club can ask for a better
+     * price only on a negotiable line.
+     */
+    @Column(nullable = false)
+    private boolean negotiable = true;
+
+    /**
      * Mandatory with an override (DB check).
      */
     @Column(length = 300)

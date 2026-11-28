@@ -47,6 +47,8 @@ export const lineSchema = z
     certainty: option,
     estimateNote: z.string().max(300, 'At most 300 characters.'),
     coveredByRoadLeg: z.boolean(),
+    /** A third party's charge passed on at cost: a club can't negotiate it. */
+    fixedFee: z.boolean(),
   })
   .superRefine((v, ctx) => {
     const basis = v.basis.value as RateBasis;

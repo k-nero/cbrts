@@ -24,6 +24,8 @@ public final class CustomerQuotationMapper {
     /**
      * @param versions the request's quotation versions, newest first; drafts are left out here
      * @param daysToDeparture days from today to the departure as quoted, in the business zone
+     * @param negotiated the versions the club negotiated that a later version answered
+     * @param answersCounterOfferOf when the club sent the counter-offer {@code q} answers, or null
      */
     public static CustomerQuotationResponse toResponse(
             Quotation q,
@@ -31,7 +33,11 @@ public final class CustomerQuotationMapper {
             QuotationSnapshot snapshot,
             List<RateFeeBand> cancellation,
             long daysToDeparture,
-            List<Quotation> versions) {
+            List<Quotation> versions,
+            CounterOfferResponse counterOffer,
+            boolean canNegotiate,
+            java.util.Set<java.util.UUID> negotiated,
+            java.time.Instant answersCounterOfferOf) {
         QuotationSnapshot.Facts facts = snapshot.request();
         BigDecimal low = request.getEstimateLow();
         BigDecimal high = request.getEstimateHigh();
@@ -109,9 +115,13 @@ public final class CustomerQuotationMapper {
                                 v.getStatus(),
                                 v.getIssuedAt(),
                                 v.getValidUntil(),
-                                v.getSupersededReason()))
+                                v.getSupersededReason(),
+                                negotiated.contains(v.getId())))
                         .toList())
                 .nextVersion(nextVersion(q, request, versions))
+                .counterOffer(counterOffer)
+                .canNegotiate(canNegotiate)
+                .answersCounterOfferOf(answersCounterOfferOf)
                 .build();
     }
 
@@ -151,6 +161,7 @@ public final class CustomerQuotationMapper {
 
     private static CustomerQuotationResponse.Line toLine(QuotationLine l) {
         return new CustomerQuotationResponse.Line(
+                l.getLineKey(),
                 l.getDescription(),
                 l.getBasisText(),
                 l.getQuantity(),
@@ -162,7 +173,8 @@ public final class CustomerQuotationMapper {
                 l.getCatalogAmount(),
                 l.getOverrideReason(),
                 l.getManualReason() != null,
-                l.getManualReason());
+                l.getManualReason(),
+                l.isNegotiable());
     }
 
     private static BigDecimal amount(QuotationLine l) {

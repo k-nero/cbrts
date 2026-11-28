@@ -10,7 +10,8 @@ import { CancelButton } from '@/components/form/CancelButton';
 import FormWrapper, { useFormCustom } from '@/components/form/FormWrapper';
 import { SubmitButton } from '@/components/form/SubmitButton';
 import { useOverrideLine } from '@/hooks/staffRequest';
-import type { QuoteLineRow } from '@/interfaces';
+import { Button } from '@/components/ui';
+import type { CounterOffer, QuoteLineRow } from '@/interfaces';
 import { moneyOrDash, overrideDefaults } from '@/lib/utils';
 
 /**
@@ -20,10 +21,12 @@ import { moneyOrDash, overrideDefaults } from '@/lib/utils';
 export const OverrideEditor: FC<{
   requestId: string;
   line: QuoteLineRow;
+  /** The club's ask on this line, from its open counter-offer. */
+  ask?: CounterOffer['lines'][number];
   currency: string;
   run: RunWrite;
   onClose: () => void;
-}> = ({ requestId, line, currency, run, onClose }) => {
+}> = ({ requestId, line, ask, currency, run, onClose }) => {
   const save = useOverrideLine();
   const defaults = overrideDefaults(line);
   const methods = useFormCustom<OverrideForm>({
@@ -45,6 +48,26 @@ export const OverrideEditor: FC<{
 
   return (
     <EditorFrame title={`Override ${line.description}`}>
+      {ask && (
+        <Flex align="center" justify="space-between" gap={12}>
+          <span className="type-body-s text-info">
+            {`Club asks ${moneyOrDash(ask.askedAmount, currency)} · “${ask.reason}”`}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            type="button"
+            onClick={() =>
+              methods.setValue('amount', ask.askedAmount, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+          >
+            Use the club’s price
+          </Button>
+        </Flex>
+      )}
       <span className="type-body-s text-ink-3">
         Catalog amount{' '}
         <span className="type-data text-ink-3 line-through">

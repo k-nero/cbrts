@@ -4,11 +4,13 @@ import static com.equifreight.service.pricing.PricingText.money;
 
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
 import com.equifreight.entity.QuotationLine;
 import com.equifreight.entity.RateCatalogVersion;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.CatalogStatus;
+import com.equifreight.entity.enums.CounterOfferStatus;
 import com.equifreight.entity.enums.NotificationKind;
 import com.equifreight.entity.enums.QuotationStatus;
 import com.equifreight.entity.enums.RatePolicyKey;
@@ -16,6 +18,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.exception.BusinessException;
 import com.equifreight.exception.ConflictException;
 import com.equifreight.exception.ResourceNotFoundException;
+import com.equifreight.model.quotation.BestPriceRequest;
 import com.equifreight.model.quotation.IssueRequest;
 import com.equifreight.model.quotation.QuotationDraftResponse;
 import com.equifreight.model.quotation.QuotationMapper;
@@ -61,6 +64,7 @@ public class QuotationIssueService {
     private final AuditService audit;
     private final Snapshots snapshots;
     private final Clock clock;
+    private final CounterOfferLedger counterOffers;
 
     public QuotationIssueService(
             TransportRequestRepository requests,
@@ -70,7 +74,8 @@ public class QuotationIssueService {
             NotificationService notifications,
             AuditService audit,
             Snapshots snapshots,
-            Clock clock) {
+            Clock clock,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.quotations = quotations;
         this.versions = versions;
@@ -79,6 +84,67 @@ public class QuotationIssueService {
         this.audit = audit;
         this.snapshots = snapshots;
         this.clock = clock;
+        this.counterOffers = counterOffers;
+    }
+
+    /**
+     * Answers the club's open counter-offer without a new version (spec 2026-11-23): the version stands as the best
+     * price, with the manager's message. Only on a version the club can still accept; once it has expired, the answer
+     * is a revision. Refused while a revision is being drafted, which would answer it too.
+     */
+    @Transactional
+    public QuotationDraftResponse bestPrice(User manager, UUID requestId, BestPriceRequest body) {
+        TransportRequest request = requests.findByIdForUpdate(requestId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Request", requestId));
+        QuotationCounterOffer offer = counterOffers
+                .open(requestId)
+                .orElseThrow(() -> new ConflictException("NO_COUNTER_OFFER", "There's no counter-offer to answer."));
+        Quotation latest = quotations
+                .findFirstByRequestIdOrderByVersionNoDesc(requestId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Quotation for request", requestId));
+        if (latest.getStatus() == QuotationStatus.DRAFT) {
+            throw new ConflictException(
+                    "DRAFT_EXISTS", "Version " + latest.getVersionNo() + " is already being drafted.");
+        }
+        Quotation q = offer.getQuotation();
+        Instant now = clock.instant();
+        if (CounterOfferLedger.departureHasCome(request, now)) {
+            throw new ConflictException(
+                    "DEPARTURE_PASSED",
+                    "The departure on " + BusinessTime.DAY.format(request.getDepartureDate())
+                            + " has come, so this counter-offer can't be answered.");
+        }
+        // Past its last valid day the club can't accept it, even before the hourly expiry job marks it EXPIRED.
+        if (q.getStatus() != QuotationStatus.ISSUED || now.isAfter(q.getValidUntil())) {
+            throw new ConflictException(
+                    "COUNTER_OFFER_EXPIRED",
+                    "Version " + q.getVersionNo()
+                            + " has expired, so the club can't accept it any more. Revise it to answer.");
+        }
+        String message = body.message().strip();
+        offer.setStatus(CounterOfferStatus.BEST_PRICE);
+        offer.setAnswerMessage(message);
+        offer.setAnsweredBy(manager);
+        offer.setAnsweredAt(now);
+        counterOffers.save(offer);
+
+        audit.recordDecision(
+                manager,
+                "QUOTATION_BEST_PRICE",
+                AuditText.fit(q.getCode() + " v" + q.getVersionNo() + ": best price"),
+                QuotationDraftService.ENTITY_TYPE,
+                request.getId(),
+                request.getCode(),
+                message,
+                null,
+                null);
+        notifications.notify(
+                NotificationKind.QUOTATION_BEST_PRICE,
+                Audience.club(request.getClub().getId()),
+                Subject.quotation(q),
+                "Answer to your counter-offer on " + q.getCode() + " v" + q.getVersionNo(),
+                "“" + message + "” Version " + q.getVersionNo() + " is our best price: accept or decline it.");
+        return pricing.toResponse(q, request, List.of());
     }
 
     public QuotationDraftResponse issue(User manager, UUID requestId, IssueRequest body) {
@@ -149,6 +215,19 @@ public class QuotationIssueService {
         request.setStatus(RequestStatus.QUOTED);
         requests.save(request);
         Quotation saved = quotations.saveAndFlush(q);
+        // The club's counter-offer on an earlier version (issued or expired) is answered by this one.
+        boolean answers = counterOffers
+                .open(requestId)
+                .filter(o -> o.getQuotation().getVersionNo() < q.getVersionNo())
+                .map(o -> {
+                    o.setStatus(CounterOfferStatus.REVISED);
+                    o.setAnsweredWithQuotation(saved);
+                    o.setAnsweredBy(manager);
+                    o.setAnsweredAt(now);
+                    counterOffers.save(o);
+                    return true;
+                })
+                .orElse(false);
 
         String until = BusinessTime.DAY.format(validUntil.atZone(BusinessTime.ZONE));
         String label = "Quotation " + q.getCode() + " v" + q.getVersionNo();
@@ -168,7 +247,8 @@ public class QuotationIssueService {
                 Audience.club(request.getClub().getId()),
                 Subject.quotation(q),
                 "Your quotation for " + request.getCode() + " is ready",
-                label + ", " + money(q.getTotal()) + ". It holds its price until " + until + ".");
+                label + ", " + money(q.getTotal()) + ". It holds its price until " + until + "."
+                        + (answers ? " Answer to your counter-offer." : ""));
         return pricing.toResponse(saved, request, List.of());
     }
 

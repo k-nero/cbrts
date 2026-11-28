@@ -39,6 +39,9 @@ export const CustomerTotals: FC<{ quotation: CustomerQuotation }> = ({ quotation
             </span>
           </Flex>
         </div>
+        <p className="type-body-s m-0 text-ink-3">
+          Insurance, fuel and fees follow from the lines above and your request.
+        </p>
       </Flex>
     </Panel>
   );

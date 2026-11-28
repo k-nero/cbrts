@@ -63,6 +63,7 @@ public class RequestApprovalService {
     private final Clock clock;
     private final RequestFleetService fleet;
     private final InvoiceService invoices;
+    private final CounterOfferLedger counterOffers;
 
     public RequestApprovalService(
             TransportRequestRepository requests,
@@ -76,7 +77,8 @@ public class RequestApprovalService {
             NotificationService notifications,
             Clock clock,
             RequestFleetService fleet,
-            InvoiceService invoices) {
+            InvoiceService invoices,
+            CounterOfferLedger counterOffers) {
         this.requests = requests;
         this.quotations = quotations;
         this.jobs = jobs;
@@ -89,6 +91,7 @@ public class RequestApprovalService {
         this.clock = clock;
         this.fleet = fleet;
         this.invoices = invoices;
+        this.counterOffers = counterOffers;
     }
 
     /** Who can be put on the job: every active specialist and coordinator, fewest open jobs first. */
@@ -212,6 +215,7 @@ public class RequestApprovalService {
                     request.getCode() + " can't be rejected; it is " + RequestReviewService.statusWords(before) + ".");
         }
 
+        counterOffers.closeOpen(request.getId(), clock.instant());
         request.setStatus(RequestStatus.REJECTED);
         request.setRejectReason(reason);
         requests.saveAndFlush(request);

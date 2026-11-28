@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.equifreight.configuration.BusinessTime;
 import com.equifreight.entity.Club;
 import com.equifreight.entity.Quotation;
+import com.equifreight.entity.QuotationCounterOffer;
 import com.equifreight.entity.TransportRequest;
 import com.equifreight.entity.User;
 import com.equifreight.entity.enums.NotificationKind;
@@ -22,6 +23,7 @@ import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.repository.QuotationRepository;
 import com.equifreight.repository.TransportRequestRepository;
 import com.equifreight.service.AuditService;
+import com.equifreight.service.CounterOfferLedger;
 import com.equifreight.service.NotificationService;
 import com.equifreight.service.notification.Audience;
 import com.equifreight.service.notification.Subject;
@@ -33,6 +35,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +50,7 @@ class QuotationExpiryJobTest {
     NotificationService notifications;
     AuditService audit;
     EntityManager entities;
+    CounterOfferLedger counterOffers;
     QuotationExpiryJob job;
     List<Quotation> issued = new ArrayList<>();
     TransportRequest request;
@@ -59,7 +63,13 @@ class QuotationExpiryJobTest {
         audit = mock(AuditService.class);
         entities = mock(EntityManager.class);
         job = new QuotationExpiryJob(
-                quotations, requests, notifications, audit, entities, Clock.fixed(NOW, BusinessTime.ZONE));
+                quotations,
+                requests,
+                notifications,
+                audit,
+                entities,
+                Clock.fixed(NOW, BusinessTime.ZONE),
+                counterOffers = mock(CounterOfferLedger.class));
         Club club = new Club();
         club.setId(UUID.randomUUID());
         request = new TransportRequest();
@@ -177,6 +187,22 @@ class QuotationExpiryJobTest {
         verifyNoInteractions(notifications);
         // Its departure can't move while it is quoted, so the request row isn't locked hour after hour for it.
         verify(entities, never()).refresh(request, LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test
+    void theExpiryNoticeSaysTheCounterOfferIsStillWithUs() {
+        Quotation q = issuedUntil(Instant.parse("2026-10-27T16:59:59.999Z"));
+        when(counterOffers.open(request.getId())).thenReturn(Optional.of(new QuotationCounterOffer()));
+
+        job.run();
+
+        verify(notifications)
+                .notify(
+                        NotificationKind.QUOTATION_EXPIRED,
+                        Audience.club(request.getClub().getId()),
+                        Subject.quotation(q),
+                        "Quotation Q-2026-0189 has expired",
+                        "Your counter-offer is still with us: we'll answer with a new version.");
     }
 
     @Test

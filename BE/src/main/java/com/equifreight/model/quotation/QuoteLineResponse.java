@@ -26,4 +26,6 @@ public record QuoteLineResponse(
         BigDecimal overrideAmount,
         String overrideReason,
         boolean manual,
-        String manualReason) {}
+        String manualReason,
+        /* False for a fixed fee passed on at cost, which a club can't negotiate. */
+        boolean negotiable) {}

@@ -90,4 +90,10 @@ public class RateLine extends BaseEntity {
      */
     @Column(nullable = false)
     private boolean coveredByRoadLeg;
+
+    /**
+     * False for a third party's charge (vet, authority, isolation) passed on at cost: a club can't negotiate it.
+     */
+    @Column(nullable = false)
+    private boolean negotiable = true;
 }

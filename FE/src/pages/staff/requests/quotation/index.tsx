@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import type { RunWrite } from './editorOptions';
 import { IssuePanel } from './IssuePanel';
 import { Ledger } from './Ledger';
+import { CounterOfferPanel } from './CounterOfferPanel';
 import { MissingCallout } from './MissingCallout';
 import { StallChoice } from './StallChoice';
 import { StatusPanel } from './StatusPanel';
@@ -230,6 +231,7 @@ const QuotationBuilderPage: FC = () => {
               This draft can't be issued. Discard it.
             </Callout>
           )}
+          <CounterOfferPanel quotation={q} draft={draft} run={write} />
           {editable && <MissingCallout quotation={q} />}
           {!draft && (
             <Callout

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { issueSchema, manualLineSchema, overrideSchema } from './schema';
+import { bestPriceSchema, issueSchema, manualLineSchema, overrideSchema } from './schema';
 
 const fixed = { label: 'Fixed', value: 'FIXED' };
 const estimated = { label: 'Estimated', value: 'ESTIMATED' };
@@ -81,5 +81,15 @@ describe('issueSchema', () => {
     expect(issueSchema.safeParse({ versionNo: 2, changeNote: 'x'.repeat(301) }).success).toBe(
       false,
     );
+  });
+});
+
+describe('bestPriceSchema', () => {
+  test('aBestPriceAnswerNeedsAMessageTheClubReads', () => {
+    expect(bestPriceSchema.safeParse({ message: '  ' }).success).toBe(false);
+    expect(bestPriceSchema.safeParse({ message: 'Our grooms are already at cost.' }).success).toBe(
+      true,
+    );
+    expect(bestPriceSchema.safeParse({ message: 'x'.repeat(501) }).success).toBe(false);
   });
 });

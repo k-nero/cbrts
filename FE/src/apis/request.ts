@@ -2,6 +2,7 @@ import client from '@/config/axios';
 import { makeCrudApi } from './crudFactory';
 
 import type {
+  CounterOfferRequest,
   CustomerQuotation,
   Estimate,
   PagedResponse,
@@ -75,6 +76,16 @@ export const requestQuote = (
   client
     .post<CustomerQuotation>(`${BASE}/${id}/quotation/requote`, { versionNo, note })
     .then((r) => r.data);
+
+/**
+ * Send a counter-offer on the open quotation: the lines the club would like cheaper, its price and
+ * reason for each. No price changes; the logistics manager answers with a new version or best price.
+ */
+export const sendCounterOffer = (
+  id: string,
+  body: CounterOfferRequest,
+): Promise<CustomerQuotation> =>
+  client.post<CustomerQuotation>(`${BASE}/${id}/quotation/counter-offer`, body).then((r) => r.data);
 
 /** Cancel a submitted request before approval; the fee band follows the days left (BR-F1-07). */
 export const cancelRequest = (id: string): Promise<TransportRequest> =>

@@ -4,6 +4,7 @@ import com.equifreight.entity.User;
 import com.equifreight.entity.enums.RequestStatus;
 import com.equifreight.model.estimate.EstimateResponse;
 import com.equifreight.model.quotation.AcceptRequest;
+import com.equifreight.model.quotation.CounterOfferRequest;
 import com.equifreight.model.quotation.CustomerQuotationResponse;
 import com.equifreight.model.quotation.DeclineRequest;
 import com.equifreight.model.quotation.RequoteRequest;
@@ -131,6 +132,17 @@ public class RequestController {
             @PathVariable UUID id,
             @Valid @RequestBody(required = false) DeclineRequest body) {
         return quotations.decline(user, id, body);
+    }
+
+    @PostMapping("/requests/{id}/quotation/counter-offer")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(
+            summary = "Send a counter-offer on the open quotation (201): for each negotiable line the club would like"
+                    + " cheaper, its price and reason. No price changes; the logistics manager answers with a new"
+                    + " version or a best-price message, and the version stays open to accept meanwhile")
+    public CustomerQuotationResponse counterOffer(
+            @AuthenticationPrincipal User user, @PathVariable UUID id, @Valid @RequestBody CounterOfferRequest body) {
+        return quotations.counterOffer(user, id, body);
     }
 
     @Operation(

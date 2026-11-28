@@ -144,6 +144,7 @@ public final class RateMapper {
                 .estimateNote(l.getEstimateNote())
                 .everyCorridor(l.getCorridor() == null)
                 .coveredByRoadLeg(l.isCoveredByRoadLeg())
+                .negotiable(l.isNegotiable())
                 .build();
     }
 

@@ -79,6 +79,8 @@ export interface QuoteLineRow {
   overrideReason: string | null;
   manual: boolean;
   manualReason: string | null;
+  /** False for a fixed fee passed on at cost, which a club can't negotiate. */
+  negotiable: boolean;
 }
 
 export interface QuoteGroup {
@@ -182,6 +184,8 @@ export interface QuotationDraft {
   /** Every version, newest first. */
   versions: QuotationVersion[];
   previous: PreviousVersion | null;
+  /** The club's counter-offer waiting for an answer on this request, or null. */
+  counterOffer: CounterOffer | null;
 }
 
 /* ---------- the customer's issued quotation (spec §6.1) ---------- */
@@ -197,6 +201,8 @@ export interface QuotedHorse {
 
 /** A line as the customer reads it: amount is the override when there is one. */
 export interface CustomerQuoteLine {
+  /** Names the line in a counter-offer; opaque to the client. */
+  lineKey: string;
   description: string;
   basisText: string | null;
   quantity: number;
@@ -209,6 +215,35 @@ export interface CustomerQuoteLine {
   overrideReason: string | null;
   manual: boolean;
   manualReason: string | null;
+  /** False for a fixed fee passed on at cost ("At cost"), which can't be negotiated. */
+  negotiable: boolean;
+}
+
+/** A club's counter-offer on one version, and how it was answered (spec 2026-11-23). */
+export interface CounterOffer {
+  status: 'OPEN' | 'REVISED' | 'BEST_PRICE' | 'CLOSED';
+  versionNo: number;
+  createdAt: string;
+  createdBy: string | null;
+  message: string | null;
+  lines: {
+    lineKey: string;
+    description: string;
+    quotedAmount: number;
+    askedAmount: number;
+    reason: string;
+  }[];
+  answerMessage: string | null;
+  answeredBy: string | null;
+  answeredAt: string | null;
+  answeredWithVersionNo: number | null;
+}
+
+/** POST /customer/requests/{id}/quotation/counter-offer. */
+export interface CounterOfferRequest {
+  versionNo: number;
+  message: string | null;
+  lines: { lineKey: string; askedAmount: number; reason: string }[];
 }
 
 export interface CustomerQuoteGroup {
@@ -276,9 +311,17 @@ export interface CustomerQuotation {
     issuedAt: string | null;
     validUntil: string | null;
     supersededReason: string | null;
+    /** The club negotiated this version, and a later version answered it. */
+    negotiated: boolean;
   }[];
   /** The version being drafted after this one (a re-quote, A4); null when none is. */
   nextVersion: number | null;
+  /** The club's counter-offer on this version, whatever its status; null when none was sent. */
+  counterOffer: CounterOffer | null;
+  /** The club may send a counter-offer: the version is open and has none yet. */
+  canNegotiate: boolean;
+  /** When the club sent the counter-offer this version answers (a revision); null otherwise. */
+  answersCounterOfferOf: string | null;
 }
 
 /** The request's latest issued quotation, on the request and its list row. */

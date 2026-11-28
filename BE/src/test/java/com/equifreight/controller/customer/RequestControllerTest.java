@@ -119,7 +119,8 @@ class RequestControllerTest {
                         .deposit(new DepositResponse(new BigDecimal("30"), new BigDecimal("2627.02")))
                         .cancellation(new CustomerQuotationResponse.Cancellation(
                                 37, List.of(new CustomerQuotationResponse.Band(30, null, new BigDecimal("10"), true))))
-                        .versions(List.of(new CustomerQuotationResponse.Version((short) 2, null, null, null, null)))
+                        .versions(List.of(
+                                new CustomerQuotationResponse.Version((short) 2, null, null, null, null, false)))
                         .build());
 
         mvc.perform(get("/api/v1/customer/requests/" + id + "/quotation"))

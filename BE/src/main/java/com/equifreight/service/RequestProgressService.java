@@ -36,6 +36,13 @@ public class RequestProgressService {
     private static final String ENTITY_TYPE = "TRANSPORT_REQUEST";
     private static final String YOU = "You";
 
+    /**
+     * Steps the club takes or is answered on that don't move the request: its counter-offer, and either answer (a
+     * later version issued while the request stays quoted, or the best price).
+     */
+    private static final java.util.Set<String> SHOWN_ACTIONS =
+            java.util.Set.of("QUOTATION_COUNTER_OFFERED", "QUOTATION_ISSUED", "QUOTATION_BEST_PRICE");
+
     private final AuditLogRepository auditLogs;
     private final QuotationRepository quotations;
     private final TransportJobRepository jobs;
@@ -67,7 +74,7 @@ public class RequestProgressService {
     public Progress of(TransportRequest request, LeadTimeResponse leadTime) {
         List<HistoryEntryResponse> history =
                 auditLogs.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(ENTITY_TYPE, request.getId()).stream()
-                        .filter(this::changesStatus)
+                        .filter(row -> changesStatus(row) || SHOWN_ACTIONS.contains(row.getAction()))
                         .map(RequestMapper::toCustomerHistory)
                         .toList();
         String jobCode = request.getStatus() == RequestStatus.APPROVED

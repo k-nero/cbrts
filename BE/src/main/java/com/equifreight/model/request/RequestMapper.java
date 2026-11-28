@@ -26,6 +26,8 @@ public final class RequestMapper {
         String summary = switch (a.getAction()) {
             case "QUOTATION_STARTED", "QUOTATION_RESUMED" ->
                 "Under review: the logistics manager is preparing your quotation.";
+            case "QUOTATION_BEST_PRICE" ->
+                a.getReason() == null ? a.getSummary() : a.getSummary() + ": “" + a.getReason() + "”";
             default -> a.getSummary();
         };
         return HistoryEntryResponse.builder()
